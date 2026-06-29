@@ -1,0 +1,9 @@
+export type CarrierStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+export type CarrierType = 'BILLBOARD' | 'BIGBOARD' | 'CITYLIGHT' | 'BANNER' | 'FACADE' | 'LED_SCREEN' | 'OTHER';
+export type SurfaceStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'NEGOTIATION' | 'OUT_OF_SERVICE';
+export type OccupancyStatus = 'RESERVED' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE';
+export type Surface = { id: string; carrierId: string; name: string; size?: string; orientation?: string; status: SurfaceStatus; price?: number; note?: string; occupancies: Occupancy[]; photos: Photo[] };
+export type Occupancy = { id: string; surfaceId: string; clientName: string; campaignName: string; dateFrom: string; dateTo: string; status: OccupancyStatus; price?: number; note?: string };
+export type Photo = { id: string; carrierId?: string; surfaceId?: string; url: string; type: PhotoType; note?: string };
+export type Carrier = { id: string; name: string; code: string; type: CarrierType; latitude: number; longitude: number; address?: string; city: string; region?: string; status: CarrierStatus; note?: string; surfaces: Surface[]; photos: Photo[] };

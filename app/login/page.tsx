@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function Login(){ return <main className="min-h-screen grid place-items-center bg-slate-950"><div className="card w-full max-w-md"><h1 className="text-3xl font-bold">SeePoint</h1><p className="mt-2 text-slate-500">Mock přihlášení pro MVP.</p><input className="input mt-6" defaultValue="sales@seepoint.local"/><input className="input mt-3" type="password" defaultValue="demo"/><Link href="/dashboard" className="mt-5 block rounded-xl bg-slate-950 px-4 py-3 text-center text-white">Přihlásit</Link></div></main> }
