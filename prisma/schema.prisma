@@ -94,9 +94,11 @@ model AdvertisingSurface {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  carrier    AdvertisingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  carrier     AdvertisingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   occupancies Occupancy[]
   photos      Photo[]
+
+  @@index([carrierId])
 }
 
 model Occupancy {
@@ -113,6 +115,8 @@ model Occupancy {
   updatedAt    DateTime        @updatedAt
 
   surface AdvertisingSurface @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+
+  @@index([surfaceId])
 }
 
 model Photo {
@@ -126,4 +130,7 @@ model Photo {
 
   carrier AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+
+  @@index([carrierId])
+  @@index([surfaceId])
 }
