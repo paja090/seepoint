@@ -1,4 +1,9 @@
 import { AppShell } from '@/components/AppShell';
 import { MapView } from '@/components/MapView';
-import { carriers } from '@/lib/mock-data';
-export default function MapPage(){ return <AppShell><MapView initialCarriers={carriers}/></AppShell> }
+import { getCarriers } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+
+export default async function MapPage() {
+  return <AppShell><MapView initialCarriers={await getCarriers()}/></AppShell>;
+}
