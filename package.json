@@ -11,9 +11,6 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed"
   },
-  "prisma": {
-    "seed": "node prisma/seed.mjs"
-  },
   "dependencies": {
     "@prisma/client": "^6.16.0",
     "@react-google-maps/api": "^2.20.7",
