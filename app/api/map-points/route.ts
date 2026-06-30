@@ -1,2 +1,17 @@
-import { NextResponse } from 'next/server';import { carrierMapColor, carriers } from '@/lib/mock-data';
-export async function GET(){ return NextResponse.json(carriers.map(c=>({id:c.id,name:c.name,code:c.code,type:c.type,latitude:c.latitude,longitude:c.longitude,city:c.city,status:c.status,color:carrierMapColor(c)}))); }
+import { NextResponse } from 'next/server';
+import { carrierMapColor, getCarriers } from '@/lib/db';
+
+export async function GET() {
+  const carriers = await getCarriers();
+  return NextResponse.json(carriers.map((carrier) => ({
+    id: carrier.id,
+    name: carrier.name,
+    code: carrier.code,
+    type: carrier.type,
+    latitude: carrier.latitude,
+    longitude: carrier.longitude,
+    city: carrier.city,
+    status: carrier.status,
+    color: carrierMapColor(carrier),
+  })));
+}
