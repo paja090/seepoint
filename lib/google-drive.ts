@@ -93,28 +93,31 @@ async function getOrCreatePhotoFolder(accessToken: string) {
 export async function uploadPhotoToGoogleDrive(file: File, fileName: string, photoId: string) {
   const accessToken = await getAccessToken();
   const folderId = await getOrCreatePhotoFolder(accessToken);
-  const form = new FormData();
-  form.append(
-    'metadata',
-    new Blob(
-      [
-        JSON.stringify({
-          name: fileName,
-          parents: [folderId],
-          appProperties: { seepointPhotoId: photoId },
-        }),
-      ],
-      { type: 'application/json' },
-    ),
+  const boundary = `seepoint-${crypto.randomUUID()}`;
+  const metadata = JSON.stringify({
+    name: fileName,
+    parents: [folderId],
+    appProperties: { seepointPhotoId: photoId },
+  });
+  const body = new Blob(
+    [
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
+      `--${boundary}\r\nContent-Type: ${file.type}\r\n\r\n`,
+      file,
+      `\r\n--${boundary}--`,
+    ],
+    { type: `multipart/related; boundary=${boundary}` },
   );
-  form.append('file', file, fileName);
 
   const response = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,size',
     {
       method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: form,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': body.type,
+      },
+      body,
     },
   );
   const data = (await response.json()) as {
