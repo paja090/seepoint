@@ -10,6 +10,7 @@ import { CarrierForm } from './CarrierForm';
 
 type LeafletModule = typeof import('leaflet');
 type StatusFilter = 'ALL' | CarrierStatus;
+type LocatedCarrier = Carrier & { latitude: number; longitude: number };
 
 const statusLabels: Record<StatusFilter, string> = {
   ALL: 'Všechny stavy',
@@ -31,6 +32,10 @@ function carrierCountLabel(count: number) {
   return `${count} nosičů`;
 }
 
+function hasCoordinates(carrier: Carrier): carrier is LocatedCarrier {
+  return Number.isFinite(carrier.latitude) && Number.isFinite(carrier.longitude);
+}
+
 export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
   const [items, setItems] = useState(initialCarriers);
   const [selectedId, setSelectedId] = useState(initialCarriers[0]?.id);
@@ -48,11 +53,13 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
     const normalizedQuery = query.trim().toLocaleLowerCase('cs');
     return items.filter((carrier) => {
       const matchesStatus = status === 'ALL' || carrier.status === status;
-      const matchesQuery = !normalizedQuery || [carrier.name, carrier.code, carrier.city, carrier.address]
+      const matchesQuery = !normalizedQuery || [carrier.name, carrier.code, carrier.city, carrier.address, carrier.cadastralArea, carrier.structureCode]
         .some((value) => value?.toLocaleLowerCase('cs').includes(normalizedQuery));
       return matchesStatus && matchesQuery;
     });
   }, [items, query, status]);
+  const mappableItems = useMemo(() => filteredItems.filter(hasCoordinates), [filteredItems]);
+  const missingGpsCount = filteredItems.length - mappableItems.length;
 
   useEffect(() => {
     if (filteredItems.length > 0 && !filteredItems.some((carrier) => carrier.id === selectedId)) {
@@ -84,9 +91,11 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
         setDraft({
           latitude: event.latlng.lat,
           longitude: event.latlng.lng,
+          gpsStatus: 'UNVERIFIED',
           city: '',
           status: 'ACTIVE',
           type: 'BILLBOARD',
+          mountingType: 'UNKNOWN',
         });
       });
 
@@ -116,7 +125,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
     markerLayer.clearLayers();
     const bounds = L.latLngBounds([]);
 
-    filteredItems.forEach((carrier) => {
+    mappableItems.forEach((carrier) => {
       const tooltip = document.createElement('div');
       const title = document.createElement('strong');
       const subtitle = document.createElement('div');
@@ -145,10 +154,10 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
     if (bounds.isValid()) {
       map.fitBounds(bounds.pad(0.2), { animate: false, maxZoom: 14 });
     }
-  }, [filteredItems, mapReady]);
+  }, [mappableItems, mapReady]);
 
   function focusSelected() {
-    if (!selected || !mapRef.current) return;
+    if (!selected || !hasCoordinates(selected) || !mapRef.current) return;
     mapRef.current.flyTo([selected.latitude, selected.longitude], 15, { duration: 0.8 });
   }
 
@@ -161,7 +170,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
             <input
               className="input"
               type="search"
-              placeholder="Hledat podle názvu, kódu, města nebo adresy"
+              placeholder="Hledat podle názvu, kódu, města, katastru nebo sloupu"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -187,6 +196,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
             </span>
           ))}
           <strong className="text-slate-900">{carrierCountLabel(filteredItems.length)}</strong>
+          {missingGpsCount > 0 && <strong className="text-amber-700">{missingGpsCount} bez GPS</strong>}
         </div>
       </section>
 
@@ -206,6 +216,11 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
           {mapReady && filteredItems.length === 0 && (
             <div className="pointer-events-none absolute left-1/2 top-4 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium shadow">
               Filtru neodpovídá žádný nosič
+            </div>
+          )}
+          {mapReady && filteredItems.length > 0 && mappableItems.length === 0 && (
+            <div className="pointer-events-none absolute left-1/2 top-4 z-[500] -translate-x-1/2 rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow">
+              Vyfiltrované nosiče zatím nemají GPS
             </div>
           )}
           <div className="pointer-events-none absolute bottom-7 left-3 z-[500] rounded-lg bg-white/90 px-3 py-2 text-xs text-slate-600 shadow">
@@ -234,8 +249,12 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
           ) : selected ? (
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
-                <button className="text-sm font-medium text-emerald-700 hover:text-emerald-900" onClick={focusSelected}>
-                  Zobrazit na mapě
+                <button
+                  className="text-sm font-medium text-emerald-700 hover:text-emerald-900 disabled:cursor-not-allowed disabled:text-slate-400"
+                  disabled={!hasCoordinates(selected)}
+                  onClick={focusSelected}
+                >
+                  {hasCoordinates(selected) ? 'Zobrazit na mapě' : 'Chybí GPS'}
                 </button>
                 <Link className="text-sm font-medium text-slate-700 hover:text-slate-950" href={`/carriers/${selected.id}`}>
                   Otevřít celý detail →
