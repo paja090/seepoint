@@ -120,13 +120,17 @@ model Occupancy {
 }
 
 model Photo {
-  id        String    @id @default(cuid())
-  carrierId String?
-  surfaceId String?
-  url       String
-  type      PhotoType @default(CARRIER)
-  note      String?
-  createdAt DateTime  @default(now())
+  id          String    @id @default(cuid())
+  carrierId   String?
+  surfaceId   String?
+  url         String
+  driveFileId String?   @unique
+  fileName    String?
+  mimeType    String?
+  size        Int?
+  type        PhotoType @default(CARRIER)
+  note        String?
+  createdAt   DateTime  @default(now())
 
   carrier AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
