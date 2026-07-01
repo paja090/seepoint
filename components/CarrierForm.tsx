@@ -62,7 +62,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
   const set = (key: keyof Carrier, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
-    <form className="grid gap-3" onSubmit={save}>
+    <form className="grid gap-3" onSubmit={save} noValidate>
       <input className="input" placeholder="Název" aria-label="Název" required value={form.name ?? ''} onChange={(event) => set('name', event.target.value)} />
       <input className="input" placeholder="Interní kód" aria-label="Interní kód" required value={form.code ?? ''} onChange={(event) => set('code', event.target.value)} />
       <div className="grid grid-cols-2 gap-2">
