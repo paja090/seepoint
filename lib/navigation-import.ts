@@ -123,8 +123,8 @@ function detectDelimiter(text: string) {
 }
 
 function findColumn(headers: string[], key: HeaderKey) {
-  const aliases = HEADER_ALIASES[key];
-  return headers.findIndex((header) => aliases.includes(normalize(header) as never));
+  const aliases: readonly string[] = HEADER_ALIASES[key];
+  return headers.findIndex((header) => aliases.includes(normalize(header)));
 }
 
 function valueAt(row: string[], index: number) {
