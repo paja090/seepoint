@@ -5,6 +5,7 @@ import type { Carrier } from '@/lib/types';
 
 const types: Carrier['type'][] = ['BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BANNER', 'FACADE', 'LED_SCREEN', 'OTHER'];
 const statuses: Carrier['status'][] = ['ACTIVE', 'INACTIVE', 'MAINTENANCE'];
+const mountingTypes: Carrier['mountingType'][] = ['LIGHT_POLE', 'POLE', 'COLUMN', 'TRACTION', 'OTHER', 'UNKNOWN'];
 
 type ApiError = { error?: string };
 
@@ -17,13 +18,18 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
     event.preventDefault();
     setError('');
 
+    const hasLatitude = Number.isFinite(form.latitude);
+    const hasLongitude = Number.isFinite(form.longitude);
     const payload = {
       ...form,
       name: form.name?.trim(),
       code: form.code?.trim(),
       city: form.city?.trim(),
       address: form.address?.trim(),
+      cadastralArea: form.cadastralArea?.trim(),
+      structureCode: form.structureCode?.trim(),
       note: form.note?.trim(),
+      gpsStatus: hasLatitude && hasLongitude ? form.gpsStatus ?? 'UNVERIFIED' as const : 'MISSING' as const,
     };
 
     if (!payload.name || !payload.code || !payload.city) {
@@ -31,8 +37,12 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       return;
     }
 
-    if (!Number.isFinite(payload.latitude) || !Number.isFinite(payload.longitude)) {
-      setError('Vyberte platné místo na mapě.');
+    if (hasLatitude !== hasLongitude) {
+      setError('Vyplňte obě GPS souřadnice, nebo nechte obě prázdné.');
+      return;
+    }
+    if (!form.id && (!hasLatitude || !hasLongitude)) {
+      setError('Nový ručně zadávaný nosič nejprve umístěte na mapu.');
       return;
     }
 
@@ -59,7 +69,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
     }
   }
 
-  const set = (key: keyof Carrier, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
+  const set = (key: keyof Carrier, value: string | number | undefined) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
     <form className="grid gap-3" onSubmit={save} noValidate>
@@ -74,11 +84,18 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
         </select>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <input className="input" aria-label="Latitude" type="number" step="any" required placeholder="Latitude" value={form.latitude ?? ''} onChange={(event) => set('latitude', Number(event.target.value))} />
-        <input className="input" aria-label="Longitude" type="number" step="any" required placeholder="Longitude" value={form.longitude ?? ''} onChange={(event) => set('longitude', Number(event.target.value))} />
+        <input className="input" aria-label="Latitude" type="number" step="any" placeholder="Latitude" value={form.latitude ?? ''} onChange={(event) => set('latitude', event.target.value ? Number(event.target.value) : undefined)} />
+        <input className="input" aria-label="Longitude" type="number" step="any" placeholder="Longitude" value={form.longitude ?? ''} onChange={(event) => set('longitude', event.target.value ? Number(event.target.value) : undefined)} />
       </div>
       <input className="input" placeholder="Adresa" aria-label="Adresa" value={form.address ?? ''} onChange={(event) => set('address', event.target.value)} />
       <input className="input" placeholder="Město" aria-label="Město" required value={form.city ?? ''} onChange={(event) => set('city', event.target.value)} />
+      <input className="input" placeholder="Katastrální území" aria-label="Katastrální území" value={form.cadastralArea ?? ''} onChange={(event) => set('cadastralArea', event.target.value)} />
+      <div className="grid grid-cols-2 gap-2">
+        <input className="input" placeholder="Číslo sloupu / stožáru" aria-label="Číslo sloupu nebo stožáru" value={form.structureCode ?? ''} onChange={(event) => set('structureCode', event.target.value)} />
+        <select className="input" aria-label="Typ uchycení" value={form.mountingType ?? 'UNKNOWN'} onChange={(event) => set('mountingType', event.target.value)}>
+          {mountingTypes.map((type) => <option key={type}>{type}</option>)}
+        </select>
+      </div>
       <textarea className="input" placeholder="Poznámka" aria-label="Poznámka" value={form.note ?? ''} onChange={(event) => set('note', event.target.value)} />
       {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
       <button type="submit" disabled={saving} className="rounded-xl bg-slate-950 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60">
