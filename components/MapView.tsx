@@ -25,6 +25,12 @@ const legend = [
   { color: '#64748b', label: 'Mimo provoz' },
 ];
 
+function carrierCountLabel(count: number) {
+  if (count === 1) return '1 nosič';
+  if (count >= 2 && count <= 4) return `${count} nosiče`;
+  return `${count} nosičů`;
+}
+
 export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
   const [items, setItems] = useState(initialCarriers);
   const [selectedId, setSelectedId] = useState(initialCarriers[0]?.id);
@@ -47,6 +53,13 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
       return matchesStatus && matchesQuery;
     });
   }, [items, query, status]);
+
+  useEffect(() => {
+    if (filteredItems.length > 0 && !filteredItems.some((carrier) => carrier.id === selectedId)) {
+      setSelectedId(filteredItems[0].id);
+      setDraft(undefined);
+    }
+  }, [filteredItems, selectedId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,7 +186,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
               {item.label}
             </span>
           ))}
-          <strong className="text-slate-900">{filteredItems.length} nosičů</strong>
+          <strong className="text-slate-900">{carrierCountLabel(filteredItems.length)}</strong>
         </div>
       </section>
 
