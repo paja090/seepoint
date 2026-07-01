@@ -29,7 +29,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       cadastralArea: form.cadastralArea?.trim(),
       structureCode: form.structureCode?.trim(),
       note: form.note?.trim(),
-      gpsStatus: hasLatitude && hasLongitude ? form.gpsStatus ?? 'UNVERIFIED' as const : 'MISSING' as const,
+      gpsStatus: hasLatitude && hasLongitude ? (form.gpsStatus ?? 'UNVERIFIED') : 'MISSING',
     };
 
     if (!payload.name || !payload.code || !payload.city) {
