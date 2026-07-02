@@ -12,6 +12,12 @@ const carrierInclude = {
 
 type CarrierRow = Prisma.AdvertisingCarrierGetPayload<{ include: typeof carrierInclude }>;
 
+export type SurfaceTemplate = {
+  name: string;
+  mediaType: Surface['mediaType'];
+  orientation?: string;
+};
+
 function serializeCarrier(carrier: CarrierRow): Carrier {
   return {
     id: carrier.id,
@@ -64,7 +70,7 @@ export async function getCarrier(id: string): Promise<Carrier | undefined> {
   return carrier ? serializeCarrier(carrier) : undefined;
 }
 
-export async function upsertCarrier(input: Partial<Carrier>): Promise<Carrier> {
+export async function upsertCarrier(input: Partial<Carrier>, surfaceTemplates: SurfaceTemplate[] = []): Promise<Carrier> {
   const existing = input.id ? await prisma.advertisingCarrier.findUnique({ where: { id: input.id } }) : null;
   const latitude = input.latitude ?? existing?.latitude ?? null;
   const longitude = input.longitude ?? existing?.longitude ?? null;
@@ -89,7 +95,22 @@ export async function upsertCarrier(input: Partial<Carrier>): Promise<Carrier> {
   };
   const saved = existing
     ? await prisma.advertisingCarrier.update({ where: { id: existing.id }, data })
-    : await prisma.advertisingCarrier.create({ data: { ...data, id: input.id } });
+    : await prisma.advertisingCarrier.create({
+        data: {
+          ...data,
+          id: input.id,
+          surfaces: surfaceTemplates.length
+            ? {
+                create: surfaceTemplates.map((surface) => ({
+                  name: surface.name,
+                  mediaType: surface.mediaType,
+                  orientation: surface.orientation ?? null,
+                  status: 'AVAILABLE',
+                })),
+              }
+            : undefined,
+        },
+      });
   return (await getCarrier(saved.id))!;
 }
 
