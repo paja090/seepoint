@@ -1,8 +1,8 @@
 export type CarrierStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
-export type CarrierType = 'BILLBOARD' | 'BIGBOARD' | 'CITYLIGHT' | 'BANNER' | 'FACADE' | 'LED_SCREEN' | 'OTHER';
+export type CarrierType = 'BILLBOARD' | 'BIGBOARD' | 'CITYLIGHT' | 'BANNER' | 'FACADE' | 'LED_SCREEN' | 'PROMO_BENCH' | 'PROMO_HORIZON' | 'CITY_POSTER' | 'NAVIGATION' | 'PROMO_TOWER' | 'PROMO_MINITOWER' | 'OTHER';
 export type GpsStatus = 'MISSING' | 'UNVERIFIED' | 'VERIFIED';
 export type MountingType = 'LIGHT_POLE' | 'POLE' | 'COLUMN' | 'TRACTION' | 'OTHER' | 'UNKNOWN';
-export type MediaType = 'NAVIGATION_SIGN' | 'BILLBOARD' | 'BIGBOARD' | 'CITYLIGHT' | 'BANNER' | 'FACADE' | 'LED_SCREEN' | 'OTHER';
+export type MediaType = 'NAVIGATION_SIGN' | 'BILLBOARD' | 'BIGBOARD' | 'CITYLIGHT' | 'BANNER' | 'FACADE' | 'LED_SCREEN' | 'PROMO_BENCH' | 'PROMO_HORIZON' | 'CITY_POSTER' | 'PROMO_TOWER' | 'PROMO_MINITOWER' | 'OTHER';
 export type SurfaceStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'NEGOTIATION' | 'OUT_OF_SERVICE';
 export type OccupancyStatus = 'RESERVED' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
 export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE';
