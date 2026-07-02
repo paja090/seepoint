@@ -1,8 +1,23 @@
-import type { Carrier } from '@/lib/types';
+'use client';
+
+import type { Carrier, Client, SurfaceStatus } from '@/lib/types';
+import { ClientAssignments } from './ClientAssignments';
 import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 
-export function CarrierDetail({ carrier }: { carrier: Carrier }) {
+type SurfaceClientChangeHandler = (
+  surfaceId: string,
+  currentClient: Pick<Client, 'id' | 'name'> | undefined,
+  status: SurfaceStatus,
+) => void;
+
+export function CarrierDetail({
+  carrier,
+  onSurfaceClientChanged,
+}: {
+  carrier: Carrier;
+  onSurfaceClientChanged?: SurfaceClientChangeHandler;
+}) {
   const campaigns = carrier.surfaces.flatMap((surface) =>
     surface.occupancies.map((occupancy) => ({ ...occupancy, surface: surface.name })),
   );
@@ -23,38 +38,17 @@ export function CarrierDetail({ carrier }: { carrier: Carrier }) {
       </div>
       <PhotoGallery carrierId={carrier.id} carrierPhotos={carrier.photos} surfaces={carrier.surfaces} />
       <section>
-        <h3 className="mb-2 font-semibold">Reklamní plochy a navigace</h3>
-        <div className="space-y-2">
-          {carrier.surfaces.map((surface) => {
-            const legacyDescription = [surface.size, surface.orientation, surface.price ? `${surface.price.toLocaleString('cs-CZ')} Kč` : undefined]
-              .filter(Boolean)
-              .join(' · ');
-            return (
-              <div key={surface.id} className="rounded-xl border p-3">
-                <div className="flex justify-between gap-3">
-                  <div>
-                    <b>{surface.name}</b>
-                    <p className="text-xs text-slate-500">
-                      {[surface.mediaType, surface.sourcePosition, surface.currentClient?.name].filter(Boolean).join(' · ')}
-                    </p>
-                  </div>
-                  <StatusBadge value={surface.status} />
-                </div>
-                {surface.directionDescription && <p className="mt-2 text-sm">{surface.directionDescription}</p>}
-                {legacyDescription && <p className="text-sm text-slate-500">{legacyDescription}</p>}
-              </div>
-            );
-          })}
-        </div>
+        <h3 className="mb-2 font-semibold">Reklamní plochy, navigace a klienti</h3>
+        <ClientAssignments initialSurfaces={carrier.surfaces} onChanged={onSurfaceClientChanged} />
       </section>
       <section>
         <h3 className="mb-2 font-semibold">Historie kampaní</h3>
-        {campaigns.map((campaign) => (
+        {campaigns.length > 0 ? campaigns.map((campaign) => (
           <div key={campaign.id} className="border-b py-2 text-sm">
             <b>{campaign.campaignName}</b> ({campaign.clientName})<br />
             {campaign.surface}: {campaign.dateFrom} – {campaign.dateTo}
           </div>
-        ))}
+        )) : <p className="text-sm text-slate-500">Historie kampaní zatím není doplněna.</p>}
       </section>
     </div>
   );
