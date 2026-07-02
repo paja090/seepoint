@@ -178,14 +178,7 @@ export function buildNavigationImportPlan(reports: NavigationImportReport[]): Na
     const longitude = coordinateRows.length
       ? coordinateRows.reduce((sum, row) => sum + row.longitude, 0) / coordinateRows.length
       : undefined;
-    const occurrence = new Map<string, number>();
-    const navigations = groupRows.map((row) => {
-      const baseKey = surfaceBaseKey(row);
-      const duplicateNumber = (occurrence.get(baseKey) ?? 0) + 1;
-      occurrence.set(baseKey, duplicateNumber);
-      const stableKey = `${baseKey}|duplicate:${duplicateNumber}`;
-      return { sourceKey: `navigation-surface:${hash(stableKey)}`, row };
-    });
+    const navigations = groupRows.map((row) => ({ sourceKey: '', row }));
     const clients = [...new Set(groupRows.map((row) => row.clientName).filter(Boolean))].sort();
     const spread = coordinateSpread(groupRows);
     const specificStructures = [...new Set(groupRows
@@ -223,6 +216,14 @@ export function buildNavigationImportPlan(reports: NavigationImportReport[]): Na
       warnings,
     };
   }).sort((left, right) => left.code.localeCompare(right.code, 'cs'));
+
+  const surfaceOccurrences = new Map<string, number>();
+  carriers.forEach((carrier) => carrier.navigations.forEach((navigation) => {
+    const baseKey = surfaceBaseKey(navigation.row);
+    const duplicateNumber = (surfaceOccurrences.get(baseKey) ?? 0) + 1;
+    surfaceOccurrences.set(baseKey, duplicateNumber);
+    navigation.sourceKey = `navigation-surface:${hash(`${baseKey}|duplicate:${duplicateNumber}`)}`;
+  }));
 
   const clients = new Set(rows.map((row) => normalizeClientName(row.clientName)).filter(Boolean));
   const planHash = hash(carriers.flatMap((carrier) => [
