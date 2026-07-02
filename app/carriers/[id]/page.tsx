@@ -9,5 +9,18 @@ export const dynamic = 'force-dynamic';
 export default async function CarrierPage({ params }: { params: Promise<{ id: string }> }) {
   const carrier = await getCarrier((await params).id);
   if (!carrier) notFound();
-  return <AppShell><div className="grid lg:grid-cols-[1fr_420px] gap-6"><div className="card"><CarrierDetail carrier={carrier}/></div><div className="card"><h2 className="font-bold mb-4">Upravit nosič</h2><CarrierForm carrier={carrier}/></div></div></AppShell>;
+
+  return (
+    <AppShell>
+      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div className="card">
+          <CarrierDetail carrier={carrier} showLocationMap />
+        </div>
+        <div id="carrier-form" className="card scroll-mt-6">
+          <h2 className="mb-4 font-bold">Upravit nosič</h2>
+          <CarrierForm carrier={carrier} />
+        </div>
+      </div>
+    </AppShell>
+  );
 }
