@@ -136,7 +136,13 @@ function groupImportRows(rows: NavigationImportRow[]) {
       const anchor = [...group].sort((left, right) =>
         surfaceBaseKey(left).localeCompare(surfaceBaseKey(right), 'cs'),
       )[0];
-      groups.set(`${sheetKey}|gps-cluster:${hash(surfaceBaseKey(anchor))}`, group);
+      const anchorKey = [
+        surfaceBaseKey(anchor),
+        anchor.latitude.toFixed(6),
+        anchor.longitude.toFixed(6),
+        `row:${anchor.sourceRow}`,
+      ].join('|');
+      groups.set(`${sheetKey}|gps-cluster:${hash(anchorKey)}`, group);
     });
 
     sheetRows.filter((row) => !hasCoordinates(row)).forEach((row) => {
