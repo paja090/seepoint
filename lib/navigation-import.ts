@@ -72,6 +72,8 @@ function normalize(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-zA-Z0-9/]+/g, ' ')
+    .replace(/\s*\/\s*/g, ' / ')
+    .replace(/\s+/g, ' ')
     .trim()
     .toLocaleLowerCase('cs');
 }
