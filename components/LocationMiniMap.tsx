@@ -38,13 +38,15 @@ export function LocationMiniMap({ carrierId, carrierName, latitude, longitude }:
         maxZoom: 19,
       }).addTo(map);
 
+      const tooltip = document.createElement('strong');
+      tooltip.textContent = carrierName;
       L.circleMarker([latitude, longitude], {
         radius: 10,
         color: '#ffffff',
         weight: 3,
         fillColor: '#059669',
         fillOpacity: 1,
-      }).bindTooltip(carrierName).addTo(map);
+      }).bindTooltip(tooltip).addTo(map);
 
       mapRef.current = map;
     }
@@ -69,7 +71,7 @@ export function LocationMiniMap({ carrierId, carrierName, latitude, longitude }:
       <div
         ref={mapElementRef}
         className="h-64 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
-        role="img"
+        role="region"
         aria-label={`Mapa umístění nosiče ${carrierName}`}
       />
     </section>
