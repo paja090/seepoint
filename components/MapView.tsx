@@ -3,13 +3,17 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
-import type { Carrier, CarrierStatus } from '@/lib/types';
+import type { Carrier, CarrierStatus, Client, SurfaceStatus } from '@/lib/types';
 import { carrierMapColor } from '@/lib/mock-data';
 import { CarrierDetail } from './CarrierDetail';
 import { CarrierForm } from './CarrierForm';
 
 type LeafletModule = typeof import('leaflet');
 type StatusFilter = 'ALL' | CarrierStatus;
+type LocatedCarrier = Carrier & { latitude: number; longitude: number };
+
+const ALL_CLIENTS = '__ALL_CLIENTS__';
+const WITHOUT_CLIENT = '__WITHOUT_CLIENT__';
 
 const statusLabels: Record<StatusFilter, string> = {
   ALL: 'Všechny stavy',
@@ -31,12 +35,17 @@ function carrierCountLabel(count: number) {
   return `${count} nosičů`;
 }
 
+function hasCoordinates(carrier: Carrier): carrier is LocatedCarrier {
+  return Number.isFinite(carrier.latitude) && Number.isFinite(carrier.longitude);
+}
+
 export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
   const [items, setItems] = useState(initialCarriers);
   const [selectedId, setSelectedId] = useState(initialCarriers[0]?.id);
   const [draft, setDraft] = useState<Partial<Carrier> | undefined>();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('ALL');
+  const [clientFilter, setClientFilter] = useState(ALL_CLIENTS);
   const [mapReady, setMapReady] = useState(false);
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -44,15 +53,34 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
   const leafletRef = useRef<LeafletModule | null>(null);
 
   const selected = items.find((carrier) => carrier.id === selectedId);
+  const clientNames = useMemo(() => [...new Set(items.flatMap((carrier) =>
+    carrier.surfaces.map((surface) => surface.currentClient?.name).filter((name): name is string => Boolean(name)),
+  ))].sort((left, right) => left.localeCompare(right, 'cs')), [items]);
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('cs');
     return items.filter((carrier) => {
+      const surfaceClientNames = carrier.surfaces
+        .map((surface) => surface.currentClient?.name)
+        .filter((name): name is string => Boolean(name));
       const matchesStatus = status === 'ALL' || carrier.status === status;
-      const matchesQuery = !normalizedQuery || [carrier.name, carrier.code, carrier.city, carrier.address]
-        .some((value) => value?.toLocaleLowerCase('cs').includes(normalizedQuery));
-      return matchesStatus && matchesQuery;
+      const matchesClient = clientFilter === ALL_CLIENTS
+        || (clientFilter === WITHOUT_CLIENT
+          ? carrier.surfaces.some((surface) => !surface.currentClient)
+          : surfaceClientNames.includes(clientFilter));
+      const matchesQuery = !normalizedQuery || [
+        carrier.name,
+        carrier.code,
+        carrier.city,
+        carrier.address,
+        carrier.cadastralArea,
+        carrier.structureCode,
+        ...surfaceClientNames,
+      ].some((value) => value?.toLocaleLowerCase('cs').includes(normalizedQuery));
+      return matchesStatus && matchesClient && matchesQuery;
     });
-  }, [items, query, status]);
+  }, [clientFilter, items, query, status]);
+  const mappableItems = useMemo(() => filteredItems.filter(hasCoordinates), [filteredItems]);
+  const missingGpsCount = filteredItems.length - mappableItems.length;
 
   useEffect(() => {
     if (filteredItems.length > 0 && !filteredItems.some((carrier) => carrier.id === selectedId)) {
@@ -84,9 +112,11 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
         setDraft({
           latitude: event.latlng.lat,
           longitude: event.latlng.lng,
+          gpsStatus: 'UNVERIFIED',
           city: '',
           status: 'ACTIVE',
           type: 'BILLBOARD',
+          mountingType: 'UNKNOWN',
         });
       });
 
@@ -116,12 +146,15 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
     markerLayer.clearLayers();
     const bounds = L.latLngBounds([]);
 
-    filteredItems.forEach((carrier) => {
+    mappableItems.forEach((carrier) => {
       const tooltip = document.createElement('div');
       const title = document.createElement('strong');
       const subtitle = document.createElement('div');
+      const clients = [...new Set(carrier.surfaces
+        .map((surface) => surface.currentClient?.name)
+        .filter((name): name is string => Boolean(name)))];
       title.textContent = carrier.name;
-      subtitle.textContent = `${carrier.code} · ${carrier.city}`;
+      subtitle.textContent = `${carrier.code} · ${carrier.city} · ${clients.join(', ') || 'klient neuveden'}`;
       tooltip.append(title, subtitle);
 
       L.circleMarker([carrier.latitude, carrier.longitude], {
@@ -145,11 +178,31 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
     if (bounds.isValid()) {
       map.fitBounds(bounds.pad(0.2), { animate: false, maxZoom: 14 });
     }
-  }, [filteredItems, mapReady]);
+  }, [mappableItems, mapReady]);
 
   function focusSelected() {
-    if (!selected || !mapRef.current) return;
+    if (!selected || !hasCoordinates(selected) || !mapRef.current) return;
     mapRef.current.flyTo([selected.latitude, selected.longitude], 15, { duration: 0.8 });
+  }
+
+  function updateSurfaceClient(
+    surfaceId: string,
+    currentClient: Pick<Client, 'id' | 'name'> | undefined,
+    surfaceStatus: SurfaceStatus,
+  ) {
+    setItems((current) => current.map((carrier) => carrier.surfaces.some((surface) => surface.id === surfaceId)
+      ? {
+          ...carrier,
+          surfaces: carrier.surfaces.map((surface) => surface.id === surfaceId
+            ? {
+                ...surface,
+                currentClientId: currentClient?.id,
+                currentClient,
+                status: surfaceStatus,
+              }
+            : surface),
+        }
+      : carrier));
   }
 
   return (
@@ -161,7 +214,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
             <input
               className="input"
               type="search"
-              placeholder="Hledat podle názvu, kódu, města nebo adresy"
+              placeholder="Hledat podle místa, sloupu nebo klienta"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -178,6 +231,20 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
               ))}
             </select>
           </label>
+          <label>
+            <span className="sr-only">Filtrovat podle klienta</span>
+            <select
+              className="input min-w-52"
+              value={clientFilter}
+              onChange={(event) => setClientFilter(event.target.value)}
+            >
+              <option value={ALL_CLIENTS}>Všichni klienti</option>
+              <option value={WITHOUT_CLIENT}>Bez klienta</option>
+              {clientNames.map((clientName) => (
+                <option key={clientName} value={clientName}>{clientName}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
           {legend.map((item) => (
@@ -187,6 +254,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
             </span>
           ))}
           <strong className="text-slate-900">{carrierCountLabel(filteredItems.length)}</strong>
+          {missingGpsCount > 0 && <strong className="text-amber-700">{missingGpsCount} bez GPS</strong>}
         </div>
       </section>
 
@@ -206,6 +274,11 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
           {mapReady && filteredItems.length === 0 && (
             <div className="pointer-events-none absolute left-1/2 top-4 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium shadow">
               Filtru neodpovídá žádný nosič
+            </div>
+          )}
+          {mapReady && filteredItems.length > 0 && mappableItems.length === 0 && (
+            <div className="pointer-events-none absolute left-1/2 top-4 z-[500] -translate-x-1/2 rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow">
+              Vyfiltrované nosiče zatím nemají GPS
             </div>
           )}
           <div className="pointer-events-none absolute bottom-7 left-3 z-[500] rounded-lg bg-white/90 px-3 py-2 text-xs text-slate-600 shadow">
@@ -234,14 +307,18 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
           ) : selected ? (
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
-                <button className="text-sm font-medium text-emerald-700 hover:text-emerald-900" onClick={focusSelected}>
-                  Zobrazit na mapě
+                <button
+                  className="text-sm font-medium text-emerald-700 hover:text-emerald-900 disabled:cursor-not-allowed disabled:text-slate-400"
+                  disabled={!hasCoordinates(selected)}
+                  onClick={focusSelected}
+                >
+                  {hasCoordinates(selected) ? 'Zobrazit na mapě' : 'Chybí GPS'}
                 </button>
                 <Link className="text-sm font-medium text-slate-700 hover:text-slate-950" href={`/carriers/${selected.id}`}>
                   Otevřít celý detail →
                 </Link>
               </div>
-              <CarrierDetail carrier={selected} />
+              <CarrierDetail carrier={selected} onSurfaceClientChanged={updateSurfaceClient} />
             </>
           ) : (
             <p className="text-sm text-slate-500">Vyberte nosič na mapě.</p>

@@ -6,11 +6,17 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 const carrierInclude = {
-  surfaces: { include: { occupancies: true, photos: true } },
+  surfaces: { include: { currentClient: true, occupancies: true, photos: true } },
   photos: true,
 } satisfies Prisma.AdvertisingCarrierInclude;
 
 type CarrierRow = Prisma.AdvertisingCarrierGetPayload<{ include: typeof carrierInclude }>;
+
+export type SurfaceTemplate = {
+  name: string;
+  mediaType: Surface['mediaType'];
+  orientation?: string;
+};
 
 function serializeCarrier(carrier: CarrierRow): Carrier {
   return {
@@ -18,25 +24,38 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
     name: carrier.name,
     code: carrier.code,
     type: carrier.type,
-    latitude: carrier.latitude,
-    longitude: carrier.longitude,
+    latitude: carrier.latitude ?? undefined,
+    longitude: carrier.longitude ?? undefined,
+    gpsStatus: carrier.gpsStatus,
     address: carrier.address ?? undefined,
     city: carrier.city,
     region: carrier.region ?? undefined,
+    cadastralArea: carrier.cadastralArea ?? undefined,
+    structureCode: carrier.structureCode ?? undefined,
+    mountingType: carrier.mountingType,
     status: carrier.status,
     note: carrier.note ?? undefined,
+    sourceSystem: carrier.sourceSystem ?? undefined,
+    sourceSheet: carrier.sourceSheet ?? undefined,
+    sourceRow: carrier.sourceRow ?? undefined,
     photos: carrier.photos.map((photo) => ({ id: photo.id, carrierId: photo.carrierId ?? undefined, surfaceId: photo.surfaceId ?? undefined, url: photo.url, type: photo.type, note: photo.note ?? undefined })),
     surfaces: carrier.surfaces.map((surface) => ({
       id: surface.id,
       carrierId: surface.carrierId,
+      currentClientId: surface.currentClientId ?? undefined,
+      currentClient: surface.currentClient ? { id: surface.currentClient.id, name: surface.currentClient.name } : undefined,
       name: surface.name,
+      mediaType: surface.mediaType,
+      sourcePosition: surface.sourcePosition ?? undefined,
+      directionDescription: surface.directionDescription ?? undefined,
+      rawMediaType: surface.rawMediaType ?? undefined,
       size: surface.size ?? undefined,
       orientation: surface.orientation ?? undefined,
       status: surface.status,
       price: surface.price?.toNumber(),
       note: surface.note ?? undefined,
       photos: surface.photos.map((photo) => ({ id: photo.id, carrierId: photo.carrierId ?? undefined, surfaceId: photo.surfaceId ?? undefined, url: photo.url, type: photo.type, note: photo.note ?? undefined })),
-      occupancies: surface.occupancies.map((occupancy) => ({ id: occupancy.id, surfaceId: occupancy.surfaceId, clientName: occupancy.clientName, campaignName: occupancy.campaignName, dateFrom: occupancy.dateFrom.toISOString().slice(0, 10), dateTo: occupancy.dateTo.toISOString().slice(0, 10), status: occupancy.status, price: occupancy.price?.toNumber(), note: occupancy.note ?? undefined })),
+      occupancies: surface.occupancies.map((occupancy) => ({ id: occupancy.id, surfaceId: occupancy.surfaceId, clientId: occupancy.clientId ?? undefined, clientName: occupancy.clientName, campaignName: occupancy.campaignName, dateFrom: occupancy.dateFrom.toISOString().slice(0, 10), dateTo: occupancy.dateTo.toISOString().slice(0, 10), status: occupancy.status, price: occupancy.price?.toNumber(), note: occupancy.note ?? undefined })),
     })),
   };
 }
@@ -51,23 +70,47 @@ export async function getCarrier(id: string): Promise<Carrier | undefined> {
   return carrier ? serializeCarrier(carrier) : undefined;
 }
 
-export async function upsertCarrier(input: Partial<Carrier>): Promise<Carrier> {
+export async function upsertCarrier(input: Partial<Carrier>, surfaceTemplates: SurfaceTemplate[] = []): Promise<Carrier> {
   const existing = input.id ? await prisma.advertisingCarrier.findUnique({ where: { id: input.id } }) : null;
+  const latitude = input.latitude ?? existing?.latitude ?? null;
+  const longitude = input.longitude ?? existing?.longitude ?? null;
   const data = {
     name: input.name ?? existing?.name ?? 'Nový nosič',
     code: input.code ?? existing?.code ?? `NEW-${Date.now()}`,
     type: input.type ?? existing?.type ?? 'BILLBOARD',
-    latitude: input.latitude ?? existing?.latitude ?? 50.0755,
-    longitude: input.longitude ?? existing?.longitude ?? 14.4378,
+    latitude,
+    longitude,
+    gpsStatus: input.gpsStatus ?? existing?.gpsStatus ?? (latitude === null || longitude === null ? 'MISSING' : 'UNVERIFIED'),
     address: input.address ?? existing?.address ?? null,
     city: input.city ?? existing?.city ?? 'Praha',
     region: input.region ?? existing?.region ?? null,
+    cadastralArea: input.cadastralArea ?? existing?.cadastralArea ?? null,
+    structureCode: input.structureCode ?? existing?.structureCode ?? null,
+    mountingType: input.mountingType ?? existing?.mountingType ?? 'UNKNOWN',
     status: input.status ?? existing?.status ?? 'ACTIVE',
     note: input.note ?? existing?.note ?? null,
+    sourceSystem: input.sourceSystem ?? existing?.sourceSystem ?? null,
+    sourceSheet: input.sourceSheet ?? existing?.sourceSheet ?? null,
+    sourceRow: input.sourceRow ?? existing?.sourceRow ?? null,
   };
   const saved = existing
     ? await prisma.advertisingCarrier.update({ where: { id: existing.id }, data })
-    : await prisma.advertisingCarrier.create({ data: { ...data, id: input.id } });
+    : await prisma.advertisingCarrier.create({
+        data: {
+          ...data,
+          id: input.id,
+          surfaces: surfaceTemplates.length
+            ? {
+                create: surfaceTemplates.map((surface) => ({
+                  name: surface.name,
+                  mediaType: surface.mediaType,
+                  orientation: surface.orientation ?? null,
+                  status: 'AVAILABLE',
+                })),
+              }
+            : undefined,
+        },
+      });
   return (await getCarrier(saved.id))!;
 }
 
@@ -77,20 +120,59 @@ export async function deleteCarrier(id: string) {
 
 export async function upsertSurface(input: Partial<Surface> & { carrierId: string }): Promise<Surface> {
   const existing = input.id ? await prisma.advertisingSurface.findUnique({ where: { id: input.id } }) : null;
-  const data = { carrierId: input.carrierId, name: input.name ?? existing?.name ?? 'Plocha', size: input.size ?? existing?.size ?? null, orientation: input.orientation ?? existing?.orientation ?? null, status: input.status ?? existing?.status ?? 'AVAILABLE', price: input.price ?? existing?.price ?? null, note: input.note ?? existing?.note ?? null };
+  const data = {
+    carrierId: input.carrierId,
+    currentClientId: input.currentClientId ?? existing?.currentClientId ?? null,
+    name: input.name ?? existing?.name ?? 'Plocha',
+    mediaType: input.mediaType ?? existing?.mediaType ?? 'OTHER',
+    sourcePosition: input.sourcePosition ?? existing?.sourcePosition ?? null,
+    directionDescription: input.directionDescription ?? existing?.directionDescription ?? null,
+    rawMediaType: input.rawMediaType ?? existing?.rawMediaType ?? null,
+    size: input.size ?? existing?.size ?? null,
+    orientation: input.orientation ?? existing?.orientation ?? null,
+    status: input.status ?? existing?.status ?? 'AVAILABLE',
+    price: input.price ?? existing?.price ?? null,
+    note: input.note ?? existing?.note ?? null,
+  };
   const saved = existing
     ? await prisma.advertisingSurface.update({ where: { id: existing.id }, data })
     : await prisma.advertisingSurface.create({ data: { ...data, id: input.id } });
-  return { id: saved.id, carrierId: saved.carrierId, name: saved.name, size: saved.size ?? undefined, orientation: saved.orientation ?? undefined, status: saved.status, price: saved.price?.toNumber(), note: saved.note ?? undefined, occupancies: [], photos: [] };
+  return {
+    id: saved.id,
+    carrierId: saved.carrierId,
+    currentClientId: saved.currentClientId ?? undefined,
+    name: saved.name,
+    mediaType: saved.mediaType,
+    sourcePosition: saved.sourcePosition ?? undefined,
+    directionDescription: saved.directionDescription ?? undefined,
+    rawMediaType: saved.rawMediaType ?? undefined,
+    size: saved.size ?? undefined,
+    orientation: saved.orientation ?? undefined,
+    status: saved.status,
+    price: saved.price?.toNumber(),
+    note: saved.note ?? undefined,
+    occupancies: [],
+    photos: [],
+  };
 }
 
 export async function upsertOccupancy(input: Partial<Occupancy> & { surfaceId: string }): Promise<Occupancy> {
   const existing = input.id ? await prisma.occupancy.findUnique({ where: { id: input.id } }) : null;
-  const data = { surfaceId: input.surfaceId, clientName: input.clientName ?? existing?.clientName ?? 'Klient', campaignName: input.campaignName ?? existing?.campaignName ?? 'Kampaň', dateFrom: input.dateFrom ? new Date(input.dateFrom) : existing?.dateFrom ?? new Date(), dateTo: input.dateTo ? new Date(input.dateTo) : existing?.dateTo ?? new Date(), status: input.status ?? existing?.status ?? 'RESERVED', price: input.price ?? existing?.price ?? null, note: input.note ?? existing?.note ?? null };
+  const data = {
+    surfaceId: input.surfaceId,
+    clientId: input.clientId ?? existing?.clientId ?? null,
+    clientName: input.clientName ?? existing?.clientName ?? 'Klient',
+    campaignName: input.campaignName ?? existing?.campaignName ?? 'Kampaň',
+    dateFrom: input.dateFrom ? new Date(input.dateFrom) : existing?.dateFrom ?? new Date(),
+    dateTo: input.dateTo ? new Date(input.dateTo) : existing?.dateTo ?? new Date(),
+    status: input.status ?? existing?.status ?? 'RESERVED',
+    price: input.price ?? existing?.price ?? null,
+    note: input.note ?? existing?.note ?? null,
+  };
   const saved = existing
     ? await prisma.occupancy.update({ where: { id: existing.id }, data })
     : await prisma.occupancy.create({ data: { ...data, id: input.id } });
-  return { id: saved.id, surfaceId: saved.surfaceId, clientName: saved.clientName, campaignName: saved.campaignName, dateFrom: saved.dateFrom.toISOString().slice(0, 10), dateTo: saved.dateTo.toISOString().slice(0, 10), status: saved.status, price: saved.price?.toNumber(), note: saved.note ?? undefined };
+  return { id: saved.id, surfaceId: saved.surfaceId, clientId: saved.clientId ?? undefined, clientName: saved.clientName, campaignName: saved.campaignName, dateFrom: saved.dateFrom.toISOString().slice(0, 10), dateTo: saved.dateTo.toISOString().slice(0, 10), status: saved.status, price: saved.price?.toNumber(), note: saved.note ?? undefined };
 }
 
 export function carrierMapColor(carrier: Carrier) {
