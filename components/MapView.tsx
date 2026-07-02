@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
-import type { Carrier, CarrierStatus } from '@/lib/types';
+import type { Carrier, CarrierStatus, Client, SurfaceStatus } from '@/lib/types';
 import { carrierMapColor } from '@/lib/mock-data';
 import { CarrierDetail } from './CarrierDetail';
 import { CarrierForm } from './CarrierForm';
@@ -11,6 +11,9 @@ import { CarrierForm } from './CarrierForm';
 type LeafletModule = typeof import('leaflet');
 type StatusFilter = 'ALL' | CarrierStatus;
 type LocatedCarrier = Carrier & { latitude: number; longitude: number };
+
+const ALL_CLIENTS = '__ALL_CLIENTS__';
+const WITHOUT_CLIENT = '__WITHOUT_CLIENT__';
 
 const statusLabels: Record<StatusFilter, string> = {
   ALL: 'Všechny stavy',
@@ -42,6 +45,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
   const [draft, setDraft] = useState<Partial<Carrier> | undefined>();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('ALL');
+  const [clientFilter, setClientFilter] = useState(ALL_CLIENTS);
   const [mapReady, setMapReady] = useState(false);
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
@@ -49,15 +53,32 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
   const leafletRef = useRef<LeafletModule | null>(null);
 
   const selected = items.find((carrier) => carrier.id === selectedId);
+  const clientNames = useMemo(() => [...new Set(items.flatMap((carrier) =>
+    carrier.surfaces.map((surface) => surface.currentClient?.name).filter((name): name is string => Boolean(name)),
+  ))].sort((left, right) => left.localeCompare(right, 'cs')), [items]);
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('cs');
     return items.filter((carrier) => {
+      const surfaceClientNames = carrier.surfaces
+        .map((surface) => surface.currentClient?.name)
+        .filter((name): name is string => Boolean(name));
       const matchesStatus = status === 'ALL' || carrier.status === status;
-      const matchesQuery = !normalizedQuery || [carrier.name, carrier.code, carrier.city, carrier.address, carrier.cadastralArea, carrier.structureCode]
-        .some((value) => value?.toLocaleLowerCase('cs').includes(normalizedQuery));
-      return matchesStatus && matchesQuery;
+      const matchesClient = clientFilter === ALL_CLIENTS
+        || (clientFilter === WITHOUT_CLIENT
+          ? carrier.surfaces.some((surface) => !surface.currentClient)
+          : surfaceClientNames.includes(clientFilter));
+      const matchesQuery = !normalizedQuery || [
+        carrier.name,
+        carrier.code,
+        carrier.city,
+        carrier.address,
+        carrier.cadastralArea,
+        carrier.structureCode,
+        ...surfaceClientNames,
+      ].some((value) => value?.toLocaleLowerCase('cs').includes(normalizedQuery));
+      return matchesStatus && matchesClient && matchesQuery;
     });
-  }, [items, query, status]);
+  }, [clientFilter, items, query, status]);
   const mappableItems = useMemo(() => filteredItems.filter(hasCoordinates), [filteredItems]);
   const missingGpsCount = filteredItems.length - mappableItems.length;
 
@@ -129,8 +150,11 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
       const tooltip = document.createElement('div');
       const title = document.createElement('strong');
       const subtitle = document.createElement('div');
+      const clients = [...new Set(carrier.surfaces
+        .map((surface) => surface.currentClient?.name)
+        .filter((name): name is string => Boolean(name)))];
       title.textContent = carrier.name;
-      subtitle.textContent = `${carrier.code} · ${carrier.city}`;
+      subtitle.textContent = `${carrier.code} · ${carrier.city} · ${clients.join(', ') || 'klient neuveden'}`;
       tooltip.append(title, subtitle);
 
       L.circleMarker([carrier.latitude, carrier.longitude], {
@@ -161,6 +185,26 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
     mapRef.current.flyTo([selected.latitude, selected.longitude], 15, { duration: 0.8 });
   }
 
+  function updateSurfaceClient(
+    surfaceId: string,
+    currentClient: Pick<Client, 'id' | 'name'> | undefined,
+    surfaceStatus: SurfaceStatus,
+  ) {
+    setItems((current) => current.map((carrier) => carrier.surfaces.some((surface) => surface.id === surfaceId)
+      ? {
+          ...carrier,
+          surfaces: carrier.surfaces.map((surface) => surface.id === surfaceId
+            ? {
+                ...surface,
+                currentClientId: currentClient?.id,
+                currentClient,
+                status: surfaceStatus,
+              }
+            : surface),
+        }
+      : carrier));
+  }
+
   return (
     <div className="space-y-4">
       <section className="card flex flex-col gap-4 !p-4 xl:flex-row xl:items-center xl:justify-between">
@@ -170,7 +214,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
             <input
               className="input"
               type="search"
-              placeholder="Hledat podle názvu, kódu, města, katastru nebo sloupu"
+              placeholder="Hledat podle místa, sloupu nebo klienta"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -184,6 +228,20 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
             >
               {Object.entries(statusLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="sr-only">Filtrovat podle klienta</span>
+            <select
+              className="input min-w-52"
+              value={clientFilter}
+              onChange={(event) => setClientFilter(event.target.value)}
+            >
+              <option value={ALL_CLIENTS}>Všichni klienti</option>
+              <option value={WITHOUT_CLIENT}>Bez klienta</option>
+              {clientNames.map((clientName) => (
+                <option key={clientName} value={clientName}>{clientName}</option>
               ))}
             </select>
           </label>
@@ -260,7 +318,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
                   Otevřít celý detail →
                 </Link>
               </div>
-              <CarrierDetail carrier={selected} />
+              <CarrierDetail carrier={selected} onSurfaceClientChanged={updateSurfaceClient} />
             </>
           ) : (
             <p className="text-sm text-slate-500">Vyberte nosič na mapě.</p>
