@@ -3,7 +3,6 @@ export type NavigationImportIssueCode =
   | 'MISSING_STREET'
   | 'MISSING_STRUCTURE'
   | 'MISSING_PHOTO'
-  | 'UNKNOWN_MEDIA_TYPE'
   | 'STATUS_REVIEW';
 
 export type NavigationImportIssue = {
@@ -208,9 +207,6 @@ export function parseNavigationImport(text: string, sheetName: string): Navigati
     if (!street) issues.push({ code: 'MISSING_STREET', message: 'Chybí ulice.' });
     if (!structureCode) issues.push({ code: 'MISSING_STRUCTURE', message: 'Chybí číslo nebo typ sloupu.' });
     if (!photoReferences.length) issues.push({ code: 'MISSING_PHOTO', message: 'Chybí odkaz nebo název fotografie.' });
-    if (['j', 'o'].includes(normalize(rawMediaType))) {
-      issues.push({ code: 'UNKNOWN_MEDIA_TYPE', message: `Význam typu „${rawMediaType}“ vyžaduje potvrzení.` });
-    }
     if (/deinstal|demont|odstran|není|chybi|chybí/i.test(note)) {
       issues.push({ code: 'STATUS_REVIEW', message: 'Provozní stav vyžaduje kontrolu.' });
     }
