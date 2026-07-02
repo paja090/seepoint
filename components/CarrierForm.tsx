@@ -15,6 +15,11 @@ type ProductOption = {
   surfaces: SurfaceDraft[];
 };
 
+type SelectOption<T extends string> = {
+  value: T;
+  label: string;
+};
+
 function sides(mediaType: Surface['mediaType'], names: string[]): SurfaceDraft[] {
   return names.map((name) => ({ name: `Strana ${name}`, mediaType, orientation: name }));
 }
@@ -38,8 +43,20 @@ const legacyProducts: ProductOption[] = [
   { value: 'OTHER', label: 'Jiný typ', surfaces: [] },
 ];
 
-const statuses: Carrier['status'][] = ['ACTIVE', 'INACTIVE', 'MAINTENANCE'];
-const mountingTypes: Carrier['mountingType'][] = ['LIGHT_POLE', 'POLE', 'COLUMN', 'TRACTION', 'OTHER', 'UNKNOWN'];
+const statuses: SelectOption<Carrier['status']>[] = [
+  { value: 'ACTIVE', label: 'Aktivní' },
+  { value: 'INACTIVE', label: 'Neaktivní' },
+  { value: 'MAINTENANCE', label: 'Údržba' },
+];
+
+const mountingTypes: SelectOption<Carrier['mountingType']>[] = [
+  { value: 'LIGHT_POLE', label: 'Stožár veřejného osvětlení' },
+  { value: 'POLE', label: 'Sloup' },
+  { value: 'COLUMN', label: 'Sloupek' },
+  { value: 'TRACTION', label: 'Trakční vedení' },
+  { value: 'OTHER', label: 'Jiné uchycení' },
+  { value: 'UNKNOWN', label: 'Neuvedeno' },
+];
 
 type ApiError = { error?: string };
 
@@ -121,7 +138,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
           </optgroup>
         </select>
         <select className="input" aria-label="Stav nosiče" value={form.status ?? 'ACTIVE'} onChange={(event) => set('status', event.target.value)}>
-          {statuses.map((status) => <option key={status}>{status}</option>)}
+          {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
         </select>
       </div>
       {!form.id && selectedProduct && selectedProduct.surfaces.length > 0 && (
@@ -130,8 +147,8 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
         </p>
       )}
       <div className="grid grid-cols-2 gap-2">
-        <input className="input" aria-label="Latitude" type="number" step="any" placeholder="Latitude" value={form.latitude ?? ''} onChange={(event) => set('latitude', event.target.value ? Number(event.target.value) : undefined)} />
-        <input className="input" aria-label="Longitude" type="number" step="any" placeholder="Longitude" value={form.longitude ?? ''} onChange={(event) => set('longitude', event.target.value ? Number(event.target.value) : undefined)} />
+        <input className="input" aria-label="Zeměpisná šířka" type="number" step="any" placeholder="Zeměpisná šířka" value={form.latitude ?? ''} onChange={(event) => set('latitude', event.target.value ? Number(event.target.value) : undefined)} />
+        <input className="input" aria-label="Zeměpisná délka" type="number" step="any" placeholder="Zeměpisná délka" value={form.longitude ?? ''} onChange={(event) => set('longitude', event.target.value ? Number(event.target.value) : undefined)} />
       </div>
       <input className="input" placeholder="Adresa" aria-label="Adresa" value={form.address ?? ''} onChange={(event) => set('address', event.target.value)} />
       <input className="input" placeholder="Město" aria-label="Město" required value={form.city ?? ''} onChange={(event) => set('city', event.target.value)} />
@@ -139,7 +156,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       <div className="grid grid-cols-2 gap-2">
         <input className="input" placeholder="Číslo sloupu / stožáru" aria-label="Číslo sloupu nebo stožáru" value={form.structureCode ?? ''} onChange={(event) => set('structureCode', event.target.value)} />
         <select className="input" aria-label="Typ uchycení" value={form.mountingType ?? 'UNKNOWN'} onChange={(event) => set('mountingType', event.target.value)}>
-          {mountingTypes.map((type) => <option key={type}>{type}</option>)}
+          {mountingTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
         </select>
       </div>
       <textarea className="input" placeholder="Poznámka" aria-label="Poznámka" value={form.note ?? ''} onChange={(event) => set('note', event.target.value)} />
