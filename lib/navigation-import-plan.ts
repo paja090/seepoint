@@ -36,6 +36,8 @@ export type NavigationImportPlan = {
   };
 };
 
+type CoordinateRow = NavigationImportRow & { latitude: number; longitude: number };
+
 function normalize(value: string | undefined) {
   return (value ?? '')
     .normalize('NFD')
@@ -67,15 +69,26 @@ function cityFromSheet(sheetName: string) {
   return sheetName.replace(/\b20\d{2}\b/g, '').trim() || 'Neurčené město';
 }
 
-function carrierGroupKey(row: NavigationImportRow) {
-  const sheet = normalize(row.sheetName);
-  const structure = normalize(row.structureCode);
-  const street = normalize(row.street);
-  if (structure) return `${sheet}|structure:${structure}|street:${street || 'unknown'}`;
-  if (row.latitude !== undefined && row.longitude !== undefined) {
-    return `${sheet}|gps:${row.latitude.toFixed(6)},${row.longitude.toFixed(6)}`;
-  }
-  return `${sheet}|row:${row.sourceRow}`;
+function hasCoordinates(row: NavigationImportRow): row is CoordinateRow {
+  return row.latitude !== undefined && row.longitude !== undefined;
+}
+
+function isSpecificStructure(value: string | undefined) {
+  return /\d/.test(value ?? '');
+}
+
+function distanceMeters(left: CoordinateRow, right: CoordinateRow) {
+  const latitude = ((left.latitude + right.latitude) / 2) * Math.PI / 180;
+  const latitudeMeters = (left.latitude - right.latitude) * 111_320;
+  const longitudeMeters = (left.longitude - right.longitude) * 111_320 * Math.cos(latitude);
+  return Math.hypot(latitudeMeters, longitudeMeters);
+}
+
+function structuresCompatible(left: CoordinateRow, right: CoordinateRow) {
+  const distance = distanceMeters(left, right);
+  if (distance <= 1) return true;
+  if (!isSpecificStructure(left.structureCode) || !isSpecificStructure(right.structureCode)) return true;
+  return normalize(left.structureCode) === normalize(right.structureCode);
 }
 
 function surfaceBaseKey(row: NavigationImportRow) {
@@ -89,34 +102,76 @@ function surfaceBaseKey(row: NavigationImportRow) {
   ].join('|');
 }
 
+function groupImportRows(rows: NavigationImportRow[]) {
+  const groups = new Map<string, NavigationImportRow[]>();
+  const sheets = new Map<string, NavigationImportRow[]>();
+  rows.forEach((row) => {
+    const key = normalize(row.sheetName);
+    sheets.set(key, [...(sheets.get(key) ?? []), row]);
+  });
+
+  sheets.forEach((sheetRows, sheetKey) => {
+    const coordinateGroups: CoordinateRow[][] = [];
+    const coordinateRows = sheetRows.filter(hasCoordinates).sort((left, right) =>
+      surfaceBaseKey(left).localeCompare(surfaceBaseKey(right), 'cs'),
+    );
+
+    coordinateRows.forEach((row) => {
+      const candidates = coordinateGroups
+        .map((group, index) => ({
+          group,
+          index,
+          nearestDistance: Math.min(...group.map((candidate) => distanceMeters(row, candidate))),
+        }))
+        .filter(({ group }) => group.every((candidate) =>
+          distanceMeters(row, candidate) <= 10 && structuresCompatible(row, candidate),
+        ))
+        .sort((left, right) => left.nearestDistance - right.nearestDistance);
+
+      if (candidates[0]) candidates[0].group.push(row);
+      else coordinateGroups.push([row]);
+    });
+
+    coordinateGroups.forEach((group) => {
+      const anchor = [...group].sort((left, right) =>
+        surfaceBaseKey(left).localeCompare(surfaceBaseKey(right), 'cs'),
+      )[0];
+      groups.set(`${sheetKey}|gps-cluster:${hash(surfaceBaseKey(anchor))}`, group);
+    });
+
+    sheetRows.filter((row) => !hasCoordinates(row)).forEach((row) => {
+      const structure = normalize(row.structureCode);
+      const street = normalize(row.street);
+      const key = isSpecificStructure(row.structureCode)
+        ? `${sheetKey}|structure:${structure}|street:${street || 'unknown'}`
+        : `${sheetKey}|row:${row.sourceRow}`;
+      groups.set(key, [...(groups.get(key) ?? []), row]);
+    });
+  });
+
+  return groups;
+}
+
 function coordinateSpread(rows: NavigationImportRow[]) {
-  const coordinates = rows.filter(
-    (row): row is NavigationImportRow & { latitude: number; longitude: number } =>
-      row.latitude !== undefined && row.longitude !== undefined,
-  );
+  const coordinates = rows.filter(hasCoordinates);
   if (coordinates.length < 2) return 0;
-  const latitudes = coordinates.map((row) => row.latitude);
-  const longitudes = coordinates.map((row) => row.longitude);
-  const latitudeMeters = (Math.max(...latitudes) - Math.min(...latitudes)) * 111_000;
-  const longitudeMeters = (Math.max(...longitudes) - Math.min(...longitudes)) * 72_000;
-  return Math.hypot(latitudeMeters, longitudeMeters);
+  return Math.max(...coordinates.flatMap((left) => coordinates.map((right) => distanceMeters(left, right))));
 }
 
 export function buildNavigationImportPlan(reports: NavigationImportReport[]): NavigationImportPlan {
   const rows = reports.flatMap((report) => report.records);
-  const grouped = new Map<string, NavigationImportRow[]>();
-
-  rows.forEach((row) => {
-    const key = carrierGroupKey(row);
-    grouped.set(key, [...(grouped.get(key) ?? []), row]);
-  });
+  const grouped = groupImportRows(rows);
 
   const carriers = [...grouped.entries()].map(([groupKey, groupRows]) => {
     const first = groupRows[0];
     const city = cityFromSheet(first.sheetName);
-    const coordinateRow = groupRows.find(
-      (row) => row.latitude !== undefined && row.longitude !== undefined,
-    );
+    const coordinateRows = groupRows.filter(hasCoordinates);
+    const latitude = coordinateRows.length
+      ? coordinateRows.reduce((sum, row) => sum + row.latitude, 0) / coordinateRows.length
+      : undefined;
+    const longitude = coordinateRows.length
+      ? coordinateRows.reduce((sum, row) => sum + row.longitude, 0) / coordinateRows.length
+      : undefined;
     const occurrence = new Map<string, number>();
     const navigations = groupRows.map((row) => {
       const baseKey = surfaceBaseKey(row);
@@ -127,13 +182,22 @@ export function buildNavigationImportPlan(reports: NavigationImportReport[]): Na
     });
     const clients = [...new Set(groupRows.map((row) => row.clientName).filter(Boolean))].sort();
     const spread = coordinateSpread(groupRows);
+    const specificStructures = [...new Set(groupRows
+      .map((row) => row.structureCode)
+      .filter(isSpecificStructure)
+      .map((value) => normalize(value)))];
     const warnings: string[] = [];
-    if (spread > 25) warnings.push(`GPS záznamů na sloupu se liší přibližně o ${Math.round(spread)} m.`);
-    if (!first.structureCode && !coordinateRow) warnings.push('Sloup nemá číslo ani GPS a nebude sloučen s jiným řádkem.');
+    if (spread > 10) warnings.push(`GPS záznamů na sloupu se liší přibližně o ${Math.round(spread)} m.`);
+    if (specificStructures.length > 1) warnings.push('Stejný GPS bod obsahuje více čísel sloupu; vyžaduje ruční kontrolu.');
+    if (!coordinateRows.length && !isSpecificStructure(first.structureCode)) {
+      warnings.push('Řádek nemá GPS ani konkrétní číslo sloupu a nebude sloučen s jiným řádkem.');
+    }
 
+    const preferredStructure = groupRows.find((row) => isSpecificStructure(row.structureCode))?.structureCode
+      ?? first.structureCode;
     const groupHash = hash(groupKey);
     const cityCode = normalize(city).replace(/-/g, '').slice(0, 3).toUpperCase() || 'NAV';
-    const structureLabel = first.structureCode ? `sloup ${first.structureCode}` : `bod ${groupHash.slice(0, 5)}`;
+    const structureLabel = preferredStructure ? `sloup ${preferredStructure}` : `bod ${groupHash.slice(0, 5)}`;
     const locationLabel = first.street || first.cadastralArea || city;
 
     return {
@@ -144,10 +208,10 @@ export function buildNavigationImportPlan(reports: NavigationImportReport[]): Na
       city,
       address: first.street,
       cadastralArea: first.cadastralArea,
-      structureCode: first.structureCode,
-      latitude: coordinateRow?.latitude,
-      longitude: coordinateRow?.longitude,
-      gpsStatus: coordinateRow ? 'UNVERIFIED' as const : 'MISSING' as const,
+      structureCode: preferredStructure,
+      latitude,
+      longitude,
+      gpsStatus: coordinateRows.length ? 'UNVERIFIED' as const : 'MISSING' as const,
       navigations,
       clients,
       warnings,
