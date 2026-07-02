@@ -21,6 +21,12 @@ enum CarrierType {
   BANNER
   FACADE
   LED_SCREEN
+  PROMO_BENCH
+  PROMO_HORIZON
+  CITY_POSTER
+  NAVIGATION
+  PROMO_TOWER
+  PROMO_MINITOWER
   OTHER
 }
 
@@ -53,6 +59,11 @@ enum MediaType {
   BANNER
   FACADE
   LED_SCREEN
+  PROMO_BENCH
+  PROMO_HORIZON
+  CITY_POSTER
+  PROMO_TOWER
+  PROMO_MINITOWER
   OTHER
 }
 
@@ -164,7 +175,7 @@ model AdvertisingSurface {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  carrier      AdvertisingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  carrier       AdvertisingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   currentClient Client?            @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
   importBatch   ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   occupancies   Occupancy[]
