@@ -52,9 +52,11 @@ function SurfaceClientRow({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const listId = `clients-${surface.id}`;
+  const repeatedOrientation = surface.orientation?.trim().toLocaleLowerCase('cs')
+    === surface.directionDescription?.trim().toLocaleLowerCase('cs');
   const legacyDescription = [
     surface.size,
-    surface.orientation,
+    repeatedOrientation ? undefined : surface.orientation,
     surface.price ? `${surface.price.toLocaleString('cs-CZ')} Kč` : undefined,
   ].filter(Boolean).join(' · ');
   const mediaLabel = surface.mediaType === 'NAVIGATION_SIGN' ? 'Navigace' : surface.mediaType;
