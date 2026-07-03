@@ -35,7 +35,7 @@ export default async function WorkPlanPage() {
         </section>
         <WorkOrderForm
           clients={clients.map((client) => ({ id: client.id, label: client.name }))}
-          carriers={carriers.map((carrier) => ({ id: carrier.id, label: `${carrier.city} · ${carrier.code} · ${carrier.name}` }))}
+          carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
         />
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-4"><div><h2 className="text-2xl font-bold">Naplánované práce</h2><p className="text-sm text-slate-500">Řazeno podle data provedení.</p></div><span className="text-sm font-medium text-slate-500">{orders.length} úkolů</span></div>
