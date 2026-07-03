@@ -57,6 +57,15 @@ export async function POST(request: Request) {
   const quantity = quantityText ? Number.parseInt(quantityText, 10) : undefined;
   if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) return NextResponse.json({ error: 'Počet kusů musí být kladné celé číslo.' }, { status: 400 });
   const workerNames = (text(input, 'workerNames') || '').split(',').map((name) => name.trim()).filter(Boolean);
+  const ftdUrl = text(input, 'ftdUrl');
+  if (ftdUrl) {
+    try {
+      const url = new URL(ftdUrl);
+      if (url.protocol !== 'https:' || url.hostname !== 'drive.google.com') throw new Error('invalid');
+    } catch {
+      return NextResponse.json({ error: 'Odkaz na fotodokumentaci musí být platná adresa složky na Google Disku.' }, { status: 400 });
+    }
+  }
 
   const order = await prisma.workOrder.create({
     data: {
@@ -77,6 +86,7 @@ export async function POST(request: Request) {
       mediaLabel: text(input, 'mediaLabel'),
       quantity,
       referenceUrl: text(input, 'referenceUrl'),
+      ftdUrl,
       assignments: workerNames.length ? { create: workerNames.map((workerName) => ({ workerName })) } : undefined,
       items: carrier ? { create: { carrierId: carrier.id, quantity: quantity || 1 } } : undefined,
     },
