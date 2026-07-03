@@ -2,22 +2,37 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { WorkOrderActions } from '@/components/WorkOrderActions';
+import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { prisma } from '@/lib/db';
 import { formatWorkDate, formatWorkPrice, workPriorityLabels, workPriorityStyles, workStatusLabels, workStatusStyles, workTypeLabels } from '@/lib/work';
 
 export const dynamic = 'force-dynamic';
 
+function dateTimeInput(value?: Date | null) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(value).replace(' ', 'T');
+}
+
+function dateInput(value?: Date | null) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague', year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+}
+
 export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const order = await prisma.workOrder.findUnique({
-    where: { id: (await params).id },
-    include: { client: true, assignments: true, items: { include: { carrier: true, surface: true } } },
-  });
+  const { id } = await params;
+  const [order, clients, carriers] = await Promise.all([
+    prisma.workOrder.findUnique({ where: { id }, include: { client: true, assignments: true, items: { include: { carrier: true, surface: true } } } }),
+    prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.advertisingCarrier.findMany({ orderBy: [{ city: 'asc' }, { name: 'asc' }], select: { id: true, code: true, name: true, city: true } }),
+  ]);
   if (!order) notFound();
   const isOverdue = Boolean(order.deadlineAt && order.deadlineAt < new Date() && !['DONE', 'CANCELLED'].includes(order.status));
+  const awaitsInvoice = order.ftdSent && !order.invoiced && order.status !== 'CANCELLED';
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl space-y-6">
         <Link className="text-sm font-medium text-sky-700 hover:text-sky-900" href="/work">← Zpět na plán práce</Link>
+        {awaitsInvoice && <section className="card border-emerald-300 bg-emerald-50" role="status"><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Upozornění pro zadavatele</p><h2 className="mt-1 text-xl font-bold text-emerald-950">Fotodokumentace je hotová – úkol čeká na fakturu</h2><p className="mt-1 text-sm text-emerald-800">Zadavatel: {order.requestedBy || 'neuveden'}</p></section>}
         <header className={`card ${isOverdue ? 'border-red-400 ring-2 ring-red-100' : ''}`}>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>{isOverdue && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">Po termínu</span>}<span className="text-sm text-slate-500">{workTypeLabels[order.workType]}</span></div><h1 className="mt-3 text-3xl font-bold">{order.title}</h1><p className="mt-2 text-slate-600">{order.client?.name || order.clientName}</p><p className="mt-1 text-sm font-medium text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p></div>
@@ -37,6 +52,34 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
             <section className="card"><h2 className="text-lg font-bold">Kontakt na místě</h2><p className="mt-2 text-sm">{order.contactName || 'Neuveden'}</p>{order.contactPhone && <a className="mt-1 block text-sm font-medium text-sky-700" href={`tel:${order.contactPhone}`}>{order.contactPhone}</a>}</section>
           </aside>
         </div>
+        <WorkOrderEditForm
+          clients={clients.map((client) => ({ id: client.id, label: client.name }))}
+          carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
+          order={{
+            id: order.id,
+            title: order.title,
+            description: order.description,
+            scheduledAt: dateTimeInput(order.scheduledAt),
+            deadlineAt: dateTimeInput(order.deadlineAt),
+            campaignDateFrom: dateInput(order.campaignDateFrom),
+            campaignDateTo: dateInput(order.campaignDateTo),
+            workType: order.workType,
+            priority: order.priority,
+            price: order.price?.toString() ?? '',
+            clientId: order.clientId ?? '',
+            clientName: order.clientName,
+            requestedBy: order.requestedBy ?? '',
+            workerNames: order.assignments.map((assignment) => assignment.workerName).join(', '),
+            carrierCode: order.items[0]?.carrier?.code ?? '',
+            mediaLabel: order.mediaLabel ?? '',
+            quantity: order.quantity?.toString() ?? '',
+            contactName: order.contactName ?? '',
+            contactPhone: order.contactPhone ?? '',
+            locationNote: order.locationNote ?? '',
+            referenceUrl: order.referenceUrl ?? '',
+            ftdUrl: order.ftdUrl ?? '',
+          }}
+        />
       </div>
     </AppShell>
   );
