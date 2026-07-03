@@ -107,6 +107,13 @@ enum WorkOrderStatus {
   CANCELLED
 }
 
+enum WorkPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 enum WorkType {
   INSTALLATION
   REINSTALLATION
@@ -125,7 +132,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  importBatches  ImportBatch[]
+  importBatches   ImportBatch[]
   workAssignments WorkAssignment[]
 }
 
@@ -298,6 +305,7 @@ model WorkOrder {
   title            String
   description      String
   status           WorkOrderStatus @default(NEW)
+  priority         WorkPriority    @default(NORMAL)
   workType         WorkType        @default(OTHER)
   scheduledAt      DateTime
   deadlineAt       DateTime?
@@ -311,6 +319,7 @@ model WorkOrder {
   locationNote     String?
   mediaLabel       String?
   quantity         Int?
+  price            Decimal?        @db.Decimal(12, 2)
   referenceUrl     String?
   ftdUrl           String?
   ftdSent          Boolean         @default(false)
@@ -323,6 +332,7 @@ model WorkOrder {
   items       WorkOrderItem[]
 
   @@index([scheduledAt, status])
+  @@index([priority, scheduledAt])
   @@index([clientId])
 }
 
