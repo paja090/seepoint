@@ -19,7 +19,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         <Link className="text-sm font-medium text-sky-700 hover:text-sky-900" href="/work">← Zpět na plán práce</Link>
         <header className="card">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className="text-sm text-slate-500">{workTypeLabels[order.workType]}</span></div><h1 className="mt-3 text-3xl font-bold">{order.title}</h1><p className="mt-2 text-slate-600">{order.client?.name || order.clientName}</p></div>
+            <div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className="text-sm text-slate-500">{workTypeLabels[order.workType]}</span></div><h1 className="mt-3 text-3xl font-bold">{order.title}</h1><p className="mt-2 text-slate-600">{order.client?.name || order.clientName}</p><p className="mt-1 text-sm font-medium text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p></div>
             <div className="rounded-xl bg-slate-100 px-4 py-3 text-right"><p className="text-xs uppercase tracking-wide text-slate-500">Datum práce</p><strong>{formatWorkDate(order.scheduledAt)}</strong></div>
           </div>
         </header>
@@ -30,8 +30,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
             <section className="card"><h2 className="text-lg font-bold">Termíny a podklady</h2><dl className="mt-3 grid gap-3 sm:grid-cols-2"><div><dt className="text-xs uppercase text-slate-500">Dokončit do</dt><dd>{order.deadlineAt ? formatWorkDate(order.deadlineAt) : 'Neuvedeno'}</dd></div><div><dt className="text-xs uppercase text-slate-500">Platnost kampaně</dt><dd>{order.campaignDateFrom ? `${formatWorkDate(order.campaignDateFrom)} – ${order.campaignDateTo ? formatWorkDate(order.campaignDateTo) : 'bez konce'}` : 'Neuvedeno'}</dd></div></dl>{order.referenceUrl && <a className="mt-4 inline-block text-sm font-medium text-sky-700" href={order.referenceUrl} rel="noreferrer" target="_blank">Otevřít podklady ↗</a>}</section>
           </div>
           <aside className="space-y-6">
-            <WorkOrderActions id={order.id} status={order.status} ftdSent={order.ftdSent} invoiced={order.invoiced} />
-            <section className="card"><h2 className="text-lg font-bold">Pracovníci</h2><p className="mt-2 text-sm">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Zatím nepřiřazeni'}</p></section>
+            <WorkOrderActions id={order.id} status={order.status} ftdSent={order.ftdSent} invoiced={order.invoiced} requestedBy={order.requestedBy} />
+            <section className="card"><h2 className="text-lg font-bold">Zadavatel</h2><p className="mt-2 text-sm">{order.requestedBy || 'Neuveden'}</p><p className="mt-1 text-xs text-slate-500">Zadavatel po potvrzení fotodokumentace vystavuje fakturu.</p></section>
+            <section className="card"><h2 className="text-lg font-bold">Pracovníci</h2><p className="mt-2 text-sm">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Zatím nepřiřazeni'}</p><p className="mt-1 text-xs text-slate-500">Pracovník potvrzuje nahrání fotodokumentace.</p></section>
             <section className="card"><h2 className="text-lg font-bold">Kontakt na místě</h2><p className="mt-2 text-sm">{order.contactName || 'Neuveden'}</p>{order.contactPhone && <a className="mt-1 block text-sm font-medium text-sky-700" href={`tel:${order.contactPhone}`}>{order.contactPhone}</a>}</section>
           </aside>
         </div>
