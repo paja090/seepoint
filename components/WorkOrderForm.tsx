@@ -5,7 +5,8 @@ import { FormEvent, useState } from 'react';
 import { workTypeLabels } from '@/lib/work';
 
 type Option = { id: string; label: string };
-type WorkOrderFormProps = { clients: Option[]; carriers: Option[] };
+type CarrierOption = Option & { code: string };
+type WorkOrderFormProps = { clients: Option[]; carriers: CarrierOption[] };
 
 export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
   const router = useRouter();
@@ -47,7 +48,7 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
         <label>Jiný nebo nový klient<input className="input mt-1" name="clientName" placeholder="Název klienta" /></label>
         <label>Typ média<input className="input mt-1" name="mediaLabel" placeholder="Navigace, billboard, city poster…" /></label>
         <label>Počet kusů<input className="input mt-1" min="1" name="quantity" type="number" /></label>
-        <label className="lg:col-span-2">Propojený nosič<select className="input mt-1" name="carrierId" defaultValue=""><option value="">Bez konkrétního nosiče</option>{carriers.map((carrier) => <option key={carrier.id} value={carrier.id}>{carrier.label}</option>)}</select></label>
+        <label className="lg:col-span-2">Propojený nosič<input className="input mt-1" list="work-carriers" name="carrierCode" placeholder="Začněte psát kód, město nebo název" /><datalist id="work-carriers">{carriers.map((carrier) => <option key={carrier.id} value={carrier.code}>{carrier.label}</option>)}</datalist><span className="mt-1 block text-xs text-slate-500">Pole můžete nechat prázdné pro obecnou práci bez konkrétního nosiče.</span></label>
         <label>Platnost kampaně od<input className="input mt-1" name="campaignDateFrom" type="date" /></label>
         <label>Platnost kampaně do<input className="input mt-1" name="campaignDateTo" type="date" /></label>
         <label>Kontaktní osoba<input className="input mt-1" name="contactName" /></label>
