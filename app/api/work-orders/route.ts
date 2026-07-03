@@ -1,6 +1,7 @@
 import { WorkType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { workRequesters } from '@/lib/work';
 
 type WorkOrderInput = Record<string, unknown>;
 
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
   const title = text(input, 'title');
   const description = text(input, 'description');
   const scheduledAt = optionalDate(input, 'scheduledAt');
-  if (!title || !description || !scheduledAt) return NextResponse.json({ error: 'Vyplňte název, datum práce a zadání.' }, { status: 400 });
+  const requestedBy = text(input, 'requestedBy');
+  if (!title || !description || !scheduledAt || !requestedBy) return NextResponse.json({ error: 'Vyplňte název, datum práce, zadavatele a zadání.' }, { status: 400 });
+  if (!workRequesters.includes(requestedBy as (typeof workRequesters)[number])) return NextResponse.json({ error: 'Vyberte platného zadavatele úkolu.' }, { status: 400 });
 
   const deadlineAt = optionalDate(input, 'deadlineAt');
   const campaignDateFrom = optionalDate(input, 'campaignDateFrom');
@@ -67,7 +70,7 @@ export async function POST(request: Request) {
       status: 'PLANNED',
       clientId: client?.id,
       clientName,
-      requestedBy: text(input, 'requestedBy'),
+      requestedBy,
       contactName: text(input, 'contactName'),
       contactPhone: text(input, 'contactPhone'),
       locationNote: text(input, 'locationNote'),
