@@ -1,19 +1,21 @@
 'use client';
 
-import type { WorkOrderStatus } from '@prisma/client';
+import type { WorkOrderStatus, WorkPriority } from '@prisma/client';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { workStatusLabels } from '@/lib/work';
+import { workPriorityLabels, workStatusLabels } from '@/lib/work';
 
 type WorkOrderActionsProps = {
   id: string;
   status: WorkOrderStatus;
+  priority: WorkPriority;
+  price?: string | null;
   ftdSent: boolean;
   invoiced: boolean;
   requestedBy?: string | null;
 };
 
-export function WorkOrderActions({ id, status, ftdSent, invoiced, requestedBy }: WorkOrderActionsProps) {
+export function WorkOrderActions({ id, status, priority, price, ftdSent, invoiced, requestedBy }: WorkOrderActionsProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -26,11 +28,11 @@ export function WorkOrderActions({ id, status, ftdSent, invoiced, requestedBy }:
     setError('');
     const response = await fetch(`/api/work-orders/${id}`, {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ status: form.get('status'), ftdSent: form.get('ftdSent') === 'on', invoiced: form.get('invoiced') === 'on' }),
+      body: JSON.stringify({ status: form.get('status'), priority: form.get('priority'), price: form.get('price'), ftdSent: form.get('ftdSent') === 'on', invoiced: form.get('invoiced') === 'on' }),
     });
     const result = await response.json().catch(() => null) as { error?: string } | null;
     setSaving(false);
-    if (!response.ok) { setError(result?.error || 'Stav se nepodařilo uložit.'); return; }
+    if (!response.ok) { setError(result?.error || 'Změny se nepodařilo uložit.'); return; }
     router.refresh();
   }
 
@@ -42,9 +44,11 @@ export function WorkOrderActions({ id, status, ftdSent, invoiced, requestedBy }:
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pracovník</p>
         <label className="mt-2 flex items-center gap-3"><input defaultChecked={ftdSent} name="ftdSent" type="checkbox" /> Fotodokumentace nahrána</label>
       </div>
-      <div className="rounded-xl border border-slate-200 p-3">
+      <div className="space-y-3 rounded-xl border border-slate-200 p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Zadavatel: {requestedBy || 'neuveden'}</p>
-        <label className="mt-2 flex items-center gap-3"><input defaultChecked={invoiced} name="invoiced" type="checkbox" /> Faktura vystavena</label>
+        <label className="block text-sm">Priorita<select className="input mt-1" defaultValue={priority} name="priority">{Object.entries(workPriorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="block text-sm">Cena za úkol v Kč<input className="input mt-1" defaultValue={price || ''} min="0" name="price" step="0.01" type="number" /></label>
+        <label className="flex items-center gap-3"><input defaultChecked={invoiced} name="invoiced" type="checkbox" /> Faktura vystavena</label>
       </div>
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
       <button className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit změny'}</button>
