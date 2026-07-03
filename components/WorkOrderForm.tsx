@@ -14,9 +14,10 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setSubmitting(true);
     setError('');
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const response = await fetch('/api/work-orders', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -28,7 +29,7 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
       setError(result?.error || 'Pracovní úkol se nepodařilo uložit.');
       return;
     }
-    event.currentTarget.reset();
+    formElement.reset();
     router.push(`/work/${result.id}`);
     router.refresh();
   }
