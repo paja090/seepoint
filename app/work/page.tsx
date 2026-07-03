@@ -38,6 +38,7 @@ export default async function WorkPlanPage() {
           id: order.id,
           title: order.title,
           clientName: order.clientName,
+          requestedBy: order.requestedBy,
           scheduledAt: order.scheduledAt.toISOString(),
           status: order.status,
           workType: order.workType,
@@ -59,6 +60,7 @@ export default async function WorkPlanPage() {
                   <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className="text-sm font-medium text-slate-500">{workTypeLabels[order.workType]}</span></div>
                   <h3 className="mt-2 text-lg font-bold">{order.title}</h3>
                   <p className="mt-1 text-sm text-slate-600">{order.clientName} · {formatWorkDate(order.scheduledAt)}</p>
+                  <p className="mt-1 text-sm text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p>
                   {order.items[0]?.carrier && <p className="mt-1 text-sm text-slate-500">{order.items[0].carrier.code} · {order.items[0].carrier.city}</p>}
                 </div>
                 <div className="text-sm md:text-right"><p className="font-medium">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Nepřiřazený pracovník'}</p>{order.quantity && <p className="text-slate-500">{order.quantity} ks {order.mediaLabel || ''}</p>}</div>
