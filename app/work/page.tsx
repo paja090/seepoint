@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { WorkOrderForm } from '@/components/WorkOrderForm';
+import { WorkWeekView } from '@/components/WorkWeekView';
 import { prisma } from '@/lib/db';
 import { formatWorkDate, workStatusLabels, workStatusStyles, workTypeLabels } from '@/lib/work';
 
@@ -33,12 +34,24 @@ export default async function WorkPlanPage() {
           <div className="card"><p className="text-sm text-slate-500">Příštích 7 dní</p><strong className="text-3xl">{weekCount}</strong></div>
           <div className="card"><p className="text-sm text-slate-500">Otevřené úkoly</p><strong className="text-3xl">{openCount}</strong></div>
         </section>
+        <WorkWeekView initialOrders={orders.map((order) => ({
+          id: order.id,
+          title: order.title,
+          clientName: order.clientName,
+          scheduledAt: order.scheduledAt.toISOString(),
+          status: order.status,
+          workType: order.workType,
+          ftdSent: order.ftdSent,
+          invoiced: order.invoiced,
+          workers: order.assignments.map((assignment) => assignment.workerName),
+          carrierCode: order.items[0]?.carrier?.code,
+        }))} />
         <WorkOrderForm
           clients={clients.map((client) => ({ id: client.id, label: client.name }))}
           carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
         />
         <section className="space-y-3">
-          <div className="flex items-end justify-between gap-4"><div><h2 className="text-2xl font-bold">Naplánované práce</h2><p className="text-sm text-slate-500">Řazeno podle data provedení.</p></div><span className="text-sm font-medium text-slate-500">{orders.length} úkolů</span></div>
+          <div className="flex items-end justify-between gap-4"><div><h2 className="text-2xl font-bold">Všechny pracovní úkoly</h2><p className="text-sm text-slate-500">Řazeno podle data provedení.</p></div><span className="text-sm font-medium text-slate-500">{orders.length} úkolů</span></div>
           {orders.length === 0 ? <div className="card text-center"><p className="font-medium">Zatím zde není žádný pracovní úkol.</p><p className="mt-1 text-sm text-slate-500">První úkol vytvořte ve formuláři výše. Původní tabulka zůstává beze změny.</p></div> : orders.map((order) => (
             <Link className="card block transition hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md" href={`/work/${order.id}`} key={order.id}>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
