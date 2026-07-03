@@ -1,4 +1,4 @@
-import { WorkType } from '@prisma/client';
+import { WorkPriority, WorkType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { workRequesters } from '@/lib/work';
@@ -15,6 +15,14 @@ function optionalDate(input: WorkOrderInput, key: string) {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function optionalPrice(input: WorkOrderInput) {
+  const value = text(input, 'price');
+  if (!value) return undefined;
+  const normalized = value.replace(/\s/g, '').replace(',', '.');
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(normalized)) return null;
+  return normalized;
 }
 
 export async function GET() {
@@ -45,6 +53,11 @@ export async function POST(request: Request) {
 
   const requestedWorkType = text(input, 'workType');
   const workType = requestedWorkType && Object.values(WorkType).includes(requestedWorkType as WorkType) ? requestedWorkType as WorkType : WorkType.OTHER;
+  const requestedPriority = text(input, 'priority');
+  const priority = requestedPriority && Object.values(WorkPriority).includes(requestedPriority as WorkPriority) ? requestedPriority as WorkPriority : WorkPriority.NORMAL;
+  const price = optionalPrice(input);
+  if (price === null) return NextResponse.json({ error: 'Cena musí být kladné číslo s nejvýše dvěma desetinnými místy.' }, { status: 400 });
+
   const clientId = text(input, 'clientId');
   const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
   if (clientId && !client) return NextResponse.json({ error: 'Vybraný klient už neexistuje.' }, { status: 400 });
@@ -76,6 +89,8 @@ export async function POST(request: Request) {
       campaignDateFrom,
       campaignDateTo,
       workType,
+      priority,
+      price,
       status: 'PLANNED',
       clientId: client?.id,
       clientName,
