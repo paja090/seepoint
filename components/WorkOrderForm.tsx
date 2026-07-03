@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { workTypeLabels } from '@/lib/work';
+import { workRequesters, workTypeLabels } from '@/lib/work';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -43,7 +43,8 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
         <label>Datum a čas práce<input className="input mt-1" name="scheduledAt" required type="datetime-local" /></label>
         <label>Dokončit nejpozději<input className="input mt-1" name="deadlineAt" type="datetime-local" /></label>
         <label>Typ práce<select className="input mt-1" name="workType" defaultValue="INSTALLATION">{Object.entries(workTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label>Pracovníci<input className="input mt-1" name="workerNames" placeholder="Pavel, Mirek" /><span className="mt-1 block text-xs text-slate-500">Více jmen oddělte čárkou.</span></label>
+        <label>Úkol zadal/a<select className="input mt-1" name="requestedBy" defaultValue="" required><option disabled value="">Vyberte zadavatele</option>{workRequesters.map((requester) => <option key={requester} value={requester}>{requester}</option>)}</select></label>
+        <label>Pracovníci<input className="input mt-1" name="workerNames" placeholder="Pavel, Mirek" /><span className="mt-1 block text-xs text-slate-500">Pracovník po dokončení potvrzuje nahrání fotodokumentace.</span></label>
         <label>Existující klient<select className="input mt-1" name="clientId" defaultValue=""><option value="">Bez vybraného klienta</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></label>
         <label>Jiný nebo nový klient<input className="input mt-1" name="clientName" placeholder="Název klienta" /></label>
         <label>Typ média<input className="input mt-1" name="mediaLabel" placeholder="Navigace, billboard, city poster…" /></label>
