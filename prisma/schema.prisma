@@ -98,6 +98,25 @@ enum ImportStatus {
   FAILED
 }
 
+enum WorkOrderStatus {
+  NEW
+  PLANNED
+  HANDED_OVER
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum WorkType {
+  INSTALLATION
+  REINSTALLATION
+  DEINSTALLATION
+  REPAIR
+  CHECK
+  TRANSPORT
+  OTHER
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -106,7 +125,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  importBatches ImportBatch[]
+  importBatches  ImportBatch[]
+  workAssignments WorkAssignment[]
 }
 
 model Client {
@@ -121,6 +141,7 @@ model Client {
 
   currentSurfaces AdvertisingSurface[] @relation("CurrentSurfaceClient")
   occupancies     Occupancy[]
+  workOrders      WorkOrder[]
 }
 
 model AdvertisingCarrier {
@@ -150,6 +171,7 @@ model AdvertisingCarrier {
   importBatch ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   surfaces    AdvertisingSurface[]
   photos      Photo[]
+  workItems   WorkOrderItem[]
 
   @@index([importBatchId])
   @@index([city, structureCode])
@@ -180,6 +202,7 @@ model AdvertisingSurface {
   importBatch   ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   occupancies   Occupancy[]
   photos        Photo[]
+  workItems     WorkOrderItem[]
 
   @@index([carrierId])
   @@index([currentClientId])
@@ -268,4 +291,69 @@ model ImportRowError {
   batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId, rowNumber])
+}
+
+model WorkOrder {
+  id               String          @id @default(cuid())
+  title            String
+  description      String
+  status           WorkOrderStatus @default(NEW)
+  workType         WorkType        @default(OTHER)
+  scheduledAt      DateTime
+  deadlineAt       DateTime?
+  campaignDateFrom DateTime?
+  campaignDateTo   DateTime?
+  clientId         String?
+  clientName       String
+  requestedBy      String?
+  contactName      String?
+  contactPhone     String?
+  locationNote     String?
+  mediaLabel       String?
+  quantity         Int?
+  referenceUrl     String?
+  ftdUrl           String?
+  ftdSent          Boolean         @default(false)
+  invoiced         Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  client      Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  assignments WorkAssignment[]
+  items       WorkOrderItem[]
+
+  @@index([scheduledAt, status])
+  @@index([clientId])
+}
+
+model WorkAssignment {
+  id          String   @id @default(cuid())
+  workOrderId String
+  userId      String?
+  workerName  String
+  createdAt   DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId])
+  @@index([userId])
+}
+
+model WorkOrderItem {
+  id          String   @id @default(cuid())
+  workOrderId String
+  carrierId   String?
+  surfaceId   String?
+  description String?
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  workOrder WorkOrder           @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  surface   AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
+
+  @@index([workOrderId])
+  @@index([carrierId])
+  @@index([surfaceId])
 }
