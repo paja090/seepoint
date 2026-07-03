@@ -21,7 +21,7 @@ export default async function WorkPlanPage() {
   const weekCount = orders.filter((order) => order.scheduledAt >= dayStart && order.scheduledAt < weekEnd).length;
   const openCount = orders.filter((order) => !['DONE', 'CANCELLED'].includes(order.status)).length;
   const urgentCount = orders.filter((order) => order.priority === 'URGENT' && !['DONE', 'CANCELLED'].includes(order.status)).length;
-  const billingCount = orders.filter((order) => order.ftdSent && !order.invoiced && order.status !== 'CANCELLED').length;
+  const billingOrders = orders.filter((order) => order.ftdSent && !order.invoiced && order.status !== 'CANCELLED');
 
   return (
     <AppShell>
@@ -36,7 +36,11 @@ export default async function WorkPlanPage() {
           <div className="card"><p className="text-sm text-slate-500">Příštích 7 dní</p><strong className="text-3xl">{weekCount}</strong></div>
           <div className="card"><p className="text-sm text-slate-500">Otevřené úkoly</p><strong className="text-3xl">{openCount}</strong></div>
           <div className="card border-red-200 bg-red-50"><p className="text-sm text-red-700">Urgentní</p><strong className="text-3xl text-red-800">{urgentCount}</strong></div>
-          <div className="card border-emerald-200 bg-emerald-50"><p className="text-sm text-emerald-700">Připravené k fakturaci</p><strong className="text-3xl text-emerald-800">{billingCount}</strong></div>
+          <div className="card border-emerald-200 bg-emerald-50"><p className="text-sm text-emerald-700">Připravené k fakturaci</p><strong className="text-3xl text-emerald-800">{billingOrders.length}</strong></div>
+        </section>
+        <section className="card border-emerald-200 bg-emerald-50" aria-labelledby="billing-alerts-heading">
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Upozornění pro zadavatele</p><h2 className="text-xl font-bold text-emerald-950" id="billing-alerts-heading">Fotky hotové, čeká se na fakturu</h2></div><span className="rounded-full bg-emerald-700 px-3 py-1 text-sm font-bold text-white">{billingOrders.length}</span></div>
+          {billingOrders.length === 0 ? <p className="mt-3 text-sm text-emerald-800">Žádný úkol nyní nečeká na fakturaci.</p> : <div className="mt-4 grid gap-3 md:grid-cols-2">{billingOrders.map((order) => <Link className="rounded-xl border border-emerald-200 bg-white p-3 transition hover:border-emerald-500 hover:shadow-sm" href={`/work/${order.id}`} key={order.id}><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-slate-950">{order.title}</p><p className="mt-1 text-sm text-slate-600">{order.clientName} · zadavatel {order.requestedBy || 'neuveden'}</p></div><span className="text-sm font-semibold text-emerald-800">{formatWorkPrice(order.price?.toString())}</span></div></Link>)}</div>}
         </section>
         <WorkWeekView initialOrders={orders.map((order) => ({
           id: order.id,
