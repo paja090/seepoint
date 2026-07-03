@@ -5,9 +5,15 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { workStatusLabels } from '@/lib/work';
 
-type WorkOrderActionsProps = { id: string; status: WorkOrderStatus; ftdSent: boolean; invoiced: boolean };
+type WorkOrderActionsProps = {
+  id: string;
+  status: WorkOrderStatus;
+  ftdSent: boolean;
+  invoiced: boolean;
+  requestedBy?: string | null;
+};
 
-export function WorkOrderActions({ id, status, ftdSent, invoiced }: WorkOrderActionsProps) {
+export function WorkOrderActions({ id, status, ftdSent, invoiced, requestedBy }: WorkOrderActionsProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -32,10 +38,16 @@ export function WorkOrderActions({ id, status, ftdSent, invoiced }: WorkOrderAct
     <form className="card space-y-4" onSubmit={handleSubmit}>
       <h2 className="text-lg font-bold">Aktualizace práce</h2>
       <label>Stav<select className="input mt-1" defaultValue={status} name="status">{Object.entries(workStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-      <label className="flex items-center gap-3"><input defaultChecked={ftdSent} name="ftdSent" type="checkbox" /> FTD odeslána</label>
-      <label className="flex items-center gap-3"><input defaultChecked={invoiced} name="invoiced" type="checkbox" /> Fakturováno</label>
+      <div className="rounded-xl border border-slate-200 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pracovník</p>
+        <label className="mt-2 flex items-center gap-3"><input defaultChecked={ftdSent} name="ftdSent" type="checkbox" /> Fotodokumentace nahrána</label>
+      </div>
+      <div className="rounded-xl border border-slate-200 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Zadavatel: {requestedBy || 'neuveden'}</p>
+        <label className="mt-2 flex items-center gap-3"><input defaultChecked={invoiced} name="invoiced" type="checkbox" /> Faktura vystavena</label>
+      </div>
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
-      <button className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit stav'}</button>
+      <button className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit změny'}</button>
     </form>
   );
 }
