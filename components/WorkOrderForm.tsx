@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { workRequesters, workTypeLabels } from '@/lib/work';
+import { workPriorityLabels, workRequesters, workTypeLabels } from '@/lib/work';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -49,6 +49,8 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
         <label>Dokončit nejpozději<input className="input mt-1" name="deadlineAt" type="datetime-local" /></label>
         <label>Typ práce<select className="input mt-1" name="workType" defaultValue="INSTALLATION">{Object.entries(workTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Úkol zadal/a<select className="input mt-1" name="requestedBy" defaultValue="" required><option disabled value="">Vyberte zadavatele</option>{workRequesters.map((requester) => <option key={requester} value={requester}>{requester}</option>)}</select></label>
+        <label>Priorita<select className="input mt-1" name="priority" defaultValue="NORMAL">{Object.entries(workPriorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><span className="mt-1 block text-xs text-slate-500">Urgentní úkoly se v plánu zvýrazní červeně.</span></label>
+        <label>Cena za úkol v Kč (zadavatel)<input className="input mt-1" min="0" name="price" step="0.01" type="number" placeholder="Např. 2500" /><span className="mt-1 block text-xs text-slate-500">Cenu lze doplnit nebo změnit také v detailu úkolu.</span></label>
         <label>Pracovníci<input className="input mt-1" name="workerNames" placeholder="Pavel, Mirek" /><span className="mt-1 block text-xs text-slate-500">Pracovník po dokončení potvrzuje nahrání fotodokumentace.</span></label>
         <label>Existující klient<select className="input mt-1" name="clientId" defaultValue=""><option value="">Bez vybraného klienta</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></label>
         <label>Jiný nebo nový klient<input className="input mt-1" name="clientName" placeholder="Název klienta" /></label>
