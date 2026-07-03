@@ -19,10 +19,15 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
     setSubmitting(true);
     setError('');
     const form = new FormData(formElement);
+    const payload = Object.fromEntries(form.entries());
+    for (const field of ['scheduledAt', 'deadlineAt']) {
+      const value = payload[field];
+      if (typeof value === 'string' && value) payload[field] = new Date(value).toISOString();
+    }
     const response = await fetch('/api/work-orders', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(Object.fromEntries(form.entries())),
+      body: JSON.stringify(payload),
     });
     const result = await response.json().catch(() => null) as { id?: string; error?: string } | null;
     setSubmitting(false);
@@ -56,6 +61,7 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
         <label>Telefon<input className="input mt-1" name="contactPhone" type="tel" /></label>
         <label className="lg:col-span-2">Místo a pokyny<input className="input mt-1" name="locationNote" placeholder="Adresa, příjezd, čas srazu…" /></label>
         <label className="lg:col-span-2">Podrobné zadání<textarea className="input mt-1 min-h-28" name="description" required /></label>
+        <label className="lg:col-span-2">Složka fotodokumentace na Google Disku<input className="input mt-1" name="ftdUrl" type="url" placeholder="https://drive.google.com/…" /><span className="mt-1 block text-xs text-slate-500">Zadavatel vytvoří firemní složku a vloží sem její odkaz.</span></label>
         <label className="lg:col-span-2">Odkaz na podklady<input className="input mt-1" name="referenceUrl" type="url" placeholder="https://…" /></label>
         {error && <p className="lg:col-span-2 text-sm text-red-700" role="alert">{error}</p>}
         <div className="lg:col-span-2"><button className="rounded-xl bg-slate-950 px-5 py-3 font-medium text-white disabled:opacity-50" disabled={submitting} type="submit">{submitting ? 'Ukládám…' : 'Vytvořit pracovní úkol'}</button></div>
