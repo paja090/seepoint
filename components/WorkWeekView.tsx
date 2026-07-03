@@ -9,6 +9,7 @@ type WeekOrder = {
   id: string;
   title: string;
   clientName: string;
+  requestedBy?: string | null;
   scheduledAt: string;
   status: WorkOrderStatus;
   workType: WorkType;
@@ -92,9 +93,13 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
                 <div className="flex items-center justify-between gap-2"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className="text-[11px] text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
                 <Link className="mt-2 block text-sm font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
                 <p className="mt-1 text-xs text-slate-600">{order.clientName}</p>
-                <p className="mt-1 text-xs text-slate-500">{order.workers.join(', ') || 'Bez pracovníka'}{order.carrierCode ? ` · ${order.carrierCode}` : ''}</p>
+                <p className="mt-1 text-xs text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p>
+                <p className="mt-1 text-xs text-slate-500">Pracovník: {order.workers.join(', ') || 'nepřiřazen'}{order.carrierCode ? ` · ${order.carrierCode}` : ''}</p>
                 <label className="mt-3 block text-xs">Stav<select className="input mt-1 !py-1 text-xs" disabled={savingId === order.id} value={order.status} onChange={(event) => void updateOrder(order, { status: event.target.value as WorkOrderStatus })}>{Object.entries(workStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                <div className="mt-2 grid grid-cols-2 gap-2"><button aria-pressed={order.ftdSent} className={`rounded-lg px-2 py-1 text-xs font-medium ${order.ftdSent ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { ftdSent: !order.ftdSent })} type="button">FTD {order.ftdSent ? '✓' : '—'}</button><button aria-pressed={order.invoiced} className={`rounded-lg px-2 py-1 text-xs font-medium ${order.invoiced ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { invoiced: !order.invoiced })} type="button">Faktura {order.invoiced ? '✓' : '—'}</button></div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div><p className="mb-1 text-[10px] font-semibold uppercase text-slate-400">Pracovník</p><button aria-pressed={order.ftdSent} className={`w-full rounded-lg px-2 py-1 text-xs font-medium ${order.ftdSent ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { ftdSent: !order.ftdSent })} type="button">Foto {order.ftdSent ? '✓' : '—'}</button></div>
+                  <div><p className="mb-1 truncate text-[10px] font-semibold uppercase text-slate-400">{order.requestedBy || 'Zadavatel'}</p><button aria-pressed={order.invoiced} className={`w-full rounded-lg px-2 py-1 text-xs font-medium ${order.invoiced ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { invoiced: !order.invoiced })} type="button">Faktura {order.invoiced ? '✓' : '—'}</button></div>
+                </div>
                 <p className="mt-2 text-[11px] text-slate-400">{workTypeLabels[order.workType]}</p>
               </article>)}</div>
             </section>;
