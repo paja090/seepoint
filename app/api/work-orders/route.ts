@@ -46,9 +46,9 @@ export async function POST(request: Request) {
   const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
   if (clientId && !client) return NextResponse.json({ error: 'Vybraný klient už neexistuje.' }, { status: 400 });
   const clientName = text(input, 'clientName') || client?.name || 'Bez klienta';
-  const carrierId = text(input, 'carrierId');
-  const carrier = carrierId ? await prisma.advertisingCarrier.findUnique({ where: { id: carrierId }, select: { id: true } }) : null;
-  if (carrierId && !carrier) return NextResponse.json({ error: 'Vybraný nosič už neexistuje.' }, { status: 400 });
+  const carrierCode = text(input, 'carrierCode');
+  const carrier = carrierCode ? await prisma.advertisingCarrier.findUnique({ where: { code: carrierCode }, select: { id: true } }) : null;
+  if (carrierCode && !carrier) return NextResponse.json({ error: 'Vyberte existující nosič z nabídky.' }, { status: 400 });
 
   const quantityText = text(input, 'quantity');
   const quantity = quantityText ? Number.parseInt(quantityText, 10) : undefined;
