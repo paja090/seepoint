@@ -1,5 +1,7 @@
 import type { WorkOrderStatus, WorkType } from '@prisma/client';
 
+export const workRequesters = ['MAREK', 'MIREK', 'VLAĎKA', 'SILVA', 'ZUZANA'] as const;
+
 export const workStatusLabels: Record<WorkOrderStatus, string> = {
   NEW: 'Nový',
   PLANNED: 'Naplánovaný',
