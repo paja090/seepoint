@@ -1,11 +1,12 @@
 import Link from 'next/link';
-import { BarChart3, CalendarRange, FileUp, LogOut, Map, PanelsTopLeft, Settings } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, CalendarRange, FileUp, LogOut, Map, PanelsTopLeft, Settings } from 'lucide-react';
 
 const nav = [
   ['/dashboard', 'Dashboard', BarChart3],
   ['/map', 'Mapa', Map],
   ['/carriers', 'Nosiče', PanelsTopLeft],
   ['/occupancy', 'Obsazenost', CalendarRange],
+  ['/work', 'Plán práce', BriefcaseBusiness],
   ['/import', 'Import', FileUp],
   ['/settings', 'Nastavení', Settings],
 ] as const;
