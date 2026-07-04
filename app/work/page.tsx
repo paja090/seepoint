@@ -22,6 +22,7 @@ export default async function WorkPlanPage() {
   const openCount = orders.filter((order) => !['DONE', 'CANCELLED'].includes(order.status)).length;
   const urgentCount = orders.filter((order) => order.priority === 'URGENT' && !['DONE', 'CANCELLED'].includes(order.status)).length;
   const billingOrders = orders.filter((order) => order.ftdSent && !order.invoiced && order.status !== 'CANCELLED');
+  const listOrders = orders.slice(0, 40);
 
   return (
     <AppShell>
@@ -63,8 +64,8 @@ export default async function WorkPlanPage() {
           carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
         />
         <section className="space-y-3">
-          <div className="flex items-end justify-between gap-4"><div><h2 className="text-2xl font-bold">Všechny pracovní úkoly</h2><p className="text-sm text-slate-500">Řazeno podle data provedení.</p></div><span className="text-sm font-medium text-slate-500">{orders.length} úkolů</span></div>
-          {orders.length === 0 ? <div className="card text-center"><p className="font-medium">Zatím zde není žádný pracovní úkol.</p><p className="mt-1 text-sm text-slate-500">První úkol vytvořte ve formuláři výše. Původní tabulka zůstává beze změny.</p></div> : orders.map((order) => {
+          <div className="flex items-end justify-between gap-4"><div><h2 className="text-2xl font-bold">Nejbližší pracovní úkoly</h2><p className="text-sm text-slate-500">Řazeno podle data provedení. Kompletní plán zůstává v týdenním rozpisu.</p></div><span className="text-sm font-medium text-slate-500">{listOrders.length} z {orders.length} úkolů</span></div>
+          {orders.length === 0 ? <div className="card text-center"><p className="font-medium">Zatím zde není žádný pracovní úkol.</p><p className="mt-1 text-sm text-slate-500">První úkol vytvořte ve formuláři výše. Původní tabulka zůstává beze změny.</p></div> : listOrders.map((order) => {
             const isOverdue = order.deadlineAt && order.deadlineAt < now && !['DONE', 'CANCELLED'].includes(order.status);
             return <Link className={`card block transition hover:-translate-y-0.5 hover:shadow-md ${isOverdue ? 'border-red-400 ring-2 ring-red-100' : 'hover:border-sky-300'}`} href={`/work/${order.id}`} key={order.id}>
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
