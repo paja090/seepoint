@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { parseMediaImport } from '@/lib/media-import';
 import type { MediaImportKind, MediaImportReport } from '@/lib/media-import';
 
 const mediaSources = [
@@ -18,10 +17,47 @@ const emptyInputs: Record<MediaImportKind, string> = {
   TOWER: '',
 };
 
+type ImportPlan = {
+  planHash: string;
+  stats: {
+    sourceRows: number;
+    importableRows: number;
+    blockedRows: number;
+    warnings: number;
+  };
+};
+
+type ImportResult = {
+  batchId: string;
+  createdCarriers: number;
+  createdSurfaces: number;
+  importedRows: number;
+  skippedRows: number;
+  reviewItems: number;
+};
+
+function sourcePayload(inputs: Record<MediaImportKind, string>) {
+  return mediaSources
+    .filter(({ kind }) => inputs[kind].trim())
+    .map(({ kind }) => ({ kind, text: inputs[kind] }));
+}
+
 export function MediaImportPreview() {
   const [inputs, setInputs] = useState<Record<MediaImportKind, string>>(emptyInputs);
   const [reports, setReports] = useState<MediaImportReport[]>([]);
+  const [plan, setPlan] = useState<ImportPlan>();
+  const [importKey, setImportKey] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [result, setResult] = useState<ImportResult>();
+  const [busy, setBusy] = useState<'preview' | 'commit'>();
   const [error, setError] = useState('');
+
+  function clearPreview() {
+    setReports([]);
+    setPlan(undefined);
+    setResult(undefined);
+    setConfirmed(false);
+  }
 
   async function readFile(kind: MediaImportKind, file?: File) {
     if (!file) return;
@@ -29,24 +65,61 @@ export function MediaImportPreview() {
     try {
       const text = await file.text();
       setInputs((current) => ({ ...current, [kind]: text }));
-      setReports([]);
+      clearPreview();
       setError('');
     } catch {
       setError(`Soubor ${file.name} se nepodařilo přečíst.`);
     }
   }
 
-  function createPreview() {
+  async function createPreview() {
+    setBusy('preview');
     setError('');
+    setResult(undefined);
     try {
-      const nextReports = mediaSources
-        .filter(({ kind }) => inputs[kind].trim())
-        .map(({ kind }) => parseMediaImport(kind, inputs[kind]));
-      if (!nextReports.length) throw new Error('Vložte data alespoň jednoho listu.');
-      setReports(nextReports);
+      const response = await fetch('/api/import/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'preview', sources: sourcePayload(inputs) }),
+      });
+      const data = await response.json() as { reports?: MediaImportReport[]; plan?: ImportPlan; error?: string };
+      if (!response.ok || !data.reports || !data.plan) throw new Error(data.error || 'Kontrolní report se nepodařilo vytvořit.');
+      setReports(data.reports);
+      setPlan(data.plan);
+      setConfirmed(false);
     } catch (previewError) {
-      setReports([]);
+      clearPreview();
       setError(previewError instanceof Error ? previewError.message : 'Kontrolní report se nepodařilo vytvořit.');
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  async function commitImport() {
+    if (!plan || !confirmed) return;
+    setBusy('commit');
+    setError('');
+    setResult(undefined);
+    try {
+      const response = await fetch('/api/import/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-import-key': importKey },
+        body: JSON.stringify({
+          mode: 'commit',
+          sources: sourcePayload(inputs),
+          planHash: plan.planHash,
+          confirmation: 'IMPORTOVAT',
+        }),
+      });
+      const data = await response.json() as { result?: ImportResult; error?: string };
+      if (!response.ok || !data.result) throw new Error(data.error || 'Zápis do databáze se nepodařil.');
+      setResult(data.result);
+      setConfirmed(false);
+      setImportKey('');
+    } catch (commitError) {
+      setError(commitError instanceof Error ? commitError.message : 'Zápis do databáze se nepodařil.');
+    } finally {
+      setBusy(undefined);
     }
   }
 
@@ -68,7 +141,7 @@ export function MediaImportPreview() {
           <p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Nový import nosičů</p>
           <h2 className="text-xl font-bold">Citypostery, Promolavičky, Promohorizonty a Towery</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Náhled probíhá pouze ve vašem prohlížeči. Nic se neposílá do databáze ani nemění ve zdrojové tabulce.
+            Náhled nic nezapisuje do databáze a nikdy nemění zdrojovou Google tabulku. Zápis je samostatný, chráněný krok.
           </p>
         </div>
 
@@ -101,7 +174,7 @@ export function MediaImportPreview() {
                   placeholder={`Vložte celý list ${source.sheet} včetně hlavičky…`}
                   onChange={(event) => {
                     setInputs((current) => ({ ...current, [source.kind]: event.target.value }));
-                    setReports([]);
+                    clearPreview();
                   }}
                 />
               </label>
@@ -109,11 +182,13 @@ export function MediaImportPreview() {
           ))}
         </div>
 
-        <button className="btn" type="button" onClick={createPreview}>Vytvořit bezpečný kontrolní report</button>
+        <button className="btn" type="button" disabled={Boolean(busy)} onClick={() => void createPreview()}>
+          {busy === 'preview' ? 'Kontroluji data…' : 'Vytvořit bezpečný kontrolní report'}
+        </button>
         {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
       </section>
 
-      {reports.length > 0 && (
+      {reports.length > 0 && plan && (
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
@@ -124,6 +199,7 @@ export function MediaImportPreview() {
               ['Bez GPS', totals.missingGps],
               ['S fotografií', totals.withPhotos],
               ['Řádky ke kontrole', totals.reviewRows],
+              ['Řádky zablokované', plan.stats.blockedRows],
             ].map(([label, value]) => (
               <div className="card !p-4" key={label}>
                 <p className="text-xs text-slate-500">{label}</p>
@@ -165,6 +241,34 @@ export function MediaImportPreview() {
                 </tr>
               ))}</tbody>
             </table>
+          </section>
+
+          <section className="card space-y-4 border-amber-200 bg-amber-50">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Chráněný zápis</p>
+              <h2 className="text-xl font-bold">Importovat zkontrolovaná data do databáze</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Importuje se {plan.stats.importableRows} řádků. {plan.stats.blockedRows} problematických řádků se přeskočí a uloží do importního reportu. Chybějící GPS a fotografie jsou pouze upozornění.
+              </p>
+            </div>
+            <label className="block max-w-md text-sm font-medium">
+              Importní klíč
+              <input className="input mt-1" type="password" autoComplete="off" value={importKey} onChange={(event) => setImportKey(event.target.value)} />
+            </label>
+            <label className="flex max-w-2xl items-start gap-3 text-sm">
+              <input className="mt-1" type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+              <span>Potvrzuji zápis do databáze. Rozumím, že zdrojová tabulka se nezmění a opakovaný import nevytvoří stejné nosiče ani plochy podruhé.</span>
+            </label>
+            <button className="btn" type="button" disabled={!confirmed || !importKey || Boolean(busy)} onClick={() => void commitImport()}>
+              {busy === 'commit' ? 'Importuji…' : 'Importovat do databáze'}
+            </button>
+            {result && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900" role="status">
+                <p className="font-bold">Import byl dokončen.</p>
+                <p>Nové nosiče: {result.createdCarriers} · nové plochy: {result.createdSurfaces} · přeskočené řádky: {result.skippedRows} · položky ke kontrole: {result.reviewItems}</p>
+                <p className="mt-1 text-xs">Číslo importu: {result.batchId}</p>
+              </div>
+            )}
           </section>
         </>
       )}
