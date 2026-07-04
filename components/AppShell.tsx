@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BarChart3, BriefcaseBusiness, CalendarRange, FileUp, LogOut, Map, PanelsTopLeft, Settings } from 'lucide-react';
+import { BarChart3, BriefcaseBusiness, CalendarRange, FileUp, LogOut, Map, PanelsTopLeft, Route, Settings } from 'lucide-react';
 
 const nav = [
   ['/dashboard', 'Dashboard', BarChart3],
@@ -7,6 +7,7 @@ const nav = [
   ['/carriers', 'Nosiče', PanelsTopLeft],
   ['/occupancy', 'Obsazenost', CalendarRange],
   ['/work', 'Plán práce', BriefcaseBusiness],
+  ['/work/route', 'Pracovní výjezd', Route],
   ['/import', 'Import', FileUp],
   ['/settings', 'Nastavení', Settings],
 ] as const;
