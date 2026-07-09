@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
+import { parseCarrierFilters } from '@/lib/carrier-filters';
 import { getCarriers, upsertCarrier, type SurfaceTemplate } from '@/lib/db';
 import type { Carrier, Surface } from '@/lib/types';
 
@@ -17,8 +18,10 @@ type CarrierCreateRequest = Partial<Carrier> & {
   surfaceTemplates?: SurfaceTemplate[];
 };
 
-export async function GET() {
-  return NextResponse.json(await getCarriers());
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const params = Object.fromEntries(url.searchParams.entries());
+  return NextResponse.json(await getCarriers(parseCarrierFilters(params)));
 }
 
 export async function POST(req: Request) {
@@ -29,7 +32,15 @@ export async function POST(req: Request) {
     if (!carrierInput.name?.trim() || !carrierInput.code?.trim() || !carrierInput.city?.trim()) {
       return NextResponse.json({ error: 'Vyplňte název, interní kód a město.' }, { status: 400 });
     }
-    if (!Number.isFinite(carrierInput.latitude) || !Number.isFinite(carrierInput.longitude)) {
+
+    const hasLatitude = carrierInput.latitude !== undefined && carrierInput.latitude !== null;
+    const hasLongitude = carrierInput.longitude !== undefined && carrierInput.longitude !== null;
+    if (hasLatitude !== hasLongitude) {
+      return NextResponse.json({ error: 'Vyplňte obě GPS souřadnice, nebo nechte obě prázdné.' }, { status: 400 });
+    }
+    if (hasLatitude && hasLongitude && (!Number.isFinite(carrierInput.latitude) || !Number.isFinite(carrierInput.longitude)
+      || carrierInput.latitude! < -90 || carrierInput.latitude! > 90
+      || carrierInput.longitude! < -180 || carrierInput.longitude! > 180)) {
       return NextResponse.json({ error: 'Souřadnice nosiče nejsou platné.' }, { status: 400 });
     }
     if (!Array.isArray(requestedTemplates) || requestedTemplates.length > 4) {
@@ -49,7 +60,10 @@ export async function POST(req: Request) {
       surfaceTemplates.push({ name, mediaType: template.mediaType, orientation: orientation || undefined });
     }
 
-    return NextResponse.json(await upsertCarrier(carrierInput, surfaceTemplates), { status: 201 });
+    return NextResponse.json(await upsertCarrier({
+      ...carrierInput,
+      gpsStatus: hasLatitude && hasLongitude ? carrierInput.gpsStatus ?? 'UNVERIFIED' : 'MISSING',
+    }, surfaceTemplates), { status: 201 });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'Nosič s tímto interním kódem už existuje.' }, { status: 409 });
