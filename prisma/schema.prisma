@@ -152,28 +152,35 @@ model Client {
 }
 
 model AdvertisingCarrier {
-  id              String        @id @default(cuid())
-  name            String
-  code            String        @unique
-  type            CarrierType
-  latitude        Float?
-  longitude       Float?
-  gpsStatus       GpsStatus     @default(UNVERIFIED)
-  address         String?
-  city            String
-  region          String?
-  cadastralArea   String?
-  structureCode   String?
-  mountingType    MountingType  @default(UNKNOWN)
-  status          CarrierStatus @default(ACTIVE)
-  note            String?
-  sourceSystem    String?
-  sourceSheet     String?
-  sourceRow       Int?
-  sourceKey       String?       @unique
-  importBatchId   String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                   String        @id @default(cuid())
+  name                 String
+  code                 String        @unique
+  type                 CarrierType
+  latitude             Float?
+  longitude            Float?
+  gpsStatus            GpsStatus     @default(UNVERIFIED)
+  street               String?
+  address              String?
+  locality             String?
+  city                 String
+  region               String?
+  cadastralArea        String?
+  structureCode        String?
+  mountingType         MountingType  @default(UNKNOWN)
+  status               CarrierStatus @default(ACTIVE)
+  description          String?
+  placementDescription String?
+  note                 String?
+  archivedAt           DateTime?
+  archivedBy           String?
+  archiveReason        String?
+  sourceSystem         String?
+  sourceSheet          String?
+  sourceRow            Int?
+  sourceKey            String?       @unique
+  importBatchId        String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   importBatch ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   surfaces    AdvertisingSurface[]
@@ -181,6 +188,7 @@ model AdvertisingCarrier {
   workItems   WorkOrderItem[]
 
   @@index([importBatchId])
+  @@index([archivedAt])
   @@index([city, structureCode])
   @@index([latitude, longitude])
 }
@@ -232,7 +240,7 @@ model Occupancy {
   updatedAt    DateTime        @updatedAt
 
   surface AdvertisingSurface @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
-  client  Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client  Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   @@index([surfaceId])
   @@index([clientId])

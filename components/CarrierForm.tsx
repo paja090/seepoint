@@ -78,8 +78,12 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       code: form.code?.trim(),
       city: form.city?.trim(),
       address: form.address?.trim(),
+      street: form.street?.trim(),
+      locality: form.locality?.trim(),
       cadastralArea: form.cadastralArea?.trim(),
       structureCode: form.structureCode?.trim(),
+      description: form.description?.trim(),
+      placementDescription: form.placementDescription?.trim(),
       note: form.note?.trim(),
       gpsStatus: hasLatitude && hasLongitude ? (form.gpsStatus ?? 'UNVERIFIED') : 'MISSING',
       ...(!form.id ? { surfaceTemplates: selectedProduct?.surfaces ?? [] } : {}),
@@ -94,11 +98,6 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       setError('Vyplňte obě GPS souřadnice, nebo nechte obě prázdné.');
       return;
     }
-    if (!form.id && (!hasLatitude || !hasLongitude)) {
-      setError('Nový ručně zadávaný nosič nejprve umístěte na mapu.');
-      return;
-    }
-
     setSaving(true);
     try {
       const response = await fetch(`/api/carriers${form.id ? `/${form.id}` : ''}`, {
@@ -151,7 +150,9 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
         <input className="input" aria-label="Zeměpisná délka" type="number" step="any" placeholder="Zeměpisná délka" value={form.longitude ?? ''} onChange={(event) => set('longitude', event.target.value ? Number(event.target.value) : undefined)} />
       </div>
       <input className="input" placeholder="Adresa" aria-label="Adresa" value={form.address ?? ''} onChange={(event) => set('address', event.target.value)} />
+      <input className="input" placeholder="Ulice" aria-label="Ulice" value={form.street ?? ''} onChange={(event) => set('street', event.target.value)} />
       <input className="input" placeholder="Město" aria-label="Město" required value={form.city ?? ''} onChange={(event) => set('city', event.target.value)} />
+      <input className="input" placeholder="Lokalita" aria-label="Lokalita" value={form.locality ?? ''} onChange={(event) => set('locality', event.target.value)} />
       <input className="input" placeholder="Katastrální území" aria-label="Katastrální území" value={form.cadastralArea ?? ''} onChange={(event) => set('cadastralArea', event.target.value)} />
       <div className="grid grid-cols-2 gap-2">
         <input className="input" placeholder="Číslo sloupu / stožáru" aria-label="Číslo sloupu nebo stožáru" value={form.structureCode ?? ''} onChange={(event) => set('structureCode', event.target.value)} />
@@ -159,6 +160,8 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
           {mountingTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
         </select>
       </div>
+      <textarea className="input" placeholder="Popis nosiče" aria-label="Popis nosiče" value={form.description ?? ''} onChange={(event) => set('description', event.target.value)} />
+      <textarea className="input" placeholder="Popis umístění" aria-label="Popis umístění" value={form.placementDescription ?? ''} onChange={(event) => set('placementDescription', event.target.value)} />
       <textarea className="input" placeholder="Poznámka" aria-label="Poznámka" value={form.note ?? ''} onChange={(event) => set('note', event.target.value)} />
       {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
       <button type="submit" disabled={saving} className="rounded-xl bg-slate-950 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60">
