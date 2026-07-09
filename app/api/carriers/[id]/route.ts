@@ -8,25 +8,43 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const input = await req.json() as Partial<Carrier>;
-  const hasLatitude = input.latitude !== undefined;
-  const hasLongitude = input.longitude !== undefined;
+  try {
+    const input = await req.json() as Partial<Carrier>;
+    const hasLatitude = input.latitude !== undefined && input.latitude !== null;
+    const hasLongitude = input.longitude !== undefined && input.longitude !== null;
 
-  if (hasLatitude !== hasLongitude) {
-    return NextResponse.json({ error: 'Vyplňte obě GPS souřadnice.' }, { status: 400 });
-  }
-  if (hasLatitude && hasLongitude) {
-    if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)
-      || input.latitude! < -90 || input.latitude! > 90
-      || input.longitude! < -180 || input.longitude! > 180) {
-      return NextResponse.json({ error: 'GPS souřadnice nejsou platné.' }, { status: 400 });
+    if (hasLatitude !== hasLongitude) {
+      return NextResponse.json({ error: 'Vyplňte obě GPS souřadnice.' }, { status: 400 });
     }
-  }
+    if (hasLatitude && hasLongitude) {
+      if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)
+        || input.latitude! < -90 || input.latitude! > 90
+        || input.longitude! < -180 || input.longitude! > 180) {
+        return NextResponse.json({ error: 'GPS souřadnice nejsou platné.' }, { status: 400 });
+      }
+    }
 
-  return NextResponse.json(await upsertCarrier({ ...input, id: (await params).id }));
+    const id = (await params).id;
+    return NextResponse.json(await upsertCarrier({
+      ...input,
+      id,
+      ...(hasLatitude && hasLongitude ? { gpsStatus: input.gpsStatus ?? 'VERIFIED' } : {}),
+    }));
+  } catch (error) {
+    console.error('[api/carriers/:id] update failed', error);
+    return NextResponse.json({ error: 'Nosič se nepodařilo uložit.' }, { status: 500 });
+  }
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  await deleteCarrier((await params).id);
-  return NextResponse.json({ ok: true });
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (req.headers.get('x-seepoint-admin-confirm') !== 'hard-delete-empty-carrier') {
+    return NextResponse.json({ error: 'Fyzické smazání je vypnuté. Použijte archivaci nosiče.' }, { status: 403 });
+  }
+  try {
+    await deleteCarrier((await params).id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Nosič se nepodařilo smazat.';
+    return NextResponse.json({ error: message }, { status: 409 });
+  }
 }
