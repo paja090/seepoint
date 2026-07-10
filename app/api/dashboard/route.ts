@@ -1,20 +1,67 @@
 import { NextResponse } from 'next/server';
-import { getCarriers } from '@/lib/db';
+import { prisma } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const carriers = await getCarriers();
-  const surfaces = carriers.flatMap((carrier) => carrier.surfaces);
-  const occupied = surfaces.filter((surface) => surface.status === 'OCCUPIED').length;
-  const reserved = surfaces.filter((surface) => surface.status === 'RESERVED').length;
-  const available = surfaces.filter((surface) => surface.status === 'AVAILABLE').length;
-  const month = new Date().toISOString().slice(0, 7);
+  const activeCarrierWhere = { archivedAt: null };
+  const activeSurfaceWhere = { carrier: activeCarrierWhere };
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  const [
+    totalCarriers,
+    activeCarriers,
+    archivedCarriers,
+    carriersWithGps,
+    carriersMissingGps,
+    totalSurfaces,
+    availableSurfaces,
+    occupiedSurfaces,
+    reservedSurfaces,
+    campaignsEndingThisMonth,
+  ] = await Promise.all([
+    prisma.advertisingCarrier.count(),
+    prisma.advertisingCarrier.count({ where: activeCarrierWhere }),
+    prisma.advertisingCarrier.count({ where: { archivedAt: { not: null } } }),
+    prisma.advertisingCarrier.count({ where: { ...activeCarrierWhere, latitude: { not: null }, longitude: { not: null } } }),
+    prisma.advertisingCarrier.count({
+      where: {
+        ...activeCarrierWhere,
+        OR: [{ gpsStatus: 'MISSING' }, { latitude: null }, { longitude: null }],
+      },
+    }),
+    prisma.advertisingSurface.count({ where: activeSurfaceWhere }),
+    prisma.advertisingSurface.count({ where: { ...activeSurfaceWhere, status: 'AVAILABLE' } }),
+    prisma.advertisingSurface.count({ where: { ...activeSurfaceWhere, status: 'OCCUPIED' } }),
+    prisma.advertisingSurface.count({ where: { ...activeSurfaceWhere, status: 'RESERVED' } }),
+    prisma.occupancy.findMany({
+      where: {
+        dateTo: { gte: monthStart, lt: nextMonthStart },
+        surface: { carrier: activeCarrierWhere },
+      },
+      orderBy: { dateTo: 'asc' },
+      take: 20,
+    }),
+  ]);
+
   return NextResponse.json({
-    totalCarriers: carriers.length,
-    activeCarriers: carriers.filter((carrier) => carrier.status === 'ACTIVE').length,
-    availableSurfaces: available,
-    occupiedSurfaces: occupied,
-    reservedSurfaces: reserved,
-    occupancyPercent: Math.round((occupied / Math.max(surfaces.length, 1)) * 100),
-    campaignsEndingThisMonth: surfaces.flatMap((surface) => surface.occupancies).filter((occupancy) => occupancy.dateTo.startsWith(month)),
+    totalCarriers,
+    activeCarriers,
+    archivedCarriers,
+    carriersWithGps,
+    carriersMissingGps,
+    availableSurfaces,
+    occupiedSurfaces,
+    reservedSurfaces,
+    occupancyPercent: Math.round((occupiedSurfaces / Math.max(totalSurfaces, 1)) * 100),
+    campaignsEndingThisMonth: campaignsEndingThisMonth.map((occupancy) => ({
+      ...occupancy,
+      dateFrom: occupancy.dateFrom.toISOString(),
+      dateTo: occupancy.dateTo.toISOString(),
+      createdAt: occupancy.createdAt.toISOString(),
+      updatedAt: occupancy.updatedAt.toISOString(),
+    })),
   });
 }
