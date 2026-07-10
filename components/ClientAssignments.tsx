@@ -44,7 +44,7 @@ function SurfaceClientRow({
   onSaved: SurfaceSavedHandler;
 }) {
   const editableCampaign = surface.occupancies.find((occupancy) =>
-    occupancy.status === 'ACTIVE' || occupancy.status === 'RESERVED');
+    occupancy.status === 'OCCUPIED' || occupancy.status === 'RESERVED');
   const [clientName, setClientName] = useState(surface.currentClient?.name ?? '');
   const [dateFrom, setDateFrom] = useState(editableCampaign?.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(editableCampaign?.dateTo ?? '');
