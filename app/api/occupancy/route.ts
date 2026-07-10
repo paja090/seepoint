@@ -1,7 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
-import { checkOccupancyConflicts, hasBlockingConflict, updateOccupancyAction, upsertOccupancy } from '@/lib/db';
-import { prisma } from '@/lib/db';
+import { checkOccupancyConflicts, hasBlockingConflict, prisma, updateOccupancyAction, upsertOccupancy } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
 
 export const dynamic = 'force-dynamic';
@@ -35,9 +34,10 @@ function buildWhere(url: URL) {
   const mediaType = clean(url.searchParams.get('mediaType'));
   const dateFrom = parseDate(clean(url.searchParams.get('dateFrom')));
   const dateTo = parseDate(clean(url.searchParams.get('dateTo')));
-  const where: Prisma.OccupancyWhereInput = {
-    surface: { carrier: { archivedAt: null } },
+  const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = {
+    carrier: { archivedAt: null },
   };
+  const where: Prisma.OccupancyWhereInput = {};
 
   if (q) {
     where.OR = [
@@ -54,16 +54,9 @@ function buildWhere(url: URL) {
   if (dateFrom && dateTo) Object.assign(where, { dateFrom: { lte: dateTo }, dateTo: { gte: dateFrom } });
   else if (dateFrom) where.dateTo = { gte: dateFrom };
   else if (dateTo) where.dateFrom = { lte: dateTo };
-
-  const surfaceFilter: Prisma.AdvertisingSurfaceWhereInput = {};
-  if (isMediaType(mediaType)) surfaceFilter.mediaType = mediaType;
-  if (city) surfaceFilter.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null };
-  if (Object.keys(surfaceFilter).length > 0) {
-    where.surface = {
-      ...(typeof where.surface === 'object' ? where.surface : {}),
-      ...surfaceFilter,
-    };
-  }
+  if (isMediaType(mediaType)) surfaceWhere.mediaType = mediaType;
+  if (city) surfaceWhere.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null };
+  where.surface = surfaceWhere;
 
   return where;
 }
