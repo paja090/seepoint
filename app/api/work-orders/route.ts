@@ -1,6 +1,7 @@
 import { WorkPriority, WorkType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { workRequesters } from '@/lib/work';
 
 type WorkOrderInput = Record<string, unknown>;
@@ -27,7 +28,7 @@ function optionalPrice(input: WorkOrderInput) {
 
 export async function GET() {
   const orders = await prisma.workOrder.findMany({
-    include: { assignments: true, items: { include: { carrier: true, surface: true } }, client: true },
+    include: { assignments: true, items: { include: { carrier: true, surface: true } }, client: true, workTasks: { include: { assignedTo: true } } },
     orderBy: { scheduledAt: 'asc' },
     take: 200,
   });
@@ -107,5 +108,6 @@ export async function POST(request: Request) {
     },
     select: { id: true },
   });
+  await syncWorkOrderTasks(order.id);
   return NextResponse.json(order, { status: 201 });
 }
