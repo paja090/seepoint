@@ -1,6 +1,7 @@
 import { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { workRequesters } from '@/lib/work';
 
 type UpdateInput = { status?: unknown; priority?: unknown; price?: unknown; ftdSent?: unknown; invoiced?: unknown };
@@ -70,6 +71,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     },
     select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true },
   });
+  await syncWorkOrderTasks(id);
   return NextResponse.json({ ...saved, price: saved.price?.toString() ?? null });
 }
 
@@ -149,5 +151,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       },
     },
   });
+  await syncWorkOrderTasks(id);
   return NextResponse.json({ id });
 }

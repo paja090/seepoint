@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function WorkPlanPage() {
   const [orders, clients, carriers] = await Promise.all([
-    prisma.workOrder.findMany({ include: { assignments: true, items: { include: { carrier: true } } }, orderBy: { scheduledAt: 'asc' }, take: 200 }),
+    prisma.workOrder.findMany({ include: { assignments: true, workTasks: { include: { assignedTo: true } }, items: { include: { carrier: true } } }, orderBy: { scheduledAt: 'asc' }, take: 200 }),
     prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     prisma.advertisingCarrier.findMany({ orderBy: [{ city: 'asc' }, { name: 'asc' }], select: { id: true, code: true, name: true, city: true } }),
   ]);
@@ -22,6 +22,7 @@ export default async function WorkPlanPage() {
   const openCount = orders.filter((order) => !['DONE', 'CANCELLED'].includes(order.status)).length;
   const urgentCount = orders.filter((order) => order.priority === 'URGENT' && !['DONE', 'CANCELLED'].includes(order.status)).length;
   const billingOrders = orders.filter((order) => order.ftdSent && !order.invoiced && order.status !== 'CANCELLED');
+  const internalTaskCount = orders.reduce((sum, order) => sum + order.workTasks.length, 0);
   const listOrders = orders.slice(0, 40);
 
   return (
@@ -30,12 +31,13 @@ export default async function WorkPlanPage() {
         <header>
           <p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Provoz SeePOINT</p>
           <h1 className="text-3xl font-bold">Plán práce</h1>
-          <p className="mt-2 text-slate-600">Instalace, opravy, kontroly a převozy na jednom místě.</p>
+          <p className="mt-2 text-slate-600">Instalace, opravy, kontroly a převozy na jednom místě. Při uložení zakázky se automaticky vytvoří interní úkoly pro zaměstnance.</p>
         </header>
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <div className="card"><p className="text-sm text-slate-500">Dnes</p><strong className="text-3xl">{todayCount}</strong></div>
           <div className="card"><p className="text-sm text-slate-500">Příštích 7 dní</p><strong className="text-3xl">{weekCount}</strong></div>
           <div className="card"><p className="text-sm text-slate-500">Otevřené úkoly</p><strong className="text-3xl">{openCount}</strong></div>
+          <div className="card"><p className="text-sm text-slate-500">Interní úkoly</p><strong className="text-3xl">{internalTaskCount}</strong></div>
           <div className="card border-red-200 bg-red-50"><p className="text-sm text-red-700">Urgentní</p><strong className="text-3xl text-red-800">{urgentCount}</strong></div>
           <div className="card border-emerald-200 bg-emerald-50"><p className="text-sm text-emerald-700">Připravené k fakturaci</p><strong className="text-3xl text-emerald-800">{billingOrders.length}</strong></div>
         </section>
@@ -76,7 +78,7 @@ export default async function WorkPlanPage() {
                   <p className="mt-1 text-sm text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p>
                   {order.items[0]?.carrier && <p className="mt-1 text-sm text-slate-500">{order.items[0].carrier.code} · {order.items[0].carrier.city}</p>}
                 </div>
-                <div className="text-sm md:text-right"><p className="font-semibold">{formatWorkPrice(order.price?.toString())}</p><p className="font-medium">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Nepřiřazený pracovník'}</p>{order.quantity && <p className="text-slate-500">{order.quantity} ks {order.mediaLabel || ''}</p>}</div>
+                <div className="text-sm md:text-right"><p className="font-semibold">{formatWorkPrice(order.price?.toString())}</p><p className="font-medium">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Nepřiřazený pracovník'}</p><p className="text-slate-500">Interní úkoly: {order.workTasks.length}</p>{order.quantity && <p className="text-slate-500">{order.quantity} ks {order.mediaLabel || ''}</p>}</div>
               </div>
             </Link>;
           })}
