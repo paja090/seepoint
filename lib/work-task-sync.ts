@@ -8,16 +8,10 @@ type WorkOrderForSync = Prisma.WorkOrderGetPayload<{
   };
 }>;
 
+type TaskPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
 function normalizeName(value: string) {
   return value.trim().toLocaleLowerCase('cs-CZ').replace(/\s+/g, ' ');
-}
-
-function splitName(value: string) {
-  const parts = value.trim().split(/\s+/).filter(Boolean);
-  return {
-    firstName: parts[0] ?? value.trim(),
-    lastName: parts.slice(1).join(' ') || parts[0] || value.trim(),
-  };
 }
 
 function workTaskStatus(status: WorkOrderStatus) {
@@ -27,8 +21,8 @@ function workTaskStatus(status: WorkOrderStatus) {
   return 'TODO' as const;
 }
 
-function workTaskPriority(priority: WorkPriority) {
-  return priority;
+function workTaskPriority(priority: WorkPriority): TaskPriority {
+  return priority as TaskPriority;
 }
 
 async function employeeByNames(workerNames: string[]) {
@@ -43,6 +37,11 @@ async function employeeByNames(workerNames: string[]) {
 
 function taskTitle(order: WorkOrderForSync, workerName?: string) {
   return workerName ? `${order.title} · ${workerName}` : order.title;
+}
+
+function taskLocation(order: WorkOrderForSync) {
+  const carrier = order.items[0]?.carrier;
+  return [order.locationNote, carrier ? `${carrier.code} ${carrier.city}` : undefined].filter(Boolean).join(' · ') || null;
 }
 
 function taskNote(order: WorkOrderForSync, workerName?: string, employee?: Employee) {
@@ -66,17 +65,15 @@ export async function syncWorkOrderTasks(workOrderId: string) {
   const namesForTasks = workerNames.length ? workerNames : [''];
   const employees = await employeeByNames(workerNames);
   const carrierId = order.items[0]?.carrierId ?? null;
-  const carrier = order.items[0]?.carrier;
   const status = workTaskStatus(order.status);
   const priority = workTaskPriority(order.priority);
+  const location = taskLocation(order);
 
   await prisma.$transaction(async (transaction) => {
     await transaction.workTask.deleteMany({ where: { workOrderId: order.id } });
     await transaction.workTask.createMany({
       data: namesForTasks.map((workerName) => {
         const employee = workerName ? employees.get(workerName) : undefined;
-        const fallbackName = workerName || 'Nepřiřazeno';
-        const split = splitName(fallbackName);
         return {
           workOrderId: order.id,
           title: taskTitle(order, workerName || undefined),
@@ -87,7 +84,7 @@ export async function syncWorkOrderTasks(workOrderId: string) {
           scheduledDate: order.scheduledAt,
           priority,
           status,
-          location: order.locationNote ?? carrier ? [order.locationNote, carrier ? `${carrier.code} ${carrier.city}` : undefined].filter(Boolean).join(' · ') : null,
+          location,
           note: taskNote(order, workerName || undefined, employee),
         };
       }),
