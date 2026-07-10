@@ -197,7 +197,7 @@ export async function POST(request: Request) {
             campaignName: 'Navigace – import',
             dateFrom,
             dateTo,
-            status: dateTo < new Date() ? 'FINISHED' : dateFrom <= new Date() ? 'ACTIVE' : 'RESERVED',
+            status: dateTo < new Date() ? 'FINISHED' : dateFrom <= new Date() ? 'OCCUPIED' : 'RESERVED',
             note: `Import z listu ${row.sheetName}, řádek ${row.sourceRow}`,
           });
         } else if ((row.dateFrom || row.dateTo) && (!dateFrom || !dateTo)) {
