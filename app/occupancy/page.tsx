@@ -46,9 +46,10 @@ function buildWhere(params: SearchParams) {
   const mediaType = clean(params.mediaType);
   const dateFrom = parseDate(clean(params.dateFrom));
   const dateTo = parseDate(clean(params.dateTo));
-  const where: Prisma.OccupancyWhereInput = {
-    surface: { carrier: { archivedAt: null } },
+  const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = {
+    carrier: { archivedAt: null },
   };
+  const where: Prisma.OccupancyWhereInput = {};
 
   if (q) {
     where.OR = [
@@ -65,16 +66,9 @@ function buildWhere(params: SearchParams) {
   if (dateFrom && dateTo) Object.assign(where, { dateFrom: { lte: dateTo }, dateTo: { gte: dateFrom } });
   else if (dateFrom) where.dateTo = { gte: dateFrom };
   else if (dateTo) where.dateFrom = { lte: dateTo };
-
-  const surfaceFilter: Prisma.AdvertisingSurfaceWhereInput = {};
-  if (isMediaType(mediaType)) surfaceFilter.mediaType = mediaType;
-  if (city) surfaceFilter.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null };
-  if (Object.keys(surfaceFilter).length > 0) {
-    where.surface = {
-      ...(typeof where.surface === 'object' ? where.surface : {}),
-      ...surfaceFilter,
-    };
-  }
+  if (isMediaType(mediaType)) surfaceWhere.mediaType = mediaType;
+  if (city) surfaceWhere.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null };
+  where.surface = surfaceWhere;
 
   return where;
 }
