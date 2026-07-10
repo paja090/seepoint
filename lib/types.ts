@@ -4,13 +4,19 @@ export type GpsStatus = 'MISSING' | 'UNVERIFIED' | 'VERIFIED';
 export type MountingType = 'LIGHT_POLE' | 'POLE' | 'COLUMN' | 'TRACTION' | 'OTHER' | 'UNKNOWN';
 export type MediaType = 'NAVIGATION_SIGN' | 'BILLBOARD' | 'BIGBOARD' | 'CITYLIGHT' | 'BANNER' | 'FACADE' | 'LED_SCREEN' | 'PROMO_BENCH' | 'PROMO_HORIZON' | 'CITY_POSTER' | 'PROMO_TOWER' | 'PROMO_MINITOWER' | 'OTHER';
 export type SurfaceStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'NEGOTIATION' | 'OUT_OF_SERVICE';
-export type OccupancyStatus = 'RESERVED' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+export type Role = 'ADMIN' | 'SALES' | 'TECHNICIAN' | 'WORKER' | 'VIEWER';
+export type OccupancyStatus = 'AVAILABLE' | 'NEGOTIATION' | 'RESERVED' | 'OCCUPIED' | 'FINISHED' | 'CANCELLED' | 'OUT_OF_SERVICE';
+export type OfferStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE';
 
 export type Client = {
   id: string;
   name: string;
   normalizedName: string;
+  companyId?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
   externalCode?: string;
   note?: string;
   active: boolean;
@@ -46,6 +52,40 @@ export type Occupancy = {
   status: OccupancyStatus;
   price?: number;
   note?: string;
+  createdBy?: string;
+  updatedBy?: string;
+  reservedUntil?: string;
+  offerId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type OfferItem = {
+  id: string;
+  offerId: string;
+  surfaceId: string;
+  surface?: Pick<Surface, 'id' | 'name' | 'mediaType' | 'status'> & {
+    carrier?: Pick<Carrier, 'id' | 'name' | 'code' | 'city' | 'locality' | 'address'>;
+  };
+  dateFrom: string;
+  dateTo: string;
+  price?: number;
+  note?: string;
+};
+
+export type Offer = {
+  id: string;
+  clientId: string;
+  client?: Pick<Client, 'id' | 'name'>;
+  title: string;
+  status: OfferStatus;
+  validUntil?: string;
+  note?: string;
+  totalPrice?: number;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  items: OfferItem[];
 };
 
 export type Photo = {
