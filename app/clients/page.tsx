@@ -1,60 +1,67 @@
+import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
+import { Button, EmptyState, FilterBar, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ClientsPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function first(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] : value; }
+function clean(value: string | string[] | undefined) { return first(value)?.trim() || undefined; }
+
+export default async function ClientsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const params = await searchParams;
+  const q = clean(params.q);
+  const where: Prisma.ClientWhereInput = { active: true };
+  if (q) where.OR = [
+    { name: { contains: q, mode: 'insensitive' } },
+    { contactPerson: { contains: q, mode: 'insensitive' } },
+    { email: { contains: q, mode: 'insensitive' } },
+    { phone: { contains: q, mode: 'insensitive' } },
+    { companyId: { contains: q, mode: 'insensitive' } },
+  ];
+
   const clients = await prisma.client.findMany({
-    where: { active: true },
+    where,
     orderBy: { name: 'asc' },
-    include: {
-      _count: { select: { occupancies: true, offers: true, currentSurfaces: true } },
-    },
+    include: { _count: { select: { occupancies: true, offers: true, currentSurfaces: true } } },
   });
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Klienti</h1>
-        <p className="mt-1 text-sm text-slate-500">Zakladni obchodni evidence klientu pro obsazenost a nabidky.</p>
-      </div>
+      <PageHeader title="Klienti" description="Obchodní evidence klientů pro obsazenost, rezervace a nabídky." />
 
-      <section className="card overflow-x-auto">
-        <h2 className="mb-3 text-xl font-bold">Seznam klientu</h2>
+      <FilterBar>
+        <form className="flex flex-col gap-3 md:flex-row md:items-end" method="get">
+          <label className="flex-1 text-sm font-medium">Vyhledat klienta<input className="input mt-1" name="q" defaultValue={q ?? ''} placeholder="Název, kontakt, e-mail nebo IČO" /></label>
+          <Button type="submit">Hledat</Button>
+          <Button href="/clients" variant="secondary">Vymazat</Button>
+          <span className="text-sm text-slate-500 md:ml-auto">Nalezeno: <strong className="text-slate-950">{clients.length}</strong></span>
+        </form>
+      </FilterBar>
+
+      <section className="card !p-0">
         {clients.length === 0 ? (
-          <p className="text-sm text-slate-500">Zatim neni ulozeny zadny klient.</p>
+          <div className="p-5"><EmptyState title="Zatím není uložený žádný klient." description="Klienti vznikají pro nabídky a obsazenost. Jakmile budou založení, zobrazí se v této tabulce." /></div>
         ) : (
-          <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="border-b py-2 pr-3">Klient</th>
-                <th className="border-b py-2 pr-3">Kontakt</th>
-                <th className="border-b py-2 pr-3">Plochy</th>
-                <th className="border-b py-2 pr-3">Obsazenost</th>
-                <th className="border-b py-2 pr-3">Nabidky</th>
-                <th className="border-b py-2 pr-3">Poznamka</th>
-              </tr>
-            </thead>
+          <Table minWidth="min-w-[980px]">
+            <TableHead><tr><TableHeaderCell>Název klienta</TableHeaderCell><TableHeaderCell>Kontaktní osoba</TableHeaderCell><TableHeaderCell>Email</TableHeaderCell><TableHeaderCell>Telefon</TableHeaderCell><TableHeaderCell>Aktivní kampaně</TableHeaderCell><TableHeaderCell>Nabídky</TableHeaderCell><TableHeaderCell>Poznámka</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
             <tbody>
               {clients.map((client) => (
-                <tr className="border-b last:border-0" key={client.id}>
-                  <td className="py-3 pr-3">
-                    <b>{client.name}</b>
-                    {client.companyId && <><br /><span className="text-slate-500">{client.companyId}</span></>}
-                  </td>
-                  <td className="py-3 pr-3">
-                    {client.contactPerson ?? 'Neuvedeno'}
-                    {client.email && <><br /><span className="text-slate-500">{client.email}</span></>}
-                    {client.phone && <><br /><span className="text-slate-500">{client.phone}</span></>}
-                  </td>
-                  <td className="py-3 pr-3">{client._count.currentSurfaces}</td>
-                  <td className="py-3 pr-3">{client._count.occupancies}</td>
-                  <td className="py-3 pr-3">{client._count.offers}</td>
-                  <td className="py-3 pr-3">{client.note ?? '-'}</td>
+                <tr className="hover:bg-slate-50/60" key={client.id}>
+                  <TableCell><b>{client.name}</b>{client.companyId && <><br /><span className="text-slate-500">{client.companyId}</span></>}</TableCell>
+                  <TableCell>{client.contactPerson ?? <span className="text-slate-400">Neuvedeno</span>}</TableCell>
+                  <TableCell>{client.email ?? <span className="text-slate-400">-</span>}</TableCell>
+                  <TableCell>{client.phone ?? <span className="text-slate-400">-</span>}</TableCell>
+                  <TableCell>{client._count.occupancies}</TableCell>
+                  <TableCell>{client._count.offers}</TableCell>
+                  <TableCell>{client.note ?? <span className="text-slate-400">-</span>}</TableCell>
+                  <TableCell><a className="table-action" href={`/clients?q=${encodeURIComponent(client.name)}`}>Filtrovat</a></TableCell>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         )}
       </section>
     </AppShell>
