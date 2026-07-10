@@ -304,6 +304,7 @@ model WorkTask {
   createdByEmployeeId  String?
   carrierId            String?
   vehicleId            String?
+  workOrderId          String?
   dueDate              DateTime?
   scheduledDate        DateTime?
   priority             WorkTaskPriority @default(NORMAL)
@@ -317,12 +318,14 @@ model WorkTask {
   createdBy  Employee?           @relation("CreatedWorkTasks", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
   carrier    AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
   vehicle    Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  workOrder  WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   items      SettlementItem[]
 
   @@index([assignedToEmployeeId])
   @@index([createdByEmployeeId])
   @@index([carrierId])
   @@index([vehicleId])
+  @@index([workOrderId])
   @@index([status, scheduledDate])
   @@index([priority, dueDate])
 }
@@ -616,6 +619,7 @@ model WorkOrder {
   client      Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
   assignments WorkAssignment[]
   items       WorkOrderItem[]
+  workTasks   WorkTask[]
 
   @@index([scheduledAt, status])
   @@index([priority, scheduledAt])
