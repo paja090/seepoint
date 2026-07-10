@@ -32,7 +32,7 @@ function campaignStatuses(dateFrom: Date | undefined, dateTo: Date | undefined) 
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   if (dateTo < today) return { occupancy: 'FINISHED' as const, surface: 'AVAILABLE' as const };
   if (dateFrom > today) return { occupancy: 'RESERVED' as const, surface: 'RESERVED' as const };
-  return { occupancy: 'ACTIVE' as const, surface: 'OCCUPIED' as const };
+  return { occupancy: 'OCCUPIED' as const, surface: 'OCCUPIED' as const };
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
