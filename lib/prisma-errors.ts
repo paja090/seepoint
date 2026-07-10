@@ -11,5 +11,5 @@ export function isMissingDatabaseStructureError(error: unknown) {
 }
 
 export function productionMigrationMessage() {
-  return 'Databaze jeste nema spustenou posledni migraci pro obsazenost a nabidky. Nejdřív spustte bezpecne `npm run db:migrate:deploy` proti produkcni DATABASE_URL.';
+  return 'Databaze jeste nema spustenou posledni migraci pro obsazenost a nabidky. Nejdriv spustte bezpecne `npm run db:migrate:deploy` proti produkcni DATABASE_URL.';
 }
