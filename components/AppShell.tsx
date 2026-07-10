@@ -1,11 +1,13 @@
 import Link from 'next/link';
-import { BarChart3, BriefcaseBusiness, CalendarRange, FileUp, LogOut, Map, PanelsTopLeft, Route, Settings } from 'lucide-react';
+import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarRange, FileUp, LogOut, Map, PanelsTopLeft, Route, Settings, Users } from 'lucide-react';
 
 const nav = [
   ['/dashboard', 'Dashboard', BarChart3],
   ['/map', 'Mapa', Map],
   ['/carriers', 'Nosiče', PanelsTopLeft],
   ['/occupancy', 'Obsazenost', CalendarRange],
+  ['/clients', 'Klienti', Users],
+  ['/offers', 'Nabídky', BadgeDollarSign],
   ['/work', 'Plán práce', BriefcaseBusiness],
   ['/work/route', 'Pracovní výjezd', Route],
   ['/import', 'Import', FileUp],
