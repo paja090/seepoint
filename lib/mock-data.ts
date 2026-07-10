@@ -26,7 +26,7 @@ export const carriers: Carrier[] = [
         orientation: 'směr Brno',
         status: 'OCCUPIED',
         price: 18000,
-        occupancies: [{ id: 'o1', surfaceId: 's1', clientName: 'Auto ESA', campaignName: 'Letní akce', dateFrom: '2026-06-01', dateTo: '2026-06-30', status: 'ACTIVE', price: 18000 }],
+        occupancies: [{ id: 'o1', surfaceId: 's1', clientName: 'Auto ESA', campaignName: 'Letní akce', dateFrom: '2026-06-01', dateTo: '2026-06-30', status: 'OCCUPIED', price: 18000 }],
         photos: [],
       },
       {
