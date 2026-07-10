@@ -1,7 +1,9 @@
 import Link from 'next/link';
+import { MapPinned, Plus } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { CarrierFilters } from '@/components/CarrierFilters';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Button, EmptyState, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { carrierTypeLabel, mediaTypeLabel, parseCarrierFilters } from '@/lib/carrier-filters';
 import { getCarrierFilterOptions, getCarriersPage } from '@/lib/db';
 
@@ -18,40 +20,75 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold">Reklamni nosice</h1>
-          <p className="mt-1 text-sm text-slate-500">Filtry bezi nad databazi, seznam je strankovany.</p>
-        </div>
-        <Link className="rounded-xl bg-slate-950 px-4 py-2 text-white" href="/map">Pridat v mape</Link>
-      </div>
+      <PageHeader
+        title="Reklamní nosiče"
+        description="Databázově filtrovaný seznam nosičů. Tabulka je stránkovaná, ale celkový počet se počítá nad celou databází."
+        actions={<Button href="/map" variant="primary"><Plus size={16} className="mr-2" />Přidat v mapě</Button>}
+      />
 
       <CarrierFilters action="/carriers" filters={filters} options={filterOptions} resultCount={meta.total} />
-      <section className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-        Zobrazeno <strong>{meta.returned}</strong> z <strong>{meta.total}</strong> nosicu.
-        <span className="ml-3 text-slate-500">Stranka {meta.page}, limit {meta.limit}. Archivovanych: {meta.archivedCount}, bez GPS: {meta.missingGpsCount}.</span>
-        {meta.hasMore && <Link className="ml-3 font-semibold text-sky-700 hover:underline" href={`/carriers?${nextParams.toString()}`}>Nacist dalsi stranku</Link>}
+
+      <section className="mb-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          Zobrazeno <strong>{meta.returned}</strong> z <strong>{meta.total}</strong> nosičů.
+          <span className="ml-2 text-slate-500">Stránka {meta.page}, limit {meta.limit}.</span>
+        </p>
+        <p className="text-slate-500">Archivovaných: {meta.archivedCount} · Bez GPS: {meta.missingGpsCount}</p>
+        {meta.hasMore && <Link className="font-semibold text-sky-700 hover:underline" href={`/carriers?${nextParams.toString()}`}>Načíst další stránku</Link>}
       </section>
 
-      <div className="card overflow-x-auto">
-        {carriers.length === 0 ? <p className="text-sm text-slate-500">Filtrum neodpovida zadny nosic.</p> : (
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-slate-500"><tr className="border-b"><th className="py-2 pr-3">Nosic</th><th className="py-2 pr-3">Typ</th><th className="py-2 pr-3">Media / klienti</th><th className="py-2 pr-3">Mesto</th><th className="py-2 pr-3">GPS</th><th className="py-2 pr-3">Stav</th></tr></thead>
-            <tbody>{carriers.map((carrier) => {
-              const clients = [...new Set(carrier.surfaces.map((surface) => surface.currentClient?.name).filter((name): name is string => Boolean(name)))];
-              const mediaTypes = [...new Set(carrier.surfaces.map((surface) => mediaTypeLabel(surface.mediaType)))];
-              return <tr className={`border-b last:border-0 ${carrier.archivedAt ? 'bg-slate-50 text-slate-500' : ''}`} key={carrier.id}>
-                <td className="py-3 pr-3"><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${carrier.id}`}>{carrier.name}</Link><br /><span className="text-slate-500">{carrier.code}</span>{carrier.archivedAt && <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs">Archiv</span>}</td>
-                <td className="py-3 pr-3">{carrierTypeLabel(carrier.type)}</td>
-                <td className="py-3 pr-3"><span>{mediaTypes.join(', ') || 'Bez ploch'}</span><br /><span className="text-slate-500">{clients.join(', ') || 'Klient neuveden'}</span></td>
-                <td className="py-3 pr-3">{[carrier.city, carrier.locality ?? carrier.cadastralArea, carrier.street ?? carrier.address].filter(Boolean).join(' - ')}</td>
-                <td className="py-3 pr-3">{carrier.latitude && carrier.longitude ? 'Ma GPS' : 'Bez GPS'}</td>
-                <td className="py-3 pr-3"><StatusBadge value={carrier.archivedAt ? 'ARCHIVED' : carrier.status} /></td>
-              </tr>;
-            })}</tbody>
-          </table>
+      <section className="card !p-0">
+        {carriers.length === 0 ? (
+          <div className="p-5"><EmptyState title="Filtrům neodpovídá žádný nosič." description="Zkuste zrušit část filtrů nebo hledat podle jiného kódu, města či klienta." /></div>
+        ) : (
+          <Table minWidth="min-w-[1160px]">
+            <TableHead>
+              <tr>
+                <TableHeaderCell>Kód</TableHeaderCell>
+                <TableHeaderCell>Název</TableHeaderCell>
+                <TableHeaderCell>Typ média</TableHeaderCell>
+                <TableHeaderCell>Město</TableHeaderCell>
+                <TableHeaderCell>Lokalita / ulice</TableHeaderCell>
+                <TableHeaderCell>Klient</TableHeaderCell>
+                <TableHeaderCell>Stav nosiče</TableHeaderCell>
+                <TableHeaderCell>Stav obsazenosti</TableHeaderCell>
+                <TableHeaderCell>GPS</TableHeaderCell>
+                <TableHeaderCell>Fotky</TableHeaderCell>
+                <TableHeaderCell>Akce</TableHeaderCell>
+              </tr>
+            </TableHead>
+            <tbody>
+              {carriers.map((carrier) => {
+                const clients = [...new Set(carrier.surfaces.map((surface) => surface.currentClient?.name).filter((name): name is string => Boolean(name)))];
+                const mediaTypes = [...new Set(carrier.surfaces.map((surface) => mediaTypeLabel(surface.mediaType)))];
+                const surfaceStatuses = [...new Set(carrier.surfaces.map((surface) => surface.status))];
+                const hasGps = Boolean(carrier.latitude && carrier.longitude);
+                return (
+                  <tr className={carrier.archivedAt ? 'bg-slate-50 text-slate-500' : 'hover:bg-slate-50/60'} key={carrier.id}>
+                    <TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${carrier.id}`}>{carrier.code}</Link></TableCell>
+                    <TableCell><b>{carrier.name}</b><br /><span className="text-slate-500">{carrierTypeLabel(carrier.type)}</span></TableCell>
+                    <TableCell>{mediaTypes.join(', ') || 'Bez ploch'}</TableCell>
+                    <TableCell>{carrier.city || '-'}</TableCell>
+                    <TableCell>{[carrier.locality ?? carrier.cadastralArea, carrier.street ?? carrier.address].filter(Boolean).join(' · ') || '-'}</TableCell>
+                    <TableCell>{clients.join(', ') || <span className="text-slate-400">Klient neuveden</span>}</TableCell>
+                    <TableCell><StatusBadge value={carrier.archivedAt ? 'ARCHIVED' : carrier.status} /></TableCell>
+                    <TableCell><div className="flex flex-wrap gap-1">{surfaceStatuses.length ? surfaceStatuses.map((status) => <StatusBadge key={status} value={status} />) : <span className="text-slate-400">Bez ploch</span>}</div></TableCell>
+                    <TableCell>{hasGps ? <StatusBadge value={carrier.gpsStatus === 'VERIFIED' ? 'VERIFIED' : carrier.gpsStatus} /> : <StatusBadge value="MISSING" />}</TableCell>
+                    <TableCell>{carrier.photos.length + carrier.surfaces.reduce((sum, surface) => sum + surface.photos.length, 0)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        <Link className="table-action" href={`/carriers/${carrier.id}`}>Detail</Link>
+                        <Link className="table-action" href={`/map?carrier=${carrier.id}`}><MapPinned size={14} className="mr-1" />Mapa</Link>
+                        <Link className="table-action" href={`/carriers/${carrier.id}`}>Upravit</Link>
+                      </div>
+                    </TableCell>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
         )}
-      </div>
+      </section>
     </AppShell>
   );
 }
