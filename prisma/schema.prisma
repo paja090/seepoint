@@ -9,10 +9,20 @@ datasource db {
 
 enum Role {
   ADMIN
+  MANAGER
   SALES
   TECHNICIAN
   WORKER
+  ACCOUNTANT
   VIEWER
+}
+
+enum EmploymentType {
+  EMPLOYEE
+  CONTRACTOR
+  FREELANCER
+  PART_TIME
+  OTHER
 }
 
 enum CarrierType {
@@ -136,6 +146,50 @@ enum WorkType {
   OTHER
 }
 
+enum WorkTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum WorkTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SettlementStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum VehicleType {
+  CAR
+  VAN
+  TRAILER
+  OTHER
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  RESERVED
+  IN_USE
+  SERVICE
+  OUT_OF_SERVICE
+}
+
+enum ReservationStatus {
+  RESERVED
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
 model User {
   id        String   @id @default(cuid())
   name      String
@@ -146,6 +200,37 @@ model User {
 
   importBatches   ImportBatch[]
   workAssignments WorkAssignment[]
+  employee        Employee?
+}
+
+model Employee {
+  id             String         @id @default(cuid())
+  userId         String?        @unique
+  firstName      String
+  lastName       String
+  email          String?        @unique
+  phone          String?
+  position       String?
+  role           Role           @default(WORKER)
+  employmentType EmploymentType @default(EMPLOYEE)
+  ico            String?
+  dateOfBirth    DateTime?
+  startDate      DateTime?
+  endDate        DateTime?
+  isActive       Boolean        @default(true)
+  note           String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignedTasks       WorkTask[]           @relation("AssignedWorkTasks")
+  createdTasks        WorkTask[]           @relation("CreatedWorkTasks")
+  settlements         Settlement[]
+  vehicleReservations VehicleReservation[]
+
+  @@index([role])
+  @@index([isActive])
+  @@index([lastName, firstName])
 }
 
 model Client {
@@ -203,11 +288,141 @@ model AdvertisingCarrier {
   surfaces    AdvertisingSurface[]
   photos      Photo[]
   workItems   WorkOrderItem[]
+  workTasks   WorkTask[]
 
   @@index([importBatchId])
   @@index([archivedAt])
   @@index([city, structureCode])
   @@index([latitude, longitude])
+}
+
+model WorkTask {
+  id                   String           @id @default(cuid())
+  title                String
+  description          String?
+  assignedToEmployeeId String?
+  createdByEmployeeId  String?
+  carrierId            String?
+  vehicleId            String?
+  dueDate              DateTime?
+  scheduledDate        DateTime?
+  priority             WorkTaskPriority @default(NORMAL)
+  status               WorkTaskStatus   @default(TODO)
+  location             String?
+  note                 String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  assignedTo Employee?           @relation("AssignedWorkTasks", fields: [assignedToEmployeeId], references: [id], onDelete: SetNull)
+  createdBy  Employee?           @relation("CreatedWorkTasks", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  carrier    AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  vehicle    Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  items      SettlementItem[]
+
+  @@index([assignedToEmployeeId])
+  @@index([createdByEmployeeId])
+  @@index([carrierId])
+  @@index([vehicleId])
+  @@index([status, scheduledDate])
+  @@index([priority, dueDate])
+}
+
+model Settlement {
+  id          String           @id @default(cuid())
+  employeeId  String
+  periodFrom  DateTime
+  periodTo    DateTime
+  status      SettlementStatus @default(DRAFT)
+  totalAmount Decimal?         @db.Decimal(12, 2)
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  employee Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  items    SettlementItem[]
+
+  @@index([employeeId])
+  @@index([status, periodFrom, periodTo])
+}
+
+model SettlementItem {
+  id           String   @id @default(cuid())
+  settlementId String
+  taskId       String?
+  date         DateTime
+  description  String
+  quantity     Decimal? @db.Decimal(10, 2)
+  unit         String?
+  unitPrice    Decimal? @db.Decimal(12, 2)
+  amount       Decimal  @db.Decimal(12, 2)
+  note         String?
+
+  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  task       WorkTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([settlementId])
+  @@index([taskId])
+  @@index([date])
+}
+
+model Vehicle {
+  id                       String        @id @default(cuid())
+  name                     String
+  type                     VehicleType   @default(CAR)
+  registrationNumber       String?
+  vin                      String?
+  status                   VehicleStatus @default(AVAILABLE)
+  technicalInspectionUntil DateTime?
+  insuranceUntil           DateTime?
+  note                     String?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  reservations   VehicleReservation[]
+  serviceRecords VehicleServiceRecord[]
+  workTasks      WorkTask[]
+
+  @@index([type, status])
+  @@index([registrationNumber])
+}
+
+model VehicleReservation {
+  id         String            @id @default(cuid())
+  vehicleId  String
+  employeeId String
+  dateFrom   DateTime
+  dateTo     DateTime
+  purpose    String
+  status     ReservationStatus @default(RESERVED)
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([employeeId])
+  @@index([status, dateFrom, dateTo])
+}
+
+model VehicleServiceRecord {
+  id              String    @id @default(cuid())
+  vehicleId       String
+  date            DateTime
+  title           String
+  description     String?
+  cost            Decimal?  @db.Decimal(12, 2)
+  mileage         Int?
+  nextServiceDate DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([date])
+  @@index([nextServiceDate])
 }
 
 model AdvertisingSurface {
