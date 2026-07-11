@@ -1,6 +1,9 @@
+import Link from 'next/link';
+import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset } from 'lucide-react';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Button, EmptyState, ErrorState, FilterBar, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { prisma } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
@@ -12,31 +15,12 @@ const mediaTypes = ['NAVIGATION_SIGN', 'BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BA
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
-function first(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function clean(value: string | string[] | undefined) {
-  return first(value)?.trim() || undefined;
-}
-
-function parseDate(value: string | undefined) {
-  if (!value) return undefined;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? undefined : date;
-}
-
-function isOccupancyStatus(value: string | undefined): value is typeof occupancyStatuses[number] {
-  return Boolean(value && occupancyStatuses.includes(value as typeof occupancyStatuses[number]));
-}
-
-function isMediaType(value: string | undefined): value is typeof mediaTypes[number] {
-  return Boolean(value && mediaTypes.includes(value as typeof mediaTypes[number]));
-}
-
-function dateOnly(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
+function first(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] : value; }
+function clean(value: string | string[] | undefined) { return first(value)?.trim() || undefined; }
+function parseDate(value: string | undefined) { if (!value) return undefined; const date = new Date(`${value}T00:00:00.000Z`); return Number.isNaN(date.getTime()) ? undefined : date; }
+function isOccupancyStatus(value: string | undefined): value is typeof occupancyStatuses[number] { return Boolean(value && occupancyStatuses.includes(value as typeof occupancyStatuses[number])); }
+function isMediaType(value: string | undefined): value is typeof mediaTypes[number] { return Boolean(value && mediaTypes.includes(value as typeof mediaTypes[number])); }
+function dateOnly(date: Date) { return date.toISOString().slice(0, 10); }
 
 function buildWhere(params: SearchParams) {
   const q = clean(params.q);
@@ -46,21 +30,17 @@ function buildWhere(params: SearchParams) {
   const mediaType = clean(params.mediaType);
   const dateFrom = parseDate(clean(params.dateFrom));
   const dateTo = parseDate(clean(params.dateTo));
-  const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = {
-    carrier: { archivedAt: null },
-  };
+  const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = { carrier: { archivedAt: null } };
   const where: Prisma.OccupancyWhereInput = {};
 
-  if (q) {
-    where.OR = [
-      { campaignName: { contains: q, mode: 'insensitive' } },
-      { clientName: { contains: q, mode: 'insensitive' } },
-      { surface: { name: { contains: q, mode: 'insensitive' } } },
-      { surface: { carrier: { code: { contains: q, mode: 'insensitive' } } } },
-      { surface: { carrier: { name: { contains: q, mode: 'insensitive' } } } },
-      { surface: { carrier: { city: { contains: q, mode: 'insensitive' } } } },
-    ];
-  }
+  if (q) where.OR = [
+    { campaignName: { contains: q, mode: 'insensitive' } },
+    { clientName: { contains: q, mode: 'insensitive' } },
+    { surface: { name: { contains: q, mode: 'insensitive' } } },
+    { surface: { carrier: { code: { contains: q, mode: 'insensitive' } } } },
+    { surface: { carrier: { name: { contains: q, mode: 'insensitive' } } } },
+    { surface: { carrier: { city: { contains: q, mode: 'insensitive' } } } },
+  ];
   if (client) where.clientName = { contains: client, mode: 'insensitive' };
   if (isOccupancyStatus(status)) where.status = status;
   if (dateFrom && dateTo) Object.assign(where, { dateFrom: { lte: dateTo }, dateTo: { gte: dateFrom } });
@@ -69,19 +49,19 @@ function buildWhere(params: SearchParams) {
   if (isMediaType(mediaType)) surfaceWhere.mediaType = mediaType;
   if (city) surfaceWhere.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null };
   where.surface = surfaceWhere;
-
   return where;
 }
 
 export default async function Occupancy({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
-  const activeFilters = Object.entries(params)
-    .map(([key, value]) => [key, clean(value)] as const)
-    .filter(([, value]) => Boolean(value));
+  const activeFilters = Object.entries(params).map(([key, value]) => [key, clean(value)] as const).filter(([, value]) => Boolean(value));
 
   try {
     const where = buildWhere(params);
-    const [total, rows] = await Promise.all([
+    const today = new Date();
+    const in7 = new Date(today); in7.setDate(today.getDate() + 7);
+    const in30 = new Date(today); in30.setDate(today.getDate() + 30);
+    const [total, rows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count] = await Promise.all([
       prisma.occupancy.count({ where }),
       prisma.occupancy.findMany({
         where,
@@ -89,86 +69,54 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         orderBy: [{ dateTo: 'asc' }, { dateFrom: 'asc' }],
         take: 500,
       }),
+      prisma.occupancy.count({ where: { ...where, status: 'OCCUPIED' } }),
+      prisma.occupancy.count({ where: { ...where, status: 'RESERVED' } }),
+      prisma.occupancy.count({ where: { ...where, status: 'NEGOTIATION' } }),
+      prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in7 } } }),
+      prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } } }),
     ]);
 
     return (
       <AppShell>
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Obsazenost</h1>
-          <p className="mt-1 text-sm text-slate-500">Přehled kampaní, rezervací a jednání nad reklamními plochami.</p>
+        <PageHeader
+          title="Obsazenost"
+          description="Přehled kampaní, rezervací a jednání nad reklamními plochami. Stránka vždy zobrazuje stav dat, aktivní filtry a výsledek dotazu."
+          actions={<Button href="/offers" variant="secondary">Vytvořit nabídku</Button>}
+        />
+
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <StatCard icon={<ShieldAlert size={20} />} label="Aktuálně obsazeno" tone="red" value={occupiedCount} />
+          <StatCard icon={<Clock3 size={20} />} label="Rezervace" tone="orange" value={reservedCount} />
+          <StatCard icon={<Handshake size={20} />} label="Jednání" tone="blue" value={negotiationCount} />
+          <StatCard icon={<TimerReset size={20} />} label="Končí do 7 dnů" tone="orange" value={ending7Count} />
+          <StatCard icon={<CalendarClock size={20} />} label="Končí do 30 dnů" tone="slate" value={ending30Count} />
         </div>
 
-        <form className="card mb-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6" method="get">
-          <label className="text-sm font-medium">Hledání
-            <input className="mt-1 w-full rounded-lg border px-3 py-2" name="q" defaultValue={clean(params.q) ?? ''} placeholder="Kampaň, klient, kód" />
-          </label>
-          <label className="text-sm font-medium">Klient
-            <input className="mt-1 w-full rounded-lg border px-3 py-2" name="client" defaultValue={clean(params.client) ?? ''} />
-          </label>
-          <label className="text-sm font-medium">Město
-            <input className="mt-1 w-full rounded-lg border px-3 py-2" name="city" defaultValue={clean(params.city) ?? ''} />
-          </label>
-          <label className="text-sm font-medium">Typ média
-            <select className="mt-1 w-full rounded-lg border px-3 py-2" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}>
-              <option value="">Všechna média</option>
-              {mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}
-            </select>
-          </label>
-          <label className="text-sm font-medium">Stav
-            <select className="mt-1 w-full rounded-lg border px-3 py-2" name="status" defaultValue={clean(params.status) ?? ''}>
-              <option value="">Všechny stavy</option>
-              {occupancyStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-sm font-medium">Od
-              <input className="mt-1 w-full rounded-lg border px-3 py-2" name="dateFrom" type="date" defaultValue={clean(params.dateFrom) ?? ''} />
-            </label>
-            <label className="text-sm font-medium">Do
-              <input className="mt-1 w-full rounded-lg border px-3 py-2" name="dateTo" type="date" defaultValue={clean(params.dateTo) ?? ''} />
-            </label>
-          </div>
-          <div className="md:col-span-3 xl:col-span-6 flex flex-wrap items-center gap-2">
-            <button className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white" type="submit">Filtrovat</button>
-            <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href="/occupancy">Vymazat filtry</a>
-          </div>
-        </form>
+        <FilterBar>
+          <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-6" method="get">
+            <label className="text-sm font-medium">Hledání<input className="input mt-1" name="q" defaultValue={clean(params.q) ?? ''} placeholder="Kampaň, klient, kód" /></label>
+            <label className="text-sm font-medium">Klient<input className="input mt-1" name="client" defaultValue={clean(params.client) ?? ''} /></label>
+            <label className="text-sm font-medium">Město<input className="input mt-1" name="city" defaultValue={clean(params.city) ?? ''} /></label>
+            <label className="text-sm font-medium">Typ média<select className="input mt-1" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}><option value="">Všechna média</option>{mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}</select></label>
+            <label className="text-sm font-medium">Stav<select className="input mt-1" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <div className="grid grid-cols-2 gap-2"><label className="text-sm font-medium">Od<input className="input mt-1" name="dateFrom" type="date" defaultValue={clean(params.dateFrom) ?? ''} /></label><label className="text-sm font-medium">Do<input className="input mt-1" name="dateTo" type="date" defaultValue={clean(params.dateTo) ?? ''} /></label></div>
+            <div className="flex flex-wrap items-center gap-2 md:col-span-3 xl:col-span-6"><Button type="submit">Filtrovat</Button><Button href="/occupancy" variant="secondary">Vymazat filtry</Button></div>
+          </form>
+        </FilterBar>
 
-        <section className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-          Stav dat: načteno. Nalezeno <strong>{total}</strong> záznamů, zobrazeno <strong>{rows.length}</strong>.
+        <section className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+          Nalezeno <strong>{total}</strong> záznamů, zobrazeno <strong>{rows.length}</strong>.
           <span className="ml-3 text-slate-500">Aktivní filtry: {activeFilters.length ? activeFilters.map(([key, value]) => `${key}=${value}`).join(', ') : 'žádné'}</span>
         </section>
 
-        <section className="card overflow-x-auto">
+        <section className="card !p-0">
           {rows.length === 0 ? (
-            <p className="text-sm text-slate-500">Zatím není evidována žádná obsazenost.</p>
+            <div className="p-5"><EmptyState title="Zatím není evidována žádná obsazenost." description="Jakmile obchodník vytvoří rezervaci, jednání nebo obsazenost, zobrazí se v této tabulce." /></div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr className="border-b">
-                  <th className="py-2 pr-3">Kampaň</th>
-                  <th className="py-2 pr-3">Klient</th>
-                  <th className="py-2 pr-3">Nosič</th>
-                  <th className="py-2 pr-3">Plocha</th>
-                  <th className="py-2 pr-3">Termín</th>
-                  <th className="py-2 pr-3">Stav</th>
-                  <th className="py-2 pr-3">Cena</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr className="border-b last:border-0" key={row.id}>
-                    <td className="py-3 pr-3 font-semibold">{row.campaignName}</td>
-                    <td className="py-3 pr-3">{row.client?.name ?? row.clientName}</td>
-                    <td className="py-3 pr-3">{row.surface.carrier.code}<br /><span className="text-slate-500">{row.surface.carrier.city}</span></td>
-                    <td className="py-3 pr-3">{row.surface.name}<br /><span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span></td>
-                    <td className="py-3 pr-3">{dateOnly(row.dateFrom)} – {dateOnly(row.dateTo)}</td>
-                    <td className="py-3 pr-3"><StatusBadge value={row.status} /></td>
-                    <td className="py-3 pr-3">{row.price ? `${row.price.toString()} Kč` : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Table minWidth="min-w-[980px]">
+              <TableHead><tr><TableHeaderCell>Nosič</TableHeaderCell><TableHeaderCell>Plocha</TableHeaderCell><TableHeaderCell>Klient</TableHeaderCell><TableHeaderCell>Kampaň</TableHeaderCell><TableHeaderCell>Od</TableHeaderCell><TableHeaderCell>Do</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
+              <tbody>{rows.map((row) => <tr className="hover:bg-slate-50/60" key={row.id}><TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>{row.surface.carrier.code}</Link><br /><span className="text-slate-500">{row.surface.carrier.city}</span></TableCell><TableCell>{row.surface.name}<br /><span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span></TableCell><TableCell>{row.client?.name ?? row.clientName}</TableCell><TableCell><b>{row.campaignName}</b></TableCell><TableCell>{dateOnly(row.dateFrom)}</TableCell><TableCell>{dateOnly(row.dateTo)}</TableCell><TableCell><StatusBadge value={row.status} /></TableCell><TableCell><Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>Detail</Link></TableCell></tr>)}</tbody>
+            </Table>
           )}
         </section>
       </AppShell>
@@ -177,13 +125,8 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     console.error('Occupancy page failed', error);
     return (
       <AppShell>
-        <h1 className="mb-6 text-3xl font-bold">Obsazenost</h1>
-        <section className="card border-red-200 bg-red-50">
-          <h2 className="font-semibold text-red-900">Obsazenost se nepodařilo načíst</h2>
-          <p className="mt-2 text-sm text-red-700">
-            {isMissingDatabaseStructureError(error) ? productionMigrationMessage() : 'Zkuste stránku obnovit nebo zkontrolovat runtime logy.'}
-          </p>
-        </section>
+        <PageHeader title="Obsazenost" description="Přehled kampaní, rezervací a jednání nad reklamními plochami." />
+        <ErrorState title="Obsazenost se nepodařilo načíst" description={isMissingDatabaseStructureError(error) ? productionMigrationMessage() : 'Zkuste stránku obnovit nebo zkontrolovat runtime logy.'} />
       </AppShell>
     );
   }

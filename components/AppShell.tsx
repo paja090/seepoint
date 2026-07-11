@@ -1,52 +1,83 @@
-import Link from 'next/link';
-import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Car, ClipboardList, FileText, FileUp, LogOut, Map, PanelsTopLeft, Route, Settings, UserRound, Users } from 'lucide-react';
-import { canAccess, getCurrentUser, roleLabel, type AppSection } from '@/lib/rbac';
+import { canAccess, getCurrentUser, type AppSection } from '@/lib/rbac';
+import { AppNavLink, type AppNavIcon } from './AppNavLink';
+import { AppTopbar } from './AppTopbar';
 
-const nav: Array<[string, string, React.ComponentType<{ size?: number }>, AppSection]> = [
-  ['/dashboard', 'Dashboard', BarChart3, 'dashboard'],
-  ['/map', 'Mapa', Map, 'map'],
-  ['/carriers', 'Nosiče', PanelsTopLeft, 'carriers'],
-  ['/occupancy', 'Obsazenost', CalendarRange, 'occupancy'],
-  ['/clients', 'Klienti', Users, 'clients'],
-  ['/offers', 'Nabídky', BadgeDollarSign, 'offers'],
-  ['/employees', 'Zaměstnanci', UserRound, 'employees'],
-  ['/tasks', 'Úkoly', ClipboardList, 'tasks'],
-  ['/my-tasks', 'Moje úkoly', CalendarCheck, 'myTasks'],
-  ['/settlements', 'Vyúčtování', FileText, 'settlements'],
-  ['/my-settlements', 'Moje vyúčtování', FileText, 'mySettlements'],
-  ['/vehicles', 'Vozidla a vozíky', Car, 'vehicles'],
-  ['/work', 'Plán práce', BriefcaseBusiness, 'work'],
-  ['/work/route', 'Pracovní výjezd', Route, 'work'],
-  ['/import', 'Import', FileUp, 'import'],
-  ['/settings', 'Nastavení', Settings, 'settings'],
+type NavItem = [string, string, AppNavIcon, AppSection];
+type NavGroup = { label: string; items: NavItem[] };
+
+const navGroups: NavGroup[] = [
+  {
+    label: 'Přehled',
+    items: [
+      ['/dashboard', 'Dashboard', 'barChart3', 'dashboard'],
+      ['/map', 'Mapa', 'map', 'map'],
+    ],
+  },
+  {
+    label: 'Evidence',
+    items: [
+      ['/carriers', 'Nosiče', 'panelsTopLeft', 'carriers'],
+      ['/occupancy', 'Obsazenost', 'calendarRange', 'occupancy'],
+      ['/clients', 'Klienti', 'users', 'clients'],
+      ['/offers', 'Nabídky', 'badgeDollarSign', 'offers'],
+    ],
+  },
+  {
+    label: 'Interní provoz',
+    items: [
+      ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
+      ['/tasks', 'Úkoly', 'clipboardList', 'tasks'],
+      ['/my-tasks', 'Moje úkoly', 'calendarCheck', 'myTasks'],
+      ['/settlements', 'Vyúčtování', 'fileText', 'settlements'],
+      ['/my-settlements', 'Moje vyúčtování', 'fileText', 'mySettlements'],
+      ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
+    ],
+  },
+  {
+    label: 'Provoz',
+    items: [
+      ['/work', 'Plán práce', 'briefcaseBusiness', 'work'],
+      ['/work/route', 'Pracovní výjezd', 'route', 'work'],
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      ['/import', 'Import', 'fileUp', 'import'],
+      ['/settings', 'Nastavení', 'settings', 'settings'],
+    ],
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const user = getCurrentUser();
-  const visibleNav = nav.filter(([, , , section]) => canAccess(user.role, section));
+  const visibleGroups = navGroups
+    .map((group) => ({ ...group, items: group.items.filter(([, , , section]) => canAccess(user.role, section)) }))
+    .filter((group) => group.items.length > 0);
 
   return (
-    <div className="min-h-screen md:flex">
-      <aside className="bg-slate-950 p-4 text-white md:w-64">
-        <div className="mb-8 text-2xl font-bold">SeePoint</div>
-        <nav className="space-y-2">
-          {visibleNav.map(([href, label, Icon]) => (
-            <Link className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-800" href={href} key={href}>
-              <Icon size={18} />
-              {label}
-            </Link>
+    <div className="min-h-screen bg-slate-100 text-slate-950 lg:flex">
+      <aside className="border-b border-slate-900 bg-slate-950 px-4 py-4 text-white lg:fixed lg:inset-y-0 lg:w-72 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <div className="mb-6 px-2">
+          <div className="inline-flex max-w-full rounded-2xl bg-white p-2 shadow-sm shadow-slate-950/20">
+            <img alt="SeePOINT Outdoor reklama" className="h-16 w-auto max-w-full" src="/seepoint-logo.svg" />
+          </div>
+          <p className="mt-3 text-xs text-slate-400">Interní administrační systém</p>
+        </div>
+        <nav className="space-y-6">
+          {visibleGroups.map((group) => (
+            <section key={group.label}>
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{group.label}</p>
+              <div className="space-y-1">
+                {group.items.map(([href, label, icon]) => <AppNavLink href={href} icon={icon} key={href} label={label} />)}
+              </div>
+            </section>
           ))}
         </nav>
       </aside>
-      <main className="flex-1">
-        <header className="flex h-16 items-center justify-between border-b bg-white px-6">
-          <div>
-            <b>Správa reklamních nosičů</b>
-            <p className="text-xs text-slate-500">Mock přihlášený uživatel: {user.name} · {roleLabel(user.role)}</p>
-          </div>
-          <Link href="/login" className="flex gap-2 text-sm"><LogOut size={16} />Odhlásit</Link>
-        </header>
-        <div className="p-6">{children}</div>
+      <main className="min-w-0 flex-1 lg:pl-72">
+        <AppTopbar user={user} />
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 lg:px-8">{children}</div>
       </main>
     </div>
   );
