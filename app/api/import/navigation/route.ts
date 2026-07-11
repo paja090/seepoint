@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { parseNavigationImport } from '@/lib/navigation-import';
@@ -66,6 +67,7 @@ function jsonValue(value: unknown): Prisma.InputJsonValue {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApiAccess('import'); if (isApiDenied(auth)) return auth;
   try {
     const body = await request.json() as ImportRequest;
     const sources = readSources(body.sources);

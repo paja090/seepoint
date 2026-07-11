@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { Button, EmptyState, FilterBar, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { prisma } from '@/lib/db';
 
@@ -11,6 +12,7 @@ function first(value: string | string[] | undefined) { return Array.isArray(valu
 function clean(value: string | string[] | undefined) { return first(value)?.trim() || undefined; }
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  await requirePageAccess('clients');
   const params = await searchParams;
   const q = clean(params.q);
   const where: Prisma.ClientWhereInput = { active: true };

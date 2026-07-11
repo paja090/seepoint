@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { createOfferDraft, getOffers } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
 
@@ -25,6 +26,7 @@ function conflictsFrom(error: unknown) {
 }
 
 export async function GET() {
+  const auth = await requireApiAccess('offers'); if (isApiDenied(auth)) return auth;
   try {
     return NextResponse.json(await getOffers());
   } catch (error) {
@@ -37,6 +39,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApiAccess('offers'); if (isApiDenied(auth)) return auth;
   try {
     const body = await request.json() as OfferBody;
     const rawItems = Array.isArray(body.items) ? body.items : [];

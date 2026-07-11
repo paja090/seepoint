@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { deleteCarrier, getCarrier, upsertCarrier } from '@/lib/db';
 import type { Carrier } from '@/lib/types';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   const carrier = await getCarrier((await params).id);
   return carrier ? NextResponse.json(carrier) : NextResponse.json({ error: 'Nosič nebyl nalezen.' }, { status: 404 });
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   try {
     const input = await req.json() as Partial<Carrier>;
     const hasLatitude = input.latitude !== undefined && input.latitude !== null;
@@ -37,6 +40,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   if (req.headers.get('x-seepoint-admin-confirm') !== 'hard-delete-empty-carrier') {
     return NextResponse.json({ error: 'Fyzické smazání je vypnuté. Použijte archivaci nosiče.' }, { status: 403 });
   }

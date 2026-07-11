@@ -1,6 +1,8 @@
-import { canAccess, getCurrentUser, type AppSection } from '@/lib/rbac';
+import { canAccess, type AppSection } from '@/lib/rbac';
+import { getCurrentUser } from '@/lib/auth';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
+import { redirect } from 'next/navigation';
 
 type NavItem = [string, string, AppNavIcon, AppSection];
 type NavGroup = { label: string; items: NavItem[] };
@@ -49,8 +51,9 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const user = getCurrentUser();
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser();
+  if (!user) redirect('/login');
   const visibleGroups = navGroups
     .map((group) => ({ ...group, items: group.items.filter(([, , , section]) => canAccess(user.role, section)) }))
     .filter((group) => group.items.length > 0);

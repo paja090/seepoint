@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset } from 'lucide-react';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button, EmptyState, ErrorState, FilterBar, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
@@ -53,6 +54,7 @@ function buildWhere(params: SearchParams) {
 }
 
 export default async function Occupancy({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  await requirePageAccess('occupancy');
   const params = await searchParams;
   const activeFilters = Object.entries(params).map(([key, value]) => [key, clean(value)] as const).filter(([, value]) => Boolean(value));
 

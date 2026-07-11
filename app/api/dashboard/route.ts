@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { getCarriers } from '@/lib/db';
 
 export async function GET() {
+  const auth = await requireApiAccess('dashboard'); if (isApiDenied(auth)) return auth;
   const carriers = await getCarriers();
   const surfaces = carriers.flatMap((carrier) => carrier.surfaces);
   const occupied = surfaces.filter((surface) => surface.status === 'OCCUPIED').length;

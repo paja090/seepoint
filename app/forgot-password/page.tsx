@@ -1,0 +1,2 @@
+import Link from 'next/link'; import { AuthForm } from '@/components/AuthForm';
+export default function Page(){return <main className="grid min-h-screen place-items-center bg-slate-950 px-4"><section className="card w-full max-w-md"><h1 className="text-2xl font-bold">Obnova hesla</h1><p className="mt-2 text-sm text-slate-500">Zadejte e-mail svého účtu.</p><AuthForm mode="forgot"/><Link href="/login" className="mt-5 block text-center text-sm text-sky-700">Zpět na přihlášení</Link></section></main>}

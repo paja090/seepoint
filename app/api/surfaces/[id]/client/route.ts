@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 
 function normalizeClientName(value: string) {
@@ -36,6 +37,7 @@ function campaignStatuses(dateFrom: Date | undefined, dateTo: Date | undefined) 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('occupancy'); if (isApiDenied(auth)) return auth;
   try {
     const surfaceId = (await params).id;
     const body = await request.json() as {

@@ -1,5 +1,6 @@
 import { CheckCircle2, Database, FileSearch, FileUp, GitBranch, ListChecks, UploadCloud } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { Card, EmptyState, PageHeader, Tabs } from '@/components/ui';
 import { MediaImportPreview } from '@/components/MediaImportPreview';
 import { NavigationImportPreview } from '@/components/NavigationImportPreview';
@@ -13,7 +14,8 @@ const steps = [
   ['Report', CheckCircle2],
 ] as const;
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  await requirePageAccess('import');
   return (
     <AppShell>
       <PageHeader

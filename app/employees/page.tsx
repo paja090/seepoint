@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { EmployeeCreateForm } from '@/components/EmployeeCreateForm';
 import { prisma } from '@/lib/db';
-import { AccessDenied, canAccess, canViewSensitiveEmployeeData, getCurrentUser, roleLabel, roles } from '@/lib/rbac';
+import { AccessDenied, canAccess, canViewSensitiveEmployeeData, roleLabel, roles } from '@/lib/rbac';
+import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill, statusLabel } from '@/lib/internal-format';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ function clean(value: string | string[] | undefined) {
 }
 
 export default async function EmployeesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = getCurrentUser();
+  const user = await requirePageAccess('employees');
   if (!canAccess(user.role, 'employees')) return <AppShell><AccessDenied /></AppShell>;
 
   const params = await searchParams;

@@ -1,12 +1,18 @@
 import { PrismaClient } from '@prisma/client';
+import { randomBytes, scrypt as scryptCallback } from 'node:crypto';
+import { promisify } from 'node:util';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!email || !password || password.length < 12 || !/[a-zá-ž]/i.test(password) || !/\d/.test(password)) throw new Error('Nastavte SEED_ADMIN_EMAIL a SEED_ADMIN_PASSWORD (min. 12 znaků, písmeno a číslice).');
+  const salt = randomBytes(16); const derived = await promisify(scryptCallback)(password, salt, 64); const passwordHash = `scrypt:${salt.toString('base64')}:${derived.toString('base64')}`;
   await prisma.user.upsert({
-    where: { email: 'admin@seepoint.cz' },
-    update: { name: 'SeePoint Admin', role: 'ADMIN' },
-    create: { id: 'user-admin', name: 'SeePoint Admin', email: 'admin@seepoint.cz', role: 'ADMIN' },
+    where: { email },
+    update: { name: process.env.SEED_ADMIN_NAME || 'SeePoint Admin', role: 'ADMIN', status: 'ACTIVE', passwordHash, sessionVersion: { increment: 1 } },
+    create: { name: process.env.SEED_ADMIN_NAME || 'SeePoint Admin', email, role: 'ADMIN', status: 'ACTIVE', passwordHash },
   });
 
   const carriers = [
@@ -29,7 +35,7 @@ async function main() {
   }
 
   const occupancies = [
-    { id: 'o1', surfaceId: 's1', clientName: 'Auto ESA', campaignName: 'Letní akce', dateFrom: new Date('2026-06-01T00:00:00.000Z'), dateTo: new Date('2026-06-30T00:00:00.000Z'), status: 'ACTIVE', price: 18000 },
+    { id: 'o1', surfaceId: 's1', clientName: 'Auto ESA', campaignName: 'Letní akce', dateFrom: new Date('2026-06-01T00:00:00.000Z'), dateTo: new Date('2026-06-30T00:00:00.000Z'), status: 'OCCUPIED', price: 18000 },
     { id: 'o2', surfaceId: 's3', clientName: 'Kavárna Metro', campaignName: 'Opening', dateFrom: new Date('2026-07-01T00:00:00.000Z'), dateTo: new Date('2026-07-31T00:00:00.000Z'), status: 'RESERVED', price: 9000 },
   ];
   for (const occupancy of occupancies) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, Search } from 'lucide-react';
+import { LogOut, Search, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
@@ -29,6 +29,7 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
   const pathname = usePathname();
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
+  async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
 
   return (
     <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-6">
@@ -46,9 +47,10 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
           <p className="text-xs text-slate-500">{roleLabel(user.role)}</p>
         </div>
         <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-950 text-sm font-semibold text-white" title={user.email}>{initials}</div>
-        <Link className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" href="/login" title="Odhlásit">
+        <Link className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" href="/profile" title="Můj profil"><UserRound size={18} /></Link>
+        <button className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" onClick={logout} title="Odhlásit">
           <LogOut size={18} />
-        </Link>
+        </button>
       </div>
     </header>
   );

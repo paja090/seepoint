@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
-import { AccessDenied, canViewAllTasks, getCurrentUser } from '@/lib/rbac';
+import { AccessDenied, canViewAllTasks } from '@/lib/rbac';
+import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ function first(value: string | string[] | undefined) { return Array.isArray(valu
 function clean(value: string | string[] | undefined) { return first(value)?.trim() || undefined; }
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = getCurrentUser();
+  const user = await requirePageAccess('tasks');
   if (!canViewAllTasks(user.role)) return <AppShell><AccessDenied /></AppShell>;
 
   const params = await searchParams;

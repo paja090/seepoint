@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MapPinned, Plus } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { CarrierFilters } from '@/components/CarrierFilters';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button, EmptyState, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
@@ -10,6 +11,7 @@ import { getCarrierFilterOptions, getCarriersPage } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export default async function Carriers({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requirePageAccess('carriers');
   const filters = parseCarrierFilters(await searchParams);
   const [{ carriers, meta }, filterOptions] = await Promise.all([getCarriersPage(filters), getCarrierFilterOptions()]);
   const nextParams = new URLSearchParams();

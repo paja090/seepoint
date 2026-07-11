@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { parseCarrierFilters } from '@/lib/carrier-filters';
 import { getCarriersPage, upsertCarrier, type SurfaceTemplate } from '@/lib/db';
 import type { Carrier, Surface } from '@/lib/types';
@@ -9,12 +10,14 @@ const allowedMediaTypes = new Set<Surface['mediaType']>(['BILLBOARD', 'PROMO_BEN
 type CarrierCreateRequest = Partial<Carrier> & { surfaceTemplates?: SurfaceTemplate[] };
 
 export async function GET(req: Request) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   const url = new URL(req.url);
   const params = Object.fromEntries(url.searchParams.entries());
   return NextResponse.json(await getCarriersPage(parseCarrierFilters(params)));
 }
 
 export async function POST(req: Request) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   try {
     const input = await req.json() as CarrierCreateRequest;
     const { surfaceTemplates: requestedTemplates = [], ...carrierInput } = input;

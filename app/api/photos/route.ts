@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import {
   deletePhotoFromGoogleDrive,
@@ -14,6 +15,7 @@ const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PHOTO_TYPES = new Set(['LOCATION', 'CARRIER', 'CAMPAIGN', 'INSTALLATION', 'CHECK', 'ARCHIVE']);
 
 export async function POST(req: Request) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   let driveFileId: string | undefined;
 
   try {

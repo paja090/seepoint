@@ -1,4 +1,5 @@
 import { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
@@ -46,6 +47,7 @@ function validDriveUrl(value?: string) {
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
   const input = await request.json().catch(() => null) as UpdateInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
   if (typeof input.status !== 'string' || !Object.values(WorkOrderStatus).includes(input.status as WorkOrderStatus)) {
@@ -76,6 +78,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
   const input = await request.json().catch(() => null) as EditInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
 

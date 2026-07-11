@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
@@ -20,6 +21,7 @@ function dateInput(value?: Date | null) {
 }
 
 export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageAccess('work');
   const { id } = await params;
   const [order, clients, carriers] = await Promise.all([
     prisma.workOrder.findUnique({ where: { id }, include: { client: true, assignments: true, workTasks: { include: { assignedTo: true } }, items: { include: { carrier: true, surface: true } } } }),

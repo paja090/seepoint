@@ -1,4 +1,5 @@
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { WorkRoutePlanner } from '@/components/WorkRoutePlanner';
 import { prisma } from '@/lib/db';
 
@@ -14,6 +15,7 @@ function localDate(value: Date) {
 }
 
 export default async function WorkRoutePage() {
+  await requirePageAccess('work');
   const now = new Date();
   const rangeStart = new Date(now);
   rangeStart.setDate(rangeStart.getDate() - 14);

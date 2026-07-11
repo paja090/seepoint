@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { CarrierDetail } from '@/components/CarrierDetail';
 import { CarrierForm } from '@/components/CarrierForm';
 import { getCarrier, prisma } from '@/lib/db';
@@ -8,6 +9,7 @@ import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/l
 export const dynamic = 'force-dynamic';
 
 export default async function CarrierPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageAccess('carriers');
   let carrier;
   try {
     carrier = await getCarrier((await params).id);

@@ -1,5 +1,6 @@
 import { AlertTriangle, MapPinned, Search } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { CarrierFilters } from '@/components/CarrierFilters';
 import { MapView } from '@/components/MapView';
 import { PageHeader, StatCard } from '@/components/ui';
@@ -9,6 +10,7 @@ import { getCarrierFilterOptions, getMapCarriers } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export default async function MapPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requirePageAccess('map');
   const params = await searchParams;
   const filters = parseCarrierFilters(params);
   const selectedCarrierId = Array.isArray(params.carrier) ? params.carrier[0] : params.carrier;
