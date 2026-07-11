@@ -40,7 +40,12 @@ export default async function OffersPage() {
       <PageHeader
         title="Obchodní nabídky"
         description="Nabídky propojují klienta, reklamní plochy, termín, cenu a kontrolu kolizí s obsazeností."
-        actions={<Button href="/occupancy" variant="secondary">Přehled obsazenosti</Button>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button href="/offers/preview" variant="secondary">Náhled klientské nabídky</Button>
+            <Button href="/occupancy" variant="ghost">Přehled obsazenosti</Button>
+          </div>
+        }
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
