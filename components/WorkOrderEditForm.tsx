@@ -68,7 +68,7 @@ export function WorkOrderEditForm({ order, clients, carriers }: WorkOrderEditFor
 
   return (
     <details className="card">
-      <summary className="cursor-pointer text-lg font-bold">Upravit celý úkol</summary>
+      <summary className="cursor-pointer text-lg font-semibold text-slate-950">Upravit celý úkol</summary>
       <form className="mt-5 grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
         <label className="lg:col-span-2">Název úkolu<input className="input mt-1" defaultValue={order.title} name="title" required /></label>
         <label>Datum a čas práce<input className="input mt-1" defaultValue={order.scheduledAt} name="scheduledAt" required type="datetime-local" /></label>
@@ -93,7 +93,7 @@ export function WorkOrderEditForm({ order, clients, carriers }: WorkOrderEditFor
         <label className="lg:col-span-2">Odkaz na podklady<input className="input mt-1" defaultValue={order.referenceUrl} name="referenceUrl" type="url" /></label>
         {error && <p className="lg:col-span-2 text-sm text-red-700" role="alert">{error}</p>}
         {saved && <p className="lg:col-span-2 text-sm font-medium text-emerald-700" role="status">Změny byly uloženy.</p>}
-        <div className="lg:col-span-2"><button className="rounded-xl bg-slate-950 px-5 py-3 font-medium text-white disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit celý úkol'}</button></div>
+        <div className="lg:col-span-2"><button className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit celý úkol'}</button></div>
       </form>
     </details>
   );

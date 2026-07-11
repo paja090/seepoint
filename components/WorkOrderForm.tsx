@@ -42,7 +42,7 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
 
   return (
     <details className="card" open>
-      <summary className="cursor-pointer text-lg font-bold">Nový pracovní úkol</summary>
+      <summary className="cursor-pointer text-lg font-semibold text-slate-950">Nový pracovní úkol</summary>
       <form className="mt-5 grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
         <label className="lg:col-span-2">Název úkolu<input className="input mt-1" name="title" required placeholder="Např. Instalace navigací Lemon" /></label>
         <label>Datum a čas práce<input className="input mt-1" name="scheduledAt" required type="datetime-local" /></label>
@@ -66,7 +66,7 @@ export function WorkOrderForm({ clients, carriers }: WorkOrderFormProps) {
         <label className="lg:col-span-2">Složka fotodokumentace na Google Disku<input className="input mt-1" name="ftdUrl" type="url" placeholder="https://drive.google.com/…" /><span className="mt-1 block text-xs text-slate-500">Zadavatel vytvoří firemní složku a vloží sem její odkaz.</span></label>
         <label className="lg:col-span-2">Odkaz na podklady<input className="input mt-1" name="referenceUrl" type="url" placeholder="https://…" /></label>
         {error && <p className="lg:col-span-2 text-sm text-red-700" role="alert">{error}</p>}
-        <div className="lg:col-span-2"><button className="rounded-xl bg-slate-950 px-5 py-3 font-medium text-white disabled:opacity-50" disabled={submitting} type="submit">{submitting ? 'Ukládám…' : 'Vytvořit pracovní úkol'}</button></div>
+        <div className="lg:col-span-2"><button className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50" disabled={submitting} type="submit">{submitting ? 'Ukládám…' : 'Vytvořit pracovní úkol'}</button></div>
       </form>
     </details>
   );

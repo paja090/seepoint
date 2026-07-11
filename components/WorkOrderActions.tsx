@@ -38,7 +38,7 @@ export function WorkOrderActions({ id, status, priority, price, ftdSent, invoice
 
   return (
     <form className="card space-y-4" onSubmit={handleSubmit}>
-      <h2 className="text-lg font-bold">Aktualizace práce</h2>
+      <h2 className="text-lg font-semibold text-slate-950">Aktualizace práce</h2>
       <label>Stav<select className="input mt-1" defaultValue={status} name="status">{Object.entries(workStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <div className="rounded-xl border border-slate-200 p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pracovník</p>
@@ -51,7 +51,7 @@ export function WorkOrderActions({ id, status, priority, price, ftdSent, invoice
         <label className="flex items-center gap-3"><input defaultChecked={invoiced} name="invoiced" type="checkbox" /> Faktura vystavena</label>
       </div>
       {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
-      <button className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit změny'}</button>
+      <button className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Uložit změny'}</button>
     </form>
   );
 }
