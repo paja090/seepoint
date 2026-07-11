@@ -4,7 +4,7 @@ import type { WorkOrderStatus, WorkPriority } from '@prisma/client';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { workPriorityLabels, workPriorityStyles, workStatusLabels, workStatusStyles } from '@/lib/work';
+import { StatusBadge } from '@/components/StatusBadge';
 
 type RouteCarrier = {
   id: string;
@@ -139,7 +139,7 @@ export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlanne
         radius: 13,
         color: '#ffffff',
         weight: 3,
-        fillColor: order.priority === 'URGENT' ? '#dc2626' : '#0369a1',
+        fillColor: order.priority === 'URGENT' ? '#dc2626' : '#0f172a',
         fillOpacity: 1,
       });
       const tooltip = document.createElement('span');
@@ -164,11 +164,11 @@ export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlanne
     <div className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Pracovní výjezd</p>
-          <h1 className="text-3xl font-bold">Úkoly na mapě</h1>
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Pracovní výjezd</p>
+          <h1 className="text-3xl font-bold text-slate-950">Úkoly na mapě</h1>
           <p className="mt-2 text-slate-600">Pořadí zastávek, zadání a navigace pro vybraný pracovní den.</p>
         </div>
-        <Link className="text-sm font-semibold text-sky-700 hover:text-sky-900" href="/work">← Zpět na plán práce</Link>
+        <Link className="text-sm font-semibold text-slate-600 hover:text-slate-950" href="/work">← Zpět na plán práce</Link>
       </header>
 
       <section className="card grid gap-3 md:grid-cols-2 xl:grid-cols-[auto_auto_1fr_auto] xl:items-end">
@@ -179,7 +179,7 @@ export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlanne
         </div>
         <label className="text-sm font-medium">Datum<input className="input mt-1" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
         <label className="text-sm font-medium">Pracovník<select className="input mt-1" value={worker} onChange={(event) => setWorker(event.target.value)}><option value="ALL">Všichni pracovníci</option>{workers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
-        {fullRouteUrl && <a className="rounded-xl bg-sky-700 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-sky-800" href={fullRouteUrl} rel="noreferrer" target="_blank">Navigovat celou trasu ↗</a>}
+        {fullRouteUrl && <a className="rounded-xl bg-slate-950 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800" href={fullRouteUrl} rel="noreferrer" target="_blank">Navigovat celou trasu ↗</a>}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
@@ -189,20 +189,20 @@ export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlanne
         </div>
 
         <div>
-          <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Pořadí zastávek</p><h2 className="text-xl font-bold capitalize">{formattedDate}</h2></div><span className="text-sm font-semibold text-slate-500">{dayOrders.length} úkolů</span></div>
-          {dayOrders.length === 0 ? <div className="card text-center"><p className="font-semibold">Na tento den není naplánovaná žádná práce.</p><p className="mt-1 text-sm text-slate-500">Vyberte jiný den nebo pracovníka.</p></div> : <ol className="space-y-3">{dayOrders.map((order, index) => {
+          <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Pořadí zastávek</p><h2 className="text-xl font-bold capitalize text-slate-950">{formattedDate}</h2></div><span className="text-sm font-semibold text-slate-500">{dayOrders.length} úkolů</span></div>
+          {dayOrders.length === 0 ? <div className="card text-center"><p className="font-semibold text-slate-950">Na tento den není naplánovaná žádná práce.</p><p className="mt-1 text-sm text-slate-500">Vyberte jiný den nebo pracovníka.</p></div> : <ol className="space-y-3">{dayOrders.map((order, index) => {
             const located = hasCoordinates(order.carrier);
             return <li className={`rounded-2xl border bg-white p-4 shadow-sm ${order.priority === 'URGENT' ? 'border-red-300' : 'border-slate-200'}`} key={order.id}>
               <div className="flex items-start gap-3">
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full font-bold text-white ${order.priority === 'URGENT' ? 'bg-red-600' : 'bg-sky-700'}`}>{index + 1}</span>
+                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full font-bold text-white ${order.priority === 'URGENT' ? 'bg-red-600' : 'bg-slate-950'}`}>{index + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span><span className="ml-auto text-xs font-semibold text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' })}</span></div>
-                  <Link className="mt-2 block font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
+                  <div className="flex flex-wrap items-center gap-1.5"><StatusBadge value={order.status} /><StatusBadge value={order.priority} /><span className="ml-auto text-xs font-semibold text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' })}</span></div>
+                  <Link className="mt-2 block font-bold text-slate-950 hover:text-slate-700" href={`/work/${order.id}`}>{order.title}</Link>
                   <p className="mt-1 text-sm text-slate-600">{order.clientName}</p>
                   <p className="mt-1 text-xs text-slate-500">{order.workers.join(', ') || 'Nepřiřazený pracovník'}</p>
                   <p className="mt-2 text-sm text-slate-700">{order.carrier ? `${order.carrier.code} · ${order.carrier.address || order.carrier.city}` : order.locationNote || 'Místo není upřesněno'}</p>
                   {!located && <p className="mt-1 text-xs font-medium text-amber-700">Bez přesného GPS bodu – navigace použije textové místo.</p>}
-                  <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><a className="text-sky-700 hover:text-sky-900" href={navigationUrl(order)} rel="noreferrer" target="_blank">Navigovat ↗</a><Link className="text-slate-600 hover:text-slate-900" href={`/work/${order.id}`}>Otevřít zadání</Link>{order.carrier && <Link className="text-slate-600 hover:text-slate-900" href={`/carriers/${order.carrier.id}`}>Detail nosiče</Link>}</div>
+                  <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><a className="text-slate-700 hover:text-slate-950 hover:underline" href={navigationUrl(order)} rel="noreferrer" target="_blank">Navigovat ↗</a><Link className="text-slate-600 hover:text-slate-900" href={`/work/${order.id}`}>Otevřít zadání</Link>{order.carrier && <Link className="text-slate-600 hover:text-slate-900" href={`/carriers/${order.carrier.id}`}>Detail nosiče</Link>}</div>
                 </div>
               </div>
             </li>;

@@ -3,7 +3,8 @@
 import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { formatWorkPrice, workPriorityLabels, workPriorityStyles, workStatusLabels, workStatusStyles, workTypeLabels } from '@/lib/work';
+import { StatusBadge } from '@/components/StatusBadge';
+import { formatWorkPrice, workPriorityLabels, workStatusLabels, workTypeLabels } from '@/lib/work';
 
 type WeekOrder = {
   id: string;
@@ -109,21 +110,21 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
 
   return (
     <section className="space-y-5" aria-labelledby="worker-view-heading">
-      <section className="rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5" aria-labelledby="worker-view-heading">
+      <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5" aria-labelledby="worker-view-heading">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div><p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Rychlý přehled pracovníka</p><h2 className="text-2xl font-bold" id="worker-view-heading">Co je potřeba udělat</h2><p className="mt-1 text-sm text-slate-600">Vyberte pracovníka a stav úkolu změňte jedním tlačítkem.</p></div>
+          <div><p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Rychlý přehled pracovníka</p><h2 className="text-2xl font-bold text-slate-950" id="worker-view-heading">Co je potřeba udělat</h2><p className="mt-1 text-sm text-slate-600">Vyberte pracovníka a stav úkolu změňte jedním tlačítkem.</p></div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Období rychlého přehledu">
-            <button aria-pressed={focusMode === 'TODAY'} className={`rounded-xl px-4 py-2 text-sm font-semibold ${focusMode === 'TODAY' ? 'bg-sky-700 text-white' : 'border border-sky-200 bg-white text-sky-900'}`} onClick={() => setFocusMode('TODAY')} type="button">Dnes</button>
-            <button aria-pressed={focusMode === 'WEEK'} className={`rounded-xl px-4 py-2 text-sm font-semibold ${focusMode === 'WEEK' ? 'bg-sky-700 text-white' : 'border border-sky-200 bg-white text-sky-900'}`} onClick={() => setFocusMode('WEEK')} type="button">Příštích 7 dní</button>
+            <button aria-pressed={focusMode === 'TODAY'} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${focusMode === 'TODAY' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => setFocusMode('TODAY')} type="button">Dnes</button>
+            <button aria-pressed={focusMode === 'WEEK'} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${focusMode === 'WEEK' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`} onClick={() => setFocusMode('WEEK')} type="button">Příštích 7 dní</button>
           </div>
         </div>
         <label className="mt-4 block max-w-sm text-sm font-medium">Pracovník<select className="input mt-1" value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)}><option value="ALL">Všichni pracovníci</option>{workers.map((worker) => <option key={worker} value={worker}>{worker}</option>)}</select></label>
-        {focusedOrders.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-sky-300 bg-white p-5 text-center"><p className="font-semibold">Pro zvolený pohled nejsou žádné úkoly.</p><p className="mt-1 text-sm text-slate-500">Zkuste příštích 7 dní nebo jiného pracovníka.</p></div> : <div className="mt-4 grid gap-3 lg:grid-cols-2">{focusedOrders.map((order) => {
+        {focusedOrders.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center"><p className="font-semibold text-slate-950">Pro zvolený pohled nejsou žádné úkoly.</p><p className="mt-1 text-sm text-slate-500">Zkuste příštích 7 dní nebo jiného pracovníka.</p></div> : <div className="mt-4 grid gap-3 lg:grid-cols-2">{focusedOrders.map((order) => {
           const overdue = isOrderOverdue(order);
           const urgent = order.priority === 'URGENT' && isOpen(order);
-          return <article className={`rounded-xl border bg-white p-4 shadow-sm ${overdue ? 'border-red-500 ring-2 ring-red-100' : urgent ? 'border-red-300 bg-red-50' : 'border-sky-200'}`} key={order.id}>
-            <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>{overdue && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">Po termínu</span>}<span className="ml-auto text-sm font-semibold text-slate-700">{new Date(order.scheduledAt).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })} · {new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
-            <Link className="mt-3 block text-lg font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
+          return <article className={`rounded-xl border bg-white p-4 shadow-sm ${overdue ? 'border-red-500 ring-2 ring-red-100' : urgent ? 'border-red-300 bg-red-50' : 'border-slate-200'}`} key={order.id}>
+            <div className="flex flex-wrap items-center gap-2"><StatusBadge value={order.status} /><StatusBadge value={order.priority} />{overdue && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">Po termínu</span>}<span className="ml-auto text-sm font-semibold text-slate-700">{new Date(order.scheduledAt).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })} · {new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
+            <Link className="mt-3 block text-lg font-bold text-slate-950 hover:text-slate-700" href={`/work/${order.id}`}>{order.title}</Link>
             <p className="mt-1 text-sm text-slate-600">{order.clientName} · {order.workers.join(', ') || 'nepřiřazený pracovník'}</p>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{workerStatusActions.map((action) => <button aria-pressed={order.status === action.status} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${order.status === action.status ? action.activeClass : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`} disabled={savingId === order.id} key={action.status} onClick={() => void updateOrder(order, { status: action.status })} type="button">{action.label}</button>)}<button aria-pressed={order.ftdSent} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${order.ftdSent ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { ftdSent: !order.ftdSent })} type="button">Foto {order.ftdSent ? 'nahrána ✓' : 'nahrána'}</button></div>
           </article>;
@@ -131,7 +132,7 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
       </section>
 
       <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div><p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Týdenní rozpis</p><h2 className="text-2xl font-bold">{weekLabel}</h2></div>
+        <div><p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Týdenní rozpis</p><h2 className="text-2xl font-bold text-slate-950">{weekLabel}</h2></div>
         <div className="flex flex-wrap gap-2"><button className="rounded-xl border bg-white px-3 py-2 text-sm font-medium" onClick={() => setWeekOffset((value) => value - 1)} type="button">← Předchozí</button><button className="rounded-xl border bg-white px-3 py-2 text-sm font-medium" onClick={() => setWeekOffset(0)} type="button">Tento týden</button><button className="rounded-xl border bg-white px-3 py-2 text-sm font-medium" onClick={() => setWeekOffset((value) => value + 1)} type="button">Další →</button></div>
       </div>
       <div className="card grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -146,13 +147,13 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
           {days.map((day) => {
             const dayOrders = visibleOrders.filter((order) => sameDay(new Date(order.scheduledAt), day));
             const isToday = sameDay(day, new Date());
-            return <section className={`min-h-64 rounded-2xl border p-3 ${isToday ? 'border-sky-400 bg-sky-50' : 'border-slate-200 bg-slate-50'}`} key={day.toISOString()} aria-label={day.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })}>
+            return <section className={`min-h-64 rounded-2xl border p-3 ${isToday ? 'border-slate-400 bg-white ring-1 ring-slate-200' : 'border-slate-200 bg-slate-50'}`} key={day.toISOString()} aria-label={day.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' })}>
               <header className="mb-3"><p className="text-xs font-semibold uppercase text-slate-500">{day.toLocaleDateString('cs-CZ', { weekday: 'long' })}</p><strong>{day.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}</strong></header>
               <div className="space-y-3">{dayOrders.length === 0 ? <p className="text-xs text-slate-400">Bez práce</p> : dayOrders.map((order) => {
                 const overdue = isOrderOverdue(order);
                 return <article className={`rounded-xl border bg-white p-3 shadow-sm ${overdue ? 'border-red-400 ring-2 ring-red-100' : order.priority === 'URGENT' ? 'border-red-300 bg-red-50' : 'border-slate-200'}`} key={order.id}>
-                  <div className="flex flex-wrap items-center gap-1"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>{overdue && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white">Po termínu</span>}<span className="ml-auto text-[11px] text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
-                  <Link className="mt-2 block text-sm font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
+                  <div className="flex flex-wrap items-center gap-1"><StatusBadge value={order.status} /><StatusBadge value={order.priority} />{overdue && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white">Po termínu</span>}<span className="ml-auto text-[11px] text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
+                  <Link className="mt-2 block text-sm font-bold text-slate-950 hover:text-slate-700" href={`/work/${order.id}`}>{order.title}</Link>
                   <p className="mt-1 text-xs text-slate-600">{order.clientName}</p>
                   <p className="mt-1 text-xs font-semibold text-slate-700">{formatWorkPrice(order.price)}</p>
                   <p className="mt-1 text-xs text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p>

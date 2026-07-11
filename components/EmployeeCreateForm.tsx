@@ -43,7 +43,7 @@ export function EmployeeCreateForm({ canCreate }: EmployeeCreateFormProps) {
 
   return (
     <details className="card mb-6" open>
-      <summary className="cursor-pointer text-lg font-bold">Nový zaměstnanec</summary>
+      <summary className="cursor-pointer text-lg font-semibold text-slate-950">Nový zaměstnanec</summary>
       <p className="mt-2 text-sm text-slate-600">Pro párování s plánem práce musí jméno pracovníka v zakázce odpovídat jménu a příjmení zaměstnance, případně jeho e-mailu.</p>
       {!canCreate ? <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Nové zaměstnance může zakládat jen admin nebo manažer.</p> : (
         <form className="mt-5 grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
@@ -59,7 +59,7 @@ export function EmployeeCreateForm({ canCreate }: EmployeeCreateFormProps) {
           <label>Datum narození<input className="input mt-1" name="dateOfBirth" type="date" /></label>
           <label className="lg:col-span-2">Poznámka<textarea className="input mt-1 min-h-24" name="note" /></label>
           {error && <p className="lg:col-span-2 text-sm text-red-700" role="alert">{error}</p>}
-          <div className="lg:col-span-2"><button className="rounded-xl bg-slate-950 px-5 py-3 font-medium text-white disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Založit zaměstnance'}</button></div>
+          <div className="lg:col-span-2"><button className="inline-flex items-center justify-center rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50" disabled={saving} type="submit">{saving ? 'Ukládám…' : 'Založit zaměstnance'}</button></div>
         </form>
       )}
     </details>
