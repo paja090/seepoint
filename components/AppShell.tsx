@@ -59,8 +59,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-100 text-slate-950 lg:flex">
       <aside className="border-b border-slate-900 bg-slate-950 px-4 py-4 text-white lg:fixed lg:inset-y-0 lg:w-72 lg:overflow-y-auto lg:border-b-0 lg:border-r">
         <div className="mb-6 px-2">
-          <div className="rounded-2xl bg-white p-2 shadow-sm shadow-slate-950/20">
-            <img alt="SeePOINT Outdoor reklama" className="h-auto w-full" src="/seepoint-logo.svg" />
+          <div className="inline-flex max-w-full rounded-2xl bg-white p-2 shadow-sm shadow-slate-950/20">
+            <img alt="SeePOINT Outdoor reklama" className="h-16 w-auto max-w-full" src="/seepoint-logo.svg" />
           </div>
           <p className="mt-3 text-xs text-slate-400">Interní administrační systém</p>
         </div>
