@@ -5,6 +5,8 @@ import { audit } from '@/lib/audit';
 import { getCurrentUser, issueUserToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 
 type AccountInput = { action?: 'enableAccess' | 'invite' | 'suspend' | 'restore' | 'role'; role?: Role };
 
@@ -37,6 +39,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === 'role' && (!body.role || !canAssignRole(actor.role, body.role))) return NextResponse.json({ error: 'Tuto roli nemůžete přiřadit.' }, { status: 403 });
 
   if (body.action === 'invite') {
+    const limited = await enforceRateLimit(request, hashRateLimitIdentity(target.id), rateLimitPolicies.resendInvitation);
+    if (limited) return limited;
     if (target.status !== 'INVITED') return NextResponse.json({ error: 'Novou pozvánku lze poslat pouze účtu ve stavu INVITED.' }, { status: 400 });
     ensureEmailConfigured();
     const token = await issueUserToken(target.id, 'ACTIVATION', 48); const url = activationUrl(token);

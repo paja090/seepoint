@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createSession, verifyPassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as { email?: string; password?: string } | null;
   const email = body?.email?.trim().toLowerCase();
+  const limited = await enforceRateLimit(request, hashRateLimitIdentity(email ?? 'missing-email'), rateLimitPolicies.login);
+  if (limited) return limited;
   if (!email || !body?.password) return NextResponse.json({ error: 'Vyplňte e-mail a heslo.' }, { status: 400 });
   const user = await prisma.user.findUnique({ where: { email }, include: { employee: true } });
   const valid = user?.passwordHash ? await verifyPassword(body.password, user.passwordHash) : false;
