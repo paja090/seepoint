@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 290" role="img" aria-labelledby="title desc">
+  <title id="title">SeePOINT Outdoor Reklama</title>
+  <desc id="desc">Modré logo SeePOINT s bílým nápisem a doplňkem Outdoor reklama.</desc>
+  <rect x="4" y="4" width="732" height="212" rx="24" fill="#0ea5d7"/>
+  <path d="M3 153h68c14 0 24-6 29-17" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
+  <text x="70" y="151" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="86" font-style="italic" font-weight="700" letter-spacing="-5">seepoint</text>
+  <path d="M653 75h83M694 31l-24 120" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="square"/>
+  <path d="M296 206 290 278 378 206Z" fill="#0ea5d7"/>
+  <text x="352" y="276" fill="#0ea5d7" font-family="Arial Narrow, Arial, Helvetica, sans-serif" font-size="38" font-style="italic" font-weight="800" letter-spacing="2">OUTDOOR REKLAMA</text>
+</svg>
