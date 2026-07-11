@@ -8,17 +8,37 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ');
 }
 
-/** Small rounded label. Tone-aware when a valid accent tone is passed. */
+/** Extra status tones beyond the media accent palette. */
+type StatusTone = 'red' | 'amber' | 'green' | 'slate';
+type ChipTone = MockAccentTone | StatusTone;
+
+const STATUS_TONE_CLASS: Record<StatusTone, string> = {
+  red: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+  amber: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+  green: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+  slate: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200',
+};
+
+function isAccentTone(tone: ChipTone): tone is MockAccentTone {
+  return tone in TONE_CLASSES;
+}
+
+/** Small rounded label. Tone-aware for media accents and status colors. */
 export function Chip({
   children,
   tone,
   className,
 }: {
   children: ReactNode;
-  tone?: MockAccentTone;
+  tone?: ChipTone;
   className?: string;
 }) {
-  const toneClass = tone ? cx(TONE_CLASSES[tone].softBg, TONE_CLASSES[tone].text, 'ring-1', TONE_CLASSES[tone].ring) : 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
+  let toneClass = 'bg-slate-100 text-slate-700 ring-1 ring-slate-200';
+  if (tone) {
+    toneClass = isAccentTone(tone)
+      ? cx(TONE_CLASSES[tone].softBg, TONE_CLASSES[tone].text, 'ring-1', TONE_CLASSES[tone].ring)
+      : STATUS_TONE_CLASS[tone];
+  }
   return (
     <span className={cx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold', toneClass, className)}>
       {children}
