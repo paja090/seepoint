@@ -23,6 +23,14 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Obchodní workflow',
+    items: [
+      ['/sales', 'Sales dashboard', 'gauge', 'offers'],
+      ['/sales/crm', 'Klientské CRM', 'contactRound', 'offers'],
+      ['/sales/new', 'Nový návrh kampaně', 'filePlus2', 'offers'],
+    ],
+  },
+  {
     label: 'Interní provoz',
     items: [
       ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
