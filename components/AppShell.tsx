@@ -1,51 +1,50 @@
-import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Car, ClipboardList, FileText, FileUp, Map, PanelsTopLeft, Route, Settings, UserRound, Users } from 'lucide-react';
 import { canAccess, getCurrentUser, type AppSection } from '@/lib/rbac';
-import { AppNavLink } from './AppNavLink';
+import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
 
-type NavItem = [string, string, React.ComponentType<{ size?: number }>, AppSection];
+type NavItem = [string, string, AppNavIcon, AppSection];
 type NavGroup = { label: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
   {
     label: 'Přehled',
     items: [
-      ['/dashboard', 'Dashboard', BarChart3, 'dashboard'],
-      ['/map', 'Mapa', Map, 'map'],
+      ['/dashboard', 'Dashboard', 'barChart3', 'dashboard'],
+      ['/map', 'Mapa', 'map', 'map'],
     ],
   },
   {
     label: 'Evidence',
     items: [
-      ['/carriers', 'Nosiče', PanelsTopLeft, 'carriers'],
-      ['/occupancy', 'Obsazenost', CalendarRange, 'occupancy'],
-      ['/clients', 'Klienti', Users, 'clients'],
-      ['/offers', 'Nabídky', BadgeDollarSign, 'offers'],
+      ['/carriers', 'Nosiče', 'panelsTopLeft', 'carriers'],
+      ['/occupancy', 'Obsazenost', 'calendarRange', 'occupancy'],
+      ['/clients', 'Klienti', 'users', 'clients'],
+      ['/offers', 'Nabídky', 'badgeDollarSign', 'offers'],
     ],
   },
   {
     label: 'Interní provoz',
     items: [
-      ['/employees', 'Zaměstnanci', UserRound, 'employees'],
-      ['/tasks', 'Úkoly', ClipboardList, 'tasks'],
-      ['/my-tasks', 'Moje úkoly', CalendarCheck, 'myTasks'],
-      ['/settlements', 'Vyúčtování', FileText, 'settlements'],
-      ['/my-settlements', 'Moje vyúčtování', FileText, 'mySettlements'],
-      ['/vehicles', 'Vozidla a vozíky', Car, 'vehicles'],
+      ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
+      ['/tasks', 'Úkoly', 'clipboardList', 'tasks'],
+      ['/my-tasks', 'Moje úkoly', 'calendarCheck', 'myTasks'],
+      ['/settlements', 'Vyúčtování', 'fileText', 'settlements'],
+      ['/my-settlements', 'Moje vyúčtování', 'fileText', 'mySettlements'],
+      ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
     ],
   },
   {
     label: 'Provoz',
     items: [
-      ['/work', 'Plán práce', BriefcaseBusiness, 'work'],
-      ['/work/route', 'Pracovní výjezd', Route, 'work'],
+      ['/work', 'Plán práce', 'briefcaseBusiness', 'work'],
+      ['/work/route', 'Pracovní výjezd', 'route', 'work'],
     ],
   },
   {
     label: 'Data',
     items: [
-      ['/import', 'Import', FileUp, 'import'],
-      ['/settings', 'Nastavení', Settings, 'settings'],
+      ['/import', 'Import', 'fileUp', 'import'],
+      ['/settings', 'Nastavení', 'settings', 'settings'],
     ],
   },
 ];
@@ -71,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <section key={group.label}>
               <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{group.label}</p>
               <div className="space-y-1">
-                {group.items.map(([href, label, Icon]) => <AppNavLink href={href} icon={Icon} key={href} label={label} />)}
+                {group.items.map(([href, label, icon]) => <AppNavLink href={href} icon={icon} key={href} label={label} />)}
               </div>
             </section>
           ))}
