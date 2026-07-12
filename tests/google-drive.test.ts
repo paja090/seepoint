@@ -43,11 +43,11 @@ test('1. Mock cannot be activated in production', () => {
 
 test('2. Missing credentials without mock enabled throws error', async () => {
   const originalMockEnabled = env.GOOGLE_DRIVE_MOCK_ENABLED;
-  const originalClientId = env.GOOGLE_DRIVE_CLIENT_ID;
+  const originalEmail = env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
   try {
     env.GOOGLE_DRIVE_MOCK_ENABLED = 'false';
-    delete env.GOOGLE_DRIVE_CLIENT_ID;
+    delete env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
     const dummyFile = new File(['dummy'], 'test.jpg', { type: 'image/jpeg' });
     await assert.rejects(
@@ -55,12 +55,12 @@ test('2. Missing credentials without mock enabled throws error', async () => {
         await uploadPhotoToGoogleDrive(dummyFile, 'test.jpg', 'photo1');
       },
       (err: unknown) => {
-        return err instanceof Error && err.message.includes('Missing Google Drive configuration');
+        return err instanceof Error && err.message.includes('Chybí konfigurace Google Service Account');
       }
     );
   } finally {
     env.GOOGLE_DRIVE_MOCK_ENABLED = originalMockEnabled;
-    env.GOOGLE_DRIVE_CLIENT_ID = originalClientId;
+    env.GOOGLE_SERVICE_ACCOUNT_EMAIL = originalEmail;
   }
 });
 

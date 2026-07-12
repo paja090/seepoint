@@ -1,4 +1,6 @@
-const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+import crypto from 'node:crypto';
+
+const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const DRIVE_FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 
 export class GoogleDriveConfigurationError extends Error {}
@@ -81,42 +83,49 @@ export function isGoogleDriveMockEnabled() {
   return process.env.NODE_ENV !== 'production' && process.env.GOOGLE_DRIVE_MOCK_ENABLED === 'true';
 }
 
-function getOAuthConfig() {
-  const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+async function getAccessToken() {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  let privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
-  const missing = [
-    !clientId && 'GOOGLE_DRIVE_CLIENT_ID',
-    !clientSecret && 'GOOGLE_DRIVE_CLIENT_SECRET',
-    !refreshToken && 'GOOGLE_DRIVE_REFRESH_TOKEN',
-  ].filter(Boolean);
-
-  if (missing.length) {
-    throw new GoogleDriveConfigurationError(`Missing Google Drive configuration: ${missing.join(', ')}`);
+  if (!email || !privateKey) {
+    throw new GoogleDriveConfigurationError(
+      'Chybí konfigurace Google Service Account (GOOGLE_SERVICE_ACCOUNT_EMAIL a GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY).'
+    );
   }
 
-  return { clientId: clientId!, clientSecret: clientSecret!, refreshToken: refreshToken! };
-}
+  // Support Vercel multi-line environment variables
+  privateKey = privateKey.replace(/\\n/g, '\n');
 
-async function getAccessToken() {
-  const { clientId, clientSecret, refreshToken } = getOAuthConfig();
-  const body = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    refresh_token: refreshToken,
-    grant_type: 'refresh_token',
-  });
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const claimSet = Buffer.from(
+    JSON.stringify({
+      iss: email,
+      scope: 'https://www.googleapis.com/auth/drive',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now,
+    })
+  ).toString('base64url');
+
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(`${header}.${claimSet}`);
+  const signature = sign.sign(privateKey, 'base64url');
+  const jwt = `${header}.${claimSet}.${signature}`;
+
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
     cache: 'no-store',
   });
-  const data = (await response.json()) as { access_token?: string; error_description?: string };
 
+  const data = (await response.json()) as { access_token?: string; error_description?: string };
   if (!response.ok || !data.access_token) {
-    throw new Error(`Google OAuth token refresh failed: ${data.error_description ?? response.statusText}`);
+    throw new Error(`Google Service Account autentizace selhala: ${data.error_description ?? response.statusText}`);
   }
 
   return data.access_token;
