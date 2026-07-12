@@ -70,24 +70,59 @@ export async function syncWorkOrderTasks(workOrderId: string) {
   const location = taskLocation(order);
 
   await prisma.$transaction(async (transaction) => {
-    await transaction.workTask.deleteMany({ where: { workOrderId: order.id } });
-    await transaction.workTask.createMany({
-      data: namesForTasks.map((workerName) => {
-        const employee = workerName ? employees.get(workerName) : undefined;
-        return {
-          workOrderId: order.id,
-          title: taskTitle(order, workerName || undefined),
-          description: order.description,
-          assignedToEmployeeId: employee?.id ?? null,
-          carrierId,
-          dueDate: order.deadlineAt,
-          scheduledDate: order.scheduledAt,
-          priority,
-          status,
-          location,
-          note: taskNote(order, workerName || undefined, employee),
-        };
-      }),
+    const existingTasks = await transaction.workTask.findMany({
+      where: { workOrderId: order.id },
+      include: { workEntries: true },
     });
+
+    const matchedIds = new Set<string>();
+
+    for (const workerName of namesForTasks) {
+      const employee = workerName ? employees.get(workerName) : undefined;
+      const employeeId = employee?.id ?? null;
+      const expectedTitle = taskTitle(order, workerName || undefined);
+
+      const matchedTask = existingTasks.find(t => 
+        (employeeId !== null && t.assignedToEmployeeId === employeeId) ||
+        (employeeId === null && t.assignedToEmployeeId === null && t.title === expectedTitle)
+      );
+
+      const taskData = {
+        title: expectedTitle,
+        description: order.description,
+        assignedToEmployeeId: employeeId,
+        carrierId,
+        dueDate: order.deadlineAt,
+        scheduledDate: order.scheduledAt,
+        priority,
+        status,
+        location,
+        note: taskNote(order, workerName || undefined, employee),
+      };
+
+      if (matchedTask) {
+        matchedIds.add(matchedTask.id);
+        await transaction.workTask.update({
+          where: { id: matchedTask.id },
+          data: taskData,
+        });
+      } else {
+        await transaction.workTask.create({
+          data: {
+            workOrderId: order.id,
+            ...taskData,
+          },
+        });
+      }
+    }
+
+    const unmatchedTasks = existingTasks.filter(t => !matchedIds.has(t.id));
+    for (const task of unmatchedTasks) {
+      if (task.workEntries.length > 0) {
+        throw new Error(`NELZE_ODEBRAT_PRACOVNIKA: Pracovník přiřazený k úkolu "${task.title}" již vykázal práci. Odebrání pracovníka bylo zablokováno.`);
+      } else {
+        await transaction.workTask.delete({ where: { id: task.id } });
+      }
+    }
   });
 }

@@ -1,0 +1,88 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
+import { parseRateInput } from '@/lib/worker-rates';
+import { intervalsOverlap } from '@/lib/rate-intervals';
+import { Prisma, RateType, WorkType } from '@prisma/client';
+
+async function assertNoCompanyRateConflict(
+  tx: Prisma.TransactionClient,
+  candidate: { type: RateType; name: string; workType: WorkType | null; validFrom: Date; validTo: Date | null },
+  excludeId?: string
+) {
+  const conflicts = await tx.companyRate.findMany({
+    where: {
+      type: candidate.type,
+      workType: candidate.workType,
+      ...(candidate.type === 'HOURLY' ? {} : { name: { equals: candidate.name, mode: 'insensitive' } }),
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: { validFrom: true, validTo: true },
+  });
+
+  if (conflicts.some((rate) => intervalsOverlap(rate, candidate))) {
+    throw new Error('RATE_CONFLICT');
+  }
+}
+
+export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
+  }
+
+  if (user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Sazby může spravovat pouze administrátor.' }, { status: 403 });
+  }
+
+  const raw = await request.json().catch(() => null);
+  try {
+    if (!raw) throw new Error('Neplatná data.');
+    const data = parseRateInput(raw);
+
+    const rate = await prisma.$transaction(async (tx) => {
+      await assertNoCompanyRateConflict(tx, data);
+      return tx.companyRate.create({
+        data: {
+          ...data,
+          createdByUserId: user.id,
+          updatedByUserId: user.id,
+        },
+      });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    return NextResponse.json({ id: rate.id }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error && error.message === 'RATE_CONFLICT'
+            ? 'Sazba se překrývá s jinou aktivní firemní sazbou stejného typu a práce.'
+            : error instanceof Error
+            ? error.message
+            : 'Sazbu se nepodařilo uložit.',
+      },
+      {
+        status: error instanceof Error && error.message === 'RATE_CONFLICT' ? 409 : 400,
+      }
+    );
+  }
+}
+
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
+  }
+
+  const rates = await prisma.companyRate.findMany({
+    orderBy: { validFrom: 'desc' },
+  });
+
+  const formatted = rates.map((rate) => ({
+    ...rate,
+    amount: rate.amount.toString(),
+  }));
+
+  return NextResponse.json(formatted);
+}

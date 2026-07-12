@@ -73,7 +73,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     },
     select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true },
   });
-  await syncWorkOrderTasks(id);
+  try {
+    await syncWorkOrderTasks(id);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {
+      return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });
+    }
+    throw err;
+  }
   return NextResponse.json({ ...saved, price: saved.price?.toString() ?? null });
 }
 
@@ -154,6 +161,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       },
     },
   });
-  await syncWorkOrderTasks(id);
+  try {
+    await syncWorkOrderTasks(id);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {
+      return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });
+    }
+    throw err;
+  }
   return NextResponse.json({ id });
 }
