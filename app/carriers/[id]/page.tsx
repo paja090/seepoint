@@ -40,7 +40,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
     <AppShell>
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <div className="card">
-          <CarrierDetail carrier={carrier} clients={clients} showLocationMap canEdit={canEdit} />
+          <CarrierDetail carrier={carrier} clients={clients} showLocationMap canEdit={canEdit} userRole={user.role} />
         </div>
         <div id="carrier-form" className="card scroll-mt-6">
           <h2 className="mb-4 font-bold">Upravit nosič</h2>
