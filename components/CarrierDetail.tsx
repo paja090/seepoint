@@ -21,14 +21,12 @@ export function CarrierDetail({
   showLocationMap = false,
   clients = [],
   canEdit = false,
-  userRole,
 }: {
   carrier: Carrier;
   onSurfaceClientChanged?: SurfaceClientChangeHandler;
   showLocationMap?: boolean;
   clients?: Array<Pick<Client, 'id' | 'name'>>;
   canEdit?: boolean;
-  userRole?: string;
 }) {
   const campaigns = carrier.surfaces.flatMap((surface) =>
     surface.occupancies.map((occupancy) => ({ ...occupancy, surface: surface.name })),
@@ -51,11 +49,6 @@ export function CarrierDetail({
 
   return (
     <div className="space-y-5">
-      {userRole && (
-        <div className="p-3 bg-red-100 border border-red-200 text-red-700 text-xs rounded-xl" id="debug-user-role">
-          Role: {userRole} | canEdit: {String(canEdit)}
-        </div>
-      )}
       <div>
         <h2 className="text-2xl font-bold">{carrier.name}</h2>
         <p className="text-sm text-slate-500">
