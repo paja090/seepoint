@@ -3,6 +3,84 @@ const DRIVE_FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 
 export class GoogleDriveConfigurationError extends Error {}
 
+export interface GoogleDriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  thumbnailLink?: string;
+}
+
+interface MockFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  content: Buffer;
+  thumbnailLink?: string;
+  parents: string[];
+}
+
+const defaultMockFiles: MockFile[] = [
+  {
+    id: 'mock-file-1',
+    name: 'PHA-D1-001_praha-d1.jpg',
+    mimeType: 'image/jpeg',
+    size: 1024,
+    content: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
+    thumbnailLink: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=150&h=150&fit=crop',
+    parents: [],
+  },
+  {
+    id: 'mock-file-2',
+    name: 'PHA-CL-014_andel-citylight.png',
+    mimeType: 'image/png',
+    size: 2048,
+    content: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'),
+    thumbnailLink: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=150&h=150&fit=crop',
+    parents: [],
+  },
+  {
+    id: 'mock-file-3',
+    name: 'BRN-LED-007_brno-led-screen.webp',
+    mimeType: 'image/webp',
+    size: 3072,
+    content: Buffer.from('UklGRhoAAABXRUJQVlA4TCEAAAAvAAAAEP8IEP8HAP8HAP8HAP8HAP8HAP8HAP8HAP8HAP8HAP8=', 'base64'),
+    thumbnailLink: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=150&h=150&fit=crop',
+    parents: [],
+  },
+  {
+    id: 'mock-file-4',
+    name: 'PHA-D1-001_interior-check.jpg',
+    mimeType: 'image/jpeg',
+    size: 1536,
+    content: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
+    thumbnailLink: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=150&h=150&fit=crop',
+    parents: [],
+  }
+];
+
+const globalForMockDrive = globalThis as unknown as {
+  mockDriveFiles?: Map<string, MockFile>;
+};
+
+function getMockDriveFiles() {
+  if (!globalForMockDrive.mockDriveFiles) {
+    const map = new Map<string, MockFile>();
+    defaultMockFiles.forEach(file => {
+      const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+      file.parents = [folderId];
+      map.set(file.id, file);
+    });
+    globalForMockDrive.mockDriveFiles = map;
+  }
+  return globalForMockDrive.mockDriveFiles;
+}
+
+export function isGoogleDriveMockEnabled() {
+  return process.env.NODE_ENV !== 'production' && process.env.GOOGLE_DRIVE_MOCK_ENABLED === 'true';
+}
+
 function getOAuthConfig() {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
@@ -91,6 +169,28 @@ async function getOrCreatePhotoFolder(accessToken: string) {
 }
 
 export async function uploadPhotoToGoogleDrive(file: File, fileName: string, photoId: string) {
+  if (isGoogleDriveMockEnabled()) {
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mockFileId = `mock-uploaded-${crypto.randomUUID()}`;
+    const newMockFile: MockFile = {
+      id: mockFileId,
+      name: fileName,
+      mimeType: file.type,
+      size: file.size,
+      content: buffer,
+      parents: [folderId],
+      thumbnailLink: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=150&h=150&fit=crop',
+    };
+    getMockDriveFiles().set(mockFileId, newMockFile);
+    return {
+      id: mockFileId,
+      name: fileName,
+      mimeType: file.type,
+      size: file.size,
+    };
+  }
+
   const accessToken = await getAccessToken();
   const folderId = await getOrCreatePhotoFolder(accessToken);
   const boundary = `seepoint-${crypto.randomUUID()}`;
@@ -140,7 +240,18 @@ export async function uploadPhotoToGoogleDrive(file: File, fileName: string, pho
   };
 }
 
-export async function downloadPhotoFromGoogleDrive(fileId: string) {
+export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Response> {
+  if (isGoogleDriveMockEnabled()) {
+    const file = getMockDriveFiles().get(fileId);
+    if (!file) {
+      return new Response(JSON.stringify({ error: 'Mock file not found' }), { status: 404 });
+    }
+    return new Response(new Uint8Array(file.content), {
+      status: 200,
+      headers: { 'Content-Type': file.mimeType },
+    });
+  }
+
   const accessToken = await getAccessToken();
   return fetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
@@ -152,6 +263,11 @@ export async function downloadPhotoFromGoogleDrive(fileId: string) {
 }
 
 export async function deletePhotoFromGoogleDrive(fileId: string) {
+  if (isGoogleDriveMockEnabled()) {
+    getMockDriveFiles().delete(fileId);
+    return;
+  }
+
   const accessToken = await getAccessToken();
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`,
@@ -164,6 +280,74 @@ export async function deletePhotoFromGoogleDrive(fileId: string) {
   if (!response.ok && response.status !== 404) {
     throw new Error(`Google Drive delete failed: ${response.statusText}`);
   }
+}
+
+export async function listImagesInFolder(folderId: string): Promise<GoogleDriveFile[]> {
+  if (isGoogleDriveMockEnabled()) {
+    const list: GoogleDriveFile[] = [];
+    getMockDriveFiles().forEach(file => {
+      if (file.parents.includes(folderId)) {
+        list.push({
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size,
+          thumbnailLink: file.thumbnailLink,
+        });
+      }
+    });
+    return list;
+  }
+
+  const accessToken = await getAccessToken();
+  const query = `'${folderId}' in parents and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'image/webp') and trashed = false`;
+  const params = new URLSearchParams({
+    q: query,
+    fields: 'files(id, name, mimeType, size, thumbnailLink)',
+    pageSize: '1000',
+    supportsAllDrives: 'true',
+    includeItemsFromAllDrives: 'true',
+  });
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
+  const data = (await response.json()) as {
+    files?: Array<{ id: string; name: string; mimeType: string; size?: string; thumbnailLink?: string }>;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(`Google Drive list failed: ${data.error?.message ?? response.statusText}`);
+  }
+
+  return (data.files ?? []).map(file => ({
+    id: file.id,
+    name: file.name,
+    mimeType: file.mimeType,
+    size: Number(file.size ?? 0),
+    thumbnailLink: file.thumbnailLink,
+  }));
+}
+
+export async function verifyFileInFolder(fileId: string, folderId: string): Promise<boolean> {
+  if (isGoogleDriveMockEnabled()) {
+    const file = getMockDriveFiles().get(fileId);
+    return file?.parents.includes(folderId) ?? false;
+  }
+
+  const accessToken = await getAccessToken();
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=parents&supportsAllDrives=true`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    },
+  );
+
+  if (!response.ok) return false;
+  const data = (await response.json()) as { parents?: string[] };
+  return data.parents?.includes(folderId) ?? false;
 }
 
 export const googleDriveScope = DRIVE_FILE_SCOPE;

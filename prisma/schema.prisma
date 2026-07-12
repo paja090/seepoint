@@ -684,24 +684,29 @@ model OfferItem {
 }
 
 model Photo {
-  id          String    @id @default(cuid())
-  carrierId   String?
-  surfaceId   String?
-  employeeId  String?
-  url         String
-  driveFileId String?   @unique
-  fileName    String?
-  mimeType    String?
-  size        Int?
-  type        PhotoType @default(CARRIER)
-  note        String?
-  createdAt   DateTime  @default(now())
+  id              String              @id @default(cuid())
+  carrierId       String?
+  surfaceId       String?
+  employeeId      String?
+  url             String
+  driveFileId     String?
+  fileName        String?
+  mimeType        String?
+  size            Int?
+  type            PhotoType           @default(CARRIER)
+  note            String?
+  sortOrder       Int                 @default(0)
+  isPrimary       Boolean             @default(false)
+  isClientVisible Boolean             @default(false)
+  createdAt       DateTime            @default(now())
 
   carrier  AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface  AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
   employee Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  @@unique([carrierId, driveFileId])
   @@index([carrierId])
+  @@index([carrierId, sortOrder])
   @@index([surfaceId])
   @@index([employeeId])
 }

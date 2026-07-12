@@ -9,7 +9,8 @@ import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/l
 export const dynamic = 'force-dynamic';
 
 export default async function CarrierPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePageAccess('carriers');
+  const user = await requirePageAccess('carriers');
+  const canEdit = user.role === 'ADMIN' || user.role === 'MANAGER';
   let carrier;
   try {
     carrier = await getCarrier((await params).id);
@@ -39,7 +40,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
     <AppShell>
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
         <div className="card">
-          <CarrierDetail carrier={carrier} clients={clients} showLocationMap />
+          <CarrierDetail carrier={carrier} clients={clients} showLocationMap canEdit={canEdit} />
         </div>
         <div id="carrier-form" className="card scroll-mt-6">
           <h2 className="mb-4 font-bold">Upravit nosič</h2>

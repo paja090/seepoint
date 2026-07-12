@@ -95,6 +95,13 @@ export type Photo = {
   url: string;
   type: PhotoType;
   note?: string;
+  sortOrder?: number;
+  isPrimary?: boolean;
+  isClientVisible?: boolean;
+  driveFileId?: string;
+  fileName?: string;
+  mimeType?: string;
+  size?: number;
 };
 
 export type Carrier = {
