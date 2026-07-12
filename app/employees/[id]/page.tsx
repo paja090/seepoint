@@ -7,6 +7,8 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, money, StatusPill, statusLabel } from '@/lib/internal-format';
 import { AccountAdmin } from '@/components/AccountAdmin';
 import { EmployeeEditForm } from '@/components/EmployeeEditForm';
+import { EmployeeRates } from '@/components/EmployeeRates';
+import { EmployeeBillingForm } from '@/components/EmployeeBillingForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,8 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       settlements: { orderBy: { periodFrom: 'desc' }, take: 20, include: { items: true } },
       vehicleReservations: { orderBy: { dateFrom: 'desc' }, take: 20, include: { vehicle: true } },
       user: true,
+      rates: { orderBy: { validFrom: 'desc' } },
+      billingProfile: true,
     },
   });
   if (!employee) notFound();
@@ -37,6 +41,8 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       </div>
       {(user.role === 'ADMIN' || user.role === 'MANAGER') && <AccountAdmin employeeId={employee.id} status={employee.user?.status ?? null} role={employee.user?.role ?? employee.role} lastLoginAt={employee.user?.lastLoginAt?.toISOString() ?? null} canSetAdmin={user.role === 'ADMIN'} />}
       {(user.role === 'ADMIN' || user.role === 'MANAGER') && <EmployeeEditForm employee={{ id: employee.id, firstName: employee.firstName, lastName: employee.lastName, email: employee.email, phone: employee.phone, position: employee.position, note: employee.note, isActive: employee.isActive }} />}
+      <EmployeeRates employeeId={employee.id} editable={user.role === 'ADMIN'} rates={employee.rates.map(r => ({ id:r.id,name:r.name,type:r.type,amount:r.amount.toString(),currency:r.currency,unit:r.unit,workType:r.workType,validFrom:r.validFrom.toISOString().slice(0,10),validTo:r.validTo?.toISOString().slice(0,10)??null,isActive:r.isActive }))} />
+      {user.role === 'ADMIN' && <EmployeeBillingForm employeeId={employee.id} profile={employee.billingProfile} />}
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <section className="card"><h2 className="mb-3 text-xl font-bold">Přiřazené úkoly</h2>{employee.assignedTasks.length === 0 ? <p className="text-sm text-slate-500">Žádné úkoly.</p> : employee.assignedTasks.map((task) => <div className="border-b py-3 text-sm last:border-0" key={task.id}><div className="flex items-center justify-between gap-3"><b>{task.title}</b><StatusPill value={task.status} /></div><p className="text-slate-500">{dateOnly(task.scheduledDate)} · {task.carrier?.code ?? task.location ?? 'Bez lokality'} · {task.vehicle?.name ?? 'Bez vozidla'}</p></div>)}</section>
         <section className="card"><h2 className="mb-3 text-xl font-bold">Vyúčtování</h2>{employee.settlements.length === 0 ? <p className="text-sm text-slate-500">Žádné vyúčtování.</p> : employee.settlements.map((settlement) => <div className="border-b py-3 text-sm last:border-0" key={settlement.id}><div className="flex items-center justify-between gap-3"><b>{dateOnly(settlement.periodFrom)} – {dateOnly(settlement.periodTo)}</b><StatusPill value={settlement.status} /></div><p className="text-slate-500">{money(settlement.totalAmount)} · položek {settlement.items.length}</p></div>)}</section>
