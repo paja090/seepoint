@@ -33,7 +33,7 @@ type EntryPayload = {
 type WorkEntriesManagerProps = {
   employees: EmployeePayload[];
   initialEntries: EntryPayload[];
-  currentUserRole: string;
+  currentUserRole?: string;
 };
 
 const workTypeLabels: Record<string, string> = {
@@ -58,7 +58,7 @@ const rateSourceLabels: Record<string, string> = {
   MANUAL: 'Manuální zadání',
 };
 
-export function WorkEntriesManager({ employees, initialEntries, currentUserRole: _currentUserRole }: WorkEntriesManagerProps) {
+export function WorkEntriesManager({ employees, initialEntries }: WorkEntriesManagerProps) {
   const [entries, setEntries] = useState<EntryPayload[]>(initialEntries);
 
   // Filters

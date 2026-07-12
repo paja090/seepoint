@@ -68,7 +68,6 @@ export default async function WorkEntriesPage() {
       <WorkEntriesManager
         employees={employees}
         initialEntries={formattedEntries}
-        currentUserRole={user.role}
       />
     </AppShell>
   );

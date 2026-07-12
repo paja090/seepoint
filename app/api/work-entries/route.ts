@@ -214,6 +214,7 @@ export async function POST(request: Request) {
       workType: workType as WorkType,
       workDate: dateObj,
       remunerationMethod: remunerationMethod as RateType,
+      workOrderId,
     });
     if (resolved) {
       finalRate = resolved.amount;

@@ -5,7 +5,7 @@ CREATE TYPE "WorkEntryStatus" AS ENUM ('DRAFT', 'CONFIRMED');
 CREATE TYPE "WorkEntryCreationSource" AS ENUM ('AUTOMATIC', 'MANUAL');
 
 -- CreateEnum
-CREATE TYPE "RateSource" AS ENUM ('EMPLOYEE_RATE', 'COMPANY_RATE', 'MANUAL');
+CREATE TYPE "RateSource" AS ENUM ('EMPLOYEE_RATE', 'WORK_ORDER_RATE', 'COMPANY_RATE', 'MANUAL');
 
 -- CreateTable
 CREATE TABLE "CompanyRate" (
@@ -75,3 +75,33 @@ ALTER TABLE "WorkEntry" ADD CONSTRAINT "WorkEntry_workOrderId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "WorkEntry" ADD CONSTRAINT "WorkEntry_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- CreateTable
+CREATE TABLE "WorkOrderRate" (
+    "id" TEXT NOT NULL,
+    "workOrderId" TEXT NOT NULL,
+    "type" "RateType" NOT NULL,
+    "name" TEXT NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'CZK',
+    "unit" TEXT,
+    "workType" "WorkType",
+    "validFrom" TIMESTAMP(3) NOT NULL,
+    "validTo" TIMESTAMP(3),
+    "note" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdByUserId" TEXT,
+    "updatedByUserId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "WorkOrderRate_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "WorkOrderRate_workOrderId_idx" ON "WorkOrderRate"("workOrderId");
+CREATE INDEX "WorkOrderRate_type_workType_validFrom_idx" ON "WorkOrderRate"("type", "workType", "validFrom");
+CREATE INDEX "WorkOrderRate_isActive_validFrom_validTo_idx" ON "WorkOrderRate"("isActive", "validFrom", "validTo");
+
+-- AddForeignKey
+ALTER TABLE "WorkOrderRate" ADD CONSTRAINT "WorkOrderRate_workOrderId_fkey" FOREIGN KEY ("workOrderId") REFERENCES "WorkOrder"("id") ON DELETE CASCADE ON UPDATE CASCADE;

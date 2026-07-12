@@ -7,8 +7,9 @@ export async function resolveWorkEntryRate(params: {
   workType: WorkType;
   workDate: Date;
   remunerationMethod: RateType;
+  workOrderId?: string | null;
 }) {
-  const { employeeId, workType, workDate, remunerationMethod } = params;
+  const { employeeId, workType, workDate, remunerationMethod, workOrderId } = params;
 
   // 1. Employee-specific rate
   const employeeRates = await prisma.employeeRate.findMany({
@@ -35,7 +36,31 @@ export async function resolveWorkEntryRate(params: {
     };
   }
 
-  // 2. Rate configured on the WorkOrder or job - NOT implemented since WorkOrder.price is client-facing.
+  // 2. WorkOrder/job-specific worker rate
+  if (workOrderId) {
+    const workOrderRates = await prisma.workOrderRate.findMany({
+      where: {
+        workOrderId,
+        type: remunerationMethod,
+        isActive: true,
+        validFrom: { lte: workDate },
+        OR: [
+          { validTo: null },
+          { validTo: { gte: workDate } }
+        ]
+      },
+      orderBy: { validFrom: 'desc' }
+    });
+
+    const resolvedWorkOrderRate = selectRateAtDate(workOrderRates, workType, workDate);
+    if (resolvedWorkOrderRate) {
+      return {
+        amount: resolvedWorkOrderRate.amount,
+        unit: resolvedWorkOrderRate.unit || 'ks',
+        source: RateSource.WORK_ORDER_RATE
+      };
+    }
+  }
 
   // 3. Company-wide rate
   const companyRates = await prisma.companyRate.findMany({

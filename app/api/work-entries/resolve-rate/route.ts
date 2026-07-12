@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const workType = searchParams.get('workType');
   const workDate = searchParams.get('workDate');
   const remunerationMethod = searchParams.get('remunerationMethod');
+  const workOrderId = searchParams.get('workOrderId');
 
   if (!employeeId || !workType || !workDate || !remunerationMethod) {
     return NextResponse.json({ error: 'Chybí parametry dotazu.' }, { status: 400 });
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
     workType: workType as WorkType,
     workDate: dateObj,
     remunerationMethod: remunerationMethod as RateType,
+    workOrderId,
   });
 
   if (!resolved) {

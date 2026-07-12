@@ -780,6 +780,7 @@ model WorkOrder {
   items       WorkOrderItem[]
   workTasks   WorkTask[]
   workEntries WorkEntry[]
+  rates       WorkOrderRate[]
 
   @@index([scheduledAt, status])
   @@index([priority, scheduledAt])
@@ -830,8 +831,34 @@ enum WorkEntryCreationSource {
 
 enum RateSource {
   EMPLOYEE_RATE
+  WORK_ORDER_RATE
   COMPANY_RATE
   MANUAL
+}
+
+model WorkOrderRate {
+  id              String    @id @default(cuid())
+  workOrderId     String
+  type            RateType
+  name            String
+  amount          Decimal   @db.Decimal(12, 2)
+  currency        String    @default("CZK")
+  unit            String?
+  workType        WorkType?
+  validFrom       DateTime
+  validTo         DateTime?
+  note            String?
+  isActive        Boolean   @default(true)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+  @@index([type, workType, validFrom])
+  @@index([isActive, validFrom, validTo])
 }
 
 model CompanyRate {

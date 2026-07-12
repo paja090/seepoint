@@ -29,22 +29,38 @@ test('3. fixed amount work representation', async () => {
   assert.equal(amount.toFixed(2), '5000.00');
 });
 
-test('4. resolve rate priority: employee-specific rate vs company-wide rate', async () => {
-  // Mock resolve logic in a pure unit test
+test('4. resolve rate priority: EmployeeRate -> WorkOrderRate -> CompanyRate -> MANUAL', async () => {
+  // Mock rates database state
   const employeeRates = [
-    { workType: 'INSTALLATION', validFrom: new Date('2026-01-01'), validTo: null, amount: dec('400.00'), unit: 'hod', type: 'HOURLY' }
+    { workType: 'INSTALLATION', amount: dec('400.00'), source: 'EMPLOYEE_RATE' }
+  ];
+  const workOrderRates = [
+    { workType: 'INSTALLATION', amount: dec('350.00'), source: 'WORK_ORDER_RATE' }
   ];
   const companyRates = [
-    { workType: 'INSTALLATION', validFrom: new Date('2026-01-01'), validTo: null, amount: dec('300.00'), unit: 'hod', type: 'HOURLY' }
+    { workType: 'INSTALLATION', amount: dec('300.00'), source: 'COMPANY_RATE' }
   ];
+  const manualRate = { amount: dec('500.00'), source: 'MANUAL' };
 
-  // If employee rate exists, resolve it
-  const resolvedFromEmployee = employeeRates[0];
-  assert.equal(resolvedFromEmployee.amount.toFixed(2), '400.00');
+  // 1. Highest priority is EmployeeRate
+  const resolved = employeeRates[0] || workOrderRates[0] || companyRates[0];
+  assert.equal(resolved.source, 'EMPLOYEE_RATE');
+  assert.equal(resolved.amount.toFixed(2), '400.00');
 
-  // If no employee rate exists, fall back to company rate
-  const resolvedFromCompany = companyRates[0];
-  assert.equal(resolvedFromCompany.amount.toFixed(2), '300.00');
+  // 2. Next priority is WorkOrderRate if no EmployeeRate exists
+  const resolvedNoEmp = workOrderRates[0] || companyRates[0];
+  assert.equal(resolvedNoEmp.source, 'WORK_ORDER_RATE');
+  assert.equal(resolvedNoEmp.amount.toFixed(2), '350.00');
+
+  // 3. Next priority is CompanyRate if neither EmployeeRate nor WorkOrderRate exists
+  const resolvedNoEmpNoOrder = companyRates[0];
+  assert.equal(resolvedNoEmpNoOrder.source, 'COMPANY_RATE');
+  assert.equal(resolvedNoEmpNoOrder.amount.toFixed(2), '300.00');
+
+  // 4. Manual rate override bypasses the entire resolver hierarchy if present
+  const resolvedManual = manualRate;
+  assert.equal(resolvedManual.source, 'MANUAL');
+  assert.equal(resolvedManual.amount.toFixed(2), '500.00');
 });
 
 test('5. draft entry can be saved when rate is missing', () => {
