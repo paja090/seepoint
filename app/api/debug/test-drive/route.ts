@@ -20,11 +20,12 @@ export async function GET() {
       filesCount: files.length,
       firstFile: files[0] ?? null,
     });
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as Error;
     return NextResponse.json({
       success: false,
-      error: error.message || String(error),
-      stack: error.stack,
+      error: err.message || String(error),
+      stack: err.stack,
     });
   }
 }
