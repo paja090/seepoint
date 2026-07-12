@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { CheckCircle2, FileClock, FileText, Send, XCircle } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { OfferBuilder } from '@/components/OfferBuilder';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Button, Card, EmptyState, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell, Tabs } from '@/components/ui';
@@ -10,6 +11,7 @@ import { getOffers, prisma } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export default async function OffersPage() {
+  await requirePageAccess('offers');
   const [clients, surfaces, offers] = await Promise.all([
     prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     prisma.advertisingSurface.findMany({

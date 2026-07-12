@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
+import { requirePageAccess } from '@/lib/page-auth';
 import { WorkOrderForm } from '@/components/WorkOrderForm';
 import { WorkWeekView } from '@/components/WorkWeekView';
 import { prisma } from '@/lib/db';
@@ -8,6 +9,7 @@ import { formatWorkDate, formatWorkPrice, workPriorityLabels, workPriorityStyles
 export const dynamic = 'force-dynamic';
 
 export default async function WorkPlanPage() {
+  await requirePageAccess('work');
   const [orders, clients, carriers] = await Promise.all([
     prisma.workOrder.findMany({ include: { assignments: true, workTasks: { include: { assignedTo: true } }, items: { include: { carrier: true } } }, orderBy: { scheduledAt: 'asc' }, take: 200 }),
     prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),

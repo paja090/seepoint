@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
-import { AccessDenied, canAccess, getCurrentUser } from '@/lib/rbac';
+import { AccessDenied, canAccess } from '@/lib/rbac';
+import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, money, StatusPill } from '@/lib/internal-format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = getCurrentUser();
+  const user = await requirePageAccess('vehicles');
   if (!canAccess(user.role, 'vehicles')) return <AppShell><AccessDenied /></AppShell>;
   const { id } = await params;
   const vehicle = await prisma.vehicle.findUnique({ where: { id }, include: { reservations: { include: { employee: true }, orderBy: { dateFrom: 'desc' }, take: 20 }, serviceRecords: { orderBy: { date: 'desc' }, take: 20 }, workTasks: { include: { assignedTo: true }, orderBy: { scheduledDate: 'desc' }, take: 20 } } });

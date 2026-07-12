@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell';
 import { EmptyState, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { StatusBadge } from '@/components/StatusBadge';
 import { prisma } from '@/lib/db';
+import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,7 @@ function dateOnly(date: Date) {
 }
 
 export default async function Dashboard() {
+  await requirePageAccess('dashboard');
   const today = new Date();
   const in7 = new Date(today);
   in7.setDate(today.getDate() + 7);

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { deletePhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
 
 export const runtime = 'nodejs';
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   try {
     const id = (await params).id;
     const photo = await prisma.photo.findUnique({ where: { id }, select: { driveFileId: true } });

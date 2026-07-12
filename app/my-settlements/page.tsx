@@ -1,12 +1,13 @@
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
-import { AccessDenied, canAccess, getCurrentUser } from '@/lib/rbac';
+import { AccessDenied, canAccess } from '@/lib/rbac';
+import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, money, StatusPill } from '@/lib/internal-format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MySettlementsPage() {
-  const user = getCurrentUser();
+  const user = await requirePageAccess('mySettlements');
   if (!canAccess(user.role, 'mySettlements')) return <AppShell><AccessDenied /></AppShell>;
   const employee = await prisma.employee.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
   const settlements = employee ? await prisma.settlement.findMany({ where: { employeeId: employee.id }, include: { items: { include: { task: true } } }, orderBy: { periodFrom: 'desc' }, take: 100 }) : [];

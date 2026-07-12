@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { archiveCarrier, restoreCarrier } from '@/lib/db';
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   try {
     const input = await req.json().catch(() => ({})) as { archivedBy?: string; archiveReason?: string };
     const carrier = await archiveCarrier((await params).id, {
@@ -16,6 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   try {
     const carrier = await restoreCarrier((await params).id);
     return NextResponse.json(carrier);

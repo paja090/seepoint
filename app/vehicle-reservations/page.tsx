@@ -1,12 +1,13 @@
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
-import { AccessDenied, canAccess, getCurrentUser } from '@/lib/rbac';
+import { AccessDenied, canAccess } from '@/lib/rbac';
+import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function VehicleReservationsPage() {
-  const user = getCurrentUser();
+  const user = await requirePageAccess('vehicles');
   if (!canAccess(user.role, 'vehicles')) return <AppShell><AccessDenied /></AppShell>;
   const reservations = await prisma.vehicleReservation.findMany({ include: { vehicle: true, employee: true }, orderBy: [{ dateFrom: 'desc' }], take: 500 });
   return (

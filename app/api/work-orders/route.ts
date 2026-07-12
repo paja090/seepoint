@@ -1,4 +1,5 @@
 import { WorkPriority, WorkType } from '@prisma/client';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
@@ -27,6 +28,7 @@ function optionalPrice(input: WorkOrderInput) {
 }
 
 export async function GET() {
+  const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
   const orders = await prisma.workOrder.findMany({
     include: { assignments: true, items: { include: { carrier: true, surface: true } }, client: true, workTasks: { include: { assignedTo: true } } },
     orderBy: { scheduledAt: 'asc' },
@@ -36,6 +38,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
   const input = await request.json().catch(() => null) as WorkOrderInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
   const title = text(input, 'title');

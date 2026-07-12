@@ -1,7 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
-import { AccessDenied, canViewAllSettlements, getCurrentUser } from '@/lib/rbac';
+import { AccessDenied, canViewAllSettlements } from '@/lib/rbac';
+import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, money, StatusPill } from '@/lib/internal-format';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ function first(value: string | string[] | undefined) { return Array.isArray(valu
 function clean(value: string | string[] | undefined) { return first(value)?.trim() || undefined; }
 
 export default async function SettlementsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = getCurrentUser();
+  const user = await requirePageAccess('settlements');
   if (!canViewAllSettlements(user.role)) return <AppShell><AccessDenied /></AppShell>;
   const params = await searchParams;
   const status = clean(params.status);

@@ -1,7 +1,10 @@
 import { EmploymentType, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/rbac';
+import { getCurrentUser } from '@/lib/auth';
+import { issueUserToken } from '@/lib/auth';
+import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
+import { audit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +29,8 @@ function optionalEmail(input: EmployeeInput) {
 }
 
 export async function POST(request: Request) {
-  const user = getCurrentUser();
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     return NextResponse.json({ error: 'Zaměstnance může vytvářet jen admin nebo manažer.' }, { status: 403 });
   }
@@ -43,6 +47,10 @@ export async function POST(request: Request) {
 
   const roleInput = text(input, 'role');
   const role = roleInput && Object.values(Role).includes(roleInput as Role) ? roleInput as Role : Role.WORKER;
+  if (user.role === 'MANAGER' && role === Role.ADMIN) return NextResponse.json({ error: 'Manažer nemůže vytvářet administrátory.' }, { status: 403 });
+  const allowAccess = text(input, 'allowAccess') === 'true';
+  if (allowAccess && !email) return NextResponse.json({ error: 'Pro přístup do aplikace je e-mail povinný.' }, { status: 400 });
+  if (allowAccess) ensureEmailConfigured();
   const employmentTypeInput = text(input, 'employmentType');
   const employmentType = employmentTypeInput && Object.values(EmploymentType).includes(employmentTypeInput as EmploymentType) ? employmentTypeInput as EmploymentType : EmploymentType.EMPLOYEE;
 
@@ -57,8 +65,7 @@ export async function POST(request: Request) {
     if (existing) return NextResponse.json({ error: 'Zaměstnanec s tímto e-mailem už existuje.' }, { status: 409 });
   }
 
-  const employee = await prisma.employee.create({
-    data: {
+  const employee = await prisma.employee.create({ data: {
       firstName,
       lastName,
       email,
@@ -71,10 +78,9 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       isActive: true,
-      note: text(input, 'note'),
-    },
-    select: { id: true },
-  });
+      note: text(input, 'note'), ...(allowAccess && email ? { user: { create: { name: `${firstName} ${lastName}`, email, role, status: 'INVITED' } } } : {}) }, select: { id: true, userId: true, email: true } });
+  let activationUrl: string | undefined;
+  if (employee.userId && employee.email) { const token = await issueUserToken(employee.userId, 'ACTIVATION', 48); activationUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/activate/${token}`; await sendActivationEmail(employee.email, activationUrl); await audit('ACCOUNT_CREATED', employee.userId, user.id); }
 
-  return NextResponse.json(employee, { status: 201 });
+  return NextResponse.json({ id: employee.id, ...(process.env.NODE_ENV !== 'production' ? { activationUrl } : {}) }, { status: 201 });
 }

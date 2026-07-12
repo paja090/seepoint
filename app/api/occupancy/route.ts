@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { checkOccupancyConflicts, hasBlockingConflict, prisma, updateOccupancyAction, upsertOccupancy } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
 
@@ -97,6 +98,7 @@ function serializeOccupancyRow(row: Prisma.OccupancyGetPayload<{ include: { clie
 }
 
 export async function GET(request: Request) {
+  const auth = await requireApiAccess('occupancy'); if (isApiDenied(auth)) return auth;
   try {
     const url = new URL(request.url);
     const where = buildWhere(url);
@@ -167,14 +169,17 @@ async function save(request: Request, status = 200) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApiAccess('occupancy'); if (isApiDenied(auth)) return auth;
   return save(request, 201);
 }
 
 export async function PUT(request: Request) {
+  const auth = await requireApiAccess('occupancy'); if (isApiDenied(auth)) return auth;
   return save(request);
 }
 
 export async function PATCH(request: Request) {
+  const auth = await requireApiAccess('occupancy'); if (isApiDenied(auth)) return auth;
   try {
     const input = await request.json();
     const id = typeof input.id === 'string' ? input.id : '';
