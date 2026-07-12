@@ -10,7 +10,6 @@ const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PHOTO_TYPES = new Set(['LOCATION', 'CARRIER', 'CAMPAIGN', 'INSTALLATION', 'CHECK', 'ARCHIVE', 'EMPLOYEE_PROFILE']);
 
 export async function POST(request: Request) {
-  const auth = await requireApiAccess('carriers'); if (isApiDenied(auth)) return auth;
   let driveFileId: string | undefined;
   try {
     const form = await request.formData(); const file = form.get('file');
@@ -21,6 +20,7 @@ export async function POST(request: Request) {
     const surfaceId = form.get('surfaceId') ? String(form.get('surfaceId')) : null;
     const employeeId = form.get('employeeId') ? String(form.get('employeeId')) : null;
     if ([carrierId, surfaceId, employeeId].filter(Boolean).length !== 1) return NextResponse.json({ error: 'Fotografie musí patřit právě jednomu nosiči, ploše nebo zaměstnanci.' }, { status: 400 });
+    const auth = await requireApiAccess(employeeId ? 'employees' : 'carriers'); if (isApiDenied(auth)) return auth;
     if (employeeId && auth.role !== 'ADMIN') return NextResponse.json({ error: 'Fotografii zaměstnance může měnit pouze administrátor.' }, { status: 403 });
     const targetExists = carrierId ? await prisma.advertisingCarrier.count({ where: { id: carrierId } }) : surfaceId ? await prisma.advertisingSurface.count({ where: { id: surfaceId } }) : await prisma.employee.count({ where: { id: employeeId! } });
     if (!targetExists) return NextResponse.json({ error: 'Cílový záznam neexistuje.' }, { status: 404 });
