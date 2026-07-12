@@ -62,26 +62,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: 'Pracovní úkol nebyl nalezen.' }, { status: 404 });
-  const saved = await prisma.workOrder.update({
-    where: { id },
-    data: {
-      status: input.status as WorkOrderStatus,
-      priority: input.priority as WorkPriority | undefined,
-      price,
-      ftdSent: typeof input.ftdSent === 'boolean' ? input.ftdSent : undefined,
-      invoiced: typeof input.invoiced === 'boolean' ? input.invoiced : undefined,
-    },
-    select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true },
-  });
+  
   try {
-    await syncWorkOrderTasks(id);
+    const saved = await prisma.$transaction(async (tx) => {
+      const updated = await tx.workOrder.update({
+        where: { id },
+        data: {
+          status: input.status as WorkOrderStatus,
+          priority: input.priority as WorkPriority | undefined,
+          price,
+          ftdSent: typeof input.ftdSent === 'boolean' ? input.ftdSent : undefined,
+          invoiced: typeof input.invoiced === 'boolean' ? input.invoiced : undefined,
+        },
+        select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true },
+      });
+      await syncWorkOrderTasks(id, tx);
+      return updated;
+    });
+    return NextResponse.json({ ...saved, price: saved.price?.toString() ?? null });
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {
       return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });
     }
     throw err;
   }
-  return NextResponse.json({ ...saved, price: saved.price?.toString() ?? null });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -129,40 +133,42 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: 'Pracovní úkol nebyl nalezen.' }, { status: 404 });
 
-  await prisma.workOrder.update({
-    where: { id },
-    data: {
-      title,
-      description,
-      scheduledAt,
-      deadlineAt,
-      campaignDateFrom,
-      campaignDateTo,
-      workType: workTypeValue as WorkType,
-      priority: priorityValue as WorkPriority,
-      price,
-      clientId: client?.id ?? null,
-      clientName,
-      requestedBy,
-      contactName: text(input, 'contactName') ?? null,
-      contactPhone: text(input, 'contactPhone') ?? null,
-      locationNote: text(input, 'locationNote') ?? null,
-      mediaLabel: text(input, 'mediaLabel') ?? null,
-      quantity,
-      referenceUrl: text(input, 'referenceUrl') ?? null,
-      ftdUrl: ftdUrl ?? null,
-      assignments: {
-        deleteMany: {},
-        ...(workerNames.length ? { create: workerNames.map((workerName) => ({ workerName })) } : {}),
-      },
-      items: {
-        deleteMany: {},
-        ...(carrier ? { create: [{ carrierId: carrier.id, quantity: quantity || 1 }] } : {}),
-      },
-    },
-  });
   try {
-    await syncWorkOrderTasks(id);
+    await prisma.$transaction(async (tx) => {
+      await tx.workOrder.update({
+        where: { id },
+        data: {
+          title,
+          description,
+          scheduledAt,
+          deadlineAt,
+          campaignDateFrom,
+          campaignDateTo,
+          workType: workTypeValue as WorkType,
+          priority: priorityValue as WorkPriority,
+          price,
+          clientId: client?.id ?? null,
+          clientName,
+          requestedBy,
+          contactName: text(input, 'contactName') ?? null,
+          contactPhone: text(input, 'contactPhone') ?? null,
+          locationNote: text(input, 'locationNote') ?? null,
+          mediaLabel: text(input, 'mediaLabel') ?? null,
+          quantity,
+          referenceUrl: text(input, 'referenceUrl') ?? null,
+          ftdUrl: ftdUrl ?? null,
+          assignments: {
+            deleteMany: {},
+            ...(workerNames.length ? { create: workerNames.map((workerName) => ({ workerName })) } : {}),
+          },
+          items: {
+            deleteMany: {},
+            ...(carrier ? { create: [{ carrierId: carrier.id, quantity: quantity || 1 }] } : {}),
+          },
+        },
+      });
+      await syncWorkOrderTasks(id, tx);
+    });
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {
       return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });

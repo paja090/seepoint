@@ -82,7 +82,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     quantity,
     unit,
     note,
-    manualRate, // optional manual rate provided by manager/admin
+    manualRate,
+    manualOverride,
   } = input;
 
   // 3. Decimal quantity parsing (if quantity is updated)
@@ -96,8 +97,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const hrs = parseInt(parts[0], 10);
         const mins = parseInt(parts[1], 10);
         if (isNaN(hrs) || isNaN(mins) || mins < 0 || mins >= 60 || hrs < 0) throw new Error();
-        const totalHrs = hrs + mins / 60;
-        qtyDecimal = new Prisma.Decimal(totalHrs.toFixed(2));
+        const hrsDec = new Prisma.Decimal(hrs);
+        const minsDec = new Prisma.Decimal(mins).div(60);
+        qtyDecimal = hrsDec.add(minsDec);
       } else {
         const normalized = qtyStr.replace(',', '.');
         qtyDecimal = new Prisma.Decimal(normalized);
@@ -118,9 +120,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const targetType = workType ? (workType as WorkType) : entry.workType;
   const targetMethod = remunerationMethod ? (remunerationMethod as RateType) : entry.remunerationMethod;
 
+  // Enforce unit rules based on remunerationMethod
+  let finalUnit = unit || entry.unit;
+  if (targetMethod === 'HOURLY') {
+    finalUnit = 'hod';
+  } else if (targetMethod === 'FIXED') {
+    qtyDecimal = new Prisma.Decimal(1);
+    finalUnit = 'ks';
+  }
+
+  const resolved = await resolveWorkEntryRate({
+    employeeId: entry.employeeId,
+    workType: targetType,
+    workDate: targetDate,
+    remunerationMethod: targetMethod,
+    workOrderId: entry.workOrderId, // CRITICAL FIX: Pass the existing entry.workOrderId!
+  });
+
   if (manualRate !== undefined && manualRate !== null) {
     if (!isManagerOrAdmin) {
       return NextResponse.json({ error: 'Pouze manažer nebo administrátor může zadat sazbu ručně.' }, { status: 403 });
+    }
+    if (resolved) {
+      if (manualOverride !== true || !String(note || '').trim()) {
+        return NextResponse.json({
+          error: 'RUČNÍ_PŘEPSÁNÍ_VYŽADOVÁNO',
+          message: 'Pro přepsání automatické sazby musíte zaškrtnout souhlas a vyplnit důvod v poznámce.',
+        }, { status: 400 });
+      }
     }
     try {
       finalRate = new Prisma.Decimal(String(manualRate).replace(',', '.'));
@@ -130,19 +157,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'Neplatná hodnota ruční sazby.' }, { status: 400 });
     }
   } else if (finalSource === 'MANUAL' && (workDate || workType || remunerationMethod)) {
-    // A manual rate was previously set. We do NOT silently overwrite it when other attributes change.
-    // Keep the manual rate unless explicitly updated or cleared.
+    // Keep manual rate
   } else if (workDate || workType || remunerationMethod) {
-    // Re-resolve rate due to date or method change
-    const resolved = await resolveWorkEntryRate({
-      employeeId: entry.employeeId,
-      workType: targetType,
-      workDate: targetDate,
-      remunerationMethod: targetMethod,
-    });
     if (resolved) {
       finalRate = resolved.amount;
       finalSource = resolved.source;
+      if (targetMethod === 'TASK' && resolved.unit) {
+        finalUnit = resolved.unit;
+      }
     } else {
       finalRate = null;
       finalSource = null;
@@ -159,7 +181,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       workType: workType as WorkType || undefined,
       remunerationMethod: remunerationMethod as RateType || undefined,
       quantity: qtyDecimal,
-      unit: unit || undefined,
+      unit: finalUnit,
       appliedUnitRate: finalRate,
       calculatedAmount,
       rateSource: finalSource,

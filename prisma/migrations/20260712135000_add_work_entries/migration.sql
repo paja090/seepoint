@@ -39,7 +39,7 @@ CREATE TABLE "WorkEntry" (
     "clientName" TEXT,
     "workType" "WorkType" NOT NULL,
     "remunerationMethod" "RateType" NOT NULL,
-    "quantity" DECIMAL(10,2) NOT NULL,
+    "quantity" DECIMAL(10,4) NOT NULL,
     "unit" TEXT NOT NULL,
     "appliedUnitRate" DECIMAL(12,2),
     "calculatedAmount" DECIMAL(12,2) NOT NULL,

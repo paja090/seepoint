@@ -15,59 +15,82 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const entry = await prisma.workEntry.findUnique({
-    where: { id },
-    include: {
-      employee: true,
-      workTask: true,
-    },
-  });
 
-  if (!entry) {
-    return NextResponse.json({ error: 'Záznam práce nebyl nalezen.' }, { status: 404 });
-  }
+  try {
+    const confirmed = await prisma.$transaction(async (tx) => {
+      const entry = await tx.workEntry.findUnique({
+        where: { id },
+        include: {
+          employee: true,
+          workTask: true,
+        },
+      });
 
-  // 2. Validate current status
-  if (entry.status === 'CONFIRMED') {
-    return NextResponse.json({ error: 'Tento záznam práce je již potvrzen.' }, { status: 400 });
-  }
+      if (!entry) {
+        throw new Error('NOT_FOUND');
+      }
 
-  // 3. Validation before confirmation
-  if (!entry.appliedUnitRate) {
-    return NextResponse.json({ error: 'Záznam práce nelze potvrdit, protože chybí jednotková sazba.' }, { status: 400 });
-  }
+      // 2. Validate current status
+      if (entry.status === 'CONFIRMED') {
+        throw new Error('ALREADY_CONFIRMED');
+      }
 
-  if (entry.quantity.lte(0)) {
-    return NextResponse.json({ error: 'Záznam práce nelze potvrdit s nulovým nebo záporným množstvím.' }, { status: 400 });
-  }
+      // 3. Validation before confirmation
+      if (!entry.appliedUnitRate) {
+        throw new Error('MISSING_RATE');
+      }
 
-  if (!entry.employeeId || !entry.workTaskId) {
-    return NextResponse.json({ error: 'Záznam práce obsahuje neplatná data.' }, { status: 400 });
-  }
+      if (entry.quantity.lte(0)) {
+        throw new Error('INVALID_QUANTITY');
+      }
 
-  // Verify and recalculate amount to prevent any front-end tampering
-  const expectedAmount = entry.quantity.mul(entry.appliedUnitRate);
-  if (!entry.calculatedAmount.equals(expectedAmount)) {
-    // Correct it on the server if it differs
-    await prisma.workEntry.update({
-      where: { id },
-      data: { calculatedAmount: expectedAmount },
+      if (!entry.employeeId || !entry.workTaskId) {
+        throw new Error('INVALID_DATA');
+      }
+
+      // Verify and recalculate amount to prevent any front-end tampering
+      const expectedAmount = entry.quantity.mul(entry.appliedUnitRate);
+
+      // 4. Update status to CONFIRMED using conditional query (status: 'DRAFT')
+      // This protects against concurrent changes
+      return tx.workEntry.update({
+        where: { id, status: 'DRAFT' },
+        data: {
+          status: 'CONFIRMED',
+          calculatedAmount: expectedAmount,
+        },
+      });
     });
+
+    return NextResponse.json({
+      id: confirmed.id,
+      status: confirmed.status,
+      quantity: confirmed.quantity.toString(),
+      appliedUnitRate: confirmed.appliedUnitRate?.toString() ?? null,
+      calculatedAmount: confirmed.calculatedAmount.toString(),
+    });
+
+  } catch (error: unknown) {
+    const err = error as Error & { code?: string };
+    if (err.message === 'NOT_FOUND') {
+      return NextResponse.json({ error: 'Záznam práce nebyl nalezen.' }, { status: 404 });
+    }
+    if (err.message === 'ALREADY_CONFIRMED') {
+      return NextResponse.json({ error: 'Tento záznam práce je již potvrzen.' }, { status: 400 });
+    }
+    if (err.message === 'MISSING_RATE') {
+      return NextResponse.json({ error: 'Záznam práce nelze potvrdit, protože chybí jednotková sazba.' }, { status: 400 });
+    }
+    if (err.message === 'INVALID_QUANTITY') {
+      return NextResponse.json({ error: 'Záznam práce nelze potvrdit s nulovým nebo záporným množstvím.' }, { status: 400 });
+    }
+    if (err.message === 'INVALID_DATA') {
+      return NextResponse.json({ error: 'Záznam práce obsahuje neplatná data.' }, { status: 400 });
+    }
+    // Prisma record not found error (P2025) means the conditional update (status: 'DRAFT') failed
+    if (err.code === 'P2025') {
+      return NextResponse.json({ error: 'Záznam práce se nepodařilo potvrdit. Pravděpodobně byl již potvrzen nebo upraven v jiném požadavku.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: err.message || 'Nastala chyba při potvrzování záznamu.' }, { status: 500 });
   }
-
-  // 4. Update status to CONFIRMED
-  const confirmed = await prisma.workEntry.update({
-    where: { id },
-    data: {
-      status: 'CONFIRMED',
-    },
-  });
-
-  return NextResponse.json({
-    id: confirmed.id,
-    status: confirmed.status,
-    quantity: confirmed.quantity.toString(),
-    appliedUnitRate: confirmed.appliedUnitRate?.toString() ?? null,
-    calculatedAmount: confirmed.calculatedAmount.toString(),
-  });
 }

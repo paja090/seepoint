@@ -1,6 +1,6 @@
 import { prisma } from './db';
 import { selectRateAtDate } from './rate-selection';
-import { RateType, WorkType, RateSource } from '@prisma/client';
+import { RateType, WorkType, RateSource, Prisma } from '@prisma/client';
 
 export async function resolveWorkEntryRate(params: {
   employeeId: string;
@@ -8,11 +8,12 @@ export async function resolveWorkEntryRate(params: {
   workDate: Date;
   remunerationMethod: RateType;
   workOrderId?: string | null;
-}) {
+}, tx?: Prisma.TransactionClient) {
   const { employeeId, workType, workDate, remunerationMethod, workOrderId } = params;
+  const client = tx || prisma;
 
   // 1. Employee-specific rate
-  const employeeRates = await prisma.employeeRate.findMany({
+  const employeeRates = await client.employeeRate.findMany({
     where: {
       employeeId,
       type: remunerationMethod,
@@ -38,7 +39,7 @@ export async function resolveWorkEntryRate(params: {
 
   // 2. WorkOrder/job-specific worker rate
   if (workOrderId) {
-    const workOrderRates = await prisma.workOrderRate.findMany({
+    const workOrderRates = await client.workOrderRate.findMany({
       where: {
         workOrderId,
         type: remunerationMethod,
@@ -63,7 +64,7 @@ export async function resolveWorkEntryRate(params: {
   }
 
   // 3. Company-wide rate
-  const companyRates = await prisma.companyRate.findMany({
+  const companyRates = await client.companyRate.findMany({
     where: {
       type: remunerationMethod,
       isActive: true,

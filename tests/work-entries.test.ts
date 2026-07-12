@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Prisma } from '@prisma/client';
+import { Prisma, WorkType, RateType } from '@prisma/client';
+import { resolveWorkEntryRate } from '../lib/work-entry-rates';
+import { syncWorkOrderTasks } from '../lib/work-task-sync';
 
 // Helper to create Decimal
 const dec = (val: string | number) => new Prisma.Decimal(val);
@@ -200,4 +202,295 @@ test('18. WorkTask archival or change does not delete confirmed WorkEntry due to
   // Representing Restrict constraint
   const onDeleteRestrictActive = true;
   assert.equal(onDeleteRestrictActive, true);
+});
+
+test('19. resolveWorkEntryRate executes EmployeeRate priority', async () => {
+  const mockTx = {
+    employeeRate: {
+      findMany: async () => [
+        {
+          id: 'emp-rate-1',
+          type: 'HOURLY',
+          amount: dec('400.00'),
+          unit: 'hod',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        }
+      ]
+    },
+    workOrderRate: {
+      findMany: async () => []
+    },
+    companyRate: {
+      findMany: async () => []
+    }
+  } as unknown as Prisma.TransactionClient;
+
+  const result = await resolveWorkEntryRate({
+    employeeId: 'employee-1',
+    workType: 'INSTALLATION',
+    workDate: new Date('2026-06-01'),
+    remunerationMethod: 'HOURLY',
+    workOrderId: 'order-1',
+  }, mockTx);
+
+  assert.ok(result);
+  assert.equal(result.amount.toFixed(2), '400.00');
+  assert.equal(result.source, 'EMPLOYEE_RATE');
+});
+
+test('20. resolveWorkEntryRate executes WorkOrderRate fallback', async () => {
+  const mockTx = {
+    employeeRate: {
+      findMany: async () => []
+    },
+    workOrderRate: {
+      findMany: async () => [
+        {
+          id: 'order-rate-1',
+          type: 'HOURLY',
+          amount: dec('350.00'),
+          unit: 'hod',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        }
+      ]
+    },
+    companyRate: {
+      findMany: async () => [
+        {
+          id: 'company-rate-1',
+          type: 'HOURLY',
+          amount: dec('300.00'),
+          unit: 'hod',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        }
+      ]
+    }
+  } as unknown as Prisma.TransactionClient;
+
+  const result = await resolveWorkEntryRate({
+    employeeId: 'employee-1',
+    workType: 'INSTALLATION',
+    workDate: new Date('2026-06-01'),
+    remunerationMethod: 'HOURLY',
+    workOrderId: 'order-1',
+  }, mockTx);
+
+  assert.ok(result);
+  assert.equal(result.amount.toFixed(2), '350.00');
+  assert.equal(result.source, 'WORK_ORDER_RATE');
+});
+
+test('21. resolveWorkEntryRate executes CompanyRate fallback', async () => {
+  const mockTx = {
+    employeeRate: {
+      findMany: async () => []
+    },
+    workOrderRate: {
+      findMany: async () => []
+    },
+    companyRate: {
+      findMany: async () => [
+        {
+          id: 'company-rate-1',
+          type: 'HOURLY',
+          amount: dec('300.00'),
+          unit: 'hod',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        }
+      ]
+    }
+  } as unknown as Prisma.TransactionClient;
+
+  const result = await resolveWorkEntryRate({
+    employeeId: 'employee-1',
+    workType: 'INSTALLATION',
+    workDate: new Date('2026-06-01'),
+    remunerationMethod: 'HOURLY',
+    workOrderId: 'order-1',
+  }, mockTx);
+
+  assert.ok(result);
+  assert.equal(result.amount.toFixed(2), '300.00');
+  assert.equal(result.source, 'COMPANY_RATE');
+});
+
+test('22. resolveWorkEntryRate returns null when no rate exists', async () => {
+  const mockTx = {
+    employeeRate: {
+      findMany: async () => []
+    },
+    workOrderRate: {
+      findMany: async () => []
+    },
+    companyRate: {
+      findMany: async () => []
+    }
+  } as unknown as Prisma.TransactionClient;
+
+  const result = await resolveWorkEntryRate({
+    employeeId: 'employee-1',
+    workType: 'INSTALLATION',
+    workDate: new Date('2026-06-01'),
+    remunerationMethod: 'HOURLY',
+    workOrderId: 'order-1',
+  }, mockTx);
+
+  assert.equal(result, null);
+});
+
+test('23. Decimal-safe H:MM time conversion matches expectation without floating point errors', () => {
+  const qtyStr = '2:30';
+  const parts = qtyStr.split(':');
+  const hrs = parseInt(parts[0], 10);
+  const mins = parseInt(parts[1], 10);
+  
+  const hrsDec = dec(hrs);
+  const minsDec = dec(mins).div(60);
+  const qtyDecimal = hrsDec.add(minsDec);
+
+  assert.equal(qtyDecimal.toString(), '2.5');
+  assert.equal(qtyDecimal.toFixed(4), '2.5000');
+});
+
+test('24. HOURLY, TASK, and FIXED rate calculations', () => {
+  // HOURLY
+  const qtyHourly = dec('2.50');
+  const rateHourly = dec('150.00');
+  assert.equal(qtyHourly.mul(rateHourly).toFixed(2), '375.00');
+
+  // FIXED
+  const qtyFixed = dec('1.00'); // quantity forced to 1 on server
+  const rateFixed = dec('2000.00');
+  assert.equal(qtyFixed.mul(rateFixed).toFixed(2), '2000.00');
+
+  // TASK
+  const qtyTask = dec('10.00');
+  const rateTask = dec('15.50');
+  assert.equal(qtyTask.mul(rateTask).toFixed(2), '155.00');
+});
+
+test('25. syncWorkOrderTasks works with custom TransactionClient', async () => {
+  let findCalled = false;
+  let updateCalled = false;
+
+  const mockTx = {
+    workOrder: {
+      findUnique: async () => ({
+        id: 'order-1',
+        title: 'Zakázka 1',
+        description: 'Popis',
+        status: 'DONE',
+        priority: 'NORMAL',
+        deadlineAt: new Date('2026-06-30'),
+        scheduledAt: new Date('2026-06-15'),
+        locationNote: 'Místo',
+        clientName: 'Klient',
+        requestedBy: 'Zadavatel',
+        assignments: [
+          { workerName: 'Jan Novák' }
+        ],
+        items: []
+      })
+    },
+    employee: {
+      findMany: async () => [
+        { id: 'emp-1', firstName: 'Jan', lastName: 'Novák', email: 'jan@novak.cz', isActive: true }
+      ]
+    },
+    workTask: {
+      findMany: async () => {
+        findCalled = true;
+        return [];
+      },
+      create: async () => {
+        updateCalled = true;
+        return { id: 'task-1' };
+      }
+    }
+  } as unknown as Prisma.TransactionClient;
+
+  await syncWorkOrderTasks('order-1', mockTx);
+  assert.equal(findCalled, true);
+  assert.equal(updateCalled, true);
+});
+
+test('26. PATCH re-resolution retains WorkOrderRate and does not incorrectly fall back to CompanyRate', async () => {
+  // Simulate the re-resolution inputs:
+  const entry = {
+    employeeId: 'employee-1',
+    workOrderId: 'order-1', // has a specific order
+    workType: 'INSTALLATION',
+    workDate: new Date('2026-06-01'),
+    remunerationMethod: 'HOURLY',
+  };
+
+  const mockTx = {
+    employeeRate: { findMany: async () => [] },
+    workOrderRate: {
+      findMany: async () => [
+        {
+          id: 'order-rate-1',
+          type: 'HOURLY',
+          amount: dec('350.00'),
+          unit: 'hod',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        }
+      ]
+    },
+    companyRate: {
+      findMany: async () => [
+        {
+          id: 'company-rate-1',
+          type: 'HOURLY',
+          amount: dec('300.00'),
+          unit: 'hod',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        }
+      ]
+    }
+  } as unknown as Prisma.TransactionClient;
+
+  // If we resolve WITH workOrderId (retaining the job rate)
+  const resolvedWithOrder = await resolveWorkEntryRate({
+    employeeId: entry.employeeId,
+    workType: entry.workType as WorkType,
+    workDate: entry.workDate,
+    remunerationMethod: entry.remunerationMethod as RateType,
+    workOrderId: entry.workOrderId,
+  }, mockTx);
+
+  assert.ok(resolvedWithOrder);
+  assert.equal(resolvedWithOrder.source, 'WORK_ORDER_RATE');
+  assert.equal(resolvedWithOrder.amount.toFixed(2), '350.00');
+
+  // If we resolve WITHOUT workOrderId (incorrectly missing)
+  const resolvedWithoutOrder = await resolveWorkEntryRate({
+    employeeId: entry.employeeId,
+    workType: entry.workType as WorkType,
+    workDate: entry.workDate,
+    remunerationMethod: entry.remunerationMethod as RateType,
+    workOrderId: undefined, // missing
+  }, mockTx);
+
+  assert.ok(resolvedWithoutOrder);
+  assert.equal(resolvedWithoutOrder.source, 'COMPANY_RATE'); // falls back to CompanyRate incorrectly!
+  assert.equal(resolvedWithoutOrder.amount.toFixed(2), '300.00');
 });

@@ -892,7 +892,7 @@ model WorkEntry {
   clientName         String?
   workType           WorkType
   remunerationMethod RateType
-  quantity           Decimal                 @db.Decimal(10, 2)
+  quantity           Decimal                 @db.Decimal(10, 4)
   unit               String
   appliedUnitRate    Decimal?                @db.Decimal(12, 2)
   calculatedAmount   Decimal                 @db.Decimal(12, 2)
