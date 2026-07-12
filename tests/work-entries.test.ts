@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Prisma, WorkType, RateType } from '@prisma/client';
-import { resolveWorkEntryRate } from '../lib/work-entry-rates';
-import { syncWorkOrderTasks } from '../lib/work-task-sync';
+import { resolveWorkEntryRate } from '../lib/work-entry-rates.ts';
+import { syncWorkOrderTasks } from '../lib/work-task-sync.ts';
 
 // Helper to create Decimal
 const dec = (val: string | number) => new Prisma.Decimal(val);
