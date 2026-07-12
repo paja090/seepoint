@@ -51,7 +51,7 @@ export function EmployeeCreateForm({ canCreate }: EmployeeCreateFormProps) {
           <label>Příjmení<input className="input mt-1" name="lastName" required placeholder="Např. Novák" /></label>
           <label>E-mail<input className="input mt-1" name="email" type="email" placeholder="pavel@seepoint.local" /><span className="mt-1 block text-xs text-slate-500">Když bude později mock nebo reálný uživatel používat stejný e-mail, uvidí svoje úkoly v Moje úkoly.</span></label>
           <label>Telefon<input className="input mt-1" name="phone" type="tel" /></label>
-          <label>Pozice<input className="input mt-1" name="position" placeholder="Technik, obchodník, pracovník montáže…" /></label>
+          <label>Pozice<input className="input mt-1" name="positions" placeholder="Technik, obchodník, pracovník montáže…" /><span className="mt-1 block text-xs text-slate-500">Více pozic oddělte čárkou.</span></label>
           <label>Role<select className="input mt-1" name="role" defaultValue="WORKER">{roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select></label>
           <label className="flex items-center gap-3 rounded-xl border p-3"><input name="allowAccess" type="checkbox" value="true" /><span><b>Povolit přístup do aplikace</b><small className="block text-slate-500">Vytvoří účet a jednorázovou pozvánku.</small></span></label>
           <label>Typ spolupráce<select className="input mt-1" name="employmentType" defaultValue="EMPLOYEE">{employmentTypes.map((type) => <option key={type} value={type}>{statusLabel(type)}</option>)}</select></label>

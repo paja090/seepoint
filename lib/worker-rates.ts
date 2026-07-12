@@ -29,7 +29,9 @@ export async function resolveWorkerRate(workerId: string, workType: WorkType | n
   return rate ? { rate, source: 'INDIVIDUAL' as const } : null;
 }
 
-export async function assertNoRateConflict(tx: Prisma.TransactionClient, employeeId: string, candidate: { type: RateType; workType: WorkType | null; validFrom: Date; validTo: Date | null }, excludeId?: string) {
-  const conflicts = await tx.employeeRate.findMany({ where: { employeeId, type: candidate.type, workType: candidate.workType, ...(excludeId ? { id: { not: excludeId } } : {}) }, select: { validFrom: true, validTo: true } });
+export async function assertNoRateConflict(tx: Prisma.TransactionClient, employeeId: string, candidate: { type: RateType; name: string; workType: WorkType | null; validFrom: Date; validTo: Date | null }, excludeId?: string) {
+  const conflicts = await tx.employeeRate.findMany({ where: { employeeId, type: candidate.type, workType: candidate.workType,
+    ...(candidate.type === 'HOURLY' ? {} : { name: { equals: candidate.name, mode: 'insensitive' } }),
+    ...(excludeId ? { id: { not: excludeId } } : {}) }, select: { validFrom: true, validTo: true } });
   if (conflicts.some((rate) => intervalsOverlap(rate, candidate))) throw new Error('RATE_CONFLICT');
 }

@@ -7,7 +7,7 @@ export type SurfaceStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'NEGOTIATION
 export type Role = 'ADMIN' | 'SALES' | 'TECHNICIAN' | 'WORKER' | 'VIEWER';
 export type OccupancyStatus = 'AVAILABLE' | 'NEGOTIATION' | 'RESERVED' | 'OCCUPIED' | 'FINISHED' | 'CANCELLED' | 'OUT_OF_SERVICE';
 export type OfferStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
-export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE';
+export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE' | 'EMPLOYEE_PROFILE';
 
 export type Client = {
   id: string;

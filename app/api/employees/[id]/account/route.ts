@@ -23,9 +23,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!employee || !body?.action) return NextResponse.json({ error: 'Zaměstnanec nebo akce nebyli nalezeni.' }, { status: 404 });
 
   if (body.action === 'enableAccess' && !employee.user) {
-    ensureEmailConfigured();
     if (!employee.email) return NextResponse.json({ error: 'Pro přístup do aplikace musí mít zaměstnanec e-mail.' }, { status: 400 });
     if (!canAssignRole(actor.role, employee.role)) return NextResponse.json({ error: 'Manažer nemůže vytvořit administrátorský účet.' }, { status: 403 });
+    const existing = await prisma.user.findUnique({ where: { email: employee.email }, include: { employee: true } });
+    if (existing) {
+      if (existing.employee) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
+      if (actor.role !== 'ADMIN' && existing.role === 'ADMIN') return NextResponse.json({ error: 'Administrátorský účet může propojit pouze administrátor.' }, { status: 403 });
+      await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, role: existing.role } });
+      return NextResponse.json({ ok: true, linkedExistingAccount: true });
+    }
+    ensureEmailConfigured();
     const user = await prisma.user.create({ data: { name: `${employee.firstName} ${employee.lastName}`, email: employee.email, role: employee.role, employee: { connect: { id: employee.id } } } });
     const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = activationUrl(token);
     await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);

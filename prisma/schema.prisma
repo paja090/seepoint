@@ -132,6 +132,7 @@ enum PhotoType {
   INSTALLATION
   CHECK
   ARCHIVE
+  EMPLOYEE_PROFILE
 }
 
 enum ImportStatus {
@@ -308,6 +309,7 @@ model Employee {
   email          String?        @unique
   phone          String?
   position       String?
+  positions      String[]       @default([])
   role           Role           @default(WORKER)
   employmentType EmploymentType @default(EMPLOYEE)
   ico            String?
@@ -326,6 +328,7 @@ model Employee {
   vehicleReservations VehicleReservation[]
   billingProfile      EmployeeBillingProfile?
   rates               EmployeeRate[]
+  photos              Photo[]
 
   @@index([role])
   @@index([isActive])
@@ -681,6 +684,7 @@ model Photo {
   id          String    @id @default(cuid())
   carrierId   String?
   surfaceId   String?
+  employeeId  String?
   url         String
   driveFileId String?   @unique
   fileName    String?
@@ -690,11 +694,13 @@ model Photo {
   note        String?
   createdAt   DateTime  @default(now())
 
-  carrier AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  surface AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  carrier  AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  surface  AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  employee Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([carrierId])
   @@index([surfaceId])
+  @@index([employeeId])
 }
 
 model ImportBatch {
