@@ -17,6 +17,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       folderId,
+      serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       filesCount: files.length,
       firstFile: files[0] ?? null,
     });
@@ -24,6 +25,8 @@ export async function GET() {
     const err = error as Error;
     return NextResponse.json({
       success: false,
+      folderId,
+      serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       error: err.message || String(error),
       stack: err.stack,
     });
