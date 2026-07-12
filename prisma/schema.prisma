@@ -469,12 +469,12 @@ model WorkTask {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
-  assignedTo Employee?           @relation("AssignedWorkTasks", fields: [assignedToEmployeeId], references: [id], onDelete: SetNull)
-  createdBy  Employee?           @relation("CreatedWorkTasks", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
-  carrier    AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
-  vehicle    Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  workOrder  WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  items      SettlementItem[]
+  assignedTo  Employee?           @relation("AssignedWorkTasks", fields: [assignedToEmployeeId], references: [id], onDelete: SetNull)
+  createdBy   Employee?           @relation("CreatedWorkTasks", fields: [createdByEmployeeId], references: [id], onDelete: SetNull)
+  carrier     AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  vehicle     Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  workOrder   WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  items       SettlementItem[]
   workEntries WorkEntry[]
 
   @@index([assignedToEmployeeId])
@@ -684,7 +684,7 @@ model OfferItem {
 }
 
 model Photo {
-  id              String              @id @default(cuid())
+  id              String    @id @default(cuid())
   carrierId       String?
   surfaceId       String?
   employeeId      String?
@@ -693,12 +693,12 @@ model Photo {
   fileName        String?
   mimeType        String?
   size            Int?
-  type            PhotoType           @default(CARRIER)
+  type            PhotoType @default(CARRIER)
   note            String?
-  sortOrder       Int                 @default(0)
-  isPrimary       Boolean             @default(false)
-  isClientVisible Boolean             @default(false)
-  createdAt       DateTime            @default(now())
+  sortOrder       Int       @default(0)
+  isPrimary       Boolean   @default(false)
+  isClientVisible Boolean   @default(false)
+  createdAt       DateTime  @default(now())
 
   carrier  AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface  AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
@@ -859,7 +859,7 @@ model WorkOrderRate {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  workOrder       WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
 
   @@index([workOrderId])
   @@index([type, workType, validFrom])
@@ -919,4 +919,3 @@ model WorkEntry {
   @@index([status])
   @@index([workDate])
 }
-
