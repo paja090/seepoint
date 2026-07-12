@@ -28,6 +28,11 @@ function optionalEmail(input: EmployeeInput) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : null;
 }
 
+function positions(input: EmployeeInput) {
+  const raw = text(input, 'positions') ?? text(input, 'position') ?? '';
+  return [...new Set(raw.split(',').map((value) => value.trim()).filter(Boolean))].slice(0, 12);
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
@@ -53,6 +58,7 @@ export async function POST(request: Request) {
   if (allowAccess) ensureEmailConfigured();
   const employmentTypeInput = text(input, 'employmentType');
   const employmentType = employmentTypeInput && Object.values(EmploymentType).includes(employmentTypeInput as EmploymentType) ? employmentTypeInput as EmploymentType : EmploymentType.EMPLOYEE;
+  const employeePositions = positions(input);
 
   const dateOfBirth = optionalDate(input, 'dateOfBirth');
   const startDate = optionalDate(input, 'startDate');
@@ -70,7 +76,8 @@ export async function POST(request: Request) {
       lastName,
       email,
       phone: text(input, 'phone'),
-      position: text(input, 'position'),
+      position: employeePositions[0],
+      positions: employeePositions,
       role,
       employmentType,
       ico: text(input, 'ico'),

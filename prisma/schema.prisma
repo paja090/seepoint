@@ -132,6 +132,7 @@ enum PhotoType {
   INSTALLATION
   CHECK
   ARCHIVE
+  EMPLOYEE_PROFILE
 }
 
 enum ImportStatus {
@@ -187,6 +188,18 @@ enum SettlementStatus {
   APPROVED
   PAID
   REJECTED
+}
+
+enum RateType {
+  HOURLY
+  TASK
+  FIXED
+}
+
+enum BillingSubjectType {
+  INDIVIDUAL
+  SOLE_TRADER
+  COMPANY
 }
 
 enum VehicleType {
@@ -296,6 +309,7 @@ model Employee {
   email          String?        @unique
   phone          String?
   position       String?
+  positions      String[]       @default([])
   role           Role           @default(WORKER)
   employmentType EmploymentType @default(EMPLOYEE)
   ico            String?
@@ -307,15 +321,69 @@ model Employee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
-  assignedTasks       WorkTask[]           @relation("AssignedWorkTasks")
-  createdTasks        WorkTask[]           @relation("CreatedWorkTasks")
+  user                User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignedTasks       WorkTask[]              @relation("AssignedWorkTasks")
+  createdTasks        WorkTask[]              @relation("CreatedWorkTasks")
   settlements         Settlement[]
   vehicleReservations VehicleReservation[]
+  billingProfile      EmployeeBillingProfile?
+  rates               EmployeeRate[]
+  photos              Photo[]
 
   @@index([role])
   @@index([isActive])
   @@index([lastName, firstName])
+}
+
+model EmployeeBillingProfile {
+  id               String             @id @default(cuid())
+  employeeId       String             @unique
+  subjectType      BillingSubjectType @default(INDIVIDUAL)
+  billingName      String
+  companyId        String?
+  vatId            String?
+  vatPayer         Boolean            @default(false)
+  street           String?
+  city             String?
+  postalCode       String?
+  country          String             @default("CZ")
+  accountNumber    String?
+  bankCode         String?
+  iban             String?
+  swift            String?
+  billingEmail     String?
+  billingPhone     String?
+  paymentTermsDays Int?
+  note             String?
+  updatedByUserId  String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  employee         Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model EmployeeRate {
+  id              String    @id @default(cuid())
+  employeeId      String
+  type            RateType
+  name            String
+  amount          Decimal   @db.Decimal(12, 2)
+  currency        String    @default("CZK")
+  unit            String?
+  workType        WorkType?
+  validFrom       DateTime
+  validTo         DateTime?
+  note            String?
+  isActive        Boolean   @default(true)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, type, workType, validFrom])
+  @@index([employeeId, isActive, validFrom, validTo])
 }
 
 model Client {
@@ -616,6 +684,7 @@ model Photo {
   id          String    @id @default(cuid())
   carrierId   String?
   surfaceId   String?
+  employeeId  String?
   url         String
   driveFileId String?   @unique
   fileName    String?
@@ -625,11 +694,13 @@ model Photo {
   note        String?
   createdAt   DateTime  @default(now())
 
-  carrier AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  surface AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  carrier  AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  surface  AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  employee Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([carrierId])
   @@index([surfaceId])
+  @@index([employeeId])
 }
 
 model ImportBatch {
