@@ -25,8 +25,8 @@ function workTaskPriority(priority: WorkPriority): TaskPriority {
   return priority as TaskPriority;
 }
 
-async function employeeByNames(workerNames: string[]) {
-  const employees = await prisma.employee.findMany({ where: { isActive: true } });
+async function employeeByNames(workerNames: string[], client: Prisma.TransactionClient | typeof prisma = prisma) {
+  const employees = await client.employee.findMany({ where: { isActive: true } });
   const byName = new Map<string, Employee>();
   for (const employee of employees) {
     byName.set(normalizeName(`${employee.firstName} ${employee.lastName}`), employee);
@@ -54,8 +54,9 @@ function taskNote(order: WorkOrderForSync, workerName?: string, employee?: Emplo
   return lines.join('\n');
 }
 
-export async function syncWorkOrderTasks(workOrderId: string) {
-  const order = await prisma.workOrder.findUnique({
+export async function syncWorkOrderTasks(workOrderId: string, tx?: Prisma.TransactionClient) {
+  const client = tx || prisma;
+  const order = await client.workOrder.findUnique({
     where: { id: workOrderId },
     include: { assignments: true, items: { include: { carrier: true } } },
   });
@@ -63,31 +64,72 @@ export async function syncWorkOrderTasks(workOrderId: string) {
 
   const workerNames = [...new Set(order.assignments.map((assignment) => assignment.workerName.trim()).filter(Boolean))];
   const namesForTasks = workerNames.length ? workerNames : [''];
-  const employees = await employeeByNames(workerNames);
+  const employees = await employeeByNames(workerNames, client);
   const carrierId = order.items[0]?.carrierId ?? null;
   const status = workTaskStatus(order.status);
   const priority = workTaskPriority(order.priority);
   const location = taskLocation(order);
 
-  await prisma.$transaction(async (transaction) => {
-    await transaction.workTask.deleteMany({ where: { workOrderId: order.id } });
-    await transaction.workTask.createMany({
-      data: namesForTasks.map((workerName) => {
-        const employee = workerName ? employees.get(workerName) : undefined;
-        return {
-          workOrderId: order.id,
-          title: taskTitle(order, workerName || undefined),
-          description: order.description,
-          assignedToEmployeeId: employee?.id ?? null,
-          carrierId,
-          dueDate: order.deadlineAt,
-          scheduledDate: order.scheduledAt,
-          priority,
-          status,
-          location,
-          note: taskNote(order, workerName || undefined, employee),
-        };
-      }),
+  const syncLogic = async (transaction: Prisma.TransactionClient) => {
+    const existingTasks = await transaction.workTask.findMany({
+      where: { workOrderId: order.id },
+      include: { workEntries: true },
     });
-  });
+
+    const matchedIds = new Set<string>();
+
+    for (const workerName of namesForTasks) {
+      const employee = workerName ? employees.get(workerName) : undefined;
+      const employeeId = employee?.id ?? null;
+      const expectedTitle = taskTitle(order, workerName || undefined);
+
+      const matchedTask = existingTasks.find(t => 
+        (employeeId !== null && t.assignedToEmployeeId === employeeId) ||
+        (employeeId === null && t.assignedToEmployeeId === null && t.title === expectedTitle)
+      );
+
+      const taskData = {
+        title: expectedTitle,
+        description: order.description,
+        assignedToEmployeeId: employeeId,
+        carrierId,
+        dueDate: order.deadlineAt,
+        scheduledDate: order.scheduledAt,
+        priority,
+        status,
+        location,
+        note: taskNote(order, workerName || undefined, employee),
+      };
+
+      if (matchedTask) {
+        matchedIds.add(matchedTask.id);
+        await transaction.workTask.update({
+          where: { id: matchedTask.id },
+          data: taskData,
+        });
+      } else {
+        await transaction.workTask.create({
+          data: {
+            workOrderId: order.id,
+            ...taskData,
+          },
+        });
+      }
+    }
+
+    const unmatchedTasks = existingTasks.filter(t => !matchedIds.has(t.id));
+    for (const task of unmatchedTasks) {
+      if (task.workEntries.length > 0) {
+        throw new Error(`NELZE_ODEBRAT_PRACOVNIKA: Pracovník přiřazený k úkolu "${task.title}" již vykázal práci. Odebrání pracovníka bylo zablokováno.`);
+      } else {
+        await transaction.workTask.delete({ where: { id: task.id } });
+      }
+    }
+  };
+
+  if (tx) {
+    await syncLogic(tx);
+  } else {
+    await prisma.$transaction(syncLogic);
+  }
 }

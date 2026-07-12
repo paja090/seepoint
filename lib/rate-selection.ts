@@ -1,6 +1,6 @@
 export type SelectableRate = { workType: string | null; validFrom: Date; validTo: Date | null };
 
-export function selectRateAtDate<T extends SelectableRate>(rates: T[], workType: string | null, date: Date) {
+export function selectRateAtDate<T extends SelectableRate>(rates: T[], workType: string | null, date: Date): T | null {
   const valid = rates.filter(rate => rate.validFrom <= date && (!rate.validTo || rate.validTo >= date));
   const newest = (items: T[]) => [...items].sort((a, b) => b.validFrom.getTime() - a.validFrom.getTime())[0] ?? null;
   return workType

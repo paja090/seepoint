@@ -30,6 +30,8 @@ const navGroups: NavGroup[] = [
       ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
       ['/tasks', 'Úkoly', 'clipboardList', 'tasks'],
       ['/my-tasks', 'Moje úkoly', 'calendarCheck', 'myTasks'],
+      ['/work-entries', 'Odvedená práce', 'fileText', 'workEntries'],
+      ['/my-work-entries', 'Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
       ['/settlements', 'Vyúčtování', 'fileText', 'settlements'],
       ['/my-settlements', 'Moje vyúčtování', 'fileText', 'mySettlements'],
       ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],

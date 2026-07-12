@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Car, ClipboardList, FileText, FileUp, Map, PanelsTopLeft, Route, Settings, UserRound, Users } from 'lucide-react';
+import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Car, ClipboardList, ClipboardCheck, FileText, FileUp, Map, PanelsTopLeft, Route, Settings, UserRound, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -12,6 +12,7 @@ export type AppNavIcon =
   | 'calendarRange'
   | 'car'
   | 'clipboardList'
+  | 'clipboardCheck'
   | 'fileText'
   | 'fileUp'
   | 'map'
@@ -29,6 +30,7 @@ const icons = {
   calendarRange: CalendarRange,
   car: Car,
   clipboardList: ClipboardList,
+  clipboardCheck: ClipboardCheck,
   fileText: FileText,
   fileUp: FileUp,
   map: Map,
