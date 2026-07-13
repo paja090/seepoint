@@ -29,7 +29,48 @@ export async function POST(request: Request) {
     if (employeeId && rawType !== 'EMPLOYEE_PROFILE') return NextResponse.json({ error: 'Profilová fotografie má neplatný typ.' }, { status: 400 });
     const photoId = randomUUID(); const safeOriginalName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(-120) || 'photo';
     const storedFile = await uploadPhotoToGoogleDrive(file, `${Date.now()}-${safeOriginalName}`, photoId); driveFileId = storedFile.id;
-    const photo = await prisma.photo.create({ data: { id: photoId, url: `/api/photos/${photoId}/file`, driveFileId: storedFile.id, fileName: storedFile.name, mimeType: storedFile.mimeType, size: storedFile.size, type: rawType as 'LOCATION'|'CARRIER'|'CAMPAIGN'|'INSTALLATION'|'CHECK'|'ARCHIVE'|'EMPLOYEE_PROFILE', carrierId, surfaceId, employeeId, note: form.get('note') ? String(form.get('note')) : null } });
+    const photo = await prisma.$transaction(async (tx) => {
+      if (carrierId) {
+        await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE id = ${carrierId} FOR UPDATE`;
+      } else if (surfaceId) {
+        await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE id = ${surfaceId} FOR UPDATE`;
+      }
+
+      const count = await tx.photo.count({
+        where: {
+          carrierId,
+          surfaceId,
+        },
+      });
+
+      const hasPrimary = await tx.photo.count({
+        where: {
+          carrierId,
+          surfaceId,
+          isPrimary: true,
+        },
+      });
+
+      const isPrimary = !employeeId && hasPrimary === 0;
+
+      return tx.photo.create({
+        data: {
+          id: photoId,
+          url: `/api/photos/${photoId}/file`,
+          driveFileId: storedFile.id,
+          fileName: storedFile.name,
+          mimeType: storedFile.mimeType,
+          size: storedFile.size,
+          type: rawType as 'LOCATION'|'CARRIER'|'CAMPAIGN'|'INSTALLATION'|'CHECK'|'ARCHIVE'|'EMPLOYEE_PROFILE',
+          carrierId,
+          surfaceId,
+          employeeId,
+          sortOrder: count,
+          isPrimary,
+          note: form.get('note') ? String(form.get('note')) : null,
+        },
+      });
+    });
     return NextResponse.json(photo, { status: 201 });
   } catch (error) {
     if (driveFileId) await deletePhotoFromGoogleDrive(driveFileId).catch(() => undefined);

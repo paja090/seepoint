@@ -73,6 +73,13 @@ export async function POST(request: Request) {
 
     // Perform transaction to compute sorting order and primary photo flags atomically
     const photo = await prisma.$transaction(async (tx) => {
+      // Lock target to serialize concurrent links and prevent multiple primary photos
+      if (targetCarrierId) {
+        await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE id = ${targetCarrierId} FOR UPDATE`;
+      } else if (targetSurfaceId) {
+        await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE id = ${targetSurfaceId} FOR UPDATE`;
+      }
+
       const count = await tx.photo.count({
         where: {
           carrierId: targetCarrierId,
