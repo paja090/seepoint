@@ -2,6 +2,7 @@ import { prisma } from './db';
 import { Prisma } from '@prisma/client';
 import { getOrCreateSettlement } from './settlement-generation';
 import { recalculateSettlementTotals } from './settlement-recalculation';
+import { runTransactionWithRetry } from './transaction-retry';
 
 /**
  * Approves a WorkExpense. Creates the corresponding SettlementAdjustment.
@@ -89,9 +90,7 @@ export async function approveWorkExpense(
   if (tx) {
     return await runApproval(tx);
   } else {
-    return await prisma.$transaction(runApproval, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-    });
+    return await runTransactionWithRetry(runApproval);
   }
 }
 

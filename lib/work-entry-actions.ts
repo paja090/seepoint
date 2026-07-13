@@ -2,6 +2,7 @@ import { prisma } from './db';
 import { Prisma, WorkEntryStatus } from '@prisma/client';
 import { getOrCreateSettlement, getPragueYearMonth } from './settlement-generation';
 import { recalculateSettlementTotals } from './settlement-recalculation';
+import { runTransactionWithRetry } from './transaction-retry';
 
 /**
  * Validates state transitions for WorkEntry.
@@ -119,83 +120,62 @@ export async function approveWorkEntry(
           const type = isPositive ? 'CARRY_OVER_ADD' as const : 'CARRY_OVER_SUB' as const;
           const absDiff = diff.abs();
 
-          const existingAdj = await transaction.settlementAdjustment.findFirst({
-            where: {
-              settlementId: settlement.id,
-              correctionWorkEntryId: entry.id,
-            }
-          });
-
+          const correctionKey = `work-entry-correction:${entry.id}:${originalSettlementItem.settlementId}:${settlement.id}`;
           const description = `Oprava odměny (rozdíl) z uzamčeného období ${originalYearMonth.year}-${String(originalYearMonth.month).padStart(2, '0')} za: ${entry.note || entry.id}`;
 
-          if (existingAdj) {
-            await transaction.settlementAdjustment.update({
-              where: { id: existingAdj.id },
-              data: {
-                type,
-                description,
-                amount: absDiff,
-                changedByUserId: approvedByUserId,
-                reason: 'Oprava práce po uzávěrce (aktualizace)',
-              }
-            });
-          } else {
-            // Create correction adjustment in the open future settlement
-            await transaction.settlementAdjustment.create({
-              data: {
-                settlementId: settlement.id,
-                type,
-                category: 'OTHER',
-                description,
-                amount: absDiff,
-                correctionWorkEntryId: entry.id,
-                correctionSettlementItemId: originalSettlementItem.id,
-                correctionOriginalSettlementId: originalSettlementItem.settlementId,
-                changedByUserId: approvedByUserId,
-                reason: 'Oprava práce po uzávěrce',
-              }
-            });
-          }
+          await transaction.settlementAdjustment.upsert({
+            where: { correctionKey },
+            update: {
+              type,
+              description,
+              amount: absDiff,
+              changedByUserId: approvedByUserId,
+              reason: 'Oprava práce po uzávěrce (aktualizace)',
+            },
+            create: {
+              settlementId: settlement.id,
+              type,
+              category: 'OTHER',
+              description,
+              amount: absDiff,
+              correctionWorkEntryId: entry.id,
+              correctionSettlementItemId: originalSettlementItem.id,
+              correctionOriginalSettlementId: originalSettlementItem.settlementId,
+              correctionKey,
+              changedByUserId: approvedByUserId,
+              reason: 'Oprava práce po uzávěrce',
+            }
+          });
 
           // Recalculate future open settlement
           await recalculateSettlementTotals(settlement.id, transaction);
         }
       } else {
         // CASE B: First-time approval of work logged in a past locked period
-        const existingAdj = await transaction.settlementAdjustment.findFirst({
-          where: {
-            settlementId: settlement.id,
-            correctionWorkEntryId: entry.id,
-          }
-        });
-
+        const correctionKey = `work-entry-correction:${entry.id}:none:${settlement.id}`;
         const description = `Dodatečně schválená práce z uzamčeného období ${originalYearMonth.year}-${String(originalYearMonth.month).padStart(2, '0')}: ${entry.note || entry.id}`;
 
-        if (existingAdj) {
-          await transaction.settlementAdjustment.update({
-            where: { id: existingAdj.id },
-            data: {
-              type: 'CARRY_OVER_ADD',
-              description,
-              amount: entry.calculatedAmount,
-              changedByUserId: approvedByUserId,
-              reason: 'Dodatečné schválení práce po uzávěrce (aktualizace)',
-            }
-          });
-        } else {
-          await transaction.settlementAdjustment.create({
-            data: {
-              settlementId: settlement.id,
-              type: 'CARRY_OVER_ADD',
-              category: 'OTHER',
-              description,
-              amount: entry.calculatedAmount,
-              correctionWorkEntryId: entry.id,
-              changedByUserId: approvedByUserId,
-              reason: 'Dodatečné schválení práce po uzávěrce',
-            }
-          });
-        }
+        await transaction.settlementAdjustment.upsert({
+          where: { correctionKey },
+          update: {
+            type: 'CARRY_OVER_ADD',
+            description,
+            amount: entry.calculatedAmount,
+            changedByUserId: approvedByUserId,
+            reason: 'Dodatečné schválení práce po uzávěrce (aktualizace)',
+          },
+          create: {
+            settlementId: settlement.id,
+            type: 'CARRY_OVER_ADD',
+            category: 'OTHER',
+            description,
+            amount: entry.calculatedAmount,
+            correctionWorkEntryId: entry.id,
+            correctionKey,
+            changedByUserId: approvedByUserId,
+            reason: 'Dodatečné schválení práce po uzávěrce',
+          }
+        });
 
         // Recalculate future open settlement
         await recalculateSettlementTotals(settlement.id, transaction);
@@ -217,9 +197,7 @@ export async function approveWorkEntry(
   if (tx) {
     return await runApproval(tx);
   } else {
-    return await prisma.$transaction(runApproval, {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable
-    });
+    return await runTransactionWithRetry(runApproval);
   }
 }
 

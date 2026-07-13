@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { approveWorkEntry } from '@/lib/work-entry-actions';
+import { ConcurrencyError } from '@/lib/transaction-retry';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -28,6 +29,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
 
   } catch (error: unknown) {
+    if (error instanceof ConcurrencyError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     const err = error as Error & { code?: string };
     if (err.message.includes('nebyl nalezen')) {
       return NextResponse.json({ error: 'Záznam práce nebyl nalezen.' }, { status: 404 });

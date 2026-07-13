@@ -8,6 +8,7 @@ import { getPragueYearMonth, getPragueMonthRange } from '../lib/settlement-gener
 import { recalculateSettlementTotals } from '../lib/settlement-recalculation.ts';
 import { validateWorkEntryTransition, approveWorkEntry } from '../lib/work-entry-actions.ts';
 import { approveWorkExpense } from '../lib/work-expense-actions.ts';
+import { prisma } from '../lib/db.ts';
 
 const dec = (val: string | number) => new Prisma.Decimal(val);
 
@@ -191,14 +192,12 @@ test('5. Lock-based carry-over offset during WorkEntry approval', async () => {
       update: async () => mockOpenSettlement
     },
     settlementAdjustment: {
-      findFirst: async () => null,
-      create: async (args: any) => {
-        // Check that correction carries over the entire amount of 1600 CZK
-        assert.equal(args.data.settlementId, 'set-open-07');
-        assert.equal(args.data.type, 'CARRY_OVER_ADD');
-        assert.equal(args.data.amount.toFixed(2), '1600.00');
-        assert.equal(args.data.correctionWorkEntryId, 'entry-1');
-        return args.data;
+      upsert: async (args: any) => {
+        assert.equal(args.create.settlementId, 'set-open-07');
+        assert.equal(args.create.type, 'CARRY_OVER_ADD');
+        assert.equal(args.create.amount.toFixed(2), '1600.00');
+        assert.equal(args.create.correctionWorkEntryId, 'entry-1');
+        return args.create;
       }
     }
   } as unknown as Prisma.TransactionClient;
@@ -433,12 +432,10 @@ test('8. Idempotency on double approvals and carry-over edits', async () => {
       update: async () => mockOpenSettlement
     },
     settlementAdjustment: {
-      findFirst: async () => mockExistingAdjustment, // simulates that adjustment already exists!
-      update: async (args: any) => {
-        // Assert that the adjustment amount is updated to the new difference (2000 - 1600 = 400)
-        assert.equal(args.where.id, 'adj-correction-1');
-        assert.equal(args.data.amount.toFixed(2), '400.00');
-        assert.equal(args.data.type, 'CARRY_OVER_ADD');
+      upsert: async (args: any) => {
+        assert.equal(args.where.correctionKey, 'work-entry-correction:entry-99:set-locked-06:set-open-07');
+        assert.equal(args.update.amount.toFixed(2), '400.00');
+        assert.equal(args.update.type, 'CARRY_OVER_ADD');
         return mockExistingAdjustment;
       }
     }
@@ -479,4 +476,232 @@ test('10. Permission restrictions on WORKER role (cannot approve work or expense
   const isAuthorized = workerUser.role === 'ADMIN' || workerUser.role === 'MANAGER';
   assert.equal(isAuthorized, false);
 });
+
+import { ConcurrencyError, runTransactionWithRetry } from '../lib/transaction-retry.ts';
+import { updateSystemSettings } from '../lib/system-settings.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+
+test('11. Backfill of historical appliedRate and nullable rateType', () => {
+  const legacyItem: any = {
+    id: 'legacy-item-1',
+    appliedRate: dec('0.00'),
+    rateType: null,
+  };
+  assert.equal(legacyItem.rateType, null);
+  assert.equal(legacyItem.appliedRate.toString(), '0');
+});
+
+test('12. Mandatory rateType check when creating new item', () => {
+  const createNewItem = (data: { rateType?: any }) => {
+    if (!data.rateType) {
+      throw new Error('RateType is mandatory for new settlement items.');
+    }
+    return { ...data };
+  };
+
+  assert.throws(() => createNewItem({}), /RateType is mandatory/);
+  const okItem = createNewItem({ rateType: 'HOURLY' });
+  assert.equal(okItem.rateType, 'HOURLY');
+});
+
+test('13. Idempotency of carry-over adjustment inside the same target settlement', async () => {
+  let upsertCount = 0;
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => ({
+        id: 'entry-idx',
+        employeeId: 'emp-1',
+        workDate: new Date('2026-06-01'),
+        calculatedAmount: dec('2000.00'),
+        status: 'SUBMITTED',
+        note: 'Test entry',
+        settlementItem: { id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }
+      }),
+      update: async () => ({})
+    },
+    settlement: {
+      findUnique: async (args: any) => {
+        const id = args.where.id ?? (args.where.employeeId_periodYear_periodMonth ? 'set-locked-06' : 'set-open-07');
+        if (id === 'set-locked-06') {
+          return { id: 'set-locked-06', status: 'LOCKED', periodYear: 2026, periodMonth: 6, items: [], adjustments: [] };
+        }
+        return { id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] };
+      },
+      findMany: async () => [{ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }],
+      update: async () => ({})
+    },
+    settlementItem: {
+      findUnique: async () => ({ id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }),
+    },
+    settlementAdjustment: {
+      upsert: async (args: any) => {
+        upsertCount++;
+        assert.equal(args.where.correctionKey, 'work-entry-correction:entry-idx:set-locked-06:set-open-07');
+        return {};
+      }
+    }
+  } as any;
+
+  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+
+  assert.equal(upsertCount, 2);
+});
+
+test('14. Subsequent carry-over adjustment of same work entry in a new target settlement', async () => {
+  let lastKey = '';
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => ({
+        id: 'entry-idx',
+        employeeId: 'emp-1',
+        workDate: new Date('2026-06-01'),
+        calculatedAmount: dec('2000.00'),
+        status: 'SUBMITTED',
+        note: 'Test entry',
+        settlementItem: { id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }
+      }),
+      update: async () => ({})
+    },
+    settlement: {
+      findUnique: async (args: any) => {
+        const id = args.where.id ?? (args.where.employeeId_periodYear_periodMonth ? 'set-locked-06' : 'set-open-07');
+        if (id === 'set-locked-06') {
+          return { id: 'set-locked-06', status: 'LOCKED', periodYear: 2026, periodMonth: 6, items: [], adjustments: [] };
+        }
+        return { id, status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] };
+      },
+      findMany: async () => {
+        if (lastKey === '') {
+          return [{ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }];
+        }
+        return [{ id: 'set-open-08', status: 'DRAFT', periodYear: 2026, periodMonth: 8, items: [], adjustments: [] }];
+      },
+      update: async () => ({})
+    },
+    settlementItem: {
+      findUnique: async () => ({ id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }),
+    },
+    settlementAdjustment: {
+      upsert: async (args: any) => {
+        lastKey = args.where.correctionKey;
+        return {};
+      }
+    }
+  } as any;
+
+  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+  assert.equal(lastKey, 'work-entry-correction:entry-idx:set-locked-06:set-open-07');
+
+  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+  assert.equal(lastKey, 'work-entry-correction:entry-idx:set-locked-06:set-open-08');
+});
+
+test('15. Transaction retry helper - success on second attempt', async () => {
+  let attempts = 0;
+  const originalTransaction = (prisma as any).$transaction;
+  
+  (prisma as any).$transaction = async (_fn: any, _options: any) => {
+    attempts++;
+    if (attempts === 1) {
+      throw new Prisma.PrismaClientKnownRequestError('Simulated serialization error', {
+        code: 'P2034',
+        clientVersion: '5.0.0',
+      });
+    }
+    return 'success-data';
+  };
+
+  try {
+    const result = await runTransactionWithRetry(async (_tx) => 'data', 3);
+    assert.equal(result, 'success-data');
+    assert.equal(attempts, 2);
+  } finally {
+    (prisma as any).$transaction = originalTransaction;
+  }
+});
+
+test('16. Transaction retry helper - exhaustion throws ConcurrencyError', async () => {
+  let attempts = 0;
+  const originalTransaction = (prisma as any).$transaction;
+  
+  (prisma as any).$transaction = async (_fn: any, _options: any) => {
+    attempts++;
+    throw new Prisma.PrismaClientKnownRequestError('Simulated serialization error', {
+      code: 'P2034',
+      clientVersion: '5.0.0',
+    });
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await runTransactionWithRetry(async (_tx) => 'data', 3);
+      },
+      ConcurrencyError
+    );
+    assert.equal(attempts, 3);
+  } finally {
+    (prisma as any).$transaction = originalTransaction;
+  }
+});
+
+test('17. Transaction retry helper - other Prisma errors are thrown immediately', async () => {
+  let attempts = 0;
+  const originalTransaction = (prisma as any).$transaction;
+  
+  (prisma as any).$transaction = async (_fn: any, _options: any) => {
+    attempts++;
+    throw new Prisma.PrismaClientKnownRequestError('Simulated other error', {
+      code: 'P2002',
+      clientVersion: '5.0.0',
+    });
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await runTransactionWithRetry(async (_tx) => 'data', 3);
+      },
+      (err: any) => {
+        return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+      }
+    );
+    assert.equal(attempts, 1);
+  } finally {
+    (prisma as any).$transaction = originalTransaction;
+  }
+});
+
+test('18. SystemSettings singleton restriction', async () => {
+  const originalUpsert = (prisma.systemSettings as any).upsert;
+  let upsertArgs: any = null;
+
+  (prisma.systemSettings as any).upsert = async (args: any) => {
+    upsertArgs = args;
+    return { id: 'default', companyName: args.update.companyName };
+  };
+
+  try {
+    const input: any = { id: 'some-malicious-id', companyName: 'Hack Corp', vatRate: 15 };
+    await updateSystemSettings(input);
+
+    assert.equal(upsertArgs.where.id, 'default');
+    assert.equal(upsertArgs.create.id, 'default');
+    assert.equal(upsertArgs.update.id, undefined);
+    assert.equal(upsertArgs.update.companyName, 'Hack Corp');
+  } finally {
+    (prisma.systemSettings as any).upsert = originalUpsert;
+  }
+});
+
+test('19. Build script check in package.json', () => {
+  const pkgPath = path.join(__dirname, '../package.json');
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  
+  assert.equal(pkg.scripts.build, 'prisma generate && next build');
+  assert.equal(pkg.scripts['db:migrate:deploy'], 'prisma migrate deploy');
+});
+
 

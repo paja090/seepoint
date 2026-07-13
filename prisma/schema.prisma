@@ -543,7 +543,7 @@ model SettlementItem {
   unitPrice    Decimal?     @db.Decimal(12, 2)
   amount       Decimal      @db.Decimal(12, 2)
   appliedRate  Decimal      @default(0) @db.Decimal(12, 2)
-  rateType     RateType     @default(HOURLY)
+  rateType     RateType?
   rateSource   RateSource?
   rateId       String?
   carrierType  CarrierType?
@@ -1050,6 +1050,7 @@ model SettlementAdjustment {
   correctionWorkEntryId          String?
   correctionSettlementItemId     String?
   correctionOriginalSettlementId String?
+  correctionKey                  String?            @unique
   type                           AdjustmentType
   category                       AdjustmentCategory
   description                    String
