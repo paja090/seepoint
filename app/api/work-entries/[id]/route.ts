@@ -57,9 +57,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Záznam práce nebyl nalezen.' }, { status: 404 });
   }
 
-  // 1. Strict Immutability for CONFIRMED entries
-  if (entry.status === 'CONFIRMED') {
-    return NextResponse.json({ error: 'Potvrzený záznam práce nelze upravovat.' }, { status: 400 });
+  // 1. Strict Immutability for SUBMITTED/APPROVED entries
+  if (entry.status === 'SUBMITTED' || entry.status === 'APPROVED') {
+    return NextResponse.json({ error: 'Schválený nebo odeslaný záznam práce nelze upravovat.' }, { status: 400 });
   }
 
   // 2. Authorization

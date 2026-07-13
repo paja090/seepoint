@@ -23,7 +23,7 @@ type EntryPayload = {
   calculatedAmount: string;
   rateSource: string | null;
   note: string | null;
-  status: 'DRAFT' | 'CONFIRMED';
+  status: 'DRAFT' | 'CONFIRMED' | 'SUBMITTED' | 'APPROVED' | 'RETURNED';
   creationSource: 'AUTOMATIC' | 'MANUAL';
   employee: { firstName: string; lastName: string };
   workTask: { title: string } | null;

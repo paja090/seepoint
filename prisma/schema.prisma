@@ -40,6 +40,8 @@ enum AuditAction {
 
 enum EmploymentType {
   EMPLOYEE
+  DPP
+  DPC
   CONTRACTOR
   FREELANCER
   PART_TIME
@@ -133,6 +135,7 @@ enum PhotoType {
   CHECK
   ARCHIVE
   EMPLOYEE_PROFILE
+  EXPENSE_RECEIPT
 }
 
 enum ImportStatus {
@@ -186,6 +189,7 @@ enum SettlementStatus {
   DRAFT
   SUBMITTED
   APPROVED
+  LOCKED
   PAID
   REJECTED
 }
@@ -321,15 +325,16 @@ model Employee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  user                User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  assignedTasks       WorkTask[]              @relation("AssignedWorkTasks")
-  createdTasks        WorkTask[]              @relation("CreatedWorkTasks")
-  settlements         Settlement[]
-  vehicleReservations VehicleReservation[]
-  billingProfile      EmployeeBillingProfile?
-  rates               EmployeeRate[]
-  photos              Photo[]
-  workEntries         WorkEntry[]
+  user                 User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignedTasks        WorkTask[]              @relation("AssignedWorkTasks")
+  createdTasks         WorkTask[]              @relation("CreatedWorkTasks")
+  settlements          Settlement[]
+  vehicleReservations  VehicleReservation[]
+  billingProfile       EmployeeBillingProfile?
+  rates                EmployeeRate[]
+  photos               Photo[]
+  workEntries          WorkEntry[]
+  recurringAdjustments RecurringAdjustment[]
 
   @@index([role])
   @@index([isActive])
@@ -337,51 +342,56 @@ model Employee {
 }
 
 model EmployeeBillingProfile {
-  id               String             @id @default(cuid())
-  employeeId       String             @unique
-  subjectType      BillingSubjectType @default(INDIVIDUAL)
-  billingName      String
-  companyId        String?
-  vatId            String?
-  vatPayer         Boolean            @default(false)
-  street           String?
-  city             String?
-  postalCode       String?
-  country          String             @default("CZ")
-  accountNumber    String?
-  bankCode         String?
-  iban             String?
-  swift            String?
-  billingEmail     String?
-  billingPhone     String?
-  paymentTermsDays Int?
-  note             String?
-  updatedByUserId  String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  employee         Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id                  String             @id @default(cuid())
+  employeeId          String             @unique
+  subjectType         BillingSubjectType @default(INDIVIDUAL)
+  billingName         String
+  companyId           String?
+  vatId               String?
+  vatPayer            Boolean            @default(false)
+  street              String?
+  city                String?
+  postalCode          String?
+  country             String             @default("CZ")
+  accountNumber       String?
+  bankCode            String?
+  iban                String?
+  swift               String?
+  billingEmail        String?
+  billingPhone        String?
+  paymentTermsDays    Int?
+  note                String?
+  updatedByUserId     String?
+  invoiceEnabled      Boolean            @default(false)
+  invoiceNumberPrefix String?
+  nextInvoiceNumber   Int                @default(1)
+  defaultDueDays      Int                @default(14)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  employee            Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
 }
 
 model EmployeeRate {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   employeeId      String
   type            RateType
   name            String
-  amount          Decimal   @db.Decimal(12, 2)
-  currency        String    @default("CZK")
+  amount          Decimal      @db.Decimal(12, 2)
+  currency        String       @default("CZK")
   unit            String?
   workType        WorkType?
+  carrierType     CarrierType?
   validFrom       DateTime
   validTo         DateTime?
   note            String?
-  isActive        Boolean   @default(true)
+  isActive        Boolean      @default(true)
   createdByUserId String?
   updatedByUserId String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  employee        Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId, type, workType, validFrom])
   @@index([employeeId, isActive, validFrom, validTo])
@@ -466,6 +476,9 @@ model WorkTask {
   status               WorkTaskStatus   @default(TODO)
   location             String?
   note                 String?
+  remunerationMethod   RateType         @default(HOURLY)
+  plannedQuantity      Decimal?         @db.Decimal(10, 2)
+  plannedTimeHours     Decimal?         @db.Decimal(10, 2)
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -476,6 +489,7 @@ model WorkTask {
   workOrder   WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   items       SettlementItem[]
   workEntries WorkEntry[]
+  photos      Photo[]
 
   @@index([assignedToEmployeeId])
   @@index([createdByEmployeeId])
@@ -487,37 +501,59 @@ model WorkTask {
 }
 
 model Settlement {
-  id          String           @id @default(cuid())
-  employeeId  String
-  periodFrom  DateTime
-  periodTo    DateTime
-  status      SettlementStatus @default(DRAFT)
-  totalAmount Decimal?         @db.Decimal(12, 2)
-  note        String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id                  String           @id @default(cuid())
+  employeeId          String
+  periodFrom          DateTime
+  periodTo            DateTime
+  periodYear          Int
+  periodMonth         Int
+  status              SettlementStatus @default(DRAFT)
+  totalAmount         Decimal?         @db.Decimal(12, 2)
+  totalWorkAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  totalReimbursements Decimal          @default(0) @db.Decimal(12, 2)
+  totalDeductions     Decimal          @default(0) @db.Decimal(12, 2)
+  totalAdvances       Decimal          @default(0) @db.Decimal(12, 2)
+  finalPayableAmount  Decimal          @default(0) @db.Decimal(12, 2)
+  paidAmount          Decimal?         @db.Decimal(12, 2)
+  paymentDate         DateTime?
+  note                String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
-  employee Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  items    SettlementItem[]
+  employee    Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  items       SettlementItem[]
+  adjustments SettlementAdjustment[]
+  auditLogs   SettlementAuditLog[]
+  invoice     Invoice?
 
+  @@unique([employeeId, periodYear, periodMonth])
   @@index([employeeId])
   @@index([status, periodFrom, periodTo])
 }
 
 model SettlementItem {
-  id           String   @id @default(cuid())
+  id           String       @id @default(cuid())
   settlementId String
   taskId       String?
+  workEntryId  String?      @unique
   date         DateTime
   description  String
-  quantity     Decimal? @db.Decimal(10, 2)
+  quantity     Decimal?     @db.Decimal(10, 2)
   unit         String?
-  unitPrice    Decimal? @db.Decimal(12, 2)
-  amount       Decimal  @db.Decimal(12, 2)
+  unitPrice    Decimal?     @db.Decimal(12, 2)
+  amount       Decimal      @db.Decimal(12, 2)
+  appliedRate  Decimal      @default(0) @db.Decimal(12, 2)
+  rateType     RateType     @default(HOURLY)
+  rateSource   RateSource?
+  rateId       String?
+  carrierType  CarrierType?
+  workType     WorkType?
   note         String?
 
-  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
-  task       WorkTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  settlement            Settlement             @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  task                  WorkTask?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workEntry             WorkEntry?             @relation(fields: [workEntryId], references: [id], onDelete: Restrict)
+  settlementAdjustments SettlementAdjustment[]
 
   @@index([settlementId])
   @@index([taskId])
@@ -688,6 +724,8 @@ model Photo {
   carrierId       String?
   surfaceId       String?
   employeeId      String?
+  taskId          String?
+  workEntryId     String?
   url             String
   driveFileId     String?
   fileName        String?
@@ -698,11 +736,14 @@ model Photo {
   sortOrder       Int       @default(0)
   isPrimary       Boolean   @default(false)
   isClientVisible Boolean   @default(false)
+  isPrivate       Boolean   @default(false)
   createdAt       DateTime  @default(now())
 
-  carrier  AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  surface  AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
-  employee Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  surface   AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  employee  Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  task      WorkTask?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workEntry WorkEntry?          @relation(fields: [workEntryId], references: [id], onDelete: SetNull)
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
@@ -826,7 +867,9 @@ model WorkOrderItem {
 
 enum WorkEntryStatus {
   DRAFT
-  CONFIRMED
+  SUBMITTED
+  APPROVED
+  RETURNED
 }
 
 enum WorkEntryCreationSource {
@@ -842,22 +885,23 @@ enum RateSource {
 }
 
 model WorkOrderRate {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   workOrderId     String
   type            RateType
   name            String
-  amount          Decimal   @db.Decimal(12, 2)
-  currency        String    @default("CZK")
+  amount          Decimal      @db.Decimal(12, 2)
+  currency        String       @default("CZK")
   unit            String?
   workType        WorkType?
+  carrierType     CarrierType?
   validFrom       DateTime
   validTo         DateTime?
   note            String?
-  isActive        Boolean   @default(true)
+  isActive        Boolean      @default(true)
   createdByUserId String?
   updatedByUserId String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
 
@@ -867,21 +911,22 @@ model WorkOrderRate {
 }
 
 model CompanyRate {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   type            RateType
   name            String
-  amount          Decimal   @db.Decimal(12, 2)
-  currency        String    @default("CZK")
+  amount          Decimal      @db.Decimal(12, 2)
+  currency        String       @default("CZK")
   unit            String?
   workType        WorkType?
+  carrierType     CarrierType?
   validFrom       DateTime
   validTo         DateTime?
   note            String?
-  isActive        Boolean   @default(true)
+  isActive        Boolean      @default(true)
   createdByUserId String?
   updatedByUserId String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   @@index([type, workType, validFrom])
   @@index([isActive, validFrom, validTo])
@@ -896,6 +941,7 @@ model WorkEntry {
   clientId           String?
   clientName         String?
   workType           WorkType
+  carrierType        CarrierType?
   remunerationMethod RateType
   quantity           Decimal                 @db.Decimal(10, 4)
   unit               String
@@ -905,17 +951,216 @@ model WorkEntry {
   note               String?
   status             WorkEntryStatus         @default(DRAFT)
   creationSource     WorkEntryCreationSource @default(MANUAL)
+  timeFrom           DateTime?
+  timeTo             DateTime?
+  rejectionReason    String?
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
-  employee  Employee   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  workTask  WorkTask   @relation(fields: [workTaskId], references: [id], onDelete: Restrict)
-  workOrder WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
-  client    Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  employee              Employee               @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  workTask              WorkTask               @relation(fields: [workTaskId], references: [id], onDelete: Restrict)
+  workOrder             WorkOrder?             @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  client                Client?                @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  settlementItem        SettlementItem?
+  photos                Photo[]
+  expenses              WorkExpense[]
+  settlementAdjustments SettlementAdjustment[]
 
   @@index([employeeId])
   @@index([workTaskId])
   @@index([workOrderId])
   @@index([status])
   @@index([workDate])
+}
+
+enum ExpenseType {
+  FUEL
+  PARKING
+  PURCHASE
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AdjustmentType {
+  REIMBURSEMENT
+  BONUS
+  CARRY_OVER_ADD
+  ADVANCE
+  DEDUCTION
+  CARRY_OVER_SUB
+}
+
+enum AdjustmentCategory {
+  PHONE
+  RENT
+  PARKING
+  FUEL
+  PURCHASE
+  PENALTY
+  OTHER
+}
+
+model WorkExpense {
+  id               String        @id @default(cuid())
+  workEntryId      String
+  type             ExpenseType
+  description      String
+  amount           Decimal       @db.Decimal(12, 2)
+  receiptPhotoId   String?
+  status           ExpenseStatus @default(PENDING)
+  approvedByUserId String?
+  approvedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  workEntry   WorkEntry              @relation(fields: [workEntryId], references: [id], onDelete: Cascade)
+  adjustments SettlementAdjustment[]
+}
+
+model RecurringAdjustment {
+  id          String             @id @default(cuid())
+  employeeId  String
+  type        AdjustmentType
+  category    AdjustmentCategory
+  description String
+  amount      Decimal            @db.Decimal(12, 2)
+  validFrom   DateTime
+  validTo     DateTime?
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  employee    Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  adjustments SettlementAdjustment[]
+
+  @@index([employeeId])
+}
+
+model SettlementAdjustment {
+  id                             String             @id @default(cuid())
+  settlementId                   String
+  recurringAdjustmentId          String?
+  workExpenseId                  String?            @unique
+  correctionWorkEntryId          String?
+  correctionSettlementItemId     String?
+  correctionOriginalSettlementId String?
+  type                           AdjustmentType
+  category                       AdjustmentCategory
+  description                    String
+  amount                         Decimal            @db.Decimal(12, 2)
+  note                           String?
+  reason                         String? // Reason for manually overriding or adding/deleting
+  changedByUserId                String?
+  createdAt                      DateTime           @default(now())
+  updatedAt                      DateTime           @updatedAt
+
+  settlement               Settlement           @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  recurringAdjustment      RecurringAdjustment? @relation(fields: [recurringAdjustmentId], references: [id], onDelete: SetNull)
+  workExpense              WorkExpense?         @relation(fields: [workExpenseId], references: [id], onDelete: Restrict)
+  correctionWorkEntry      WorkEntry?           @relation(fields: [correctionWorkEntryId], references: [id], onDelete: SetNull)
+  correctionSettlementItem SettlementItem?      @relation(fields: [correctionSettlementItemId], references: [id], onDelete: SetNull)
+
+  @@unique([settlementId, recurringAdjustmentId])
+  @@index([settlementId])
+  @@index([recurringAdjustmentId])
+  @@index([workExpenseId])
+}
+
+model SystemSettings {
+  id          String   @id @default("default")
+  companyName String   @default("SeePoint s.r.o.")
+  companyId   String   @default("12345678") // IČO
+  vatId       String   @default("CZ12345678") // DIČ
+  street      String   @default("Mezibranská 1367/21")
+  city        String   @default("Praha")
+  postalCode  String   @default("110 00")
+  country     String   @default("CZ")
+  bankAccount String?
+  iban        String?
+  swift       String?
+  updatedAt   DateTime @updatedAt
+}
+
+model SettlementAuditLog {
+  id           String   @id @default(cuid())
+  settlementId String
+  userId       String
+  userName     String
+  action       String // e.g. "ITEM_UPDATE", "ITEM_DELETE", "ADJUSTMENT_ADD", "STATUS_CHANGE"
+  fieldName    String? // e.g. "amount", "unitPrice", "quantity", "status"
+  oldValue     String?
+  newValue     String?
+  reason       String
+  createdAt    DateTime @default(now())
+
+  settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  @@index([settlementId])
+}
+
+model Invoice {
+  id            String @id @default(cuid())
+  settlementId  String @unique
+  invoiceNumber String @unique
+  status        String @default("DRAFT") // DRAFT, ISSUED, PAID, CANCELLED
+
+  // Date details:
+  issueDate  DateTime
+  dueDate    DateTime
+  periodFrom DateTime
+  periodTo   DateTime
+
+  // Supplier details snapshot (Worker):
+  supplierName     String
+  supplierIco      String?
+  supplierDic      String?
+  supplierAddress  String
+  supplierAccount  String?
+  supplierIban     String?
+  supplierSwift    String?
+  supplierVatPayer Boolean @default(false)
+
+  // Customer details snapshot (Company):
+  customerName    String
+  customerIco     String?
+  customerDic     String?
+  customerAddress String
+  customerAccount String?
+  customerIban    String?
+  customerSwift   String?
+
+  totalAmount Decimal @db.Decimal(12, 2)
+  vatAmount   Decimal @default(0) @db.Decimal(12, 2)
+  grossAmount Decimal @db.Decimal(12, 2)
+  note        String?
+  pdfUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settlement Settlement    @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  items      InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unit        String
+  unitPrice   Decimal @db.Decimal(12, 2)
+  amount      Decimal @db.Decimal(12, 2)
+  vatRate     Decimal @default(0) @db.Decimal(5, 2)
+  vatAmount   Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal @db.Decimal(12, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
 }
