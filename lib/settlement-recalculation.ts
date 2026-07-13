@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
+import { EDITABLE_SETTLEMENT_STATUSES } from './settlement-statuses';
 
 /**
  * Recalculates all sum fields of a monthly Settlement inside a transaction.
@@ -22,9 +23,9 @@ export async function recalculateSettlementTotals(settlementId: string, tx?: Pri
     throw new Error(`Settlement with ID ${settlementId} not found.`);
   }
 
-  // Prevents modifying totals if locked or paid (integrity rule)
-  if (settlement.status === 'LOCKED' || settlement.status === 'PAID') {
-    throw new Error('Nelze přepočítat uzamčené nebo zaplacené vyúčtování.');
+  // Prevents modifying totals if not in editable status (integrity rule)
+  if (settlement.status && !EDITABLE_SETTLEMENT_STATUSES.includes(settlement.status)) {
+    throw new Error('Nelze přepočítat uzamčené, zaplacené nebo zamítnuté vyúčtování.');
   }
 
   let totalWorkAmount = new Prisma.Decimal(0);

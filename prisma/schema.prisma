@@ -1059,6 +1059,11 @@ model SettlementAdjustment {
   note                           String?
   reason                         String? // Reason for manually overriding or adding/deleting
   changedByUserId                String?
+  previousEffectiveAmount        Decimal?           @db.Decimal(12, 2)
+  correctedEffectiveAmount       Decimal?           @db.Decimal(12, 2)
+  correctedQuantity              Decimal?           @db.Decimal(10, 2)
+  correctedUnitRate              Decimal?           @db.Decimal(12, 2)
+  correctedNote                  String?
   createdAt                      DateTime           @default(now())
   updatedAt                      DateTime           @updatedAt
 

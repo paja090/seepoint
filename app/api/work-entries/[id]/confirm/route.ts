@@ -17,8 +17,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
 
+  let reason: string | undefined;
   try {
-    const confirmed = await approveWorkEntry(id, user.id);
+    const body = await request.json().catch(() => ({}));
+    reason = body.reason;
+  } catch (_) {}
+
+  try {
+    const confirmed = await approveWorkEntry(id, user.id, { reason });
 
     return NextResponse.json({
       id: confirmed.id,
@@ -38,6 +44,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (err.message.includes('Neplatný přechod')) {
       return NextResponse.json({ error: 'Tento záznam práce nelze schválit v jeho aktuálním stavu.' }, { status: 400 });
+    }
+    if (
+      err.message.includes('je nutné uvést důvod') ||
+      err.message.includes('Množství') ||
+      err.message.includes('Jednotková sazba') ||
+      err.message.includes('Úkol') ||
+      err.message.includes('ID pracovníka') ||
+      err.message.includes('Typ odměny') ||
+      err.message.includes('neodpovídá serverovému výpočtu')
+    ) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
     return NextResponse.json({ error: err.message || 'Nastala chyba při schvalování záznamu.' }, { status: 500 });
   }

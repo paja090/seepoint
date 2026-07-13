@@ -199,11 +199,14 @@ test('5. Lock-based carry-over offset during WorkEntry approval', async () => {
         assert.equal(args.create.correctionWorkEntryId, 'entry-1');
         return args.create;
       }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
     }
   } as unknown as Prisma.TransactionClient;
 
   // Run approval
-  await approveWorkEntry('entry-1', 'admin-1', mockTx);
+  await approveWorkEntry('entry-1', 'admin-1', { reason: 'Důvod schválení', tx: mockTx });
 });
 
 test('6. Idempotent WorkExpense approval and unique SettlementAdjustment link', async () => {
@@ -426,6 +429,7 @@ test('8. Idempotency on double approvals and carry-over edits', async () => {
     settlement: {
       findUnique: async (args: any) => {
         if (args.where.id === 'set-locked-06') return mockLockedSettlement;
+        if (args.where.employeeId_periodYear_periodMonth?.periodMonth === 6) return mockLockedSettlement;
         return mockOpenSettlement;
       },
       findMany: async () => [mockOpenSettlement],
@@ -433,15 +437,18 @@ test('8. Idempotency on double approvals and carry-over edits', async () => {
     },
     settlementAdjustment: {
       upsert: async (args: any) => {
-        assert.equal(args.where.correctionKey, 'work-entry-correction:entry-99:none:set-open-07');
+        assert.equal(args.where.correctionKey, 'work-entry-correction:entry-99:set-locked-06:set-open-07');
         assert.equal(args.update.amount.toFixed(2), '2000.00');
         assert.equal(args.update.type, 'CARRY_OVER_ADD');
         return mockExistingAdjustment;
       }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
     }
   } as unknown as Prisma.TransactionClient;
 
-  await approveWorkEntry('entry-99', 'admin-1', mockTx);
+  await approveWorkEntry('entry-99', 'admin-1', { reason: 'Důvod schválení', tx: mockTx });
 });
 
 test('9. Active RecurringAdjustment date filter rules', async () => {
@@ -540,11 +547,15 @@ test('13. Idempotency of carry-over adjustment inside the same target settlement
       findUnique: async () => ({ id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }),
     },
     settlementAdjustment: {
+      findMany: async () => [],
       upsert: async (args: any) => {
         upsertCount++;
         assert.equal(args.where.correctionKey, 'work-entry-correction:entry-idx:set-locked-06:set-open-07');
         return {};
       }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
     }
   } as any;
 
@@ -594,10 +605,14 @@ test('14. Subsequent carry-over adjustment of same work entry in a new target se
       findUnique: async () => ({ id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }),
     },
     settlementAdjustment: {
+      findMany: async () => [],
       upsert: async (args: any) => {
         lastKey = args.where.correctionKey;
         return {};
       }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
     }
   } as any;
 
@@ -773,6 +788,9 @@ test('21. Separate correction of approved work in an open period', async () => {
         carryOverCreated = true;
         return {};
       }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
     }
   } as any;
 
@@ -833,11 +851,15 @@ test('22. Separate correction of approved work in a locked period (carry-over di
       update: async () => ({})
     },
     settlementAdjustment: {
+      findMany: async () => [],
       upsert: async (args: any) => {
         carryOverCreated = true;
         upsertArgs = args;
         return {};
       }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
     }
   } as any;
 
@@ -908,6 +930,129 @@ test('26. SystemSettings has no fake billing defaults', () => {
   assert.doesNotMatch(schema, /vatId\s+String\s+@default/);
   assert.doesNotMatch(schema, /street\s+String\s+@default/);
   assert.doesNotMatch(schema, /city\s+String\s+@default/);
+});
+
+test('27. Cumulative carry-over corrections and baseline calculations', async () => {
+  let upsertArgs: any = null;
+  const mockEntry = {
+    id: 'entry-cumulative',
+    employeeId: 'emp-1',
+    status: 'APPROVED',
+    remunerationMethod: 'HOURLY',
+    quantity: dec('10.00'),
+    appliedUnitRate: dec('150.00'),
+    calculatedAmount: dec('1500.00'),
+    settlementItem: {
+      id: 'item-1',
+      amount: dec('1000.00'),
+      settlement: {
+        id: 'set-locked-06',
+        status: 'LOCKED',
+        periodYear: 2026,
+        periodMonth: 6,
+        items: [],
+        adjustments: []
+      }
+    }
+  };
+
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => mockEntry,
+      update: async () => ({})
+    },
+    settlementItem: {
+      update: async () => ({})
+    },
+    settlement: {
+      findUnique: async () => ({ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }),
+      findMany: async () => [{ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }],
+      update: async () => ({})
+    },
+    settlementAdjustment: {
+      findMany: async () => [
+        { type: 'CARRY_OVER_ADD', amount: dec('200.00') }, // 1000 + 200 = 1200
+      ],
+      upsert: async (args: any) => {
+        upsertArgs = args;
+        return {};
+      }
+    },
+    settlementAuditLog: {
+      create: async () => ({})
+    }
+  } as any;
+
+  // New amount is 1500. Baseline (lastLockedEffectiveAmount) = 1000 + 200 = 1200.
+  // Expected difference (amount in upsert) = 1500 - 1200 = 300.
+  const res = await correctApprovedWorkEntry('entry-cumulative', { quantity: 10, unitPrice: 150 }, 'Korekce na 1500', 'admin-1', mockTx);
+  assert.equal(res.success, true);
+  assert.equal(upsertArgs.create.amount.toFixed(2), '300.00');
+  assert.equal(upsertArgs.create.type, 'CARRY_OVER_ADD');
+});
+
+test('28. Removing open carry-over adjustment when correction difference is zero', async () => {
+  let deleted = false;
+  let auditCreated = false;
+
+  const mockEntry = {
+    id: 'entry-zero-diff',
+    employeeId: 'emp-1',
+    status: 'APPROVED',
+    remunerationMethod: 'HOURLY',
+    quantity: dec('10.00'),
+    appliedUnitRate: dec('100.00'),
+    calculatedAmount: dec('1000.00'),
+    settlementItem: {
+      id: 'item-1',
+      amount: dec('1000.00'),
+      settlement: {
+        id: 'set-locked-06',
+        status: 'LOCKED',
+        periodYear: 2026,
+        periodMonth: 6,
+        items: [],
+        adjustments: []
+      }
+    }
+  };
+
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => mockEntry,
+      update: async () => ({})
+    },
+    settlementItem: {
+      update: async () => ({})
+    },
+    settlement: {
+      findUnique: async () => ({ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }),
+      findMany: async () => [{ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }],
+      update: async () => ({})
+    },
+    settlementAdjustment: {
+      findMany: async () => [],
+      findFirst: async () => ({ id: 'adj-open-1', amount: dec('200.00') }),
+      delete: async (args: any) => {
+        assert.equal(args.where.id, 'adj-open-1');
+        deleted = true;
+        return {};
+      }
+    },
+    settlementAuditLog: {
+      create: async () => {
+        auditCreated = true;
+        return {};
+      }
+    }
+  } as any;
+
+  // New amount is 1000. Baseline = 1000. Diff is 0.
+  // Should delete the existing open adjustment and create audit log.
+  const res = await correctApprovedWorkEntry('entry-zero-diff', { quantity: 10, unitPrice: 100 }, 'Oprava na 1000 (diff 0)', 'admin-1', mockTx);
+  assert.equal(res.success, true);
+  assert.equal(deleted, true);
+  assert.equal(auditCreated, true);
 });
 
 

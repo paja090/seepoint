@@ -20,7 +20,12 @@ UPDATE "SystemSettings" SET
   "city" = NULL, 
   "postalCode" = NULL, 
   "country" = NULL 
-WHERE "id" = 'default';
+WHERE "id" = 'default'
+  AND "companyId" = '12345678'
+  AND "vatId" = 'CZ12345678'
+  AND "street" = 'Mezibranská 1367/21'
+  AND "city" = 'Praha'
+  AND "postalCode" = '110 00';
 
 -- Create InvoiceStatus Enum
 CREATE TYPE "InvoiceStatus" AS ENUM ('DRAFT', 'ISSUED', 'PAID', 'CANCELLED');
@@ -46,3 +51,10 @@ ALTER TABLE "SettlementItem" ADD CONSTRAINT "SettlementItem_settlementId_fkey" F
 
 -- Add new relation correctionOriginalSettlement
 ALTER TABLE "SettlementAdjustment" ADD CONSTRAINT "SettlementAdjustment_correctionOriginalSettlementId_fkey" FOREIGN KEY ("correctionOriginalSettlementId") REFERENCES "Settlement"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Add carry-over snapshot columns to SettlementAdjustment
+ALTER TABLE "SettlementAdjustment" ADD COLUMN "previousEffectiveAmount" DECIMAL(12,2);
+ALTER TABLE "SettlementAdjustment" ADD COLUMN "correctedEffectiveAmount" DECIMAL(12,2);
+ALTER TABLE "SettlementAdjustment" ADD COLUMN "correctedQuantity" DECIMAL(10,2);
+ALTER TABLE "SettlementAdjustment" ADD COLUMN "correctedUnitRate" DECIMAL(12,2);
+ALTER TABLE "SettlementAdjustment" ADD COLUMN "correctedNote" TEXT;

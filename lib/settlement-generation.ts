@@ -1,5 +1,6 @@
 import { prisma } from './db';
 import { Prisma, Settlement } from '@prisma/client';
+import { EDITABLE_SETTLEMENT_STATUSES } from './settlement-statuses';
 
 export function getPragueYearMonth(date: Date) {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -72,17 +73,17 @@ export async function getOrCreateSettlement(
     },
   });
 
-  // 3. If target settlement exists and is NOT locked or paid, return it!
-  if (targetSettlement && targetSettlement.status !== 'LOCKED' && targetSettlement.status !== 'PAID') {
+  // 3. If target settlement exists and is editable, return it!
+  if (targetSettlement && EDITABLE_SETTLEMENT_STATUSES.includes(targetSettlement.status)) {
     return targetSettlement;
   }
 
-  // 4. If target settlement is locked/paid, search for the nearest open period in the future
+  // 4. If target settlement is not editable, search for the nearest open period in the future
   if (targetSettlement) {
     const openSettlements = await client.settlement.findMany({
       where: {
         employeeId,
-        status: { notIn: ['LOCKED', 'PAID'] },
+        status: { in: EDITABLE_SETTLEMENT_STATUSES },
         OR: [
           { periodYear: { gt: targetYear } },
           {
@@ -141,7 +142,7 @@ export async function getOrCreateSettlement(
         return newSettlement;
       }
 
-      if (existing.status !== 'LOCKED' && existing.status !== 'PAID') {
+      if (EDITABLE_SETTLEMENT_STATUSES.includes(existing.status)) {
         return existing;
       }
 
