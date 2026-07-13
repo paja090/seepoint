@@ -7,7 +7,7 @@ export type SurfaceStatus = 'AVAILABLE' | 'RESERVED' | 'OCCUPIED' | 'NEGOTIATION
 export type Role = 'ADMIN' | 'SALES' | 'TECHNICIAN' | 'WORKER' | 'VIEWER';
 export type OccupancyStatus = 'AVAILABLE' | 'NEGOTIATION' | 'RESERVED' | 'OCCUPIED' | 'FINISHED' | 'CANCELLED' | 'OUT_OF_SERVICE';
 export type OfferStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
-export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE' | 'EMPLOYEE_PROFILE' | 'EXPENSE_RECEIPT';
+export type PhotoType = 'LOCATION' | 'CARRIER' | 'CAMPAIGN' | 'INSTALLATION' | 'CHECK' | 'ARCHIVE' | 'EMPLOYEE_PROFILE';
 
 export type Client = {
   id: string;
@@ -98,13 +98,10 @@ export type Photo = {
   sortOrder?: number;
   isPrimary?: boolean;
   isClientVisible?: boolean;
-  isPrivate?: boolean;
   driveFileId?: string;
   fileName?: string;
   mimeType?: string;
   size?: number;
-  taskId?: string;
-  workEntryId?: string;
 };
 
 export type Carrier = {
