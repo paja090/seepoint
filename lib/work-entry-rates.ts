@@ -1,6 +1,6 @@
 import { prisma } from './db';
 import { selectRateAtDate } from './rate-selection';
-import { RateType, WorkType, RateSource, Prisma } from '@prisma/client';
+import { RateType, WorkType, RateSource, Prisma, CarrierType } from '@prisma/client';
 
 export async function resolveWorkEntryRate(params: {
   employeeId: string;
@@ -8,8 +8,9 @@ export async function resolveWorkEntryRate(params: {
   workDate: Date;
   remunerationMethod: RateType;
   workOrderId?: string | null;
+  carrierType?: CarrierType | null;
 }, tx?: Prisma.TransactionClient) {
-  const { employeeId, workType, workDate, remunerationMethod, workOrderId } = params;
+  const { employeeId, workType, workDate, remunerationMethod, workOrderId, carrierType } = params;
   const client = tx || prisma;
 
   // 1. Employee-specific rate
@@ -27,13 +28,14 @@ export async function resolveWorkEntryRate(params: {
     orderBy: { validFrom: 'desc' }
   });
 
-  // Filter with workType-specific priority (specific workType first, then general NULL workType)
-  const resolvedEmployeeRate = selectRateAtDate(employeeRates, workType, workDate);
+  // Filter with workType and carrierType priorities
+  const resolvedEmployeeRate = selectRateAtDate(employeeRates, workType, carrierType || null, workDate);
   if (resolvedEmployeeRate) {
     return {
       amount: resolvedEmployeeRate.amount,
       unit: resolvedEmployeeRate.unit || 'ks',
-      source: RateSource.EMPLOYEE_RATE
+      source: RateSource.EMPLOYEE_RATE,
+      id: resolvedEmployeeRate.id
     };
   }
 
@@ -53,12 +55,13 @@ export async function resolveWorkEntryRate(params: {
       orderBy: { validFrom: 'desc' }
     });
 
-    const resolvedWorkOrderRate = selectRateAtDate(workOrderRates, workType, workDate);
+    const resolvedWorkOrderRate = selectRateAtDate(workOrderRates, workType, carrierType || null, workDate);
     if (resolvedWorkOrderRate) {
       return {
         amount: resolvedWorkOrderRate.amount,
         unit: resolvedWorkOrderRate.unit || 'ks',
-        source: RateSource.WORK_ORDER_RATE
+        source: RateSource.WORK_ORDER_RATE,
+        id: resolvedWorkOrderRate.id
       };
     }
   }
@@ -77,12 +80,13 @@ export async function resolveWorkEntryRate(params: {
     orderBy: { validFrom: 'desc' }
   });
 
-  const resolvedCompanyRate = selectRateAtDate(companyRates, workType, workDate);
+  const resolvedCompanyRate = selectRateAtDate(companyRates, workType, carrierType || null, workDate);
   if (resolvedCompanyRate) {
     return {
       amount: resolvedCompanyRate.amount,
       unit: resolvedCompanyRate.unit || 'ks',
-      source: RateSource.COMPANY_RATE
+      source: RateSource.COMPANY_RATE,
+      id: resolvedCompanyRate.id
     };
   }
 
