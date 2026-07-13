@@ -6,7 +6,7 @@ import { selectRateAtDate } from '../lib/rate-selection.ts';
 import { resolveWorkEntryRate } from '../lib/work-entry-rates.ts';
 import { getPragueYearMonth, getPragueMonthRange } from '../lib/settlement-generation.ts';
 import { recalculateSettlementTotals } from '../lib/settlement-recalculation.ts';
-import { validateWorkEntryTransition, approveWorkEntry } from '../lib/work-entry-actions.ts';
+import { validateWorkEntryTransition, approveWorkEntry, correctApprovedWorkEntry } from '../lib/work-entry-actions.ts';
 import { approveWorkExpense } from '../lib/work-expense-actions.ts';
 import { prisma } from '../lib/db.ts';
 
@@ -433,8 +433,8 @@ test('8. Idempotency on double approvals and carry-over edits', async () => {
     },
     settlementAdjustment: {
       upsert: async (args: any) => {
-        assert.equal(args.where.correctionKey, 'work-entry-correction:entry-99:set-locked-06:set-open-07');
-        assert.equal(args.update.amount.toFixed(2), '400.00');
+        assert.equal(args.where.correctionKey, 'work-entry-correction:entry-99:none:set-open-07');
+        assert.equal(args.update.amount.toFixed(2), '2000.00');
         assert.equal(args.update.type, 'CARRY_OVER_ADD');
         return mockExistingAdjustment;
       }
@@ -514,9 +514,14 @@ test('13. Idempotency of carry-over adjustment inside the same target settlement
         employeeId: 'emp-1',
         workDate: new Date('2026-06-01'),
         calculatedAmount: dec('2000.00'),
-        status: 'SUBMITTED',
+        status: 'APPROVED',
         note: 'Test entry',
-        settlementItem: { id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }
+        settlementItem: {
+          id: 'item-1',
+          amount: dec('1500.00'),
+          settlementId: 'set-locked-06',
+          settlement: { id: 'set-locked-06', status: 'LOCKED', periodYear: 2026, periodMonth: 6, items: [], adjustments: [] }
+        }
       }),
       update: async () => ({})
     },
@@ -543,8 +548,8 @@ test('13. Idempotency of carry-over adjustment inside the same target settlement
     }
   } as any;
 
-  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
-  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+  await correctApprovedWorkEntry('entry-idx', { quantity: 12 }, 'Chyba', 'admin-1', mockTx);
+  await correctApprovedWorkEntry('entry-idx', { quantity: 12 }, 'Chyba', 'admin-1', mockTx);
 
   assert.equal(upsertCount, 2);
 });
@@ -558,9 +563,14 @@ test('14. Subsequent carry-over adjustment of same work entry in a new target se
         employeeId: 'emp-1',
         workDate: new Date('2026-06-01'),
         calculatedAmount: dec('2000.00'),
-        status: 'SUBMITTED',
+        status: 'APPROVED',
         note: 'Test entry',
-        settlementItem: { id: 'item-1', amount: dec('1500.00'), settlementId: 'set-locked-06' }
+        settlementItem: {
+          id: 'item-1',
+          amount: dec('1500.00'),
+          settlementId: 'set-locked-06',
+          settlement: { id: 'set-locked-06', status: 'LOCKED', periodYear: 2026, periodMonth: 6, items: [], adjustments: [] }
+        }
       }),
       update: async () => ({})
     },
@@ -591,10 +601,10 @@ test('14. Subsequent carry-over adjustment of same work entry in a new target se
     }
   } as any;
 
-  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+  await correctApprovedWorkEntry('entry-idx', { quantity: 12 }, 'Chyba 1', 'admin-1', mockTx);
   assert.equal(lastKey, 'work-entry-correction:entry-idx:set-locked-06:set-open-07');
 
-  await approveWorkEntry('entry-idx', 'admin-1', mockTx);
+  await correctApprovedWorkEntry('entry-idx', { quantity: 12 }, 'Chyba 2', 'admin-1', mockTx);
   assert.equal(lastKey, 'work-entry-correction:entry-idx:set-locked-06:set-open-08');
 });
 
@@ -702,6 +712,202 @@ test('19. Build script check in package.json', () => {
   
   assert.equal(pkg.scripts.build, 'prisma generate && next build');
   assert.equal(pkg.scripts['db:migrate:deploy'], 'prisma migrate deploy');
+});
+
+test('20. Transition DRAFT to APPROVED is forbidden', () => {
+  assert.throws(
+    () => validateWorkEntryTransition('DRAFT', 'APPROVED'),
+    /Neplatný přechod stavu práce/
+  );
+});
+
+test('21. Separate correction of approved work in an open period', async () => {
+  let workEntryUpdated = false;
+  let settlementItemUpdated = false;
+  let carryOverCreated = false;
+
+  const mockEntry = {
+    id: 'entry-correct-open',
+    employeeId: 'emp-1',
+    status: 'APPROVED',
+    remunerationMethod: 'HOURLY',
+    quantity: dec('10.00'),
+    appliedUnitRate: dec('150.00'),
+    calculatedAmount: dec('1500.00'),
+    settlementItem: {
+      id: 'item-1',
+      amount: dec('1500.00'),
+      settlement: {
+        id: 'set-open-06',
+        status: 'DRAFT',
+        periodYear: 2026,
+        periodMonth: 6,
+        items: [],
+        adjustments: []
+      }
+    }
+  };
+
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => mockEntry,
+      update: async (args: any) => {
+        workEntryUpdated = true;
+        assert.equal(args.data.calculatedAmount.toFixed(2), '1800.00');
+        return {};
+      }
+    },
+    settlementItem: {
+      update: async (args: any) => {
+        settlementItemUpdated = true;
+        assert.equal(args.data.amount.toFixed(2), '1800.00');
+        return {};
+      }
+    },
+    settlement: {
+      findUnique: async () => ({ id: 'set-open-06', items: [], adjustments: [] }),
+      update: async () => ({})
+    },
+    settlementAdjustment: {
+      upsert: async () => {
+        carryOverCreated = true;
+        return {};
+      }
+    }
+  } as any;
+
+  const res = await correctApprovedWorkEntry('entry-correct-open', { quantity: 12 }, 'Chyba v hodinách', 'admin-1', mockTx);
+  assert.equal(res.success, true);
+  assert.equal(workEntryUpdated, true);
+  assert.equal(settlementItemUpdated, true);
+  assert.equal(carryOverCreated, false);
+});
+
+test('22. Separate correction of approved work in a locked period (carry-over difference)', async () => {
+  let workEntryUpdated = false;
+  let settlementItemUpdated = false;
+  let carryOverCreated = false;
+  let upsertArgs: any = null;
+
+  const mockEntry = {
+    id: 'entry-correct-locked',
+    employeeId: 'emp-1',
+    status: 'APPROVED',
+    remunerationMethod: 'HOURLY',
+    quantity: dec('10.00'),
+    appliedUnitRate: dec('150.00'),
+    calculatedAmount: dec('1500.00'),
+    settlementItem: {
+      id: 'item-1',
+      amount: dec('1500.00'),
+      settlement: {
+        id: 'set-locked-06',
+        status: 'LOCKED',
+        periodYear: 2026,
+        periodMonth: 6,
+        items: [],
+        adjustments: []
+      }
+    }
+  };
+
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => mockEntry,
+      update: async () => {
+        workEntryUpdated = true;
+        return {};
+      }
+    },
+    settlementItem: {
+      update: async () => {
+        settlementItemUpdated = true;
+        return {};
+      }
+    },
+    settlement: {
+      findUnique: async (args: any) => {
+        return { id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] };
+      },
+      findMany: async () => [{ id: 'set-open-07', status: 'DRAFT', periodYear: 2026, periodMonth: 7, items: [], adjustments: [] }],
+      update: async () => ({})
+    },
+    settlementAdjustment: {
+      upsert: async (args: any) => {
+        carryOverCreated = true;
+        upsertArgs = args;
+        return {};
+      }
+    }
+  } as any;
+
+  const res = await correctApprovedWorkEntry('entry-correct-locked', { quantity: 12 }, 'Oprava po uzávěrce', 'admin-1', mockTx);
+  assert.equal(res.success, true);
+  assert.equal(workEntryUpdated, false);
+  assert.equal(settlementItemUpdated, false);
+  assert.equal(carryOverCreated, true);
+  assert.equal(upsertArgs.create.amount.toFixed(2), '300.00');
+  assert.equal(upsertArgs.create.type, 'CARRY_OVER_ADD');
+});
+
+test('23. Required reason for work entry correction', async () => {
+  const mockTx = {
+    workEntry: {
+      findUnique: async () => ({ id: 'entry-1', status: 'APPROVED' })
+    }
+  } as any;
+
+  await assert.rejects(
+    correctApprovedWorkEntry('entry-1', { quantity: 12 }, '', 'admin-1', mockTx),
+    /Pro opravu schválené práce je nutné uvést důvod/
+  );
+  await assert.rejects(
+    correctApprovedWorkEntry('entry-1', { quantity: 12 }, '   ', 'admin-1', mockTx),
+    /Pro opravu schválené práce je nutné uvést důvod/
+  );
+});
+
+test('24. Financial origin deletion restriction (onDelete constraints checking)', () => {
+  const schemaPath = path.join(__dirname, '../prisma/schema.prisma');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
+
+  // Verify settlementId in SettlementItem has onDelete: Restrict
+  assert.match(
+    schema,
+    /settlement\s+Settlement\s+@relation\(fields:\s*\[settlementId\],\s*references:\s*\[id\],\s*onDelete:\s*Restrict\)/
+  );
+
+  // Verify workEntryId in WorkExpense has onDelete: Restrict
+  assert.match(
+    schema,
+    /workEntry\s+WorkEntry\s+@relation\(fields:\s*\[workEntryId\],\s*references:\s*\[id\],\s*onDelete:\s*Restrict\)/
+  );
+
+  // Verify correctionOriginalSettlement in SettlementAdjustment has onDelete: Restrict
+  assert.match(
+    schema,
+    /correctionOriginalSettlement\s+Settlement\?\s+@relation\("CorrectionOriginalSettlement",\s*fields:\s*\[correctionOriginalSettlementId\],\s*references:\s*\[id\],\s*onDelete:\s*Restrict\)/
+  );
+});
+
+test('25. InvoiceStatus enum values validation', () => {
+  const schemaPath = path.join(__dirname, '../prisma/schema.prisma');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
+
+  assert.match(
+    schema,
+    /enum\s+InvoiceStatus\s+\{\s*DRAFT\s+ISSUED\s+PAID\s+CANCELLED\s*\}/
+  );
+});
+
+test('26. SystemSettings has no fake billing defaults', () => {
+  const schemaPath = path.join(__dirname, '../prisma/schema.prisma');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
+
+  assert.doesNotMatch(schema, /companyId\s+String\s+@default/);
+  assert.doesNotMatch(schema, /vatId\s+String\s+@default/);
+  assert.doesNotMatch(schema, /street\s+String\s+@default/);
+  assert.doesNotMatch(schema, /city\s+String\s+@default/);
 });
 
 

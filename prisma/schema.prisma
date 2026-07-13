@@ -520,11 +520,12 @@ model Settlement {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
 
-  employee    Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  items       SettlementItem[]
-  adjustments SettlementAdjustment[]
-  auditLogs   SettlementAuditLog[]
-  invoice     Invoice?
+  employee              Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  items                 SettlementItem[]
+  adjustments           SettlementAdjustment[]
+  auditLogs             SettlementAuditLog[]
+  invoice               Invoice?
+  correctionAdjustments SettlementAdjustment[] @relation("CorrectionOriginalSettlement")
 
   @@unique([employeeId, periodYear, periodMonth])
   @@index([employeeId])
@@ -550,7 +551,7 @@ model SettlementItem {
   workType     WorkType?
   note         String?
 
-  settlement            Settlement             @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  settlement            Settlement             @relation(fields: [settlementId], references: [id], onDelete: Restrict)
   task                  WorkTask?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
   workEntry             WorkEntry?             @relation(fields: [workEntryId], references: [id], onDelete: Restrict)
   settlementAdjustments SettlementAdjustment[]
@@ -1019,7 +1020,7 @@ model WorkExpense {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  workEntry   WorkEntry              @relation(fields: [workEntryId], references: [id], onDelete: Cascade)
+  workEntry   WorkEntry              @relation(fields: [workEntryId], references: [id], onDelete: Restrict)
   adjustments SettlementAdjustment[]
 }
 
@@ -1061,11 +1062,12 @@ model SettlementAdjustment {
   createdAt                      DateTime           @default(now())
   updatedAt                      DateTime           @updatedAt
 
-  settlement               Settlement           @relation(fields: [settlementId], references: [id], onDelete: Cascade)
-  recurringAdjustment      RecurringAdjustment? @relation(fields: [recurringAdjustmentId], references: [id], onDelete: SetNull)
-  workExpense              WorkExpense?         @relation(fields: [workExpenseId], references: [id], onDelete: Restrict)
-  correctionWorkEntry      WorkEntry?           @relation(fields: [correctionWorkEntryId], references: [id], onDelete: SetNull)
-  correctionSettlementItem SettlementItem?      @relation(fields: [correctionSettlementItemId], references: [id], onDelete: SetNull)
+  settlement                   Settlement           @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  recurringAdjustment          RecurringAdjustment? @relation(fields: [recurringAdjustmentId], references: [id], onDelete: SetNull)
+  workExpense                  WorkExpense?         @relation(fields: [workExpenseId], references: [id], onDelete: Restrict)
+  correctionWorkEntry          WorkEntry?           @relation(fields: [correctionWorkEntryId], references: [id], onDelete: Restrict)
+  correctionSettlementItem     SettlementItem?      @relation(fields: [correctionSettlementItemId], references: [id], onDelete: Restrict)
+  correctionOriginalSettlement Settlement?          @relation("CorrectionOriginalSettlement", fields: [correctionOriginalSettlementId], references: [id], onDelete: Restrict)
 
   @@unique([settlementId, recurringAdjustmentId])
   @@index([settlementId])
@@ -1076,12 +1078,12 @@ model SettlementAdjustment {
 model SystemSettings {
   id          String   @id @default("default")
   companyName String   @default("SeePoint s.r.o.")
-  companyId   String   @default("12345678") // IČO
-  vatId       String   @default("CZ12345678") // DIČ
-  street      String   @default("Mezibranská 1367/21")
-  city        String   @default("Praha")
-  postalCode  String   @default("110 00")
-  country     String   @default("CZ")
+  companyId   String?
+  vatId       String?
+  street      String?
+  city        String?
+  postalCode  String?
+  country     String?
   bankAccount String?
   iban        String?
   swift       String?
@@ -1106,10 +1108,10 @@ model SettlementAuditLog {
 }
 
 model Invoice {
-  id            String @id @default(cuid())
-  settlementId  String @unique
-  invoiceNumber String @unique
-  status        String @default("DRAFT") // DRAFT, ISSUED, PAID, CANCELLED
+  id            String        @id @default(cuid())
+  settlementId  String        @unique
+  invoiceNumber String        @unique
+  status        InvoiceStatus @default(DRAFT)
 
   // Date details:
   issueDate  DateTime
@@ -1164,4 +1166,11 @@ model InvoiceItem {
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  CANCELLED
 }
