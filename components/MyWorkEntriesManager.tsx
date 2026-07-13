@@ -31,10 +31,11 @@ type EntryPayload = {
   calculatedAmount: string;
   rateSource: string | null;
   note: string | null;
-  status: 'DRAFT' | 'CONFIRMED' | 'SUBMITTED' | 'APPROVED' | 'RETURNED';
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'RETURNED';
   creationSource: 'AUTOMATIC' | 'MANUAL';
   workTask: { title: string } | null;
   workOrder: { title: string } | null;
+  rejectionReason?: string | null;
 };
 
 type MyWorkEntriesManagerProps = {
@@ -69,6 +70,20 @@ const rateSourceLabels: Record<string, string> = {
   MANUAL: 'Manuální zadání',
 };
 
+const statusLabels: Record<string, string> = {
+  DRAFT: 'Koncept',
+  SUBMITTED: 'Odesláno',
+  APPROVED: 'Schváleno',
+  RETURNED: 'Vráceno',
+};
+
+const statusClasses: Record<string, string> = {
+  DRAFT: 'bg-slate-100 text-slate-800 border border-slate-200',
+  SUBMITTED: 'bg-blue-100 text-blue-800 border border-blue-200',
+  APPROVED: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+  RETURNED: 'bg-red-100 text-red-800 border border-red-200 font-bold',
+};
+
 export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }: MyWorkEntriesManagerProps) {
   const router = useRouter();
   const [entries, setEntries] = useState<EntryPayload[]>(initialEntries);
@@ -99,6 +114,9 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
   // Filters
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+
+  // Bulk Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Dynamic rate resolution
   useEffect(() => {
@@ -140,6 +158,16 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
       setUnit(resolvedUnit || 'ks');
     }
   }, [remunerationMethod, resolvedUnit]);
+
+  const refreshList = async () => {
+    try {
+      const fetchEntries = await fetch(`/api/work-entries?employeeId=${employee.id}`);
+      const freshData = await fetchEntries.json();
+      if (fetchEntries.ok) {
+        setEntries(freshData);
+      }
+    } catch (e) {}
+  };
 
   // Handle Create or Update submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,16 +219,41 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
       setShowForm(false);
       setEditingEntry(null);
       resetForm();
-
-      // Refresh list
-      const fetchEntries = await fetch(`/api/work-entries?employeeId=${employee.id}`);
-      const freshData = await fetchEntries.json();
-      if (fetchEntries.ok) {
-        setEntries(freshData);
-      }
+      await refreshList();
       router.refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
+      setErrorMsg(message);
+    }
+  };
+
+  // Bulk Submit handler
+  const handleBulkSubmit = async () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (selectedIds.length === 0) return;
+
+    const confirmMsg = `Opravdu chcete odeslat ${selectedIds.length} vybraných výkazů ke schválení? Po odeslání je již nebudete moci upravovat.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch('/api/work-entries/submit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Odeslání selhalo.');
+      }
+
+      setSuccessMsg(`Úspěšně odesláno ${selectedIds.length} záznamů ke schválení.`);
+      setSelectedIds([]);
+      await refreshList();
+      router.refresh();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Nastala chyba při odesílání.';
       setErrorMsg(message);
     }
   };
@@ -239,6 +292,29 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
     if (dateFilter && !entry.workDate.startsWith(dateFilter)) return false;
     return true;
   });
+
+  const editableEntries = filteredEntries.filter((e) => e.status === 'DRAFT' || e.status === 'RETURNED');
+  const allSelected = editableEntries.length > 0 && editableEntries.every((e) => selectedIds.includes(e.id));
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(selectedIds.filter((id) => !editableEntries.some((e) => e.id === id)));
+    } else {
+      setSelectedIds([...new Set([...selectedIds, ...editableEntries.map((e) => e.id)])]);
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter((x) => x !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const selectedSum = filteredEntries
+    .filter((e) => selectedIds.includes(e.id))
+    .reduce((sum, e) => sum + parseFloat(e.calculatedAmount), 0);
 
   return (
     <div className="space-y-6">
@@ -429,6 +505,30 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
         </section>
       )}
 
+      {/* Bulk Action Panel */}
+      {selectedIds.length > 0 && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 flex flex-wrap items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-2">
+          <div className="text-sm text-blue-900">
+            Vybráno <strong>{selectedIds.length}</strong> záznamů v hodnotě{' '}
+            <strong>{selectedSum.toLocaleString('cs-CZ')} CZK</strong>.
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedIds([])}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+            >
+              Zrušit výběr
+            </button>
+            <button
+              onClick={handleBulkSubmit}
+              className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
+            >
+              Odeslat označené ke schválení
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filtering */}
       <div className="card grid gap-4 sm:grid-cols-3">
         <label className="text-sm font-semibold">
@@ -440,7 +540,9 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
           >
             <option value="">Všechny stavy</option>
             <option value="DRAFT">Koncept (DRAFT)</option>
-            <option value="CONFIRMED">Potvrzeno (CONFIRMED)</option>
+            <option value="SUBMITTED">Odesláno (SUBMITTED)</option>
+            <option value="APPROVED">Schváleno (APPROVED)</option>
+            <option value="RETURNED">Vráceno k opravě (RETURNED)</option>
           </select>
         </label>
         <label className="text-sm font-semibold">
@@ -478,6 +580,15 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-500 border-b">
               <tr>
+                <th className="py-2 pr-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={handleSelectAll}
+                    disabled={editableEntries.length === 0}
+                    className="rounded text-slate-900 focus:ring-slate-500"
+                  />
+                </th>
                 <th className="py-2 pr-3">Datum</th>
                 <th className="py-2 pr-3">Úkol / Zakázka</th>
                 <th className="py-2 pr-3">Druh práce</th>
@@ -489,61 +600,72 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
               </tr>
             </thead>
             <tbody>
-              {filteredEntries.map((entry) => (
-                <tr className="border-b last:border-0 hover:bg-slate-50/50" key={entry.id}>
-                  <td className="py-3 pr-3 font-medium">{dateOnly(new Date(entry.workDate))}</td>
-                  <td className="py-3 pr-3">
-                    <div className="font-semibold text-slate-900">{entry.workTask?.title || 'Interní úkol'}</div>
-                    <div className="text-xs text-slate-500">
-                      Zakázka: {entry.workOrder?.title || 'Bez zakázky'}
-                    </div>
-                  </td>
-                  <td className="py-3 pr-3 text-slate-700">{workTypeLabels[entry.workType] || entry.workType}</td>
-                  <td className="py-3 pr-3">
-                    {Number(entry.quantity).toLocaleString('cs-CZ')} {entry.unit}
-                  </td>
-                  <td className="py-3 pr-3 text-slate-700">
-                    {entry.appliedUnitRate ? (
-                      <>
-                        {Number(entry.appliedUnitRate).toLocaleString('cs-CZ')} CZK
-                        {entry.rateSource && (
-                          <span className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-600">
-                            {rateSourceLabels[entry.rateSource] || entry.rateSource}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                        Chybí sazba
+              {filteredEntries.map((entry) => {
+                const isEditable = entry.status === 'DRAFT' || entry.status === 'RETURNED';
+                return (
+                  <tr className="border-b last:border-0 hover:bg-slate-50/50" key={entry.id}>
+                    <td className="py-3 pr-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(entry.id)}
+                        disabled={!isEditable}
+                        onChange={() => handleSelectRow(entry.id)}
+                        className="rounded text-slate-900 focus:ring-slate-500 disabled:opacity-40"
+                      />
+                    </td>
+                    <td className="py-3 pr-3 font-medium">{dateOnly(new Date(entry.workDate))}</td>
+                    <td className="py-3 pr-3">
+                      <div className="font-semibold text-slate-900">{entry.workTask?.title || 'Interní úkol'}</div>
+                      <div className="text-xs text-slate-500">
+                        Zakázka: {entry.workOrder?.title || 'Bez zakázky'}
+                      </div>
+                      {entry.status === 'RETURNED' && entry.rejectionReason && (
+                        <div className="mt-1 text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded px-2 py-0.5 inline-block">
+                          Důvod vrácení: {entry.rejectionReason}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 text-slate-700">{workTypeLabels[entry.workType] || entry.workType}</td>
+                    <td className="py-3 pr-3">
+                      {Number(entry.quantity).toLocaleString('cs-CZ')} {entry.unit}
+                    </td>
+                    <td className="py-3 pr-3 text-slate-700">
+                      {entry.appliedUnitRate ? (
+                        <>
+                          {Number(entry.appliedUnitRate).toLocaleString('cs-CZ')} CZK
+                          {entry.rateSource && (
+                            <span className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-600">
+                              {rateSourceLabels[entry.rateSource] || entry.rateSource}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                          Chybí sazba
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 font-semibold text-slate-900">
+                      {Number(entry.calculatedAmount).toLocaleString('cs-CZ')} CZK
+                    </td>
+                    <td className="py-3 pr-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClasses[entry.status]}`}>
+                        {statusLabels[entry.status] || entry.status}
                       </span>
-                    )}
-                  </td>
-                  <td className="py-3 pr-3 font-semibold text-slate-900">
-                    {Number(entry.calculatedAmount).toLocaleString('cs-CZ')} CZK
-                  </td>
-                  <td className="py-3 pr-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        entry.status === 'CONFIRMED'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {entry.status === 'CONFIRMED' ? 'Potvrzeno' : 'Koncept'}
-                    </span>
-                  </td>
-                  <td className="py-3 text-right">
-                    {entry.status === 'DRAFT' && (
-                      <button
-                        onClick={() => handleEdit(entry)}
-                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
-                      >
-                        Upravit
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 text-right">
+                      {isEditable && (
+                        <button
+                          onClick={() => handleEdit(entry)}
+                          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+                        >
+                          Upravit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

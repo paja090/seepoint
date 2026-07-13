@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { getOrCreateSettlement } from './settlement-generation';
 import { recalculateSettlementTotals } from './settlement-recalculation';
 import { runTransactionWithRetry } from './transaction-retry';
+import { validateReason } from './settlement-actions';
 
 /**
  * Approves a WorkExpense. Creates the corresponding SettlementAdjustment.
@@ -120,9 +121,7 @@ export async function rejectWorkExpense(
       throw new Error('Nelze zamítnout již schválený výdaj.');
     }
 
-    if (!reason.trim()) {
-      throw new Error('Pro zamítnutí výdaje musíte vyplnit důvod.');
-    }
+    reason = validateReason(reason);
 
     // Update status
     const updated = await transaction.workExpense.update({

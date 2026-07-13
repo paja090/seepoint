@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const body = await request.json().catch(() => ({}));
     reason = body.reason;
-  } catch (_) {}
+  } catch {}
 
   try {
     const confirmed = await approveWorkEntry(id, user.id, { reason });

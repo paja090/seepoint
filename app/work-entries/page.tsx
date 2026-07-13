@@ -35,6 +35,7 @@ export default async function WorkEntriesPage() {
       workTask: true,
       workOrder: true,
       client: true,
+      expenses: true,
     },
     orderBy: { workDate: 'desc' },
   });
@@ -61,6 +62,15 @@ export default async function WorkEntriesPage() {
     },
     workTask: entry.workTask ? { title: entry.workTask.title } : null,
     workOrder: entry.workOrder ? { title: entry.workOrder.title } : null,
+    expenses: entry.expenses.map(exp => ({
+      id: exp.id,
+      type: exp.type,
+      description: exp.description,
+      amount: exp.amount.toString(),
+      status: exp.status,
+      rejectionReason: exp.rejectionReason,
+      receiptUrl: exp.receiptPhotoId ? `/api/photos/${exp.receiptPhotoId}/file` : null,
+    })),
   }));
 
   return (

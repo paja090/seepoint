@@ -4,6 +4,8 @@ import { getOrCreateSettlement, getPragueYearMonth } from './settlement-generati
 import { recalculateSettlementTotals } from './settlement-recalculation';
 import { runTransactionWithRetry } from './transaction-retry';
 import { EDITABLE_SETTLEMENT_STATUSES, FINALIZED_SETTLEMENT_STATUSES } from './settlement-statuses';
+import { validateReason } from './settlement-actions';
+
 
 /**
  * Validates state transitions for WorkEntry.
@@ -257,15 +259,13 @@ export async function returnWorkEntry(
 
     validateWorkEntryTransition(entry.status, 'RETURNED');
 
-    if (!reason.trim()) {
-      throw new Error('Pro vrácení práce k opravě musíte vyplnit důvod.');
-    }
+    const cleanReason = validateReason(reason, 'Pro vrácení práce k opravě musíte vyplnit důvod.');
 
     const updated = await transaction.workEntry.update({
       where: { id: entry.id },
       data: {
         status: 'RETURNED',
-        rejectionReason: reason,
+        rejectionReason: cleanReason,
       }
     });
 
@@ -317,9 +317,7 @@ export async function correctApprovedWorkEntry(
       throw new Error('Lze opravit pouze již schválené záznamy práce.');
     }
 
-    if (!reason || !reason.trim()) {
-      throw new Error('Pro opravu schválené práce je nutné uvést důvod.');
-    }
+    reason = validateReason(reason, 'Pro opravu schválené práce je nutné uvést důvod.');
 
     // Convert values to Prisma.Decimal and validate
     const finalQuantity = params.quantity !== undefined ? new Prisma.Decimal(params.quantity) : entry.quantity;
@@ -562,3 +560,67 @@ export async function correctApprovedWorkEntry(
     return await runTransactionWithRetry(runCorrection);
   }
 }
+
+/**
+ * Submits multiple WorkEntries (DRAFT/RETURNED -> SUBMITTED) in a single transaction.
+ */
+export async function submitWorkEntries(
+  workEntryIds: string[],
+  actor: { id: string; email: string; role: string },
+  tx?: Prisma.TransactionClient
+) {
+  const runInTx = async (op: (t: Prisma.TransactionClient) => Promise<Prisma.BatchPayload>) => {
+    if (tx) {
+      return await op(tx);
+    } else {
+      return await prisma.$transaction(op, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    }
+  };
+
+  return await runInTx(async (transaction) => {
+    // 1. Fetch all work entries
+    const entries = await transaction.workEntry.findMany({
+      where: { id: { in: workEntryIds } }
+    });
+
+    if (entries.length !== workEntryIds.length) {
+      throw new Error('Jeden nebo více záznamů práce nebyly nalezeny.');
+    }
+
+    // 2. Resolve employee for the actor (if not manager/admin)
+    let employeeId: string | null = null;
+    if (actor.role !== 'ADMIN' && actor.role !== 'MANAGER') {
+      const employee = await transaction.employee.findFirst({
+        where: { OR: [{ userId: actor.id }, { email: actor.email }] }
+      });
+      if (!employee) {
+        throw new Error('Zaměstnanecký profil nebyl nalezen.');
+      }
+      employeeId = employee.id;
+    }
+
+    // 3. Validate ownership & status
+    for (const entry of entries) {
+      if (employeeId && entry.employeeId !== employeeId) {
+        throw new Error('Nemáte oprávnění odeslat cizí záznam práce.');
+      }
+      if (entry.status !== 'DRAFT' && entry.status !== 'RETURNED') {
+        throw new Error(`Záznam práce v neočekávaném stavu: ${entry.status}. Lze odeslat pouze koncepty a vrácené záznamy.`);
+      }
+    }
+
+    // 4. Update all to SUBMITTED
+    const updated = await transaction.workEntry.updateMany({
+      where: { id: { in: workEntryIds } },
+      data: {
+        status: 'SUBMITTED',
+        rejectionReason: null, // Clear any previous rejection reason
+      }
+    });
+
+    return updated;
+  });
+}
+
