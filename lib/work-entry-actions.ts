@@ -119,39 +119,83 @@ export async function approveWorkEntry(
           const type = isPositive ? 'CARRY_OVER_ADD' as const : 'CARRY_OVER_SUB' as const;
           const absDiff = diff.abs();
 
-          // Create correction adjustment in the open future settlement
-          await transaction.settlementAdjustment.create({
-            data: {
+          const existingAdj = await transaction.settlementAdjustment.findFirst({
+            where: {
               settlementId: settlement.id,
-              type,
-              category: 'OTHER',
-              description: `Oprava odměny (rozdíl) z uzamčeného období ${originalYearMonth.year}-${String(originalYearMonth.month).padStart(2, '0')} za: ${entry.note || entry.id}`,
-              amount: absDiff,
               correctionWorkEntryId: entry.id,
-              correctionSettlementItemId: originalSettlementItem.id,
-              correctionOriginalSettlementId: originalSettlementItem.settlementId,
-              changedByUserId: approvedByUserId,
-              reason: 'Oprava práce po uzávěrce',
             }
           });
+
+          const description = `Oprava odměny (rozdíl) z uzamčeného období ${originalYearMonth.year}-${String(originalYearMonth.month).padStart(2, '0')} za: ${entry.note || entry.id}`;
+
+          if (existingAdj) {
+            await transaction.settlementAdjustment.update({
+              where: { id: existingAdj.id },
+              data: {
+                type,
+                description,
+                amount: absDiff,
+                changedByUserId: approvedByUserId,
+                reason: 'Oprava práce po uzávěrce (aktualizace)',
+              }
+            });
+          } else {
+            // Create correction adjustment in the open future settlement
+            await transaction.settlementAdjustment.create({
+              data: {
+                settlementId: settlement.id,
+                type,
+                category: 'OTHER',
+                description,
+                amount: absDiff,
+                correctionWorkEntryId: entry.id,
+                correctionSettlementItemId: originalSettlementItem.id,
+                correctionOriginalSettlementId: originalSettlementItem.settlementId,
+                changedByUserId: approvedByUserId,
+                reason: 'Oprava práce po uzávěrce',
+              }
+            });
+          }
 
           // Recalculate future open settlement
           await recalculateSettlementTotals(settlement.id, transaction);
         }
       } else {
         // CASE B: First-time approval of work logged in a past locked period
-        await transaction.settlementAdjustment.create({
-          data: {
+        const existingAdj = await transaction.settlementAdjustment.findFirst({
+          where: {
             settlementId: settlement.id,
-            type: 'CARRY_OVER_ADD',
-            category: 'OTHER',
-            description: `Dodatečně schválená práce z uzamčeného období ${originalYearMonth.year}-${String(originalYearMonth.month).padStart(2, '0')}: ${entry.note || entry.id}`,
-            amount: entry.calculatedAmount,
             correctionWorkEntryId: entry.id,
-            changedByUserId: approvedByUserId,
-            reason: 'Dodatečné schválení práce po uzávěrce',
           }
         });
+
+        const description = `Dodatečně schválená práce z uzamčeného období ${originalYearMonth.year}-${String(originalYearMonth.month).padStart(2, '0')}: ${entry.note || entry.id}`;
+
+        if (existingAdj) {
+          await transaction.settlementAdjustment.update({
+            where: { id: existingAdj.id },
+            data: {
+              type: 'CARRY_OVER_ADD',
+              description,
+              amount: entry.calculatedAmount,
+              changedByUserId: approvedByUserId,
+              reason: 'Dodatečné schválení práce po uzávěrce (aktualizace)',
+            }
+          });
+        } else {
+          await transaction.settlementAdjustment.create({
+            data: {
+              settlementId: settlement.id,
+              type: 'CARRY_OVER_ADD',
+              category: 'OTHER',
+              description,
+              amount: entry.calculatedAmount,
+              correctionWorkEntryId: entry.id,
+              changedByUserId: approvedByUserId,
+              reason: 'Dodatečné schválení práce po uzávěrce',
+            }
+          });
+        }
 
         // Recalculate future open settlement
         await recalculateSettlementTotals(settlement.id, transaction);

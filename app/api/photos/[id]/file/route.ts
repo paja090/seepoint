@@ -9,9 +9,33 @@ export const runtime = 'nodejs';
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser(); if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   try {
-    const photo = await prisma.photo.findUnique({ where: { id: (await params).id }, select: { driveFileId:true,fileName:true,mimeType:true,employeeId:true } });
+    const photo = await prisma.photo.findUnique({
+      where: { id: (await params).id },
+      select: { driveFileId: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true },
+    });
     if (!photo?.driveFileId) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
-    const allowed = photo.employeeId ? user.employee?.id === photo.employeeId || canAccess(user.role, 'employees') : canAccess(user.role, 'carriers');
+
+    let allowed = false;
+    const isManagerOrAdmin = user.role === 'ADMIN' || user.role === 'MANAGER';
+
+    if (photo.type === 'EXPENSE_RECEIPT' || photo.isPrivate) {
+      if (isManagerOrAdmin) {
+        allowed = true;
+      } else if (photo.workEntryId) {
+        const entry = await prisma.workEntry.findUnique({
+          where: { id: photo.workEntryId },
+          select: { employee: { select: { id: true, userId: true } } }
+        });
+        if (entry) {
+          allowed = entry.employee.userId === user.id || entry.employee.id === user.employee?.id;
+        }
+      }
+    } else if (photo.employeeId) {
+      allowed = user.employee?.id === photo.employeeId || canAccess(user.role, 'employees');
+    } else {
+      allowed = canAccess(user.role, 'carriers');
+    }
+
     if (!allowed) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
     const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
     if (!file.ok || !file.body) return NextResponse.json({ error: 'Fotografii se nepodařilo načíst.' }, { status: file.status === 404 ? 404 : 502 });
