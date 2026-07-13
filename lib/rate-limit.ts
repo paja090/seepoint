@@ -23,6 +23,7 @@ export const rateLimitPolicies = {
   resetPassword: { scope: 'auth:reset-password', windowMs: 60 * 60_000, limits: { ip: 20, identity: 8, pair: 6 } },
   activate: { scope: 'auth:activate', windowMs: 60 * 60_000, limits: { ip: 20, identity: 8, pair: 6 } },
   resendInvitation: { scope: 'auth:resend-invitation', windowMs: 60 * 60_000, limits: { ip: 30, identity: 5, pair: 5 } },
+  publicOfferResponse: { scope: 'offers:public-response', windowMs: 15 * 60_000, limits: { ip: 30, identity: 12, pair: 10 } },
 } satisfies Record<string, RateLimitPolicy>;
 
 export async function enforceRateLimit(request: Request, identityHash: string, policy: RateLimitPolicy) {

@@ -1,5 +1,5 @@
 import type { Employee, Prisma, WorkOrderStatus, WorkPriority } from '@prisma/client';
-import { prisma } from '@/lib/db';
+import { prisma } from './db.ts';
 
 type WorkOrderForSync = Prisma.WorkOrderGetPayload<{
   include: {

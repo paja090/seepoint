@@ -30,7 +30,7 @@ export type AppSection =
 
 const permissions: Record<AppRole, AppSection[]> = {
   ADMIN: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'import', 'settings', 'workEntries', 'myWorkEntries'],
-  MANAGER: ['dashboard', 'map', 'carriers', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'workEntries', 'myWorkEntries'],
+  MANAGER: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'workEntries', 'myWorkEntries'],
   SALES: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers'],
   TECHNICIAN: ['dashboard', 'map', 'carriers', 'work', 'tasks', 'myTasks', 'vehicles', 'myWorkEntries'],
   WORKER: ['myTasks', 'mySettlements', 'myWorkEntries'],

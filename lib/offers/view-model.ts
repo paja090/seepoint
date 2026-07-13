@@ -1,0 +1,84 @@
+export type OfferPhotoView = { id: string; url: string; note?: string | null; isPrimary: boolean };
+export type OfferItemView = {
+  id?: string;
+  surfaceId?: string;
+  dateFrom: string | null;
+  dateTo: string | null;
+  quantity: string;
+  unit: string;
+  unitPrice: string | null;
+  discountPercent: string | null;
+  discountAmount: string | null;
+  subtotal: string | null;
+  note?: string | null;
+  groupLabel: string;
+  customTitle?: string | null;
+  clientDescription?: string | null;
+  surface: {
+    name: string;
+    mediaType: string;
+    size?: string | null;
+    orientation?: string | null;
+    status?: string;
+    carrier: {
+      code: string;
+      name: string;
+      city: string;
+      locality?: string | null;
+      street?: string | null;
+      address?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      description?: string | null;
+    };
+    photos: OfferPhotoView[];
+  };
+};
+
+export type OfferView = {
+  id?: string;
+  clientId?: string;
+  title: string;
+  campaignName: string;
+  contactPerson?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  campaignGoal?: string | null;
+  budget?: string | null;
+  status: string;
+  validUntil: string | null;
+  internalNote?: string | null;
+  clientMessage?: string | null;
+  currency: string;
+  taxRate: string | null;
+  subtotalBeforeDiscount: string;
+  subtotal: string | null;
+  discountAmount: string | null;
+  taxAmount: string | null;
+  totalWithTax: string | null;
+  hasPublicLink?: boolean;
+  publishedAt?: string | null;
+  sentAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id?: string; name: string; email?: string };
+  client: { name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null };
+  items: OfferItemView[];
+  events?: Array<{ id: string; type: string; fromStatus?: string | null; toStatus?: string | null; actorName?: string | null; actorEmail?: string | null; message?: string | null; createdAt: string }>;
+  converted?: boolean;
+};
+
+export type OfferClientOption = { id: string; name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };
+export type OfferSurfaceOption = {
+  id: string;
+  name: string;
+  mediaType: string;
+  status: string;
+  price: string;
+  currentClient?: string | null;
+  photos: Array<{ id: string; url: string }>;
+  carrier: { id: string; code: string; name: string; city: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };
+};

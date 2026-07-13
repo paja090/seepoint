@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 const SESSION_COOKIE = 'seepoint_session';
-const publicPaths = ['/login', '/forgot-password', '/activate', '/reset-password', '/api/auth'];
+const publicPaths = ['/login', '/forgot-password', '/activate', '/reset-password', '/proposal', '/api/auth', '/api/proposals'];
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (publicPaths.some((item) => path === item || path.startsWith(`${item}/`))) return NextResponse.next();
