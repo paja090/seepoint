@@ -10,7 +10,8 @@ import { getCarrierFilterOptions, getMapCarriers } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export default async function MapPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requirePageAccess('map');
+  const user = await requirePageAccess('map');
+  const canEdit = user.role === 'ADMIN' || user.role === 'MANAGER';
   const params = await searchParams;
   const filters = parseCarrierFilters(params);
   const selectedCarrierId = Array.isArray(params.carrier) ? params.carrier[0] : params.carrier;
@@ -42,7 +43,7 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
           </section>
         </aside>
         <section className="min-w-0">
-          <MapView initialCarriers={orderedCarriers} />
+          <MapView initialCarriers={orderedCarriers} canEdit={canEdit} />
         </section>
       </div>
     </AppShell>

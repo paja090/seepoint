@@ -20,11 +20,13 @@ export function CarrierDetail({
   onSurfaceClientChanged,
   showLocationMap = false,
   clients = [],
+  canEdit = false,
 }: {
   carrier: Carrier;
   onSurfaceClientChanged?: SurfaceClientChangeHandler;
   showLocationMap?: boolean;
   clients?: Array<Pick<Client, 'id' | 'name'>>;
+  canEdit?: boolean;
 }) {
   const campaigns = carrier.surfaces.flatMap((surface) =>
     surface.occupancies.map((occupancy) => ({ ...occupancy, surface: surface.name })),
@@ -125,7 +127,7 @@ export function CarrierDetail({
       )}
 
       <div id="photo-gallery" className="scroll-mt-6">
-        <PhotoGallery carrierId={carrier.id} carrierPhotos={carrier.photos} surfaces={carrier.surfaces} />
+        <PhotoGallery carrierId={carrier.id} carrierPhotos={carrier.photos} surfaces={carrier.surfaces} canEdit={canEdit} />
       </div>
 
       <section id="surfaces" className="scroll-mt-6">

@@ -34,7 +34,13 @@ function hasCoordinates(carrier: Carrier): carrier is LocatedCarrier {
   return Number.isFinite(carrier.latitude) && Number.isFinite(carrier.longitude);
 }
 
-export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
+export function MapView({
+  initialCarriers,
+  canEdit,
+}: {
+  initialCarriers: Carrier[];
+  canEdit?: boolean;
+}) {
   const [items, setItems] = useState(initialCarriers);
   const [selectedId, setSelectedId] = useState(initialCarriers[0]?.id);
   const [draft, setDraft] = useState<Partial<Carrier> | undefined>();
@@ -247,7 +253,7 @@ export function MapView({ initialCarriers }: { initialCarriers: Carrier[] }) {
               <button type="button" className="text-sm font-medium text-sky-700 hover:text-sky-900" onClick={startLocationEdit}>{hasCoordinates(selected) ? 'Upravit polohu' : 'Doplnit polohu'}</button>
               <Link className="ml-auto text-sm font-medium text-slate-700 hover:text-slate-950" href={`/carriers/${selected.id}`}>Otevřít celý detail →</Link>
             </div>}
-            <CarrierDetail carrier={selected} onSurfaceClientChanged={updateSurfaceClient} />
+            <CarrierDetail carrier={selected} onSurfaceClientChanged={updateSurfaceClient} canEdit={canEdit} />
           </> : <p className="text-sm text-slate-500">Vyberte nosič na mapě.</p>}
         </aside>
       </div>

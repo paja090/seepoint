@@ -28,7 +28,22 @@ function serializeOccupancy(occupancy: OccupancyRow): Occupancy {
 }
 
 function serializeCarrier(carrier: CarrierRow): Carrier {
-  return { id: carrier.id, name: carrier.name, code: carrier.code, type: carrier.type, latitude: carrier.latitude ?? undefined, longitude: carrier.longitude ?? undefined, gpsStatus: carrier.gpsStatus, street: carrier.street ?? undefined, address: carrier.address ?? undefined, locality: carrier.locality ?? undefined, city: carrier.city, region: carrier.region ?? undefined, cadastralArea: carrier.cadastralArea ?? undefined, structureCode: carrier.structureCode ?? undefined, mountingType: carrier.mountingType, status: carrier.status, description: carrier.description ?? undefined, placementDescription: carrier.placementDescription ?? undefined, note: carrier.note ?? undefined, archivedAt: carrier.archivedAt?.toISOString(), archivedBy: carrier.archivedBy ?? undefined, archiveReason: carrier.archiveReason ?? undefined, sourceSystem: carrier.sourceSystem ?? undefined, sourceSheet: carrier.sourceSheet ?? undefined, sourceRow: carrier.sourceRow ?? undefined, importBatchId: carrier.importBatchId ?? undefined, photos: carrier.photos.map((photo) => ({ id: photo.id, carrierId: photo.carrierId ?? undefined, surfaceId: photo.surfaceId ?? undefined, url: photo.url, type: photo.type, note: photo.note ?? undefined })), surfaces: carrier.surfaces.map((surface) => ({ id: surface.id, carrierId: surface.carrierId, currentClientId: surface.currentClientId ?? undefined, currentClient: surface.currentClient ? { id: surface.currentClient.id, name: surface.currentClient.name } : undefined, name: surface.name, mediaType: surface.mediaType, sourcePosition: surface.sourcePosition ?? undefined, directionDescription: surface.directionDescription ?? undefined, rawMediaType: surface.rawMediaType ?? undefined, size: surface.size ?? undefined, orientation: surface.orientation ?? undefined, status: surface.status, price: surface.price?.toNumber(), note: surface.note ?? undefined, photos: surface.photos.map((photo) => ({ id: photo.id, carrierId: photo.carrierId ?? undefined, surfaceId: photo.surfaceId ?? undefined, url: photo.url, type: photo.type, note: photo.note ?? undefined })), occupancies: surface.occupancies.map(serializeOccupancy) })) };
+  const mapPhoto = (photo: typeof carrier.photos[number]) => ({
+    id: photo.id,
+    carrierId: photo.carrierId ?? undefined,
+    surfaceId: photo.surfaceId ?? undefined,
+    url: photo.url,
+    type: photo.type,
+    note: photo.note ?? undefined,
+    sortOrder: photo.sortOrder,
+    isPrimary: photo.isPrimary,
+    isClientVisible: photo.isClientVisible,
+    driveFileId: photo.driveFileId ?? undefined,
+    fileName: photo.fileName ?? undefined,
+    mimeType: photo.mimeType ?? undefined,
+    size: photo.size ?? undefined,
+  });
+  return { id: carrier.id, name: carrier.name, code: carrier.code, type: carrier.type, latitude: carrier.latitude ?? undefined, longitude: carrier.longitude ?? undefined, gpsStatus: carrier.gpsStatus, street: carrier.street ?? undefined, address: carrier.address ?? undefined, locality: carrier.locality ?? undefined, city: carrier.city, region: carrier.region ?? undefined, cadastralArea: carrier.cadastralArea ?? undefined, structureCode: carrier.structureCode ?? undefined, mountingType: carrier.mountingType, status: carrier.status, description: carrier.description ?? undefined, placementDescription: carrier.placementDescription ?? undefined, note: carrier.note ?? undefined, archivedAt: carrier.archivedAt?.toISOString(), archivedBy: carrier.archivedBy ?? undefined, archiveReason: carrier.archiveReason ?? undefined, sourceSystem: carrier.sourceSystem ?? undefined, sourceSheet: carrier.sourceSheet ?? undefined, sourceRow: carrier.sourceRow ?? undefined, importBatchId: carrier.importBatchId ?? undefined, photos: carrier.photos.map(mapPhoto), surfaces: carrier.surfaces.map((surface) => ({ id: surface.id, carrierId: surface.carrierId, currentClientId: surface.currentClientId ?? undefined, currentClient: surface.currentClient ? { id: surface.currentClient.id, name: surface.currentClient.name } : undefined, name: surface.name, mediaType: surface.mediaType, sourcePosition: surface.sourcePosition ?? undefined, directionDescription: surface.directionDescription ?? undefined, rawMediaType: surface.rawMediaType ?? undefined, size: surface.size ?? undefined, orientation: surface.orientation ?? undefined, status: surface.status, price: surface.price?.toNumber(), note: surface.note ?? undefined, photos: surface.photos.map(mapPhoto), occupancies: surface.occupancies.map(serializeOccupancy) })) };
 }
 
 export function buildCarrierWhere(filters: CarrierFilters = {}): Prisma.AdvertisingCarrierWhereInput {
