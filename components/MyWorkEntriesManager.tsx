@@ -31,7 +31,7 @@ type EntryPayload = {
   calculatedAmount: string;
   rateSource: string | null;
   note: string | null;
-  status: 'DRAFT' | 'CONFIRMED' | 'SUBMITTED' | 'APPROVED' | 'RETURNED';
+  status: 'DRAFT' | 'CONFIRMED';
   creationSource: 'AUTOMATIC' | 'MANUAL';
   workTask: { title: string } | null;
   workOrder: { title: string } | null;

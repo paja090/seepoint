@@ -7,23 +7,8 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export const carrierInclude = {
-  surfaces: {
-    include: {
-      currentClient: true,
-      occupancies: { orderBy: { dateFrom: 'desc' } },
-      photos: {
-        where: {
-          type: { not: 'EXPENSE_RECEIPT' },
-        },
-      },
-    },
-    orderBy: { name: 'asc' },
-  },
-  photos: {
-    where: {
-      type: { not: 'EXPENSE_RECEIPT' },
-    },
-  },
+  surfaces: { include: { currentClient: true, occupancies: { orderBy: { dateFrom: 'desc' } }, photos: true }, orderBy: { name: 'asc' } },
+  photos: true,
 } satisfies Prisma.AdvertisingCarrierInclude;
 
 type CarrierRow = Prisma.AdvertisingCarrierGetPayload<{ include: typeof carrierInclude }>;
