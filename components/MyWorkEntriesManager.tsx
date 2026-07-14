@@ -469,11 +469,15 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
                         setIsAdHoc(e.target.checked);
                         if (e.target.checked) {
                           setWorkTaskId('');
+                          setRemunerationMethod('HOURLY');
+                          setUnit('hod');
+                          setQuantity('');
                         } else {
                           const initialId = prefilledTask?.id || (assignedTasks && assignedTasks.length > 0 ? assignedTasks[0].id : '');
                           setWorkTaskId(initialId);
                           setAdHocTaskTitle('');
                           setWorkOrderId('');
+                          setAdHocCarrierType('');
                         }
                       }}
                     />
@@ -512,21 +516,23 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
                       </select>
                     </label>
 
-                    <label className="text-sm font-semibold">
-                      Typ nosiče / plochy (nepovinné)
-                      <select
-                        className="input mt-1 w-full font-medium"
-                        value={adHocCarrierType}
-                        onChange={(e) => setAdHocCarrierType(e.target.value)}
-                      >
-                        <option value="">-- Bez typu nosiče --</option>
-                        {Object.entries(carrierTypeLabels).map(([val, label]) => (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {remunerationMethod === 'TASK' && (
+                      <label className="text-sm font-semibold">
+                        Typ nosiče / plochy (nepovinné)
+                        <select
+                          className="input mt-1 w-full font-medium"
+                          value={adHocCarrierType}
+                          onChange={(e) => setAdHocCarrierType(e.target.value)}
+                        >
+                          <option value="">-- Bez typu nosiče --</option>
+                          {Object.entries(carrierTypeLabels).map(([val, label]) => (
+                            <option key={val} value={val}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                   </>
                 ) : (
                   <label className="text-sm font-semibold">
