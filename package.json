@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "seed:demo-settlement": "npx tsx scripts/seed-demo-settlement.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",
