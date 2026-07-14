@@ -135,6 +135,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     workDate: targetDate,
     remunerationMethod: targetMethod,
     workOrderId: entry.workOrderId, // CRITICAL FIX: Pass the existing entry.workOrderId!
+    carrierType: entry.carrierType,
   });
 
   if (manualRate !== undefined && manualRate !== null) {

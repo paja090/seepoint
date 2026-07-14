@@ -106,6 +106,7 @@ export async function POST(request: Request) {
     isAdHoc,
     adHocTaskTitle,
     workOrderId,
+    carrierType,
   } = input;
 
   if (!employeeId || (!workTaskId && !isAdHoc) || !workDate || !workType || !remunerationMethod || quantity === undefined) {
@@ -255,7 +256,9 @@ export async function POST(request: Request) {
       let finalSource: RateSource | null = null;
       let resolvedCarrierType: CarrierType | null = null;
 
-      if (targetWorkTaskId) {
+      if (isAdHoc && carrierType) {
+        resolvedCarrierType = carrierType as CarrierType;
+      } else if (targetWorkTaskId) {
         const taskObj = await tx.workTask.findUnique({
           where: { id: targetWorkTaskId },
           include: { carrier: true },
@@ -318,6 +321,7 @@ export async function POST(request: Request) {
           clientName: targetClientName,
           workType: workType as WorkType,
           remunerationMethod: remunerationMethod as RateType,
+          carrierType: resolvedCarrierType,
           quantity: qtyDecimal,
           unit: finalUnit,
           appliedUnitRate: finalRate,

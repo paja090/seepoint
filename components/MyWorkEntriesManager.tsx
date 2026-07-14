@@ -80,6 +80,22 @@ const statusLabels: Record<string, string> = {
   RETURNED: 'Vráceno',
 };
 
+const carrierTypeLabels: Record<string, string> = {
+  BILLBOARD: 'Billboard',
+  BIGBOARD: 'Bigboard',
+  CITYLIGHT: 'CLV (Citylight)',
+  BANNER: 'Banner',
+  FACADE: 'Fasáda',
+  LED_SCREEN: 'LED obrazovka',
+  PROMO_BENCH: 'Lavička',
+  PROMO_HORIZON: 'Horizon',
+  CITY_POSTER: 'City Poster',
+  NAVIGATION: 'Navigace',
+  PROMO_TOWER: 'Tower',
+  PROMO_MINITOWER: 'Minitower',
+  OTHER: 'Jiné',
+};
+
 const statusClasses: Record<string, string> = {
   DRAFT: 'bg-slate-100 text-slate-800 border border-slate-200',
   SUBMITTED: 'bg-blue-100 text-blue-800 border border-blue-200',
@@ -97,6 +113,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
   const [isAdHoc, setIsAdHoc] = useState(false);
   const [adHocTaskTitle, setAdHocTaskTitle] = useState('');
   const [workOrderId, setWorkOrderId] = useState('');
+  const [adHocCarrierType, setAdHocCarrierType] = useState('');
   const [workOrders, setWorkOrders] = useState<Array<{ id: string; title: string; clientName: string | null }>>([]);
   
   const defaultTaskId = prefilledTask?.id || (assignedTasks && assignedTasks.length > 0 ? assignedTasks[0].id : '');
@@ -166,8 +183,13 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
       setLoadingRate(true);
       try {
         let url = `/api/work-entries/resolve-rate?employeeId=${employee.id}&workType=${workType}&workDate=${workDate}&remunerationMethod=${remunerationMethod}`;
-        if (isAdHoc && workOrderId) {
-          url += `&workOrderId=${workOrderId}`;
+        if (isAdHoc) {
+          if (workOrderId) {
+            url += `&workOrderId=${workOrderId}`;
+          }
+          if (adHocCarrierType) {
+            url += `&carrierType=${adHocCarrierType}`;
+          }
         } else if (!isAdHoc && workTaskId) {
           const task = prefilledTask?.id === workTaskId ? prefilledTask : assignedTasks?.find((t) => t.id === workTaskId);
           if (task) {
@@ -200,7 +222,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
 
     const timer = setTimeout(fetchRate, 300);
     return () => clearTimeout(timer);
-  }, [showForm, workType, remunerationMethod, workDate, employee.id, isAdHoc, workOrderId, workTaskId, prefilledTask, assignedTasks]);
+  }, [showForm, workType, remunerationMethod, workDate, employee.id, isAdHoc, workOrderId, adHocCarrierType, workTaskId, prefilledTask, assignedTasks]);
 
   // Adjust unit default based on method
   useEffect(() => {
@@ -218,7 +240,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
       if (fetchEntries.ok) {
         setEntries(freshData);
       }
-    } catch (e) {}
+    } catch {}
   };
 
   // Handle Create or Update submission
@@ -240,6 +262,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
       isAdHoc,
       adHocTaskTitle: isAdHoc ? adHocTaskTitle : undefined,
       workOrderId: isAdHoc && workOrderId ? workOrderId : undefined,
+      carrierType: isAdHoc && adHocCarrierType ? adHocCarrierType : undefined,
     };
 
     try {
@@ -324,6 +347,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
     setIsAdHoc(false);
     setAdHocTaskTitle('');
     setWorkOrderId('');
+    setAdHocCarrierType('');
     setResolvedRate(null);
     setResolvedSource(null);
     setEditingEntry(null);
@@ -487,6 +511,22 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
                         ))}
                       </select>
                     </label>
+
+                    <label className="text-sm font-semibold">
+                      Typ nosiče / plochy (nepovinné)
+                      <select
+                        className="input mt-1 w-full font-medium"
+                        value={adHocCarrierType}
+                        onChange={(e) => setAdHocCarrierType(e.target.value)}
+                      >
+                        <option value="">-- Bez typu nosiče --</option>
+                        {Object.entries(carrierTypeLabels).map(([val, label]) => (
+                          <option key={val} value={val}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </>
                 ) : (
                   <label className="text-sm font-semibold">
@@ -521,13 +561,12 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
               />
             </label>
 
-            <label className={`text-sm font-semibold ${!isAdHoc && !prefilledTask ? 'text-slate-500' : ''}`}>
-              Druh práce {!isAdHoc && !prefilledTask && <span className="text-xs font-normal text-slate-400">(určeno úkolem)</span>}
+            <label className="text-sm font-semibold">
+              Druh práce <span className="text-red-500">*</span>
               <select
-                className={`input mt-1 w-full font-medium ${!isAdHoc && !prefilledTask ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : ''}`}
+                className="input mt-1 w-full font-medium"
                 value={workType}
                 onChange={(e) => setWorkType(e.target.value)}
-                disabled={!isAdHoc && !prefilledTask}
               >
                 {Object.entries(workTypeLabels).map(([val, label]) => (
                   <option key={val} value={val}>
@@ -537,13 +576,12 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
               </select>
             </label>
 
-            <label className={`text-sm font-semibold ${!isAdHoc && !prefilledTask ? 'text-slate-500' : ''}`}>
-              Forma odměny {!isAdHoc && !prefilledTask && <span className="text-xs font-normal text-slate-400">(určeno úkolem)</span>}
+            <label className="text-sm font-semibold">
+              Forma odměny <span className="text-red-500">*</span>
               <select
-                className={`input mt-1 w-full font-medium ${!isAdHoc && !prefilledTask ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : ''}`}
+                className="input mt-1 w-full font-medium"
                 value={remunerationMethod}
                 onChange={(e) => setRemunerationMethod(e.target.value)}
-                disabled={!isAdHoc && !prefilledTask}
               >
                 {Object.entries(rateTypeLabels).map(([val, label]) => (
                   <option key={val} value={val}>
@@ -565,15 +603,14 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
               />
             </label>
 
-            <label className="text-sm font-semibold text-slate-500">
-              Jednotka <span className="text-slate-400">(určeno formou odměny)</span>
+            <label className="text-sm font-semibold">
+              Jednotka <span className="text-red-500">*</span>
               <input
-                className="input mt-1 w-full bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed font-medium"
+                className="input mt-1 w-full font-medium"
                 required
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="hod, ks, atd."
-                disabled
               />
             </label>
 
