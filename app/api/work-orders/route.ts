@@ -1,9 +1,11 @@
-import { WorkPriority, WorkType } from '@prisma/client';
+import { WorkPriority, WorkType, WorkOrderStatus } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { workRequesters } from '@/lib/work';
+import { getCurrentUser } from '@/lib/auth';
+import { canAccess } from '@/lib/rbac';
 
 type WorkOrderInput = Record<string, unknown>;
 
@@ -28,7 +30,36 @@ function optionalPrice(input: WorkOrderInput) {
 }
 
 export async function GET() {
-  const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
+  }
+
+  const hasWorkAccess = canAccess(user.role, 'work');
+  const hasMyAccess = canAccess(user.role, 'myWorkEntries') || canAccess(user.role, 'myTasks');
+
+  if (!hasWorkAccess && !hasMyAccess) {
+    return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  }
+
+  // Fetch only active/new work orders if they only have myWorkEntries/myTasks (workers)
+  const where = !hasWorkAccess ? { status: { in: ['NEW', 'IN_PROGRESS'] as WorkOrderStatus[] } } : {};
+
+  if (!hasWorkAccess) {
+    const orders = await prisma.workOrder.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        clientName: true,
+        workType: true,
+      },
+      orderBy: { scheduledAt: 'asc' },
+      take: 200,
+    });
+    return NextResponse.json(orders);
+  }
+
   const orders = await prisma.workOrder.findMany({
     include: { assignments: true, items: { include: { carrier: true, surface: true } }, client: true, workTasks: { include: { assignedTo: true } } },
     orderBy: { scheduledAt: 'asc' },

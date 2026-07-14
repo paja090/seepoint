@@ -103,9 +103,12 @@ export async function POST(request: Request) {
     additionalEntryReason,
     manualRate,
     manualOverride,
+    isAdHoc,
+    adHocTaskTitle,
+    workOrderId,
   } = input;
 
-  if (!employeeId || !workTaskId || !workDate || !workType || !remunerationMethod || quantity === undefined) {
+  if (!employeeId || (!workTaskId && !isAdHoc) || !workDate || !workType || !remunerationMethod || quantity === undefined) {
     return NextResponse.json({ error: 'Chybí povinná pole.' }, { status: 400 });
   }
 
@@ -124,26 +127,66 @@ export async function POST(request: Request) {
         throw new Error('Nemáte oprávnění vytvářet záznamy pro jiného pracovníka.');
       }
 
-      // 2. Validate WorkTask and WorkOrder
-      const workTask = await tx.workTask.findUnique({
-        where: { id: workTaskId },
-        include: { workOrder: true }
-      });
-      if (!workTask) {
-        throw new Error('Přiřazený úkol nebyl nalezen.');
+      const dateObj = new Date(workDate);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error('Neplatné datum.');
       }
 
-      const workOrderId = workTask.workOrderId;
-      const clientId = workTask.workOrder?.clientId || null;
-      const clientName = workTask.workOrder?.clientName || null;
+      // 2. Validate or Auto-Create WorkTask
+      let targetWorkTaskId = workTaskId;
+      let targetWorkOrderId = workOrderId || null;
+      let targetClientId = null;
+      let targetClientName = null;
 
-      // WORKER and TECHNICIAN validation
-      if (!isManagerOrAdmin) {
-        if (workTask.assignedToEmployeeId !== employeeId) {
-          throw new Error('Tento úkol není přiřazen vám.');
+      if (isAdHoc) {
+        if (!adHocTaskTitle || !adHocTaskTitle.trim()) {
+          throw new Error('Pro neplánovanou práci musíte vyplnit název úkolu.');
         }
-        if (workTask.status !== 'DONE') {
-          throw new Error('Práci lze vykazovat pouze u dokončených úkolů (DONE).');
+
+        if (targetWorkOrderId) {
+          const workOrder = await tx.workOrder.findUnique({
+            where: { id: targetWorkOrderId }
+          });
+          if (workOrder) {
+            targetClientId = workOrder.clientId || null;
+            targetClientName = workOrder.clientName || null;
+          }
+        }
+
+        const newAdHocTask = await tx.workTask.create({
+          data: {
+            title: adHocTaskTitle.trim(),
+            description: 'Ad-hoc neplánovaný úkol vytvořený pracovníkem',
+            assignedToEmployeeId: employeeId,
+            createdByEmployeeId: employeeId,
+            workOrderId: targetWorkOrderId,
+            scheduledDate: dateObj,
+            status: 'DONE',
+            remunerationMethod: remunerationMethod as RateType,
+          }
+        });
+        targetWorkTaskId = newAdHocTask.id;
+      } else {
+        const workTask = await tx.workTask.findUnique({
+          where: { id: workTaskId },
+          include: { workOrder: true }
+        });
+        if (!workTask) {
+          throw new Error('Přiřazený úkol nebyl nalezen.');
+        }
+
+        targetWorkOrderId = workTask.workOrderId;
+        targetClientId = workTask.workOrder?.clientId || null;
+        targetClientName = workTask.workOrder?.clientName || null;
+
+        // WORKER and TECHNICIAN validation
+        if (!isManagerOrAdmin) {
+          if (workTask.assignedToEmployeeId !== employeeId) {
+            throw new Error('Tento úkol není přiřazen vám.');
+          }
+          if (workTask.status !== 'DONE') {
+            throw new Error('Práci lze vykazovat pouze u dokončených úkolů (DONE).');
+          }
         }
       }
 
@@ -179,7 +222,6 @@ export async function POST(request: Request) {
       }
 
       // 4. Duplicate prevention INSIDE the transaction
-      const dateObj = new Date(workDate);
       const startOfDay = new Date(dateObj);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(dateObj);
@@ -187,7 +229,7 @@ export async function POST(request: Request) {
 
       const existingDuplicate = await tx.workEntry.findFirst({
         where: {
-          workTaskId,
+          workTaskId: targetWorkTaskId,
           employeeId,
           workType: workType as WorkType,
           workDate: {
@@ -217,7 +259,7 @@ export async function POST(request: Request) {
         workType: workType as WorkType,
         workDate: dateObj,
         remunerationMethod: remunerationMethod as RateType,
-        workOrderId,
+        workOrderId: targetWorkOrderId,
       }, tx);
 
       if (manualRate !== undefined && manualRate !== null) {
@@ -258,10 +300,10 @@ export async function POST(request: Request) {
         data: {
           employeeId,
           workDate: dateObj,
-          workTaskId,
-          workOrderId,
-          clientId,
-          clientName,
+          workTaskId: targetWorkTaskId,
+          workOrderId: targetWorkOrderId,
+          clientId: targetClientId,
+          clientName: targetClientName,
           workType: workType as WorkType,
           remunerationMethod: remunerationMethod as RateType,
           quantity: qtyDecimal,

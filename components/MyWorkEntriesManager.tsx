@@ -91,6 +91,10 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
 
   // Form states
   const [showForm, setShowForm] = useState(prefilledTask !== null);
+  const [isAdHoc, setIsAdHoc] = useState(false);
+  const [adHocTaskTitle, setAdHocTaskTitle] = useState('');
+  const [workOrderId, setWorkOrderId] = useState('');
+  const [workOrders, setWorkOrders] = useState<Array<{ id: string; title: string; clientName: string | null }>>([]);
   const [workTaskId, setWorkTaskId] = useState(prefilledTask?.id || '');
   const [workDate, setWorkDate] = useState(
     prefilledTask?.scheduledDate
@@ -102,6 +106,23 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('hod');
   const [note, setNote] = useState('');
+
+  // Load work orders for ad-hoc selection
+  useEffect(() => {
+    if (!showForm) return;
+    const loadWorkOrders = async () => {
+      try {
+        const res = await fetch('/api/work-orders');
+        const data = await res.json();
+        if (res.ok && Array.isArray(data)) {
+          setWorkOrders(data);
+        }
+      } catch (e) {
+        console.error('Chyba při načítání zakázek:', e);
+      }
+    };
+    loadWorkOrders();
+  }, [showForm]);
 
   // Resolved rate state
   const [resolvedRate, setResolvedRate] = useState<string | null>(null);
@@ -125,9 +146,15 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
     const fetchRate = async () => {
       setLoadingRate(true);
       try {
-        const res = await fetch(
-          `/api/work-entries/resolve-rate?employeeId=${employee.id}&workType=${workType}&workDate=${workDate}&remunerationMethod=${remunerationMethod}`
-        );
+        let url = `/api/work-entries/resolve-rate?employeeId=${employee.id}&workType=${workType}&workDate=${workDate}&remunerationMethod=${remunerationMethod}`;
+        if (isAdHoc && workOrderId) {
+          url += `&workOrderId=${workOrderId}`;
+        } else if (!isAdHoc && workTaskId) {
+          if (prefilledTask?.workOrder?.id) {
+            url += `&workOrderId=${prefilledTask.workOrder.id}`;
+          }
+        }
+        const res = await fetch(url);
         const data = await res.json();
         if (res.ok && data.rate) {
           setResolvedRate(data.rate);
@@ -148,7 +175,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
 
     const timer = setTimeout(fetchRate, 300);
     return () => clearTimeout(timer);
-  }, [showForm, workType, remunerationMethod, workDate, employee.id]);
+  }, [showForm, workType, remunerationMethod, workDate, employee.id, isAdHoc, workOrderId, workTaskId, prefilledTask]);
 
   // Adjust unit default based on method
   useEffect(() => {
@@ -177,7 +204,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
 
     const bodyData = {
       employeeId: employee.id,
-      workTaskId,
+      workTaskId: isAdHoc ? undefined : workTaskId,
       workDate,
       workType,
       remunerationMethod,
@@ -185,6 +212,9 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
       unit,
       note,
       creationSource: prefilledTask ? 'AUTOMATIC' : 'MANUAL',
+      isAdHoc,
+      adHocTaskTitle: isAdHoc ? adHocTaskTitle : undefined,
+      workOrderId: isAdHoc && workOrderId ? workOrderId : undefined,
     };
 
     try {
@@ -266,6 +296,9 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
     setQuantity('');
     setUnit('hod');
     setNote('');
+    setIsAdHoc(false);
+    setAdHocTaskTitle('');
+    setWorkOrderId('');
     setResolvedRate(null);
     setResolvedSource(null);
     setEditingEntry(null);
@@ -375,17 +408,73 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
                 {prefilledTask.description && <p className="mt-1 text-xs text-sky-800">{prefilledTask.description}</p>}
               </div>
             ) : (
-              <label className="text-sm font-semibold">
-                ID Úkolu (WorkTask CUID) <span className="text-red-500">*</span>
-                <input
-                  className="input mt-1 w-full"
-                  required
-                  value={workTaskId}
-                  onChange={(e) => setWorkTaskId(e.target.value)}
-                  placeholder="Zadejte ID úkolu..."
-                  disabled={!!prefilledTask}
-                />
-              </label>
+              <>
+                {!editingEntry && (
+                  <div className="md:col-span-2 lg:col-span-3 flex items-center gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      id="isAdHoc"
+                      className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                      checked={isAdHoc}
+                      onChange={(e) => {
+                        setIsAdHoc(e.target.checked);
+                        if (e.target.checked) {
+                          setWorkTaskId('');
+                        } else {
+                          setAdHocTaskTitle('');
+                          setWorkOrderId('');
+                        }
+                      }}
+                    />
+                    <label htmlFor="isAdHoc" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
+                      Neplánovaná práce mimo plán (Ad-hoc)
+                    </label>
+                  </div>
+                )}
+
+                {isAdHoc ? (
+                  <>
+                    <label className="text-sm font-semibold">
+                      Název provedené práce (úkolu) <span className="text-red-500">*</span>
+                      <input
+                        className="input mt-1 w-full"
+                        required
+                        value={adHocTaskTitle}
+                        onChange={(e) => setAdHocTaskTitle(e.target.value)}
+                        placeholder="např. Neplánovaná oprava osvětlení..."
+                      />
+                    </label>
+
+                    <label className="text-sm font-semibold">
+                      Přiřadit k zakázce (nepovinné)
+                      <select
+                        className="input mt-1 w-full"
+                        value={workOrderId}
+                        onChange={(e) => setWorkOrderId(e.target.value)}
+                      >
+                        <option value="">-- Bez přiřazení k zakázce --</option>
+                        {workOrders.map((wo) => (
+                          <option key={wo.id} value={wo.id}>
+                            {wo.title} {wo.clientName ? `(${wo.clientName})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <label className="text-sm font-semibold">
+                    ID Úkolu (WorkTask CUID) <span className="text-red-500">*</span>
+                    <input
+                      className="input mt-1 w-full"
+                      required
+                      value={workTaskId}
+                      onChange={(e) => setWorkTaskId(e.target.value)}
+                      placeholder="Zadejte ID úkolu..."
+                      disabled={!!prefilledTask}
+                    />
+                  </label>
+                )}
+              </>
             )}
 
             <label className="text-sm font-semibold">
