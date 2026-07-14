@@ -87,6 +87,11 @@ async function main() {
   });
   console.log('Staré demo zakázky a úkoly byly odstraněny.');
 
+  if (process.argv.includes('--clean')) {
+    console.log('Demo data byla úspěšně kompletně odstraněna. Končím.');
+    return;
+  }
+
   // 3. Create demo User
   const pw = 'Password12345';
   const hashedPw = await hashPassword(pw);
