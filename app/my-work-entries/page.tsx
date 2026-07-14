@@ -60,7 +60,8 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
         id: task.id,
         title: task.title,
         description: task.description,
-        scheduledDate: task.scheduledDate,
+        scheduledDate: task.scheduledDate ? task.scheduledDate.toISOString() : null,
+        remunerationMethod: task.remunerationMethod,
         workOrder: task.workOrder
           ? {
               id: task.workOrder.id,
@@ -104,6 +105,35 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     workOrder: entry.workOrder ? { title: entry.workOrder.title } : null,
   }));
 
+  // 4. Fetch assigned planned tasks for selection in dropdown
+  const assignedTasks = await prisma.workTask.findMany({
+    where: {
+      assignedToEmployeeId: employee.id,
+    },
+    include: {
+      workOrder: true,
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 100,
+  });
+
+  const formattedTasks = assignedTasks.map((task) => ({
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    scheduledDate: task.scheduledDate ? task.scheduledDate.toISOString() : null,
+    remunerationMethod: task.remunerationMethod,
+    workOrder: task.workOrder
+      ? {
+          id: task.workOrder.id,
+          title: task.workOrder.title,
+          workType: task.workOrder.workType,
+          clientId: task.workOrder.clientId,
+          clientName: task.workOrder.clientName || '',
+        }
+      : null,
+  }));
+
   return (
     <AppShell>
       <MyWorkEntriesManager
@@ -114,6 +144,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
         }}
         initialEntries={formattedEntries}
         prefilledTask={prefilledTask}
+        assignedTasks={formattedTasks}
       />
     </AppShell>
   );

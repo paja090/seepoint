@@ -8,7 +8,8 @@ type TaskPayload = {
   id: string;
   title: string;
   description: string | null;
-  scheduledDate: Date | null;
+  scheduledDate: string | null;
+  remunerationMethod: string;
   workOrder: {
     id: string;
     title: string;
@@ -46,6 +47,7 @@ type MyWorkEntriesManagerProps = {
   };
   initialEntries: EntryPayload[];
   prefilledTask: TaskPayload | null;
+  assignedTasks?: TaskPayload[];
 };
 
 const workTypeLabels: Record<string, string> = {
@@ -84,7 +86,7 @@ const statusClasses: Record<string, string> = {
   RETURNED: 'bg-red-100 text-red-800 border border-red-200 font-bold',
 };
 
-export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }: MyWorkEntriesManagerProps) {
+export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, assignedTasks }: MyWorkEntriesManagerProps) {
   const router = useRouter();
   const [entries, setEntries] = useState<EntryPayload[]>(initialEntries);
   const [editingEntry, setEditingEntry] = useState<EntryPayload | null>(null);
@@ -95,7 +97,10 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
   const [adHocTaskTitle, setAdHocTaskTitle] = useState('');
   const [workOrderId, setWorkOrderId] = useState('');
   const [workOrders, setWorkOrders] = useState<Array<{ id: string; title: string; clientName: string | null }>>([]);
-  const [workTaskId, setWorkTaskId] = useState(prefilledTask?.id || '');
+  
+  const defaultTaskId = prefilledTask?.id || (assignedTasks && assignedTasks.length > 0 ? assignedTasks[0].id : '');
+  const [workTaskId, setWorkTaskId] = useState(defaultTaskId);
+  
   const [workDate, setWorkDate] = useState(
     prefilledTask?.scheduledDate
       ? new Date(prefilledTask.scheduledDate).toISOString().slice(0, 10)
@@ -106,6 +111,19 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('hod');
   const [note, setNote] = useState('');
+
+  // Automatically update fields when a planned task is selected
+  useEffect(() => {
+    if (isAdHoc || !workTaskId) return;
+    const task = prefilledTask?.id === workTaskId ? prefilledTask : assignedTasks?.find((t) => t.id === workTaskId);
+    if (task) {
+      setWorkType(task.workOrder?.workType || 'INSTALLATION');
+      setRemunerationMethod(task.remunerationMethod);
+      if (task.scheduledDate) {
+        setWorkDate(new Date(task.scheduledDate).toISOString().slice(0, 10));
+      }
+    }
+  }, [workTaskId, isAdHoc, assignedTasks, prefilledTask]);
 
   // Load work orders for ad-hoc selection
   useEffect(() => {
@@ -289,7 +307,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
   };
 
   const resetForm = () => {
-    setWorkTaskId(prefilledTask?.id || '');
+    setWorkTaskId(prefilledTask?.id || (assignedTasks && assignedTasks.length > 0 ? assignedTasks[0].id : ''));
     setWorkDate(new Date().toISOString().slice(0, 10));
     setWorkType('INSTALLATION');
     setRemunerationMethod('HOURLY');
@@ -421,6 +439,8 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
                         if (e.target.checked) {
                           setWorkTaskId('');
                         } else {
+                          const initialId = prefilledTask?.id || (assignedTasks && assignedTasks.length > 0 ? assignedTasks[0].id : '');
+                          setWorkTaskId(initialId);
                           setAdHocTaskTitle('');
                           setWorkOrderId('');
                         }
@@ -437,18 +457,18 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
                     <label className="text-sm font-semibold">
                       Název provedené práce (úkolu) <span className="text-red-500">*</span>
                       <input
-                        className="input mt-1 w-full"
+                        className="input mt-1 w-full font-medium"
                         required
                         value={adHocTaskTitle}
                         onChange={(e) => setAdHocTaskTitle(e.target.value)}
-                        placeholder="např. Neplánovaná oprava osvětlení..."
+                        placeholder="např. Oprava osvětlení..."
                       />
                     </label>
 
                     <label className="text-sm font-semibold">
                       Přiřadit k zakázce (nepovinné)
                       <select
-                        className="input mt-1 w-full"
+                        className="input mt-1 w-full font-medium"
                         value={workOrderId}
                         onChange={(e) => setWorkOrderId(e.target.value)}
                       >
@@ -463,15 +483,21 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
                   </>
                 ) : (
                   <label className="text-sm font-semibold">
-                    ID Úkolu (WorkTask CUID) <span className="text-red-500">*</span>
-                    <input
-                      className="input mt-1 w-full"
+                    Vyberte plánovaný úkol <span className="text-red-500">*</span>
+                    <select
+                      className="input mt-1 w-full font-semibold"
                       required
                       value={workTaskId}
                       onChange={(e) => setWorkTaskId(e.target.value)}
-                      placeholder="Zadejte ID úkolu..."
                       disabled={!!prefilledTask}
-                    />
+                    >
+                      <option value="">-- Zvolte úkol ze svého plánu --</option>
+                      {assignedTasks?.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title} {t.scheduledDate ? `(${new Date(t.scheduledDate).toLocaleDateString('cs-CZ')})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 )}
               </>
@@ -481,19 +507,20 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
               Datum práce <span className="text-red-500">*</span>
               <input
                 type="date"
-                className="input mt-1 w-full"
+                className="input mt-1 w-full font-medium"
                 required
                 value={workDate}
                 onChange={(e) => setWorkDate(e.target.value)}
               />
             </label>
 
-            <label className="text-sm font-semibold">
-              Druh práce <span className="text-red-500">*</span>
+            <label className={`text-sm font-semibold ${!isAdHoc && !prefilledTask ? 'text-slate-500' : ''}`}>
+              Druh práce {!isAdHoc && !prefilledTask && <span className="text-xs font-normal text-slate-400">(určeno úkolem)</span>}
               <select
-                className="input mt-1 w-full"
+                className={`input mt-1 w-full font-medium ${!isAdHoc && !prefilledTask ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : ''}`}
                 value={workType}
                 onChange={(e) => setWorkType(e.target.value)}
+                disabled={!isAdHoc && !prefilledTask}
               >
                 {Object.entries(workTypeLabels).map(([val, label]) => (
                   <option key={val} value={val}>
@@ -503,12 +530,13 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
               </select>
             </label>
 
-            <label className="text-sm font-semibold">
-              Forma odměny <span className="text-red-500">*</span>
+            <label className={`text-sm font-semibold ${!isAdHoc && !prefilledTask ? 'text-slate-500' : ''}`}>
+              Forma odměny {!isAdHoc && !prefilledTask && <span className="text-xs font-normal text-slate-400">(určeno úkolem)</span>}
               <select
-                className="input mt-1 w-full"
+                className={`input mt-1 w-full font-medium ${!isAdHoc && !prefilledTask ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : ''}`}
                 value={remunerationMethod}
                 onChange={(e) => setRemunerationMethod(e.target.value)}
+                disabled={!isAdHoc && !prefilledTask}
               >
                 {Object.entries(rateTypeLabels).map(([val, label]) => (
                   <option key={val} value={val}>
@@ -518,26 +546,27 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
               </select>
             </label>
 
-            <label className="text-sm font-semibold">
+            <label className={`text-sm font-semibold ${remunerationMethod === 'FIXED' ? 'text-slate-500' : ''}`}>
               Množství <span className="text-red-500">*</span>
               <input
-                className="input mt-1 w-full"
+                className={`input mt-1 w-full font-medium ${remunerationMethod === 'FIXED' ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : ''}`}
                 required
-                value={quantity}
+                value={remunerationMethod === 'FIXED' ? '1' : quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder={remunerationMethod === 'HOURLY' ? 'např. 2:30 nebo 2.5' : 'např. 5'}
+                disabled={remunerationMethod === 'FIXED'}
               />
             </label>
 
-            <label className="text-sm font-semibold">
-              Jednotka <span className="text-red-500">*</span>
+            <label className="text-sm font-semibold text-slate-500">
+              Jednotka <span className="text-slate-400">(určeno formou odměny)</span>
               <input
-                className="input mt-1 w-full"
+                className="input mt-1 w-full bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed font-medium"
                 required
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="hod, ks, atd."
-                disabled={remunerationMethod === 'HOURLY'}
+                disabled
               />
             </label>
 
