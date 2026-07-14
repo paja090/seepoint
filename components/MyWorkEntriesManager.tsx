@@ -427,7 +427,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask }
                       }}
                     />
                     <label htmlFor="isAdHoc" className="text-sm font-bold text-slate-800 cursor-pointer select-none">
-                      Neplánovaná práce mimo plán (Ad-hoc)
+                      Neplánovaná práce mimo plán práce
                     </label>
                   </div>
                 )}
