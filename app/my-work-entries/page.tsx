@@ -53,7 +53,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
   if (taskId) {
     const task = await prisma.workTask.findFirst({
       where: { id: taskId, assignedToEmployeeId: employee.id },
-      include: { workOrder: true },
+      include: { workOrder: true, carrier: true },
     });
     if (task) {
       prefilledTask = {
@@ -62,6 +62,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
         description: task.description,
         scheduledDate: task.scheduledDate ? task.scheduledDate.toISOString() : null,
         remunerationMethod: task.remunerationMethod,
+        carrierType: task.carrier?.type || null,
         workOrder: task.workOrder
           ? {
               id: task.workOrder.id,
@@ -112,6 +113,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     },
     include: {
       workOrder: true,
+      carrier: true,
     },
     orderBy: { updatedAt: 'desc' },
     take: 100,
@@ -123,6 +125,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     description: task.description,
     scheduledDate: task.scheduledDate ? task.scheduledDate.toISOString() : null,
     remunerationMethod: task.remunerationMethod,
+    carrierType: task.carrier?.type || null,
     workOrder: task.workOrder
       ? {
           id: task.workOrder.id,

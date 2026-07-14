@@ -7,6 +7,7 @@ type CompanyRatePayload = {
   type: string;
   name: string;
   workType: string | null;
+  carrierType: string | null;
   amount: string;
   unit: string;
   validFrom: string;
@@ -21,6 +22,22 @@ const workTypeLabels: Record<string, string> = {
   CHECK: 'Kontrola',
   TRANSPORT: 'Převoz',
   OTHER: 'Jiná práce',
+};
+
+const carrierTypeLabels: Record<string, string> = {
+  BILLBOARD: 'Billboard',
+  BIGBOARD: 'Bigboard',
+  CITYLIGHT: 'CLV (Citylight)',
+  BANNER: 'Banner',
+  FACADE: 'Fasáda',
+  LED_SCREEN: 'LED obrazovka',
+  PROMO_BENCH: 'Lavička',
+  PROMO_HORIZON: 'Horizon',
+  CITY_POSTER: 'City Poster',
+  NAVIGATION: 'Navigace',
+  PROMO_TOWER: 'Tower',
+  PROMO_MINITOWER: 'Minitower',
+  OTHER: 'Jiné',
 };
 
 const rateTypeLabels: Record<string, string> = {
@@ -39,6 +56,7 @@ export function CompanyRatesSettings() {
   const [type, setType] = useState('HOURLY');
   const [name, setName] = useState('Základní firemní sazba');
   const [workType, setWorkType] = useState<string>('INSTALLATION');
+  const [carrierType, setCarrierType] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState('hod');
   const [validFrom, setValidFrom] = useState(new Date().toISOString().slice(0, 10));
@@ -81,6 +99,7 @@ export function CompanyRatesSettings() {
       type,
       name,
       workType: workType || null,
+      carrierType: carrierType || null,
       amount,
       unit,
       validFrom,
@@ -160,6 +179,7 @@ export function CompanyRatesSettings() {
     setType('HOURLY');
     setName('Základní firemní sazba');
     setWorkType('INSTALLATION');
+    setCarrierType('');
     setAmount('');
     setUnit('hod');
     setValidFrom(new Date().toISOString().slice(0, 10));
@@ -219,6 +239,22 @@ export function CompanyRatesSettings() {
           >
             <option value="">Jakýkoliv druh práce</option>
             {Object.entries(workTypeLabels).map(([val, label]) => (
+              <option key={val} value={val}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm font-semibold">
+          Typ nosiče / plochy
+          <select
+            className="input mt-1 w-full"
+            value={carrierType}
+            onChange={(e) => setCarrierType(e.target.value)}
+          >
+            <option value="">Jakýkoliv nosič / plocha</option>
+            {Object.entries(carrierTypeLabels).map(([val, label]) => (
               <option key={val} value={val}>
                 {label}
               </option>
@@ -295,6 +331,7 @@ export function CompanyRatesSettings() {
                 <th className="py-2 pr-3">Název</th>
                 <th className="py-2 pr-3">Typ</th>
                 <th className="py-2 pr-3">Druh práce</th>
+                <th className="py-2 pr-3">Typ nosiče</th>
                 <th className="py-2 pr-3">Sazba</th>
                 <th className="py-2 pr-3">Platnost od</th>
                 <th className="py-2 pr-3">Platnost do</th>
@@ -310,6 +347,9 @@ export function CompanyRatesSettings() {
                     <td className="py-3 pr-3 text-slate-600">{rateTypeLabels[rate.type] || rate.type}</td>
                     <td className="py-3 pr-3 text-slate-700">
                       {rate.workType ? workTypeLabels[rate.workType] : 'Jakýkoliv'}
+                    </td>
+                    <td className="py-3 pr-3 text-slate-700">
+                      {rate.carrierType ? (carrierTypeLabels[rate.carrierType] || rate.carrierType) : 'Jakýkoliv'}
                     </td>
                     <td className="py-3 pr-3 font-bold text-slate-900">
                       {Number(rate.amount).toLocaleString('cs-CZ')} CZK / {rate.unit}

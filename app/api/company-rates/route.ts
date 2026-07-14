@@ -3,17 +3,18 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { parseRateInput } from '@/lib/worker-rates';
 import { intervalsOverlap } from '@/lib/rate-intervals';
-import { Prisma, RateType, WorkType } from '@prisma/client';
+import { Prisma, RateType, WorkType, CarrierType } from '@prisma/client';
 
 async function assertNoCompanyRateConflict(
   tx: Prisma.TransactionClient,
-  candidate: { type: RateType; name: string; workType: WorkType | null; validFrom: Date; validTo: Date | null },
+  candidate: { type: RateType; name: string; workType: WorkType | null; carrierType: CarrierType | null; validFrom: Date; validTo: Date | null },
   excludeId?: string
 ) {
   const conflicts = await tx.companyRate.findMany({
     where: {
       type: candidate.type,
       workType: candidate.workType,
+      carrierType: candidate.carrierType,
       ...(candidate.type === 'HOURLY' ? {} : { name: { equals: candidate.name, mode: 'insensitive' } }),
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },

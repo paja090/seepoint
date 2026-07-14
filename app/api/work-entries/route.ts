@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { canAccess } from '@/lib/rbac';
 import { resolveWorkEntryRate } from '@/lib/work-entry-rates';
-import { Prisma, RateType, WorkType, WorkEntryStatus, RateSource } from '@prisma/client';
+import { Prisma, RateType, WorkType, WorkEntryStatus, RateSource, CarrierType } from '@prisma/client';
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -253,6 +253,17 @@ export async function POST(request: Request) {
       // 5. Rate Resolution
       let finalRate: Prisma.Decimal | null = null;
       let finalSource: RateSource | null = null;
+      let resolvedCarrierType: CarrierType | null = null;
+
+      if (targetWorkTaskId) {
+        const taskObj = await tx.workTask.findUnique({
+          where: { id: targetWorkTaskId },
+          include: { carrier: true },
+        });
+        if (taskObj?.carrier?.type) {
+          resolvedCarrierType = taskObj.carrier.type;
+        }
+      }
 
       const resolved = await resolveWorkEntryRate({
         employeeId,
@@ -260,6 +271,7 @@ export async function POST(request: Request) {
         workDate: dateObj,
         remunerationMethod: remunerationMethod as RateType,
         workOrderId: targetWorkOrderId,
+        carrierType: resolvedCarrierType,
       }, tx);
 
       if (manualRate !== undefined && manualRate !== null) {

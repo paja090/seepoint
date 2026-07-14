@@ -10,6 +10,7 @@ type TaskPayload = {
   description: string | null;
   scheduledDate: string | null;
   remunerationMethod: string;
+  carrierType: string | null;
   workOrder: {
     id: string;
     title: string;
@@ -168,8 +169,14 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
         if (isAdHoc && workOrderId) {
           url += `&workOrderId=${workOrderId}`;
         } else if (!isAdHoc && workTaskId) {
-          if (prefilledTask?.workOrder?.id) {
-            url += `&workOrderId=${prefilledTask.workOrder.id}`;
+          const task = prefilledTask?.id === workTaskId ? prefilledTask : assignedTasks?.find((t) => t.id === workTaskId);
+          if (task) {
+            if (task.workOrder?.id) {
+              url += `&workOrderId=${task.workOrder.id}`;
+            }
+            if (task.carrierType) {
+              url += `&carrierType=${task.carrierType}`;
+            }
           }
         }
         const res = await fetch(url);
@@ -193,7 +200,7 @@ export function MyWorkEntriesManager({ employee, initialEntries, prefilledTask, 
 
     const timer = setTimeout(fetchRate, 300);
     return () => clearTimeout(timer);
-  }, [showForm, workType, remunerationMethod, workDate, employee.id, isAdHoc, workOrderId, workTaskId, prefilledTask]);
+  }, [showForm, workType, remunerationMethod, workDate, employee.id, isAdHoc, workOrderId, workTaskId, prefilledTask, assignedTasks]);
 
   // Adjust unit default based on method
   useEffect(() => {
