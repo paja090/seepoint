@@ -95,7 +95,6 @@ export function OfferProposal({
         {variant === 'public' && token && (
           <OfferCta
             onApprove={() => setAction('approve')}
-            onReject={() => setAction('reject')}
             onRevision={() => setAction('revision')}
             onQuestion={() => setAction('question')}
           />
@@ -104,7 +103,7 @@ export function OfferProposal({
 
       {variant === 'public' && <PublicOfferFooter />}
 
-      <OfferActionDialog action={action} offerStatus={offer.status} onClose={() => setAction(null)} token={token} />
+      <OfferActionDialog action={action} offerStatus={offer.status} onClose={() => setAction(null)} onReject={() => setAction('reject')} token={token} />
 
       {copied && (
         <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg print:hidden">

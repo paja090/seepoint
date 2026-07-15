@@ -4,7 +4,8 @@ import type { OfferView } from '@/lib/offers/view-model';
 
 const stages = [
   { key: 'DRAFT', label: 'Koncepty', description: 'Rozpracované nabídky', tone: 'bg-amber-500' },
-  { key: 'SENT', label: 'Odeslané', description: 'Čekají na klienta', tone: 'bg-sky-500' },
+  { key: 'SENT', label: 'Odeslané', description: 'Zatím bez zobrazení', tone: 'bg-sky-500' },
+  { key: 'VIEWED', label: 'Zobrazené', description: 'Klient otevřel nabídku', tone: 'bg-indigo-500' },
   { key: 'ACCEPTED', label: 'Přijaté', description: 'Schválené klientem', tone: 'bg-emerald-500' },
   { key: 'REJECTED', label: 'Odmítnuté', description: 'Odmítnuté klientem', tone: 'bg-red-500' },
   { key: 'EXPIRED', label: 'Expirované', description: 'Po datu platnosti', tone: 'bg-slate-400' },
@@ -15,9 +16,13 @@ const money = (value: string | null) => new Intl.NumberFormat('cs-CZ', { style: 
 export function OfferPipeline({ offers }: { offers: OfferView[] }) {
   return <section className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
     <div className="border-b border-slate-100 p-5"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Sales pipeline</p><h2 className="mt-1 text-xl font-semibold text-slate-950">Nabídky podle stavu</h2></div>
-    <div className="overflow-x-auto p-4"><div className="grid min-w-[1000px] grid-cols-5 gap-4">
+    <div className="overflow-x-auto p-4"><div className="grid min-w-[1100px] grid-cols-6 gap-4">
       {stages.map((stage) => {
-        const rows = offers.filter((offer) => offer.status === stage.key);
+        const rows = offers.filter((offer) => stage.key === 'VIEWED'
+          ? offer.status === 'SENT' && offer.events?.some((event) => event.type === 'VIEWED')
+          : stage.key === 'SENT'
+            ? offer.status === 'SENT' && !offer.events?.some((event) => event.type === 'VIEWED')
+            : offer.status === stage.key);
         const total = rows.reduce((sum, offer) => sum + Number(offer.totalWithTax ?? 0), 0);
         return <div className="flex min-h-52 flex-col rounded-2xl border border-slate-200 bg-slate-50/70" key={stage.key}>
           <header className="border-b border-slate-200 p-3"><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${stage.tone}`} /><h3 className="text-sm font-semibold text-slate-950">{stage.label}</h3><span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-white px-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">{rows.length}</span></div><p className="mt-1 text-[11px] text-slate-500">{stage.description}</p><p className="mt-1.5 text-xs font-semibold text-slate-700">{money(total.toFixed(2))}</p></header>

@@ -62,7 +62,7 @@ export type ProposalOffer = {
   salesperson: ProposalSalesperson;
   heroImage: string;
   heroImageAlt: string;
-  stats: { carriers: number; mediaTypes: number; locations: number; days: number };
+  stats: { carriers: number; mediaTypes: number; locations: number; photos: number; total: number; days: number };
   mediaMix: ProposalMediaType[];
   carriers: ProposalCarrier[];
   pricing: Array<{ label: string; amount: number; emphasis?: 'discount' | 'subtotal' | 'total'; note?: string }>;
@@ -180,7 +180,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt SeePOINT', phone: '', email: offer.createdBy.email || '', avatar: undefined },
     heroImage: firstPhoto?.url || '/offer/hero-campaign.png',
     heroImageAlt: firstPhoto?.note || `Reklamní kampaň ${offer.campaignName}`,
-    stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, days: campaignDays },
+    stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
     pricing: [

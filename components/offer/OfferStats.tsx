@@ -1,4 +1,4 @@
-import { CalendarRange, Layers, MapPin, PanelsTopLeft } from 'lucide-react';
+import { CalendarRange, Camera, Layers, MapPin, PanelsTopLeft, ReceiptText } from 'lucide-react';
 import type { ProposalOffer } from '@/lib/offers/presentation';
 import { formatNumber } from '@/lib/offers/presentation';
 
@@ -7,12 +7,14 @@ export function OfferStats({ offer }: { offer: ProposalOffer }) {
     { icon: PanelsTopLeft, value: formatNumber(offer.stats.carriers), label: 'Vybraných nosičů' },
     { icon: Layers, value: formatNumber(offer.stats.mediaTypes), label: 'Typů médií' },
     { icon: MapPin, value: formatNumber(offer.stats.locations), label: 'Lokalit' },
+    { icon: Camera, value: formatNumber(offer.stats.photos), label: 'Fotografií ploch' },
+    { icon: ReceiptText, value: `${formatNumber(Math.round(offer.stats.total))} Kč`, label: 'Celkem s DPH' },
     { icon: CalendarRange, value: `${offer.stats.days} dní`, label: 'Délka kampaně' },
   ];
 
   return (
     <section aria-label="Statistiky kampaně">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map(({ icon: Icon, value, label }) => (
           <div
             key={label}

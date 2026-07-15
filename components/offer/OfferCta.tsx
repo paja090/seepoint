@@ -1,13 +1,11 @@
-import { CheckCircle2, HelpCircle, PencilLine, XCircle } from 'lucide-react';
+import { CheckCircle2, HelpCircle, PencilLine } from 'lucide-react';
 
 export function OfferCta({
   onApprove,
-  onReject,
   onRevision,
   onQuestion,
 }: {
   onApprove: () => void;
-  onReject: () => void;
   onRevision: () => void;
   onQuestion: () => void;
 }) {
@@ -46,14 +44,6 @@ export function OfferCta({
           >
             <HelpCircle aria-hidden size={18} />
             Mám dotaz
-          </button>
-          <button
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20"
-            onClick={onReject}
-            type="button"
-          >
-            <XCircle aria-hidden size={18} />
-            Odmítnout
           </button>
         </div>
       </div>
