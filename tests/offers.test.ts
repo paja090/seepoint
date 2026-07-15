@@ -10,6 +10,7 @@ import {
   normalizeOfferInput,
   OfferValidationError,
   planOfferConversion,
+  recoverFixedDiscount,
   serverOfferAuthor,
   stripPublicOfferSecrets,
 } from '../lib/offers/domain.ts';
@@ -31,6 +32,12 @@ test('finanční výpočty používají Decimal a bezpečné zaokrouhlení', () 
   assert.equal(calculated.totals.subtotal, '1750.45');
   assert.equal(calculated.totals.taxAmount, '367.59');
   assert.equal(calculated.totals.totalWithTax, '2118.04');
+});
+
+test('editace a duplikace obnoví pevnou část slevy z uložené celkové slevy', () => {
+  assert.equal(recoverFixedDiscount('2', '1000.25', '10', '250.05'), '50.00');
+  assert.equal(recoverFixedDiscount('1', '999.99', '0', '25.50'), '25.50');
+  assert.equal(recoverFixedDiscount('1', '100', '10', null), '0.00');
 });
 
 test('prázdná nabídka je zamítnuta', () => {

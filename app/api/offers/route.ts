@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(await listOffers(auth, new URL(request.url).searchParams));
   } catch (error) {
-    return offerErrorResponse(error);
+    return offerErrorResponse(error, 'Offers API list failed');
   }
 }
 

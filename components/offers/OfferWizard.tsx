@@ -39,7 +39,7 @@ export function OfferWizard({ clients: initialClients, surfaces, initialOffer }:
   const [taxRate, setTaxRate] = useState(initialOffer?.taxRate ?? '21');
   const [dateFrom, setDateFrom] = useState(initialOffer?.items[0]?.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(initialOffer?.items[0]?.dateTo ?? '');
-  const [items, setItems] = useState<DraftItem[]>(() => initialOffer?.items.map((item) => ({ surfaceId: item.surfaceId!, dateFrom: item.dateFrom ?? '', dateTo: item.dateTo ?? '', quantity: item.quantity, unit: item.unit, unitPrice: item.unitPrice ?? '0', discountPercent: item.discountPercent ?? '0', discountAmount: '0', note: item.note ?? '', groupLabel: item.groupLabel, customTitle: item.customTitle ?? '', clientDescription: item.clientDescription ?? '' })) ?? []);
+  const [items, setItems] = useState<DraftItem[]>(() => initialOffer?.items.map((item) => ({ surfaceId: item.surfaceId!, dateFrom: item.dateFrom ?? '', dateTo: item.dateTo ?? '', quantity: item.quantity, unit: item.unit, unitPrice: item.unitPrice ?? '0', discountPercent: item.discountPercent ?? '0', discountAmount: item.fixedDiscountAmount ?? '0', note: item.note ?? '', groupLabel: item.groupLabel, customTitle: item.customTitle ?? '', clientDescription: item.clientDescription ?? '' })) ?? []);
   const [query, setQuery] = useState('');
   const [city, setCity] = useState('');
   const [mediaType, setMediaType] = useState('');
@@ -92,7 +92,14 @@ export function OfferWizard({ clients: initialClients, surfaces, initialOffer }:
     const response = await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClient) });
     const data = await response.json() as OfferClientOption & { error?: string };
     if (!response.ok) { setMessage(data.error || 'Klienta se nepodařilo vytvořit.'); return; }
-    setClients((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name, 'cs'))); selectClient(data.id); setShowClientForm(false); setNewClient({ name: '', contactPerson: '', email: '', phone: '', companyId: '', note: '' });
+    setClients((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+    setClientId(data.id);
+    setContactPerson(data.contactPerson ?? '');
+    setContactEmail(data.email ?? '');
+    setContactPhone(data.phone ?? '');
+    touch();
+    setShowClientForm(false);
+    setNewClient({ name: '', contactPerson: '', email: '', phone: '', companyId: '', note: '' });
   }
 
   async function checkAvailability() {

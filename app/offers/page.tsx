@@ -16,11 +16,19 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const urlParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (typeof value === 'string' && value) urlParams.set(key, value); });
-  const [rows, clients, salespeople] = await Promise.all([
-    listOffers(user, urlParams) as Promise<OfferView[]>,
-    prisma.client.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-    user.role === 'SALES' ? [] : prisma.user.findMany({ where: { role: { in: ['ADMIN', 'MANAGER', 'SALES'] } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-  ]);
+  let rows: OfferView[];
+  let clients: Array<{ id: string; name: string }>;
+  let salespeople: Array<{ id: string; name: string }>;
+  try {
+    [rows, clients, salespeople] = await Promise.all([
+      listOffers(user, urlParams) as Promise<OfferView[]>,
+      prisma.client.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      user.role === 'SALES' ? [] : prisma.user.findMany({ where: { role: { in: ['ADMIN', 'MANAGER', 'SALES'] } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+    ]);
+  } catch (error) {
+    console.error('Offers page load failed', { userId: user.id, role: user.role }, error);
+    throw error;
+  }
   const counts = rows.reduce<Record<string, number>>((acc, offer) => ({ ...acc, [offer.status]: (acc[offer.status] ?? 0) + 1 }), {});
   return <AppShell>
     <PageHeader title="Obchodní nabídky" description="Kompletní životní cyklus reklamních nabídek od výběru klienta a ploch po veřejnou prezentaci a převod na obsazenost." actions={<Button href="/offers/new"><Plus size={17} /> Nová nabídka</Button>} />

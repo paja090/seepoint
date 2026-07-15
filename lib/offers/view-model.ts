@@ -9,6 +9,7 @@ export type OfferItemView = {
   unitPrice: string | null;
   discountPercent: string | null;
   discountAmount: string | null;
+  fixedDiscountAmount?: string;
   subtotal: string | null;
   note?: string | null;
   groupLabel: string;

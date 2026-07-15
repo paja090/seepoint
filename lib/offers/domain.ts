@@ -200,6 +200,23 @@ export function calculateOffer(items: OfferItemInput[], taxRateInput: string) {
   return { items: calculatedItems, totals };
 }
 
+export function recoverFixedDiscount(
+  quantityInput: string,
+  unitPriceInput: string,
+  discountPercentInput: string,
+  calculatedDiscountInput: string | null | undefined,
+) {
+  if (!calculatedDiscountInput) return '0.00';
+  const quantity = decimal(quantityInput, 'Množství');
+  const unitPrice = decimal(unitPriceInput, 'Jednotková cena');
+  const discountPercent = decimal(discountPercentInput, 'Sleva v procentech', '0');
+  const calculatedDiscount = money(decimal(calculatedDiscountInput, 'Sleva v částce'));
+  const base = money(quantity.mul(unitPrice));
+  const percentageDiscount = money(base.mul(discountPercent).div(100));
+  const fixedDiscount = money(calculatedDiscount.sub(percentageDiscount));
+  return moneyString(fixedDiscount.gt(0) ? fixedDiscount : new Prisma.Decimal(0));
+}
+
 const TRANSITIONS: Record<OfferStatusValue, OfferStatusValue[]> = {
   DRAFT: ['SENT', 'EXPIRED'],
   SENT: ['ACCEPTED', 'REJECTED', 'EXPIRED'],
