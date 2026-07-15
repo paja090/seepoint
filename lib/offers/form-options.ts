@@ -7,7 +7,7 @@ export async function getOfferFormOptions() {
     prisma.client.findMany({ where: { active: true }, select: { id: true, name: true, companyId: true, contactPerson: true, email: true, phone: true, note: true }, orderBy: { name: 'asc' } }),
     prisma.advertisingSurface.findMany({
       where: { carrier: { archivedAt: null } },
-      include: { currentClient: { select: { name: true } }, photos: { where: { isClientVisible: true }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] }, carrier: { include: { photos: { where: { isClientVisible: true }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] } } } },
+      include: { currentClient: { select: { name: true } }, photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] }, carrier: { include: { photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] } } } },
       orderBy: [{ carrier: { city: 'asc' } }, { carrier: { code: 'asc' } }, { name: 'asc' }],
       take: 2000,
     }),

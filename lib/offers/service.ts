@@ -48,8 +48,8 @@ const offerInclude = {
     include: {
       surface: {
         include: {
-          carrier: { include: { photos: { where: { isClientVisible: true }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] } } },
-          photos: { where: { isClientVisible: true }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+          carrier: { include: { photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] } } },
+          photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
         },
       },
     },
@@ -103,6 +103,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     },
     items: row.items.map((item) => {
       const photos = [...item.surface.photos, ...item.surface.carrier.photos]
+          .filter((photo) => !publicView || photo.isClientVisible)
         .filter((photo, index, all) => all.findIndex((candidate) => candidate.id === photo.id) === index)
         .map((photo) => ({
           id: photo.id,
