@@ -198,11 +198,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       { id: 'documentation', icon: 'camera', title: 'Doložení realizace', description: 'Dostupné fotografie konkrétních ploch jsou součástí klientského přehledu.' },
     ],
     references: [],
-    caseStudies: [
-      { id: 'retail-opening', title: 'Otevření nové prodejny', clientLabel: 'Demo retail', image: '/offer/media-city-poster.png', imageAlt: 'Ukázka městské City Poster kampaně', objective: 'Maximalizovat povědomí o otevření nové pobočky v regionu.', mediaTypes: ['City Poster', 'Citylight'], cities: ['Ostrava', 'Havířov'], surfaces: 24, result: 'Ilustrační návrh regionální kampaně' },
-      { id: 'regional-recruitment', title: 'Regionální náborová kampaň', clientLabel: 'Demo nábor', image: '/offer/media-tower.png', imageAlt: 'Ukázka regionální venkovní kampaně', objective: 'Oslovit uchazeče v dojezdové vzdálenosti zaměstnavatele.', mediaTypes: ['Promo Tower', 'Navigace'], cities: ['Ostrava', 'Frýdek-Místek'], surfaces: 18, result: 'Ilustrační mix ploch pro nábor' },
-      { id: 'seasonal-product', title: 'Sezónní produktová kampaň', clientLabel: 'Demo FMCG', image: '/offer/media-promo-bench.png', imageAlt: 'Ukázka sezónní produktové kampaně', objective: 'Podpořit prodej sezónního produktu v místech s vysokou návštěvností.', mediaTypes: ['Promo lavička', 'City Poster'], cities: ['Ostrava', 'Opava'], surfaces: 31, result: 'Ilustrační návrh sezónního zásahu' },
-    ],
+    caseStudies: [],
     conditions: [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },
       { id: 'availability', text: 'Realizace podléhá finálnímu potvrzení dostupnosti vybraných ploch.' },
