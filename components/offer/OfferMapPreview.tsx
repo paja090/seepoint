@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Maximize2, MapPin } from 'lucide-react';
 import type { ProposalOffer, ProposalMediaTypeKey } from '@/lib/offers/presentation';
 import { MEDIA_TYPE_META, TONE_CLASSES } from '@/lib/offers/presentation';
+import { OfferMap } from '@/components/offers/OfferMap';
 
 function Chip({
   active,
@@ -46,6 +47,10 @@ export function OfferMapPreview({ offer }: { offer: ProposalOffer }) {
   const visible = offer.carriers.filter(
     (c) => (cityFilter === null || c.city === cityFilter) && (mediaFilter === null || c.mediaType === mediaFilter),
   );
+  const located = visible.filter((carrier) => typeof carrier.latitude === 'number' && typeof carrier.longitude === 'number');
+  const osmUrl = located.length > 0
+    ? `https://www.openstreetmap.org/?mlat=${located[0].latitude}&mlon=${located[0].longitude}#map=13/${located[0].latitude}/${located[0].longitude}`
+    : 'https://www.openstreetmap.org/';
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
@@ -89,56 +94,17 @@ export function OfferMapPreview({ offer }: { offer: ProposalOffer }) {
         ))}
       </div>
 
-      {/* Map placeholder — structured so it can later be swapped for a real Google Maps / Leaflet component. */}
-      <div
-        className="relative mt-5 h-[340px] w-full overflow-hidden rounded-2xl border border-slate-200 sm:h-[420px]"
-        role="img"
-        aria-label="Zástupná mapa s rozmístěním reklamních nosičů"
-      >
-        <div className="absolute inset-0 bg-[#eef2f6]" />
-        {/* Subtle street-grid pattern (decorative placeholder, not real cartography) */}
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-70"
-          style={{
-            backgroundImage:
-              'linear-gradient(#dbe2ea 1px, transparent 1px), linear-gradient(90deg, #dbe2ea 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(115deg, transparent 46%, #d3dbe4 46%, #d3dbe4 54%, transparent 54%), linear-gradient(35deg, transparent 60%, #dfe6ee 60%, #dfe6ee 66%, transparent 66%)',
-          }}
-        />
-        <div aria-hidden className="absolute left-6 top-6 rounded-md bg-white/70 px-2 py-1 text-xs font-medium text-slate-400">
-          Ostrava a okolí
-        </div>
-
-        {visible.map((carrier) => {
-          const tone = TONE_CLASSES[MEDIA_TYPE_META[carrier.mediaType].tone];
-          return (
-            <div
-              className="group absolute -translate-x-1/2 -translate-y-full"
-              key={carrier.id}
-              style={{ left: `${carrier.mapX}%`, top: `${carrier.mapY}%` }}
-            >
-              <div
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-white shadow-md ring-4 ${tone.marker}`}
-                title={`${carrier.code} · ${carrier.city}`}
-              >
-                <MapPin aria-hidden size={15} />
-              </div>
-              <div className="pointer-events-none absolute left-1/2 top-full z-10 hidden -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-slate-900 px-2 py-1 text-xs font-medium text-white group-hover:block">
-                {carrier.code} · {carrier.locality}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <OfferMap
+        className="mt-5 h-[340px] sm:h-[420px]"
+        points={visible.map((carrier) => ({
+          id: carrier.id,
+          code: carrier.code,
+          city: carrier.city,
+          latitude: carrier.latitude,
+          longitude: carrier.longitude,
+          selected: true,
+        }))}
+      />
 
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -153,13 +119,15 @@ export function OfferMapPreview({ offer }: { offer: ProposalOffer }) {
             );
           })}
         </div>
-        <button
+        <a
           className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 print:hidden"
-          type="button"
+          href={osmUrl}
+          rel="noreferrer"
+          target="_blank"
         >
           <Maximize2 aria-hidden size={16} />
           Zobrazit detail mapy
-        </button>
+        </a>
       </div>
     </section>
   );

@@ -50,8 +50,8 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: action === 'approve' ? 'accept' : action === 'reject' ? 'reject' : 'question',
-          actorName: name,
-          actorEmail: email,
+          name,
+          email,
           message: action === 'revision' ? `Požadavek na úpravu: ${message}` : message,
           consent,
         }),

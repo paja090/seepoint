@@ -9,8 +9,8 @@ export function CaseStudies({ offer }: { offer: ProposalOffer }) {
       <SectionHeading
         id="cases-heading"
         eyebrow="Případové studie"
-        title="Ukázky realizovaných kampaní"
-        description="Ilustrační příklady toho, jak podobné kampaně stavíme a vyhodnocujeme."
+        title="Demo ukázky kampaní"
+        description="Ilustrační scénáře, jak lze podobnou kampaň poskládat. Nejde o výsledky aktuální nabídky."
       />
       <div className="grid gap-5 lg:grid-cols-3">
         {offer.caseStudies.map((study) => (

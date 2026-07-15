@@ -164,7 +164,6 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       subtotal: items.reduce((sum, item) => sum + number(item.subtotal), 0),
     };
   });
-  const firstPhoto = offer.items.find((item) => item.surface.photos[0])?.surface.photos[0];
   return {
     id: offer.id ?? 'public-offer',
     status: (['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'].includes(offer.status) ? offer.status : 'DRAFT') as ProposalStatus,
@@ -178,8 +177,8 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     cities,
     client: { id: offer.clientId ?? 'client', name: offer.client.name, logoLabel: offer.client.name.slice(0, 2).toUpperCase(), contactPerson: offer.contactPerson || offer.client.contactPerson || '', email: offer.contactEmail || offer.client.email || '' },
     salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt SeePOINT', phone: '', email: offer.createdBy.email || '', avatar: undefined },
-    heroImage: firstPhoto?.url || '/offer/hero-campaign.png',
-    heroImageAlt: firstPhoto?.note || `Reklamní kampaň ${offer.campaignName}`,
+    heroImage: '/offer/hero-city-poster.png',
+    heroImageAlt: `City Poster v městském prostředí pro kampaň ${offer.campaignName || offer.title}`,
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
@@ -191,16 +190,26 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' },
     ],
     benefits: [
-      { id: 'locations', icon: 'pin', title: 'Konkrétní lokality', description: 'Každá položka nabídky je navázaná na konkrétní reklamní plochu a termín.' },
-      { id: 'pricing', icon: 'brand', title: 'Transparentní kalkulace', description: 'Ceny, slevy a DPH jsou vypočtené serverově a uvedené v souhrnu.' },
-      { id: 'availability', icon: 'clock', title: 'Kontrola dostupnosti', description: 'Před realizací se ověřují kolize obsazenosti vybraných ploch.' },
+      { id: 'reach', icon: 'reach', title: 'Vysoký zásah', description: 'Kombinace vybraných médií oslovuje publikum napříč lokalitami kampaně.' },
+      { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Venkovní reklama komunikuje průběžně po celou dobu kampaně.' },
+      { id: 'locations', icon: 'pin', title: 'Pokrytí klíčových lokalit', description: 'Každá položka je navázaná na konkrétní plochu, město a termín.' },
+      { id: 'traffic', icon: 'traffic', title: 'Pěší i automobilová doprava', description: 'Mix ploch umožňuje zasáhnout chodce i řidiče v přirozeném pohybu.' },
+      { id: 'brand', icon: 'brand', title: 'Dlouhodobé působení značky', description: 'Opakovaný kontakt během kampaně pomáhá budovat zapamatovatelnost.' },
+      { id: 'documentation', icon: 'camera', title: 'Doložení realizace', description: 'Dostupné fotografie konkrétních ploch jsou součástí klientského přehledu.' },
     ],
     references: [],
-    caseStudies: [],
+    caseStudies: [
+      { id: 'retail-opening', title: 'Otevření nové prodejny', clientLabel: 'Demo retail', image: '/offer/media-city-poster.png', imageAlt: 'Ukázka městské City Poster kampaně', objective: 'Maximalizovat povědomí o otevření nové pobočky v regionu.', mediaTypes: ['City Poster', 'Citylight'], cities: ['Ostrava', 'Havířov'], surfaces: 24, result: 'Ilustrační návrh regionální kampaně' },
+      { id: 'regional-recruitment', title: 'Regionální náborová kampaň', clientLabel: 'Demo nábor', image: '/offer/media-tower.png', imageAlt: 'Ukázka regionální venkovní kampaně', objective: 'Oslovit uchazeče v dojezdové vzdálenosti zaměstnavatele.', mediaTypes: ['Promo Tower', 'Navigace'], cities: ['Ostrava', 'Frýdek-Místek'], surfaces: 18, result: 'Ilustrační mix ploch pro nábor' },
+      { id: 'seasonal-product', title: 'Sezónní produktová kampaň', clientLabel: 'Demo FMCG', image: '/offer/media-promo-bench.png', imageAlt: 'Ukázka sezónní produktové kampaně', objective: 'Podpořit prodej sezónního produktu v místech s vysokou návštěvností.', mediaTypes: ['Promo lavička', 'City Poster'], cities: ['Ostrava', 'Opava'], surfaces: 31, result: 'Ilustrační návrh sezónního zásahu' },
+    ],
     conditions: [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },
       { id: 'availability', text: 'Realizace podléhá finálnímu potvrzení dostupnosti vybraných ploch.' },
       { id: 'dates', text: `Navržený termín kampaně: ${asDate(from)} – ${asDate(to)}.` },
+      { id: 'pricing', text: 'Uvedené ceny, sleva a DPH odpovídají kalkulaci zobrazené v nabídce.' },
+      { id: 'production', text: 'Výroba a instalace jsou zahrnuté pouze u položek uvedených v kalkulaci.' },
+      { id: 'reservation', text: 'Finální rezervace ploch vznikne až po schválení nabídky a převodu na obsazenost.' },
     ],
   };
 }
