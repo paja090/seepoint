@@ -1,77 +1,96 @@
 # Audit a integrační mapa modulu obchodních nabídek
 
-Datum auditu: 13. 7. 2026
+Datum aktualizace: 16. 7. 2026
 
-Výchozí větev: `main` (`e5e95fb`)
+Zdroj vizuálu: `origin/advertising-proposal-experience` (`f497687`)
 
-Cílová větev: `feature/complete-offers-module`
+Cílová větev / PR: `feature/complete-offers-module`, PR #30
 
-## Nalezené frontendové větve
+Společný základ: `2276cc3985b08c448cfb4519dd8c9c7cf45a5aac`
 
-1. `origin/v0/seepoint-proposal-page-9bba62ca` obsahuje původní v0 prezentační návrh v `app/proposal/page.tsx`, komponentách `components/proposal/*`, `lib/proposal-data.ts` a statických obrázcích `public/proposal/*`.
-2. `origin/advertising-proposal-experience` je navazující a pro integraci důležitější větev. Obsahuje veřejnou nabídku `app/offer/[token]`, interní preview, `components/offer/*`, `CarrierPreviewCard`, `MediaMix`, `OfferProposal` a širší sales workflow včetně `CampaignWizard`, `CrmClientDetail`, planneru, pricingu, approval a conversion obrazovek.
+## Kontrolní brána
 
-Obě větve jsou od `main` oddělené a nebyly sloučené. Druhá větev používá vizuální jazyk původního v0 proposal, ale rozšiřuje jej o celý mockovaný obchodní proces.
+- PR #30 je otevřený draft a jeho pracovní větev je `feature/complete-offers-module`.
+- Pracovní větev byla před změnami čistá a sledovala `origin/feature/complete-offers-module`.
+- `origin/advertising-proposal-experience` existuje a obsahuje 5 unikátních commitů; PR #30 obsahuje 51 unikátních commitů proti společnému základu.
+- V0 mění 64 souborů, PR #30 238 souborů a 32 cest bylo změněno v obou větvích.
+- Přímý merge není bezpečný: 21 souborů má skutečný obsahový konflikt, hlavně `app/offers/page.tsx`, shell aplikace a `components/offer/*`.
+- PR #30 obsahuje novější Prisma model, migraci, API, RBAC, tokeny, audit, fotografie, serverové finanční výpočty a transakční převod. V těchto oblastech je zdrojem pravdy PR #30.
 
-## Stav v0 / advertising frontendů před integrací
+## Srovnávací tabulka
 
-- Prezentační části: hero, statistiky, media mix, karty nosičů, mapa, kalkulace, reference/case studies, kontakt, CTA a veřejný header/footer.
-- Mock data: veškerá data veřejné nabídky pocházela z `lib/mock-offer-data.ts`; CRM, pipeline, wizard, planner, pricing, approval, feedback, conversion a success obrazovky z `lib/mock-sales-data.ts`.
-- Nefunkční akce: wizard pouze měnil lokální React state a přecházel na další mock route; přijetí, zamítnutí, dotaz, pricing, schválení, převod, stažení PDF a sdílení nevolaly žádné produkční API.
-- Veřejná route používala čitelný mock token a neověřovala hash v databázi.
-- Reference a case studies byly smyšlená mock data a nesměly být publikovány jako skutečné reference SeePOINT.
+| Oblast | Větev v0 | PR #30 před tímto auditem | Rozhodnutí |
+| --- | --- | --- | --- |
+| Dashboard | Vizuálně hotový šestisloupcový pipeline dashboard nad mock daty | Stejná struktura napojená na skutečné nabídky a události | Zachovat PR #30, dolaďovat pouze odchylky vzhledu |
+| Průvodce | Sedm kroků, třísloupcový layout, lokální React state, nefunkční založení klienta | Sedm kroků a stejné rozložení, reálný klient, API, plochy a uložení | Zachovat backend PR #30 a doplnit chybějící UX v0 |
+| Výběr ploch | Mapa byla dekorativní, seznam i balíčky byly mock | Reálná OSM mapa a až 2 000 DB ploch, ale pouze textové hledání a bez stránkování | Doplnit filtry, stránkování, hromadný výběr, detail a lightbox |
+| Plánování | Hotový vizuál časové osy a kolizí nad mock daty | Stejný vizuál nad reálnými termíny a serverovými kolizemi | Zachovat PR #30 |
+| Cenotvorba | Vizuální řádky a lokální procentní sleva | Serverový Decimal výpočet, ale UI zpřístupňovalo jen cenu a procentní slevu | Zpřístupnit množství, jednotku, pevnou slevu, období, poznámky a hromadné ceny |
+| Schválení | Checklist a chybějící podklady byly mock | Checklist vzniká z klienta, GPS, fotografií, kalkulace a kolizí | Zachovat PR #30 |
+| Klientská nabídka | Vizuálně kompletní, ale s čitelným mock tokenem, falešnými statistikami a nefunkčními akcemi | Stejná komponentová struktura, hash token, veřejná API, skutečné fotografie a ceny | Zachovat PR #30; žádné falešné reference ani případové studie |
+| Přijetí / odmítnutí | Pouze dialog a lokální stav | Veřejná tokenová akce, expirace, stavový automat a audit | Zachovat PR #30 |
+| Převod na obsazenost | Prezentační progress obrazovka bez zápisu | Transakční, idempotentní převod s novou kontrolou kolizí | Zachovat PR #30; vizuální progress je volitelné další vylepšení |
+| Datový model | Mock TypeScript objekty | `Client`, `Offer`, `OfferItem`, `AdvertisingCarrier`, `AdvertisingSurface`, `Occupancy`, `OfferEvent` | Výhradně aktuální Prisma model PR #30 |
+| RBAC | Žádné reálné serverové oprávnění | ADMIN/MANAGER globálně, SALES vlastní/legacy, ostatní bez přístupu | Výhradně PR #30 |
+| PDF | Tlačítko bez produkčního rendereru | Tisková verze přes `window.print()` | Zachovat jednotný webový view model; samostatný PDF renderer až po bezpečném výběru runtime |
 
-## Stav backendu na main před integrací
+## Obrazovky a konfliktní soubory
 
-- Existovaly `Offer`, `OfferItem`, `Client`, `AdvertisingCarrier`, `AdvertisingSurface`, `Occupancy`, `Photo` a `User`.
-- `GET/POST /api/offers` uměly seznam a vytvoření nabídky, databázová funkce přijímala pole položek, ale UI posílalo vždy jedinou plochu.
-- Kontrola kolizí rozlišovala `OCCUPIED`, `RESERVED` a `NEGOTIATION`, ale vytvoření nabídky blokovalo jen `OCCUPIED`; `RESERVED` tedy představovalo chybu integrity.
-- Cena se sčítala přes JavaScript `number` a nebyl oddělen základ, sleva, DPH ani cena s DPH.
-- `createdBy` bylo přijímáno z klientského payloadu a `OfferBuilder` posílal natvrdo `SALES`.
-- Odkaz Detail vedl zpět na `/offers`; nebyly detail/edit/public routes ani řízené stavové akce a převod.
-- Sekční RBAC povoloval offers pouze `ADMIN` a `SALES`; očekávaný přístup `MANAGER` chyběl.
+V0 přidalo `/sales`, `/offer/[token]` a interní `/offers/preview`. Tyto paralelní routy se nepřenášejí. Jediný systém zůstává pod:
 
-## Integrační rozhodnutí
+- `/offers`
+- `/offers/new`
+- `/offers/[id]`
+- `/offers/[id]/edit`
+- `/offers/[id]/planner`
+- `/offers/[id]/pricing`
+- `/offers/[id]/approval`
+- `/offers/[id]/preview`
+- `/proposal/[token]`
 
-- Vizuální struktura `OfferProposal`, `CarrierPreviewCard`, `MediaMix`, `PricingSummary`, mapy a CTA byla znovu použita jako předloha pro sjednocené `ProposalView`, `OfferMap` a veřejné akce.
-- Mock datové kontrakty nebyly přeneseny. Nový view model vzniká pouze ze serverově načtených Prisma dat.
-- `CampaignWizard` byl funkčně převeden na jediný `OfferWizard` pod `/offers/new` a `/offers/[id]/edit`.
-- Starý `components/OfferBuilder.tsx` byl odstraněn; `/sales/new` ani další paralelní creator nebyl přenesen.
-- Mock reference a case studies nebyly převzaty. Veřejný výstup je připraven tak, aby se budoucí ověřené reference daly doplnit samostatným modelem.
-- PDF není součástí tohoto PR. Webový výstup a jeho serverový view model jsou jednotný budoucí zdroj pro PDF renderer.
+Vizuální komponenty `OfferProposal`, `OfferHero`, `OfferStats`, `OfferMapPreview`, `MediaMix`, `CarrierShowcase`, `PricingSummary`, `ConditionsSection`, `ContactCard`, CTA a veřejný header/footer byly zachovány a jejich datový kontrakt byl převeden z mocků na `ProposalOffer` vytvořený z `OfferView`.
 
-## API a oprávnění po integraci
+## Funkční stav po auditu
 
-- Interní seznam, vytvoření, detail, editace, bezpečná archivace, duplikace, odeslání, přijetí, zamítnutí, expirace, publikace tokenu, kontrola dostupnosti a převod na rezervaci/obsazenost.
-- Veřejné čtení a odpověď pouze přes dlouhý náhodný token, z něhož je v DB uložen SHA-256 hash.
-- Veřejné fotografie jsou dostupné pouze pokud patří k ploše nabídky a mají `isClientVisible`; Google Drive identifikátor ani token se klientovi neposílá.
-- `ADMIN` a `MANAGER` mohou spravovat všechny nabídky a provést převod. `SALES` spravuje vlastní nabídky a vidí i historické nabídky bez vlastníka. Ostatní role nemají sekční přístup.
+### Hotové v PR #30
 
-## Databázové rozhodnutí a rizika
+- vytvoření a editace konceptu,
+- založení klienta přes autorizované API,
+- individuální položky, slevy, DPH a serverový Decimal přepočet,
+- serverová kontrola `OCCUPIED`, `RESERVED` a `NEGOTIATION`,
+- odeslání, publikace/rotace tokenu, přijetí, odmítnutí, dotaz a expirace,
+- duplikace, archivace, historie událostí a audit,
+- transakční převod přijaté nabídky na obsazenost,
+- klientské fotografie pouze pro plochy nabídky a pouze s `isClientVisible`,
+- tisková verze klientské nabídky.
 
-- Migrace je aditivní: rozšiřuje `Offer`/`OfferItem`, přidává `OfferEvent`, vlastnické vazby na `User` a unikátní `(offerId, surfaceId)` pro idempotentní převod.
-- Žádná produkční migrace nebyla spuštěna a nebylo použito `prisma db push`.
-- Jediný záměrný `DROP` je změna existujícího FK constraintu `Offer_clientId_fkey` z `CASCADE` na `RESTRICT`; nedochází k `DROP TABLE`, `DROP COLUMN`, `DELETE` ani `TRUNCATE`.
-- Unikátní index `Occupancy(offerId, surfaceId)` může selhat, pokud produkční data už obsahují duplicitní převody stejné nabídky a plochy. Před deploy migrace je nutný read-only preflight dotaz na duplicity.
-- Historické nabídky zůstanou bez `createdByUserId`; aplikace je pro SALES považuje za legacy přístupné a nové zápisy už vždy používají session uživatele.
+### Doplněno při tomto auditu
 
-## Ruční testovací checklist
+- hledání ploch přes kód, název, ulici, adresu, město, lokalitu a popis,
+- filtry typu média, evidenčního stavu, výsledku kontroly dostupnosti a přítomnosti GPS,
+- stránkování velkého seznamu po 24 položkách,
+- hromadný výběr a odebrání právě zobrazených ploch,
+- synchronizovaný výběr ploch z reálné mapy,
+- detail plochy v modálním okně a zvětšení skutečné fotografie,
+- množství, jednotka, období, jednotková cena, procentní i pevná sleva, skupina a poznámky položky,
+- hromadné nastavení jednotkové ceny a slevy,
+- validované přechody mezi kroky,
+- debounced automatické uložení existujícího konceptu,
+- automatická serverová kontrola kolizí po změně výběru nebo termínu,
+- odstranění tří natvrdo zadaných demo případových studií a jejich falešných statistik.
 
-- [ ] ADMIN/MANAGER/SALES otevře `/offers`; WORKER/TECHNICIAN je odmítnut.
-- [ ] Wizard založí klienta, vybere více ploch a zachová data při průchodu sedmi kroky.
-- [ ] `OCCUPIED` a `RESERVED` zastaví uložení i odeslání.
-- [ ] `NEGOTIATION` vyžaduje checkbox a potvrzení se uloží.
-- [ ] Kalkulace se po uložení shoduje s preview včetně slev a DPH.
-- [ ] Koncept jde upravit a duplikovat; odeslanou nabídku už upravit nelze.
-- [ ] Stavové akce odmítnou nepovolené přechody.
-- [ ] Publikace zobrazí jednorázově nový veřejný URL; po rotaci starý URL přestane fungovat.
-- [ ] Veřejná nabídka neobsahuje interní poznámku, interní ID, rozpočet ani soukromý e-mail autora.
-- [ ] Veřejná fotografie bez `isClientVisible` vrátí 404.
-- [ ] Klient může ze stavu SENT přijmout, odmítnout nebo položit dotaz; opakovaný přechod je odmítnut.
-- [ ] ADMIN/MANAGER převede ACCEPTED nabídku atomicky na RESERVED/OCCUPIED; druhé spuštění je idempotentní.
-- [ ] Konflikt vzniklý těsně před převodem způsobí rollback bez částečných Occupancy záznamů.
-- [ ] Filtry listu fungují pro klienta, stav, obchodníka, média, cenu, vytvoření i platnost.
+## Bezpečnostní a databázová rozhodnutí
 
-## Samostatný PDF úkol
+- Nevzniká druhá databáze, Prisma client ani paralelní tabulka.
+- Mock data z `lib/mock-offer-data.ts` a `lib/mock-sales-data.ts` se nevracejí.
+- Klientský výstup nevystavuje interní poznámku, soukromé identifikátory ani neveřejné fotografie.
+- Klientský finanční náhled je pouze pomocný; před uložením je vždy znovu normalizován a přepočítán serverem přes Prisma `Decimal`.
+- Produkční migrace se v rámci této integrace nespouští a `prisma db push` se nepoužívá.
+- Migrace nabídek je aditivní. Před pozdějším deployem zůstává povinný read-only preflight duplicit `Occupancy(offerId, surfaceId)`.
 
-PDF má používat stejný veřejný serverový view model a stejná Decimal pole jako `ProposalView`. Navazující úkol musí vybrat renderer kompatibilní s Vercel runtime, vložit font s českými znaky, otestovat zalamování karet/mapy a nesmí kopírovat finanční logiku ani posílat data externí PDF službě.
+## Zbývající ověření
+
+- kompletní lint, typecheck, testy, Prisma validate/generate a produkční build,
+- vizuální kontrola desktop/mobil proti v0,
+- E2E vytvoření → plánování → ceny → kontrola → publikace → klientská reakce → převod nad izolovanými testovacími daty,
+- runtime ověření až po potvrzení, že dostupný `DATABASE_URL` patří bezpečnému testovacímu/preview prostředí.
