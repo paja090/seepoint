@@ -141,6 +141,17 @@ enum OfferEventType {
   ARCHIVED
 }
 
+enum OfferPriceCategory {
+  RENTAL
+  PRODUCTION
+  SERVICE
+}
+
+enum OfferPriceCalculation {
+  PER_SURFACE
+  FLAT
+}
+
 enum PhotoType {
   LOCATION
   CARRIER
@@ -254,16 +265,18 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  importBatches   ImportBatch[]
-  workAssignments WorkAssignment[]
-  employee        Employee?
-  sessions        UserSession[]
-  tokens          UserToken[]
-  auditActions    UserAuditLog[]   @relation("AuditActor")
-  auditTargets    UserAuditLog[]   @relation("AuditTarget")
-  createdOffers   Offer[]          @relation("OfferCreatedBy")
-  updatedOffers   Offer[]          @relation("OfferUpdatedBy")
-  offerEvents     OfferEvent[]
+  importBatches          ImportBatch[]
+  workAssignments        WorkAssignment[]
+  employee               Employee?
+  sessions               UserSession[]
+  tokens                 UserToken[]
+  auditActions           UserAuditLog[]   @relation("AuditActor")
+  auditTargets           UserAuditLog[]   @relation("AuditTarget")
+  createdOffers          Offer[]          @relation("OfferCreatedBy")
+  updatedOffers          Offer[]          @relation("OfferUpdatedBy")
+  offerEvents            OfferEvent[]
+  createdOfferPriceRules OfferPriceRule[] @relation("OfferPriceRuleCreatedBy")
+  updatedOfferPriceRules OfferPriceRule[] @relation("OfferPriceRuleUpdatedBy")
 }
 
 model UserSession {
@@ -736,17 +749,66 @@ model Offer {
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 
-  client        Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  createdByUser User?        @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  updatedByUser User?        @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdByUser User?         @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser User?         @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
   items         OfferItem[]
   occupancies   Occupancy[]
   events        OfferEvent[]
+  charges       OfferCharge[]
 
   @@index([clientId])
   @@index([status, validUntil])
   @@index([createdByUserId, createdAt])
   @@index([archivedAt])
+}
+
+model OfferPriceRule {
+  id              String                @id @default(cuid())
+  code            String                @unique
+  category        OfferPriceCategory
+  label           String
+  description     String?
+  mediaType       MediaType?
+  calculation     OfferPriceCalculation @default(PER_SURFACE)
+  unit            String
+  unitPrice       Decimal               @db.Decimal(12, 2)
+  defaultSelected Boolean               @default(false)
+  active          Boolean               @default(true)
+  sortOrder       Int                   @default(0)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  createdBy User?         @relation("OfferPriceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy User?         @relation("OfferPriceRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  charges   OfferCharge[]
+
+  @@index([category, active, sortOrder])
+  @@index([mediaType, active])
+}
+
+model OfferCharge {
+  id          String             @id @default(cuid())
+  offerId     String
+  priceRuleId String?
+  category    OfferPriceCategory
+  code        String
+  label       String
+  description String?
+  quantity    Decimal            @db.Decimal(10, 2)
+  unit        String
+  unitPrice   Decimal            @db.Decimal(12, 2)
+  subtotal    Decimal            @db.Decimal(12, 2)
+  sortOrder   Int                @default(0)
+  createdAt   DateTime           @default(now())
+
+  offer     Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  priceRule OfferPriceRule? @relation(fields: [priceRuleId], references: [id], onDelete: SetNull)
+
+  @@index([offerId, sortOrder])
+  @@index([priceRuleId])
 }
 
 model OfferItem {

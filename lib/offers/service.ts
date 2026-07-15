@@ -55,6 +55,7 @@ const offerInclude = {
     },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   },
+  charges: { orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] },
   events: { orderBy: { createdAt: 'desc' }, take: 100 },
   occupancies: { select: { id: true, surfaceId: true, status: true } },
 } satisfies Prisma.OfferInclude;
@@ -80,7 +81,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     clientMessage: row.clientMessage,
     currency: row.currency,
     taxRate: value(row.taxRate),
-    subtotalBeforeDiscount: row.items.reduce((sum, item) => sum.add((item.quantity ?? new Prisma.Decimal(1)).mul(item.unitPrice ?? item.price ?? 0)), new Prisma.Decimal(0)).toFixed(2),
+    subtotalBeforeDiscount: row.items.reduce((sum, item) => sum.add((item.quantity ?? new Prisma.Decimal(1)).mul(item.unitPrice ?? item.price ?? 0)), new Prisma.Decimal(0)).add(row.charges.reduce((sum, charge) => sum.add(charge.subtotal), new Prisma.Decimal(0))).toFixed(2),
     subtotal: value(row.subtotal ?? row.totalPrice),
     discountAmount: value(row.discountAmount),
     taxAmount: value(row.taxAmount),
@@ -153,6 +154,18 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         },
       };
     }),
+    charges: row.charges.map((charge) => ({
+      id: publicView ? undefined : charge.id,
+      priceRuleId: publicView ? undefined : charge.priceRuleId,
+      category: charge.category,
+      code: charge.code,
+      label: charge.label,
+      description: charge.description,
+      quantity: charge.quantity.toFixed(2),
+      unit: charge.unit,
+      unitPrice: charge.unitPrice.toFixed(2),
+      subtotal: charge.subtotal.toFixed(2),
+    })),
     events: publicView ? undefined : row.events.map((event) => ({
       id: event.id,
       type: event.type,
@@ -226,6 +239,46 @@ async function validateSurfaces(db: Db, input: OfferInput) {
   if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
 }
 
+async function resolveCharges(db: Db, input: Pick<OfferInput, 'chargeSelections'>) {
+  if (!input.chargeSelections.length) return [];
+  const ids = input.chargeSelections.map((selection) => selection.priceRuleId);
+  if (new Set(ids).size !== ids.length) throw new OfferValidationError('Každá doplňková sazba smí být v nabídce jen jednou.');
+  const rules = await db.offerPriceRule.findMany({ where: { id: { in: ids }, active: true } });
+  if (rules.length !== ids.length) throw new OfferValidationError('Některá zvolená sazba už není aktivní. Obnovte ceník.');
+  const byId = new Map(rules.map((rule) => [rule.id, rule]));
+  return input.chargeSelections.map((selection, index) => {
+    const rule = byId.get(selection.priceRuleId)!;
+    return {
+      priceRuleId: rule.id,
+      category: rule.category,
+      code: rule.code,
+      label: rule.label,
+      description: rule.description ?? undefined,
+      quantity: rule.calculation === 'FLAT' ? '1.00' : selection.quantity,
+      unit: rule.unit,
+      unitPrice: rule.unitPrice.toFixed(2),
+      sortOrder: index,
+    };
+  });
+}
+
+function existingItemInput(item: OfferRow['items'][number]) {
+  return {
+    surfaceId: item.surfaceId,
+    dateFrom: dateOnly(item.dateFrom)!,
+    dateTo: dateOnly(item.dateTo)!,
+    quantity: value(item.quantity) ?? '1',
+    unit: item.unit,
+    unitPrice: value(item.unitPrice ?? item.price) ?? '0',
+    discountPercent: value(item.discountPercent) ?? '0',
+    discountAmount: recoverFixedDiscount(value(item.quantity) ?? '1', value(item.unitPrice ?? item.price) ?? '0', value(item.discountPercent) ?? '0', value(item.discountAmount)),
+    note: item.note ?? undefined,
+    groupLabel: item.groupLabel ?? undefined,
+    customTitle: item.customTitle ?? undefined,
+    clientDescription: item.clientDescription ?? undefined,
+  };
+}
+
 function offerData(input: OfferInput, user: CurrentUser, calculated: ReturnType<typeof calculateOffer>) {
   return {
     clientId: input.clientId,
@@ -269,6 +322,21 @@ function itemData(item: ReturnType<typeof calculateOffer>['items'][number], inde
     customTitle: nullable(item.customTitle),
     clientDescription: nullable(item.clientDescription),
     sortOrder: index,
+  };
+}
+
+function chargeData(charge: ReturnType<typeof calculateOffer>['charges'][number]) {
+  return {
+    priceRuleId: charge.priceRuleId,
+    category: charge.category,
+    code: charge.code,
+    label: charge.label,
+    description: nullable(charge.description),
+    quantity: new Prisma.Decimal(charge.quantity),
+    unit: charge.unit,
+    unitPrice: new Prisma.Decimal(charge.unitPrice),
+    subtotal: new Prisma.Decimal(charge.subtotal),
+    sortOrder: charge.sortOrder,
   };
 }
 
@@ -322,10 +390,10 @@ export async function getOffer(user: CurrentUser, id: string) {
 export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draft' | 'send' = 'draft') {
   assertRole(user);
   const input = normalizeOfferInput(raw);
-  const calculated = calculateOffer(input.items, input.taxRate);
   if (intent === 'send' && input.validUntil && input.validUntil < new Date().toISOString().slice(0, 10)) throw new OfferValidationError('Nabídku po konci platnosti nelze odeslat. Změňte platnost konceptu.');
   return prisma.$transaction(async (tx) => {
     await validateSurfaces(tx, input);
+    const calculated = calculateOffer(input.items, input.taxRate, await resolveCharges(tx, input));
     const conflicts = await findConflicts(tx, input.items);
     assertConflicts(conflicts, input.confirmNegotiation);
     const now = new Date();
@@ -336,6 +404,7 @@ export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draf
         sentAt: intent === 'send' ? now : null,
         ...serverOfferAuthor(user),
         items: { create: calculated.items.map(itemData) },
+        charges: { create: calculated.charges.map(chargeData) },
         events: { create: [
           { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name },
           ...(intent === 'send' ? [{ type: 'SENT' as const, fromStatus: 'DRAFT' as const, toStatus: 'SENT' as const, actorUserId: user.id, actorName: user.name }] : []),
@@ -350,25 +419,63 @@ export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draf
 export async function updateOffer(user: CurrentUser, id: string, raw: unknown) {
   assertRole(user);
   const input = normalizeOfferInput(raw);
-  const calculated = calculateOffer(input.items, input.taxRate);
   return prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
     if (existing.status !== 'DRAFT') throw new OfferValidationError('Upravovat lze pouze koncept nabídky.', 'INVALID_STATUS_TRANSITION');
     await validateSurfaces(tx, input);
+    const calculated = calculateOffer(input.items, input.taxRate, await resolveCharges(tx, input));
     const conflicts = await findConflicts(tx, input.items);
     assertConflicts(conflicts, input.confirmNegotiation);
     await tx.offerItem.deleteMany({ where: { offerId: id } });
+    await tx.offerCharge.deleteMany({ where: { offerId: id } });
     const row = await tx.offer.update({
       where: { id },
       data: {
         ...offerData(input, user, calculated),
         items: { create: calculated.items.map(itemData) },
+        charges: { create: calculated.charges.map(chargeData) },
         events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } },
       },
       include: offerInclude,
     });
     return { offer: serializeOffer(row), conflicts };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+}
+
+export async function updateOfferPricing(user: CurrentUser, id: string, raw: unknown) {
+  assertRole(user);
+  const rows = raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).chargeSelections) ? (raw as { chargeSelections: unknown[] }).chargeSelections : [];
+  const chargeSelections = rows.map((row, index) => {
+    if (!row || typeof row !== 'object') throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
+    const input = row as Record<string, unknown>;
+    const priceRuleId = typeof input.priceRuleId === 'string' ? input.priceRuleId.trim() : '';
+    let quantity: Prisma.Decimal;
+    try { quantity = new Prisma.Decimal(String(input.quantity ?? '1').replace(',', '.')); } catch { throw new OfferValidationError(`Množství položky ${index + 1} není platné.`); }
+    if (!priceRuleId || quantity.lte(0)) throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
+    return { priceRuleId, quantity: quantity.toFixed(2) };
+  });
+  return prisma.$transaction(async (tx) => {
+    const existing = await getOfferRow(tx, id);
+    assertAccess(user, existing);
+    if (existing.status !== 'DRAFT') throw new OfferValidationError('Ceník lze upravovat pouze u konceptu.', 'INVALID_STATUS_TRANSITION');
+    const calculated = calculateOffer(existing.items.map(existingItemInput), value(existing.taxRate) ?? '21', await resolveCharges(tx, { chargeSelections }));
+    await tx.offerCharge.deleteMany({ where: { offerId: id } });
+    const row = await tx.offer.update({
+      where: { id },
+      data: {
+        subtotal: new Prisma.Decimal(calculated.totals.subtotal),
+        discountAmount: new Prisma.Decimal(calculated.totals.discountAmount),
+        taxAmount: new Prisma.Decimal(calculated.totals.taxAmount),
+        totalPrice: new Prisma.Decimal(calculated.totals.subtotal),
+        totalWithTax: new Prisma.Decimal(calculated.totals.totalWithTax),
+        updatedByUserId: user.id,
+        charges: { create: calculated.charges.map(chargeData) },
+        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, message: 'Upravena cenová kalkulace.' } },
+      },
+      include: offerInclude,
+    });
+    return serializeOffer(row);
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
@@ -399,6 +506,7 @@ export async function duplicateOffer(user: CurrentUser, id: string) {
     clientMessage: existing.clientMessage,
     taxRate: value(existing.taxRate),
     confirmNegotiation: Boolean(existing.negotiationApprovedAt),
+    chargeSelections: existing.charges.filter((charge) => charge.priceRuleId).map((charge) => ({ priceRuleId: charge.priceRuleId!, quantity: value(charge.quantity) })),
     items: existing.items.map((item) => ({
       surfaceId: item.surfaceId,
       dateFrom: dateOnly(item.dateFrom),

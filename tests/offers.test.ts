@@ -34,6 +34,18 @@ test('finanční výpočty používají Decimal a bezpečné zaokrouhlení', () 
   assert.equal(calculated.totals.totalWithTax, '2118.04');
 });
 
+test('ceník připočítá výrobu a služby serverově pomocí Decimal', () => {
+  const calculated = calculateOffer([item()], '21', [
+    { priceRuleId: 'print', category: 'PRODUCTION', code: 'PRINT', label: 'Tisk', quantity: '2', unit: 'ks', unitPrice: '174.50', sortOrder: 0 },
+    { priceRuleId: 'service', category: 'SERVICE', code: 'SERVICE', label: 'Servis', quantity: '1', unit: 'projekt', unitPrice: '2000', sortOrder: 1 },
+  ]);
+  assert.equal(calculated.charges[0].subtotal, '349.00');
+  assert.equal(calculated.charges[1].subtotal, '2000.00');
+  assert.equal(calculated.totals.subtotalBeforeDiscount, '4349.50');
+  assert.equal(calculated.totals.subtotal, '4099.45');
+  assert.equal(calculated.totals.totalWithTax, '4960.33');
+});
+
 test('editace a duplikace obnoví pevnou část slevy z uložené celkové slevy', () => {
   assert.equal(recoverFixedDiscount('2', '1000.25', '10', '250.05'), '50.00');
   assert.equal(recoverFixedDiscount('1', '999.99', '0', '25.50'), '25.50');
@@ -82,12 +94,14 @@ test('nepovolené statusové přechody jsou zamítnuty', () => {
 });
 
 test('duplikace vytváří nezávislý koncept se všemi položkami', () => {
-  const source = normalizeOfferInput(payload([item('surface-1'), item('surface-2')]));
+  const source = normalizeOfferInput({ ...payload([item('surface-1'), item('surface-2')]), chargeSelections: [{ priceRuleId: 'print', quantity: '2' }] });
   const copy = cloneOfferInput(source);
   copy.items[0].unitPrice = '999';
+  copy.chargeSelections[0].quantity = '5';
   assert.equal(copy.title, 'Kopie – Interní nabídka');
   assert.equal(copy.items.length, 2);
   assert.equal(source.items[0].unitPrice, '1000.25');
+  assert.equal(source.chargeSelections[0].quantity, '2.00');
 });
 
 test('veřejný token má dostatečnou entropii a v databázi se ukládá jen hash', () => {

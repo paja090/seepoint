@@ -36,6 +36,19 @@ export type OfferItemView = {
   };
 };
 
+export type OfferChargeView = {
+  id?: string;
+  priceRuleId?: string | null;
+  category: 'RENTAL' | 'PRODUCTION' | 'SERVICE';
+  code: string;
+  label: string;
+  description?: string | null;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+  subtotal: string;
+};
+
 export type OfferView = {
   id?: string;
   clientId?: string;
@@ -68,17 +81,31 @@ export type OfferView = {
   createdBy: { id?: string; name: string; email?: string };
   client: { name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null };
   items: OfferItemView[];
+  charges: OfferChargeView[];
   events?: Array<{ id: string; type: string; fromStatus?: string | null; toStatus?: string | null; actorName?: string | null; actorEmail?: string | null; message?: string | null; createdAt: string }>;
   converted?: boolean;
 };
 
 export type OfferClientOption = { id: string; name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };
+export type OfferPriceRuleOption = {
+  id: string;
+  code: string;
+  category: 'RENTAL' | 'PRODUCTION' | 'SERVICE';
+  label: string;
+  description?: string | null;
+  mediaType?: string | null;
+  calculation: 'PER_SURFACE' | 'FLAT';
+  unit: string;
+  unitPrice: string;
+  defaultSelected: boolean;
+};
 export type OfferSurfaceOption = {
   id: string;
   name: string;
   mediaType: string;
   status: string;
   price: string;
+  priceSource?: 'SURFACE' | 'CATALOG' | 'MISSING';
   currentClient?: string | null;
   photos: Array<{ id: string; url: string }>;
   carrier: { id: string; code: string; name: string; city: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };

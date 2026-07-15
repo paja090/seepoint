@@ -34,7 +34,22 @@ export type OfferInput = {
   taxRate: string;
   confirmNegotiation: boolean;
   items: OfferItemInput[];
+  chargeSelections: Array<{ priceRuleId: string; quantity: string }>;
 };
+
+export type OfferChargeInput = {
+  priceRuleId: string;
+  category: 'RENTAL' | 'PRODUCTION' | 'SERVICE';
+  code: string;
+  label: string;
+  description?: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+  sortOrder: number;
+};
+
+export type CalculatedCharge = OfferChargeInput & { subtotal: string };
 
 export type CalculatedItem = OfferItemInput & {
   baseAmount: string;
@@ -98,6 +113,7 @@ export function normalizeOfferInput(raw: unknown): OfferInput {
   if (!raw || typeof raw !== 'object') throw new OfferValidationError('Tělo požadavku není platné.');
   const input = raw as Record<string, unknown>;
   const rows = Array.isArray(input.items) ? input.items : [];
+  const rawCharges = Array.isArray(input.chargeSelections) ? input.chargeSelections : [];
   const items = rows.map((rawItem, index): OfferItemInput => {
     if (!rawItem || typeof rawItem !== 'object') throw new OfferValidationError(`Položka ${index + 1} není platná.`);
     const item = rawItem as Record<string, unknown>;
@@ -154,6 +170,14 @@ export function normalizeOfferInput(raw: unknown): OfferInput {
     taxRate: text(input.taxRate) || '21',
     confirmNegotiation: input.confirmNegotiation === true,
     items,
+    chargeSelections: rawCharges.map((rawCharge, index) => {
+      if (!rawCharge || typeof rawCharge !== 'object') throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
+      const charge = rawCharge as Record<string, unknown>;
+      const priceRuleId = text(charge.priceRuleId);
+      const quantity = decimal(charge.quantity, `Množství doplňkové položky ${index + 1}`, '1');
+      if (!priceRuleId || quantity.lte(0)) throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
+      return { priceRuleId, quantity: quantity.toFixed(2) };
+    }),
   };
 }
 
@@ -181,11 +205,19 @@ export function calculateItem(input: OfferItemInput): CalculatedItem {
   };
 }
 
-export function calculateOffer(items: OfferItemInput[], taxRateInput: string) {
+export function calculateOffer(items: OfferItemInput[], taxRateInput: string, charges: OfferChargeInput[] = []) {
   const taxRate = decimal(taxRateInput, 'Sazba DPH', '21');
   if (taxRate.lt(0) || taxRate.gt(100)) throw new OfferValidationError('Sazba DPH musí být v rozsahu 0–100 %.');
   const calculatedItems = items.map(calculateItem);
-  const beforeDiscount = calculatedItems.reduce((sum, item) => sum.add(item.baseAmount), new Prisma.Decimal(0));
+  const calculatedCharges = charges.map((charge): CalculatedCharge => {
+    const quantity = decimal(charge.quantity, 'Množství doplňkové položky');
+    const unitPrice = decimal(charge.unitPrice, 'Cena doplňkové položky');
+    if (quantity.lte(0) || unitPrice.lt(0)) throw new OfferValidationError('Doplňková položka má neplatnou cenu nebo množství.');
+    return { ...charge, quantity: quantity.toFixed(2), unitPrice: moneyString(unitPrice), subtotal: moneyString(quantity.mul(unitPrice)) };
+  });
+  const itemBase = calculatedItems.reduce((sum, item) => sum.add(item.baseAmount), new Prisma.Decimal(0));
+  const chargeBase = calculatedCharges.reduce((sum, charge) => sum.add(charge.subtotal), new Prisma.Decimal(0));
+  const beforeDiscount = itemBase.add(chargeBase);
   const discounts = calculatedItems.reduce((sum, item) => sum.add(item.calculatedDiscount), new Prisma.Decimal(0));
   const subtotal = money(beforeDiscount.sub(discounts));
   const taxAmount = money(subtotal.mul(taxRate).div(100));
@@ -197,7 +229,7 @@ export function calculateOffer(items: OfferItemInput[], taxRateInput: string) {
     taxAmount: moneyString(taxAmount),
     totalWithTax: moneyString(subtotal.add(taxAmount)),
   };
-  return { items: calculatedItems, totals };
+  return { items: calculatedItems, charges: calculatedCharges, totals };
 }
 
 export function recoverFixedDiscount(
@@ -258,7 +290,7 @@ export function planOfferConversion(offerSurfaceIds: string[], existingSurfaceId
 }
 
 export function cloneOfferInput(source: OfferInput): OfferInput {
-  return { ...source, title: `Kopie – ${source.title}`, items: source.items.map((item) => ({ ...item })) };
+  return { ...source, title: `Kopie – ${source.title}`, items: source.items.map((item) => ({ ...item })), chargeSelections: source.chargeSelections.map((charge) => ({ ...charge })) };
 }
 
 export function assertAvailability(conflicts: Array<{ severity: 'block' | 'warning' }>, confirmNegotiation: boolean) {
@@ -273,5 +305,6 @@ export function stripPublicOfferSecrets<T extends Record<string, unknown>>(sourc
   if (result.createdBy && typeof result.createdBy === 'object') { const author = { ...(result.createdBy as Record<string, unknown>) }; delete author.id; delete author.email; result.createdBy = author; }
   if (result.client && typeof result.client === 'object') { const client = { ...(result.client as Record<string, unknown>) }; for (const key of ['companyId', 'contactPerson', 'email', 'phone']) delete client[key]; result.client = client; }
   if (Array.isArray(result.items)) result.items = result.items.map((raw) => { const item = { ...(raw as Record<string, unknown>) }; delete item.id; delete item.surfaceId; delete item.note; if (item.surface && typeof item.surface === 'object') { const surface = { ...(item.surface as Record<string, unknown>) }; delete surface.status; item.surface = surface; } return item; });
+  if (Array.isArray(result.charges)) result.charges = result.charges.map((raw) => { const charge = { ...(raw as Record<string, unknown>) }; delete charge.id; delete charge.priceRuleId; return charge; });
   return result as T;
 }
