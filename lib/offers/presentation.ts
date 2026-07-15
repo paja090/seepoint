@@ -164,6 +164,11 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       subtotal: items.reduce((sum, item) => sum + number(item.subtotal), 0),
     };
   });
+  const rentalTotal = offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
+  const productionCharges = offer.charges.filter((charge) => charge.category === 'PRODUCTION');
+  const serviceCharges = offer.charges.filter((charge) => charge.category === 'SERVICE');
+  const productionTotal = productionCharges.reduce((sum, charge) => sum + number(charge.subtotal), 0);
+  const serviceTotal = serviceCharges.reduce((sum, charge) => sum + number(charge.subtotal), 0);
   return {
     id: offer.id ?? 'public-offer',
     status: (['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'].includes(offer.status) ? offer.status : 'DRAFT') as ProposalStatus,
@@ -183,7 +188,9 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     mediaMix,
     carriers,
     pricing: [
-      { label: 'Cena před slevou', amount: number(offer.subtotalBeforeDiscount) },
+      { label: 'Pronájem reklamních ploch', amount: rentalTotal, note: `${offer.items.length} vybraných ploch` },
+      ...(productionTotal ? [{ label: 'Výroba a instalace', amount: productionTotal, note: productionCharges.map((charge) => charge.label).join(', ') }] : []),
+      ...(serviceTotal ? [{ label: 'Služby', amount: serviceTotal, note: serviceCharges.map((charge) => charge.label).join(', ') }] : []),
       { label: 'Sleva', amount: -number(offer.discountAmount), emphasis: 'discount' },
       { label: 'Cena bez DPH', amount: number(offer.subtotal), emphasis: 'subtotal' },
       { label: `DPH ${offer.taxRate ?? 0} %`, amount: number(offer.taxAmount) },

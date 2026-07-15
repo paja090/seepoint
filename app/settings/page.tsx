@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { CompanyRatesSettings } from '@/components/CompanyRatesSettings';
+import { OfferPriceCatalogSettings } from '@/components/offers/OfferPriceCatalogSettings';
 
 export default async function Settings() {
   const user = await requirePageAccess('settings');
@@ -15,6 +16,7 @@ export default async function Settings() {
         <p>Fotky: lokálně v <code>public/uploads</code>, připraveno pro výměnu za S3/GCS storage adapter.</p>
       </div>
 
+      {isAdmin && <OfferPriceCatalogSettings />}
       {isAdmin && <CompanyRatesSettings />}
     </AppShell>
   );

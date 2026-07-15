@@ -169,6 +169,7 @@ export function OfferSurfaceBrowser({
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">{surface.carrier.city}, {surface.carrier.locality || surface.carrier.street || 'lokalita neuvedena'}</span>
                     <span className="mt-2 flex justify-between text-xs"><span>{mediaLabel(surface.mediaType)}</span><b>{money(surface.price)}</b></span>
+                    <span className={`mt-1 block text-[10px] font-medium ${surface.priceSource === 'MISSING' ? 'text-amber-600' : 'text-slate-400'}`}>{surface.priceSource === 'CATALOG' ? 'Automatická cena z ceníku' : surface.priceSource === 'SURFACE' ? 'Individuální cena plochy' : 'Cena zatím není nastavena'}</span>
                   </span>
                 </button>
                 <button className={`m-3 mt-0 inline-flex w-[calc(100%-1.5rem)] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${selected ? 'bg-slate-950 text-white' : 'border border-slate-200 text-slate-700'}`} onClick={() => onToggle(surface)} type="button">
@@ -202,7 +203,7 @@ export function OfferSurfaceBrowser({
               </button>
             ) : <div className="grid h-72 place-items-center bg-slate-100 text-slate-400"><ImageIcon size={36} /></div>}
             <div className="grid gap-4 p-5 sm:grid-cols-2">
-              <dl className="space-y-2 text-sm"><div><dt className="text-slate-500">Typ média</dt><dd className="font-semibold">{mediaLabel(active.mediaType)}</dd></div><div><dt className="text-slate-500">Evidenční stav</dt><dd className="font-semibold">{active.status}</dd></div><div><dt className="text-slate-500">Cena</dt><dd className="font-semibold">{money(active.price)}</dd></div></dl>
+              <dl className="space-y-2 text-sm"><div><dt className="text-slate-500">Typ média</dt><dd className="font-semibold">{mediaLabel(active.mediaType)}</dd></div><div><dt className="text-slate-500">Evidenční stav</dt><dd className="font-semibold">{active.status}</dd></div><div><dt className="text-slate-500">Cena</dt><dd className="font-semibold">{money(active.price)}</dd><dd className="text-xs text-slate-400">{active.priceSource === 'CATALOG' ? 'Načteno z ceníku podle média' : active.priceSource === 'SURFACE' ? 'Individuální cena této plochy' : 'Doplňte cenu v ceníku'}</dd></div></dl>
               <div><p className="text-sm text-slate-500">Popis</p><p className="mt-1 text-sm leading-6 text-slate-700">{active.carrier.description || 'Popis plochy není vyplněný.'}</p>{active.carrier.latitude != null && active.carrier.longitude != null && <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-slate-500"><MapPin size={14} />{active.carrier.latitude}, {active.carrier.longitude}</p>}</div>
               <button className={`sm:col-span-2 rounded-xl px-4 py-3 text-sm font-semibold ${selectedIds.has(active.id) ? 'border border-slate-300 text-slate-700' : 'bg-slate-950 text-white'}`} onClick={() => onToggle(active)} type="button">{selectedIds.has(active.id) ? 'Odebrat z nabídky' : 'Přidat do nabídky'}</button>
             </div>
