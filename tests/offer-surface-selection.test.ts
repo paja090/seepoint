@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { filterOfferSurfaces, paginateOfferSurfaces } from '../lib/offers/surface-selection.ts';
+import { filterOfferSurfaces, isOfferSurfaceInBounds, paginateOfferSurfaces } from '../lib/offers/surface-selection.ts';
 import type { OfferSurfaceOption } from '../lib/offers/view-model.ts';
 
 function surface(id: string, overrides: Partial<OfferSurfaceOption> = {}): OfferSurfaceOption {
@@ -54,4 +54,11 @@ test('stránkuje velký seznam a bezpečně omezí číslo stránky', () => {
   assert.equal(result.currentPage, 3);
   assert.equal(result.rows.length, 7);
   assert.equal(paginateOfferSurfaces(rows, 99, 24).currentPage, 3);
+});
+
+test('omezuje GPS plochy podle aktuálního výřezu mapy', () => {
+  const bounds = { north: 50, south: 49, east: 19, west: 18 };
+  assert.equal(isOfferSurfaceInBounds(surface('01'), bounds), true);
+  assert.equal(isOfferSurfaceInBounds(surface('02', { carrier: { ...surface('02').carrier, latitude: 48, longitude: 17 } }), bounds), false);
+  assert.equal(isOfferSurfaceInBounds(surface('03', { carrier: { ...surface('03').carrier, latitude: null } }), bounds), false);
 });

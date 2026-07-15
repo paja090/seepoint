@@ -4,9 +4,9 @@ import Image from 'next/image';
 import { Check, ChevronLeft, ChevronRight, Expand, ImageIcon, ListChecks, MapPin, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { MEDIA_TYPE_META, type ProposalMediaTypeKey } from '@/lib/offers/presentation';
-import { filterOfferSurfaces, paginateOfferSurfaces, type SurfaceAvailabilityFilter } from '@/lib/offers/surface-selection';
+import { filterOfferSurfaces, isOfferSurfaceInBounds, paginateOfferSurfaces, type SurfaceAvailabilityFilter } from '@/lib/offers/surface-selection';
 import type { OfferSurfaceOption } from '@/lib/offers/view-model';
-import { OfferMap } from './OfferMap';
+import { OfferMap, type OfferMapBounds } from './OfferMap';
 
 const PAGE_SIZE = 24;
 
@@ -44,25 +44,28 @@ export function OfferSurfaceBrowser({
   const [status, setStatus] = useState('');
   const [availability, setAvailability] = useState<SurfaceAvailabilityFilter>('all');
   const [gpsOnly, setGpsOnly] = useState(false);
+  const [viewportOnly, setViewportOnly] = useState(false);
+  const [mapBounds, setMapBounds] = useState<OfferMapBounds | null>(null);
   const [page, setPage] = useState(1);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const conflictMap = useMemo(() => new Map(conflicts.map((conflict) => [conflict.surfaceId, conflict.severity])), [conflicts]);
 
-  const filtered = useMemo(() => filterOfferSurfaces(surfaces, { query, mediaType, status, availability, gpsOnly }, conflictMap), [availability, conflictMap, gpsOnly, mediaType, query, status, surfaces]);
+  const baseFiltered = useMemo(() => filterOfferSurfaces(surfaces, { query, mediaType, status, availability, gpsOnly }, conflictMap), [availability, conflictMap, gpsOnly, mediaType, query, status, surfaces]);
+  const filtered = useMemo(() => !viewportOnly || !mapBounds ? baseFiltered : baseFiltered.filter((surface) => isOfferSurfaceInBounds(surface, mapBounds)), [baseFiltered, mapBounds, viewportOnly]);
   const { currentPage, pageCount, rows: visible } = paginateOfferSurfaces(filtered, page, PAGE_SIZE);
   const active = surfaces.find((surface) => surface.id === activeId) ?? null;
   const visibleAllSelected = visible.length > 0 && visible.every((surface) => selectedIds.has(surface.id));
   const mediaTypes = useMemo(() => [...new Set(surfaces.map((surface) => surface.mediaType))].sort(), [surfaces]);
   const statuses = useMemo(() => [...new Set(surfaces.map((surface) => surface.status))].sort(), [surfaces]);
-  const mapPoints = useMemo(() => filtered.map((surface) => ({
+  const mapPoints = useMemo(() => baseFiltered.map((surface) => ({
     id: surface.id,
     code: surface.carrier.code,
     city: surface.carrier.city,
     latitude: surface.carrier.latitude,
     longitude: surface.carrier.longitude,
     selected: selectedIds.has(surface.id),
-  })), [filtered, selectedIds]);
+  })), [baseFiltered, selectedIds]);
 
   function resetPage() {
     setPage(1);
@@ -117,6 +120,11 @@ export function OfferSurfaceBrowser({
         </label>
       </div>
 
+      {mode === 'map' && <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700">
+        <input checked={viewportOnly} disabled={!mapBounds} onChange={(event) => { setViewportOnly(event.target.checked); resetPage(); }} type="checkbox" />
+        Pracovat jen s plochami v aktuálním výřezu mapy
+      </label>}
+
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-sm">
         <span className="text-slate-600">Nalezeno <b className="text-slate-950">{filtered.length}</b> ploch · vybráno <b className="text-slate-950">{selectedIds.size}</b></span>
         <button
@@ -137,6 +145,7 @@ export function OfferSurfaceBrowser({
       ) : mode === 'map' ? (
         <OfferMap
           className="h-[480px]"
+          onBoundsChange={setMapBounds}
           onPointClick={setActiveId}
           points={mapPoints}
         />

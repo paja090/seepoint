@@ -9,6 +9,7 @@ export type SurfaceFilters = {
   availability: SurfaceAvailabilityFilter;
   gpsOnly: boolean;
 };
+export type SurfaceMapBounds = { north: number; south: number; east: number; west: number };
 
 export function filterOfferSurfaces(
   surfaces: OfferSurfaceOption[],
@@ -47,4 +48,14 @@ export function paginateOfferSurfaces(surfaces: OfferSurfaceOption[], page: numb
     pageCount,
     rows: surfaces.slice((currentPage - 1) * pageSize, currentPage * pageSize),
   };
+}
+
+export function isOfferSurfaceInBounds(surface: OfferSurfaceOption, bounds: SurfaceMapBounds) {
+  const { latitude, longitude } = surface.carrier;
+  return latitude != null
+    && longitude != null
+    && latitude <= bounds.north
+    && latitude >= bounds.south
+    && longitude <= bounds.east
+    && longitude >= bounds.west;
 }
