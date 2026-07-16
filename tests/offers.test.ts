@@ -125,6 +125,16 @@ test('veřejný view model skryje interní ID, poznámku, rozpočet a e-mail aut
   assert.equal(JSON.stringify(publicJson).includes('TAJNÁ POZNÁMKA'), false);
 });
 
+test('veřejná navigace a Galerie venku neodhalí interní ID ani poznámky', () => {
+  const publicJson = stripPublicOfferSecrets({ navigation: { targetName: 'Cíl', points: [{ id: 'point-secret', carrierId: 'carrier-secret', internalNote: 'TAJNÁ NAVIGACE', status: 'PLANNED', clientNote: 'Viditelné klientovi' }] }, cityGallery: { projectId: 'project-secret', concept: 'Veřejný koncept' } });
+  const serialized = JSON.stringify(publicJson);
+  assert.equal(serialized.includes('point-secret'), false);
+  assert.equal(serialized.includes('carrier-secret'), false);
+  assert.equal(serialized.includes('TAJNÁ NAVIGACE'), false);
+  assert.equal(serialized.includes('project-secret'), false);
+  assert.equal(serialized.includes('Viditelné klientovi'), true);
+});
+
 test('převod je idempotentní a částečný stav se zastaví před zápisy', () => {
   assert.equal(planOfferConversion(['a', 'b'], []), 'create');
   assert.equal(planOfferConversion(['a', 'b'], ['b', 'a']), 'idempotent');

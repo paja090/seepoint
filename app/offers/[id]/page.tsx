@@ -42,12 +42,12 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
     throw error;
   }
 
-  const checks = [
-    { label: 'Klient a kontaktní osoba', complete: Boolean(offer.client.name && offer.contactPerson && offer.contactEmail) },
-    { label: 'Vybrané reklamní plochy', complete: offer.items.length > 0 },
-    { label: 'Termíny kampaně', complete: offer.items.length > 0 && offer.items.every((item) => item.dateFrom && item.dateTo) },
-    { label: 'Veřejná prezentace', complete: Boolean(offer.hasPublicLink) },
-  ];
+  const domainChecks = offer.offerType === 'NAVIGATION'
+    ? [{ label: 'Cíl a GPS navigace', complete: Boolean(offer.navigation?.targetName) }, { label: 'Naplánované navigační body', complete: Boolean(offer.navigation?.points.length) }]
+    : offer.offerType === 'CITY_GALLERY'
+      ? [{ label: 'Koncept projektu', complete: Boolean(offer.cityGallery?.concept) }, { label: 'Lokalita nebo zadání prostoru', complete: Boolean(offer.cityGallery?.locationBrief) }]
+      : [{ label: 'Vybrané reklamní plochy', complete: offer.items.length > 0 }, { label: 'Termíny kampaně', complete: offer.items.length > 0 && offer.items.every((item) => item.dateFrom && item.dateTo) }];
+  const checks = [{ label: 'Klient a kontaktní osoba', complete: Boolean(offer.client.name && offer.contactPerson && offer.contactEmail) }, ...domainChecks, { label: 'Veřejná prezentace', complete: Boolean(offer.hasPublicLink) }];
 
   return (
     <AppShell>

@@ -65,10 +65,10 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
       <div className="space-y-3 p-5">
         {status === 'DRAFT' && (
           <>
-            {offerType !== 'CITY_GALLERY' && <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : `/offers/${offerId}/edit`}>
+            <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : offerType === 'CITY_GALLERY' ? `/offers/${offerId}/city-gallery/edit` : `/offers/${offerId}/edit`}>
               <FilePenLine aria-hidden="true" size={17} />
               Upravit návrh
-            </a>}
+            </a>
             <button className={primaryButton} disabled={disabled} onClick={() => void action('send')} type="button">
               <Send aria-hidden="true" size={17} />
               Odeslat klientovi

@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { OfferPlanner } from '@/components/offers/OfferPlanner';
 import { PageHeader } from '@/components/ui';
@@ -14,6 +14,7 @@ export default async function OfferPlannerPage({ params }: { params: Promise<{ i
   const user = await requirePageAccess('offers');
   try {
     const offer = await getOffer(user, (await params).id) as OfferView;
+    if (offer.offerType && offer.offerType !== 'STANDARD_MEDIA') redirect(`/offers/${offer.id}`);
     const availability = await checkOfferAvailability(user, offerAvailabilityInput(offer));
     return <AppShell><PageHeader description={`${offer.campaignName} · ${offer.client.name}`} title="Plánovač kampaně" /><OfferPlanner conflicts={availability.conflicts} offer={offer} /></AppShell>;
   } catch (error) {

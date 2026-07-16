@@ -111,6 +111,8 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   const to = toValues.sort().at(-1) ?? null;
   const campaignDays = from && to ? Math.max(1, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1) : 0;
   const cities = [...new Set(offer.items.map((item) => item.surface.carrier.city).filter(Boolean))];
+  if (offer.offerType === 'NAVIGATION' && offer.navigation?.targetName) cities.push(offer.navigation.targetName);
+  if (offer.offerType === 'CITY_GALLERY' && offer.cityGallery?.projectTitle) cities.push(offer.cityGallery.projectTitle);
   const carriers: ProposalCarrier[] = offer.items.map((item, index) => {
     const key = mediaKey(item.surface.mediaType);
     const meta = MEDIA_TYPE_META[key];
@@ -168,6 +170,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     };
   });
   if (offer.offerType === 'NAVIGATION' && offer.navigation) mediaMix.push({ key: 'NAVIGATION_SIGN', name: 'Navigace', description: `Plán navigačních bodů k cíli ${offer.navigation.targetName}.`, image: MEDIA_TYPE_META.NAVIGATION_SIGN.image, imageAlt: 'Plánované navigační body', tone: 'orange', surfaceCount: offer.navigation.points.length, locationCount: offer.navigation.points.length, subtotal: number(offer.subtotal) });
+  if (offer.offerType === 'CITY_GALLERY') mediaMix.push({ key: 'OTHER', name: 'Galerie venku', description: offer.cityGallery?.concept || 'Koncept venkovní galerie připravený podle zadání klienta.', image: MEDIA_TYPE_META.OTHER.image, imageAlt: 'Koncept Galerie venku', tone: 'purple', surfaceCount: 1, locationCount: offer.cityGallery?.locationBrief ? 1 : 0, subtotal: number(offer.subtotal) });
   const rentalTotal = offer.offerType === 'NAVIGATION' ? number(offer.subtotal) : offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
   const productionCharges = offer.charges.filter((charge) => charge.category === 'PRODUCTION');
   const serviceCharges = offer.charges.filter((charge) => charge.category === 'SERVICE');
@@ -186,13 +189,13 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     cities,
     client: { id: offer.clientId ?? 'client', name: offer.client.name, logoLabel: offer.client.name.slice(0, 2).toUpperCase(), contactPerson: offer.contactPerson || offer.client.contactPerson || '', email: offer.contactEmail || offer.client.email || '' },
     salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt SeePOINT', phone: '', email: offer.createdBy.email || '', avatar: undefined },
-    heroImage: '/offer/hero-city-poster.png',
+    heroImage: offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png',
     heroImageAlt: `City Poster v městském prostředí pro kampaň ${offer.campaignName || offer.title}`,
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
     pricing: [
-      { label: offer.offerType === 'NAVIGATION' ? 'Navigační body, výroba a montáž' : 'Pronájem reklamních ploch', amount: rentalTotal, note: offer.offerType === 'NAVIGATION' ? `${offer.navigation?.points.length ?? 0} plánovaných bodů` : `${offer.items.length} vybraných ploch` },
+      { label: offer.offerType === 'NAVIGATION' ? 'Navigační body, výroba a montáž' : offer.offerType === 'CITY_GALLERY' ? 'Projekt Galerie venku' : 'Pronájem reklamních ploch', amount: offer.offerType === 'CITY_GALLERY' ? number(offer.subtotal) : rentalTotal, note: offer.offerType === 'NAVIGATION' ? `${offer.navigation?.points.length ?? 0} plánovaných bodů` : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.locationBrief || 'Individuální realizace' : `${offer.items.length} vybraných ploch` },
       ...(productionTotal ? [{ label: 'Výroba a instalace', amount: productionTotal, note: productionCharges.map((charge) => charge.label).join(', ') }] : []),
       ...(serviceTotal ? [{ label: 'Služby', amount: serviceTotal, note: serviceCharges.map((charge) => charge.label).join(', ') }] : []),
       { label: 'Sleva', amount: -number(offer.discountAmount), emphasis: 'discount' },
@@ -212,7 +215,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     caseStudies: [],
     conditions: [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },
-      { id: 'availability', text: 'Realizace podléhá finálnímu potvrzení dostupnosti vybraných ploch.' },
+      { id: 'availability', text: offer.offerType === 'STANDARD_MEDIA' || !offer.offerType ? 'Realizace podléhá finálnímu potvrzení dostupnosti vybraných ploch.' : 'Realizace podléhá finálnímu technickému a místnímu schválení.' },
       { id: 'dates', text: `Navržený termín kampaně: ${asDate(from)} – ${asDate(to)}.` },
       { id: 'pricing', text: 'Uvedené ceny, sleva a DPH odpovídají kalkulaci zobrazené v nabídce.' },
       { id: 'production', text: 'Výroba a instalace jsou zahrnuté pouze u položek uvedených v kalkulaci.' },

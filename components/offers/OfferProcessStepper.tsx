@@ -14,10 +14,11 @@ const stages = [
 
 export type OfferProcessStage = typeof stages[number]['key'];
 
-export function OfferProcessStepper({ current, offerId }: { current: OfferProcessStage; offerId: string }) {
-  const currentStep = stages.findIndex((stage) => stage.key === current);
+export function OfferProcessStepper({ current, offerId, offerType = 'STANDARD_MEDIA' }: { current: OfferProcessStage; offerId: string; offerType?: 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY' }) {
+  const visibleStages = offerType === 'STANDARD_MEDIA' ? stages : stages.filter((stage) => ['brief', 'approval', 'preview', 'feedback', 'done'].includes(stage.key));
+  const currentStep = visibleStages.findIndex((stage) => stage.key === current);
   const href = (key: OfferProcessStage) => {
-    if (key === 'brief') return `/offers/${offerId}/edit`;
+    if (key === 'brief') return offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : offerType === 'CITY_GALLERY' ? `/offers/${offerId}/city-gallery/edit` : `/offers/${offerId}/edit`;
     if (['planner', 'pricing', 'approval', 'preview'].includes(key)) return `/offers/${offerId}/${key}`;
     return `/offers/${offerId}`;
   };
@@ -25,7 +26,7 @@ export function OfferProcessStepper({ current, offerId }: { current: OfferProces
   return (
     <nav aria-label="Průběh obchodního workflow" className="card mb-6 overflow-x-auto !p-4">
       <ol className="flex min-w-max items-center gap-1">
-        {stages.map((stage, index) => {
+        {visibleStages.map((stage, index) => {
           const done = index < currentStep;
           const active = index === currentStep;
           return (
@@ -40,7 +41,7 @@ export function OfferProcessStepper({ current, offerId }: { current: OfferProces
                 </span>
                 <span className="whitespace-nowrap">{stage.label}</span>
               </Link>
-              {index < stages.length - 1 && <span aria-hidden="true" className={`h-px w-5 ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />}
+              {index < visibleStages.length - 1 && <span aria-hidden="true" className={`h-px w-5 ${done ? 'bg-emerald-300' : 'bg-slate-200'}`} />}
             </li>
           );
         })}

@@ -14,7 +14,7 @@ export default async function OfferApprovalPage({ params }: { params: Promise<{ 
   const user = await requirePageAccess('offers');
   try {
     const offer = await getOffer(user, (await params).id) as OfferView;
-    const availability = await checkOfferAvailability(user, offerAvailabilityInput(offer));
+    const availability = offer.offerType === 'STANDARD_MEDIA' || !offer.offerType ? await checkOfferAvailability(user, offerAvailabilityInput(offer)) : { conflicts: [] };
     return <AppShell><PageHeader description={`${offer.campaignName} · ${offer.client.name}`} title="Interní schválení nabídky" /><OfferApproval conflicts={availability.conflicts} offer={offer} /></AppShell>;
   } catch (error) {
     if (error instanceof OfferValidationError && error.code === 'NOT_FOUND') notFound();
