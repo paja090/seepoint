@@ -20,6 +20,8 @@ import {
   type OfferStatusValue,
 } from './domain';
 import { createPublicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
+import type { OfferView } from './view-model';
+import { offerReadinessChecks, type OfferConflictView } from './workflow';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 type ConflictStatus = 'OCCUPIED' | 'RESERVED' | 'NEGOTIATION';
@@ -101,6 +103,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'SeePOINT' },
     client: {
       name: row.client.name,
+      logoUrl: row.client.logoDriveFileId ? publicView && token ? `/api/proposals/${encodeURIComponent(token)}/logo` : `/api/clients/${row.client.id}/logo/file` : undefined,
       companyId: publicView ? undefined : row.client.companyId,
       contactPerson: row.contactPerson ?? row.client.contactPerson,
       email: row.contactEmail ?? row.client.email,
@@ -115,6 +118,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           url: publicView && token ? `/api/proposals/${encodeURIComponent(token)}/photos/${photo.id}` : `/api/photos/${photo.id}/thumbnail`,
           note: photo.note,
           isPrimary: photo.isPrimary,
+          isClientVisible: photo.isClientVisible,
         }));
       return {
         id: publicView ? undefined : item.id,
@@ -253,8 +257,8 @@ export function assertConflicts(conflicts: OfferConflict[], confirmNegotiation: 
 
 async function validateSurfaces(db: Db, input: OfferInput) {
   const ids = input.items.map((item) => item.surfaceId);
-  const surfaces = await db.advertisingSurface.findMany({ where: { id: { in: ids }, carrier: { archivedAt: null } }, select: { id: true } });
-  if (surfaces.length !== ids.length) throw new OfferValidationError('Některá reklamní plocha neexistuje nebo je archivovaná.');
+  const surfaces = await db.advertisingSurface.findMany({ where: { id: { in: ids }, status: { not: 'OUT_OF_SERVICE' }, carrier: { archivedAt: null, status: 'ACTIVE' } }, select: { id: true } });
+  if (surfaces.length !== ids.length) throw new OfferValidationError('Některá reklamní plocha neexistuje, je mimo provoz nebo patří neaktivnímu nosiči.', 'SURFACE_NOT_OFFERABLE');
   const client = await db.client.findFirst({ where: { id: input.clientId, active: true }, select: { id: true } });
   if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
 }
@@ -420,30 +424,32 @@ export async function getOffer(user: CurrentUser, id: string) {
   return serializeOffer(row);
 }
 
+function rejectDirectSend(intent: 'draft' | 'send') {
+  if (intent === 'send') throw new OfferValidationError('Nabídku nejprve uložte jako koncept a projděte náhled a kontrolu před odesláním.', 'OFFER_REVIEW_REQUIRED');
+}
+
 export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draft' | 'send' = 'draft') {
   assertRole(user);
+  rejectDirectSend(intent);
   const input = normalizeOfferInput(raw);
-  if (intent === 'send' && input.validUntil && input.validUntil < new Date().toISOString().slice(0, 10)) throw new OfferValidationError('Nabídku po konci platnosti nelze odeslat. Změňte platnost konceptu.');
   return prisma.$transaction(async (tx) => {
     await validateSurfaces(tx, input);
     const packageSelection = await resolvePackageSelection(tx, input);
     const calculated = calculateOffer(input.items, input.taxRate, await resolveCharges(tx, input));
     const conflicts = await findConflicts(tx, input.items);
     assertConflicts(conflicts, input.confirmNegotiation);
-    const now = new Date();
     const row = await tx.offer.create({
       data: {
         ...offerData(input, user, calculated),
-        status: intent === 'send' ? 'SENT' : 'DRAFT',
+        status: 'DRAFT',
         offerType: 'STANDARD_MEDIA',
-        sentAt: intent === 'send' ? now : null,
+        sentAt: null,
         ...serverOfferAuthor(user),
         items: { create: calculated.items.map(itemData) },
         charges: { create: calculated.charges.map(chargeData) },
         packageSelections: packageSelection ? { create: packageSelection } : undefined,
         events: { create: [
           { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name },
-          ...(intent === 'send' ? [{ type: 'SENT' as const, fromStatus: 'DRAFT' as const, toStatus: 'SENT' as const, actorUserId: user.id, actorName: user.name }] : []),
         ] },
       },
       include: offerInclude,
@@ -572,6 +578,29 @@ export async function duplicateOffer(user: CurrentUser, id: string) {
   return result;
 }
 
+function assertOfferSurfacesOfferable(row: OfferRow) {
+  const unavailable = row.items.filter((item) => item.surface.status === 'OUT_OF_SERVICE' || item.surface.carrier.status !== 'ACTIVE' || item.surface.carrier.archivedAt);
+  if (unavailable.length) {
+    throw new OfferValidationError(
+      `Nabídku nelze odeslat. ${unavailable.length} ploch je mimo provoz nebo patří neaktivnímu nosiči.`,
+      'SURFACE_NOT_OFFERABLE',
+      unavailable.map((item) => ({ surfaceId: item.surfaceId, code: item.surface.carrier.code, surface: item.surface.name })),
+    );
+  }
+}
+
+function assertOfferReady(row: OfferRow, conflicts: OfferConflictView[]) {
+  assertOfferSurfacesOfferable(row);
+  const failed = offerReadinessChecks(serializeOffer(row) as OfferView, conflicts).filter((check) => check.status === 'error');
+  if (failed.length) {
+    throw new OfferValidationError(
+      `Nabídku nelze odeslat. Doplňte: ${failed.map((check) => check.label).join(', ')}.`,
+      'OFFER_NOT_READY',
+      failed,
+    );
+  }
+}
+
 export async function transitionOffer(user: CurrentUser, id: string, target: OfferStatusValue) {
   return prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
@@ -583,6 +612,9 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
       if (existing.offerType === 'STANDARD_MEDIA') {
         const conflicts = await findConflicts(tx, existing.items);
         assertConflicts(conflicts, Boolean(existing.negotiationApprovedAt));
+        assertOfferReady(existing, conflicts);
+      } else {
+        assertOfferReady(existing, []);
       }
     }
     const now = new Date();
@@ -606,6 +638,9 @@ export async function publishOffer(user: CurrentUser, id: string) {
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
+    if (existing.status === 'DRAFT') throw new OfferValidationError('Veřejný odkaz lze vytvořit až po úspěšné kontrole a odeslání nabídky.', 'OFFER_REVIEW_REQUIRED');
+    const conflicts = existing.offerType === 'STANDARD_MEDIA' ? await findConflicts(tx, existing.items) : [];
+    assertOfferReady(existing, conflicts);
     return tx.offer.update({
       where: { id },
       data: { publicTokenHash: generated.hash, publishedAt: new Date(), updatedByUserId: user.id, events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name } } },
@@ -625,6 +660,12 @@ async function getPublicRow(token: string) {
 export async function getPublicOffer(token: string) {
   const row = await getPublicRow(token);
   return serializeOffer(row, { publicToken: token, publicView: true });
+}
+
+export async function getPublicClientLogo(token: string) {
+  const row = await getPublicRow(token);
+  if (!row.client.logoDriveFileId) throw new OfferValidationError('Logo klienta nebylo nalezeno.', 'NOT_FOUND');
+  return { driveFileId: row.client.logoDriveFileId, fileName: row.client.logoFileName, mimeType: row.client.logoMimeType };
 }
 
 export async function respondToPublicOffer(token: string, raw: unknown) {
@@ -679,6 +720,7 @@ export async function convertOfferToOccupancy(user: CurrentUser, id: string, tar
     const offer = await getOfferRow(tx, id);
     if (offer.offerType !== 'STANDARD_MEDIA') throw new OfferValidationError('Na obsazenost lze převést pouze nabídku standardních médií.', 'INVALID_OFFER_TYPE');
     if (offer.status !== 'ACCEPTED') throw new OfferValidationError('Převést lze pouze přijatou nabídku.', 'INVALID_STATUS_TRANSITION');
+    assertOfferSurfacesOfferable(offer);
     const surfaceIds = offer.items.map((item) => item.surfaceId);
     if (surfaceIds.length === 0) throw new OfferValidationError('Nabídka nemá žádné položky.', 'EMPTY_OFFER');
     await tx.$queryRaw`SELECT "id" FROM "AdvertisingSurface" WHERE "id" IN (${Prisma.join(surfaceIds)}) FOR UPDATE`;

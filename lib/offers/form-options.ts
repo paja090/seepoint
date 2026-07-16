@@ -4,9 +4,9 @@ import type { MediaPackageOption, OfferClientOption, OfferPriceRuleOption, Offer
 
 export async function getOfferFormOptions() {
   const [clients, surfaces, priceRules, packages] = await Promise.all([
-    prisma.client.findMany({ where: { active: true }, select: { id: true, name: true, companyId: true, contactPerson: true, email: true, phone: true, note: true }, orderBy: { name: 'asc' } }),
+    prisma.client.findMany({ where: { active: true }, select: { id: true, name: true, companyId: true, contactPerson: true, email: true, phone: true, note: true, logoDriveFileId: true }, orderBy: { name: 'asc' } }),
     prisma.advertisingSurface.findMany({
-      where: { carrier: { archivedAt: null } },
+      where: { status: { not: 'OUT_OF_SERVICE' }, carrier: { archivedAt: null, status: 'ACTIVE' } },
       include: { currentClient: { select: { name: true } }, photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] }, carrier: { include: { photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] } } } },
       orderBy: [{ carrier: { city: 'asc' } }, { carrier: { code: 'asc' } }, { name: 'asc' }],
       take: 2000,
@@ -14,7 +14,7 @@ export async function getOfferFormOptions() {
     prisma.offerPriceRule.findMany({ where: { active: true }, orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { label: 'asc' }] }),
     prisma.mediaPackage.findMany({ where: { active: true }, include: { rules: { orderBy: { sortOrder: 'asc' } } }, orderBy: { name: 'asc' } }),
   ]);
-  const clientOptions: OfferClientOption[] = clients;
+  const clientOptions: OfferClientOption[] = clients.map(({ logoDriveFileId, ...client }) => ({ ...client, logoUrl: logoDriveFileId ? `/api/clients/${client.id}/logo/file` : undefined }));
   const rentalRules = priceRules.filter((rule) => rule.category === 'RENTAL');
   const surfaceOptions: OfferSurfaceOption[] = surfaces.map((surface) => {
     const catalogPrice = rentalRules.find((rule) => rule.mediaType === surface.mediaType) ?? rentalRules.find((rule) => rule.mediaType === null);

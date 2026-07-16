@@ -36,8 +36,13 @@ export function OfferProposal({
   }, []);
 
   const handleDownloadPdf = useCallback(() => {
-    if (typeof window !== 'undefined') window.print();
-  }, []);
+    if (typeof window === 'undefined') return;
+    if (token) {
+      window.location.assign(`/api/proposals/${encodeURIComponent(token)}/pdf`);
+      return;
+    }
+    window.print();
+  }, [token]);
 
   const handleShare = useCallback(async () => {
     if (typeof window === 'undefined') return;

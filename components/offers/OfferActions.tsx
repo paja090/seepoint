@@ -4,11 +4,11 @@ import {
   CalendarCheck,
   Check,
   Copy,
+  Eye,
   ExternalLink,
   FilePenLine,
   Link2,
   LoaderCircle,
-  Send,
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -69,10 +69,10 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
               <FilePenLine aria-hidden="true" size={17} />
               Upravit návrh
             </a>
-            <button className={primaryButton} disabled={disabled} onClick={() => void action('send')} type="button">
-              <Send aria-hidden="true" size={17} />
-              Odeslat klientovi
-            </button>
+            <a className={primaryButton} href={`/offers/${offerId}/preview`}>
+              <Eye aria-hidden="true" size={17} />
+              Zkontrolovat klientský náhled
+            </a>
           </>
         )}
 
@@ -103,12 +103,12 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           </>
         )}
 
-        <div className="border-t border-slate-100 pt-3">
+        {status !== 'DRAFT' && <div className="border-t border-slate-100 pt-3">
           <button className={secondaryButton} disabled={disabled} onClick={() => void action('publish')} type="button">
             <Link2 aria-hidden="true" size={17} />
             Vytvořit veřejný odkaz
           </button>
-        </div>
+        </div>}
 
         {offerType === 'STANDARD_MEDIA' && <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
           <Copy aria-hidden="true" size={17} />

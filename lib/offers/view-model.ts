@@ -1,4 +1,4 @@
-export type OfferPhotoView = { id: string; url: string; note?: string | null; isPrimary: boolean };
+export type OfferPhotoView = { id: string; url: string; note?: string | null; isPrimary: boolean; isClientVisible?: boolean };
 export type OfferItemView = {
   id?: string;
   surfaceId?: string;
@@ -39,7 +39,7 @@ export type OfferItemView = {
 export type OfferChargeView = {
   id?: string;
   priceRuleId?: string | null;
-  category: 'RENTAL' | 'PRODUCTION' | 'SERVICE';
+  category: 'RENTAL' | 'PRINT' | 'INSTALLATION' | 'REMOVAL' | 'PRODUCTION' | 'SERVICE';
   code: string;
   label: string;
   description?: string | null;
@@ -80,7 +80,7 @@ export type OfferView = {
   createdAt: string;
   updatedAt: string;
   createdBy: { id?: string; name: string; email?: string };
-  client: { name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null };
+  client: { name: string; logoUrl?: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null };
   items: OfferItemView[];
   charges: OfferChargeView[];
   navigation?: {
@@ -97,11 +97,11 @@ export type OfferView = {
   converted?: boolean;
 };
 
-export type OfferClientOption = { id: string; name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };
+export type OfferClientOption = { id: string; name: string; logoUrl?: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };
 export type OfferPriceRuleOption = {
   id: string;
   code: string;
-  category: 'RENTAL' | 'PRODUCTION' | 'SERVICE';
+  category: 'RENTAL' | 'PRINT' | 'INSTALLATION' | 'REMOVAL' | 'PRODUCTION' | 'SERVICE';
   label: string;
   description?: string | null;
   mediaType?: string | null;

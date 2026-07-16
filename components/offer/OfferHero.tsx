@@ -1,4 +1,5 @@
 import { CalendarDays, CheckCircle2, HelpCircle, Layers, MapPin, PencilLine, Timer } from 'lucide-react';
+import Image from 'next/image';
 import type { ProposalOffer } from '@/lib/offers/presentation';
 import { MEDIA_TYPE_META } from '@/lib/offers/presentation';
 import { LogoPlaceholder } from './LogoPlaceholder';
@@ -37,7 +38,9 @@ export function OfferHero({
         <div className="order-2 flex flex-col gap-6 p-6 lg:order-1 lg:p-10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <LogoPlaceholder label={offer.client.logoLabel} size="md" />
+              {offer.client.logoUrl
+                ? <span className="relative block size-12 overflow-hidden rounded-xl border border-slate-200 bg-white"><Image alt={`Logo ${offer.client.name}`} className="object-contain p-1" fill sizes="48px" src={offer.client.logoUrl} unoptimized /></span>
+                : <LogoPlaceholder label={offer.client.logoLabel} size="md" />}
               <div>
                 <p className="text-sm font-medium text-slate-500">Nabídka pro</p>
                 <p className="text-base font-semibold text-slate-900">{offer.client.name}</p>

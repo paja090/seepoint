@@ -40,7 +40,7 @@ export type OfferInput = {
 
 export type OfferChargeInput = {
   priceRuleId: string;
-  category: 'RENTAL' | 'PRODUCTION' | 'SERVICE';
+  category: 'RENTAL' | 'PRINT' | 'INSTALLATION' | 'REMOVAL' | 'PRODUCTION' | 'SERVICE';
   code: string;
   label: string;
   description?: string;

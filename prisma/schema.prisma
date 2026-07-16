@@ -174,6 +174,9 @@ enum OfferEventType {
 
 enum OfferPriceCategory {
   RENTAL
+  PRINT
+  INSTALLATION
+  REMOVAL
   PRODUCTION
   SERVICE
 }
@@ -459,18 +462,22 @@ model EmployeeRate {
 }
 
 model Client {
-  id             String   @id @default(cuid())
-  name           String
-  normalizedName String   @unique
-  companyId      String?
-  contactPerson  String?
-  email          String?
-  phone          String?
-  externalCode   String?  @unique
-  note           String?
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  normalizedName  String    @unique
+  companyId       String?
+  contactPerson   String?
+  email           String?
+  phone           String?
+  externalCode    String?   @unique
+  note            String?
+  logoDriveFileId String?   @unique
+  logoFileName    String?
+  logoMimeType    String?
+  logoUpdatedAt   DateTime?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   currentSurfaces AdvertisingSurface[] @relation("CurrentSurfaceClient")
   occupancies     Occupancy[]
