@@ -142,7 +142,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
               <li className="p-5 text-sm text-slate-500">Žádné blížící se termíny.</li>
             ) : upcoming.map((offer) => {
               const days = Math.max(0, Math.ceil((new Date(`${offer.validUntil}T23:59:59Z`).getTime() - Date.now()) / 86_400_000));
-              const href = offer.status === 'DRAFT' ? `/offers/${offer.id}/edit` : `/offers/${offer.id}`;
+              const href = offer.status === 'DRAFT' && offer.offerType === 'NAVIGATION' ? `/offers/${offer.id}/navigation/edit` : offer.status === 'DRAFT' && offer.offerType === 'STANDARD_MEDIA' ? `/offers/${offer.id}/edit` : `/offers/${offer.id}`;
               return (
                 <li className="flex items-center justify-between gap-4 p-4" key={offer.id}>
                   <div className="min-w-0">
@@ -201,10 +201,11 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
 
         <div className="border-t border-slate-100 p-5">
           <form action="/offers">
-            <div className="grid gap-3 lg:grid-cols-[1fr_190px_190px_190px_auto]">
+            <div className="grid gap-3 lg:grid-cols-[1fr_170px_170px_170px_170px_auto]">
               <label className="relative"><span className="sr-only">Hledat nabídku</span><Search className="absolute left-3 top-3 text-slate-400" size={18} /><input className="input pl-10" defaultValue={value('q')} name="q" placeholder="Nabídka, kampaň nebo klient" /></label>
               <select aria-label="Klient" className="input" defaultValue={value('clientId')} name="clientId"><option value="">Všichni klienti</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
               <select aria-label="Stav nabídky" className="input" defaultValue={value('status')} name="status"><option value="">Všechny stavy</option><option value="DRAFT">Koncept</option><option value="SENT">Odeslaná</option><option value="ACCEPTED">Přijatá</option><option value="REJECTED">Odmítnutá</option><option value="EXPIRED">Expirovaná</option></select>
+              <select aria-label="Typ nabídky" className="input" defaultValue={value('type')} name="type"><option value="">Všechny typy</option><option value="STANDARD_MEDIA">Standardní média</option><option value="NAVIGATION">Navigace</option><option value="CITY_GALLERY">Galerie venku</option></select>
               <select aria-label="Obchodník" className="input" defaultValue={value('createdByUserId')} disabled={user.role === 'SALES'} name="createdByUserId"><option value="">Všichni obchodníci</option>{salespeople.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
               <button className="btn-primary" type="submit">Filtrovat</button>
             </div>
@@ -224,13 +225,14 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
               <div className="p-5"><EmptyState action={<Button href="/offers/new">Vytvořit nabídku</Button>} title="Žádná nabídka neodpovídá filtru." /></div>
             ) : (
               <Table minWidth="min-w-[1050px]">
-                <TableHead><tr><TableHeaderCell>Klient / kampaň</TableHeaderCell><TableHeaderCell>Obchodník</TableHeaderCell><TableHeaderCell>Platnost</TableHeaderCell><TableHeaderCell>Plochy</TableHeaderCell><TableHeaderCell>Cena s DPH</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
+                <TableHead><tr><TableHeaderCell>Klient / kampaň</TableHeaderCell><TableHeaderCell>Typ</TableHeaderCell><TableHeaderCell>Obchodník</TableHeaderCell><TableHeaderCell>Platnost</TableHeaderCell><TableHeaderCell>Položky</TableHeaderCell><TableHeaderCell>Cena s DPH</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
                 <tbody>{rows.map((offer) => (
                   <tr className="hover:bg-slate-50" key={offer.id}>
                     <TableCell><b>{offer.client.name}</b><br /><span className="text-slate-500">{offer.campaignName}</span></TableCell>
+                    <TableCell>{offer.offerType === 'NAVIGATION' ? 'Navigace' : offer.offerType === 'CITY_GALLERY' ? 'Galerie venku' : 'Standardní média'}</TableCell>
                     <TableCell>{offer.createdBy.name}</TableCell>
                     <TableCell>{offer.validUntil ? new Date(`${offer.validUntil}T00:00:00Z`).toLocaleDateString('cs-CZ') : 'Neuvedena'}</TableCell>
-                    <TableCell>{offer.items.length}<div className="mt-1 text-xs text-slate-500">{[...new Set(offer.items.map((item) => item.groupLabel))].slice(0, 3).join(' · ')}</div></TableCell>
+                    <TableCell>{offer.offerType === 'NAVIGATION' ? offer.navigation?.points.length ?? 0 : offer.offerType === 'CITY_GALLERY' ? 1 : offer.items.length}<div className="mt-1 text-xs text-slate-500">{offer.offerType === 'NAVIGATION' ? offer.navigation?.targetName : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.projectTitle || 'Koncept' : [...new Set(offer.items.map((item) => item.groupLabel))].slice(0, 3).join(' · ')}</div></TableCell>
                     <TableCell><b>{money(offer.totalWithTax)}</b></TableCell>
                     <TableCell><StatusBadge value={offer.status} /></TableCell>
                     <TableCell><Link className="table-action" href={`/offers/${offer.id}`}>Detail</Link></TableCell>

@@ -34,6 +34,10 @@ test('finanční výpočty používají Decimal a bezpečné zaokrouhlení', () 
   assert.equal(calculated.totals.totalWithTax, '2118.04');
 });
 
+test('standardní nabídka zachová identitu vybraného databázového balíčku', () => {
+  assert.equal(normalizeOfferInput({ ...payload(), packageId: 'package-1' }).packageId, 'package-1');
+});
+
 test('ceník připočítá výrobu a služby serverově pomocí Decimal', () => {
   const calculated = calculateOffer([item()], '21', [
     { priceRuleId: 'print', category: 'PRODUCTION', code: 'PRINT', label: 'Tisk', quantity: '2', unit: 'ks', unitPrice: '174.50', sortOrder: 0 },

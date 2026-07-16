@@ -16,7 +16,7 @@ export default async function EditOfferPage({ params }: { params: Promise<{ id: 
     getOfferFormOptions(),
   ]);
 
-  if (!offer || offer.status !== 'DRAFT') notFound();
+  if (!offer || offer.status !== 'DRAFT' || (offer.offerType && offer.offerType !== 'STANDARD_MEDIA')) notFound();
 
   return (
     <AppShell>

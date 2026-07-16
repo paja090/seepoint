@@ -33,6 +33,7 @@ export type OfferInput = {
   clientMessage?: string;
   taxRate: string;
   confirmNegotiation: boolean;
+  packageId?: string;
   items: OfferItemInput[];
   chargeSelections: Array<{ priceRuleId: string; quantity: string }>;
 };
@@ -169,6 +170,7 @@ export function normalizeOfferInput(raw: unknown): OfferInput {
     clientMessage: text(input.clientMessage) || undefined,
     taxRate: text(input.taxRate) || '21',
     confirmNegotiation: input.confirmNegotiation === true,
+    packageId: text(input.packageId) || undefined,
     items,
     chargeSelections: rawCharges.map((rawCharge, index) => {
       if (!rawCharge || typeof rawCharge !== 'object') throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
@@ -306,5 +308,6 @@ export function stripPublicOfferSecrets<T extends Record<string, unknown>>(sourc
   if (result.client && typeof result.client === 'object') { const client = { ...(result.client as Record<string, unknown>) }; for (const key of ['companyId', 'contactPerson', 'email', 'phone']) delete client[key]; result.client = client; }
   if (Array.isArray(result.items)) result.items = result.items.map((raw) => { const item = { ...(raw as Record<string, unknown>) }; delete item.id; delete item.surfaceId; delete item.note; if (item.surface && typeof item.surface === 'object') { const surface = { ...(item.surface as Record<string, unknown>) }; delete surface.status; item.surface = surface; } return item; });
   if (Array.isArray(result.charges)) result.charges = result.charges.map((raw) => { const charge = { ...(raw as Record<string, unknown>) }; delete charge.id; delete charge.priceRuleId; return charge; });
+  if (Array.isArray(result.packageSelections)) result.packageSelections = result.packageSelections.map((raw) => { const selection = { ...(raw as Record<string, unknown>) }; delete selection.id; delete selection.packageId; return selection; });
   return result as T;
 }

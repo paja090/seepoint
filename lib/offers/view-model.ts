@@ -60,6 +60,7 @@ export type OfferView = {
   campaignGoal?: string | null;
   budget?: string | null;
   status: string;
+  offerType?: 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY';
   validUntil: string | null;
   internalNote?: string | null;
   clientMessage?: string | null;
@@ -82,6 +83,16 @@ export type OfferView = {
   client: { name: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null };
   items: OfferItemView[];
   charges: OfferChargeView[];
+  navigation?: {
+    targetName: string;
+    targetAddress?: string | null;
+    targetLatitude: number;
+    targetLongitude: number;
+    targetNote?: string | null;
+    points: Array<{ id: string; label: string; latitude: number; longitude: number; address?: string | null; navigationType: string; variant?: string | null; orientation?: string | null; quantity: string; unitPrice: string; subtotal: string; installationPrice: string; removalPrice: string; productionPrice: string; internalNote?: string | null; clientNote?: string | null; status: string }>;
+  } | null;
+  cityGallery?: { projectId?: string | null; projectTitle?: string | null; concept?: string | null; locationBrief?: string | null; realizationNote?: string | null } | null;
+  packageSelections?: Array<{ id: string; packageId?: string | null; packageName: string; selectionMode: string; standardPrice?: string | null; packagePrice?: string | null }>;
   events?: Array<{ id: string; type: string; fromStatus?: string | null; toStatus?: string | null; actorName?: string | null; actorEmail?: string | null; message?: string | null; createdAt: string }>;
   converted?: boolean;
 };
@@ -109,4 +120,14 @@ export type OfferSurfaceOption = {
   currentClient?: string | null;
   photos: Array<{ id: string; url: string }>;
   carrier: { id: string; code: string; name: string; city: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };
+};
+
+export type MediaPackageOption = {
+  id: string;
+  name: string;
+  description?: string | null;
+  standardPrice?: string | null;
+  packagePrice?: string | null;
+  defaultDuration?: number | null;
+  rules: Array<{ id: string; mediaType: string; city?: string | null; locality?: string | null; quantity: number; sortOrder: number }>;
 };

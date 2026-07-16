@@ -19,12 +19,13 @@ type OfferActionsProps = {
   status: string;
   converted: boolean;
   canConvert: boolean;
+  offerType: 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY';
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50';
 
-export function OfferActions({ offerId, status, converted, canConvert }: OfferActionsProps) {
+export function OfferActions({ offerId, status, converted, canConvert, offerType }: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -64,10 +65,10 @@ export function OfferActions({ offerId, status, converted, canConvert }: OfferAc
       <div className="space-y-3 p-5">
         {status === 'DRAFT' && (
           <>
-            <a className={secondaryButton} href={`/offers/${offerId}/edit`}>
+            {offerType !== 'CITY_GALLERY' && <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : `/offers/${offerId}/edit`}>
               <FilePenLine aria-hidden="true" size={17} />
               Upravit návrh
-            </a>
+            </a>}
             <button className={primaryButton} disabled={disabled} onClick={() => void action('send')} type="button">
               <Send aria-hidden="true" size={17} />
               Odeslat klientovi
@@ -90,7 +91,7 @@ export function OfferActions({ offerId, status, converted, canConvert }: OfferAc
           </>
         )}
 
-        {status === 'ACCEPTED' && canConvert && (
+        {status === 'ACCEPTED' && canConvert && offerType === 'STANDARD_MEDIA' && (
           <>
             <button className={primaryButton} disabled={disabled || converted} onClick={() => void action('convert-to-occupancy', { targetStatus: 'OCCUPIED' })} type="button">
               <CalendarCheck aria-hidden="true" size={17} />
@@ -109,10 +110,10 @@ export function OfferActions({ offerId, status, converted, canConvert }: OfferAc
           </button>
         </div>
 
-        <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
+        {offerType === 'STANDARD_MEDIA' && <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
           <Copy aria-hidden="true" size={17} />
           Duplikovat nabídku
-        </button>
+        </button>}
 
         {(status === 'DRAFT' || status === 'SENT') && (
           <button className="w-full px-3 py-2 text-sm font-semibold text-slate-500 transition hover:text-red-700 disabled:opacity-50" disabled={disabled} onClick={() => void action('expire')} type="button">

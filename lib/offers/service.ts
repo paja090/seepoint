@@ -56,6 +56,9 @@ const offerInclude = {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   },
   charges: { orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] },
+  navigationOffer: { include: { points: { include: { carrier: { select: { id: true, code: true, name: true } } }, orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] } } },
+  cityGalleryOffer: { include: { project: { select: { id: true, title: true, status: true } } } },
+  packageSelections: { orderBy: { createdAt: 'asc' as const } },
   events: { orderBy: { createdAt: 'desc' }, take: 100 },
   occupancies: { select: { id: true, surfaceId: true, status: true } },
 } satisfies Prisma.OfferInclude;
@@ -76,6 +79,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     campaignGoal: row.campaignGoal,
     budget: publicView ? undefined : value(row.budget),
     status: row.status,
+    offerType: row.offerType,
     validUntil: dateOnly(row.validUntil),
     internalNote: publicView ? undefined : row.internalNote ?? row.note,
     clientMessage: row.clientMessage,
@@ -166,6 +170,22 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       unitPrice: charge.unitPrice.toFixed(2),
       subtotal: charge.subtotal.toFixed(2),
     })),
+    navigation: row.navigationOffer ? {
+      targetName: row.navigationOffer.targetName,
+      targetAddress: row.navigationOffer.targetAddress,
+      targetLatitude: row.navigationOffer.targetLatitude,
+      targetLongitude: row.navigationOffer.targetLongitude,
+      targetNote: row.navigationOffer.targetNote,
+      points: row.navigationOffer.points.map((point) => ({
+        id: point.id, label: point.label, latitude: point.latitude, longitude: point.longitude, address: point.address,
+        navigationType: point.navigationType, variant: point.variant, orientation: point.orientation,
+        quantity: point.quantity.toFixed(2), unitPrice: point.unitPrice.toFixed(2), subtotal: point.subtotal.toFixed(2),
+        installationPrice: point.installationPrice.toFixed(2), removalPrice: point.removalPrice.toFixed(2), productionPrice: point.productionPrice.toFixed(2),
+        internalNote: publicView ? undefined : point.internalNote, clientNote: point.clientNote, status: point.status,
+      })),
+    } : null,
+    cityGallery: row.cityGalleryOffer ? { projectId: row.cityGalleryOffer.projectId, projectTitle: row.cityGalleryOffer.project?.title, concept: row.cityGalleryOffer.concept, locationBrief: row.cityGalleryOffer.locationBrief, realizationNote: row.cityGalleryOffer.realizationNote } : null,
+    packageSelections: row.packageSelections.map((selection) => ({ id: selection.id, packageId: selection.packageId, packageName: selection.packageName, selectionMode: selection.selectionMode, standardPrice: value(selection.standardPrice), packagePrice: value(selection.packagePrice) })),
     events: publicView ? undefined : row.events.map((event) => ({
       id: event.id,
       type: event.type,
@@ -340,6 +360,18 @@ function chargeData(charge: ReturnType<typeof calculateOffer>['charges'][number]
   };
 }
 
+async function resolvePackageSelection(db: Db, input: OfferInput) {
+  if (!input.packageId) return null;
+  const pkg = await db.mediaPackage.findFirst({ where: { id: input.packageId, active: true }, include: { rules: true } });
+  if (!pkg) throw new OfferValidationError('Vybraný mediální balíček neexistuje nebo není aktivní.');
+  const selected = await db.advertisingSurface.findMany({ where: { id: { in: input.items.map((item) => item.surfaceId) } }, select: { mediaType: true, carrier: { select: { city: true, locality: true } } } });
+  for (const rule of pkg.rules) {
+    const count = selected.filter((surface) => surface.mediaType === rule.mediaType && (!rule.city || surface.carrier.city === rule.city) && (!rule.locality || surface.carrier.locality === rule.locality)).length;
+    if (count < rule.quantity) throw new OfferValidationError(`Balíček ${pkg.name} nemá požadovaný počet dostupných ploch pro ${rule.mediaType}.`, 'INCOMPLETE_MEDIA_PACKAGE');
+  }
+  return { packageId: pkg.id, packageName: pkg.name, selectionMode: 'AUTOMATIC' as const, standardPrice: pkg.standardPrice, packagePrice: pkg.packagePrice };
+}
+
 export async function listOffers(user: CurrentUser, filters: URLSearchParams) {
   assertRole(user);
   const status = filters.get('status');
@@ -368,6 +400,7 @@ export async function listOffers(user: CurrentUser, filters: URLSearchParams) {
         ] } : {},
       ],
       status: status && ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'].includes(status) ? status as OfferStatus : undefined,
+      offerType: filters.get('type') && ['STANDARD_MEDIA', 'NAVIGATION', 'CITY_GALLERY'].includes(filters.get('type')!) ? filters.get('type') as never : undefined,
       clientId: clientId || undefined,
       totalWithTax: minPrice || maxPrice ? { gte: price(minPrice), lte: price(maxPrice) } : undefined,
       createdAt: createdFrom || createdTo ? { gte: fromDate(createdFrom), lte: toDate(createdTo) } : undefined,
@@ -393,6 +426,7 @@ export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draf
   if (intent === 'send' && input.validUntil && input.validUntil < new Date().toISOString().slice(0, 10)) throw new OfferValidationError('Nabídku po konci platnosti nelze odeslat. Změňte platnost konceptu.');
   return prisma.$transaction(async (tx) => {
     await validateSurfaces(tx, input);
+    const packageSelection = await resolvePackageSelection(tx, input);
     const calculated = calculateOffer(input.items, input.taxRate, await resolveCharges(tx, input));
     const conflicts = await findConflicts(tx, input.items);
     assertConflicts(conflicts, input.confirmNegotiation);
@@ -401,10 +435,12 @@ export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draf
       data: {
         ...offerData(input, user, calculated),
         status: intent === 'send' ? 'SENT' : 'DRAFT',
+        offerType: 'STANDARD_MEDIA',
         sentAt: intent === 'send' ? now : null,
         ...serverOfferAuthor(user),
         items: { create: calculated.items.map(itemData) },
         charges: { create: calculated.charges.map(chargeData) },
+        packageSelections: packageSelection ? { create: packageSelection } : undefined,
         events: { create: [
           { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name },
           ...(intent === 'send' ? [{ type: 'SENT' as const, fromStatus: 'DRAFT' as const, toStatus: 'SENT' as const, actorUserId: user.id, actorName: user.name }] : []),
@@ -424,17 +460,20 @@ export async function updateOffer(user: CurrentUser, id: string, raw: unknown) {
     assertAccess(user, existing);
     if (existing.status !== 'DRAFT') throw new OfferValidationError('Upravovat lze pouze koncept nabídky.', 'INVALID_STATUS_TRANSITION');
     await validateSurfaces(tx, input);
+    const packageSelection = await resolvePackageSelection(tx, input);
     const calculated = calculateOffer(input.items, input.taxRate, await resolveCharges(tx, input));
     const conflicts = await findConflicts(tx, input.items);
     assertConflicts(conflicts, input.confirmNegotiation);
     await tx.offerItem.deleteMany({ where: { offerId: id } });
     await tx.offerCharge.deleteMany({ where: { offerId: id } });
+    await tx.offerPackageSelection.deleteMany({ where: { offerId: id } });
     const row = await tx.offer.update({
       where: { id },
       data: {
         ...offerData(input, user, calculated),
         items: { create: calculated.items.map(itemData) },
         charges: { create: calculated.charges.map(chargeData) },
+        packageSelections: packageSelection ? { create: packageSelection } : undefined,
         events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } },
       },
       include: offerInclude,
@@ -492,6 +531,7 @@ export async function archiveOffer(user: CurrentUser, id: string) {
 export async function duplicateOffer(user: CurrentUser, id: string) {
   const existing = await getOfferRow(prisma, id);
   assertAccess(user, existing);
+  if (existing.offerType !== 'STANDARD_MEDIA') throw new OfferValidationError('Tento typ nabídky zatím duplikujte z jeho vlastního workflow.', 'INVALID_OFFER_TYPE');
   const raw = {
     clientId: existing.clientId,
     title: existing.title,
@@ -540,8 +580,10 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
     assertOfferTransition(existing.status as OfferStatusValue, target);
     if (target === 'SENT') {
       if (isPastValidity(existing.validUntil)) throw new OfferValidationError('Nabídku po konci platnosti nelze odeslat. Změňte platnost konceptu.');
-      const conflicts = await findConflicts(tx, existing.items);
-      assertConflicts(conflicts, Boolean(existing.negotiationApprovedAt));
+      if (existing.offerType === 'STANDARD_MEDIA') {
+        const conflicts = await findConflicts(tx, existing.items);
+        assertConflicts(conflicts, Boolean(existing.negotiationApprovedAt));
+      }
     }
     const now = new Date();
     const timestamp = target === 'SENT' ? { sentAt: now } : target === 'ACCEPTED' ? { acceptedAt: now } : target === 'REJECTED' ? { rejectedAt: now } : target === 'EXPIRED' ? { expiredAt: now } : {};
@@ -635,6 +677,7 @@ export async function convertOfferToOccupancy(user: CurrentUser, id: string, tar
   if (!canConvertOfferRole(user.role)) throw new OfferValidationError('Převod může provést pouze administrátor nebo manažer.', 'FORBIDDEN');
   return prisma.$transaction(async (tx) => {
     const offer = await getOfferRow(tx, id);
+    if (offer.offerType !== 'STANDARD_MEDIA') throw new OfferValidationError('Na obsazenost lze převést pouze nabídku standardních médií.', 'INVALID_OFFER_TYPE');
     if (offer.status !== 'ACCEPTED') throw new OfferValidationError('Převést lze pouze přijatou nabídku.', 'INVALID_STATUS_TRANSITION');
     const surfaceIds = offer.items.map((item) => item.surfaceId);
     if (surfaceIds.length === 0) throw new OfferValidationError('Nabídka nemá žádné položky.', 'EMPTY_OFFER');

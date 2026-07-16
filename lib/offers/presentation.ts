@@ -132,6 +132,9 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       mapY: 20 + ((index * 17) % 65),
     };
   });
+  if (offer.offerType === 'NAVIGATION' && offer.navigation) {
+    offer.navigation.points.forEach((point, index) => carriers.push({ id: point.id, code: `NAV-${String(index + 1).padStart(2, '0')}`, mediaType: 'NAVIGATION_SIGN', city: offer.navigation!.targetName, locality: point.address || '', description: point.clientNote || point.label, dimensions: point.variant || 'dle specifikace', status: point.status, image: MEDIA_TYPE_META.NAVIGATION_SIGN.image, imageAlt: point.label, latitude: point.latitude, longitude: point.longitude, mapX: 12 + ((index * 23) % 76), mapY: 20 + ((index * 17) % 65) }));
+  }
   const geocoded = carriers.filter((carrier) => carrier.latitude != null && carrier.longitude != null);
   if (geocoded.length > 0) {
     const latitudes = geocoded.map((carrier) => carrier.latitude as number);
@@ -164,7 +167,8 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       subtotal: items.reduce((sum, item) => sum + number(item.subtotal), 0),
     };
   });
-  const rentalTotal = offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
+  if (offer.offerType === 'NAVIGATION' && offer.navigation) mediaMix.push({ key: 'NAVIGATION_SIGN', name: 'Navigace', description: `Plán navigačních bodů k cíli ${offer.navigation.targetName}.`, image: MEDIA_TYPE_META.NAVIGATION_SIGN.image, imageAlt: 'Plánované navigační body', tone: 'orange', surfaceCount: offer.navigation.points.length, locationCount: offer.navigation.points.length, subtotal: number(offer.subtotal) });
+  const rentalTotal = offer.offerType === 'NAVIGATION' ? number(offer.subtotal) : offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
   const productionCharges = offer.charges.filter((charge) => charge.category === 'PRODUCTION');
   const serviceCharges = offer.charges.filter((charge) => charge.category === 'SERVICE');
   const productionTotal = productionCharges.reduce((sum, charge) => sum + number(charge.subtotal), 0);
@@ -188,7 +192,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     mediaMix,
     carriers,
     pricing: [
-      { label: 'Pronájem reklamních ploch', amount: rentalTotal, note: `${offer.items.length} vybraných ploch` },
+      { label: offer.offerType === 'NAVIGATION' ? 'Navigační body, výroba a montáž' : 'Pronájem reklamních ploch', amount: rentalTotal, note: offer.offerType === 'NAVIGATION' ? `${offer.navigation?.points.length ?? 0} plánovaných bodů` : `${offer.items.length} vybraných ploch` },
       ...(productionTotal ? [{ label: 'Výroba a instalace', amount: productionTotal, note: productionCharges.map((charge) => charge.label).join(', ') }] : []),
       ...(serviceTotal ? [{ label: 'Služby', amount: serviceTotal, note: serviceCharges.map((charge) => charge.label).join(', ') }] : []),
       { label: 'Sleva', amount: -number(offer.discountAmount), emphasis: 'discount' },

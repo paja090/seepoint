@@ -2,6 +2,7 @@ import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { CompanyRatesSettings } from '@/components/CompanyRatesSettings';
 import { OfferPriceCatalogSettings } from '@/components/offers/OfferPriceCatalogSettings';
+import { MediaPackageSettings } from '@/components/offers/MediaPackageSettings';
 
 export default async function Settings() {
   const user = await requirePageAccess('settings');
@@ -17,6 +18,7 @@ export default async function Settings() {
       </div>
 
       {isAdmin && <OfferPriceCatalogSettings />}
+      {isAdmin && <MediaPackageSettings />}
       {isAdmin && <CompanyRatesSettings />}
     </AppShell>
   );

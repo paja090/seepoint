@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { OfferProposal } from '@/components/offer/OfferProposal';
 import { OfferActions } from '@/components/offers/OfferActions';
 import { OfferWorkflowStepper } from '@/components/offers/OfferWorkflowStepper';
+import { SpecializedOfferSummary } from '@/components/offers/SpecializedOfferSummary';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card } from '@/components/ui';
 import { OfferValidationError } from '@/lib/offers/domain';
@@ -64,7 +65,9 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
 
       <OfferWorkflowStepper converted={offer.converted} events={offer.events} status={offer.status} />
 
-      <OfferProposal offer={toProposalOffer(offer)} variant="internal" />
+      {offer.offerType === 'STANDARD_MEDIA' || !offer.offerType
+        ? <OfferProposal offer={toProposalOffer(offer)} variant="internal" />
+        : <SpecializedOfferSummary offer={offer} />}
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6 lg:grid-cols-2">
@@ -128,6 +131,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         <OfferActions
           canConvert={user.role === 'ADMIN' || user.role === 'MANAGER'}
           converted={Boolean(offer.converted)}
+          offerType={offer.offerType ?? 'STANDARD_MEDIA'}
           offerId={offer.id!}
           status={offer.status}
         />
