@@ -28,20 +28,8 @@ export function PublicOfferHeader({
 
         {/* Desktop actions */}
         <div className="hidden items-center gap-4 lg:flex">
-          <a
-            className="flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900"
-            href={`tel:${salesperson.phone.replace(/\s/g, '')}`}
-          >
-            <Phone aria-hidden size={16} />
-            {salesperson.phone}
-          </a>
-          <a
-            className="flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900"
-            href={`mailto:${salesperson.email}`}
-          >
-            <Mail aria-hidden size={16} />
-            {salesperson.email}
-          </a>
+          {salesperson.phone && <a className="flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900" href={`tel:${salesperson.phone.replace(/\s/g, '')}`}><Phone aria-hidden size={16} />{salesperson.phone}</a>}
+          {salesperson.email && <a className="flex items-center gap-2 text-sm text-slate-600 transition hover:text-slate-900" href={`mailto:${salesperson.email}`}><Mail aria-hidden size={16} />{salesperson.email}</a>}
           <div className="mx-1 h-6 w-px bg-slate-200" />
           <button
             className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50"
@@ -76,14 +64,14 @@ export function PublicOfferHeader({
       {menuOpen && (
         <div className="border-t border-slate-200 bg-white px-4 py-4 lg:hidden">
           <div className="flex flex-col gap-3">
-            <a className="flex items-center gap-2 text-sm text-slate-700" href={`tel:${salesperson.phone.replace(/\s/g, '')}`}>
+            {salesperson.phone && <a className="flex items-center gap-2 text-sm text-slate-700" href={`tel:${salesperson.phone.replace(/\s/g, '')}`}>
               <Phone aria-hidden size={16} />
               {salesperson.phone}
-            </a>
-            <a className="flex items-center gap-2 text-sm text-slate-700" href={`mailto:${salesperson.email}`}>
+            </a>}
+            {salesperson.email && <a className="flex items-center gap-2 text-sm text-slate-700" href={`mailto:${salesperson.email}`}>
               <Mail aria-hidden size={16} />
               {salesperson.email}
-            </a>
+            </a>}
             <button
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800"
               onClick={() => {

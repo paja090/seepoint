@@ -30,6 +30,7 @@ export function OfferProposal({
 }) {
   const [action, setAction] = useState<OfferActionType | null>(null);
   const [copied, setCopied] = useState(false);
+  const canRespond = variant === 'public' && Boolean(token) && offer.status === 'SENT';
 
   const scrollToMap = useCallback(() => {
     document.getElementById('offer-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -69,7 +70,7 @@ export function OfferProposal({
       <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-4 py-6 lg:gap-14 lg:px-6 lg:py-10">
         <OfferHero
           offer={offer}
-          actionsEnabled={variant === 'public' && Boolean(token)}
+          actionsEnabled={canRespond}
           onApprove={() => setAction('approve')}
           onRevision={() => setAction('revision')}
           onQuestion={() => setAction('question')}
@@ -97,7 +98,7 @@ export function OfferProposal({
           <ContactCard salesperson={offer.salesperson} onQuestion={() => setAction('question')} />
         </div>
 
-        {variant === 'public' && token && (
+        {canRespond && (
           <OfferCta
             onApprove={() => setAction('approve')}
             onRevision={() => setAction('revision')}

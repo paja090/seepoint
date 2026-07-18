@@ -29,20 +29,20 @@ export function ContactCard({
           <p className="text-lg font-semibold text-slate-900">{salesperson.name}</p>
           <p className="text-sm text-slate-500">{salesperson.role}</p>
           <div className="mt-3 flex flex-col gap-2">
-            <a
+            {salesperson.phone && <a
               className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 transition hover:text-sky-700"
               href={`tel:${salesperson.phone.replace(/\s/g, '')}`}
             >
               <Phone aria-hidden size={16} />
               {salesperson.phone}
-            </a>
-            <a
+            </a>}
+            {salesperson.email && <a
               className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 transition hover:text-sky-700"
               href={`mailto:${salesperson.email}`}
             >
               <Mail aria-hidden size={16} />
               {salesperson.email}
-            </a>
+            </a>}
           </div>
         </div>
       </div>

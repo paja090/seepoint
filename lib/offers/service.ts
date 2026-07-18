@@ -647,7 +647,7 @@ export async function publishOffer(user: CurrentUser, id: string) {
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: generated.token, path: `/proposal/${generated.token}` };
+  return { offer: serializeOffer(row), token: generated.token, path: `/offer/${generated.token}` };
 }
 
 async function getPublicRow(token: string) {
