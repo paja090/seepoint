@@ -16,6 +16,8 @@ export type AppSection =
   | 'occupancy'
   | 'clients'
   | 'offers'
+  | 'navigationProjects'
+  | 'cityGallery'
   | 'work'
   | 'employees'
   | 'tasks'
@@ -29,9 +31,9 @@ export type AppSection =
   | 'myWorkEntries';
 
 const permissions: Record<AppRole, AppSection[]> = {
-  ADMIN: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'import', 'settings', 'workEntries', 'myWorkEntries'],
-  MANAGER: ['dashboard', 'map', 'carriers', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'workEntries', 'myWorkEntries'],
-  SALES: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers'],
+  ADMIN: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'navigationProjects', 'cityGallery', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'import', 'settings', 'workEntries', 'myWorkEntries'],
+  MANAGER: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'navigationProjects', 'cityGallery', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'workEntries', 'myWorkEntries'],
+  SALES: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'navigationProjects', 'cityGallery'],
   TECHNICIAN: ['dashboard', 'map', 'carriers', 'work', 'tasks', 'myTasks', 'vehicles', 'myWorkEntries'],
   WORKER: ['myTasks', 'mySettlements', 'myWorkEntries'],
   ACCOUNTANT: ['dashboard', 'employees', 'settlements', 'mySettlements'],

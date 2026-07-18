@@ -127,6 +127,65 @@ enum OfferStatus {
   EXPIRED
 }
 
+enum OfferType {
+  STANDARD_MEDIA
+  NAVIGATION
+  CITY_GALLERY
+}
+
+enum NavigationPointStatus {
+  PLANNED
+  APPROVAL_REQUIRED
+  APPROVED
+  TECHNICAL_CHECK
+  READY_FOR_INSTALLATION
+  INSTALLED
+  REMOVED
+  CANCELLED
+}
+
+enum CityGalleryProjectStatus {
+  DRAFT
+  PLANNED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum MediaPackageSelectionMode {
+  MANUAL
+  AUTOMATIC
+  HYBRID
+}
+
+enum OfferEventType {
+  CREATED
+  UPDATED
+  DUPLICATED
+  PUBLISHED
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  QUESTION
+  CONVERTED
+  ARCHIVED
+}
+
+enum OfferPriceCategory {
+  RENTAL
+  PRINT
+  INSTALLATION
+  REMOVAL
+  PRODUCTION
+  SERVICE
+}
+
+enum OfferPriceCalculation {
+  PER_SURFACE
+  FLAT
+}
+
 enum PhotoType {
   LOCATION
   CARRIER
@@ -240,13 +299,18 @@ model User {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  importBatches   ImportBatch[]
-  workAssignments WorkAssignment[]
-  employee        Employee?
-  sessions        UserSession[]
-  tokens          UserToken[]
-  auditActions    UserAuditLog[]   @relation("AuditActor")
-  auditTargets    UserAuditLog[]   @relation("AuditTarget")
+  importBatches          ImportBatch[]
+  workAssignments        WorkAssignment[]
+  employee               Employee?
+  sessions               UserSession[]
+  tokens                 UserToken[]
+  auditActions           UserAuditLog[]   @relation("AuditActor")
+  auditTargets           UserAuditLog[]   @relation("AuditTarget")
+  createdOffers          Offer[]          @relation("OfferCreatedBy")
+  updatedOffers          Offer[]          @relation("OfferUpdatedBy")
+  offerEvents            OfferEvent[]
+  createdOfferPriceRules OfferPriceRule[] @relation("OfferPriceRuleCreatedBy")
+  updatedOfferPriceRules OfferPriceRule[] @relation("OfferPriceRuleUpdatedBy")
 }
 
 model UserSession {
@@ -398,18 +462,22 @@ model EmployeeRate {
 }
 
 model Client {
-  id             String   @id @default(cuid())
-  name           String
-  normalizedName String   @unique
-  companyId      String?
-  contactPerson  String?
-  email          String?
-  phone          String?
-  externalCode   String?  @unique
-  note           String?
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  normalizedName  String    @unique
+  companyId       String?
+  contactPerson   String?
+  email           String?
+  phone           String?
+  externalCode    String?   @unique
+  note            String?
+  logoDriveFileId String?   @unique
+  logoFileName    String?
+  logoMimeType    String?
+  logoUpdatedAt   DateTime?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   currentSurfaces AdvertisingSurface[] @relation("CurrentSurfaceClient")
   occupancies     Occupancy[]
@@ -449,11 +517,12 @@ model AdvertisingCarrier {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  importBatch ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
-  surfaces    AdvertisingSurface[]
-  photos      Photo[]
-  workItems   WorkOrderItem[]
-  workTasks   WorkTask[]
+  importBatch      ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  surfaces         AdvertisingSurface[]
+  photos           Photo[]
+  workItems        WorkOrderItem[]
+  workTasks        WorkTask[]
+  navigationPoints NavigationPoint[]
 
   @@index([importBatchId])
   @@index([archivedAt])
@@ -676,6 +745,7 @@ model Occupancy {
   client  Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
   offer   Offer?             @relation(fields: [offerId], references: [id], onDelete: SetNull)
 
+  @@unique([offerId, surfaceId])
   @@index([surfaceId])
   @@index([clientId])
   @@index([offerId])
@@ -683,41 +753,292 @@ model Occupancy {
 }
 
 model Offer {
-  id         String      @id @default(cuid())
-  clientId   String
-  title      String
-  status     OfferStatus @default(DRAFT)
-  validUntil DateTime?
-  note       String?
-  totalPrice Decimal?    @db.Decimal(12, 2)
-  createdBy  String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id                    String      @id @default(cuid())
+  clientId              String
+  title                 String
+  campaignName          String?
+  contactPerson         String?
+  contactEmail          String?
+  contactPhone          String?
+  campaignGoal          String?
+  budget                Decimal?    @db.Decimal(12, 2)
+  status                OfferStatus @default(DRAFT)
+  offerType             OfferType   @default(STANDARD_MEDIA)
+  validUntil            DateTime?
+  note                  String?
+  internalNote          String?
+  clientMessage         String?
+  currency              String      @default("CZK")
+  taxRate               Decimal     @default(21) @db.Decimal(5, 2)
+  subtotal              Decimal?    @db.Decimal(12, 2)
+  discountAmount        Decimal?    @db.Decimal(12, 2)
+  taxAmount             Decimal?    @db.Decimal(12, 2)
+  totalPrice            Decimal?    @db.Decimal(12, 2)
+  totalWithTax          Decimal?    @db.Decimal(12, 2)
+  publicTokenHash       String?     @unique
+  publishedAt           DateTime?
+  sentAt                DateTime?
+  acceptedAt            DateTime?
+  rejectedAt            DateTime?
+  expiredAt             DateTime?
+  archivedAt            DateTime?
+  negotiationApprovedAt DateTime?
+  createdBy             String?
+  createdByUserId       String?
+  updatedByUserId       String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
 
-  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  items       OfferItem[]
-  occupancies Occupancy[]
+  client            Client                  @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdByUser     User?                   @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser     User?                   @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  items             OfferItem[]
+  occupancies       Occupancy[]
+  events            OfferEvent[]
+  charges           OfferCharge[]
+  navigationOffer   NavigationOffer?
+  cityGalleryOffer  CityGalleryOffer?
+  packageSelections OfferPackageSelection[]
 
   @@index([clientId])
   @@index([status, validUntil])
+  @@index([createdByUserId, createdAt])
+  @@index([archivedAt])
+}
+
+model NavigationOffer {
+  id              String   @id @default(cuid())
+  offerId         String   @unique
+  targetName      String
+  targetAddress   String?
+  targetLatitude  Float
+  targetLongitude Float
+  targetNote      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  offer  Offer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  points NavigationPoint[]
+
+  @@index([targetLatitude, targetLongitude])
+}
+
+model NavigationPoint {
+  id                String                @id @default(cuid())
+  navigationOfferId String
+  carrierId         String?
+  sortOrder         Int                   @default(0)
+  latitude          Float
+  longitude         Float
+  address           String?
+  label             String
+  navigationType    String
+  variant           String?
+  orientation       String?
+  quantity          Decimal               @default(1) @db.Decimal(10, 2)
+  unitPrice         Decimal               @default(0) @db.Decimal(12, 2)
+  subtotal          Decimal               @default(0) @db.Decimal(12, 2)
+  installationPrice Decimal               @default(0) @db.Decimal(12, 2)
+  removalPrice      Decimal               @default(0) @db.Decimal(12, 2)
+  productionPrice   Decimal               @default(0) @db.Decimal(12, 2)
+  internalNote      String?
+  clientNote        String?
+  status            NavigationPointStatus @default(PLANNED)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  navigationOffer NavigationOffer     @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  carrier         AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+
+  @@index([navigationOfferId, sortOrder])
+  @@index([carrierId])
+  @@index([latitude, longitude])
+}
+
+model CityGalleryProject {
+  id          String                   @id @default(cuid())
+  title       String
+  status      CityGalleryProjectStatus @default(DRAFT)
+  city        String?
+  locality    String?
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  description String?
+  dateFrom    DateTime?
+  dateTo      DateTime?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  offers CityGalleryOffer[]
+
+  @@index([status, city])
+}
+
+model CityGalleryOffer {
+  id              String   @id @default(cuid())
+  offerId         String   @unique
+  projectId       String?
+  concept         String?
+  locationBrief   String?
+  realizationNote String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  offer   Offer               @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  project CityGalleryProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+model MediaPackage {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  active          Boolean  @default(true)
+  standardPrice   Decimal? @db.Decimal(12, 2)
+  packagePrice    Decimal? @db.Decimal(12, 2)
+  defaultDuration Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  rules      MediaPackageRule[]
+  selections OfferPackageSelection[]
+
+  @@index([active, name])
+}
+
+model MediaPackageRule {
+  id        String    @id @default(cuid())
+  packageId String
+  mediaType MediaType
+  city      String?
+  locality  String?
+  quantity  Int
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  package MediaPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, sortOrder])
+  @@index([mediaType, city])
+}
+
+model OfferPackageSelection {
+  id            String                    @id @default(cuid())
+  offerId       String
+  packageId     String?
+  packageName   String
+  selectionMode MediaPackageSelectionMode @default(MANUAL)
+  standardPrice Decimal?                  @db.Decimal(12, 2)
+  packagePrice  Decimal?                  @db.Decimal(12, 2)
+  createdAt     DateTime                  @default(now())
+
+  offer   Offer         @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  package MediaPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  items   OfferItem[]
+
+  @@index([offerId])
+  @@index([packageId])
+}
+
+model OfferPriceRule {
+  id              String                @id @default(cuid())
+  code            String                @unique
+  category        OfferPriceCategory
+  label           String
+  description     String?
+  mediaType       MediaType?
+  calculation     OfferPriceCalculation @default(PER_SURFACE)
+  unit            String
+  unitPrice       Decimal               @db.Decimal(12, 2)
+  defaultSelected Boolean               @default(false)
+  active          Boolean               @default(true)
+  sortOrder       Int                   @default(0)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  createdBy User?         @relation("OfferPriceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy User?         @relation("OfferPriceRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  charges   OfferCharge[]
+
+  @@index([category, active, sortOrder])
+  @@index([mediaType, active])
+}
+
+model OfferCharge {
+  id          String             @id @default(cuid())
+  offerId     String
+  priceRuleId String?
+  category    OfferPriceCategory
+  code        String
+  label       String
+  description String?
+  quantity    Decimal            @db.Decimal(10, 2)
+  unit        String
+  unitPrice   Decimal            @db.Decimal(12, 2)
+  subtotal    Decimal            @db.Decimal(12, 2)
+  sortOrder   Int                @default(0)
+  createdAt   DateTime           @default(now())
+
+  offer     Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  priceRule OfferPriceRule? @relation(fields: [priceRuleId], references: [id], onDelete: SetNull)
+
+  @@index([offerId, sortOrder])
+  @@index([priceRuleId])
 }
 
 model OfferItem {
-  id        String   @id @default(cuid())
-  offerId   String
-  surfaceId String
-  dateFrom  DateTime
-  dateTo    DateTime
-  price     Decimal? @db.Decimal(12, 2)
-  note      String?
-  createdAt DateTime @default(now())
+  id                 String   @id @default(cuid())
+  offerId            String
+  packageSelectionId String?
+  surfaceId          String
+  dateFrom           DateTime
+  dateTo             DateTime
+  quantity           Decimal  @default(1) @db.Decimal(10, 2)
+  unit               String   @default("plocha")
+  unitPrice          Decimal? @db.Decimal(12, 2)
+  discountPercent    Decimal  @default(0) @db.Decimal(5, 2)
+  discountAmount     Decimal  @default(0) @db.Decimal(12, 2)
+  subtotal           Decimal? @db.Decimal(12, 2)
+  sortOrder          Int      @default(0)
+  groupLabel         String?
+  customTitle        String?
+  clientDescription  String?
+  price              Decimal? @db.Decimal(12, 2)
+  note               String?
+  createdAt          DateTime @default(now())
 
-  offer   Offer              @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  surface AdvertisingSurface @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  offer            Offer                  @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  surface          AdvertisingSurface     @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  packageSelection OfferPackageSelection? @relation(fields: [packageSelectionId], references: [id], onDelete: SetNull)
 
   @@index([offerId])
   @@index([surfaceId])
+  @@index([packageSelectionId])
   @@index([dateFrom, dateTo])
+}
+
+model OfferEvent {
+  id          String         @id @default(cuid())
+  offerId     String
+  type        OfferEventType
+  fromStatus  OfferStatus?
+  toStatus    OfferStatus?
+  actorUserId String?
+  actorName   String?
+  actorEmail  String?
+  message     String?
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([offerId, createdAt])
+  @@index([actorUserId])
 }
 
 model Photo {

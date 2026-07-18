@@ -1,5 +1,5 @@
-import { prisma } from './db';
-import { selectRateAtDate } from './rate-selection';
+import { prisma } from './db.ts';
+import { selectRateAtDate } from './rate-selection.ts';
 import { RateType, WorkType, RateSource, Prisma, CarrierType } from '@prisma/client';
 
 export async function resolveWorkEntryRate(params: {
