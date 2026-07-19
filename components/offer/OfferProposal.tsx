@@ -30,7 +30,7 @@ export function OfferProposal({
 }) {
   const [action, setAction] = useState<OfferActionType | null>(null);
   const [copied, setCopied] = useState(false);
-  const canRespond = variant === 'public' && Boolean(token) && offer.status === 'SENT';
+  const canRespond = true;
 
   const scrollToMap = useCallback(() => {
     document.getElementById('offer-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
