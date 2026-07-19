@@ -267,7 +267,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       { id: 'locations', icon: 'pin', title: 'Pokrytí klíčových lokalit', description: 'Každá položka je navázaná na konkrétní plochu, město a termín.' },
       { id: 'traffic', icon: 'traffic', title: 'Pěší i automobilová doprava', description: 'Mix ploch umožňuje zasáhnout chodce i řidiče v přirozeném pohybu.' },
       { id: 'brand', icon: 'brand', title: 'Dlouhodobé působení značky', description: 'Opakovaný kontakt během kampaně pomáhá budovat zapamatovatelnost.' },
-      { id: 'documentation', icon: 'camera', title: 'Doložení realizace', description: 'Dostupné fotografie konkrétních ploch jsou součástí klientského přehledu.' },
+      { id: 'documentation', icon: 'camera', title: 'Doložení realizace', description: 'Kompletní fotodokumentaci z instalace a průběhu realizace vaší kampaně vám doložíme ihned po jejím výlepu.' },
     ],
     references: [],
     caseStudies: [],
