@@ -41,7 +41,10 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token) return setResult({ ok: false, message: 'Veřejný odkaz nabídky není dostupný.' });
+    if (!token) {
+      setResult({ ok: true, message: 'Ukázka v náhledu: Odpověď byla úspěšně odeslána. V reálném odkazu pro klienta bude požadavek ihned doručen obchodníkovi.' });
+      return;
+    }
     setPending(true);
     setResult(null);
     try {
