@@ -305,8 +305,10 @@ export function PriceListSettings({ initialPrices }: { initialPrices: PriceListI
             {prices.map((price) => (
               <tr className="border-b last:border-0 hover:bg-slate-50/50" key={price.id}>
                 <td className="py-3 px-2 font-medium text-slate-900">{price.name}</td>
-                <td className="px-2 text-xs text-slate-600">
-                  {price.mediaType || '—'} / {price.carrierType || '—'}
+                <td className="px-2 text-xs text-slate-600 font-mono">
+                  {price.name.toLowerCase().includes('gallery') || price.name.toLowerCase().includes('galerie')
+                    ? 'CITY GALLERY / CITY GALLERY'
+                    : `${price.mediaType || '—'} / ${price.carrierType || '—'}`}
                 </td>
                 <td className="px-2">{price.rentalMonths}</td>
                 <td className="px-2">{price.minQuantity}</td>
