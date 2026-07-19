@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     if (mediaType && productionPrice > 0) {
       const code = `PRINT_${mediaType}`;
-      const label = `Tisk a výroba – ${name.replace(/\s*(komerce|kultura)\s*/i, '').trim() || mediaType}`;
+      const label = `Tisk, výroba a instalace – ${name.replace(/\s*(komerce|kultura)\s*/i, '').trim() || mediaType}`;
       await prisma.offerPriceRule.upsert({
         where: { code },
         create: {

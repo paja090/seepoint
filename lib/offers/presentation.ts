@@ -174,7 +174,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   if (offer.offerType === 'CITY_GALLERY') mediaMix.push({ key: 'OTHER', name: 'Galerie venku', description: offer.cityGallery?.concept || 'Koncept venkovní galerie připravený podle zadání klienta.', image: MEDIA_TYPE_META.OTHER.image, imageAlt: 'Koncept Galerie venku', tone: 'purple', surfaceCount: 1, locationCount: offer.cityGallery?.locationBrief ? 1 : 0, subtotal: number(offer.subtotal) });
   const rentalTotal = offer.offerType === 'NAVIGATION' ? number(offer.subtotal) : offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
   const chargeGroups = [
-    { category: 'PRINT', label: 'Tisk a výroba' },
+    { category: 'PRINT', label: 'Tisk, výroba a instalace' },
     { category: 'INSTALLATION', label: 'Instalace' },
     { category: 'REMOVAL', label: 'Deinstalace' },
     { category: 'PRODUCTION', label: 'Výroba a instalace' },
@@ -221,7 +221,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
 
       if (printTotal > 0) {
         pricingRows.push({
-          label: 'Tisk a výroba',
+          label: 'Tisk, výroba a instalace',
           amount: printTotal,
           note: offer.charges
             .filter((charge) => charge.category === 'PRINT' || charge.category === 'PRODUCTION')

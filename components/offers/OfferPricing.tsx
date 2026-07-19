@@ -10,7 +10,7 @@ import { OfferProcessStepper } from './OfferProcessStepper';
 import { countSurfacesForPriceRule } from '@/lib/offers/domain';
 
 const money = (value: string | number | null) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 2 }).format(Number(value ?? 0));
-const categoryLabels = { PRINT: 'Tisk a výroba', INSTALLATION: 'Instalace', REMOVAL: 'Deinstalace', PRODUCTION: 'Výroba a instalace (původní)', SERVICE: 'Ostatní služby' } as const;
+const categoryLabels = { PRINT: 'Tisk, výroba a instalace', INSTALLATION: 'Samostatná instalace', REMOVAL: 'Deinstalace', PRODUCTION: 'Výroba a instalace (původní)', SERVICE: 'Ostatní služby' } as const;
 
 export function OfferPricing({ offer, priceRules }: { offer: OfferView; priceRules: OfferPriceRuleOption[] }) {
   const router = useRouter();
@@ -59,7 +59,7 @@ export function OfferPricing({ offer, priceRules }: { offer: OfferView; priceRul
             return (
               <>
                 <PriceRow label="Pronájem ploch" value={money(rentalTotal)} />
-                {printTotal > 0 && <PriceRow label="Tisk a výroba" value={money(printTotal)} />}
+                {printTotal > 0 && <PriceRow label="Tisk, výroba a instalace" value={money(printTotal)} />}
                 {installationTotal > 0 && <PriceRow label="Instalace a deinstalace" value={money(installationTotal)} />}
                 {serviceTotal > 0 && <PriceRow label="Ostatní služby" value={money(serviceTotal)} />}
               </>
