@@ -240,15 +240,34 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
         {mediaMode === 'auto' && <div><div className="mb-3 flex items-center gap-2 rounded-xl bg-indigo-50 p-3 text-sm text-indigo-800 ring-1 ring-indigo-200"><Sparkles size={16} />Návrhy vycházejí z vybraných měst, ceny a aktuálně evidovaných ploch.</div><div className="space-y-2">{availableSurfaces.slice(0, 12).map((surface) => { const selected = items.some((item) => item.surfaceId === surface.id); return <div className={`flex items-center gap-3 rounded-xl border p-3 ${selected ? 'border-slate-950 bg-slate-50' : 'border-slate-200'}`} key={surface.id}><span className="grid h-9 w-9 place-items-center rounded-lg bg-slate-950 text-white"><MapPin size={16} /></span><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{surface.carrier.code} · {mediaLabel(surface.mediaType)}</p><p className="truncate text-xs text-slate-500">{surface.carrier.city}, {surface.carrier.locality || surface.carrier.street || surface.name} · {money(surface.price)}</p></div><button className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${selected ? 'bg-slate-950 text-white' : 'border border-slate-200'}`} onClick={() => toggleSurface(surface)} type="button">{selected ? 'Přidáno' : 'Přidat'}</button></div>; })}</div></div>}
 
         {items.length > 0 && <div className="mt-6 space-y-3 border-t border-slate-200 pt-5">
-          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold text-slate-950">Vybrané plochy a kalkulace</h3><span className="text-sm text-slate-500">{items.length} položek</span></div>
-          <div className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto]">
-            <Field label="Hromadná jednotková cena"><input className="input" inputMode="decimal" min="0" onChange={(event) => setBulkPrice(event.target.value)} placeholder="Ponechat beze změny" value={bulkPrice} /></Field>
-            <Field label="Hromadná sleva %"><input className="input" inputMode="decimal" min="0" max="100" onChange={(event) => setBulkDiscount(event.target.value)} placeholder="Ponechat beze změny" value={bulkDiscount} /></Field>
-            <button className="self-end rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-40" disabled={!bulkPrice && !bulkDiscount} onClick={applyBulkPricing} type="button">Použít na všechny</button>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold text-slate-950">Vybrané plochy</h3><span className="text-sm text-slate-500">{items.length} {items.length === 1 ? 'položka' : items.length < 5 ? 'položky' : 'položek'}</span></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {items.map((item) => {
+              const surface = surfaces.find((row) => row.id === item.surfaceId);
+              return (
+                <div key={item.surfaceId} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-950 truncate">{surface?.carrier.code} · {surface?.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{surface?.carrier.city} · {surface ? mediaLabel(surface.mediaType) : ''}</p>
+                    <p className="text-xs text-slate-400 mt-1">{item.dateFrom ? new Date(item.dateFrom).toLocaleDateString('cs-CZ') : 'bez termínu'} – {item.dateTo ? new Date(item.dateTo).toLocaleDateString('cs-CZ') : 'bez termínu'}</p>
+                  </div>
+                  <div className="text-right flex flex-col items-end justify-between h-full gap-3 self-stretch">
+                    <span className="text-xs font-semibold text-slate-950">{surface ? money(surface.price) : '—'}</span>
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-red-600 hover:text-red-800 transition"
+                      onClick={() => surface && toggleSurface(surface)}
+                    >
+                      Odebrat
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {items.map((item, index) => { const surface = surfaces.find((row) => row.id === item.surfaceId); return <OfferItemEditor item={item} key={item.surfaceId} mediaLabel={mediaLabel(surface?.mediaType ?? 'OTHER')} onChange={(key, value) => updateItem(index, key, value)} onRemove={() => surface && toggleSurface(surface)} surface={surface} />; })}
-          <div className="rounded-xl bg-slate-950 p-4 text-white"><div className="flex justify-between text-sm"><span>Cena před slevou</span><b>{money(totals.before)}</b></div><div className="mt-1 flex justify-between text-sm text-slate-300"><span>Sleva</span><b>−{money(totals.discount)}</b></div><div className="mt-1 flex justify-between text-sm"><span>Cena bez DPH</span><b>{money(totals.subtotal)}</b></div><div className="mt-2 flex justify-between text-lg"><span>Celkem s DPH</span><b>{money(totals.total)}</b></div></div>
-          <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold" onClick={() => void checkAvailability()} type="button">Zkontrolovat dostupnost</button>
+          <div className="pt-2 flex items-center justify-between">
+            <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold" onClick={() => void checkAvailability()} type="button">Zkontrolovat dostupnost</button>
+          </div>
           {conflicts.map((conflict) => <div className={`rounded-xl border p-3 text-sm ${conflict.severity === 'block' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`} key={`${conflict.surfaceId}-${conflict.dateFrom}-${conflict.dateTo}-${conflict.status}`}><p className="flex items-center gap-2 font-semibold"><AlertTriangle size={16} />{conflict.carrierCode} · {conflict.surfaceName}</p><p className="mt-1">{conflict.clientName} / {conflict.campaignName}, {conflict.dateFrom}–{conflict.dateTo}</p></div>)}
           {conflicts.some((conflict) => conflict.severity === 'warning') && !conflicts.some((conflict) => conflict.severity === 'block') && <label className="flex gap-2 rounded-xl bg-amber-50 p-3 text-sm"><input checked={confirmNegotiation} onChange={(event) => setConfirmNegotiation(event.target.checked)} type="checkbox" />Potvrzuji pokračování přes varování.</label>}
           <details className="rounded-xl border border-slate-200"><summary className="cursor-pointer p-4 text-sm font-semibold">Náhled nabídky ve v0 designu</summary><div className="border-t border-slate-200"><OfferProposal offer={toProposalOffer(preview)} variant="internal" /></div></details>
