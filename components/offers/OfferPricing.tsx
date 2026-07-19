@@ -7,6 +7,8 @@ import { Check, Eye, Lock, Receipt, Save } from 'lucide-react';
 import type { OfferPriceRuleOption, OfferView } from '@/lib/offers/view-model';
 import { OfferProcessStepper } from './OfferProcessStepper';
 
+import { countSurfacesForPriceRule } from '@/lib/offers/domain';
+
 const money = (value: string | number | null) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 2 }).format(Number(value ?? 0));
 const categoryLabels = { PRINT: 'Tisk a výroba', INSTALLATION: 'Instalace', REMOVAL: 'Deinstalace', PRODUCTION: 'Výroba a instalace (původní)', SERVICE: 'Ostatní služby' } as const;
 
@@ -17,7 +19,7 @@ export function OfferPricing({ offer, priceRules }: { offer: OfferView; priceRul
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const rentalTotal = offer.items.reduce((sum, item) => sum + Number(item.subtotal ?? 0), 0);
-  const quantityFor = (rule: OfferPriceRuleOption) => rule.calculation === 'FLAT' ? 1 : rule.mediaType ? offer.items.filter((item) => item.surface.mediaType === rule.mediaType).length : offer.items.length;
+  const quantityFor = (rule: OfferPriceRuleOption) => countSurfacesForPriceRule(rule, offer.items);
   const draftCharges = availableRules.filter((rule) => selected.has(rule.id)).map((rule) => ({ ...rule, quantity: quantityFor(rule), subtotal: quantityFor(rule) * Number(rule.unitPrice) })).filter((rule) => rule.quantity > 0);
   const extraTotal = draftCharges.reduce((sum, row) => sum + row.subtotal, 0);
   const subtotal = rentalTotal + extraTotal;

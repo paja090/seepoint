@@ -13,6 +13,7 @@ import { selectMediaPackageSurfaces } from '@/lib/offers/media-packages';
 import type { MediaPackageOption, OfferClientOption, OfferPriceRuleOption, OfferSurfaceOption, OfferView } from '@/lib/offers/view-model';
 import { OfferItemEditor, type EditableOfferItem } from './OfferItemEditor';
 import { OfferSurfaceBrowser } from './OfferSurfaceBrowser';
+import { countSurfacesForPriceRule } from '@/lib/offers/domain';
 
 type DraftItem = EditableOfferItem;
 type Conflict = { surfaceId: string; surfaceName: string; carrierCode: string; status: string; clientName: string; campaignName: string; dateFrom: string; dateTo: string; severity: 'block' | 'warning' };
@@ -172,11 +173,14 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
   }
   const chargeSelections = useMemo(() => {
     if (initialOffer?.charges.length) return initialOffer.charges.filter((charge) => charge.priceRuleId).map((charge) => ({ priceRuleId: charge.priceRuleId!, quantity: charge.quantity }));
-    return priceRules.filter((rule) => rule.category !== 'RENTAL' && rule.defaultSelected).map((rule) => ({
-      priceRuleId: rule.id,
-      quantity: rule.calculation === 'FLAT' ? '1' : String(rule.mediaType ? items.filter((item) => item.groupLabel === rule.mediaType).length : items.length),
-    })).filter((selection) => Number(selection.quantity) > 0);
-  }, [initialOffer?.charges, items, priceRules]);
+    return priceRules.filter((rule) => rule.category !== 'RENTAL' && rule.defaultSelected).map((rule) => {
+      const count = countSurfacesForPriceRule(rule, items.map((item) => {
+        const s = resolvedSurfaces.find((row) => row.id === item.surfaceId);
+        return { groupLabel: item.groupLabel, surface: s };
+      }));
+      return { priceRuleId: rule.id, quantity: String(count) };
+    }).filter((selection) => Number(selection.quantity) > 0);
+  }, [initialOffer?.charges, items, priceRules, resolvedSurfaces]);
   const draftPayload = useMemo(() => {
     const payloadItems = items.map((item) => {
       const surface = resolvedSurfaces.find((s) => s.id === item.surfaceId);
