@@ -56,6 +56,32 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       },
     });
 
+    if (mediaType && productionPrice > 0) {
+      const code = `PRINT_${mediaType}`;
+      const label = `Tisk a výroba – ${name.replace(/\s*(komerce|kultura)\s*/i, '').trim() || mediaType}`;
+      await prisma.offerPriceRule.upsert({
+        where: { code },
+        create: {
+          code,
+          category: 'PRINT',
+          label,
+          mediaType,
+          calculation: 'PER_SURFACE',
+          unit: 'ks',
+          unitPrice: productionPrice,
+          defaultSelected: true,
+          active: true,
+        },
+        update: {
+          label,
+          mediaType,
+          unitPrice: productionPrice,
+          defaultSelected: true,
+          active: true,
+        },
+      });
+    }
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Failed to update price list item:', error);
