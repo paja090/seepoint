@@ -284,7 +284,7 @@ test('CP26 ambiguity is historical only when the whole source month is past', ()
 });
 
 test('unresolved client UI label and filter are explicit', () => {
-  assert.equal(occupancyClientLabel(null, null, 'placeholder'), 'Klient neurÄŤen');
+  assert.equal(occupancyClientLabel(null, null, 'placeholder'), 'Klient neurčen');
   assert.equal(clientResolutionFilter('unresolved'), 'unresolved');
   assert.equal(clientResolutionFilter('invalid'), 'all');
 });

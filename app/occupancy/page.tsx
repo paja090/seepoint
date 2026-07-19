@@ -8,7 +8,8 @@ import { Button, EmptyState, ErrorState, FilterBar, PageHeader, StatCard, Table,
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { prisma } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
-import { clientResolutionFilter, occupancyClientLabel } from '@/lib/occupancy-client';
+import { clientResolutionFilter } from '@/lib/occupancy-client';
+import { OccupancyClientPairing } from '@/components/OccupancyClientPairing';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +68,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     const today = new Date();
     const in7 = new Date(today); in7.setDate(today.getDate() + 7);
     const in30 = new Date(today); in30.setDate(today.getDate() + 30);
-    const [total, rows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count] = await Promise.all([
+    const [total, rows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients] = await Promise.all([
       prisma.occupancy.count({ where }),
       prisma.occupancy.findMany({
         where,
@@ -80,6 +81,11 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       prisma.occupancy.count({ where: { ...where, status: 'NEGOTIATION' } }),
       prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in7 } } }),
       prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } } }),
+      prisma.client.findMany({
+        where: { active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
     ]);
 
     return (
@@ -122,7 +128,16 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           ) : (
             <Table minWidth="min-w-[980px]">
               <TableHead><tr><TableHeaderCell>Nosič</TableHeaderCell><TableHeaderCell>Plocha</TableHeaderCell><TableHeaderCell>Klient</TableHeaderCell><TableHeaderCell>Kampaň</TableHeaderCell><TableHeaderCell>Od</TableHeaderCell><TableHeaderCell>Do</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
-              <tbody>{rows.map((row) => <tr className="hover:bg-slate-50/60" key={row.id}><TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>{row.surface.carrier.code}</Link><br /><span className="text-slate-500">{row.surface.carrier.city}</span></TableCell><TableCell>{row.surface.name}<br /><span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span></TableCell><TableCell>{occupancyClientLabel(row.client, row.clientId, row.clientName)}</TableCell><TableCell><b>{row.campaignName}</b>{row.sourceSystem && <><br /><span className="text-slate-500">Zdroj: {row.sourceSystem}{row.sourceSheet ? ` / ${row.sourceSheet}` : ''}</span></>}</TableCell><TableCell>{dateOnly(row.dateFrom)}</TableCell><TableCell>{dateOnly(row.dateTo)}</TableCell><TableCell><StatusBadge value={row.status} /></TableCell><TableCell><Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>Detail</Link></TableCell></tr>)}</tbody>
+              <tbody>{rows.map((row) => <tr className="hover:bg-slate-50/60" key={row.id}><TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>{row.surface.carrier.code}</Link><br /><span className="text-slate-500">{row.surface.carrier.city}</span></TableCell><TableCell>{row.surface.name}<br /><span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span></TableCell><TableCell>
+                    <OccupancyClientPairing
+                      occupancyId={row.id}
+                      surfaceId={row.surfaceId}
+                      initialClientId={row.clientId}
+                      initialClientName={row.clientName}
+                      matchedClientName={row.client?.name}
+                      clients={clients}
+                    />
+                  </TableCell><TableCell><b>{row.campaignName}</b>{row.sourceSystem && <><br /><span className="text-slate-500">Zdroj: {row.sourceSystem}{row.sourceSheet ? ` / ${row.sourceSheet}` : ''}</span></>}</TableCell><TableCell>{dateOnly(row.dateFrom)}</TableCell><TableCell>{dateOnly(row.dateTo)}</TableCell><TableCell><StatusBadge value={row.status} /></TableCell><TableCell><Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>Detail</Link></TableCell></tr>)}</tbody>
             </Table>
           )}
         </section>
