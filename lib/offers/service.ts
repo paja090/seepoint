@@ -492,7 +492,8 @@ export async function updateOffer(user: CurrentUser, id: string, raw: unknown) {
 
 export async function updateOfferPricing(user: CurrentUser, id: string, raw: unknown) {
   assertRole(user);
-  const rows = raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>).chargeSelections) ? (raw as { chargeSelections: unknown[] }).chargeSelections : [];
+  const body = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const rows = Array.isArray(body.chargeSelections) ? (body.chargeSelections as unknown[]) : [];
   const chargeSelections = rows.map((row, index) => {
     if (!row || typeof row !== 'object') throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
     const input = row as Record<string, unknown>;
@@ -502,12 +503,28 @@ export async function updateOfferPricing(user: CurrentUser, id: string, raw: unk
     if (!priceRuleId || quantity.lte(0)) throw new OfferValidationError(`Doplňková položka ${index + 1} není platná.`);
     return { priceRuleId, quantity: quantity.toFixed(2) };
   });
+
+  const discountPercentStr = typeof body.discountPercent === 'string' || typeof body.discountPercent === 'number' ? String(body.discountPercent) : null;
+
   return prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
     if (existing.status !== 'DRAFT') throw new OfferValidationError('Ceník lze upravovat pouze u konceptu.', 'INVALID_STATUS_TRANSITION');
-    const calculated = calculateOffer(existing.items.map(existingItemInput), value(existing.taxRate) ?? '21', await resolveCharges(tx, { chargeSelections }));
+    
+    const items = existing.items.map((item) => {
+      const input = existingItemInput(item);
+      if (discountPercentStr !== null) {
+        input.discountPercent = discountPercentStr;
+        input.discountAmount = '0.00';
+      }
+      return input;
+    });
+
+    const calculated = calculateOffer(items, value(existing.taxRate) ?? '21', await resolveCharges(tx, { chargeSelections }));
+    
+    await tx.offerItem.deleteMany({ where: { offerId: id } });
     await tx.offerCharge.deleteMany({ where: { offerId: id } });
+
     const row = await tx.offer.update({
       where: { id },
       data: {
@@ -517,8 +534,9 @@ export async function updateOfferPricing(user: CurrentUser, id: string, raw: unk
         totalPrice: new Prisma.Decimal(calculated.totals.subtotal),
         totalWithTax: new Prisma.Decimal(calculated.totals.totalWithTax),
         updatedByUserId: user.id,
+        items: { create: calculated.items.map(itemData) },
         charges: { create: calculated.charges.map(chargeData) },
-        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, message: 'Upravena cenová kalkulace.' } },
+        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, message: 'Upravena cenová kalkulace a sleva.' } },
       },
       include: offerInclude,
     });
