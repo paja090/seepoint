@@ -775,6 +775,7 @@ model Offer {
   clientId              String
   title                 String
   campaignName          String?
+  pricingTier           String      @default("komerce")
   contactPerson         String?
   contactEmail          String?
   contactPhone          String?

@@ -68,6 +68,7 @@ export async function getOfferFormOptions() {
         code: surface.carrier.code,
         name: surface.carrier.name,
         city: surface.carrier.city,
+        type: surface.carrier.type,
         locality: surface.carrier.locality,
         street: surface.carrier.street,
         address: surface.carrier.address,
@@ -101,5 +102,5 @@ export async function getOfferFormOptions() {
     })),
   }));
 
-  return { clients: clientOptions, surfaces: surfaceOptions, priceRules: pricing, mediaPackages };
+  return { clients: clientOptions, surfaces: surfaceOptions, priceRules: pricing, mediaPackages, priceListItems: priceListItems.map(item => ({ id: item.id, name: item.name, mediaType: item.mediaType, carrierType: item.carrierType, rentalPrice: item.rentalPrice.toFixed(2) })) };
 }

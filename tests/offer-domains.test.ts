@@ -5,7 +5,7 @@ import type { MediaPackageOption, OfferSurfaceOption } from '../lib/offers/view-
 import { Prisma } from '@prisma/client';
 import { calculateNavigationOfferTotals, calculateNavigationPointSubtotal } from '../lib/offers/navigation-pricing.ts';
 
-const surface = (id: string, mediaType: string, city: string, price: string): OfferSurfaceOption => ({ id, name: id, mediaType, status: 'AVAILABLE', price, photos: [], carrier: { id: `c-${id}`, code: id, name: id, city } });
+const surface = (id: string, mediaType: string, city: string, price: string): OfferSurfaceOption => ({ id, name: id, mediaType, status: 'AVAILABLE', price, photos: [], carrier: { id: `c-${id}`, code: id, name: id, city, type: mediaType } });
 
 test('mediální balíček vybere konkrétní plochy podle typu a města bez duplicit', () => {
   const pkg: MediaPackageOption = { id: 'package-1', name: 'Ostravský mix', rules: [{ id: 'r1', mediaType: 'CITY_POSTER', city: 'Ostrava', quantity: 2, sortOrder: 0 }, { id: 'r2', mediaType: 'PROMO_BENCH', city: 'Ostrava', quantity: 1, sortOrder: 1 }] };

@@ -6,7 +6,7 @@ import type { OfferView } from '../lib/offers/view-model.ts';
 function standardOffer(clientVisible: boolean): OfferView {
   return {
     id: 'offer-1', clientId: 'client-1', title: 'Interní název', campaignName: 'Letní kampaň',
-    contactPerson: 'Jan Novák', contactEmail: 'jan@example.cz', status: 'DRAFT', validUntil: '2026-08-01',
+    contactPerson: 'Jan Novák', contactEmail: 'jan@example.cz', status: 'DRAFT', pricingTier: 'komerce', validUntil: '2026-08-01',
     currency: 'CZK', taxRate: '21.00', subtotalBeforeDiscount: '10000.00', subtotal: '10000.00', discountAmount: '0.00', taxAmount: '2100.00', totalWithTax: '12100.00',
     createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z', createdBy: { name: 'Obchodník' }, client: { name: 'Klient s.r.o.' }, charges: [],
     items: [{

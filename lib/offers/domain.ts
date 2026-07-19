@@ -31,6 +31,7 @@ export type OfferInput = {
   validUntil?: string;
   internalNote?: string;
   clientMessage?: string;
+  pricingTier: string;
   taxRate: string;
   confirmNegotiation: boolean;
   packageId?: string;
@@ -159,6 +160,7 @@ export function normalizeOfferInput(raw: unknown): OfferInput {
   return {
     clientId,
     title,
+    pricingTier: text(input.pricingTier) || 'komerce',
     campaignName: text(input.campaignName) || undefined,
     contactPerson: text(input.contactPerson) || undefined,
     contactEmail: contactEmail || undefined,
