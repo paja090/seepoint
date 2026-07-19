@@ -6,7 +6,7 @@ import type { OfferPriceRuleOption } from '@/lib/offers/view-model';
 
 type Rule = OfferPriceRuleOption & { active: boolean; sortOrder: number };
 const emptyRule = { id: '', code: '', category: 'PRINT', label: '', description: '', mediaType: '', calculation: 'PER_SURFACE', unit: 'ks', unitPrice: '', defaultSelected: true, active: true, sortOrder: 0 } as const;
-const categoryLabels = { RENTAL: 'Pronájem ploch', PRINT: 'Tisk a výroba', INSTALLATION: 'Instalace', REMOVAL: 'Deinstalace', PRODUCTION: 'Výroba (původní)', SERVICE: 'Ostatní služby' } as const;
+const categoryLabels = { RENTAL: 'Pronájem ploch', PRINT: 'Tisk, výroba a instalace', INSTALLATION: 'Samostatná instalace', REMOVAL: 'Deinstalace', PRODUCTION: 'Výroba a instalace (původní)', SERVICE: 'Ostatní služby' } as const;
 const mediaTypes = ['NAVIGATION_SIGN', 'BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BANNER', 'FACADE', 'LED_SCREEN', 'PROMO_BENCH', 'PROMO_HORIZON', 'CITY_POSTER', 'PROMO_TOWER', 'PROMO_MINITOWER', 'OTHER'];
 
 export function OfferPriceCatalogSettings() {

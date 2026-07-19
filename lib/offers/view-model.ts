@@ -60,6 +60,7 @@ export type OfferView = {
   campaignGoal?: string | null;
   budget?: string | null;
   status: string;
+  pricingTier: string;
   offerType?: 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY';
   validUntil: string | null;
   internalNote?: string | null;
@@ -119,7 +120,7 @@ export type OfferSurfaceOption = {
   priceSource?: 'SURFACE' | 'CATALOG' | 'MISSING';
   currentClient?: string | null;
   photos: Array<{ id: string; url: string }>;
-  carrier: { id: string; code: string; name: string; city: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };
+  carrier: { id: string; code: string; name: string; city: string; type: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };
 };
 
 export type MediaPackageOption = {

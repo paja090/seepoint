@@ -158,7 +158,7 @@ export function OfferSurfaceBrowser({
               <article className={`overflow-hidden rounded-xl border bg-white transition ${selected ? 'border-slate-950 ring-1 ring-slate-950' : 'border-slate-200 hover:border-slate-300'}`} key={surface.id}>
                 <button className="block w-full text-left" onClick={() => setActiveId(surface.id)} type="button">
                   {surface.photos[0] ? (
-                    <Image alt={`${surface.carrier.code} · ${surface.name}`} className="h-28 w-full object-cover" height={300} src={surface.photos[0].url} width={500} />
+                    <Image alt={`${surface.carrier.code} · ${surface.name}`} className="h-28 w-full object-cover" height={300} src={surface.photos[0].url} width={500} unoptimized />
                   ) : (
                     <span className="grid h-28 place-items-center bg-slate-100 text-slate-400"><ImageIcon aria-hidden /></span>
                   )}
@@ -197,9 +197,9 @@ export function OfferSurfaceBrowser({
               <button aria-label="Zavřít detail plochy" className="rounded-lg p-2 hover:bg-slate-100" onClick={() => { setActiveId(null); setLightboxOpen(false); }} type="button"><X size={18} /></button>
             </div>
             {active.photos[0] ? (
-              <button className="group relative block w-full" onClick={() => setLightboxOpen(true)} type="button">
-                <Image alt={`${active.carrier.code} · ${active.name}`} className="max-h-[440px] w-full object-cover" height={900} src={active.photos[0].url} width={1400} />
-                <span className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-lg bg-slate-950/85 px-3 py-2 text-sm font-semibold text-white"><Expand size={16} /> Zvětšit fotografii</span>
+              <button className="relative block w-full overflow-hidden rounded-xl border border-slate-200 text-left hover:opacity-95" onClick={() => setLightboxOpen(true)} type="button">
+                <Image alt={`${active.carrier.code} · ${active.name}`} className="max-h-[440px] w-full object-cover" height={900} src={active.photos[0].url} width={1400} unoptimized />
+                <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg bg-slate-950/80 px-2 py-1 text-xs font-semibold text-white backdrop-blur-sm"><Expand size={13} /> Zvětšit fotografii</span>
               </button>
             ) : <div className="grid h-72 place-items-center bg-slate-100 text-slate-400"><ImageIcon size={36} /></div>}
             <div className="grid gap-4 p-5 sm:grid-cols-2">
@@ -212,9 +212,10 @@ export function OfferSurfaceBrowser({
       )}
 
       {active?.photos[0] && lightboxOpen && (
-        <button aria-label="Zavřít zvětšenou fotografii" className="fixed inset-0 z-[1010] grid place-items-center bg-black/90 p-4" onClick={() => setLightboxOpen(false)} type="button">
-          <Image alt={`${active.carrier.code} · ${active.name}`} className="max-h-[94vh] w-auto max-w-[96vw] object-contain" height={1400} src={active.photos[0].url} width={2000} />
-        </button>
+        <div className="fixed inset-0 z-[1010] flex items-center justify-center bg-slate-950/90 p-4" onClick={() => setLightboxOpen(false)}>
+          <Image alt={`${active.carrier.code} · ${active.name}`} className="max-h-[94vh] w-auto max-w-[96vw] object-contain" height={1400} src={active.photos[0].url} width={2000} unoptimized />
+          <button className="absolute top-4 right-4 rounded-xl bg-white/10 p-2 text-white hover:bg-white/20" onClick={() => setLightboxOpen(false)} type="button"><X size={20} /></button>
+        </div>
       )}
     </div>
   );

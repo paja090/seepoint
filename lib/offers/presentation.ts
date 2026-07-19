@@ -174,7 +174,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   if (offer.offerType === 'CITY_GALLERY') mediaMix.push({ key: 'OTHER', name: 'Galerie venku', description: offer.cityGallery?.concept || 'Koncept venkovní galerie připravený podle zadání klienta.', image: MEDIA_TYPE_META.OTHER.image, imageAlt: 'Koncept Galerie venku', tone: 'purple', surfaceCount: 1, locationCount: offer.cityGallery?.locationBrief ? 1 : 0, subtotal: number(offer.subtotal) });
   const rentalTotal = offer.offerType === 'NAVIGATION' ? number(offer.subtotal) : offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
   const chargeGroups = [
-    { category: 'PRINT', label: 'Tisk a výroba' },
+    { category: 'PRINT', label: 'Tisk, výroba a instalace' },
     { category: 'INSTALLATION', label: 'Instalace' },
     { category: 'REMOVAL', label: 'Deinstalace' },
     { category: 'PRODUCTION', label: 'Výroba a instalace' },
@@ -198,18 +198,69 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible === true).length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
-    pricing: [
-      { label: offer.offerType === 'NAVIGATION' ? 'Navigační body, výroba a montáž' : offer.offerType === 'CITY_GALLERY' ? 'Projekt Galerie venku' : 'Pronájem reklamních ploch', amount: offer.offerType === 'CITY_GALLERY' ? number(offer.subtotal) : rentalTotal, note: offer.offerType === 'NAVIGATION' ? `${offer.navigation?.points.length ?? 0} plánovaných bodů` : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.locationBrief || 'Individuální realizace' : `${offer.items.length} vybraných ploch` },
-      ...chargeGroups.flatMap((group) => {
-        const charges = offer.charges.filter((charge) => charge.category === group.category);
-        const amount = charges.reduce((sum, charge) => sum + number(charge.subtotal), 0);
-        return amount ? [{ label: group.label, amount, note: charges.map((charge) => charge.label).join(', ') }] : [];
-      }),
-      { label: 'Sleva', amount: -number(offer.discountAmount), emphasis: 'discount' },
-      { label: 'Cena bez DPH', amount: number(offer.subtotal), emphasis: 'subtotal' },
-      { label: `DPH ${offer.taxRate ?? 0} %`, amount: number(offer.taxAmount) },
-      { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' },
-    ],
+    pricing: (() => {
+      const printTotal = offer.charges
+        .filter((charge) => charge.category === 'PRINT' || charge.category === 'PRODUCTION')
+        .reduce((sum, charge) => sum + number(charge.subtotal), 0);
+
+      const installationTotal = offer.charges
+        .filter((charge) => charge.category === 'INSTALLATION' || charge.category === 'REMOVAL')
+        .reduce((sum, charge) => sum + number(charge.subtotal), 0);
+
+      const serviceTotal = offer.charges
+        .filter((charge) => charge.category === 'SERVICE')
+        .reduce((sum, charge) => sum + number(charge.subtotal), 0);
+
+      const pricingRows: Array<{ label: string; amount: number; emphasis?: 'discount' | 'subtotal' | 'total'; note?: string }> = [
+        { 
+          label: offer.offerType === 'NAVIGATION' ? 'Navigační body, výroba a montáž' : offer.offerType === 'CITY_GALLERY' ? 'Projekt Galerie venku' : 'Pronájem reklamních ploch', 
+          amount: offer.offerType === 'CITY_GALLERY' ? number(offer.subtotal) : rentalTotal, 
+          note: offer.offerType === 'NAVIGATION' ? `${offer.navigation?.points.length ?? 0} plánovaných bodů` : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.locationBrief || 'Individuální realizace' : `${offer.items.length} vybraných ploch` 
+        }
+      ];
+
+      if (printTotal > 0) {
+        pricingRows.push({
+          label: 'Tisk, výroba a instalace',
+          amount: printTotal,
+          note: offer.charges
+            .filter((charge) => charge.category === 'PRINT' || charge.category === 'PRODUCTION')
+            .map((charge) => charge.label)
+            .join(', '),
+        });
+      }
+
+      if (installationTotal > 0) {
+        pricingRows.push({
+          label: 'Instalace a deinstalace',
+          amount: installationTotal,
+          note: offer.charges
+            .filter((charge) => charge.category === 'INSTALLATION' || charge.category === 'REMOVAL')
+            .map((charge) => charge.label)
+            .join(', '),
+        });
+      }
+
+      if (serviceTotal > 0) {
+        pricingRows.push({
+          label: 'Ostatní služby',
+          amount: serviceTotal,
+          note: offer.charges
+            .filter((charge) => charge.category === 'SERVICE')
+            .map((charge) => charge.label)
+            .join(', '),
+        });
+      }
+
+      pricingRows.push(
+        { label: 'Sleva', amount: -number(offer.discountAmount), emphasis: 'discount' as const },
+        { label: 'Cena bez DPH', amount: number(offer.subtotal), emphasis: 'subtotal' as const },
+        { label: `DPH ${offer.taxRate ?? 0} %`, amount: number(offer.taxAmount) },
+        { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' as const }
+      );
+
+      return pricingRows;
+    })(),
     benefits: [
       { id: 'reach', icon: 'reach', title: 'Vysoký zásah', description: 'Kombinace vybraných médií oslovuje publikum napříč lokalitami kampaně.' },
       { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Venkovní reklama komunikuje průběžně po celou dobu kampaně.' },

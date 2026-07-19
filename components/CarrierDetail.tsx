@@ -1,29 +1,20 @@
 'use client';
 
-import type { Carrier, Client, SurfaceStatus } from '@/lib/types';
+import type { Carrier, Client } from '@/lib/types';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { CarrierArchiveActions } from './CarrierArchiveActions';
-import { ClientAssignments } from './ClientAssignments';
 import { LocationMiniMap } from './LocationMiniMap';
 import { OccupancyActions } from './OccupancyActions';
 import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 
-type SurfaceClientChangeHandler = (
-  surfaceId: string,
-  currentClient: Pick<Client, 'id' | 'name'> | undefined,
-  status: SurfaceStatus,
-) => void;
-
 export function CarrierDetail({
   carrier,
-  onSurfaceClientChanged,
   showLocationMap = false,
   clients = [],
   canEdit = false,
 }: {
   carrier: Carrier;
-  onSurfaceClientChanged?: SurfaceClientChangeHandler;
   showLocationMap?: boolean;
   clients?: Array<Pick<Client, 'id' | 'name'>>;
   canEdit?: boolean;
@@ -142,7 +133,6 @@ export function CarrierDetail({
             ))}
           </div>
         )}
-        <ClientAssignments initialSurfaces={carrier.surfaces} onChanged={onSurfaceClientChanged} />
       </section>
 
       <section id="campaign-history" className="scroll-mt-6">

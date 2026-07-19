@@ -8,6 +8,8 @@ import { Button, EmptyState, ErrorState, FilterBar, PageHeader, StatCard, Table,
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { prisma } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
+import { clientResolutionFilter } from '@/lib/occupancy-client';
+import { OccupancyClientPairing } from '@/components/OccupancyClientPairing';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,7 @@ function dateOnly(date: Date) { return date.toISOString().slice(0, 10); }
 function buildWhere(params: SearchParams) {
   const q = clean(params.q);
   const client = clean(params.client);
+  const clientResolution = clientResolutionFilter(clean(params.clientResolution));
   const city = clean(params.city);
   const status = clean(params.status);
   const mediaType = clean(params.mediaType);
@@ -43,6 +46,8 @@ function buildWhere(params: SearchParams) {
     { surface: { carrier: { city: { contains: q, mode: 'insensitive' } } } },
   ];
   if (client) where.clientName = { contains: client, mode: 'insensitive' };
+  if (clientResolution === 'resolved') where.clientId = { not: null };
+  if (clientResolution === 'unresolved') where.clientId = null;
   if (isOccupancyStatus(status)) where.status = status;
   if (dateFrom && dateTo) Object.assign(where, { dateFrom: { lte: dateTo }, dateTo: { gte: dateFrom } });
   else if (dateFrom) where.dateTo = { gte: dateFrom };
@@ -63,7 +68,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     const today = new Date();
     const in7 = new Date(today); in7.setDate(today.getDate() + 7);
     const in30 = new Date(today); in30.setDate(today.getDate() + 30);
-    const [total, rows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count] = await Promise.all([
+    const [total, rows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients] = await Promise.all([
       prisma.occupancy.count({ where }),
       prisma.occupancy.findMany({
         where,
@@ -76,6 +81,11 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       prisma.occupancy.count({ where: { ...where, status: 'NEGOTIATION' } }),
       prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in7 } } }),
       prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } } }),
+      prisma.client.findMany({
+        where: { active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
     ]);
 
     return (
@@ -98,6 +108,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-6" method="get">
             <label className="text-sm font-medium">Hledání<input className="input mt-1" name="q" defaultValue={clean(params.q) ?? ''} placeholder="Kampaň, klient, kód" /></label>
             <label className="text-sm font-medium">Klient<input className="input mt-1" name="client" defaultValue={clean(params.client) ?? ''} /></label>
+            <label className="text-sm font-medium">PĹ™iĹ™azenĂ­ klienta<select className="input mt-1" name="clientResolution" defaultValue={clientResolutionFilter(clean(params.clientResolution))}><option value="all">VĹˇechny</option><option value="resolved">Klient pĹ™iĹ™azen</option><option value="unresolved">Klient neurÄŤen</option></select></label>
             <label className="text-sm font-medium">Město<input className="input mt-1" name="city" defaultValue={clean(params.city) ?? ''} /></label>
             <label className="text-sm font-medium">Typ média<select className="input mt-1" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}><option value="">Všechna média</option>{mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}</select></label>
             <label className="text-sm font-medium">Stav<select className="input mt-1" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
@@ -117,7 +128,16 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           ) : (
             <Table minWidth="min-w-[980px]">
               <TableHead><tr><TableHeaderCell>Nosič</TableHeaderCell><TableHeaderCell>Plocha</TableHeaderCell><TableHeaderCell>Klient</TableHeaderCell><TableHeaderCell>Kampaň</TableHeaderCell><TableHeaderCell>Od</TableHeaderCell><TableHeaderCell>Do</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
-              <tbody>{rows.map((row) => <tr className="hover:bg-slate-50/60" key={row.id}><TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>{row.surface.carrier.code}</Link><br /><span className="text-slate-500">{row.surface.carrier.city}</span></TableCell><TableCell>{row.surface.name}<br /><span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span></TableCell><TableCell>{row.client?.name ?? row.clientName}</TableCell><TableCell><b>{row.campaignName}</b></TableCell><TableCell>{dateOnly(row.dateFrom)}</TableCell><TableCell>{dateOnly(row.dateTo)}</TableCell><TableCell><StatusBadge value={row.status} /></TableCell><TableCell><Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>Detail</Link></TableCell></tr>)}</tbody>
+              <tbody>{rows.map((row) => <tr className="hover:bg-slate-50/60" key={row.id}><TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>{row.surface.carrier.code}</Link><br /><span className="text-slate-500">{row.surface.carrier.city}</span></TableCell><TableCell>{row.surface.name}<br /><span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span></TableCell><TableCell>
+                    <OccupancyClientPairing
+                      occupancyId={row.id}
+                      surfaceId={row.surfaceId}
+                      initialClientId={row.clientId}
+                      initialClientName={row.clientName}
+                      matchedClientName={row.client?.name}
+                      clients={clients}
+                    />
+                  </TableCell><TableCell><b>{row.campaignName}</b>{row.sourceSystem && <><br /><span className="text-slate-500">Zdroj: {row.sourceSystem}{row.sourceSheet ? ` / ${row.sourceSheet}` : ''}</span></>}</TableCell><TableCell>{dateOnly(row.dateFrom)}</TableCell><TableCell>{dateOnly(row.dateTo)}</TableCell><TableCell><StatusBadge value={row.status} /></TableCell><TableCell><Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>Detail</Link></TableCell></tr>)}</tbody>
             </Table>
           )}
         </section>

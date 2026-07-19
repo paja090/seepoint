@@ -31,6 +31,7 @@ export type OfferInput = {
   validUntil?: string;
   internalNote?: string;
   clientMessage?: string;
+  pricingTier: string;
   taxRate: string;
   confirmNegotiation: boolean;
   packageId?: string;
@@ -159,6 +160,7 @@ export function normalizeOfferInput(raw: unknown): OfferInput {
   return {
     clientId,
     title,
+    pricingTier: text(input.pricingTier) || 'komerce',
     campaignName: text(input.campaignName) || undefined,
     contactPerson: text(input.contactPerson) || undefined,
     contactEmail: contactEmail || undefined,
@@ -312,4 +314,37 @@ export function stripPublicOfferSecrets<T extends Record<string, unknown>>(sourc
   if (result.navigation && typeof result.navigation === 'object') { const navigation = { ...(result.navigation as Record<string, unknown>) }; if (Array.isArray(navigation.points)) navigation.points = navigation.points.map((raw) => { const point = { ...(raw as Record<string, unknown>) }; delete point.id; delete point.carrierId; delete point.internalNote; delete point.status; return point; }); result.navigation = navigation; }
   if (result.cityGallery && typeof result.cityGallery === 'object') { const gallery = { ...(result.cityGallery as Record<string, unknown>) }; delete gallery.projectId; result.cityGallery = gallery; }
   return result as T;
+}
+
+export function countSurfacesForPriceRule(
+  rule: { code: string; mediaType?: string | null; calculation?: string },
+  items: Array<{ groupLabel?: string | null; surface?: { name?: string; mediaType?: string; carrier?: { name?: string } } }>
+): number {
+  if (rule.calculation === 'FLAT') return 1;
+
+  const countMatching = (predicate: (name: string, carrierName: string, mediaType: string) => boolean) => {
+    return items.filter((item) => {
+      const name = (item.surface?.name || item.groupLabel || '').toLowerCase();
+      const carrierName = (item.surface?.carrier?.name || '').toLowerCase();
+      const mediaType = (item.surface?.mediaType || item.groupLabel || '').toUpperCase();
+      return predicate(name, carrierName, mediaType);
+    }).length;
+  };
+
+  if (rule.code === 'PRINT_CLV') {
+    return countMatching((name, carrier, mediaType) => mediaType === 'CITYLIGHT' && !name.includes('galerie') && !carrier.includes('galerie'));
+  }
+  if (rule.code === 'PRINT_CITY_GALLERY') {
+    return countMatching((name, carrier, mediaType) => mediaType === 'CITYLIGHT' && (name.includes('galerie') || carrier.includes('galerie')));
+  }
+  if (rule.code === 'PRINT_PROMO_MINITOWER') {
+    return countMatching((name, carrier, mediaType) => mediaType === 'PROMO_TOWER' && (name.includes('mini') || carrier.includes('mini')));
+  }
+  if (rule.code === 'PRINT_TOWER') {
+    return countMatching((name, carrier, mediaType) => mediaType === 'PROMO_TOWER' && !name.includes('mini') && !carrier.includes('mini'));
+  }
+  if (rule.mediaType) {
+    return countMatching((_, __, mediaType) => mediaType === rule.mediaType);
+  }
+  return items.length;
 }

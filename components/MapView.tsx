@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
-import type { Carrier, CarrierStatus, Client, SurfaceStatus } from '@/lib/types';
+import type { Carrier, CarrierStatus, Client } from '@/lib/types';
 import { carrierMapColor } from '@/lib/mock-data';
 import { CarrierDetail } from './CarrierDetail';
 import { CarrierForm } from './CarrierForm';
@@ -205,13 +205,6 @@ export function MapView({
     }
   }
 
-  function updateSurfaceClient(surfaceId: string, currentClient: Pick<Client, 'id' | 'name'> | undefined, surfaceStatus: SurfaceStatus) {
-    setItems((current) => current.map((carrier) => carrier.surfaces.some((surface) => surface.id === surfaceId) ? {
-      ...carrier,
-      surfaces: carrier.surfaces.map((surface) => surface.id === surfaceId ? { ...surface, currentClientId: currentClient?.id, currentClient, status: surfaceStatus } : surface),
-    } : carrier));
-  }
-
   return (
     <div className="space-y-4">
       <section className="card flex flex-col gap-4 !p-4 xl:flex-row xl:items-center xl:justify-between">
@@ -253,7 +246,7 @@ export function MapView({
               <button type="button" className="text-sm font-medium text-sky-700 hover:text-sky-900" onClick={startLocationEdit}>{hasCoordinates(selected) ? 'Upravit polohu' : 'Doplnit polohu'}</button>
               <Link className="ml-auto text-sm font-medium text-slate-700 hover:text-slate-950" href={`/carriers/${selected.id}`}>Otevřít celý detail →</Link>
             </div>}
-            <CarrierDetail carrier={selected} onSurfaceClientChanged={updateSurfaceClient} canEdit={canEdit} />
+            <CarrierDetail carrier={selected} canEdit={canEdit} />
           </> : <p className="text-sm text-slate-500">Vyberte nosič na mapě.</p>}
         </aside>
       </div>
