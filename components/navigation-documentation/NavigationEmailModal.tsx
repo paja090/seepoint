@@ -22,9 +22,10 @@ export function NavigationEmailModal({
   onClose: () => void;
   onSent: () => void;
 }) {
+  const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://seepoint.vercel.app';
   const defaultLink = token
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/client/navigation-documentation/${token}`
-    : 'https://seepoint.cz/client/navigation-documentation/example-token';
+    ? `${origin}/client/navigation-documentation/${token}`
+    : `${origin}/client/navigation-documentation/demo-token`;
 
   const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split');
   const [recipientEmail, setRecipientEmail] = useState(initialClientEmail || '');

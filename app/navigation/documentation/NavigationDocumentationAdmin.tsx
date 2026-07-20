@@ -168,6 +168,14 @@ export function NavigationDocumentationAdmin({
     }
   }
 
+  async function handleOpenEmailModal() {
+    if (!activeReportId) return;
+    if (!publishResult?.token) {
+      await handlePublish();
+    }
+    setShowEmailModal(true);
+  }
+
   async function handleCreateNextQuarter() {
     if (!activeReportId) return;
     setCloning(true);
@@ -343,7 +351,7 @@ export function NavigationDocumentationAdmin({
                   </button>
 
                   <button
-                    onClick={() => setShowEmailModal(true)}
+                    onClick={handleOpenEmailModal}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700"
                     type="button"
                   >
