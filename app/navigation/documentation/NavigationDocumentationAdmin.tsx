@@ -382,10 +382,11 @@ export function NavigationDocumentationAdmin({
 
                   <button
                     onClick={handleOpenEmailModal}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+                    disabled={loadingToken}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                     type="button"
                   >
-                    <Send size={15} /> Odeslat e-mail
+                    <Send size={15} /> {loadingToken ? 'Příprava odkazu…' : 'Odeslat e-mail'}
                   </button>
 
                   <button

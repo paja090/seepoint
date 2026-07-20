@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { runPrePublishChecks } from '@/lib/navigation-documentation';
+import { runPrePublishChecks, buildSnapshotItem } from '@/lib/navigation-documentation';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
