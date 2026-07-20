@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
+import { getRealRouteDistance, formatDistanceText } from '@/lib/routing';
 import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
+import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 
 type ClientOption = {
   id: string;
@@ -26,29 +28,14 @@ type DraftPoint = NavigationMapPoint & {
   productionPrice: string;
   internalNote: string;
   clientNote: string;
+  realDistanceText?: string;
+  visualizedPhotoUrl?: string;
 };
 
 const newId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `point-${Date.now()}-${Math.random()}`;
-
-// Haversine distance formula to target store
-function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c);
-}
-
-function formatDistance(meters: number): string {
-  if (meters < 1000) return `${meters} m`;
-  return `${(meters / 1000).toFixed(1)} km`;
-}
 
 const DIRECTION_PRESETS = [
   'Obousměrný (A/B)',
@@ -102,9 +89,65 @@ export function NavigationOfferForm({
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Active point selected for sign visualization overlay
+  const [activeVisualizerPointId, setActiveVisualizerPointId] = useState<string | null>(null);
+
+  // Default price list items fetched from Settings
+  const [catalogDefaults, setCatalogDefaults] = useState({
+    rentalPrice: '1500',
+    productionPrice: '1200',
+    installationPrice: '800',
+    removalPrice: '400',
+  });
+
+  useEffect(() => {
+    async function loadPriceCatalog() {
+      try {
+        const res = await fetch('/api/price-list-items');
+        if (res.ok) {
+          const items = (await res.json()) as Array<{ carrierType?: string; mediaType?: string; rentalPrice?: number; productionPrice?: number }>;
+          const navItem = items.find((i) => i.carrierType === 'NAVIGATION' || i.mediaType === 'NAVIGATION_SIGN');
+          if (navItem) {
+            setCatalogDefaults({
+              rentalPrice: String(navItem.rentalPrice || 1500),
+              productionPrice: String(navItem.productionPrice || 1200),
+              installationPrice: '800',
+              removalPrice: '400',
+            });
+          }
+        }
+      } catch {
+        /* fallback to defaults */
+      }
+    }
+    void loadPriceCatalog();
+  }, []);
+
+  // Compute real routing distances for points whenever points or target change
+  useEffect(() => {
+    if (!target) return;
+    let isCancelled = false;
+
+    async function updateDistances() {
+      for (const p of points) {
+        if (!p.realDistanceText) {
+          const res = await getRealRouteDistance(p.latitude, p.longitude, target!.latitude, target!.longitude);
+          if (!isCancelled) {
+            setPoints((curr) => curr.map((item) => (item.id === p.id ? { ...item, realDistanceText: res.formattedDistance } : item)));
+          }
+        }
+      }
+    }
+    void updateDistances();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [target, points]);
+
   const selectedClient = clients.find((client) => client.id === clientId);
 
-  // Detailed financial totals
+  // Financial summary breakdown
   const totals = useMemo(() => {
     let rental = 0;
     let production = 0;
@@ -144,10 +187,10 @@ export function NavigationOfferForm({
         variant: '120x80 cm',
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
-        unitPrice: '0',
-        installationPrice: '0',
-        removalPrice: '0',
-        productionPrice: '0',
+        unitPrice: catalogDefaults.rentalPrice,
+        productionPrice: catalogDefaults.productionPrice,
+        installationPrice: catalogDefaults.installationPrice,
+        removalPrice: catalogDefaults.removalPrice,
         internalNote: '',
         clientNote: '',
       },
@@ -204,6 +247,8 @@ export function NavigationOfferForm({
     router.push(`/offers/${data.id}`);
     router.refresh();
   }
+
+  const activePointForVisualizer = points.find((p) => p.id === activeVisualizerPointId);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
@@ -279,7 +324,7 @@ export function NavigationOfferForm({
           </button>
         </section>
 
-        {/* Detailed Itemized Financial Calculation */}
+        {/* Financial Calculation Summary Card */}
         <section className="card space-y-3 bg-slate-900 text-white">
           <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
             <Calculator size={18} className="text-sky-400" />
@@ -368,16 +413,18 @@ export function NavigationOfferForm({
         <NavigationPointMap
           mode={mode}
           onMapClick={mapClick}
-          onPointMove={(id, latitude, longitude) => updatePoint(id, { latitude, longitude })}
+          onPointMove={(id, latitude, longitude) => {
+            updatePoint(id, { latitude, longitude, realDistanceText: undefined });
+          }}
           points={points}
           target={target ? { ...target, label: targetName || 'Cíl navigace' } : undefined}
         />
 
-        {/* Itemized Points Editor */}
+        {/* Itemized Points Editor & Photo Visualizer Trigger */}
         <section className="space-y-4">
           <div className="flex items-center justify-between border-b pb-3">
             <h2 className="text-xl font-bold text-slate-900">Vytipované navigační body na trase ({points.length})</h2>
-            <p className="text-xs text-slate-500">Kliknutím do mapy přidáte nový navigační bod.</p>
+            <p className="text-xs text-slate-500">Kliknutím do mapy výše přidáte nový navigační bod.</p>
           </div>
 
           {points.length === 0 ? (
@@ -387,25 +434,30 @@ export function NavigationOfferForm({
               <p className="text-xs mt-1">Klikněte tlačítkem myši do mapy výše pro umístění prvního navigačního bodu na trase.</p>
             </div>
           ) : (
-            points.map((point, index) => {
-              const distanceMeters = target ? calculateDistanceMeters(point.latitude, point.longitude, target.latitude, target.longitude) : null;
-              const distanceText = distanceMeters !== null ? formatDistance(distanceMeters) : null;
+            points.map((point, index) => (
+              <div className="card space-y-4 border border-slate-200 bg-white p-5 shadow-sm" key={point.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-100 font-mono text-xs font-bold text-sky-800">
+                      #{index + 1}
+                    </span>
+                    <h3 className="font-bold text-slate-900">{point.label}</h3>
 
-              return (
-                <div className="card space-y-4 border border-slate-200 bg-white p-5 shadow-sm" key={point.id}>
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-100 font-mono text-xs font-bold text-sky-800">
-                        #{index + 1}
+                    {point.realDistanceText && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
+                        <Compass size={13} /> {point.realDistanceText}
                       </span>
-                      <h3 className="font-bold text-slate-900">{point.label}</h3>
+                    )}
+                  </div>
 
-                      {distanceText && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
-                          <Compass size={13} /> Vzdálenost k cíli: {distanceText}
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition"
+                      onClick={() => setActiveVisualizerPointId(point.id)}
+                      type="button"
+                    >
+                      <ImageIcon size={15} /> Foto-vizualizátor cedule
+                    </button>
 
                     <button
                       aria-label={`Odstranit ${point.label}`}
@@ -416,82 +468,107 @@ export function NavigationOfferForm({
                       <Trash2 size={15} /> Smazat bod
                     </button>
                   </div>
-
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <Field label="Označení bodu">
-                      <input className="input" value={point.label} onChange={(e) => updatePoint(point.id, { label: e.target.value })} />
-                    </Field>
-
-                    <Field label="Typ navigačního nosiče">
-                      <input className="input" value={point.navigationType} onChange={(e) => updatePoint(point.id, { navigationType: e.target.value })} />
-                    </Field>
-
-                    <Field label="Rozměr / varianta">
-                      <input className="input" value={point.variant} onChange={(e) => updatePoint(point.id, { variant: e.target.value })} />
-                    </Field>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Orientace / Směr navedení</label>
-                      <select
-                        className="input"
-                        value={DIRECTION_PRESETS.includes(point.orientation) ? point.orientation : 'custom'}
-                        onChange={(e) => {
-                          if (e.target.value !== 'custom') updatePoint(point.id, { orientation: e.target.value });
-                        }}
-                      >
-                        {DIRECTION_PRESETS.map((preset) => (
-                          <option key={preset} value={preset}>
-                            {preset}
-                          </option>
-                        ))}
-                        <option value="custom">Vlastní zadání směru…</option>
-                      </select>
-                      <input
-                        className="input mt-1 text-xs"
-                        placeholder="Vpisovaný text směru…"
-                        value={point.orientation}
-                        onChange={(e) => updatePoint(point.id, { orientation: e.target.value })}
-                      />
-                    </div>
-
-                    <Field label="Počet ks">
-                      <input className="input" min="0.01" step="0.01" type="number" value={point.quantity} onChange={(e) => updatePoint(point.id, { quantity: e.target.value })} />
-                    </Field>
-
-                    <Field label="Pronájem (Cena/ks)">
-                      <input className="input" min="0" step="0.01" type="number" value={point.unitPrice} onChange={(e) => updatePoint(point.id, { unitPrice: e.target.value })} />
-                    </Field>
-
-                    <Field label="Tisk & Výroba (Cena/ks)">
-                      <input className="input" min="0" step="0.01" type="number" value={point.productionPrice} onChange={(e) => updatePoint(point.id, { productionPrice: e.target.value })} />
-                    </Field>
-
-                    <Field label="Montáž (Cena/ks)">
-                      <input className="input" min="0" step="0.01" type="number" value={point.installationPrice} onChange={(e) => updatePoint(point.id, { installationPrice: e.target.value })} />
-                    </Field>
-
-                    <Field label="Demontáž (Cena/ks)">
-                      <input className="input" min="0" step="0.01" type="number" value={point.removalPrice} onChange={(e) => updatePoint(point.id, { removalPrice: e.target.value })} />
-                    </Field>
-
-                    <Field label="Adresa / Popis umistění">
-                      <input className="input" placeholder="Ulice, křižovatka, sloup č. …" value={point.address} onChange={(e) => updatePoint(point.id, { address: e.target.value })} />
-                    </Field>
-
-                    <Field label="Poznámka pro klienta v nabídce">
-                      <input className="input" placeholder="Vytipovaná křižovatka 350m před odbočkou…" value={point.clientNote} onChange={(e) => updatePoint(point.id, { clientNote: e.target.value })} />
-                    </Field>
-
-                    <Field label="Interní poznámka (skrytá)">
-                      <input className="input" value={point.internalNote} onChange={(e) => updatePoint(point.id, { internalNote: e.target.value })} />
-                    </Field>
-                  </div>
                 </div>
-              );
-            })
+
+                {/* Render preview of generated sign visualization if available */}
+                {point.visualizedPhotoUrl && (
+                  <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-2.5">
+                    <img alt="Vizualizace" className="h-16 w-24 object-cover rounded-lg border" src={point.visualizedPhotoUrl} />
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">✓ Vygenerována grafická vizualizace cedule</p>
+                      <p className="text-[11px] text-emerald-700">Tento snímek se zobrazí klientovi v fotodokumentaci i v nabídce.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Označení bodu">
+                    <input className="input" value={point.label} onChange={(e) => updatePoint(point.id, { label: e.target.value })} />
+                  </Field>
+
+                  <Field label="Typ navigačního nosiče">
+                    <input className="input" value={point.navigationType} onChange={(e) => updatePoint(point.id, { navigationType: e.target.value })} />
+                  </Field>
+
+                  <Field label="Rozměr / varianta">
+                    <input className="input" value={point.variant} onChange={(e) => updatePoint(point.id, { variant: e.target.value })} />
+                  </Field>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Orientace / Směr navedení</label>
+                    <select
+                      className="input"
+                      value={DIRECTION_PRESETS.includes(point.orientation) ? point.orientation : 'custom'}
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') updatePoint(point.id, { orientation: e.target.value });
+                      }}
+                    >
+                      {DIRECTION_PRESETS.map((preset) => (
+                        <option key={preset} value={preset}>
+                          {preset}
+                        </option>
+                      ))}
+                      <option value="custom">Vlastní zadání směru…</option>
+                    </select>
+                    <input
+                      className="input mt-1 text-xs"
+                      placeholder="Vpisovaný text směru…"
+                      value={point.orientation}
+                      onChange={(e) => updatePoint(point.id, { orientation: e.target.value })}
+                    />
+                  </div>
+
+                  <Field label="Počet ks">
+                    <input className="input" min="0.01" step="0.01" type="number" value={point.quantity} onChange={(e) => updatePoint(point.id, { quantity: e.target.value })} />
+                  </Field>
+
+                  <Field label="Pronájem (Cena/ks/měsíc)">
+                    <input className="input" min="0" step="0.01" type="number" value={point.unitPrice} onChange={(e) => updatePoint(point.id, { unitPrice: e.target.value })} />
+                  </Field>
+
+                  <Field label="Tisk & Výroba (Cena/ks)">
+                    <input className="input" min="0" step="0.01" type="number" value={point.productionPrice} onChange={(e) => updatePoint(point.id, { productionPrice: e.target.value })} />
+                  </Field>
+
+                  <Field label="Montáž (Cena/ks)">
+                    <input className="input" min="0" step="0.01" type="number" value={point.installationPrice} onChange={(e) => updatePoint(point.id, { installationPrice: e.target.value })} />
+                  </Field>
+
+                  <Field label="Demontáž (Cena/ks)">
+                    <input className="input" min="0" step="0.01" type="number" value={point.removalPrice} onChange={(e) => updatePoint(point.id, { removalPrice: e.target.value })} />
+                  </Field>
+
+                  <Field label="Adresa / Popis umístění">
+                    <input className="input" placeholder="Ulice, křižovatka, sloup č. …" value={point.address} onChange={(e) => updatePoint(point.id, { address: e.target.value })} />
+                  </Field>
+
+                  <Field label="Poznámka pro klienta v nabídce">
+                    <input className="input" placeholder="Vytipovaná křižovatka 350m před odbočkou…" value={point.clientNote} onChange={(e) => updatePoint(point.id, { clientNote: e.target.value })} />
+                  </Field>
+
+                  <Field label="Interní poznámka (skrytá)">
+                    <input className="input" value={point.internalNote} onChange={(e) => updatePoint(point.id, { internalNote: e.target.value })} />
+                  </Field>
+                </div>
+              </div>
+            ))
           )}
         </section>
       </main>
+
+      {/* Visualizer Modal Dialog */}
+      {activePointForVisualizer && (
+        <NavigationSignVisualizer
+          initialSignText={targetName || activePointForVisualizer.label}
+          orientation={activePointForVisualizer.orientation}
+          pointLabel={activePointForVisualizer.label}
+          onClose={() => setActiveVisualizerPointId(null)}
+          onSaveVisualization={(dataUrl) => {
+            updatePoint(activePointForVisualizer.id, { visualizedPhotoUrl: dataUrl });
+            setActiveVisualizerPointId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
