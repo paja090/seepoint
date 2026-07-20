@@ -275,8 +275,9 @@ export function NavigationEmailModal({
                   <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-6 text-slate-800 font-sans">
                     {/* Brand Header */}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl font-black tracking-tight text-slate-900">See<span className="text-sky-600">POINT</span></span>
+                      <div className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt="SeePOINT" className="h-8 w-auto" src="/seepoint-logo.svg" />
                         <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Navigace</span>
                       </div>
                       <span className="text-xs text-slate-400 font-medium">Fotodokumentace</span>

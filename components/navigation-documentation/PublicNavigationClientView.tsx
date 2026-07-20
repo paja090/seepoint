@@ -70,8 +70,6 @@ export function PublicNavigationClientView({
 
     async function initMap() {
       const L = await import('leaflet');
-      // @ts-expect-error Leaflet CSS import has no type definitions
-      await import('leaflet/dist/leaflet.css');
 
       if (!isSubscribed || !mapContainerRef.current) return;
 
@@ -163,13 +161,13 @@ export function PublicNavigationClientView({
   }, [lightboxIndex, filteredItems.length]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* Header */}
-      <header className="border-b bg-slate-950 text-white px-4 py-6 shadow-md">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-100/70 text-slate-900">
+      {/* SeePoint Client View Top Bar */}
+      <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950 text-white shadow-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="SeePOINT" className="h-10 w-auto" src="/seepoint-logo.svg" />
+            <img alt="SeePOINT Logo" className="h-9 w-auto bg-white/90 p-1 rounded-lg" src="/seepoint-logo.svg" />
             <div className="h-6 w-px bg-slate-800" />
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-sky-400">Fotodokumentace navigací</p>
@@ -220,23 +218,21 @@ export function PublicNavigationClientView({
               <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
                 <Camera size={18} />
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-950">{reportData.items.filter((i) => Boolean(i.photoUrl)).length}</p>
+              <p className="mt-2 text-2xl font-bold text-slate-950">{reportData.items.filter((i) => i.photoUrl).length}</p>
               <p className="text-xs font-medium text-slate-500">Aktuálních fotografií</p>
             </div>
 
             <div className="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
                 <Calendar size={18} />
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-950">100%</p>
+              <p className="mt-2 text-2xl font-bold text-emerald-600">Aktivní</p>
               <p className="text-xs font-medium text-slate-500">Garantovaný stav</p>
             </div>
           </div>
-        </section>
 
-        {/* Filter Toolbar */}
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
+          {/* Search & Filter Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
             <div className="relative min-w-[200px] flex-1">
               <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
               <input
@@ -318,64 +314,50 @@ export function PublicNavigationClientView({
                               e.stopPropagation();
                               setLightboxIndex(index);
                             }}
-                            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-slate-950/80 px-2.5 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-slate-900"
+                            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-xl bg-slate-950/70 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-xs hover:bg-slate-950"
                           >
-                            <Maximize2 size={13} /> Zvětšit
+                            <Maximize2 size={12} /> Zvětšit
                           </button>
                         </>
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center p-4 text-center text-slate-400">
                           <Camera size={28} />
-                          <span className="mt-1 text-xs font-medium">Fotodokumentace v přípravě</span>
+                          <span className="mt-1 text-xs">Bez fotografie</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Content Details */}
-                    <div className="flex flex-col justify-between p-5 space-y-3">
-                      <div>
+                    {/* Content Container */}
+                    <div className="p-4 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-1.5">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-900">
-                              {item.pointCode}
-                            </span>
-                            <h3 className="mt-1.5 text-base font-bold text-slate-950">{item.address}</h3>
-                          </div>
-                          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                            {item.status}
+                          <span className="font-mono text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-100">
+                            {item.pointCode}
+                          </span>
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                            {item.status || 'INSTALLED'}
                           </span>
                         </div>
 
-                        <p className="mt-1 text-xs text-slate-500">
-                          {item.city} {item.locality ? `· ${item.locality}` : ''}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 border-t pt-3 text-[11px] text-slate-600">
-                        <div>
-                          <span className="block text-slate-400">Směr / Cíl:</span>
-                          <span className="font-semibold text-slate-800">{item.direction}</span>
-                        </div>
-                        <div>
-                          <span className="block text-slate-400">Datum pořízení fotky:</span>
-                          <span className="font-semibold text-slate-800">
-                            {item.photoDate ? new Date(item.photoDate).toLocaleDateString('cs-CZ') : 'Neuvedeno'}
-                          </span>
-                        </div>
+                        <h3 className="text-base font-bold text-slate-950">{item.city}</h3>
+                        <p className="text-xs text-slate-600 font-medium">{item.address}</p>
+                        {item.locality && <p className="text-xs text-slate-500">{item.locality}</p>}
+                        {item.direction && (
+                          <p className="text-xs text-slate-500 font-medium">Směr: {item.direction}</p>
+                        )}
                       </div>
 
                       {item.clientNote && (
-                        <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-3 text-xs text-sky-950">
-                          <strong className="block text-[11px] text-sky-800">Poznámka k umístění:</strong>
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900">
+                          <strong className="block text-[11px] font-bold text-amber-950 mb-0.5">Poznámka k realizaci:</strong>
                           {item.clientNote}
                         </div>
                       )}
 
-                      {!hasGps && (
-                        <p className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
-                          <AlertTriangle size={12} /> Bez GPS (nelze zobrazit na mapě)
-                        </p>
-                      )}
+                      <div className="flex items-center justify-between border-t pt-2 text-[11px] text-slate-400">
+                        <span>Datum pořízení: {item.photoDate ? new Date(item.photoDate).toLocaleDateString('cs-CZ') : 'Aktuální'}</span>
+                        {!hasGps && <span className="text-amber-600 font-medium">GPS neuvedeno</span>}
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -383,41 +365,29 @@ export function PublicNavigationClientView({
             })}
           </div>
 
-          {/* Interactive Map Sticky Panel */}
-          <div className="lg:sticky lg:top-8 lg:self-start">
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm space-y-3 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <MapPin size={16} className="text-sky-600" />
-                  <span>Mapa navigačních nosičů</span>
-                </div>
-                <span className="text-[11px] text-slate-500">Kliknutím na kartu se mapa zaměří</span>
-              </div>
-
-              <div ref={mapContainerRef} className="h-[520px] w-full rounded-2xl border border-slate-200 bg-slate-100" />
-            </div>
+          {/* Interactive Map */}
+          <div className="sticky top-20 h-[640px] overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md">
+            <div ref={mapContainerRef} className="h-full w-full" />
           </div>
         </div>
       </main>
 
       {/* Lightbox Modal */}
       {lightboxIndex !== null && filteredItems[lightboxIndex] && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
           <button
-            aria-label="Zavřít"
-            onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 z-10 rounded-full bg-slate-800/80 p-2 text-white hover:bg-slate-700"
             type="button"
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 rounded-full bg-slate-800 p-2.5 text-white hover:bg-slate-700"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
 
           {lightboxIndex > 0 && (
             <button
-              aria-label="Předchozí"
-              onClick={() => setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
-              className="absolute left-4 z-10 rounded-full bg-slate-800/80 p-3 text-white hover:bg-slate-700"
               type="button"
+              onClick={() => setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
+              className="absolute left-4 rounded-full bg-slate-800 p-3 text-white hover:bg-slate-700"
             >
               <ChevronLeft size={24} />
             </button>
@@ -425,33 +395,32 @@ export function PublicNavigationClientView({
 
           {lightboxIndex < filteredItems.length - 1 && (
             <button
-              aria-label="Další"
-              onClick={() => setLightboxIndex((prev) => (prev !== null && prev < filteredItems.length - 1 ? prev + 1 : prev))}
-              className="absolute right-4 z-10 rounded-full bg-slate-800/80 p-3 text-white hover:bg-slate-700"
               type="button"
+              onClick={() => setLightboxIndex((prev) => (prev !== null && prev < filteredItems.length - 1 ? prev + 1 : prev))}
+              className="absolute right-4 rounded-full bg-slate-800 p-3 text-white hover:bg-slate-700"
             >
               <ChevronRight size={24} />
             </button>
           )}
 
-          <div className="flex max-h-full max-w-5xl flex-col items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={filteredItems[lightboxIndex].pointCode}
-              src={filteredItems[lightboxIndex].photoUrl || ''}
-              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
-            />
+          <div className="max-h-[90vh] max-w-[90vw] text-center space-y-3">
+            {filteredItems[lightboxIndex].photoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                alt={filteredItems[lightboxIndex].pointCode}
+                className="max-h-[78vh] max-w-full rounded-2xl shadow-2xl object-contain mx-auto"
+                src={filteredItems[lightboxIndex].photoUrl}
+              />
+            ) : (
+              <div className="flex h-64 w-96 flex-col items-center justify-center rounded-2xl bg-slate-800 text-slate-400 mx-auto">
+                <Camera size={40} />
+                <span className="mt-2 text-sm">Bez fotografie</span>
+              </div>
+            )}
 
-            <div className="text-center text-white space-y-1">
-              <h3 className="text-base font-bold">
-                {filteredItems[lightboxIndex].pointCode} · {filteredItems[lightboxIndex].address}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {filteredItems[lightboxIndex].city} · Pořízeno:{' '}
-                {filteredItems[lightboxIndex].photoDate
-                  ? new Date(filteredItems[lightboxIndex].photoDate!).toLocaleDateString('cs-CZ')
-                  : 'Neuvedeno'}
-              </p>
+            <div className="text-white text-xs space-y-1">
+              <p className="font-bold text-sm">{filteredItems[lightboxIndex].pointCode} · {filteredItems[lightboxIndex].city}</p>
+              <p className="text-slate-300">{filteredItems[lightboxIndex].address}</p>
             </div>
           </div>
         </div>
