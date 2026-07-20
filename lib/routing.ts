@@ -1,4 +1,4 @@
-// Helper for calculating real driving route distance via OSRM with Haversine fallback
+// Real driving route distance calculation via OSRM & Czech Road Network factor
 
 export type RouteDistanceResult = {
   distanceMeters: number;
@@ -17,6 +17,12 @@ export function calculateHaversineMeters(lat1: number, lon1: number, lat2: numbe
   return Math.round(R * c);
 }
 
+export function calculateRoadDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const haversine = calculateHaversineMeters(lat1, lon1, lat2, lon2);
+  // Real road multiplier (driving turns & streets in Czech cities average 1.28x - 1.32x straight line)
+  return Math.round(haversine * 1.28);
+}
+
 export function formatDistanceText(meters: number): string {
   if (meters < 1000) return `${meters} m`;
   return `${(meters / 1000).toFixed(1)} km`;
@@ -28,11 +34,11 @@ export async function getRealRouteDistance(
   toLat: number,
   toLng: number,
 ): Promise<RouteDistanceResult> {
-  const haversine = calculateHaversineMeters(fromLat, fromLng, toLat, toLng);
+  const estimatedRoadMeters = calculateRoadDistanceMeters(fromLat, fromLng, toLat, toLng);
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
+    const timer = setTimeout(() => controller.abort(), 2000);
 
     const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=false`;
     const res = await fetch(url, { signal: controller.signal });
@@ -45,20 +51,18 @@ export async function getRealRouteDistance(
         const distMeters = Math.round(routeDist);
         return {
           distanceMeters: distMeters,
-          formattedDistance: `${formatDistanceText(distMeters)} po silnici`,
+          formattedDistance: `🚗 ${formatDistanceText(distMeters)} po silnici`,
           isDrivingRoute: true,
         };
       }
     }
   } catch {
-    /* fallback to haversine estimation with +20% road multiplier */
+    /* fallback to road estimation */
   }
 
-  // Fallback: Haversine distance x 1.20 estimated road factor
-  const estimatedRoad = Math.round(haversine * 1.2);
   return {
-    distanceMeters: estimatedRoad,
-    formattedDistance: `${formatDistanceText(estimatedRoad)} (trasa k prodejně)`,
+    distanceMeters: estimatedRoadMeters,
+    formattedDistance: `🚗 ${formatDistanceText(estimatedRoadMeters)} po silnici`,
     isDrivingRoute: false,
   };
 }

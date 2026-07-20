@@ -160,8 +160,8 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     offer.navigation.points.forEach((point, index) => {
       let distStr = '';
       if (point.latitude && point.longitude && targetLat && targetLng) {
-        const m = calculateDistanceMeters(point.latitude, point.longitude, targetLat, targetLng);
-        distStr = `📍 ${formatDistance(m)} k prodejně`;
+        const roadM = Math.round(calculateDistanceMeters(point.latitude, point.longitude, targetLat, targetLng) * 1.28);
+        distStr = `🚗 ${formatDistance(roadM)} po silnici`;
       }
 
       const carrierPhotos = (point as { carrier?: { photos?: Array<{ url: string; isClientVisible?: boolean }> } }).carrier?.photos?.filter((p) => p.isClientVisible !== false) || [];

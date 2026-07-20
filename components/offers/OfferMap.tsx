@@ -41,39 +41,51 @@ export function OfferMap({
       if (cancelled || !element.current) return;
 
       const bounds = L.latLngBounds(located.map((point) => [point.latitude, point.longitude]));
-      const map = L.map(element.current, { scrollWheelZoom: false }).fitBounds(bounds.pad(0.25), { maxZoom: 16 });
+      const map = L.map(element.current, { scrollWheelZoom: false }).fitBounds(bounds.pad(0.3), { maxZoom: 16 });
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
 
-      located.forEach((point) => {
+      located.forEach((point, idx) => {
         const isNav = point.code.startsWith('NAV-');
-        const color = isNav ? '#ea580c' : point.selected ? '#059669' : '#0f172a';
+        const fillGradStart = isNav ? '#ea580c' : point.selected ? '#059669' : '#0f172a';
+        const fillGradEnd = isNav ? '#c2410c' : point.selected ? '#047857' : '#1e293b';
 
         const markerHtml = `
-          <div style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 3px 8px;
-            background: ${color};
-            color: white;
-            border-radius: 16px;
-            border: 2px solid white;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-            font-family: sans-serif;
-            font-weight: 800;
-            font-size: 11px;
-            white-space: nowrap;
-            cursor: pointer;
-          ">
-            <span>${point.code}</span>
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+            <div style="
+              position: absolute;
+              top: -24px;
+              background: #0f172a;
+              color: #ffffff;
+              padding: 2px 7px;
+              border-radius: 8px;
+              font-family: system-ui, -apple-system, sans-serif;
+              font-size: 10px;
+              font-weight: 800;
+              white-space: nowrap;
+              border: 1px solid ${fillGradStart};
+              box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            ">
+              ${point.code}
+            </div>
+            <svg width="32" height="42" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.35));">
+              <path d="M18 0C8.059 0 0 8.059 0 18C0 29.25 15.3 45.225 17.235 47.19C17.658 47.613 18.342 47.613 18.765 47.19C20.7 45.225 36 29.25 36 18C36 8.059 27.941 0 18 0Z" fill="url(#offerPinGrad_${idx})"/>
+              <circle cx="18" cy="18" r="10" fill="#FFFFFF"/>
+              <circle cx="18" cy="18" r="6" fill="${fillGradStart}"/>
+              <defs>
+                <linearGradient id="offerPinGrad_${idx}" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="${fillGradStart}"/>
+                  <stop offset="1" stop-color="${fillGradEnd}"/>
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
         `;
 
         const icon = L.divIcon({
           html: markerHtml,
-          className: 'custom-offer-marker',
-          iconSize: [80, 26],
-          iconAnchor: [40, 13],
+          className: 'custom-offer-svg-pin',
+          iconSize: [120, 60],
+          iconAnchor: [60, 42],
         });
 
         const marker = L.marker([point.latitude, point.longitude], { icon, title: `${point.code} · ${point.city}` }).addTo(map);
