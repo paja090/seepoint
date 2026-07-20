@@ -188,21 +188,58 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (Array.isArray(body.items)) {
       for (const itemInput of body.items) {
         if (!itemInput.id) continue;
+
+        const photoId =
+          itemInput.selectedPhotoId && String(itemInput.selectedPhotoId).trim() !== ''
+            ? String(itemInput.selectedPhotoId).trim()
+            : null;
+
         const updatedItem = await prisma.navigationDocumentationItem.update({
           where: { id: itemInput.id },
           data: {
-            selectedPhotoId: itemInput.selectedPhotoId !== undefined ? itemInput.selectedPhotoId : undefined,
-            clientNote: itemInput.clientNote !== undefined ? itemInput.clientNote : undefined,
+            selectedPhotoId: photoId,
+            clientNote: itemInput.clientNote !== undefined ? (itemInput.clientNote ? String(itemInput.clientNote).trim() : null) : undefined,
             sortOrder: itemInput.sortOrder !== undefined ? Number(itemInput.sortOrder) : undefined,
             isVisible: itemInput.isVisible !== undefined ? Boolean(itemInput.isVisible) : undefined,
           },
         });
 
         const newOrientation = itemInput.customDirection || itemInput.navigationPoint?.orientation;
-        if (newOrientation && updatedItem.navigationPointId) {
+        if (newOrientation !== undefined && updatedItem.navigationPointId) {
           await prisma.navigationPoint.update({
             where: { id: updatedItem.navigationPointId },
-            data: { orientation: String(newOrientation).trim() },
+            data: { orientation: newOrientation ? String(newOrientation).trim() : null },
+          });
+        }
+
+        // Rebuild snapshot for public view
+        const fullItem = await prisma.navigationDocumentationItem.findUnique({
+          where: { id: itemInput.id },
+          include: {
+            navigationPoint: true,
+            carrier: true,
+            selectedPhoto: true,
+          },
+        });
+
+        if (fullItem) {
+          const snapshotData = buildSnapshotItem({
+            id: fullItem.id,
+            clientNote: fullItem.clientNote,
+            navigationPoint: fullItem.navigationPoint,
+            carrier: fullItem.carrier,
+            selectedPhoto: fullItem.selectedPhoto
+              ? {
+                  id: fullItem.selectedPhoto.id,
+                  url: `/api/photos/${fullItem.selectedPhoto.id}/file`,
+                  createdAt: fullItem.selectedPhoto.createdAt,
+                }
+              : null,
+          });
+
+          await prisma.navigationDocumentationItem.update({
+            where: { id: fullItem.id },
+            data: { snapshot: snapshotData as unknown as object },
           });
         }
       }
