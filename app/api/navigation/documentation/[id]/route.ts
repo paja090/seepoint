@@ -226,6 +226,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           const snapshotData = buildSnapshotItem({
             id: fullItem.id,
             clientNote: fullItem.clientNote,
+            customDirection: newOrientation ? String(newOrientation).trim() : null,
             navigationPoint: fullItem.navigationPoint,
             carrier: fullItem.carrier,
             selectedPhoto: fullItem.selectedPhoto

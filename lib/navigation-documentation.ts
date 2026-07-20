@@ -139,6 +139,7 @@ export function runPrePublishChecks(
 export function buildSnapshotItem(item: {
   id: string;
   clientNote?: string | null;
+  customDirection?: string | null;
   navigationPoint?: {
     id: string;
     label: string;
@@ -175,7 +176,10 @@ export function buildSnapshotItem(item: {
   const status = item.navigationPoint?.status || 'INSTALLED';
   const lastCheckDate = item.navigationPoint?.updatedAt ? item.navigationPoint.updatedAt.toISOString() : null;
   const photoDate = item.selectedPhoto?.createdAt ? item.selectedPhoto.createdAt.toISOString() : null;
-  const direction = [item.navigationPoint?.orientation, item.navigationPoint?.variant].filter(Boolean).join(' · ') || 'Obousměrné';
+  const direction =
+    item.customDirection ||
+    [item.navigationPoint?.orientation, item.navigationPoint?.variant].filter(Boolean).join(' · ') ||
+    'Obousměrný (A/B)';
 
   return {
     id: item.id,

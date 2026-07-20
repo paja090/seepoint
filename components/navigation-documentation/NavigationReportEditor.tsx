@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Camera, Check, Compass, Eye, EyeOff } from 'lucide-react';
 import type { PrePublishWarning } from '@/lib/navigation-documentation';
 
@@ -11,6 +11,7 @@ export type ReportItemEdit = {
   selectedPhotoId?: string | null;
   clientNote?: string | null;
   customDirection?: string | null;
+  snapshot?: { direction?: string | null } | null;
   sortOrder: number;
   isVisible: boolean;
   navigationPoint?: {
@@ -57,6 +58,10 @@ export function NavigationReportEditor({
   saving: boolean;
 }) {
   const [items, setItems] = useState<ReportItemEdit[]>(initialItems);
+
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
 
   function toggleVisibility(id: string) {
     setItems((current) =>
@@ -146,7 +151,7 @@ export function NavigationReportEditor({
           const label = item.navigationPoint?.label || item.carrier?.code || item.carrier?.name || `Navigační bod #${idx + 1}`;
           const address = item.navigationPoint?.address || item.carrier?.address || 'Adresa neuvedena';
           const city = item.carrier?.city || 'Lokalita neuvedena';
-          const currentDir = item.customDirection || item.navigationPoint?.orientation || 'Obousměrný (A/B)';
+          const currentDir = item.customDirection || item.navigationPoint?.orientation || item.snapshot?.direction || 'Obousměrný (A/B)';
 
           const lat = item.navigationPoint?.latitude ?? item.carrier?.latitude;
           const lng = item.navigationPoint?.longitude ?? item.carrier?.longitude;
