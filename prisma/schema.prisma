@@ -709,6 +709,8 @@ model AdvertisingSurface {
   mediaType            MediaType     @default(OTHER)
   sourcePosition       String?
   directionDescription String?
+  destinationName      String?
+  distanceMeters       Int?
   rawMediaType         String?
   sourceKey            String?       @unique
   size                 String?
