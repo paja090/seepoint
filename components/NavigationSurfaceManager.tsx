@@ -10,6 +10,15 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function getDirectionArrow(direction?: string | null) {
+  if (!direction) return '🧭';
+  const norm = direction.toLowerCase();
+  if (norm.includes('vpravo') || norm.includes('doprava') || direction.includes('➔')) return '➔';
+  if (norm.includes('vlevo') || norm.includes('doleva') || direction.includes('⬅')) return '⬅';
+  if (norm.includes('rovne') || norm.includes('rovně') || norm.includes('primo') || norm.includes('přímo') || direction.includes('⬆')) return '⬆';
+  return '🧭';
+}
+
 export function NavigationSurfaceManager({
   carrierId,
   surfaces,
@@ -22,6 +31,16 @@ export function NavigationSurfaceManager({
   canEdit?: boolean;
 }) {
   const [activeModalSurfaceId, setActiveModalSurfaceId] = useState<string | null>(null);
+  const [inlineEditingSurfaceId, setInlineEditingSurfaceId] = useState<string | null>(null);
+  const [aiExtractingSurfaceId, setAiExtractingSurfaceId] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<{
+    surfaceId: string;
+    destinationName?: string;
+    directionDescription?: string;
+    directionArrow?: string;
+    distanceMeters?: number;
+    confidence?: string;
+  } | null>(null);
 
   // Form states for setting client / rental
   const [clientName, setClientName] = useState('');
@@ -59,6 +78,13 @@ export function NavigationSurfaceManager({
     setMessage('');
   }
 
+  function openInlineEdit(surface: Surface) {
+    setInlineEditingSurfaceId(surface.id);
+    setDestinationName(surface.destinationName ?? '');
+    setDistanceMeters(surface.distanceMeters ? surface.distanceMeters.toString() : '');
+    setDirectionDescription(surface.directionDescription ?? '');
+  }
+
   async function handleOccupySurface(surfaceId: string, isFree = false) {
     setSaving(true);
     setMessage('');
@@ -83,9 +109,90 @@ export function NavigationSurfaceManager({
 
       setMessage(isFree ? 'Pozice byla uvolněna.' : 'Pronájem byl úspěšně uložen.');
       setActiveModalSurfaceId(null);
+      setInlineEditingSurfaceId(null);
       window.location.reload();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Chyba při ukládání.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveInlineEdit(surface: Surface) {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/surfaces/${surface.id}/client`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: surface.currentClient?.name ?? '',
+          destinationName,
+          distanceMeters: distanceMeters ? Number(distanceMeters) : undefined,
+          directionDescription,
+        }),
+      });
+      if (!response.ok) throw new Error('Nepodařilo se uložit směr a vzdálenost.');
+      setInlineEditingSurfaceId(null);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při ukládání.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleExtractPhotoData(surfaceId: string) {
+    setAiExtractingSurfaceId(surfaceId);
+    setAiResult(null);
+    try {
+      const response = await fetch(`/api/surfaces/${surfaceId}/extract-photo-data`);
+      const data = (await response.json()) as {
+        found: boolean;
+        message?: string;
+        extracted?: {
+          destinationName?: string;
+          directionDescription?: string;
+          directionArrow?: string;
+          distanceMeters?: number;
+          confidence?: string;
+        };
+      };
+
+      if (!response.ok || !data.found || !data.extracted) {
+        alert(data.message || 'Z fotek nosiče se nepodařilo automaticky vyčíst směr/vzdálenost.');
+        return;
+      }
+
+      setAiResult({
+        surfaceId,
+        ...data.extracted,
+      });
+    } catch {
+      alert('Chyba při rozpoznávání z fotek.');
+    } finally {
+      setAiExtractingSurfaceId(null);
+    }
+  }
+
+  async function handleApplyAiResult(surface: Surface) {
+    if (!aiResult || aiResult.surfaceId !== surface.id) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/surfaces/${surface.id}/client`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: surface.currentClient?.name ?? '',
+          destinationName: aiResult.destinationName ?? surface.destinationName ?? '',
+          distanceMeters: aiResult.distanceMeters ?? surface.distanceMeters ?? undefined,
+          directionDescription: aiResult.directionDescription ?? surface.directionDescription ?? '',
+        }),
+      });
+      if (!response.ok) throw new Error('Nepodařilo se aplikovat návrh z fotky.');
+      setAiResult(null);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při aplikaci návrhu.');
     } finally {
       setSaving(false);
     }
@@ -144,39 +251,41 @@ export function NavigationSurfaceManager({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Navigační pozice na tomto sloupu ({surfaces.length})</h3>
+          <h3 className="text-xl font-black tracking-tight text-slate-900">
+            Navigační pozice na sloupu ({surfaces.length})
+          </h3>
           <p className="text-xs text-slate-500">
-            Každá tabule na sloupu má samostatného klienta, směr, cíl a historii pronájmu.
+            Každá navigační tabule má samostatného klienta, směr, cíl prodejny a historii pronájmu.
           </p>
         </div>
         {canEdit && (
           <button
-            className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-sky-700"
+            className="rounded-2xl bg-gradient-to-r from-sky-600 to-blue-700 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-sky-700 hover:to-blue-800 transition"
             onClick={() => setShowAddPosition(!showAddPosition)}
             type="button"
           >
-            {showAddPosition ? 'Zavřít formulář' : '➕ Přidat další pozici na sloup'}
+            {showAddPosition ? 'Zavřít' : '➕ Přidat další pozici na sloup'}
           </button>
         )}
       </div>
 
       {showAddPosition && (
-        <div className="rounded-2xl border-2 border-sky-200 bg-sky-50/50 p-4 space-y-3">
-          <h4 className="font-semibold text-sm text-sky-900">Nová navigační pozice</h4>
+        <div className="rounded-3xl border-2 border-sky-300 bg-sky-50/60 p-5 space-y-4 shadow-sm backdrop-blur-sm">
+          <h4 className="font-bold text-sm text-sky-950">Nová navigační pozice na tomto sloupu</h4>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-xs">
             <label>
-              <span className="block mb-1 font-semibold text-slate-700">Název / Číslo pozice *</span>
+              <span className="block mb-1 font-semibold text-slate-700">Název pozice *</span>
               <input
-                className="w-full rounded-xl border border-slate-300 p-2"
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
                 placeholder="např. Pozice 3 - Dolní tabule"
                 value={newPositionName}
                 onChange={(e) => setNewPositionName(e.target.value)}
               />
             </label>
             <label>
-              <span className="block mb-1 font-semibold text-slate-700">Označení pozice (sourcePosition)</span>
+              <span className="block mb-1 font-semibold text-slate-700">Kód pozice (sourcePosition)</span>
               <input
-                className="w-full rounded-xl border border-slate-300 p-2"
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
                 placeholder="např. A3"
                 value={newSourcePosition}
                 onChange={(e) => setNewSourcePosition(e.target.value)}
@@ -185,7 +294,7 @@ export function NavigationSurfaceManager({
             <label>
               <span className="block mb-1 font-semibold text-slate-700">Směr</span>
               <input
-                className="w-full rounded-xl border border-slate-300 p-2"
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
                 placeholder="např. vpravo / ul. Nádražní"
                 value={newDirection}
                 onChange={(e) => setNewDirection(e.target.value)}
@@ -194,7 +303,7 @@ export function NavigationSurfaceManager({
             <label>
               <span className="block mb-1 font-semibold text-slate-700">Cíl / Prodejna</span>
               <input
-                className="w-full rounded-xl border border-slate-300 p-2"
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
                 placeholder="např. Albert Hrabůvka"
                 value={newDestination}
                 onChange={(e) => setNewDestination(e.target.value)}
@@ -203,7 +312,7 @@ export function NavigationSurfaceManager({
             <label>
               <span className="block mb-1 font-semibold text-slate-700">Vzdálenost (v metrech)</span>
               <input
-                className="w-full rounded-xl border border-slate-300 p-2"
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
                 placeholder="např. 350"
                 type="number"
                 value={newDistance}
@@ -212,7 +321,7 @@ export function NavigationSurfaceManager({
             </label>
           </div>
           <button
-            className="rounded-xl bg-sky-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+            className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-slate-800 disabled:opacity-50"
             disabled={saving || !newPositionName.trim()}
             onClick={() => void handleAddPosition()}
             type="button"
@@ -222,7 +331,7 @@ export function NavigationSurfaceManager({
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-5 md:grid-cols-2">
         {surfaces.map((surface, index) => {
           const activeOccupancy = surface.occupancies?.find(
             (o) => o.status === 'OCCUPIED' || o.status === 'RESERVED',
@@ -230,115 +339,261 @@ export function NavigationSurfaceManager({
 
           const isOccupied = surface.status === 'OCCUPIED' || Boolean(activeOccupancy);
           const isOutOfService = surface.status === 'OUT_OF_SERVICE';
+          const arrowIcon = getDirectionArrow(surface.directionDescription);
+
+          const isInline = inlineEditingSurfaceId === surface.id;
+          const isAiActive = aiResult?.surfaceId === surface.id;
 
           return (
             <div
-              className={`rounded-2xl border p-4 shadow-sm space-y-3 transition ${
+              className={`relative overflow-hidden rounded-3xl border-2 p-5 shadow-sm transition-all duration-200 ${
                 isOutOfService
-                  ? 'border-slate-300 bg-slate-100 opacity-75'
+                  ? 'border-slate-300 bg-slate-100 opacity-80'
                   : isOccupied
-                  ? 'border-emerald-300 bg-emerald-50/30'
-                  : 'border-sky-300 bg-white'
+                  ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/30'
+                  : 'border-sky-300 bg-gradient-to-br from-sky-50/40 via-white to-blue-50/20'
               }`}
               key={surface.id}
             >
-              <div className="flex items-start justify-between gap-2 border-b border-slate-200/60 pb-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-extrabold text-white">
-                      #{index + 1}
-                    </span>
-                    <h4 className="font-bold text-sm text-slate-900">{surface.name}</h4>
+              {/* Colored left accent line */}
+              <div
+                className={`absolute left-0 top-0 bottom-0 w-2.5 ${
+                  isOutOfService ? 'bg-slate-400' : isOccupied ? 'bg-emerald-500' : 'bg-sky-500'
+                }`}
+              />
+
+              <div className="pl-2 space-y-3">
+                <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-lg bg-slate-950 px-2 py-0.5 text-[11px] font-black text-white shadow-sm">
+                        #{index + 1}
+                      </span>
+                      <h4 className="font-extrabold text-base text-slate-900">{surface.name}</h4>
+                    </div>
+                    {surface.sourcePosition && (
+                      <span className="text-[11px] font-medium text-slate-500">Kód pozice: {surface.sourcePosition}</span>
+                    )}
                   </div>
-                  {surface.sourcePosition && (
-                    <span className="text-[11px] text-slate-500">Kód pozice: {surface.sourcePosition}</span>
+                  <StatusBadge value={isOutOfService ? 'OUT_OF_SERVICE' : isOccupied ? 'OCCUPIED' : 'AVAILABLE'} />
+                </div>
+
+                {/* Client & Rental Status */}
+                <div className="rounded-2xl bg-white/80 p-3 shadow-inner border border-slate-200/50 space-y-1.5 text-xs text-slate-700">
+                  <p className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-900">👤 Klient:</span>
+                    {surface.currentClient ? (
+                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-bold text-emerald-900 border border-emerald-300">
+                        {surface.currentClient.name}
+                      </span>
+                    ) : (
+                      <span className="italic text-slate-400">Volná pozice bez klienta</span>
+                    )}
+                  </p>
+
+                  {activeOccupancy && (
+                    <p className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-900">📅 Pronajato do:</span>
+                      <span className="font-extrabold text-slate-900">{activeOccupancy.dateTo}</span>
+                      <span className="text-[11px] text-slate-500">(od {activeOccupancy.dateFrom})</span>
+                    </p>
                   )}
                 </div>
-                <StatusBadge value={isOutOfService ? 'OUT_OF_SERVICE' : isOccupied ? 'OCCUPIED' : 'AVAILABLE'} />
-              </div>
 
-              <div className="grid gap-1.5 text-xs text-slate-700">
-                <p>
-                  <strong className="text-slate-900">Klient:</strong>{' '}
-                  {surface.currentClient ? (
-                    <span className="font-semibold text-emerald-800">{surface.currentClient.name}</span>
-                  ) : (
-                    <span className="italic text-slate-400">Volná pozice bez klienta</span>
-                  )}
-                </p>
+                {/* Direction, Destination & Distance Grid */}
+                {!isInline ? (
+                  <div className="rounded-2xl border border-sky-100 bg-slate-900 p-3.5 text-white shadow-md space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+                      <span>🧭 Parametry navigace</span>
+                      {canEdit && (
+                        <div className="flex gap-1.5">
+                          <button
+                            className="rounded-lg bg-sky-500/20 px-2 py-0.5 text-[11px] font-bold text-sky-300 hover:bg-sky-500/40"
+                            onClick={() => openInlineEdit(surface)}
+                            type="button"
+                          >
+                            ✏️ Upravit
+                          </button>
+                          <button
+                            className="rounded-lg bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/40"
+                            disabled={aiExtractingSurfaceId === surface.id}
+                            onClick={() => void handleExtractPhotoData(surface.id)}
+                            type="button"
+                          >
+                            {aiExtractingSurfaceId === surface.id ? '⌛ Čtení...' : '🔍 Rozpoznat z fotky'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
-                {activeOccupancy && (
-                  <p>
-                    <strong className="text-slate-900">Pronajato do:</strong>{' '}
-                    <span className="font-bold text-slate-900">{activeOccupancy.dateTo}</span> (od {activeOccupancy.dateFrom})
-                  </p>
-                )}
+                    <div className="grid gap-2 text-xs grid-cols-1 sm:grid-cols-3 pt-1">
+                      <div className="rounded-xl bg-slate-800/80 p-2 border border-slate-700/60">
+                        <span className="block text-[10px] text-slate-400 font-semibold uppercase">Směr</span>
+                        <p className="font-bold text-sky-300 flex items-center gap-1">
+                          <span className="text-base">{arrowIcon}</span> {surface.directionDescription || 'neuvedeno'}
+                        </p>
+                      </div>
 
-                {(surface.destinationName || surface.directionDescription || surface.distanceMeters) && (
-                  <div className="mt-1 rounded-xl bg-slate-100/80 p-2 space-y-1 text-[11px]">
-                    {surface.destinationName && (
-                      <p>🎯 <strong>Cíl / Prodejna:</strong> {surface.destinationName}</p>
-                    )}
-                    {surface.directionDescription && (
-                      <p>🧭 <strong>Směr:</strong> {surface.directionDescription}</p>
-                    )}
-                    {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
-                      <p>📏 <strong>Vzdálenost:</strong> {surface.distanceMeters} m po silnici</p>
-                    )}
+                      <div className="rounded-xl bg-slate-800/80 p-2 border border-slate-700/60">
+                        <span className="block text-[10px] text-slate-400 font-semibold uppercase">Cíl / Prodejna</span>
+                        <p className="font-bold text-emerald-300 truncate">
+                          🎯 {surface.destinationName || 'neuvedeno'}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-slate-800/80 p-2 border border-slate-700/60">
+                        <span className="block text-[10px] text-slate-400 font-semibold uppercase">Vzdálenost</span>
+                        <p className="font-bold text-amber-300">
+                          📏 {surface.distanceMeters !== undefined && surface.distanceMeters !== null ? `${surface.distanceMeters} m po silnici` : 'neuvedeno'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Inline Edit Form */
+                  <div className="rounded-2xl border border-sky-300 bg-sky-50 p-3 space-y-2 text-xs">
+                    <h5 className="font-bold text-sky-950">Rychlá úprava směru, cíle a vzdálenosti</h5>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <label>
+                        <span className="block mb-0.5 font-semibold text-slate-700">Směr</span>
+                        <input
+                          className="w-full rounded-xl border border-slate-300 p-2"
+                          placeholder="vpravo / ul. Hlavní"
+                          value={directionDescription}
+                          onChange={(e) => setDirectionDescription(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span className="block mb-0.5 font-semibold text-slate-700">Cíl / Prodejna</span>
+                        <input
+                          className="w-full rounded-xl border border-slate-300 p-2"
+                          placeholder="Albert"
+                          value={destinationName}
+                          onChange={(e) => setDestinationName(e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span className="block mb-0.5 font-semibold text-slate-700">Vzdálenost (m)</span>
+                        <input
+                          className="w-full rounded-xl border border-slate-300 p-2"
+                          placeholder="350"
+                          type="number"
+                          value={distanceMeters}
+                          onChange={(e) => setDistanceMeters(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-700 hover:bg-slate-100"
+                        onClick={() => setInlineEditingSurfaceId(null)}
+                        type="button"
+                      >
+                        Zrušit
+                      </button>
+                      <button
+                        className="rounded-xl bg-sky-600 px-3 py-1 font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                        disabled={saving}
+                        onClick={() => void handleSaveInlineEdit(surface)}
+                        type="button"
+                      >
+                        Uložit
+                      </button>
+                    </div>
                   </div>
                 )}
-              </div>
 
-              {/* Action Buttons for Surface */}
-              {canEdit && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/60 text-xs">
-                  <button
-                    className={`rounded-xl px-3 py-1.5 font-bold transition ${
-                      isOccupied
-                        ? 'bg-amber-600 text-white hover:bg-amber-700'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    }`}
-                    onClick={() => openOccupyModal(surface)}
-                    type="button"
-                  >
-                    {isOccupied ? '✏️ Upravit / Prodloužit' : '✅ Nastavit jako obsazené'}
-                  </button>
-
-                  {isOccupied && (
+                {/* AI Extracted Result Banner */}
+                {isAiActive && aiResult && (
+                  <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-3 text-xs space-y-2 shadow-sm animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-emerald-950 flex items-center gap-1">
+                        ✨ Návrh rozpoznaný z fotky nosiče ({aiResult.confidence} jistota)
+                      </span>
+                      <button
+                        className="text-emerald-700 hover:text-emerald-950 font-bold"
+                        onClick={() => setAiResult(null)}
+                        type="button"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 bg-white/80 p-2 rounded-xl border border-emerald-200">
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold block">Rozpoznaný směr</span>
+                        <span className="font-bold text-slate-900">{aiResult.directionArrow} {aiResult.directionDescription || 'neuvedeno'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold block">Cíl</span>
+                        <span className="font-bold text-slate-900">🎯 {aiResult.destinationName || 'neuvedeno'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 font-semibold block">Vzdálenost</span>
+                        <span className="font-bold text-slate-900">📏 {aiResult.distanceMeters ? `${aiResult.distanceMeters} m` : 'neuvedeno'}</span>
+                      </div>
+                    </div>
                     <button
-                      className="rounded-xl border border-rose-300 bg-white px-3 py-1.5 font-semibold text-rose-700 hover:bg-rose-50"
-                      onClick={() => void handleOccupySurface(surface.id, true)}
+                      className="w-full rounded-xl bg-emerald-700 py-1.5 font-bold text-white hover:bg-emerald-800 shadow"
+                      disabled={saving}
+                      onClick={() => void handleApplyAiResult(surface)}
                       type="button"
                     >
-                      🚪 Ukončit pronájem (uvolnit)
+                      ✅ Použít tento návrh pro pozici
                     </button>
-                  )}
+                  </div>
+                )}
 
-                  <button
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => void handleToggleOutOfService(surface)}
-                    type="button"
-                  >
-                    {isOutOfService ? 'Obnovit provoz' : 'Mimo provoz'}
-                  </button>
-                </div>
-              )}
+                {/* Main Card Actions */}
+                {canEdit && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                    <button
+                      className={`rounded-xl px-4 py-2 font-bold transition shadow-sm ${
+                        isOccupied
+                          ? 'bg-amber-600 text-white hover:bg-amber-700'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      }`}
+                      onClick={() => openOccupyModal(surface)}
+                      type="button"
+                    >
+                      {isOccupied ? '✏️ Upravit pronájem' : '✅ Nastavit jako obsazené'}
+                    </button>
 
-              {/* History dropdown preview */}
-              {surface.occupancies && surface.occupancies.length > 0 && (
-                <details className="mt-2 text-[11px] text-slate-500">
-                  <summary className="cursor-pointer font-medium hover:text-slate-800">
-                    📜 Historie pronájmů ({surface.occupancies.length})
-                  </summary>
-                  <ul className="mt-1 space-y-1 pl-2 border-l border-slate-300">
-                    {surface.occupancies.map((occ) => (
-                      <li key={occ.id}>
-                        {occ.clientName} ({occ.dateFrom} - {occ.dateTo}) · <StatusBadge value={occ.status} />
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+                    {isOccupied && (
+                      <button
+                        className="rounded-xl border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50 shadow-sm"
+                        onClick={() => void handleOccupySurface(surface.id, true)}
+                        type="button"
+                      >
+                        🚪 Ukončit pronájem (uvolnit)
+                      </button>
+                    )}
+
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                      onClick={() => void handleToggleOutOfService(surface)}
+                      type="button"
+                    >
+                      {isOutOfService ? 'Obnovit provoz' : 'Mimo provoz'}
+                    </button>
+                  </div>
+                )}
+
+                {/* History dropdown preview */}
+                {surface.occupancies && surface.occupancies.length > 0 && (
+                  <details className="mt-2 text-[11px] text-slate-500">
+                    <summary className="cursor-pointer font-semibold hover:text-slate-800">
+                      📜 Historie pronájmů ({surface.occupancies.length})
+                    </summary>
+                    <ul className="mt-1 space-y-1 pl-2 border-l-2 border-slate-300">
+                      {surface.occupancies.map((occ) => (
+                        <li key={occ.id}>
+                          {occ.clientName} ({occ.dateFrom} - {occ.dateTo}) · <StatusBadge value={occ.status} />
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
             </div>
           );
         })}
@@ -346,10 +601,10 @@ export function NavigationSurfaceManager({
 
       {/* Modal for setting Occupancy & Navigation Details */}
       {activeModalSurfaceId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
-            <h4 className="text-lg font-bold text-slate-900">Správa pronájmu navigační pozice</h4>
-            
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 border border-slate-100">
+            <h4 className="text-lg font-black text-slate-900">Správa pronájmu navigační pozice</h4>
+
             {message && (
               <div className="rounded-xl bg-amber-100 p-3 text-xs font-semibold text-amber-900">
                 {message}
@@ -360,7 +615,7 @@ export function NavigationSurfaceManager({
               <label className="block">
                 <span className="block mb-1 font-semibold text-slate-700">Klient (Povinné) *</span>
                 <input
-                  className="w-full rounded-xl border border-slate-300 p-2.5"
+                  className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                   list="nav-modal-clients"
                   placeholder="Vyberte nebo zadejte jméno klienta"
                   value={clientName}
@@ -381,7 +636,7 @@ export function NavigationSurfaceManager({
                 <label>
                   <span className="block mb-1 font-semibold text-slate-700">Pronajato od *</span>
                   <input
-                    className="w-full rounded-xl border border-slate-300 p-2.5"
+                    className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
@@ -390,7 +645,7 @@ export function NavigationSurfaceManager({
                 <label>
                   <span className="block mb-1 font-semibold text-slate-700">Pronajato do *</span>
                   <input
-                    className="w-full rounded-xl border border-slate-300 p-2.5"
+                    className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
@@ -402,7 +657,7 @@ export function NavigationSurfaceManager({
                 <label>
                   <span className="block mb-1 font-semibold text-slate-700">Cíl / Prodejna</span>
                   <input
-                    className="w-full rounded-xl border border-slate-300 p-2.5"
+                    className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                     placeholder="např. Albert Hrabůvka"
                     value={destinationName}
                     onChange={(e) => setDestinationName(e.target.value)}
@@ -411,7 +666,7 @@ export function NavigationSurfaceManager({
                 <label>
                   <span className="block mb-1 font-semibold text-slate-700">Vzdálenost (v metrech)</span>
                   <input
-                    className="w-full rounded-xl border border-slate-300 p-2.5"
+                    className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                     placeholder="např. 350"
                     type="number"
                     value={distanceMeters}
@@ -423,7 +678,7 @@ export function NavigationSurfaceManager({
               <label className="block">
                 <span className="block mb-1 font-semibold text-slate-700">Směr navigace</span>
                 <input
-                  className="w-full rounded-xl border border-slate-300 p-2.5"
+                  className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                   placeholder="např. vpravo / ulice Nádražní"
                   value={directionDescription}
                   onChange={(e) => setDirectionDescription(e.target.value)}
@@ -433,7 +688,7 @@ export function NavigationSurfaceManager({
               <label className="block">
                 <span className="block mb-1 font-semibold text-slate-700">Poznámka</span>
                 <textarea
-                  className="w-full rounded-xl border border-slate-300 p-2.5"
+                  className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
                   rows={2}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
