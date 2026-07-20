@@ -73,6 +73,8 @@ export function NavigationDocumentationAdmin({
 
   // Publish / Email / Public Link state
   const [publishResult, setPublishResult] = useState<{ publicUrl?: string; token?: string } | null>(null);
+  const [currentToken, setCurrentToken] = useState<string | null>(null);
+  const [loadingToken, setLoadingToken] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [cloning, setCloning] = useState(false);
 
@@ -88,6 +90,7 @@ export function NavigationDocumentationAdmin({
     setActiveReportId(id);
     setLoadingDetail(true);
     setPublishResult(null);
+    setCurrentToken(null);
 
     try {
       const response = await fetch(`/api/navigation/documentation/${id}`);
@@ -160,6 +163,7 @@ export function NavigationDocumentationAdmin({
       const data = await response.json();
       if (response.ok && data.report) {
         setPublishResult({ publicUrl: data.publicUrl, token: data.token });
+        setCurrentToken(data.token);
         loadReportDetail(activeReportId);
         setReports((curr) => curr.map((r) => (r.id === activeReportId ? { ...r, status: 'PUBLISHED' } : r)));
       }
@@ -170,10 +174,28 @@ export function NavigationDocumentationAdmin({
 
   async function handleOpenEmailModal() {
     if (!activeReportId) return;
-    if (!publishResult?.token) {
-      await handlePublish();
+    setLoadingToken(true);
+
+    try {
+      const response = await fetch(`/api/navigation/documentation/${activeReportId}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate' }),
+      });
+      const data = await response.json();
+      if (response.ok && data.token) {
+        setCurrentToken(data.token);
+        setPublishResult({ publicUrl: data.publicUrl, token: data.token });
+        setReports((curr) =>
+          curr.map((r) => (r.id === activeReportId && r.status === 'DRAFT' ? { ...r, status: 'PUBLISHED' } : r)),
+        );
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingToken(false);
+      setShowEmailModal(true);
     }
-    setShowEmailModal(true);
   }
 
   async function handleCreateNextQuarter() {
@@ -526,7 +548,7 @@ export function NavigationDocumentationAdmin({
           clientName={reportDetail.report.client.name}
           clientEmail={reportDetail.report.client.email}
           periodTitle={`${reportDetail.report.quarter}. čtvrtletí ${reportDetail.report.year}`}
-          token={publishResult?.token}
+          token={currentToken || publishResult?.token || undefined}
           itemsCount={reportDetail.items.filter((i) => i.isVisible).length}
           onClose={() => setShowEmailModal(false)}
           onSent={() => {
