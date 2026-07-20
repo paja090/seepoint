@@ -70,6 +70,7 @@ export type ProposalOffer = {
   references: ProposalReference[];
   caseStudies: ProposalCaseStudy[];
   conditions: Array<{ id: string; text: string }>;
+  navigationTarget?: { name: string; latitude: number; longitude: number } | null;
 };
 
 export const MEDIA_TYPE_META: Record<ProposalMediaTypeKey, { label: string; tone: ProposalAccentTone; image: string }> = {
@@ -269,6 +270,11 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible === true).length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
+    navigationTarget: offer.navigation ? {
+      name: offer.navigation.targetName,
+      latitude: offer.navigation.targetLatitude,
+      longitude: offer.navigation.targetLongitude,
+    } : null,
     pricing: (() => {
       if (offer.offerType === 'NAVIGATION' && offer.navigation) {
         let rentalSum = 0;
