@@ -9,7 +9,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
 
-  const report = await prisma.navigationDocumentationReport.findUnique({
+  let report = await prisma.navigationDocumentationReport.findUnique({
     where: { id },
     include: {
       client: { select: { id: true, name: true, email: true, logoFileName: true } },
@@ -40,6 +40,123 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (!report) {
     return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
+  }
+
+  const reportId = report.id;
+  const clientId = report.clientId;
+  const clientName = report.client.name;
+
+  // Auto-heal empty items if report has 0 items
+  if (report.items.length === 0) {
+    const points = await prisma.navigationPoint.findMany({
+      where: {
+        navigationOffer: {
+          offer: { clientId },
+        },
+        status: { notIn: ['REMOVED', 'CANCELLED'] },
+      },
+      include: {
+        carrier: {
+          include: {
+            photos: {
+              where: { isPrivate: false },
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+            },
+          },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    let itemInputs: Array<{
+      reportId: string;
+      navigationPointId?: string;
+      carrierId?: string;
+      selectedPhotoId?: string;
+      sortOrder: number;
+      isVisible: boolean;
+    }> = [];
+
+    if (points.length > 0) {
+      itemInputs = points.map((point, index) => ({
+        reportId,
+        navigationPointId: point.id,
+        carrierId: point.carrierId ?? undefined,
+        selectedPhotoId: point.carrier?.photos[0]?.id ?? undefined,
+        sortOrder: index,
+        isVisible: true,
+      }));
+    } else {
+      const carriers = await prisma.advertisingCarrier.findMany({
+        where: {
+          archivedAt: null,
+          surfaces: {
+            some: {
+              OR: [
+                { currentClientId: clientId },
+                { occupancies: { some: { clientId } } },
+                { occupancies: { some: { clientName: { contains: clientName, mode: 'insensitive' } } } },
+              ],
+            },
+          },
+        },
+        include: {
+          photos: {
+            where: { isPrivate: false },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+          },
+        },
+        orderBy: { code: 'asc' },
+        take: 100,
+      });
+
+      itemInputs = carriers.map((carrier, index) => ({
+        reportId,
+        carrierId: carrier.id,
+        selectedPhotoId: carrier.photos[0]?.id ?? undefined,
+        sortOrder: index,
+        isVisible: true,
+      }));
+    }
+
+    if (itemInputs.length > 0) {
+      await prisma.navigationDocumentationItem.createMany({
+        data: itemInputs,
+      });
+
+      // Re-fetch updated report
+      const updatedReport = await prisma.navigationDocumentationReport.findUnique({
+        where: { id: reportId },
+        include: {
+          client: { select: { id: true, name: true, email: true, logoFileName: true } },
+          offer: { select: { id: true, campaignName: true, title: true } },
+          navigationOffer: { select: { id: true, targetName: true, targetAddress: true } },
+          createdBy: { select: { id: true, name: true, email: true } },
+          auditLogs: {
+            include: { actorUser: { select: { id: true, name: true } } },
+            orderBy: { createdAt: 'desc' },
+          },
+          items: {
+            include: {
+              navigationPoint: true,
+              carrier: {
+                include: {
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                },
+              },
+              selectedPhoto: true,
+            },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      });
+      if (updatedReport) {
+        report = updatedReport;
+      }
+    }
   }
 
   const warnings = runPrePublishChecks(report.client.email, report.items, report.periodFrom);
