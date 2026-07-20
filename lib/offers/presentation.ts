@@ -164,7 +164,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         distStr = `📍 ${formatDistance(m)} k prodejně`;
       }
 
-      const carrierPhotos = point.carrier?.photos?.filter((p) => p.isClientVisible !== false) || [];
+      const carrierPhotos = (point as { carrier?: { photos?: Array<{ url: string; isClientVisible?: boolean }> } }).carrier?.photos?.filter((p) => p.isClientVisible !== false) || [];
       const photoUrl = carrierPhotos[0]?.url || MEDIA_TYPE_META.NAVIGATION_SIGN.image;
 
       carriers.push({

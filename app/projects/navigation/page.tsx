@@ -1,6 +1,5 @@
 import {
   Camera,
-  CheckCircle2,
   ChevronRight,
   Compass,
   FileText,
