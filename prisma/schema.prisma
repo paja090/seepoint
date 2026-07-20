@@ -314,8 +314,10 @@ model User {
   createdOffers          Offer[]          @relation("OfferCreatedBy")
   updatedOffers          Offer[]          @relation("OfferUpdatedBy")
   offerEvents            OfferEvent[]
-  createdOfferPriceRules OfferPriceRule[] @relation("OfferPriceRuleCreatedBy")
-  updatedOfferPriceRules OfferPriceRule[] @relation("OfferPriceRuleUpdatedBy")
+  createdOfferPriceRules          OfferPriceRule[]                @relation("OfferPriceRuleCreatedBy")
+  updatedOfferPriceRules          OfferPriceRule[]                @relation("OfferPriceRuleUpdatedBy")
+  navigationDocumentationReports NavigationDocumentationReport[]
+  navigationReportAuditLogs      NavigationReportAuditLog[]
 }
 
 model UserSession {
@@ -486,9 +488,10 @@ model Client {
 
   currentSurfaces AdvertisingSurface[] @relation("CurrentSurfaceClient")
   occupancies     Occupancy[]
-  offers          Offer[]
-  workOrders      WorkOrder[]
-  workEntries     WorkEntry[]
+  offers                          Offer[]
+  workOrders                      WorkOrder[]
+  workEntries                     WorkEntry[]
+  navigationDocumentationReports NavigationDocumentationReport[]
 }
 
 model AdvertisingCarrier {
@@ -525,9 +528,10 @@ model AdvertisingCarrier {
   importBatch      ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   surfaces         AdvertisingSurface[]
   photos           Photo[]
-  workItems        WorkOrderItem[]
-  workTasks        WorkTask[]
-  navigationPoints NavigationPoint[]
+  workItems                    WorkOrderItem[]
+  workTasks                    WorkTask[]
+  navigationPoints             NavigationPoint[]
+  navigationDocumentationItems NavigationDocumentationItem[]
 
   @@index([importBatchId])
   @@index([archivedAt])
@@ -808,16 +812,17 @@ model Offer {
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
 
-  client            Client                  @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  createdByUser     User?                   @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  updatedByUser     User?                   @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
-  items             OfferItem[]
-  occupancies       Occupancy[]
-  events            OfferEvent[]
-  charges           OfferCharge[]
-  navigationOffer   NavigationOffer?
-  cityGalleryOffer  CityGalleryOffer?
-  packageSelections OfferPackageSelection[]
+  client                          Client                          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdByUser                   User?                           @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser                   User?                           @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  items                           OfferItem[]
+  occupancies                     Occupancy[]
+  events                          OfferEvent[]
+  charges                         OfferCharge[]
+  navigationOffer                 NavigationOffer?
+  cityGalleryOffer                CityGalleryOffer?
+  packageSelections               OfferPackageSelection[]
+  navigationDocumentationReports  NavigationDocumentationReport[]
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -836,8 +841,9 @@ model NavigationOffer {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  offer  Offer             @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  points NavigationPoint[]
+  offer                          Offer                           @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  points                         NavigationPoint[]
+  navigationDocumentationReports NavigationDocumentationReport[]
 
   @@index([targetLatitude, targetLongitude])
 }
@@ -866,12 +872,95 @@ model NavigationPoint {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  navigationOffer NavigationOffer     @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
-  carrier         AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  navigationOffer              NavigationOffer               @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  carrier                      AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  navigationDocumentationItems NavigationDocumentationItem[]
 
   @@index([navigationOfferId, sortOrder])
   @@index([carrierId])
   @@index([latitude, longitude])
+}
+
+enum NavigationReportStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  SENT
+  ARCHIVED
+}
+
+model NavigationDocumentationReport {
+  id                String                 @id @default(cuid())
+  clientId          String
+  offerId           String?
+  navigationOfferId String?
+  title             String
+  description       String?
+  periodFrom        DateTime
+  periodTo          DateTime
+  quarter           Int?
+  year              Int
+  status            NavigationReportStatus @default(DRAFT)
+  publicTokenHash   String?                @unique
+  tokenExpiresAt    DateTime?
+  publishedAt       DateTime?
+  sentAt            DateTime?
+  createdById       String
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  client          Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  offer           Offer?           @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  navigationOffer NavigationOffer? @relation(fields: [navigationOfferId], references: [id], onDelete: SetNull)
+  createdBy       User             @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  items     NavigationDocumentationItem[]
+  auditLogs NavigationReportAuditLog[]
+
+  @@index([clientId, year, quarter])
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+model NavigationDocumentationItem {
+  id                String   @id @default(cuid())
+  reportId          String
+  navigationPointId String?
+  carrierId         String?
+  selectedPhotoId   String?
+  clientNote        String?
+  sortOrder         Int      @default(0)
+  isVisible         Boolean  @default(true)
+  snapshot          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  report          NavigationDocumentationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  navigationPoint NavigationPoint?              @relation(fields: [navigationPointId], references: [id], onDelete: SetNull)
+  carrier         AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  selectedPhoto   Photo?                        @relation(fields: [selectedPhotoId], references: [id], onDelete: SetNull)
+
+  @@index([reportId, sortOrder])
+  @@index([navigationPointId])
+  @@index([carrierId])
+  @@index([selectedPhotoId])
+}
+
+model NavigationReportAuditLog {
+  id             String   @id @default(cuid())
+  reportId       String
+  actorUserId    String
+  action         String
+  recipientEmail String?
+  tokenExpiresAt DateTime?
+  message        String?
+  createdAt      DateTime @default(now())
+
+  report    NavigationDocumentationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  actorUser User                          @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, createdAt])
+  @@index([actorUserId])
 }
 
 model CityGalleryProject {
@@ -1083,8 +1172,9 @@ model Photo {
   carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface   AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
   employee  Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  task      WorkTask?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  workEntry WorkEntry?          @relation(fields: [workEntryId], references: [id], onDelete: SetNull)
+  task                         WorkTask?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  workEntry                    WorkEntry?                    @relation(fields: [workEntryId], references: [id], onDelete: SetNull)
+  navigationDocumentationItems NavigationDocumentationItem[]
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
