@@ -188,7 +188,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (Array.isArray(body.items)) {
       for (const itemInput of body.items) {
         if (!itemInput.id) continue;
-        await prisma.navigationDocumentationItem.update({
+        const updatedItem = await prisma.navigationDocumentationItem.update({
           where: { id: itemInput.id },
           data: {
             selectedPhotoId: itemInput.selectedPhotoId !== undefined ? itemInput.selectedPhotoId : undefined,
@@ -197,6 +197,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             isVisible: itemInput.isVisible !== undefined ? Boolean(itemInput.isVisible) : undefined,
           },
         });
+
+        const newOrientation = itemInput.customDirection || itemInput.navigationPoint?.orientation;
+        if (newOrientation && updatedItem.navigationPointId) {
+          await prisma.navigationPoint.update({
+            where: { id: updatedItem.navigationPointId },
+            data: { orientation: String(newOrientation).trim() },
+          });
+        }
       }
     }
 
