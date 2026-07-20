@@ -51,16 +51,24 @@ export default async function PublicNavigationDocumentationPage({
   }
 
   const items: SnapshotItemData[] = report.items.map((item) => {
+    let baseItem: SnapshotItemData;
     if (item.snapshot && typeof item.snapshot === 'object') {
-      return item.snapshot as SnapshotItemData;
+      baseItem = { ...(item.snapshot as SnapshotItemData) };
+    } else {
+      baseItem = buildSnapshotItem({
+        id: item.id,
+        clientNote: item.clientNote,
+        navigationPoint: item.navigationPoint,
+        carrier: item.carrier,
+        selectedPhoto: item.selectedPhoto,
+      });
     }
-    return buildSnapshotItem({
-      id: item.id,
-      clientNote: item.clientNote,
-      navigationPoint: item.navigationPoint,
-      carrier: item.carrier,
-      selectedPhoto: item.selectedPhoto,
-    });
+
+    if (item.selectedPhotoId) {
+      baseItem.photoUrl = `/api/client/navigation-documentation/${encodeURIComponent(token)}/photos/${encodeURIComponent(item.selectedPhotoId)}`;
+    }
+
+    return baseItem;
   });
 
   const campaignTitle = report.offer?.campaignName || report.offer?.title || report.navigationOffer?.targetName || report.title;

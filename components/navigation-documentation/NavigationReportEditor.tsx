@@ -27,9 +27,9 @@ export type ReportItemEdit = {
     city?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    photos: Array<{ id: string; url: string; isClientVisible: boolean; isPrivate: boolean; createdAt: string }>;
+    photos: Array<{ id: string; url?: string | null; isClientVisible: boolean; isPrivate: boolean; createdAt: string }>;
   } | null;
-  selectedPhoto?: { id: string; url: string; isClientVisible: boolean } | null;
+  selectedPhoto?: { id: string; url?: string | null; isClientVisible: boolean } | null;
 };
 
 export function NavigationReportEditor({
@@ -59,7 +59,13 @@ export function NavigationReportEditor({
         return {
           ...item,
           selectedPhotoId: photoId || null,
-          selectedPhoto: foundPhoto ? { id: foundPhoto.id, url: foundPhoto.url, isClientVisible: foundPhoto.isClientVisible } : null,
+          selectedPhoto: foundPhoto
+            ? {
+                id: foundPhoto.id,
+                url: foundPhoto.url || `/api/photos/${foundPhoto.id}/file`,
+                isClientVisible: foundPhoto.isClientVisible,
+              }
+            : null,
         };
       }),
     );
@@ -112,6 +118,9 @@ export function NavigationReportEditor({
             const lng = item.navigationPoint?.longitude ?? item.carrier?.longitude;
             const hasGps = lat !== undefined && lat !== null && lng !== undefined && lng !== null && (lat !== 0 || lng !== 0);
 
+            const photoSrc =
+              item.selectedPhoto?.url || (item.selectedPhoto?.id ? `/api/photos/${item.selectedPhoto.id}/file` : null);
+
             return (
               <div
                 key={item.id}
@@ -121,12 +130,12 @@ export function NavigationReportEditor({
                   {/* Photo Preview & Selector */}
                   <div className="space-y-2">
                     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                      {item.selectedPhoto?.url ? (
+                      {photoSrc ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           alt={label}
                           className="h-full w-full object-cover"
-                          src={item.selectedPhoto.url}
+                          src={photoSrc}
                         />
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center p-3 text-center text-slate-400">
