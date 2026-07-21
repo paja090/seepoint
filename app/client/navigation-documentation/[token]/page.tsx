@@ -12,7 +12,18 @@ export default async function PublicNavigationDocumentationPage({
 }) {
   const { token } = await params;
   if (!token || token.length < 16) {
-    notFound();
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-900 p-6 text-center text-white font-sans">
+        <div className="max-w-md rounded-3xl border border-slate-800 bg-slate-950 p-8 shadow-2xl space-y-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="SeePOINT Logo" className="h-10 w-auto mx-auto bg-white/90 p-1.5 rounded-xl" src="/seepoint-logo.svg" />
+          <h1 className="text-xl font-bold text-sky-400">Ukázkový náhled fotodokumentace</h1>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Toto je testovací náhled e-mailového odkazu. Pro zobrazení živé fotodokumentace vašich navigačních nosičů použijte unikátní odkaz odeslaný v oficiálním e-mailu.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const tokenHash = hashToken(token);
@@ -35,7 +46,7 @@ export default async function PublicNavigationDocumentationPage({
     },
   });
 
-  if (!report || report.status === 'ARCHIVED' || report.status === 'DRAFT') {
+  if (!report || report.status === 'ARCHIVED') {
     notFound();
   }
 
@@ -51,16 +62,24 @@ export default async function PublicNavigationDocumentationPage({
   }
 
   const items: SnapshotItemData[] = report.items.map((item) => {
+    let baseItem: SnapshotItemData;
     if (item.snapshot && typeof item.snapshot === 'object') {
-      return item.snapshot as SnapshotItemData;
+      baseItem = { ...(item.snapshot as SnapshotItemData) };
+    } else {
+      baseItem = buildSnapshotItem({
+        id: item.id,
+        clientNote: item.clientNote,
+        navigationPoint: item.navigationPoint,
+        carrier: item.carrier,
+        selectedPhoto: item.selectedPhoto,
+      });
     }
-    return buildSnapshotItem({
-      id: item.id,
-      clientNote: item.clientNote,
-      navigationPoint: item.navigationPoint,
-      carrier: item.carrier,
-      selectedPhoto: item.selectedPhoto,
-    });
+
+    if (item.selectedPhotoId) {
+      baseItem.photoUrl = `/api/client/navigation-documentation/${encodeURIComponent(token)}/photos/${encodeURIComponent(item.selectedPhotoId)}`;
+    }
+
+    return baseItem;
   });
 
   const campaignTitle = report.offer?.campaignName || report.offer?.title || report.navigationOffer?.targetName || report.title;

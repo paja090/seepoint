@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 const SESSION_COOKIE = 'seepoint_session';
-const publicPaths = ['/login', '/forgot-password', '/activate', '/reset-password', '/proposal', '/offer', '/api/auth', '/api/proposals'];
+const publicPaths = [
+  '/login',
+  '/forgot-password',
+  '/activate',
+  '/reset-password',
+  '/proposal',
+  '/offer',
+  '/client',
+  '/api/auth',
+  '/api/proposals',
+  '/api/client',
+];
+
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (publicPaths.some((item) => path === item || path.startsWith(`${item}/`))) return NextResponse.next();
@@ -10,4 +23,7 @@ export function middleware(request: NextRequest) {
   }
   return NextResponse.next();
 }
-export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico|seepoint-logo.svg|placeholder.svg).*)'] };
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|seepoint-logo.svg|placeholder.svg).*)'],
+};

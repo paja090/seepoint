@@ -45,6 +45,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       dateFrom?: unknown;
       dateTo?: unknown;
       occupancyId?: unknown;
+      destinationName?: unknown;
+      distanceMeters?: unknown;
+      directionDescription?: unknown;
+      sourcePosition?: unknown;
     };
     if (body.clientName !== null && body.clientName !== undefined && typeof body.clientName !== 'string') {
       return NextResponse.json({ error: 'Název klienta musí být text.' }, { status: 400 });
@@ -54,6 +58,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (clientName.length > 200) {
       return NextResponse.json({ error: 'Název klienta je příliš dlouhý.' }, { status: 400 });
     }
+
+    const destinationName = typeof body.destinationName === 'string' ? body.destinationName.trim() : undefined;
+    const distanceMeters = typeof body.distanceMeters === 'number' && Number.isFinite(body.distanceMeters) && body.distanceMeters >= 0
+      ? Math.round(body.distanceMeters)
+      : typeof body.distanceMeters === 'string' && /^\d+$/.test(body.distanceMeters.trim())
+      ? Number(body.distanceMeters.trim())
+      : undefined;
+    const directionDescription = typeof body.directionDescription === 'string' ? body.directionDescription.trim() : undefined;
+    const sourcePosition = typeof body.sourcePosition === 'string' ? body.sourcePosition.trim() : undefined;
 
     const hasDateFrom = typeof body.dateFrom === 'string' && Boolean(body.dateFrom.trim());
     const hasDateTo = typeof body.dateTo === 'string' && Boolean(body.dateTo.trim());
@@ -84,6 +97,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             status: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(existing.status)
               ? 'AVAILABLE'
               : existing.status,
+            ...(destinationName !== undefined ? { destinationName } : {}),
+            ...(distanceMeters !== undefined ? { distanceMeters } : {}),
+            ...(directionDescription !== undefined ? { directionDescription } : {}),
+            ...(sourcePosition !== undefined ? { sourcePosition } : {}),
           },
         });
         return { surface, client: null, occupancy: null };
@@ -102,6 +119,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         data: {
           currentClientId: client.id,
           status: existing.status === 'OUT_OF_SERVICE' ? existing.status : statuses.surface,
+          ...(destinationName !== undefined ? { destinationName } : {}),
+          ...(distanceMeters !== undefined ? { distanceMeters } : {}),
+          ...(directionDescription !== undefined ? { directionDescription } : {}),
+          ...(sourcePosition !== undefined ? { sourcePosition } : {}),
         },
       });
 

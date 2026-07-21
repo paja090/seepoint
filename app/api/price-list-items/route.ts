@@ -84,3 +84,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Nepodařilo se vytvořit ceníkovou položku.' }, { status: 500 });
   }
 }
+
+export async function GET() {
+  const auth = await requireApiAccess('settings');
+  if (isApiDenied(auth)) return auth;
+
+  try {
+    const items = await prisma.priceListItem.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+    return NextResponse.json(items);
+  } catch (error) {
+    console.error('Failed to fetch price list items:', error);
+    return NextResponse.json({ error: 'Nepodařilo se načíst ceníkové položky.' }, { status: 500 });
+  }
+}
+

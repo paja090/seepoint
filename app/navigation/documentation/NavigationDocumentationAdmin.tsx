@@ -71,8 +71,10 @@ export function NavigationDocumentationAdmin({
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingItems, setSavingItems] = useState(false);
 
-  // Publish / Email / Public Link state
+  const [saveFeedback, setSaveFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [publishResult, setPublishResult] = useState<{ publicUrl?: string; token?: string } | null>(null);
+  const [currentToken, setCurrentToken] = useState<string | null>(null);
+  const [loadingToken, setLoadingToken] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [cloning, setCloning] = useState(false);
 
@@ -88,6 +90,7 @@ export function NavigationDocumentationAdmin({
     setActiveReportId(id);
     setLoadingDetail(true);
     setPublishResult(null);
+    setCurrentToken(null);
 
     try {
       const response = await fetch(`/api/navigation/documentation/${id}`);
@@ -135,6 +138,7 @@ export function NavigationDocumentationAdmin({
   async function handleSaveItems(updatedItems: ReportItemEdit[]) {
     if (!activeReportId) return;
     setSavingItems(true);
+    setSaveFeedback(null);
 
     try {
       const response = await fetch(`/api/navigation/documentation/${activeReportId}`, {
@@ -143,9 +147,16 @@ export function NavigationDocumentationAdmin({
         body: JSON.stringify({ items: updatedItems }),
       });
 
+      const data = await response.json();
       if (response.ok) {
+        setSaveFeedback({ ok: true, message: 'Všechny změny položek a směrů byly úspěšně uloženy.' });
         loadReportDetail(activeReportId);
+        setTimeout(() => setSaveFeedback(null), 4000);
+      } else {
+        setSaveFeedback({ ok: false, message: data.error || 'Chyba při ukládání položek.' });
       }
+    } catch {
+      setSaveFeedback({ ok: false, message: 'Chyba při komunikaci se serverem.' });
     } finally {
       setSavingItems(false);
     }
@@ -160,11 +171,38 @@ export function NavigationDocumentationAdmin({
       const data = await response.json();
       if (response.ok && data.report) {
         setPublishResult({ publicUrl: data.publicUrl, token: data.token });
+        setCurrentToken(data.token);
         loadReportDetail(activeReportId);
         setReports((curr) => curr.map((r) => (r.id === activeReportId ? { ...r, status: 'PUBLISHED' } : r)));
       }
     } catch {
       /* error */
+    }
+  }
+
+  async function handleOpenEmailModal() {
+    if (!activeReportId) return;
+    setLoadingToken(true);
+
+    try {
+      const response = await fetch(`/api/navigation/documentation/${activeReportId}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate' }),
+      });
+      const data = await response.json();
+      if (response.ok && data.token) {
+        setCurrentToken(data.token);
+        setPublishResult({ publicUrl: data.publicUrl, token: data.token });
+        setReports((curr) =>
+          curr.map((r) => (r.id === activeReportId && r.status === 'DRAFT' ? { ...r, status: 'PUBLISHED' } : r)),
+        );
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingToken(false);
+      setShowEmailModal(true);
     }
   }
 
@@ -343,11 +381,12 @@ export function NavigationDocumentationAdmin({
                   </button>
 
                   <button
-                    onClick={() => setShowEmailModal(true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700"
+                    onClick={handleOpenEmailModal}
+                    disabled={loadingToken}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                     type="button"
                   >
-                    <Send size={15} /> Odeslat e-mail
+                    <Send size={15} /> {loadingToken ? 'Příprava odkazu…' : 'Odeslat e-mail'}
                   </button>
 
                   <button
@@ -380,6 +419,18 @@ export function NavigationDocumentationAdmin({
                   <Link href={publishResult.publicUrl} target="_blank" className="font-bold underline">
                     Otevřít odkaz klienta →
                   </Link>
+                </div>
+              )}
+
+              {saveFeedback && (
+                <div
+                  className={`rounded-xl border p-3 text-xs font-semibold ${
+                    saveFeedback.ok
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                      : 'border-red-200 bg-red-50 text-red-900'
+                  }`}
+                >
+                  {saveFeedback.message}
                 </div>
               )}
 
@@ -518,7 +569,7 @@ export function NavigationDocumentationAdmin({
           clientName={reportDetail.report.client.name}
           clientEmail={reportDetail.report.client.email}
           periodTitle={`${reportDetail.report.quarter}. čtvrtletí ${reportDetail.report.year}`}
-          token={publishResult?.token}
+          token={currentToken || publishResult?.token || undefined}
           itemsCount={reportDetail.items.filter((i) => i.isVisible).length}
           onClose={() => setShowEmailModal(false)}
           onSent={() => {

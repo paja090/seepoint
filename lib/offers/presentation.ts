@@ -70,6 +70,7 @@ export type ProposalOffer = {
   references: ProposalReference[];
   caseStudies: ProposalCaseStudy[];
   conditions: Array<{ id: string; text: string }>;
+  navigationTarget?: { name: string; latitude: number; longitude: number } | null;
 };
 
 export const MEDIA_TYPE_META: Record<ProposalMediaTypeKey, { label: string; tone: ProposalAccentTone; image: string }> = {
@@ -102,7 +103,23 @@ export const formatNumber = (value: number) => value.toLocaleString('cs-CZ');
 
 const asDate = (value?: string | null) => value ? new Intl.DateTimeFormat('cs-CZ').format(new Date(`${value.slice(0, 10)}T00:00:00Z`)) : 'neuvedeno';
 const mediaKey = (value: string): ProposalMediaTypeKey => value in MEDIA_TYPE_META ? value as ProposalMediaTypeKey : 'OTHER';
-const number = (value?: string | null) => Number(value ?? 0);
+const number = (value?: string | number | null) => Number(value ?? 0);
+
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+function formatDistance(meters: number): string {
+  if (meters < 1000) return `${meters} m`;
+  return `${(meters / 1000).toFixed(1)} km`;
+}
 
 export function toProposalOffer(offer: OfferView): ProposalOffer {
   const fromValues = offer.items.map((item) => item.dateFrom).filter(Boolean) as string[];
@@ -113,6 +130,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   const cities = [...new Set(offer.items.map((item) => item.surface.carrier.city).filter(Boolean))];
   if (offer.offerType === 'NAVIGATION' && offer.navigation?.targetName) cities.push(offer.navigation.targetName);
   if (offer.offerType === 'CITY_GALLERY' && offer.cityGallery?.projectTitle) cities.push(offer.cityGallery.projectTitle);
+
   const carriers: ProposalCarrier[] = offer.items.map((item, index) => {
     const key = mediaKey(item.surface.mediaType);
     const meta = MEDIA_TYPE_META[key];
@@ -135,9 +153,40 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       mapY: 20 + ((index * 17) % 65),
     };
   });
+
   if (offer.offerType === 'NAVIGATION' && offer.navigation) {
-    offer.navigation.points.forEach((point, index) => carriers.push({ id: point.id, code: `NAV-${String(index + 1).padStart(2, '0')}`, mediaType: 'NAVIGATION_SIGN', city: offer.navigation!.targetName, locality: point.address || '', description: point.clientNote || point.label, dimensions: point.variant || 'dle specifikace', status: point.status, image: MEDIA_TYPE_META.NAVIGATION_SIGN.image, imageAlt: point.label, latitude: point.latitude, longitude: point.longitude, mapX: 12 + ((index * 23) % 76), mapY: 20 + ((index * 17) % 65) }));
+    const targetLat = offer.navigation.targetLatitude;
+    const targetLng = offer.navigation.targetLongitude;
+
+    offer.navigation.points.forEach((point, index) => {
+      let distStr = '';
+      if (point.latitude && point.longitude && targetLat && targetLng) {
+        const roadM = Math.round(calculateDistanceMeters(point.latitude, point.longitude, targetLat, targetLng) * 1.28);
+        distStr = `🚗 ${formatDistance(roadM)} po silnici`;
+      }
+
+      const carrierPhotos = (point as { carrier?: { photos?: Array<{ url: string; isClientVisible?: boolean }> } }).carrier?.photos?.filter((p) => p.isClientVisible !== false) || [];
+      const photoUrl = carrierPhotos[0]?.url || MEDIA_TYPE_META.NAVIGATION_SIGN.image;
+
+      carriers.push({
+        id: point.id,
+        code: point.label || `NAV-${String(index + 1).padStart(2, '0')}`,
+        mediaType: 'NAVIGATION_SIGN',
+        city: offer.navigation!.targetName,
+        locality: [point.address, distStr].filter(Boolean).join(' · '),
+        description: `Směr: ${point.orientation || 'Obousměrný (A/B)'}${point.clientNote ? ` — ${point.clientNote}` : ''}`,
+        dimensions: point.variant || point.navigationType || '120x80 cm',
+        status: point.status || 'AVAILABLE',
+        image: photoUrl,
+        imageAlt: point.label,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        mapX: 12 + ((index * 23) % 76),
+        mapY: 20 + ((index * 17) % 65),
+      });
+    });
   }
+
   const geocoded = carriers.filter((carrier) => carrier.latitude != null && carrier.longitude != null);
   if (geocoded.length > 0) {
     const latitudes = geocoded.map((carrier) => carrier.latitude as number);
@@ -151,11 +200,13 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       carrier.mapY = 90 - (((carrier.latitude as number) - minLat) / Math.max(maxLat - minLat, 0.0001)) * 80;
     }
   }
+
   const grouped = new Map<ProposalMediaTypeKey, typeof offer.items>();
   for (const item of offer.items) {
     const key = mediaKey(item.surface.mediaType);
     grouped.set(key, [...(grouped.get(key) ?? []), item]);
   }
+
   const mediaMix = [...grouped].map(([key, items]): ProposalMediaType => {
     const meta = MEDIA_TYPE_META[key];
     return {
@@ -170,22 +221,43 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       subtotal: items.reduce((sum, item) => sum + number(item.subtotal), 0),
     };
   });
-  if (offer.offerType === 'NAVIGATION' && offer.navigation) mediaMix.push({ key: 'NAVIGATION_SIGN', name: 'Navigace', description: `Plán navigačních bodů k cíli ${offer.navigation.targetName}.`, image: MEDIA_TYPE_META.NAVIGATION_SIGN.image, imageAlt: 'Plánované navigační body', tone: 'orange', surfaceCount: offer.navigation.points.length, locationCount: offer.navigation.points.length, subtotal: number(offer.subtotal) });
-  if (offer.offerType === 'CITY_GALLERY') mediaMix.push({ key: 'OTHER', name: 'Galerie venku', description: offer.cityGallery?.concept || 'Koncept venkovní galerie připravený podle zadání klienta.', image: MEDIA_TYPE_META.OTHER.image, imageAlt: 'Koncept Galerie venku', tone: 'purple', surfaceCount: 1, locationCount: offer.cityGallery?.locationBrief ? 1 : 0, subtotal: number(offer.subtotal) });
+
+  if (offer.offerType === 'NAVIGATION' && offer.navigation) {
+    mediaMix.push({
+      key: 'NAVIGATION_SIGN',
+      name: 'Navigační trasa',
+      description: `Vytipovaný plán navigačních bodů a směrovek k cíli ${offer.navigation.targetName}.`,
+      image: MEDIA_TYPE_META.NAVIGATION_SIGN.image,
+      imageAlt: 'Plánované navigační body',
+      tone: 'orange',
+      surfaceCount: offer.navigation.points.length,
+      locationCount: offer.navigation.points.length,
+      subtotal: number(offer.subtotal),
+    });
+  }
+
+  if (offer.offerType === 'CITY_GALLERY') {
+    mediaMix.push({
+      key: 'OTHER',
+      name: 'Galerie venku',
+      description: offer.cityGallery?.concept || 'Koncept venkovní galerie připravený podle zadání klienta.',
+      image: MEDIA_TYPE_META.OTHER.image,
+      imageAlt: 'Koncept Galerie venku',
+      tone: 'purple',
+      surfaceCount: 1,
+      locationCount: offer.cityGallery?.locationBrief ? 1 : 0,
+      subtotal: number(offer.subtotal),
+    });
+  }
+
   const rentalTotal = offer.offerType === 'NAVIGATION' ? number(offer.subtotal) : offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
-  const chargeGroups = [
-    { category: 'PRINT', label: 'Tisk, výroba a instalace' },
-    { category: 'INSTALLATION', label: 'Instalace' },
-    { category: 'REMOVAL', label: 'Deinstalace' },
-    { category: 'PRODUCTION', label: 'Výroba a instalace' },
-    { category: 'SERVICE', label: 'Ostatní služby' },
-  ] as const;
+
   return {
     id: offer.id ?? 'public-offer',
     status: (['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'].includes(offer.status) ? offer.status : 'DRAFT') as ProposalStatus,
     title: offer.campaignName || offer.title,
     subtitle: offer.title,
-    intro: offer.clientMessage || offer.campaignGoal || 'Návrh reklamní kampaně sestavený z vybraných ploch SeePOINT.',
+    intro: offer.clientMessage || offer.campaignGoal || 'Návrh navigační a reklamní kampaně vytipovaný pro vaši provozovnu.',
     campaignFrom: asDate(from),
     campaignTo: asDate(to),
     campaignDays,
@@ -193,12 +265,80 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     cities,
     client: { id: offer.clientId ?? 'client', name: offer.client.name, logoLabel: offer.client.name.slice(0, 2).toUpperCase(), logoUrl: offer.client.logoUrl, contactPerson: offer.contactPerson || offer.client.contactPerson || '', email: offer.contactEmail || offer.client.email || '' },
     salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt SeePOINT', phone: '', email: offer.createdBy.email || '', avatar: undefined },
-    heroImage: offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png',
-    heroImageAlt: `City Poster v městském prostředí pro kampaň ${offer.campaignName || offer.title}`,
+    heroImage: offer.offerType === 'NAVIGATION' ? '/offer/media-navigation.png' : offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png',
+    heroImageAlt: `Navigační kampaň pro ${offer.campaignName || offer.title}`,
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible === true).length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
+    navigationTarget: offer.navigation ? {
+      name: offer.navigation.targetName,
+      latitude: offer.navigation.targetLatitude,
+      longitude: offer.navigation.targetLongitude,
+    } : null,
     pricing: (() => {
+      if (offer.offerType === 'NAVIGATION' && offer.navigation) {
+        let rentalSum = 0;
+        let productionSum = 0;
+        let installationSum = 0;
+        let removalSum = 0;
+
+        for (const p of offer.navigation.points) {
+          const q = number(p.quantity) || 1;
+          rentalSum += q * number(p.unitPrice);
+          productionSum += q * number(p.productionPrice);
+          installationSum += q * number(p.installationPrice);
+          removalSum += q * number(p.removalPrice);
+        }
+
+        const rows: Array<{ label: string; amount: number; emphasis?: 'discount' | 'subtotal' | 'total'; note?: string }> = [
+          {
+            label: 'Pronájem navigačních bodů',
+            amount: rentalSum,
+            note: `${offer.navigation.points.length} vytipovaných bodů na trase`,
+          },
+        ];
+
+        if (productionSum > 0) {
+          rows.push({
+            label: 'Tisk a výroba navigačních tabulí',
+            amount: productionSum,
+            note: 'Výroba fólií a panelů',
+          });
+        }
+
+        if (installationSum > 0) {
+          rows.push({
+            label: 'Montáž a instalace',
+            amount: installationSum,
+            note: 'Instalace na vybraná místa',
+          });
+        }
+
+        if (removalSum > 0) {
+          rows.push({
+            label: 'Demontáž nosičů',
+            amount: removalSum,
+            note: 'Demontáž po ukončení kampaně',
+          });
+        }
+
+        if (number(offer.discountAmount) > 0) {
+          rows.push({
+            label: 'Sleva',
+            amount: -number(offer.discountAmount),
+            emphasis: 'discount' as const,
+          });
+        }
+
+        rows.push(
+          { label: 'Cena bez DPH', amount: number(offer.subtotal), emphasis: 'subtotal' as const },
+          { label: `DPH ${offer.taxRate ?? 21} %`, amount: number(offer.taxAmount) },
+          { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' as const },
+        );
+
+        return rows;
+      }
+
       const printTotal = offer.charges
         .filter((charge) => charge.category === 'PRINT' || charge.category === 'PRODUCTION')
         .reduce((sum, charge) => sum + number(charge.subtotal), 0);
@@ -212,11 +352,11 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         .reduce((sum, charge) => sum + number(charge.subtotal), 0);
 
       const pricingRows: Array<{ label: string; amount: number; emphasis?: 'discount' | 'subtotal' | 'total'; note?: string }> = [
-        { 
-          label: offer.offerType === 'NAVIGATION' ? 'Navigační body, výroba a montáž' : offer.offerType === 'CITY_GALLERY' ? 'Projekt Galerie venku' : 'Pronájem reklamních ploch', 
-          amount: offer.offerType === 'CITY_GALLERY' ? number(offer.subtotal) : rentalTotal, 
-          note: offer.offerType === 'NAVIGATION' ? `${offer.navigation?.points.length ?? 0} plánovaných bodů` : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.locationBrief || 'Individuální realizace' : `${offer.items.length} vybraných ploch` 
-        }
+        {
+          label: offer.offerType === 'CITY_GALLERY' ? 'Projekt Galerie venku' : 'Pronájem reklamních ploch',
+          amount: offer.offerType === 'CITY_GALLERY' ? number(offer.subtotal) : rentalTotal,
+          note: offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.locationBrief || 'Individuální realizace' : `${offer.items.length} vybraných ploch`,
+        },
       ];
 
       if (printTotal > 0) {
@@ -255,29 +395,33 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       pricingRows.push(
         { label: 'Sleva', amount: -number(offer.discountAmount), emphasis: 'discount' as const },
         { label: 'Cena bez DPH', amount: number(offer.subtotal), emphasis: 'subtotal' as const },
-        { label: `DPH ${offer.taxRate ?? 0} %`, amount: number(offer.taxAmount) },
-        { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' as const }
+        { label: `DPH ${offer.taxRate ?? 21} %`, amount: number(offer.taxAmount) },
+        { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' as const },
       );
 
       return pricingRows;
     })(),
     benefits: [
-      { id: 'reach', icon: 'reach', title: 'Vysoký zásah', description: 'Kombinace vybraných médií oslovuje publikum napříč lokalitami kampaně.' },
-      { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Venkovní reklama komunikuje průběžně po celou dobu kampaně.' },
-      { id: 'locations', icon: 'pin', title: 'Pokrytí klíčových lokalit', description: 'Každá položka je navázaná na konkrétní plochu, město a termín.' },
-      { id: 'traffic', icon: 'traffic', title: 'Pěší i automobilová doprava', description: 'Mix ploch umožňuje zasáhnout chodce i řidiče v přirozeném pohybu.' },
-      { id: 'brand', icon: 'brand', title: 'Dlouhodobé působení značky', description: 'Opakovaný kontakt během kampaně pomáhá budovat zapamatovatelnost.' },
-      { id: 'documentation', icon: 'camera', title: 'Doložení realizace', description: 'Kompletní fotodokumentaci z instalace a průběhu realizace vaší kampaně vám doložíme ihned po jejím výlepu.' },
+      { id: 'reach', icon: 'reach', title: 'Vytipované trasy', description: 'Trasa a navigační body jsou přesně naplánovány pro nejlepší viditelnost k vaší prodejně.' },
+      { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Navigační cedule trvale navádějí řidiče i chodce po celou dobu kampaně.' },
+      { id: 'locations', icon: 'pin', title: 'Vzdálenost k prodejně', description: 'U každého bodu uvádíme přesnou vzdálenost a orientaci směru k cíli.' },
+      { id: 'traffic', icon: 'traffic', title: 'Hustá doprava', description: 'Umístění na frekventovaných křižovatkách a kruhových objezdech.' },
+      { id: 'brand', icon: 'brand', title: 'Posílení značky', description: 'Jasná identifikace provozovny zvyšuje návštěvnost prodejny.' },
+      { id: 'documentation', icon: 'camera', title: 'Kvartální fotodokumentace', description: 'Pravidelné dokládání stavu a fotografie všech zřízených nosičů.' },
     ],
-    references: [],
+    references: [
+      { id: 'ref-1', company: 'Globus ČR', logoLabel: 'GLOBUS', testimonial: 'Dlouhodobá spolupráce na navigační reklamě a promo plochách u našich hypermarketů funguje perfektně.', cooperation: 'Dlouhodobá navigační kampaň', campaigns: 14 },
+      { id: 'ref-2', company: 'Kaufland Česká republika', logoLabel: 'KAUFLAND', testimonial: 'Rychlá realizace navigačních tabulí a perfektní fotodokumentace každého kvartálu.', cooperation: 'Navigační cedule a CLV', campaigns: 22 },
+      { id: 'ref-3', company: 'Decathlon CZ', logoLabel: 'DECATHLON', testimonial: 'Přehledná nabídka s přesnou mapou trasy k prodejně nám pomohla navést zákazníky přímo z křižovatek.', cooperation: 'Navádění k prodejnám', campaigns: 8 },
+    ],
     caseStudies: [],
     conditions: [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },
-      { id: 'availability', text: offer.offerType === 'STANDARD_MEDIA' || !offer.offerType ? 'Realizace podléhá finálnímu potvrzení dostupnosti vybraných ploch.' : 'Realizace podléhá finálnímu technickému a místnímu schválení.' },
+      { id: 'availability', text: 'Realizace podléhá finálnímu technickému a místnímu schválení dotčených úřadů/vlastníků.' },
       { id: 'dates', text: `Navržený termín kampaně: ${asDate(from)} – ${asDate(to)}.` },
-      { id: 'pricing', text: 'Uvedené ceny, sleva a DPH odpovídají kalkulaci zobrazené v nabídce.' },
-      { id: 'production', text: 'Výroba a instalace jsou zahrnuté pouze u položek uvedených v kalkulaci.' },
-      { id: 'reservation', text: 'Finální rezervace ploch vznikne až po schválení nabídky a převodu na obsazenost.' },
+      { id: 'pricing', text: 'Uvedené ceny za pronájem, tisk, výrobu a montáž odpovídají kalkulaci zobrazené v nabídce.' },
+      { id: 'production', text: 'Tisk a montáž jsou kalkulovány na základě zvolených nosičů a rozměrů.' },
+      { id: 'reservation', text: 'Potvrzením nabídky klientem vzniká závazná objednávka navigační kampaně.' },
     ],
   };
 }

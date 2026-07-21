@@ -77,15 +77,62 @@ export async function POST(request: Request) {
         carrier: {
           include: {
             photos: {
-              where: { isClientVisible: true, isPrivate: false },
+              where: { isPrivate: false },
               orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
-              take: 1,
             },
           },
         },
       },
       orderBy: { sortOrder: 'asc' },
     });
+
+    let itemInputs: Array<{
+      navigationPointId?: string;
+      carrierId?: string;
+      selectedPhotoId?: string;
+      sortOrder: number;
+      isVisible: boolean;
+    }> = [];
+
+    if (points.length > 0) {
+      itemInputs = points.map((point, index) => ({
+        navigationPointId: point.id,
+        carrierId: point.carrierId ?? undefined,
+        selectedPhotoId: point.carrier?.photos[0]?.id ?? undefined,
+        sortOrder: index,
+        isVisible: true,
+      }));
+    } else {
+      // Fallback: Query carriers associated with this client
+      const carriers = await prisma.advertisingCarrier.findMany({
+        where: {
+          archivedAt: null,
+          surfaces: {
+            some: {
+              OR: [
+                { currentClientId: clientId },
+                { occupancies: { some: { clientId } } },
+              ],
+            },
+          },
+        },
+        include: {
+          photos: {
+            where: { isPrivate: false },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+          },
+        },
+        orderBy: { code: 'asc' },
+        take: 100,
+      });
+
+      itemInputs = carriers.map((carrier, index) => ({
+        carrierId: carrier.id,
+        selectedPhotoId: carrier.photos[0]?.id ?? undefined,
+        sortOrder: index,
+        isVisible: true,
+      }));
+    }
 
     const report = await prisma.navigationDocumentationReport.create({
       data: {
@@ -102,19 +149,13 @@ export async function POST(request: Request) {
         publicTokenHash: hash,
         createdById: auth.id,
         items: {
-          create: points.map((point, index) => ({
-            navigationPointId: point.id,
-            carrierId: point.carrierId ?? undefined,
-            selectedPhotoId: point.carrier?.photos[0]?.id ?? undefined,
-            sortOrder: index,
-            isVisible: true,
-          })),
+          create: itemInputs,
         },
         auditLogs: {
           create: {
             actorUserId: auth.id,
             action: 'CREATED',
-            message: `Vytvořen nový koncept fotodokumentace pro klienta ${client.name}.`,
+            message: `Vytvořen nový koncept fotodokumentace pro klienta ${client.name} s ${itemInputs.length} položkami.`,
           },
         },
       },

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   Calendar,
   Camera,
   ChevronLeft,
@@ -10,8 +9,10 @@ import {
   Compass,
   MapPin,
   Maximize2,
+  Printer,
   Search,
   X,
+  CheckCircle2,
 } from 'lucide-react';
 import type { SnapshotItemData } from '@/lib/navigation-documentation';
 
@@ -70,8 +71,6 @@ export function PublicNavigationClientView({
 
     async function initMap() {
       const L = await import('leaflet');
-      // @ts-expect-error Leaflet CSS import has no type definitions
-      await import('leaflet/dist/leaflet.css');
 
       if (!isSubscribed || !mapContainerRef.current) return;
 
@@ -108,6 +107,7 @@ export function PublicNavigationClientView({
         marker.bindPopup(`
           <div style="font-family: sans-serif; min-width: 180px;">
             <strong style="font-size: 13px; color: #0f172a;">${item.pointCode}</strong><br/>
+            <span style="font-size: 11px; color: #0284c7; font-weight: bold;">Směr: ${item.direction || 'Obousměrný'}</span><br/>
             <span style="font-size: 11px; color: #64748b;">${item.address}</span><br/>
             ${item.photoUrl ? `<img src="${item.photoUrl}" style="width: 100%; height: 90px; object-fit: cover; border-radius: 6px; margin-top: 6px;"/>` : ''}
           </div>
@@ -163,94 +163,123 @@ export function PublicNavigationClientView({
   }, [lightboxIndex, filteredItems.length]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      {/* Header */}
-      <header className="border-b bg-slate-950 text-white px-4 py-6 shadow-md">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen bg-slate-100/70 text-slate-900 font-sans">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950 text-white shadow-lg print:hidden">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img alt="SeePOINT" className="h-10 w-auto" src="/seepoint-logo.svg" />
+            <img alt="SeePOINT Logo" className="h-9 w-auto bg-white/95 p-1 rounded-xl shadow-xs" src="/seepoint-logo.svg" />
             <div className="h-6 w-px bg-slate-800" />
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-sky-400">Fotodokumentace navigací</p>
-              <h1 className="text-xl font-bold tracking-tight text-white">{reportData.clientName}</h1>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-sky-400">Fotodokumentace navigací</p>
+              <h1 className="text-lg font-bold tracking-tight text-white">{reportData.clientName}</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="rounded-xl bg-sky-950 border border-sky-800 px-3 py-1.5 text-xs font-bold text-sky-300">
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex rounded-xl bg-sky-950 border border-sky-800 px-3 py-1.5 text-xs font-bold text-sky-300">
               {reportData.quarter ? `${reportData.quarter}. čtvrtletí ` : ''}{reportData.year}
             </span>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 transition"
+            >
+              <Printer size={14} /> Tisk / PDF
+            </button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 space-y-8">
-        {/* Campaign Info & Stats */}
+        {/* Campaign Info & Summary Section */}
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
             <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                  <CheckCircle2 size={13} /> Oficiální klientský výstup
+                </span>
+              </div>
               <h2 className="text-2xl font-bold text-slate-950">{reportData.campaignTitle}</h2>
               {reportData.description && <p className="mt-1 text-sm text-slate-600">{reportData.description}</p>}
             </div>
-            <p className="text-xs text-slate-500">
-              Datum aktualizace: <strong>{new Date(reportData.publishedAt).toLocaleDateString('cs-CZ')}</strong>
-            </p>
+            <div className="text-right text-xs text-slate-500 space-y-0.5">
+              <p>Aktualizováno: <strong className="text-slate-800">{new Date(reportData.publishedAt).toLocaleDateString('cs-CZ')}</strong></p>
+              <p>Perioda: <strong className="text-sky-700">{reportData.quarter ? `${reportData.quarter}. čtvrtletí ` : ''}{reportData.year}</strong></p>
+            </div>
           </div>
 
-          {/* Stats Bar */}
+          {/* Key Metrics Dashboard */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
                 <Compass size={18} />
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-950">{reportData.itemsCount}</p>
-              <p className="text-xs font-medium text-slate-500">Nosičů v dokumentaci</p>
+              <div className="mt-3">
+                <p className="text-2xl font-black text-slate-950">{reportData.itemsCount}</p>
+                <p className="text-xs font-semibold text-slate-500">Navigačních bodů</p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
                 <MapPin size={18} />
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-950">{cities.length || 1}</p>
-              <p className="text-xs font-medium text-slate-500">Měst a lokalit</p>
+              <div className="mt-3">
+                <p className="text-2xl font-black text-slate-950">{cities.length || 1}</p>
+                <p className="text-xs font-semibold text-slate-500">Měst a lokalit</p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+            <div className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
                 <Camera size={18} />
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-950">{reportData.items.filter((i) => Boolean(i.photoUrl)).length}</p>
-              <p className="text-xs font-medium text-slate-500">Aktuálních fotografií</p>
+              <div className="mt-3">
+                <p className="text-2xl font-black text-slate-950">{reportData.items.filter((i) => i.photoUrl).length}</p>
+                <p className="text-xs font-semibold text-slate-500">Aktuálních fotografií</p>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+            <div className="flex flex-col justify-between rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                 <Calendar size={18} />
               </div>
-              <p className="mt-2 text-2xl font-bold text-slate-950">100%</p>
-              <p className="text-xs font-medium text-slate-500">Garantovaný stav</p>
+              <div className="mt-3">
+                <p className="text-2xl font-black text-emerald-700">100 %</p>
+                <p className="text-xs font-semibold text-emerald-800">Garantovaný stav</p>
+              </div>
             </div>
           </div>
-        </section>
 
-        {/* Filter Toolbar */}
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
-            <div className="relative min-w-[200px] flex-1">
+          {/* Search & Filter Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 print:hidden">
+            <div className="relative min-w-[220px] flex-1">
               <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
               <input
                 type="text"
-                className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2 text-xs text-slate-800 placeholder:text-slate-400"
-                placeholder="Hledat podle adresy nebo kódu…"
+                className="w-full rounded-xl border border-slate-200 pl-9 pr-8 py-2 text-xs text-slate-800 focus:border-sky-500 focus:outline-none"
+                placeholder="Hledat podle adresy, města, směru nebo kódu…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
             {cities.length > 0 && (
               <select
-                className="rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-sky-500 focus:outline-none"
                 value={selectedCity}
                 onChange={(e) => setSelectedCity(e.target.value)}
               >
@@ -265,7 +294,7 @@ export function PublicNavigationClientView({
 
             {statuses.length > 0 && (
               <select
-                className="rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-sky-500 focus:outline-none"
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
               >
@@ -278,15 +307,11 @@ export function PublicNavigationClientView({
               </select>
             )}
           </div>
-
-          <p className="text-xs font-semibold text-slate-500">
-            Zobrazeno {filteredItems.length} z {reportData.itemsCount} položek
-          </p>
         </section>
 
-        {/* Map & Grid Container */}
+        {/* Navigation Points Cards & Map Layout */}
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          {/* Cards Grid */}
+          {/* Cards List */}
           <div className="space-y-4">
             {filteredItems.map((item, index) => {
               const isSelected = item.id === activeItemId;
@@ -298,11 +323,11 @@ export function PublicNavigationClientView({
                   key={item.id}
                   onClick={() => panToPoint(item)}
                   className={`cursor-pointer overflow-hidden rounded-2xl border bg-white shadow-sm transition ${
-                    isSelected ? 'border-sky-500 ring-2 ring-sky-200' : 'border-slate-200 hover:border-slate-300'
+                    isSelected ? 'border-sky-500 ring-2 ring-sky-200 shadow-md' : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <div className="grid sm:grid-cols-[220px_1fr]">
-                    {/* Photo Container */}
+                  <div className="grid sm:grid-cols-[230px_1fr]">
+                    {/* Photo Box */}
                     <div className="relative aspect-[4/3] sm:aspect-auto sm:h-full overflow-hidden bg-slate-900 group">
                       {item.photoUrl ? (
                         <>
@@ -318,64 +343,57 @@ export function PublicNavigationClientView({
                               e.stopPropagation();
                               setLightboxIndex(index);
                             }}
-                            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-slate-950/80 px-2.5 py-1.5 text-[11px] font-semibold text-white backdrop-blur hover:bg-slate-900"
+                            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-xl bg-slate-950/75 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-xs hover:bg-slate-950"
                           >
-                            <Maximize2 size={13} /> Zvětšit
+                            <Maximize2 size={12} /> Zvětšit
                           </button>
                         </>
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center p-4 text-center text-slate-400">
                           <Camera size={28} />
-                          <span className="mt-1 text-xs font-medium">Fotodokumentace v přípravě</span>
+                          <span className="mt-1 text-xs">Bez fotografie</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Content Details */}
-                    <div className="flex flex-col justify-between p-5 space-y-3">
-                      <div>
+                    {/* Content Details Box */}
+                    <div className="p-5 space-y-3 flex flex-col justify-between">
+                      <div className="space-y-2">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-900">
-                              {item.pointCode}
-                            </span>
-                            <h3 className="mt-1.5 text-base font-bold text-slate-950">{item.address}</h3>
+                          <span className="font-mono text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-lg border border-sky-100">
+                            {item.pointCode}
+                          </span>
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200">
+                            {item.status || 'INSTALLED'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="text-base font-bold text-slate-950">{item.city}</h3>
+                          <p className="text-xs text-slate-600 font-semibold">{item.address}</p>
+                          {item.locality && <p className="text-xs text-slate-500">{item.locality}</p>}
+                        </div>
+
+                        {/* PROMINENT DIRECTION BADGE */}
+                        <div className="pt-1">
+                          <div className="inline-flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-900 border border-sky-100 shadow-2xs">
+                            <Compass size={14} className="text-sky-600" />
+                            <span>Směr: <strong>{item.direction || 'Obousměrný (A/B)'}</strong></span>
                           </div>
-                          <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                            {item.status}
-                          </span>
-                        </div>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          {item.city} {item.locality ? `· ${item.locality}` : ''}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 border-t pt-3 text-[11px] text-slate-600">
-                        <div>
-                          <span className="block text-slate-400">Směr / Cíl:</span>
-                          <span className="font-semibold text-slate-800">{item.direction}</span>
-                        </div>
-                        <div>
-                          <span className="block text-slate-400">Datum pořízení fotky:</span>
-                          <span className="font-semibold text-slate-800">
-                            {item.photoDate ? new Date(item.photoDate).toLocaleDateString('cs-CZ') : 'Neuvedeno'}
-                          </span>
                         </div>
                       </div>
 
                       {item.clientNote && (
-                        <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-3 text-xs text-sky-950">
-                          <strong className="block text-[11px] text-sky-800">Poznámka k umístění:</strong>
-                          {item.clientNote}
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-950 space-y-0.5">
+                          <strong className="block text-[11px] font-bold text-amber-900 uppercase tracking-wide">Poznámka k realizaci:</strong>
+                          <p className="leading-relaxed">{item.clientNote}</p>
                         </div>
                       )}
 
-                      {!hasGps && (
-                        <p className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700">
-                          <AlertTriangle size={12} /> Bez GPS (nelze zobrazit na mapě)
-                        </p>
-                      )}
+                      <div className="flex items-center justify-between border-t pt-2.5 text-[11px] text-slate-400">
+                        <span>Fotodokumentace: {item.photoDate ? new Date(item.photoDate).toLocaleDateString('cs-CZ') : 'Aktuální'}</span>
+                        {!hasGps && <span className="text-amber-600 font-medium">GPS neuvedeno</span>}
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -383,41 +401,29 @@ export function PublicNavigationClientView({
             })}
           </div>
 
-          {/* Interactive Map Sticky Panel */}
-          <div className="lg:sticky lg:top-8 lg:self-start">
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm space-y-3 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <MapPin size={16} className="text-sky-600" />
-                  <span>Mapa navigačních nosičů</span>
-                </div>
-                <span className="text-[11px] text-slate-500">Kliknutím na kartu se mapa zaměří</span>
-              </div>
-
-              <div ref={mapContainerRef} className="h-[520px] w-full rounded-2xl border border-slate-200 bg-slate-100" />
-            </div>
+          {/* Interactive Map Section */}
+          <div className="sticky top-20 h-[640px] overflow-hidden rounded-3xl border border-slate-200 bg-slate-900 shadow-md print:hidden">
+            <div ref={mapContainerRef} className="h-full w-full" />
           </div>
         </div>
       </main>
 
       {/* Lightbox Modal */}
       {lightboxIndex !== null && filteredItems[lightboxIndex] && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md">
           <button
-            aria-label="Zavřít"
-            onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 z-10 rounded-full bg-slate-800/80 p-2 text-white hover:bg-slate-700"
             type="button"
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 rounded-full bg-slate-800 p-2.5 text-white hover:bg-slate-700"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
 
           {lightboxIndex > 0 && (
             <button
-              aria-label="Předchozí"
-              onClick={() => setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
-              className="absolute left-4 z-10 rounded-full bg-slate-800/80 p-3 text-white hover:bg-slate-700"
               type="button"
+              onClick={() => setLightboxIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev))}
+              className="absolute left-4 rounded-full bg-slate-800 p-3 text-white hover:bg-slate-700"
             >
               <ChevronLeft size={24} />
             </button>
@@ -425,33 +431,34 @@ export function PublicNavigationClientView({
 
           {lightboxIndex < filteredItems.length - 1 && (
             <button
-              aria-label="Další"
-              onClick={() => setLightboxIndex((prev) => (prev !== null && prev < filteredItems.length - 1 ? prev + 1 : prev))}
-              className="absolute right-4 z-10 rounded-full bg-slate-800/80 p-3 text-white hover:bg-slate-700"
               type="button"
+              onClick={() => setLightboxIndex((prev) => (prev !== null && prev < filteredItems.length - 1 ? prev + 1 : prev))}
+              className="absolute right-4 rounded-full bg-slate-800 p-3 text-white hover:bg-slate-700"
             >
               <ChevronRight size={24} />
             </button>
           )}
 
-          <div className="flex max-h-full max-w-5xl flex-col items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt={filteredItems[lightboxIndex].pointCode}
-              src={filteredItems[lightboxIndex].photoUrl || ''}
-              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
-            />
+          <div className="max-h-[90vh] max-w-[90vw] text-center space-y-3">
+            {filteredItems[lightboxIndex].photoUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                alt={filteredItems[lightboxIndex].pointCode}
+                className="max-h-[78vh] max-w-full rounded-2xl shadow-2xl object-contain mx-auto"
+                src={filteredItems[lightboxIndex].photoUrl}
+              />
+            ) : (
+              <div className="flex h-64 w-96 flex-col items-center justify-center rounded-2xl bg-slate-800 text-slate-400 mx-auto">
+                <Camera size={40} />
+                <span className="mt-2 text-sm">Bez fotografie</span>
+              </div>
+            )}
 
-            <div className="text-center text-white space-y-1">
-              <h3 className="text-base font-bold">
-                {filteredItems[lightboxIndex].pointCode} · {filteredItems[lightboxIndex].address}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {filteredItems[lightboxIndex].city} · Pořízeno:{' '}
-                {filteredItems[lightboxIndex].photoDate
-                  ? new Date(filteredItems[lightboxIndex].photoDate!).toLocaleDateString('cs-CZ')
-                  : 'Neuvedeno'}
+            <div className="text-white text-xs space-y-1">
+              <p className="font-bold text-sm">
+                {filteredItems[lightboxIndex].pointCode} · {filteredItems[lightboxIndex].city} (Směr: {filteredItems[lightboxIndex].direction || 'Obousměrný'})
               </p>
+              <p className="text-slate-300">{filteredItems[lightboxIndex].address}</p>
             </div>
           </div>
         </div>

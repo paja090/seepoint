@@ -47,7 +47,7 @@ export type NavigationImportReport = {
 
 const HEADER_ALIASES = {
   position: ['pozice'],
-  structure: ['cislo stozaru sloupek', 'cislo stozaru / sloupek'],
+  structure: ['cislo stozaru sloupek', 'cislo stozaru / sloupek', 'cislo sloupu'],
   street: ['ulice'],
   description: ['popis'],
   mediaType: ['typ reklamy'],
@@ -63,7 +63,37 @@ const HEADER_ALIASES = {
   newPhoto: ['nove fotky po vraceni navigaci', 'ftd 3/2026'],
   roadNote: ['poznamky navigace zmena k 1.10.2025 rsd'],
   note: ['poznamka'],
+  mountingType: ['typ sloupu', 'konstrukce', 'uchyceni', 'typ konstrukce'],
+  direction: ['smer', 'smer navigace'],
+  destination: ['cil', 'prodejna', 'navigovany cil'],
+  distance: ['vzdalenost', 'vzdalenost v metrech'],
 } as const;
+
+export function parseMountingType(text: string | undefined): 'LIGHT_POLE' | 'POLE' | 'COLUMN' | 'TRACTION' | 'UNKNOWN' {
+  if (!text) return 'UNKNOWN';
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (norm.includes('trakc')) return 'TRACTION';
+  if (norm.includes('sloupek') || norm.includes('patka')) return 'COLUMN';
+  if (norm.includes('osvetleni') || norm.includes('vo')) return 'LIGHT_POLE';
+  if (norm.includes('sloup') || norm.includes('pylon')) return 'POLE';
+  return 'UNKNOWN';
+}
+
+export function parseDistanceMeters(text: string | undefined): number | undefined {
+  if (!text) return undefined;
+  const trimmed = text.trim().toLowerCase();
+  const kmMatch = /^([\d,.]+)\s*km$/.exec(trimmed);
+  if (kmMatch) {
+    const num = Number(kmMatch[1].replace(',', '.'));
+    return Number.isFinite(num) && num >= 0 ? Math.round(num * 1000) : undefined;
+  }
+  const mMatch = /^([\d,.]+)\s*m?$/.exec(trimmed);
+  if (mMatch) {
+    const num = Number(mMatch[1].replace(',', '.'));
+    return Number.isFinite(num) && num >= 0 ? Math.round(num) : undefined;
+  }
+  return undefined;
+}
 
 type HeaderKey = keyof typeof HEADER_ALIASES;
 
