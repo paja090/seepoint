@@ -6,6 +6,15 @@ import { StatusBadge } from './StatusBadge';
 
 type ClientOption = Pick<Client, 'id' | 'name'>;
 
+type OtherCarrierOption = {
+  id: string;
+  name: string;
+  code: string;
+  city: string;
+  street?: string;
+  surfacesCount: number;
+};
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -62,6 +71,17 @@ export function NavigationSurfaceManager({
   const [newDestination, setNewDestination] = useState('');
   const [newDistance, setNewDistance] = useState('');
 
+  // Pole Merger state
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [loadingOtherCarriers, setLoadingOtherCarriers] = useState(false);
+  const [otherCarriers, setOtherCarriers] = useState<OtherCarrierOption[]>([]);
+  const [selectedCarrierIdsToMerge, setSelectedCarrierIdsToMerge] = useState<string[]>([]);
+  const [updateGpsOnMerge, setUpdateGpsOnMerge] = useState(true);
+  const [searchFilter, setSearchFilter] = useState('');
+
+  // Surface Move / Detach state
+  const [moveModalSurfaceId, setMoveModalSurfaceId] = useState<string | null>(null);
+
   function openOccupyModal(surface: Surface) {
     setActiveModalSurfaceId(surface.id);
     setClientName(surface.currentClient?.name ?? '');
@@ -83,6 +103,85 @@ export function NavigationSurfaceManager({
     setDestinationName(surface.destinationName ?? '');
     setDistanceMeters(surface.distanceMeters ? surface.distanceMeters.toString() : '');
     setDirectionDescription(surface.directionDescription ?? '');
+  }
+
+  async function openMergeModal() {
+    setShowMergeModal(true);
+    setLoadingOtherCarriers(true);
+    setSelectedCarrierIdsToMerge([]);
+    try {
+      const response = await fetch('/api/carriers?carrierType=NAVIGATION&pageSize=2000');
+      const data = (await response.json()) as { carriers?: Array<{ id: string; name: string; code: string; city: string; street?: string; surfaces?: unknown[] }> };
+      if (data.carriers) {
+        const filtered = data.carriers
+          .filter((c) => c.id !== carrierId)
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            code: c.code,
+            city: c.city,
+            street: c.street,
+            surfacesCount: c.surfaces?.length ?? 0,
+          }));
+        setOtherCarriers(filtered);
+      }
+    } catch (err) {
+      console.error('Failed to load carriers:', err);
+    } finally {
+      setLoadingOtherCarriers(false);
+    }
+  }
+
+  async function handleExecuteMerge() {
+    if (selectedCarrierIdsToMerge.length === 0) return;
+    setSaving(true);
+    try {
+      const response = await fetch('/api/carriers/merge-navigation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetCarrierId: carrierId,
+          sourceCarrierIds: selectedCarrierIdsToMerge,
+          updateGps: updateGpsOnMerge,
+        }),
+      });
+
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) throw new Error(data.error || 'Nepodařilo se sloučit nosiče.');
+
+      alert(data.message || 'Nosiče byly úspěšně sloučeny na tento sloup.');
+      setShowMergeModal(false);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při slučování.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleMoveSurface(surfaceId: string, detachToNew = false) {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/carriers/${carrierId}/surfaces/move`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          surfaceId,
+          detachToNewPole: detachToNew,
+        }),
+      });
+
+      const data = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) throw new Error(data.error || 'Nepodařilo se přesunout pozici.');
+
+      alert(data.message || 'Pozice byla přesunuta.');
+      setMoveModalSurfaceId(null);
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při přesunu pozice.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleOccupySurface(surfaceId: string, isFree = false) {
@@ -247,6 +346,15 @@ export function NavigationSurfaceManager({
     }
   }
 
+  const filteredOtherCarriers = otherCarriers.filter(
+    (c) =>
+      !searchFilter.trim() ||
+      c.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      c.code.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      c.city.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (c.street && c.street.toLowerCase().includes(searchFilter.toLowerCase())),
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -259,13 +367,22 @@ export function NavigationSurfaceManager({
           </p>
         </div>
         {canEdit && (
-          <button
-            className="rounded-2xl bg-gradient-to-r from-sky-600 to-blue-700 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-sky-700 hover:to-blue-800 transition"
-            onClick={() => setShowAddPosition(!showAddPosition)}
-            type="button"
-          >
-            {showAddPosition ? 'Zavřít' : '➕ Přidat další pozici na sloup'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="rounded-2xl border border-sky-300 bg-white px-4 py-2 text-xs font-bold text-sky-900 shadow-sm hover:bg-sky-50 transition"
+              onClick={() => void openMergeModal()}
+              type="button"
+            >
+              🔗 Sloučit jiné navigace na tento sloup
+            </button>
+            <button
+              className="rounded-2xl bg-gradient-to-r from-sky-600 to-blue-700 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-sky-700 hover:to-blue-800 transition"
+              onClick={() => setShowAddPosition(!showAddPosition)}
+              type="button"
+            >
+              {showAddPosition ? 'Zavřít' : '➕ Přidat novou pozici'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -505,7 +622,7 @@ export function NavigationSurfaceManager({
 
                 {/* AI Extracted Result Banner */}
                 {isAiActive && aiResult && (
-                  <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-3 text-xs space-y-2 shadow-sm animate-fade-in">
+                  <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-3 text-xs space-y-2 shadow-sm">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-emerald-950 flex items-center gap-1">
                         ✨ Návrh rozpoznaný z fotky nosiče ({aiResult.confidence} jistota)
@@ -545,35 +662,45 @@ export function NavigationSurfaceManager({
 
                 {/* Main Card Actions */}
                 {canEdit && (
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/80 text-xs">
-                    <button
-                      className={`rounded-xl px-4 py-2 font-bold transition shadow-sm ${
-                        isOccupied
-                          ? 'bg-amber-600 text-white hover:bg-amber-700'
-                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      }`}
-                      onClick={() => openOccupyModal(surface)}
-                      type="button"
-                    >
-                      {isOccupied ? '✏️ Upravit pronájem' : '✅ Nastavit jako obsazené'}
-                    </button>
-
-                    {isOccupied && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                    <div className="flex flex-wrap gap-2">
                       <button
-                        className="rounded-xl border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50 shadow-sm"
-                        onClick={() => void handleOccupySurface(surface.id, true)}
+                        className={`rounded-xl px-4 py-2 font-bold transition shadow-sm ${
+                          isOccupied
+                            ? 'bg-amber-600 text-white hover:bg-amber-700'
+                            : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        }`}
+                        onClick={() => openOccupyModal(surface)}
                         type="button"
                       >
-                        🚪 Ukončit pronájem (uvolnit)
+                        {isOccupied ? '✏️ Upravit pronájem' : '✅ Nastavit jako obsazené'}
                       </button>
-                    )}
+
+                      {isOccupied && (
+                        <button
+                          className="rounded-xl border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50 shadow-sm"
+                          onClick={() => void handleOccupySurface(surface.id, true)}
+                          type="button"
+                        >
+                          🚪 Ukončit pronájem (uvolnit)
+                        </button>
+                      )}
+
+                      <button
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                        onClick={() => void handleToggleOutOfService(surface)}
+                        type="button"
+                      >
+                        {isOutOfService ? 'Obnovit provoz' : 'Mimo provoz'}
+                      </button>
+                    </div>
 
                     <button
-                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
-                      onClick={() => void handleToggleOutOfService(surface)}
+                      className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 font-bold text-sky-900 hover:bg-sky-100 shadow-sm"
+                      onClick={() => setMoveModalSurfaceId(surface.id)}
                       type="button"
                     >
-                      {isOutOfService ? 'Obnovit provoz' : 'Mimo provoz'}
+                      ↗️ Přesunout / Vyčlenit
                     </button>
                   </div>
                 )}
@@ -598,6 +725,149 @@ export function NavigationSurfaceManager({
           );
         })}
       </div>
+
+      {/* MODAL: Merge Poles */}
+      {showMergeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl space-y-4 border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xl font-black text-slate-900">🔗 Sloučení jiných sloupu na tento nosič</h4>
+                <p className="text-xs text-slate-500">
+                  Přesune všechny navigační pozice a fotky z vybraných sloupu na tento fyzický sloup.
+                </p>
+              </div>
+              <button
+                className="rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200 font-bold"
+                onClick={() => setShowMergeModal(false)}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <label className="block">
+                <span className="block mb-1 font-semibold text-slate-700">Vyhledat sloup (podle kódu, ulice nebo město)</span>
+                <input
+                  className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
+                  placeholder="Zadejte název, kód nebo ulici..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                />
+              </label>
+
+              <label className="flex items-center gap-2 rounded-xl bg-sky-50 p-3 border border-sky-200">
+                <input
+                  type="checkbox"
+                  checked={updateGpsOnMerge}
+                  onChange={(e) => setUpdateGpsOnMerge(e.target.checked)}
+                />
+                <span className="font-semibold text-sky-950">
+                  📍 Přepočítat průměrné GPS souřadnice z vybraných sloupu pro tento nosič
+                </span>
+              </label>
+
+              {loadingOtherCarriers ? (
+                <div className="p-8 text-center text-slate-500">Načítám dostupné navigace...</div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-2xl p-2 bg-slate-50">
+                  {filteredOtherCarriers.length === 0 ? (
+                    <p className="p-4 text-center text-slate-400">Žádné další navigace ke sloučení nenalezeny.</p>
+                  ) : (
+                    filteredOtherCarriers.map((c) => {
+                      const isSelected = selectedCarrierIdsToMerge.includes(c.id);
+                      return (
+                        <label
+                          key={c.id}
+                          className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
+                            isSelected ? 'border-sky-500 bg-sky-100/80 font-bold' : 'border-slate-200 bg-white hover:bg-slate-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedCarrierIdsToMerge([...selectedCarrierIdsToMerge, c.id]);
+                                } else {
+                                  setSelectedCarrierIdsToMerge(selectedCarrierIdsToMerge.filter((id) => id !== c.id));
+                                }
+                              }}
+                            />
+                            <div>
+                              <p className="text-slate-900 font-semibold">{c.name} ({c.code})</p>
+                              <p className="text-[11px] text-slate-500">{c.city} · {c.street || 'bez ulice'}</p>
+                            </div>
+                          </div>
+                          <span className="rounded-lg bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                            {c.surfacesCount} pozic
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+              <button
+                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => setShowMergeModal(false)}
+                type="button"
+              >
+                Zrušit
+              </button>
+              <button
+                className="rounded-xl bg-sky-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-sky-700 disabled:opacity-50"
+                disabled={saving || selectedCarrierIdsToMerge.length === 0}
+                onClick={() => void handleExecuteMerge()}
+                type="button"
+              >
+                Sloučit vybrané ({selectedCarrierIdsToMerge.length}) na tento sloup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Move or Detach Surface */}
+      {moveModalSurfaceId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4 border border-slate-100">
+            <h4 className="text-lg font-black text-slate-900">Přesun / Vyčlenění navigační pozice</h4>
+            <p className="text-xs text-slate-500">
+              Vyberte, zda chcete tuto pozici přesunout na jiný sloup, nebo vytvořit nový samostatný sloup.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <button
+                className="w-full rounded-2xl border-2 border-emerald-400 bg-emerald-50/80 p-4 font-bold text-emerald-950 hover:bg-emerald-100 text-left shadow-sm space-y-1"
+                disabled={saving}
+                onClick={() => void handleMoveSurface(moveModalSurfaceId, true)}
+                type="button"
+              >
+                <span className="block text-sm font-extrabold text-emerald-900">✨ Vyčlenit na nový samostatný sloup</span>
+                <span className="block text-[11px] font-normal text-emerald-700">
+                  Pozice a její fotky se oddělí a vytvoří se pro ni nový samostatný nosič v databázi.
+                </span>
+              </button>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+              <button
+                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                onClick={() => setMoveModalSurfaceId(null)}
+                type="button"
+              >
+                Zrušit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal for setting Occupancy & Navigation Details */}
       {activeModalSurfaceId && (
