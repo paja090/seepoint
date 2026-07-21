@@ -19,6 +19,7 @@ const navGroups: NavGroup[] = [
     label: 'Projekty',
     items: [
       ['/projects/navigation', 'Navigace', 'mapPinned', 'navigationProjects'],
+      ['/navigation/documentation', 'Fotodokumentace navigací', 'camera', 'navigationDocumentation'],
       ['/projects/city-gallery', 'Galerie venku', 'galleryHorizontalEnd', 'cityGallery'],
     ],
   },

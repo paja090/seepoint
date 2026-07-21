@@ -16,6 +16,7 @@ function surface(id: string, overrides: Partial<OfferSurfaceOption> = {}): Offer
       code: `CP${id}`,
       name: `Nosič ${id}`,
       city: 'Ostrava',
+      type: overrides.mediaType || 'CITY_POSTER',
       locality: 'Centrum',
       street: 'Nádražní',
       address: 'Nádražní 1',

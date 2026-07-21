@@ -31,6 +31,8 @@ export type Surface = {
   mediaType: MediaType;
   sourcePosition?: string;
   directionDescription?: string;
+  destinationName?: string;
+  distanceMeters?: number;
   rawMediaType?: string;
   size?: string;
   orientation?: string;

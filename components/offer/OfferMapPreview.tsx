@@ -96,6 +96,7 @@ export function OfferMapPreview({ offer }: { offer: ProposalOffer }) {
 
       <OfferMap
         className="mt-5 h-[340px] sm:h-[420px]"
+        target={offer.navigationTarget ? { label: offer.navigationTarget.name, latitude: offer.navigationTarget.latitude, longitude: offer.navigationTarget.longitude } : undefined}
         points={visible.map((carrier) => ({
           id: carrier.id,
           code: carrier.code,

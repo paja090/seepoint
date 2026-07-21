@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { parseNavigationImport } from '@/lib/navigation-import';
+import { parseMountingType, parseNavigationImport } from '@/lib/navigation-import';
 import { buildNavigationImportPlan, normalizeClientName } from '@/lib/navigation-import-plan';
 
 export const runtime = 'nodejs';
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       const carrierInputs: Prisma.AdvertisingCarrierCreateManyInput[] = plan.carriers.map((carrier) => ({
         name: carrier.name,
         code: carrier.code,
-        type: 'OTHER',
+        type: 'NAVIGATION',
         latitude: carrier.latitude,
         longitude: carrier.longitude,
         gpsStatus: carrier.gpsStatus,
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         city: carrier.city,
         cadastralArea: carrier.cadastralArea,
         structureCode: carrier.structureCode,
-        mountingType: 'UNKNOWN',
+        mountingType: parseMountingType(carrier.structureCode),
         status: 'ACTIVE',
         sourceSystem: 'NAVIGATION_IMPORT',
         sourceSheet: carrier.navigations[0]?.row.sheetName,

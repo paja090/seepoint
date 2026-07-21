@@ -1,29 +1,21 @@
 'use client';
 
-import type { Carrier, Client, SurfaceStatus } from '@/lib/types';
+import type { Carrier, Client } from '@/lib/types';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { CarrierArchiveActions } from './CarrierArchiveActions';
-import { ClientAssignments } from './ClientAssignments';
 import { LocationMiniMap } from './LocationMiniMap';
+import { NavigationSurfaceManager } from './NavigationSurfaceManager';
 import { OccupancyActions } from './OccupancyActions';
 import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 
-type SurfaceClientChangeHandler = (
-  surfaceId: string,
-  currentClient: Pick<Client, 'id' | 'name'> | undefined,
-  status: SurfaceStatus,
-) => void;
-
 export function CarrierDetail({
   carrier,
-  onSurfaceClientChanged,
   showLocationMap = false,
   clients = [],
   canEdit = false,
 }: {
   carrier: Carrier;
-  onSurfaceClientChanged?: SurfaceClientChangeHandler;
   showLocationMap?: boolean;
   clients?: Array<Pick<Client, 'id' | 'name'>>;
   canEdit?: boolean;
@@ -89,33 +81,44 @@ export function CarrierDetail({
         <CarrierArchiveActions carrier={carrier} />
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-semibold">Aktuální obsazenost</h3>
-            <p className="text-sm text-slate-500">Rychlý pohled pro obchodníka přímo na detailu nosiče.</p>
+      {carrier.type === 'NAVIGATION' ? (
+        <section className="rounded-2xl border border-sky-200 bg-white p-5 shadow-sm">
+          <NavigationSurfaceManager
+            canEdit={canEdit}
+            carrierId={carrier.id}
+            clients={clients}
+            surfaces={carrier.surfaces}
+          />
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">Aktuální obsazenost</h3>
+              <p className="text-sm text-slate-500">Rychlý pohled pro obchodníka přímo na detailu nosiče.</p>
+            </div>
+            {primaryCampaign ? <StatusBadge value={primaryCampaign.status} /> : <StatusBadge value="AVAILABLE" />}
           </div>
-          {primaryCampaign ? <StatusBadge value={primaryCampaign.status} /> : <StatusBadge value="AVAILABLE" />}
-        </div>
-        {primaryCampaign ? (
-          <div className="grid gap-2 text-sm md:grid-cols-2">
-            <p><b>Klient:</b> {primaryCampaign.clientName}</p>
-            <p><b>Kampaň:</b> {primaryCampaign.campaignName}</p>
-            <p><b>Plocha:</b> {primaryCampaign.surface}</p>
-            <p><b>Termín:</b> {primaryCampaign.dateFrom} - {primaryCampaign.dateTo}</p>
-            <p><b>Do konce:</b> {daysToEnd !== undefined ? `${daysToEnd} dnů` : 'neuvedeno'}</p>
-            {primaryCampaign.price && <p><b>Cena:</b> {primaryCampaign.price.toLocaleString('cs-CZ')} Kč</p>}
-            {primaryCampaign.note && <p className="md:col-span-2"><b>Poznámka:</b> {primaryCampaign.note}</p>}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-600">Na tomto nosiči není podle aktuálních dat aktivní kampaň ani rezervace.</p>
-        )}
-        <OccupancyActions
-          activeOccupancy={primaryCampaign}
-          clients={clients}
-          surfaces={carrier.surfaces.map((surface) => ({ id: surface.id, name: surface.name, price: surface.price }))}
-        />
-      </section>
+          {primaryCampaign ? (
+            <div className="grid gap-2 text-sm md:grid-cols-2">
+              <p><b>Klient:</b> {primaryCampaign.clientName}</p>
+              <p><b>Kampaň:</b> {primaryCampaign.campaignName}</p>
+              <p><b>Plocha:</b> {primaryCampaign.surface}</p>
+              <p><b>Termín:</b> {primaryCampaign.dateFrom} - {primaryCampaign.dateTo}</p>
+              <p><b>Do konce:</b> {daysToEnd !== undefined ? `${daysToEnd} dnů` : 'neuvedeno'}</p>
+              {primaryCampaign.price && <p><b>Cena:</b> {primaryCampaign.price.toLocaleString('cs-CZ')} Kč</p>}
+              {primaryCampaign.note && <p className="md:col-span-2"><b>Poznámka:</b> {primaryCampaign.note}</p>}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-600">Na tomto nosiči není podle aktuálních dat aktivní kampaň ani rezervace.</p>
+          )}
+          <OccupancyActions
+            activeOccupancy={primaryCampaign}
+            clients={clients}
+            surfaces={carrier.surfaces.map((surface) => ({ id: surface.id, name: surface.name, price: surface.price }))}
+          />
+        </section>
+      )}
 
       {showLocationMap && coordinates && (
         <LocationMiniMap
@@ -142,7 +145,6 @@ export function CarrierDetail({
             ))}
           </div>
         )}
-        <ClientAssignments initialSurfaces={carrier.surfaces} onChanged={onSurfaceClientChanged} />
       </section>
 
       <section id="campaign-history" className="scroll-mt-6">

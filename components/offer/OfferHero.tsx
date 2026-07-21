@@ -70,15 +70,15 @@ export function OfferHero({
 
           {actionsEnabled && <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap print:hidden">
             <button
-              className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 sm:flex-none"
+              className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 sm:flex-none"
               onClick={onApprove}
               type="button"
             >
               <CheckCircle2 aria-hidden size={18} />
-              Schválit nabídku
+              Mám zájem o nabídku
             </button>
             <button
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50"
               onClick={onRevision}
               type="button"
             >
@@ -86,12 +86,12 @@ export function OfferHero({
               Požádat o úpravu
             </button>
             <button
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50"
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50"
               onClick={onQuestion}
               type="button"
             >
               <HelpCircle aria-hidden size={18} />
-              Mám dotaz
+              Prostor pro dotaz
             </button>
           </div>}
         </div>

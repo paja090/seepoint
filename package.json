@@ -15,10 +15,12 @@
     "db:seed": "prisma db seed",
     "seed:demo-settlement": "npx tsx scripts/seed-demo-settlement.ts",
     "seed:demo-settlement:clean": "npx tsx scripts/seed-demo-settlement.ts --clean",
-    "offer:demo-pdf": "node --experimental-strip-types scripts/generate-demo-offer-pdf.ts"
+    "offer:demo-pdf": "node --experimental-strip-types scripts/generate-demo-offer-pdf.ts",
+    "import:carriers-2026": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/import-carriers-2026.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",
+    "exceljs": "^4.4.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
