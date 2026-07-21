@@ -19,6 +19,22 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function addMonthsToDate(baseDateStr: string, months: number) {
+  const d = baseDateStr ? new Date(baseDateStr) : new Date();
+  if (Number.isNaN(d.getTime())) {
+    const fallback = new Date();
+    fallback.setMonth(fallback.getMonth() + months);
+    return fallback.toISOString().slice(0, 10);
+  }
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+function endOfYearDate() {
+  const year = new Date().getFullYear();
+  return `${year}-12-31`;
+}
+
 function getDirectionArrow(direction?: string | null) {
   if (!direction) return '🧭';
   const norm = direction.toLowerCase();
@@ -86,11 +102,13 @@ export function NavigationSurfaceManager({
     setActiveModalSurfaceId(surface.id);
     setClientName(surface.currentClient?.name ?? '');
     setClientId(surface.currentClientId ?? '');
-    setDateFrom(today());
+    const fromDateStr = today();
+    setDateFrom(fromDateStr);
     const activeOcc = surface.occupancies?.find(
       (o) => o.status === 'OCCUPIED' || o.status === 'RESERVED',
     );
-    setDateTo(activeOcc?.dateTo ?? '');
+    const defaultToDate = activeOcc?.dateTo ?? addMonthsToDate(fromDateStr, 12);
+    setDateTo(defaultToDate);
     setDestinationName(surface.destinationName ?? '');
     setDistanceMeters(surface.distanceMeters ? surface.distanceMeters.toString() : '');
     setDirectionDescription(surface.directionDescription ?? '');
@@ -188,14 +206,17 @@ export function NavigationSurfaceManager({
     setSaving(true);
     setMessage('');
     try {
+      const finalDateFrom = dateFrom || today();
+      const finalDateTo = dateTo || addMonthsToDate(finalDateFrom, 12);
+
       const response = await fetch(`/api/surfaces/${surfaceId}/client`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: isFree ? null : clientId || undefined,
           clientName: isFree ? '' : clientName,
-          dateFrom: isFree ? undefined : dateFrom,
-          dateTo: isFree ? undefined : dateTo,
+          dateFrom: isFree ? undefined : finalDateFrom,
+          dateTo: isFree ? undefined : finalDateTo,
           destinationName,
           distanceMeters: distanceMeters ? Number(distanceMeters) : undefined,
           directionDescription,
@@ -912,15 +933,40 @@ export function NavigationSurfaceManager({
                     onChange={(e) => setDateFrom(e.target.value)}
                   />
                 </label>
-                <label>
-                  <span className="block mb-1 font-semibold text-slate-700">Pronajato do *</span>
-                  <input
-                    className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                  />
-                </label>
+                <div>
+                  <label className="block">
+                    <span className="block mb-1 font-semibold text-slate-700">Pronajato do *</span>
+                    <input
+                      className="w-full rounded-xl border border-slate-300 p-2.5 shadow-sm"
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <button
+                      type="button"
+                      className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
+                      onClick={() => setDateTo(addMonthsToDate(dateFrom || today(), 12))}
+                    >
+                      + 1 rok
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
+                      onClick={() => setDateTo(addMonthsToDate(dateFrom || today(), 6))}
+                    >
+                      + 6 měsíců
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
+                      onClick={() => setDateTo(endOfYearDate())}
+                    >
+                      Do konce roku
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -976,11 +1022,11 @@ export function NavigationSurfaceManager({
               </button>
               <button
                 className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50"
-                disabled={saving || !clientName.trim() || !dateFrom || !dateTo}
+                disabled={saving || !clientName.trim()}
                 onClick={() => void handleOccupySurface(activeModalSurfaceId)}
                 type="button"
               >
-                Uložit pronájem
+                {saving ? 'Ukládám...' : 'Uložit pronájem'}
               </button>
             </div>
           </div>
