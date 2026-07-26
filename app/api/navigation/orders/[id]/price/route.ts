@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const authResult = await requireApiAccess('offers');
   if (isApiDenied(authResult)) return authResult;
-  const user = authResult;
 
   try {
     const { searchParams } = new URL(req.url);
