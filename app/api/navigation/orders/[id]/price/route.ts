@@ -44,7 +44,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Chybí navigationPointId.' }, { status: 400 });
     }
 
-    const result = await deleteNavigationPrice(navigationPointId, user.id);
+    const result = await deleteNavigationPrice(navigationPointId);
     return NextResponse.json({ success: true, result });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Chyba při mazání ceny bodu.';

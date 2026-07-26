@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Camera, MapPin, CheckCircle2, AlertTriangle, ExternalLink, ArrowLeft } from 'lucide-react';
+import { Camera, MapPin, CheckCircle2, ExternalLink, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export type MobileTaskItem = {

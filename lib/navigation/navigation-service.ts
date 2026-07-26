@@ -1,7 +1,7 @@
-import { Prisma, PhotoType } from '@prisma/client';
+import { Prisma, PhotoType, NavigationOrderStatus } from '@prisma/client';
 import { prisma } from '../db.ts';
 import type { CurrentUser } from '../rbac.ts';
-import { NavigationOrderDetail, NavigationPointItem } from './types.ts';
+import { NavigationOrderDetail } from './types.ts';
 import { nextCrmOrderNumber } from '../crm/domain.ts';
 
 export class NavigationServiceError extends Error {
@@ -140,7 +140,7 @@ export async function listNavigationOrders(user: CurrentUser, filters: { query?:
   const where: Prisma.NavigationOrderWhereInput = {};
 
   if (filters.status) {
-    where.status = filters.status as any;
+    where.status = filters.status as NavigationOrderStatus;
   }
 
   if (filters.clientId) {

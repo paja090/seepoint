@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { Compass, Plus, Filter, AlertTriangle, CheckCircle2, Clock, FileText } from 'lucide-react';
+import { Compass, Plus, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
-import { PageHeader, StatCard, Table, TableHead, TableHeaderCell, TableCell, StatusBadge, Button } from '@/components/ui';
+import { PageHeader, StatCard, Table, TableHead, TableHeaderCell, TableCell, Button } from '@/components/ui';
 import { listNavigationOrders } from '@/lib/navigation/navigation-service';
 import { NAVIGATION_ORDER_STATUS_COLORS, NAVIGATION_ORDER_STATUS_LABELS, NAVIGATION_BLOCK_STATUS_LABELS } from '@/lib/navigation/types';
 

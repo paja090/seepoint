@@ -168,7 +168,7 @@ export async function changeNavigationPointPrice(
   });
 }
 
-export async function deleteNavigationPrice(navigationPointId: string, actorUserId: string) {
+export async function deleteNavigationPrice(navigationPointId: string) {
   const point = await prisma.navigationPoint.findUnique({
     where: { id: navigationPointId },
     include: {

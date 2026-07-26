@@ -21,7 +21,7 @@ export default async function NavigationOrderDetailPage({
         <NavigationOrderDetailView order={order} />
       </AppShell>
     );
-  } catch (err: unknown) {
+  } catch {
     notFound();
   }
 }

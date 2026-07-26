@@ -1,21 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
 import {
   Compass,
   MapPin,
-  Calendar,
-  DollarSign,
-  FileText,
   Camera,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  ArrowRight,
-  Plus,
-  Trash2,
   Edit3,
   Image as ImageIcon,
   User,
