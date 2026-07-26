@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const roles = ['ADMIN', 'MANAGER', 'SALES', 'TECHNICIAN', 'WORKER', 'ACCOUNTANT', 'VIEWER'] as const;
 
 export type AppRole = typeof roles[number];
@@ -68,4 +70,13 @@ export function roleLabel(role: AppRole | string) {
     VIEWER: 'Náhled',
   };
   return labels[role] ?? role;
+}
+
+export function AccessDenied({ title = 'Nemáte oprávnění' }: { title?: string }) {
+  return React.createElement(
+    'section',
+    { className: 'card' },
+    React.createElement('h1', { className: 'text-2xl font-bold' }, title),
+    React.createElement('p', { className: 'mt-2 text-sm text-slate-600' }, 'Tahle část je dostupná jen oprávněným rolím.')
+  );
 }

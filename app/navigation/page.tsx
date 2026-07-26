@@ -45,7 +45,7 @@ export default async function NavigationDashboardPage({
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<Compass size={20} />} label="Celkem zakázek" tone="blue" value={totalCount} description="Navigační zakázky v systému" />
         <StatCard icon={<Clock size={20} />} label="V realizaci / výrobě" tone="purple" value={activeCount} description="Výroba, tisk a probíhající montáže" />
-        <StatCard icon={<AlertTriangle size={20} />} label="Čeká na fotky" tone="amber" value={waitingForPhotosCount} description="Nainstalováno, chybí fotky z terénu" />
+        <StatCard icon={<AlertTriangle size={20} />} label="Čeká na fotky" tone="orange" value={waitingForPhotosCount} description="Nainstalováno, chybí fotky z terénu" />
         <StatCard icon={<CheckCircle2 size={20} />} label="K fakturaci" tone="green" value={readyForBillingCount} description="Připraveno k vystavení faktury" />
       </div>
 
