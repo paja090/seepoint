@@ -195,8 +195,14 @@ enum OfferPriceCalculation {
 enum PhotoType {
   LOCATION
   CARRIER
+  SURFACE
   CAMPAIGN
   INSTALLATION
+  BEFORE_INSTALLATION
+  AFTER_INSTALLATION
+  CONTROL
+  DAMAGE
+  AFTER_DEINSTALLATION
   CHECK
   ARCHIVE
   EMPLOYEE_PROFILE
@@ -330,6 +336,8 @@ model User {
   uploadedClientDocuments         ClientDocument[]                @relation("ClientDocumentUploader")
   crmAuditLogs                    CrmAuditLog[]
   performedClientMerges           ClientMergeLog[]
+  navigationPriceAuditLogs        NavigationPriceAuditLog[]       @relation("NavigationPriceAuditUser")
+  navigationPriceVersions         NavigationPriceVersion[]        @relation("NavigationPriceChangedUser")
 }
 
 model UserSession {
@@ -768,6 +776,7 @@ model AdvertisingSurface {
   photos          Photo[]
   workItems       WorkOrderItem[]
   crmRealizations CrmRealization[]
+  navigationPoints NavigationPoint[]
 
   @@index([carrierId])
   @@index([currentClientId])
@@ -894,8 +903,11 @@ model NavigationOffer {
 
 model NavigationPoint {
   id                String                @id @default(cuid())
-  navigationOfferId String
+  navigationOfferId String?
+  navigationOrderId String?
   carrierId         String?
+  surfaceId         String?
+  installedPhotoId  String?
   sortOrder         Int                   @default(0)
   latitude          Float
   longitude         Float
@@ -916,12 +928,19 @@ model NavigationPoint {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  navigationOffer              NavigationOffer               @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  navigationOffer              NavigationOffer?              @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  navigationOrder              NavigationOrder?              @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
   carrier                      AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  surface                      AdvertisingSurface?           @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
+  installedPhoto               Photo?                        @relation("PointInstalledPhoto", fields: [installedPhotoId], references: [id], onDelete: SetNull)
+  priceVersions                NavigationPriceVersion[]
+  priceAuditLogs               NavigationPriceAuditLog[]
   navigationDocumentationItems NavigationDocumentationItem[]
 
   @@index([navigationOfferId, sortOrder])
+  @@index([navigationOrderId])
   @@index([carrierId])
+  @@index([surfaceId])
   @@index([latitude, longitude])
 }
 
@@ -1221,6 +1240,7 @@ model Photo {
   workEntry                    WorkEntry?                    @relation(fields: [workEntryId], references: [id], onDelete: SetNull)
   crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
   navigationDocumentationItems NavigationDocumentationItem[]
+  installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
@@ -1922,6 +1942,7 @@ model CrmOrder {
   communications ClientCommunication[]
   crmTasks       CrmTask[]
   workOrders     WorkOrder[]
+  navigationOrder NavigationOrder?
 
   @@index([clientId])
   @@index([status])
@@ -2008,6 +2029,7 @@ model ClientInvoice {
   items     ClientInvoiceItem[]
   documents ClientDocument[]
   crmTasks  CrmTask[]
+  navigationBillingPeriods NavigationBillingPeriod[]
 
   @@index([clientId])
   @@index([status, dueDate])
@@ -2140,4 +2162,119 @@ model ClientMergeLog {
   performedByUser User   @relation(fields: [performedByUserId], references: [id], onDelete: Restrict)
 
   @@index([targetClientId])
+}
+
+enum NavigationOrderStatus {
+  POPTAVKA
+  NABIDKA
+  POTVRZENO_KLIENTEM
+  SMLOUVA_OBJEDNAVKA
+  GRAFICKE_PODKLADY
+  SCHVALENI_GRAFIKY
+  TISK_VYROBA
+  PRIPRAVENO_K_INSTALACI
+  INSTALACE
+  FOTODOKUMENTACE
+  PRIPRAVENO_K_FAKTURACI
+  FAKTUROVANO
+  DOKONCENO
+}
+
+enum NavigationBlockStatus {
+  CEKA_NA_KLIENTA
+  CEKA_NA_POTVRZENI_NABIDKY
+  CEKA_NA_OBJEDNAVKU
+  CEKA_NA_GRAFIKU
+  CEKA_NA_SCHVALENI_GRAFIKY
+  CEKA_NA_TISK
+  CEKA_NA_INSTALACI
+  CEKA_NA_FOTOGRAFIE
+  CEKA_NA_FAKTURACI
+  INTERNE_POZASTAVENO
+}
+
+model NavigationOrder {
+  id                 String                 @id @default(cuid())
+  crmOrderId         String                 @unique
+  status             NavigationOrderStatus  @default(POPTAVKA)
+  blockStatus        NavigationBlockStatus?
+  rentStart          DateTime?
+  rentEnd            DateTime?
+  installationDate   DateTime?
+  deinstallationDate DateTime?
+
+  targetName         String
+  targetAddress      String?
+  targetLatitude     Float
+  targetLongitude    Float
+  targetNote         String?
+
+  graphicsApprovedAt DateTime?
+  productionReadyAt  DateTime?
+  installedAt        DateTime?
+  invoicedAt         DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  crmOrder           CrmOrder                  @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  points             NavigationPoint[]
+  billingPeriods     NavigationBillingPeriod[]
+
+  @@index([status])
+}
+
+model NavigationBillingPeriod {
+  id                String              @id @default(cuid())
+  navigationOrderId String
+  dateFrom          DateTime
+  dateTo            DateTime
+  invoiceId         String?             @unique
+  status            ClientInvoiceStatus @default(DRAFT)
+  amount            Decimal             @db.Decimal(12, 2)
+  invoicedAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  navigationOrder   NavigationOrder     @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  invoice           ClientInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([navigationOrderId, dateFrom, dateTo])
+  @@index([navigationOrderId])
+}
+
+model NavigationPriceVersion {
+  id                String          @id @default(cuid())
+  navigationPointId String
+  validFrom         DateTime
+  validTo           DateTime?
+  unitPrice         Decimal         @db.Decimal(12, 2)
+  installationPrice Decimal         @default(0) @db.Decimal(12, 2)
+  removalPrice      Decimal         @default(0) @db.Decimal(12, 2)
+  productionPrice   Decimal         @default(0) @db.Decimal(12, 2)
+  subtotal          Decimal         @db.Decimal(12, 2)
+  reason            String?
+  changedByUserId   String?
+  createdAt         DateTime        @default(now())
+
+  navigationPoint   NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
+  changedByUser     User?           @relation("NavigationPriceChangedUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([navigationPointId, validFrom])
+}
+
+model NavigationPriceAuditLog {
+  id                String          @id @default(cuid())
+  navigationPointId String
+  oldUnitPrice      Decimal?        @db.Decimal(12, 2)
+  newUnitPrice      Decimal         @db.Decimal(12, 2)
+  effectiveDate     DateTime
+  reason            String
+  changedByUserId   String
+  changedByUserName String
+  createdAt         DateTime        @default(now())
+
+  navigationPoint   NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
+  changedByUser     User            @relation("NavigationPriceAuditUser", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([navigationPointId])
 }
