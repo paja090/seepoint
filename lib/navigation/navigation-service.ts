@@ -143,19 +143,18 @@ export async function listNavigationOrders(user: CurrentUser, filters: { query?:
     where.status = filters.status as NavigationOrderStatus;
   }
 
-  if (filters.clientId) {
-    where.crmOrder = { clientId: filters.clientId };
-  }
-
-  // RBAC for SALES role: only view own or assigned orders
   if (user.role === 'SALES') {
     where.crmOrder = {
-      ...(where.crmOrder || {}),
-      OR: [
-        { assignedUserId: user.id },
-        { offer: { createdByUserId: user.id } },
-      ],
+      is: {
+        ...(filters.clientId ? { clientId: filters.clientId } : {}),
+        OR: [
+          { assignedUserId: user.id },
+          { offer: { is: { createdByUserId: user.id } } },
+        ],
+      },
     };
+  } else if (filters.clientId) {
+    where.crmOrder = { is: { clientId: filters.clientId } };
   }
 
   if (filters.query) {
