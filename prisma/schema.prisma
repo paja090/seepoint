@@ -195,8 +195,14 @@ enum OfferPriceCalculation {
 enum PhotoType {
   LOCATION
   CARRIER
+  SURFACE
   CAMPAIGN
   INSTALLATION
+  BEFORE_INSTALLATION
+  AFTER_INSTALLATION
+  CONTROL
+  DAMAGE
+  AFTER_DEINSTALLATION
   CHECK
   ARCHIVE
   EMPLOYEE_PROFILE
@@ -299,6 +305,7 @@ model User {
   email          String     @unique
   role           Role       @default(VIEWER)
   passwordHash   String?
+  mustChangePassword Boolean @default(false)
   status         UserStatus @default(INVITED)
   lastLoginAt    DateTime?
   sessionVersion Int        @default(1)
@@ -319,6 +326,18 @@ model User {
   updatedOfferPriceRules          OfferPriceRule[]                @relation("OfferPriceRuleUpdatedBy")
   navigationDocumentationReports NavigationDocumentationReport[]
   navigationReportAuditLogs      NavigationReportAuditLog[]
+  assignedClients                 Client[]                        @relation("ClientAssignedUser")
+  assignedCrmOrders               CrmOrder[]                      @relation("CrmOrderAssignedUser")
+  assignedRealizations            CrmRealization[]                @relation("CrmRealizationAssignedUser")
+  assignedContracts               ClientContract[]                @relation("ClientContractAssignedUser")
+  communicationAuthorLogs         ClientCommunication[]           @relation("CommunicationAuthor")
+  assignedCrmTasks                CrmTask[]                       @relation("CrmTaskAssignedUser")
+  createdCrmTasks                 CrmTask[]                       @relation("CrmTaskCreatedUser")
+  uploadedClientDocuments         ClientDocument[]                @relation("ClientDocumentUploader")
+  crmAuditLogs                    CrmAuditLog[]
+  performedClientMerges           ClientMergeLog[]
+  navigationPriceAuditLogs        NavigationPriceAuditLog[]       @relation("NavigationPriceAuditUser")
+  navigationPriceVersions         NavigationPriceVersion[]        @relation("NavigationPriceChangedUser")
 }
 
 model UserSession {
@@ -470,29 +489,56 @@ model EmployeeRate {
 }
 
 model Client {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   name            String
-  normalizedName  String    @unique
+  normalizedName  String       @unique
   companyId       String?
+  tradingName     String?
+  dic             String?
+  billingStreet   String?
+  billingCity     String?
+  billingZip      String?
+  billingCountry  String?      @default("CZ")
+  shippingStreet  String?
+  shippingCity    String?
+  shippingZip     String?
+  shippingCountry String?      @default("CZ")
+  website         String?
   contactPerson   String?
   email           String?
   phone           String?
-  externalCode    String?   @unique
+  externalCode    String?      @unique
+  status          ClientStatus @default(ACTIVE)
+  clientType      ClientType   @default(DIRECT_CLIENT)
+  source          ClientSource @default(WEBSITE)
+  assignedUserId  String?
+  rating          String?
+  lastActivityAt  DateTime     @default(now())
   note            String?
-  logoDriveFileId String?   @unique
+  logoDriveFileId String?      @unique
   logoFileName    String?
   logoMimeType    String?
   logoUpdatedAt   DateTime?
-  active          Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  currentSurfaces AdvertisingSurface[] @relation("CurrentSurfaceClient")
-  occupancies     Occupancy[]
-  offers                          Offer[]
-  workOrders                      WorkOrder[]
-  workEntries                     WorkEntry[]
+  assignedUser                   User?                           @relation("ClientAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  currentSurfaces                AdvertisingSurface[]            @relation("CurrentSurfaceClient")
+  occupancies                    Occupancy[]
+  offers                         Offer[]
+  workOrders                     WorkOrder[]
+  workEntries                    WorkEntry[]
   navigationDocumentationReports NavigationDocumentationReport[]
+  contacts                       ClientContact[]
+  branches                       ClientBranch[]
+  crmOrders                      CrmOrder[]
+  contracts                      ClientContract[]
+  invoices                       ClientInvoice[]
+  communications                 ClientCommunication[]
+  crmTasks                       CrmTask[]
+  documents                      ClientDocument[]
+  mergedTargetLogs               ClientMergeLog[]
 }
 
 model AdvertisingCarrier {
@@ -531,6 +577,7 @@ model AdvertisingCarrier {
   photos           Photo[]
   workItems                    WorkOrderItem[]
   workTasks                    WorkTask[]
+  crmRealizations              CrmRealization[]
   navigationPoints             NavigationPoint[]
   navigationDocumentationItems NavigationDocumentationItem[]
 
@@ -724,10 +771,12 @@ model AdvertisingSurface {
   carrier       AdvertisingCarrier @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   currentClient Client?            @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
   importBatch   ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
-  occupancies   Occupancy[]
-  offerItems    OfferItem[]
-  photos        Photo[]
-  workItems     WorkOrderItem[]
+  occupancies     Occupancy[]
+  offerItems      OfferItem[]
+  photos          Photo[]
+  workItems       WorkOrderItem[]
+  crmRealizations CrmRealization[]
+  navigationPoints NavigationPoint[]
 
   @@index([carrierId])
   @@index([currentClientId])
@@ -826,6 +875,7 @@ model Offer {
   cityGalleryOffer                CityGalleryOffer?
   packageSelections               OfferPackageSelection[]
   navigationDocumentationReports  NavigationDocumentationReport[]
+  crmOrder                        CrmOrder?
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -853,8 +903,11 @@ model NavigationOffer {
 
 model NavigationPoint {
   id                String                @id @default(cuid())
-  navigationOfferId String
+  navigationOfferId String?
+  navigationOrderId String?
   carrierId         String?
+  surfaceId         String?
+  installedPhotoId  String?
   sortOrder         Int                   @default(0)
   latitude          Float
   longitude         Float
@@ -875,12 +928,19 @@ model NavigationPoint {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  navigationOffer              NavigationOffer               @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  navigationOffer              NavigationOffer?              @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  navigationOrder              NavigationOrder?              @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
   carrier                      AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  surface                      AdvertisingSurface?           @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
+  installedPhoto               Photo?                        @relation("PointInstalledPhoto", fields: [installedPhotoId], references: [id], onDelete: SetNull)
+  priceVersions                NavigationPriceVersion[]
+  priceAuditLogs               NavigationPriceAuditLog[]
   navigationDocumentationItems NavigationDocumentationItem[]
 
   @@index([navigationOfferId, sortOrder])
+  @@index([navigationOrderId])
   @@index([carrierId])
+  @@index([surfaceId])
   @@index([latitude, longitude])
 }
 
@@ -1158,26 +1218,29 @@ model Photo {
   surfaceId       String?
   employeeId      String?
   taskId          String?
-  workEntryId     String?
-  url             String
-  driveFileId     String?
-  fileName        String?
-  mimeType        String?
-  size            Int?
-  type            PhotoType @default(CARRIER)
-  note            String?
-  sortOrder       Int       @default(0)
-  isPrimary       Boolean   @default(false)
-  isClientVisible Boolean   @default(false)
-  isPrivate       Boolean   @default(false)
-  createdAt       DateTime  @default(now())
+  workEntryId      String?
+  crmRealizationId String?
+  url              String
+  driveFileId      String?
+  fileName         String?
+  mimeType         String?
+  size             Int?
+  type             PhotoType @default(CARRIER)
+  note             String?
+  sortOrder        Int       @default(0)
+  isPrimary        Boolean   @default(false)
+  isClientVisible  Boolean   @default(false)
+  isPrivate        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
 
   carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface   AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
   employee  Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   task                         WorkTask?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
   workEntry                    WorkEntry?                    @relation(fields: [workEntryId], references: [id], onDelete: SetNull)
+  crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
   navigationDocumentationItems NavigationDocumentationItem[]
+  installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
@@ -1290,12 +1353,15 @@ model WorkOrder {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  client      Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  assignments WorkAssignment[]
-  items       WorkOrderItem[]
-  workTasks   WorkTask[]
-  workEntries WorkEntry[]
-  rates       WorkOrderRate[]
+  crmOrderId       String?
+  client           Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  crmOrder         CrmOrder?        @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  assignments      WorkAssignment[]
+  items            WorkOrderItem[]
+  workTasks        WorkTask[]
+  workEntries      WorkEntry[]
+  rates            WorkOrderRate[]
+  crmRealizations  CrmRealization[]
 
   @@index([scheduledAt, status])
   @@index([priority, scheduledAt])
@@ -1646,4 +1712,569 @@ enum InvoiceStatus {
   ISSUED
   PAID
   CANCELLED
+}
+
+enum ClientStatus {
+  LEAD
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  FORMER_CLIENT
+}
+
+enum ClientType {
+  DIRECT_CLIENT
+  ADVERTISING_AGENCY
+  MEDIA_AGENCY
+  RETAIL_CHAIN
+  LOCAL_BUSINESS
+  PUBLIC_INSTITUTION
+  OTHER
+}
+
+enum ClientSource {
+  RECOMMENDATION
+  WEBSITE
+  OUTBOUND
+  EXHIBITION
+  IMPORT
+  OTHER
+}
+
+enum PreferredContactMethod {
+  EMAIL
+  PHONE
+  SMS
+  MEETING
+}
+
+enum CrmOrderStatus {
+  DRAFT
+  CONFIRMED
+  WAITING_FOR_MATERIALS
+  READY_FOR_PRODUCTION
+  IN_REALIZATION
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum CrmProjectType {
+  NAVIGATION
+  CITY_GALLERY
+  BENCH
+  CITY_POSTER
+  CLV
+  TOWER
+  HORIZON
+  COMBINED
+  OTHER
+}
+
+enum RealizationStatus {
+  WAITING_FOR_MATERIALS
+  MATERIALS_APPROVED
+  WAITING_FOR_PRODUCTION
+  PRODUCED
+  SCHEDULED
+  INSTALLATION_IN_PROGRESS
+  INSTALLED
+  PHOTOGRAPHED
+  DELIVERED_TO_CLIENT
+  CLAIM
+  COMPLETED
+}
+
+enum ContractStatus {
+  DRAFT
+  WAITING_FOR_SIGNATURE
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  TERMINATED
+  CANCELLED
+}
+
+enum ContractType {
+  RENTAL
+  SERVICE
+  FRAMEWORK
+  OTHER
+}
+
+enum ClientInvoiceType {
+  REGULAR
+  PROFORMA
+  CREDIT_NOTE
+}
+
+enum ClientInvoiceStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum CommunicationType {
+  PHONE_CALL
+  EMAIL
+  IN_PERSON_MEETING
+  ONLINE_MEETING
+  NOTE
+  OFFER_SENT
+  ORDER_RECEIVED
+  COMPLAINT
+  INTERNAL_NOTE
+}
+
+enum CrmTaskType {
+  CALL_CLIENT
+  PREPARE_OFFER
+  VERIFY_MATERIALS
+  GET_CONTRACT_SIGNED
+  PLAN_REALIZATION
+  PROVIDE_PHOTO_DOCS
+  ISSUE_INVOICE
+  RESOLVE_DEBT
+  RENEW_CAMPAIGN
+  OTHER
+}
+
+enum CrmTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CrmTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+model ClientContact {
+  id                     String                 @id @default(cuid())
+  clientId               String
+  firstName              String
+  lastName               String
+  title                  String?
+  department             String?
+  email                  String?
+  phone                  String?
+  note                   String?
+  preferredCommunication PreferredContactMethod @default(EMAIL)
+  isPrimary              Boolean                @default(false)
+  isCommercial           Boolean                @default(true)
+  isRealization          Boolean                @default(false)
+  isBilling              Boolean                @default(false)
+  active                 Boolean                @default(true)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  client         Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branches       ClientBranch[]
+  crmOrders      CrmOrder[]
+  communications ClientCommunication[]
+  crmTasks       CrmTask[]
+
+  @@index([clientId])
+}
+
+model ClientBranch {
+  id               String   @id @default(cuid())
+  clientId         String
+  contactPersonId  String?
+  name             String
+  code             String?
+  street           String?
+  city             String?
+  zip              String?
+  country          String?  @default("CZ")
+  latitude         Float?
+  longitude        Float?
+  openingHoursNote String?
+  note             String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contactPerson ClientContact? @relation(fields: [contactPersonId], references: [id], onDelete: SetNull)
+  crmOrders     CrmOrder[]
+
+  @@index([clientId])
+}
+
+model CrmOrder {
+  id              String         @id @default(cuid())
+  orderNumber     String         @unique
+  clientOrderCode String?
+  clientId        String
+  contactId       String?
+  branchId        String?
+  offerId         String?        @unique
+  assignedUserId  String?
+  title           String
+  projectType     CrmProjectType @default(OTHER)
+  status          CrmOrderStatus @default(DRAFT)
+  dateFrom        DateTime?
+  dateTo          DateTime?
+  totalPrice      Decimal?       @db.Decimal(12, 2)
+  billingMethod   String?
+  note            String?
+  internalNote    String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  client         Client                @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  contact        ClientContact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  branch         ClientBranch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  offer          Offer?                @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  assignedUser   User?                 @relation("CrmOrderAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  realizations   CrmRealization[]
+  clientInvoices ClientInvoice[]
+  documents      ClientDocument[]
+  communications ClientCommunication[]
+  crmTasks       CrmTask[]
+  workOrders     WorkOrder[]
+  navigationOrder NavigationOrder?
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model CrmRealization {
+  id             String            @id @default(cuid())
+  crmOrderId     String
+  surfaceId      String?
+  carrierId      String?
+  workOrderId    String?
+  assignedUserId String?
+  status         RealizationStatus @default(WAITING_FOR_MATERIALS)
+  plannedDate    DateTime?
+  actualDate     DateTime?
+  note           String?
+  claimNote      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  crmOrder     CrmOrder            @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  surface      AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
+  carrier      AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  workOrder    WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  assignedUser User?               @relation("CrmRealizationAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  photos       Photo[]
+
+  @@index([crmOrderId])
+  @@index([status])
+}
+
+model ClientContract {
+  id               String         @id @default(cuid())
+  clientId         String
+  assignedUserId   String?
+  contractNumber   String         @unique
+  title            String
+  type             ContractType   @default(RENTAL)
+  signedAt         DateTime?
+  validFrom        DateTime
+  validTo          DateTime?
+  autoRenew        Boolean        @default(false)
+  noticePeriodDays Int?           @default(30)
+  status           ContractStatus @default(ACTIVE)
+  valueAmount      Decimal?       @db.Decimal(12, 2)
+  driveFileId      String?
+  fileUrl          String?
+  fileName         String?
+  note             String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  client       Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignedUser User?            @relation("ClientContractAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  documents    ClientDocument[]
+  crmTasks     CrmTask[]
+
+  @@index([clientId])
+  @@index([status, validTo])
+}
+
+model ClientInvoice {
+  id             String              @id @default(cuid())
+  clientId       String
+  crmOrderId     String?
+  invoiceNumber  String              @unique
+  variableSymbol String?
+  type           ClientInvoiceType   @default(REGULAR)
+  status         ClientInvoiceStatus @default(ISSUED)
+  issueDate      DateTime            @default(now())
+  dueDate        DateTime
+  paidAt         DateTime?
+  subtotal       Decimal             @db.Decimal(12, 2)
+  taxAmount      Decimal             @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal             @db.Decimal(12, 2)
+  note           String?
+  pdfUrl         String?
+  driveFileId    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  client    Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  crmOrder  CrmOrder?           @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  items     ClientInvoiceItem[]
+  documents ClientDocument[]
+  crmTasks  CrmTask[]
+  navigationBillingPeriods NavigationBillingPeriod[]
+
+  @@index([clientId])
+  @@index([status, dueDate])
+}
+
+model ClientInvoiceItem {
+  id              String  @id @default(cuid())
+  clientInvoiceId String
+  description     String
+  quantity        Decimal @db.Decimal(10, 2)
+  unit            String  @default("ks")
+  unitPrice       Decimal @db.Decimal(12, 2)
+  amount          Decimal @db.Decimal(12, 2)
+  vatRate         Decimal @default(21) @db.Decimal(5, 2)
+  vatAmount       Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount     Decimal @db.Decimal(12, 2)
+
+  clientInvoice ClientInvoice @relation(fields: [clientInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([clientInvoiceId])
+}
+
+model ClientCommunication {
+  id              String            @id @default(cuid())
+  clientId        String
+  contactId       String?
+  authorUserId    String
+  crmOrderId      String?
+  type            CommunicationType @default(PHONE_CALL)
+  subject         String
+  content         String
+  result          String?
+  nextStep        String?
+  nextContactDate DateTime?
+  isInternal      Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+
+  client   Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contact  ClientContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  author   User           @relation("CommunicationAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  crmOrder CrmOrder?      @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([authorUserId])
+}
+
+model CrmTask {
+  id             String          @id @default(cuid())
+  clientId       String
+  contactId      String?
+  crmOrderId     String?
+  contractId     String?
+  invoiceId      String?
+  assignedUserId String
+  createdUserId  String
+  title          String
+  description    String?
+  type           CrmTaskType     @default(OTHER)
+  priority       CrmTaskPriority @default(NORMAL)
+  status         CrmTaskStatus   @default(TODO)
+  dueDate        DateTime
+  completedAt    DateTime?
+  resultNote     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contact      ClientContact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  crmOrder     CrmOrder?       @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  contract     ClientContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  invoice      ClientInvoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  assignedUser User            @relation("CrmTaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: Restrict)
+  createdUser  User            @relation("CrmTaskCreatedUser", fields: [createdUserId], references: [id], onDelete: Restrict)
+
+  @@index([clientId])
+  @@index([assignedUserId, status, dueDate])
+}
+
+model ClientDocument {
+  id             String   @id @default(cuid())
+  clientId       String
+  crmOrderId     String?
+  contractId     String?
+  invoiceId      String?
+  uploaderUserId String
+  name           String
+  type           String   @default("OTHER")
+  driveFileId    String?
+  fileUrl        String?
+  fileName       String?
+  mimeType       String?
+  size           Int?
+  createdAt      DateTime @default(now())
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  crmOrder     CrmOrder?       @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  contract     ClientContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  invoice      ClientInvoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  uploaderUser User            @relation("ClientDocumentUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+
+  @@index([clientId])
+}
+
+model CrmAuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  userEmail   String
+  action      String
+  entityType  String
+  entityId    String
+  detailsJson String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model ClientMergeLog {
+  id                String   @id @default(cuid())
+  targetClientId    String
+  sourceClientId    String
+  sourceClientName  String
+  performedByUserId String
+  detailsJson       String
+  createdAt         DateTime @default(now())
+
+  targetClient    Client @relation(fields: [targetClientId], references: [id], onDelete: Restrict)
+  performedByUser User   @relation(fields: [performedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([targetClientId])
+}
+
+enum NavigationOrderStatus {
+  POPTAVKA
+  NABIDKA
+  POTVRZENO_KLIENTEM
+  SMLOUVA_OBJEDNAVKA
+  GRAFICKE_PODKLADY
+  SCHVALENI_GRAFIKY
+  TISK_VYROBA
+  PRIPRAVENO_K_INSTALACI
+  INSTALACE
+  FOTODOKUMENTACE
+  PRIPRAVENO_K_FAKTURACI
+  FAKTUROVANO
+  DOKONCENO
+}
+
+enum NavigationBlockStatus {
+  CEKA_NA_KLIENTA
+  CEKA_NA_POTVRZENI_NABIDKY
+  CEKA_NA_OBJEDNAVKU
+  CEKA_NA_GRAFIKU
+  CEKA_NA_SCHVALENI_GRAFIKY
+  CEKA_NA_TISK
+  CEKA_NA_INSTALACI
+  CEKA_NA_FOTOGRAFIE
+  CEKA_NA_FAKTURACI
+  INTERNE_POZASTAVENO
+}
+
+model NavigationOrder {
+  id                 String                 @id @default(cuid())
+  crmOrderId         String                 @unique
+  status             NavigationOrderStatus  @default(POPTAVKA)
+  blockStatus        NavigationBlockStatus?
+  rentStart          DateTime?
+  rentEnd            DateTime?
+  installationDate   DateTime?
+  deinstallationDate DateTime?
+
+  targetName         String
+  targetAddress      String?
+  targetLatitude     Float
+  targetLongitude    Float
+  targetNote         String?
+
+  graphicsApprovedAt DateTime?
+  productionReadyAt  DateTime?
+  installedAt        DateTime?
+  invoicedAt         DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  crmOrder           CrmOrder                  @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  points             NavigationPoint[]
+  billingPeriods     NavigationBillingPeriod[]
+
+  @@index([status])
+}
+
+model NavigationBillingPeriod {
+  id                String              @id @default(cuid())
+  navigationOrderId String
+  dateFrom          DateTime
+  dateTo            DateTime
+  invoiceId         String?             @unique
+  status            ClientInvoiceStatus @default(DRAFT)
+  amount            Decimal             @db.Decimal(12, 2)
+  invoicedAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  navigationOrder   NavigationOrder     @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  invoice           ClientInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@unique([navigationOrderId, dateFrom, dateTo])
+  @@index([navigationOrderId])
+}
+
+model NavigationPriceVersion {
+  id                String          @id @default(cuid())
+  navigationPointId String
+  validFrom         DateTime
+  validTo           DateTime?
+  unitPrice         Decimal         @db.Decimal(12, 2)
+  installationPrice Decimal         @default(0) @db.Decimal(12, 2)
+  removalPrice      Decimal         @default(0) @db.Decimal(12, 2)
+  productionPrice   Decimal         @default(0) @db.Decimal(12, 2)
+  subtotal          Decimal         @db.Decimal(12, 2)
+  reason            String?
+  changedByUserId   String?
+  createdAt         DateTime        @default(now())
+
+  navigationPoint   NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
+  changedByUser     User?           @relation("NavigationPriceChangedUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([navigationPointId, validFrom])
+}
+
+model NavigationPriceAuditLog {
+  id                String          @id @default(cuid())
+  navigationPointId String
+  oldUnitPrice      Decimal?        @db.Decimal(12, 2)
+  newUnitPrice      Decimal         @db.Decimal(12, 2)
+  effectiveDate     DateTime
+  reason            String
+  changedByUserId   String
+  changedByUserName String
+  createdAt         DateTime        @default(now())
+
+  navigationPoint   NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
+  changedByUser     User            @relation("NavigationPriceAuditUser", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([navigationPointId])
 }

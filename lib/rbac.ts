@@ -1,3 +1,5 @@
+import React from 'react';
+
 export const roles = ['ADMIN', 'MANAGER', 'SALES', 'TECHNICIAN', 'WORKER', 'ACCOUNTANT', 'VIEWER'] as const;
 
 export type AppRole = typeof roles[number];
@@ -71,10 +73,10 @@ export function roleLabel(role: AppRole | string) {
 }
 
 export function AccessDenied({ title = 'Nemáte oprávnění' }: { title?: string }) {
-  return (
-    <section className="card">
-      <h1 className="text-2xl font-bold">{title}</h1>
-      <p className="mt-2 text-sm text-slate-600">Tahle část je dostupná jen oprávněným rolím.</p>
-    </section>
+  return React.createElement(
+    'section',
+    { className: 'card' },
+    React.createElement('h1', { className: 'text-2xl font-bold' }, title),
+    React.createElement('p', { className: 'mt-2 text-sm text-slate-600' }, 'Tahle část je dostupná jen oprávněným rolím.')
   );
 }

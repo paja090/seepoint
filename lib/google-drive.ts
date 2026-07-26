@@ -84,12 +84,35 @@ export function isGoogleDriveMockEnabled() {
 }
 
 async function getAccessToken() {
+  const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+
+  if (clientId && clientSecret && refreshToken) {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+      cache: 'no-store',
+    });
+    const data = (await response.json()) as { access_token?: string; error_description?: string };
+    if (!response.ok || !data.access_token) {
+      throw new Error(`Google OAuth autentizace selhala: ${data.error_description ?? response.statusText}`);
+    }
+    return data.access_token;
+  }
+
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!email || !privateKey) {
     throw new GoogleDriveConfigurationError(
-      'Chybí konfigurace Google Service Account (GOOGLE_SERVICE_ACCOUNT_EMAIL a GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY).'
+      'Chybí konfigurace Google Drive OAuth nebo Google Service Account.'
     );
   }
 

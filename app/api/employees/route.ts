@@ -1,10 +1,7 @@
-import { EmploymentType, Role } from '@prisma/client';
+import { EmploymentType, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
-import { issueUserToken } from '@/lib/auth';
-import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
-import { audit } from '@/lib/audit';
+import { getCurrentUser, hashPassword, validatePassword } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +52,10 @@ export async function POST(request: Request) {
   if (user.role === 'MANAGER' && role === Role.ADMIN) return NextResponse.json({ error: 'Manažer nemůže vytvářet administrátory.' }, { status: 403 });
   const allowAccess = text(input, 'allowAccess') === 'true';
   if (allowAccess && !email) return NextResponse.json({ error: 'Pro přístup do aplikace je e-mail povinný.' }, { status: 400 });
-  if (allowAccess) ensureEmailConfigured();
+  const temporaryPassword = text(input, 'temporaryPassword');
+  if (allowAccess && (!temporaryPassword || !validatePassword(temporaryPassword))) {
+    return NextResponse.json({ error: 'Dočasné heslo musí mít alespoň 12 znaků a obsahovat písmeno i číslo.' }, { status: 400 });
+  }
   const employmentTypeInput = text(input, 'employmentType');
   const employmentType = employmentTypeInput && Object.values(EmploymentType).includes(employmentTypeInput as EmploymentType) ? employmentTypeInput as EmploymentType : EmploymentType.EMPLOYEE;
   const employeePositions = positions(input);
@@ -66,28 +66,48 @@ export async function POST(request: Request) {
   if (dateOfBirth === null || startDate === null || endDate === null) return NextResponse.json({ error: 'Některé datum není platné.' }, { status: 400 });
   if (startDate && endDate && endDate < startDate) return NextResponse.json({ error: 'Datum ukončení nemůže být před datem nástupu.' }, { status: 400 });
 
-  if (email) {
-    const existing = await prisma.employee.findUnique({ where: { email }, select: { id: true } });
-    if (existing) return NextResponse.json({ error: 'Zaměstnanec s tímto e-mailem už existuje.' }, { status: 409 });
+  const [existingEmployee, existingUser] = email ? await Promise.all([
+    prisma.employee.findUnique({ where: { email }, select: { id: true } }),
+    prisma.user.findUnique({ where: { email }, include: { employee: { select: { id: true } } } }),
+  ]) : [null, null];
+  if (existingEmployee) return NextResponse.json({ error: 'Zaměstnanec s tímto e-mailem už existuje.' }, { status: 409 });
+  if (allowAccess && existingUser?.employee) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
+  if (allowAccess && existingUser) return NextResponse.json({ error: 'Účet s tímto e-mailem už existuje. Propojte ho v detailu zaměstnance.' }, { status: 409 });
+
+  try {
+    const passwordHash = allowAccess ? await hashPassword(temporaryPassword!) : undefined;
+    const employee = await prisma.$transaction(async (tx) => {
+      const created = await tx.employee.create({ data: {
+        firstName,
+        lastName,
+        email,
+        phone: text(input, 'phone'),
+        position: employeePositions[0],
+        positions: employeePositions,
+        role,
+        employmentType,
+        ico: text(input, 'ico'),
+        dateOfBirth,
+        startDate,
+        endDate,
+        isActive: true,
+        note: text(input, 'note'),
+        ...(allowAccess && email ? {
+          user: { create: { name: `${firstName} ${lastName}`, email, role, status: 'ACTIVE', passwordHash, mustChangePassword: true } },
+        } : {}),
+      }, select: { id: true, userId: true, email: true } });
+      if (created.userId) {
+        await tx.userAuditLog.create({ data: { action: 'ACCOUNT_CREATED', targetUserId: created.userId, actorUserId: user.id } });
+      }
+      return created;
+    });
+
+    return NextResponse.json({ id: employee.id }, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Zaměstnanec nebo účet se stejným e-mailem už existuje.' }, { status: 409 });
+    }
+    console.error('Employee creation failed', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ error: 'Zaměstnance se nepodařilo uložit.' }, { status: 500 });
   }
-
-  const employee = await prisma.employee.create({ data: {
-      firstName,
-      lastName,
-      email,
-      phone: text(input, 'phone'),
-      position: employeePositions[0],
-      positions: employeePositions,
-      role,
-      employmentType,
-      ico: text(input, 'ico'),
-      dateOfBirth,
-      startDate,
-      endDate,
-      isActive: true,
-      note: text(input, 'note'), ...(allowAccess && email ? { user: { create: { name: `${firstName} ${lastName}`, email, role, status: 'INVITED' } } } : {}) }, select: { id: true, userId: true, email: true } });
-  let activationUrl: string | undefined;
-  if (employee.userId && employee.email) { const token = await issueUserToken(employee.userId, 'ACTIVATION', 48); activationUrl = `${process.env.APP_URL ?? 'http://localhost:3000'}/activate/${token}`; await sendActivationEmail(employee.email, activationUrl); await audit('ACCOUNT_CREATED', employee.userId, user.id); }
-
-  return NextResponse.json({ id: employee.id, ...(process.env.NODE_ENV !== 'production' ? { activationUrl } : {}) }, { status: 201 });
 }

@@ -26,9 +26,10 @@ const navGroups: NavGroup[] = [
   {
     label: 'Evidence',
     items: [
+      ['/clients/dashboard', 'CRM Dashboard', 'barChart3', 'clients'],
+      ['/clients', 'Klienti', 'users', 'clients'],
       ['/carriers', 'Nosiče', 'panelsTopLeft', 'carriers'],
       ['/occupancy', 'Obsazenost', 'calendarRange', 'occupancy'],
-      ['/clients', 'Klienti', 'users', 'clients'],
       ['/offers', 'Nabídky', 'badgeDollarSign', 'offers'],
     ],
   },
@@ -61,9 +62,10 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-export async function AppShell({ children }: { children: React.ReactNode }) {
+export async function AppShell({ children, allowPasswordChange = false }: { children: React.ReactNode; allowPasswordChange?: boolean }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+  if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
   const visibleGroups = navGroups
     .map((group) => ({ ...group, items: group.items.filter(([, , , section]) => canAccess(user.role, section)) }))
     .filter((group) => group.items.length > 0);
