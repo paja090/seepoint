@@ -209,7 +209,7 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
       crmOrder: {
         include: {
           client: { select: { id: true, name: true, email: true, phone: true, contactPerson: true } },
-          contact: { select: { id: true, name: true, email: true, phone: true } },
+          contact: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
           assignedUser: { select: { id: true, name: true } },
         },
       },
@@ -251,7 +251,7 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
     title: o.crmOrder.title,
     clientId: o.crmOrder.clientId,
     clientName: o.crmOrder.client.name,
-    contactPerson: o.crmOrder.contact?.name || o.crmOrder.client.contactPerson || null,
+    contactPerson: o.crmOrder.contact ? `${o.crmOrder.contact.firstName} ${o.crmOrder.contact.lastName}` : o.crmOrder.client.contactPerson || null,
     contactEmail: o.crmOrder.contact?.email || o.crmOrder.client.email || null,
     contactPhone: o.crmOrder.contact?.phone || o.crmOrder.client.phone || null,
     assignedUserId: o.crmOrder.assignedUserId,

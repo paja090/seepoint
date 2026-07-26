@@ -36,9 +36,7 @@ export async function validateStatusTransition(navigationOrderId: string, target
       },
       crmOrder: {
         include: {
-          workOrders: {
-            include: { tasks: true },
-          },
+          crmTasks: true,
         },
       },
       billingPeriods: true,
@@ -95,9 +93,8 @@ export async function validateStatusTransition(navigationOrderId: string, target
 
   // Restrikce 4: Dokončeno nelze nastavit, pokud existuje otevřený deinstalační úkol
   if (targetStatus === 'DOKONCENO') {
-    const allTasks = navOrder.crmOrder.workOrders.flatMap((wo) => wo.tasks);
-    const pendingDeinstallation = allTasks.find(
-      (t) => t.type === 'DEINSTALLATION' && t.status !== 'DONE' && t.status !== 'CANCELLED'
+    const pendingDeinstallation = navOrder.crmOrder.crmTasks.find(
+      (t) => t.title.toLowerCase().includes('deinstalace') && t.status !== 'DONE' && t.status !== 'CANCELLED'
     );
     if (pendingDeinstallation) {
       throw new NavigationWorkflowError(
@@ -195,13 +192,16 @@ export async function transitionNavigationOrderStatus(
       if (!existingTask) {
         await tx.crmTask.create({
           data: {
+            clientId: navOrder.crmOrder.clientId,
             crmOrderId: navOrder.crmOrderId,
             assignedUserId: actorUserId,
             createdUserId: actorUserId,
             title: `Smlouva / Objednávka: ${navOrder.targetName}`,
             description: 'Zajistit podepsanou smlouvu nebo závaznou objednávku od klienta.',
+            type: 'GET_CONTRACT_SIGNED',
             priority: 'HIGH',
             status: 'TODO',
+            dueDate: new Date(Date.now() + 3 * 86400000),
           },
         });
       }
@@ -214,13 +214,16 @@ export async function transitionNavigationOrderStatus(
       if (!existingTask) {
         await tx.crmTask.create({
           data: {
+            clientId: navOrder.crmOrder.clientId,
             crmOrderId: navOrder.crmOrderId,
             assignedUserId: actorUserId,
             createdUserId: actorUserId,
             title: `Tisk navigačních cedulí: ${navOrder.targetName}`,
             description: `Vytisknout ${navOrder.points.length} navigačních cedulí dle schválené grafiky.`,
+            type: 'PLAN_REALIZATION',
             priority: 'NORMAL',
             status: 'TODO',
+            dueDate: new Date(Date.now() + 3 * 86400000),
           },
         });
       }
