@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiResponseMessage, prepareImageForUpload, validateImageFile } from '@/lib/client-image-upload';
 import type { Photo, PhotoType, Surface } from '@/lib/types';
 
 interface GoogleDriveFile {
@@ -128,23 +129,25 @@ export function PhotoGallery({
   // Handle standard upload
   async function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const file = fileInput.current?.files?.[0];
-    if (!file) return setError('Vyber fotografii.');
-    if (file.size > 4 * 1024 * 1024) return setError('Fotografie musí mít nejvýše 4 MB.');
+    const selectedFile = fileInput.current?.files?.[0];
+    if (!selectedFile) return setError('Vyber fotografii.');
+    const validationError = validateImageFile(selectedFile);
+    if (validationError) return setError(validationError);
 
     setSaving(true);
     setError('');
-    const form = new FormData();
-    form.append('file', file);
-    form.append('type', type);
-    if (note) form.append('note', note);
-    if (target === 'carrier') form.append('carrierId', carrierId);
-    else form.append('surfaceId', target.replace('surface:', ''));
 
     try {
+      const file = await prepareImageForUpload(selectedFile);
+      const form = new FormData();
+      form.append('file', file);
+      form.append('type', type);
+      if (note) form.append('note', note);
+      if (target === 'carrier') form.append('carrierId', carrierId);
+      else form.append('surfaceId', target.replace('surface:', ''));
       const response = await fetch('/api/photos', { method: 'POST', body: form });
+      if (!response.ok) throw new Error(await apiResponseMessage(response, 'Fotografii se nepodařilo uložit.'));
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? 'Fotografii se nepodařilo uložit.');
 
       const targetLabel =
         target === 'carrier' ? 'Nosič' : surfaces.find((surface) => `surface:${surface.id}` === target)?.name ?? 'Plocha';

@@ -11,6 +11,6 @@ export default defineConfig({
     seed: 'node prisma/seed.mjs',
   },
   datasource: {
-    url: process.env.DATABASE_URL || 'postgresql://mock:mock@localhost:5432/mock',
+    url: process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || 'postgresql://mock:mock@localhost:5432/mock',
   },
 });

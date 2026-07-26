@@ -1,9 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { ClientLogoControl } from '@/components/ClientLogoControl';
+import { AddClientModalButton } from '@/components/crm/ClientListControl';
 import { requirePageAccess } from '@/lib/page-auth';
 import { Button, EmptyState, FilterBar, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { prisma } from '@/lib/db';
+import { CLIENT_STATUS_LABELS } from '@/lib/crm/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +30,19 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const clients = await prisma.client.findMany({
     where,
     orderBy: { name: 'asc' },
-    include: { _count: { select: { occupancies: true, offers: true, currentSurfaces: true } } },
+    include: {
+      assignedUser: { select: { name: true } },
+      _count: { select: { occupancies: true, offers: true, crmOrders: true, invoices: true } },
+    },
   });
 
   return (
     <AppShell>
-      <PageHeader title="Klienti" description="Obchodní evidence klientů pro obsazenost, rezervace a nabídky." />
+      <PageHeader
+        title="CRM Klienti"
+        description="Centrální evidence obchodních partnerů, kontaktů, nabídek a zakázek."
+        actions={<AddClientModalButton />}
+      />
 
       <FilterBar>
         <form className="flex flex-col gap-3 md:flex-row md:items-end" method="get">
@@ -46,24 +55,51 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
       <section className="card !p-0">
         {clients.length === 0 ? (
-          <div className="p-5"><EmptyState title="Zatím není uložený žádný klient." description="Klienti vznikají pro nabídky a obsazenost. Jakmile budou založení, zobrazí se v této tabulce." /></div>
+          <div className="p-5"><EmptyState title="Zatím není uložený žádný klient." description="Založte první společnost tlačítkem v hlavičce." /></div>
         ) : (
-          <Table minWidth="min-w-[980px]">
-            <TableHead><tr><TableHeaderCell>Logo</TableHeaderCell><TableHeaderCell>Název klienta</TableHeaderCell><TableHeaderCell>Kontaktní osoba</TableHeaderCell><TableHeaderCell>Email</TableHeaderCell><TableHeaderCell>Telefon</TableHeaderCell><TableHeaderCell>Aktivní kampaně</TableHeaderCell><TableHeaderCell>Nabídky</TableHeaderCell><TableHeaderCell>Poznámka</TableHeaderCell><TableHeaderCell>Akce</TableHeaderCell></tr></TableHead>
+          <Table minWidth="min-w-[1000px]">
+            <TableHead>
+              <tr>
+                <TableHeaderCell>Logo</TableHeaderCell>
+                <TableHeaderCell>Název klienta</TableHeaderCell>
+                <TableHeaderCell>Stav</TableHeaderCell>
+                <TableHeaderCell>Kontaktní osoba</TableHeaderCell>
+                <TableHeaderCell>Email & Telefon</TableHeaderCell>
+                <TableHeaderCell>Obchodník</TableHeaderCell>
+                <TableHeaderCell>Kampaně</TableHeaderCell>
+                <TableHeaderCell>Zakázky</TableHeaderCell>
+                <TableHeaderCell>Akce</TableHeaderCell>
+              </tr>
+            </TableHead>
             <tbody>
-              {clients.map((client) => (
-                <tr className="hover:bg-slate-50/60" key={client.id}>
-                  <TableCell><ClientLogoControl clientId={client.id} clientName={client.name} logoUrl={client.logoDriveFileId ? `/api/clients/${client.id}/logo/file` : undefined} /></TableCell>
-                  <TableCell><b>{client.name}</b>{client.companyId && <><br /><span className="text-slate-500">{client.companyId}</span></>}</TableCell>
-                  <TableCell>{client.contactPerson ?? <span className="text-slate-400">Neuvedeno</span>}</TableCell>
-                  <TableCell>{client.email ?? <span className="text-slate-400">-</span>}</TableCell>
-                  <TableCell>{client.phone ?? <span className="text-slate-400">-</span>}</TableCell>
-                  <TableCell>{client._count.occupancies}</TableCell>
-                  <TableCell>{client._count.offers}</TableCell>
-                  <TableCell>{client.note ?? <span className="text-slate-400">-</span>}</TableCell>
-                  <TableCell><a className="table-action" href={`/clients?q=${encodeURIComponent(client.name)}`}>Filtrovat</a></TableCell>
-                </tr>
-              ))}
+              {clients.map((client) => {
+                const statusObj = CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS] || CLIENT_STATUS_LABELS.ACTIVE;
+                return (
+                  <tr className="hover:bg-slate-50/70 cursor-pointer" key={client.id}>
+                    <TableCell><ClientLogoControl clientId={client.id} clientName={client.name} logoUrl={client.logoDriveFileId ? `/api/clients/${client.id}/logo/file` : undefined} /></TableCell>
+                    <TableCell>
+                      <a href={`/clients/${client.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline">{client.name}</a>
+                      {client.companyId && <div className="text-xs text-slate-500 font-mono">IČO: {client.companyId}</div>}
+                    </TableCell>
+                    <TableCell>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusObj.badge}`}>
+                        {statusObj.label}
+                      </span>
+                    </TableCell>
+                    <TableCell>{client.contactPerson ?? <span className="text-slate-400">Neuvedeno</span>}</TableCell>
+                    <TableCell>
+                      <div className="text-xs">{client.email || '-'}</div>
+                      <div className="text-xs text-slate-500">{client.phone || ''}</div>
+                    </TableCell>
+                    <TableCell>{client.assignedUser?.name || '-'}</TableCell>
+                    <TableCell><span className="font-bold text-slate-900">{client._count.occupancies}</span></TableCell>
+                    <TableCell><span className="font-bold text-slate-900">{client._count.crmOrders}</span></TableCell>
+                    <TableCell>
+                      <a className="button !py-1 !px-2.5 !text-xs" href={`/clients/${client.id}`}>Otevřít CRM →</a>
+                    </TableCell>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         )}

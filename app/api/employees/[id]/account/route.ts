@@ -32,11 +32,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, role: existing.role } });
       return NextResponse.json({ ok: true, linkedExistingAccount: true });
     }
-    ensureEmailConfigured();
     const user = await prisma.user.create({ data: { name: `${employee.firstName} ${employee.lastName}`, email: employee.email, role: employee.role, employee: { connect: { id: employee.id } } } });
-    const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = activationUrl(token);
-    await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);
-    return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
+    try {
+      const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = activationUrl(token);
+      await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);
+      return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
+    } catch (error) {
+      console.error('Employee access was enabled, but invitation failed', error instanceof Error ? error.message : 'unknown error');
+      return NextResponse.json({ ok: true, warning: 'Přístup byl povolen, ale pozvánku se nepodařilo odeslat. Použijte akci Odeslat novou pozvánku.' });
+    }
   }
 
   const target = employee.user;

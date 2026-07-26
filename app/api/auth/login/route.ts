@@ -14,5 +14,5 @@ export async function POST(request: Request) {
   if (!user || !valid || user.status !== 'ACTIVE' || user.employee?.isActive === false) return NextResponse.json({ error: 'Neplatné přihlašovací údaje nebo neaktivní účet.' }, { status: 401 });
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   await createSession(user.id, user.sessionVersion);
-  return NextResponse.json({ ok: true, redirectTo: '/dashboard' });
+  return NextResponse.json({ ok: true, redirectTo: user.mustChangePassword ? '/profile?firstLogin=1' : '/dashboard' });
 }
