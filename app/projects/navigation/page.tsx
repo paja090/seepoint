@@ -12,12 +12,14 @@ import {
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
+import { redirect } from 'next/navigation';
 import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NavigationProjectsPage() {
   await requirePageAccess('navigationProjects');
+  redirect('/navigation');
 
   const [offers, reports] = await Promise.all([
     prisma.offer.findMany({
