@@ -93,32 +93,48 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
 
       {/* Task List */}
       {!activeItem ? (
-        <div className="space-y-3">
-          {items.map((item, idx) => (
-            <div
-              key={item.pointId}
-              onClick={() => setActiveItem(item)}
-              className="p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-sky-500 cursor-pointer space-y-2 transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-sky-400">#{idx + 1} · {item.orderNumber}</span>
-                {item.status === 'INSTALLED' ? (
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 size={14} /> Hotovo
-                  </span>
-                ) : (
-                  <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                    ⏳ Čeká na montáž
-                  </span>
-                )}
-              </div>
-              <h2 className="text-base font-bold text-white">{item.label} ({item.navigationType})</h2>
-              <p className="text-xs text-slate-400 flex items-center gap-1">
-                <MapPin size={12} className="text-rose-400" /> {item.targetName} {item.address ? `· ${item.address}` : ''}
-              </p>
+        items.length === 0 ? (
+          <div className="p-8 text-center rounded-2xl bg-slate-800/60 border border-slate-800 space-y-3 my-4">
+            <CheckCircle2 size={44} className="mx-auto text-emerald-400 opacity-70" />
+            <h3 className="text-base font-bold text-white">Žádné plánované montáže v terénu</h3>
+            <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+              V systému aktuálně nejsou žádné navigační zakázky ve fázi instalace.
+              Jakmile zakázka v CRM postoupí do fáze „Připraveno k instalaci“, zobrazí se v tomto seznamu.
+            </p>
+            <div className="pt-2">
+              <Link href="/navigation" className="inline-flex items-center gap-1.5 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-xl transition-all">
+                Přejít na přehled navigačních zakázek
+              </Link>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {items.map((item, idx) => (
+              <div
+                key={item.pointId}
+                onClick={() => setActiveItem(item)}
+                className="p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-sky-500 cursor-pointer space-y-2 transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-sky-400">#{idx + 1} · {item.orderNumber}</span>
+                  {item.status === 'INSTALLED' ? (
+                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 size={14} /> Hotovo
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
+                      ⏳ Čeká na montáž
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-base font-bold text-white">{item.label} ({item.navigationType})</h2>
+                <p className="text-xs text-slate-400 flex items-center gap-1">
+                  <MapPin size={12} className="text-rose-400" /> {item.targetName} {item.address ? `· ${item.address}` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        )
       ) : (
         /* Active Task Detail View */
         <div className="rounded-2xl bg-slate-800 border border-slate-700 p-5 space-y-4">
