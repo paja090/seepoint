@@ -1,7 +1,12 @@
 import { Prisma, PhotoType, NavigationOrderStatus } from '@prisma/client';
 import { prisma } from '../db.ts';
 import type { CurrentUser } from '../rbac.ts';
-import { NavigationOrderDetail } from './types.ts';
+import {
+  NavigationOrderDetail,
+  NavigationOrderListItem,
+  NavigationDashboardStats,
+  AttentionAlertItem,
+} from './types.ts';
 import { nextCrmOrderNumber } from '../crm/domain.ts';
 
 export class NavigationServiceError extends Error {
@@ -87,7 +92,6 @@ export async function convertOfferToNavigationOrder(
       },
     });
 
-    // Přenést navigační body nabídky do zakázky
     if (navData?.points && navData.points.length > 0) {
       for (const p of navData.points) {
         await tx.navigationPoint.create({
@@ -136,25 +140,58 @@ export async function convertOfferToNavigationOrder(
   });
 }
 
-export async function listNavigationOrders(user: CurrentUser, filters: { query?: string; status?: string; clientId?: string }) {
+export async function listNavigationOrders(
+  user: CurrentUser,
+  filters: {
+    query?: string;
+    status?: string;
+    blockStatus?: string;
+    clientId?: string;
+    assignedUserId?: string;
+    quickFilter?: string;
+  }
+): Promise<NavigationOrderListItem[]> {
   const where: Prisma.NavigationOrderWhereInput = {};
 
   if (filters.status) {
     where.status = filters.status as NavigationOrderStatus;
   }
 
+  if (filters.blockStatus) {
+    where.blockStatus = filters.blockStatus as any;
+  }
+
   if (user.role === 'SALES') {
     where.crmOrder = {
       is: {
         ...(filters.clientId ? { clientId: filters.clientId } : {}),
+        ...(filters.assignedUserId ? { assignedUserId: filters.assignedUserId } : {}),
         OR: [
           { assignedUserId: user.id },
           { offer: { is: { createdByUserId: user.id } } },
         ],
       },
     };
-  } else if (filters.clientId) {
-    where.crmOrder = { is: { clientId: filters.clientId } };
+  } else {
+    const crmOrderWhere: Prisma.CrmOrderWhereInput = {};
+    if (filters.clientId) crmOrderWhere.clientId = filters.clientId;
+    if (filters.assignedUserId) crmOrderWhere.assignedUserId = filters.assignedUserId;
+    if (Object.keys(crmOrderWhere).length > 0) {
+      where.crmOrder = { is: crmOrderWhere };
+    }
+  }
+
+  // Quick filters
+  if (filters.quickFilter === 'MY') {
+    where.crmOrder = { is: { assignedUserId: user.id } };
+  } else if (filters.quickFilter === 'ACTIVE') {
+    where.status = { in: ['POPTAVKA', 'NABIDKA', 'POTVRZENO_KLIENTEM', 'SMLOUVA_OBJEDNAVKA', 'GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE'] };
+  } else if (filters.quickFilter === 'MISSING_PHOTOS') {
+    where.status = { in: ['INSTALACE', 'FOTODOKUMENTACE'] };
+  } else if (filters.quickFilter === 'READY_BILLING') {
+    where.status = 'PRIPRAVENO_K_FAKTURACI';
+  } else if (filters.quickFilter === 'COMPLETED') {
+    where.status = { in: ['FAKTUROVANO', 'DOKONCENO'] };
   }
 
   if (filters.query) {
@@ -176,30 +213,209 @@ export async function listNavigationOrders(user: CurrentUser, filters: { query?:
           assignedUser: { select: { id: true, name: true } },
         },
       },
-      points: true,
-      billingPeriods: true,
+      points: {
+        select: {
+          id: true,
+          status: true,
+          installedPhotoId: true,
+        },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
 
-  return orders.map((o) => ({
-    id: o.id,
-    crmOrderId: o.crmOrderId,
-    orderNumber: o.crmOrder.orderNumber,
-    title: o.crmOrder.title,
-    clientId: o.crmOrder.clientId,
-    clientName: o.crmOrder.client.name,
-    assignedUserName: o.crmOrder.assignedUser?.name || null,
-    status: o.status,
-    blockStatus: o.blockStatus,
-    targetName: o.targetName,
-    targetAddress: o.targetAddress,
-    targetLatitude: o.targetLatitude,
-    targetLongitude: o.targetLongitude,
-    totalPrice: Number(o.crmOrder.totalPrice ?? 0),
-    pointsCount: o.points.length,
-    createdAt: o.createdAt.toISOString(),
-  }));
+  const now = new Date();
+
+  return orders.map((o) => {
+    const installedPointsCount = o.points.filter((p) => p.status === 'INSTALLED').length;
+    const photosCount = o.points.filter((p) => p.installedPhotoId !== null).length;
+    const daysInStatus = Math.floor((now.getTime() - new Date(o.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+
+    return {
+      id: o.id,
+      crmOrderId: o.crmOrderId,
+      orderNumber: o.crmOrder.orderNumber,
+      title: o.crmOrder.title,
+      clientId: o.crmOrder.clientId,
+      clientName: o.crmOrder.client.name,
+      assignedUserId: o.crmOrder.assignedUserId,
+      assignedUserName: o.crmOrder.assignedUser?.name || null,
+      status: o.status,
+      blockStatus: o.blockStatus,
+      targetName: o.targetName,
+      targetAddress: o.targetAddress,
+      targetLatitude: o.targetLatitude,
+      targetLongitude: o.targetLongitude,
+      totalPrice: Number(o.crmOrder.totalPrice ?? 0),
+      pointsCount: o.points.length,
+      installedPointsCount,
+      photosCount,
+      rentStart: o.rentStart ? o.rentStart.toISOString() : null,
+      rentEnd: o.rentEnd ? o.rentEnd.toISOString() : null,
+      installationDate: o.installationDate ? o.installationDate.toISOString() : null,
+      createdAt: o.createdAt.toISOString(),
+      updatedAt: o.updatedAt.toISOString(),
+      daysInStatus,
+    };
+  });
+}
+
+export async function getNavigationDashboardStats(user: CurrentUser): Promise<NavigationDashboardStats> {
+  const where: Prisma.NavigationOrderWhereInput = {};
+  if (user.role === 'SALES') {
+    where.crmOrder = {
+      is: {
+        OR: [
+          { assignedUserId: user.id },
+          { offer: { is: { createdByUserId: user.id } } },
+        ],
+      },
+    };
+  }
+
+  const allOrders = await prisma.navigationOrder.findMany({
+    where,
+    select: {
+      status: true,
+      blockStatus: true,
+      points: {
+        select: {
+          status: true,
+          installedPhotoId: true,
+        },
+      },
+    },
+  });
+
+  const totalCount = allOrders.length;
+  const activeCount = allOrders.filter((o) => o.status !== 'DOKONCENO' && o.status !== 'FAKTUROVANO').length;
+  const waitingForClientCount = allOrders.filter((o) => o.blockStatus === 'CEKA_NA_KLIENTA' || o.blockStatus === 'CEKA_NA_POTVRZENI_NABIDKY' || o.blockStatus === 'CEKA_NA_OBJEDNAVKU').length;
+  const waitingForGraphicsCount = allOrders.filter((o) => o.status === 'GRAFICKE_PODKLADY' || o.status === 'SCHVALENI_GRAFIKY' || o.blockStatus === 'CEKA_NA_GRAFIKU' || o.blockStatus === 'CEKA_NA_SCHVALENI_GRAFIKY').length;
+  const inProductionCount = allOrders.filter((o) => o.status === 'TISK_VYROBA' || o.blockStatus === 'CEKA_NA_TISK').length;
+  const readyForInstallationCount = allOrders.filter((o) => o.status === 'PRIPRAVENO_K_INSTALACI' || o.blockStatus === 'CEKA_NA_INSTALACI').length;
+  const installationInProgressCount = allOrders.filter((o) => o.status === 'INSTALACE').length;
+  const missingPhotosCount = allOrders.filter((o) => (o.status === 'INSTALACE' || o.status === 'FOTODOKUMENTACE') && o.points.some((p) => p.installedPhotoId === null)).length;
+  const readyForBillingCount = allOrders.filter((o) => o.status === 'PRIPRAVENO_K_FAKTURACI' || o.blockStatus === 'CEKA_NA_FAKTURACI').length;
+
+  return {
+    totalCount,
+    activeCount,
+    waitingForClientCount,
+    waitingForGraphicsCount,
+    inProductionCount,
+    readyForInstallationCount,
+    installationInProgressCount,
+    missingPhotosCount,
+    readyForBillingCount,
+  };
+}
+
+export async function getNavigationAttentionAlerts(user: CurrentUser): Promise<AttentionAlertItem[]> {
+  const where: Prisma.NavigationOrderWhereInput = {
+    status: { notIn: ['DOKONCENO', 'FAKTUROVANO'] },
+  };
+
+  if (user.role === 'SALES') {
+    where.crmOrder = {
+      is: {
+        OR: [
+          { assignedUserId: user.id },
+          { offer: { is: { createdByUserId: user.id } } },
+        ],
+      },
+    };
+  }
+
+  const orders = await prisma.navigationOrder.findMany({
+    where,
+    include: {
+      crmOrder: {
+        include: {
+          client: { select: { name: true } },
+          assignedUser: { select: { name: true } },
+        },
+      },
+      points: true,
+    },
+    orderBy: { updatedAt: 'asc' },
+  });
+
+  const alerts: AttentionAlertItem[] = [];
+  const now = new Date();
+
+  for (const o of orders) {
+    const daysInStatus = Math.floor((now.getTime() - new Date(o.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+    const orderNumber = o.crmOrder.orderNumber;
+    const clientName = o.crmOrder.client.name;
+    const assignedUserName = o.crmOrder.assignedUser?.name || 'Nepřiřazen';
+
+    // 1. Dlouho blokováno
+    if (o.blockStatus && daysInStatus > 3) {
+      alerts.push({
+        id: `block-${o.id}`,
+        orderId: o.id,
+        orderNumber,
+        clientName,
+        reason: `Blokováno ve stavu "${o.blockStatus}" už ${daysInStatus} dní`,
+        waitingDaysOrDeadline: `${daysInStatus} dní`,
+        assignedUserName,
+        actionUrl: `/navigation/orders/${o.id}`,
+        actionLabel: 'Vyřešit blokaci',
+        severity: daysInStatus > 7 ? 'HIGH' : 'MEDIUM',
+      });
+    }
+
+    // 2. Chybí fotodokumentace
+    if ((o.status === 'INSTALACE' || o.status === 'FOTODOKUMENTACE') && o.points.some((p) => p.installedPhotoId === null)) {
+      const missingCount = o.points.filter((p) => p.installedPhotoId === null).length;
+      alerts.push({
+        id: `photo-${o.id}`,
+        orderId: o.id,
+        orderNumber,
+        clientName,
+        reason: `Montáž dokončena, ale chybí ${missingCount} fotek z terénu`,
+        waitingDaysOrDeadline: `${o.points.length - missingCount}/${o.points.length} fotek`,
+        assignedUserName,
+        actionUrl: `/navigation/orders/${o.id}`,
+        actionLabel: 'Doplnit fotky',
+        severity: 'HIGH',
+      });
+    }
+
+    // 3. Chybí GPS u bodů
+    if (o.targetLatitude === 0 && o.targetLongitude === 0) {
+      alerts.push({
+        id: `gps-${o.id}`,
+        orderId: o.id,
+        orderNumber,
+        clientName,
+        reason: 'Cílová provozovna nemá zadané GPS souřadnice',
+        waitingDaysOrDeadline: 'Chybí GPS',
+        assignedUserName,
+        actionUrl: `/navigation/orders/${o.id}`,
+        actionLabel: 'Doplnit GPS',
+        severity: 'LOW',
+      });
+    }
+
+    // 4. Připraveno k fakturaci
+    if (o.status === 'PRIPRAVENO_K_FAKTURACI') {
+      alerts.push({
+        id: `billing-${o.id}`,
+        orderId: o.id,
+        orderNumber,
+        clientName,
+        reason: 'Montáž i dokumentace schválena – čení na vystavení faktury',
+        waitingDaysOrDeadline: 'K fakturaci',
+        assignedUserName,
+        actionUrl: `/navigation/orders/${o.id}`,
+        actionLabel: 'Vystavit fakturu',
+        severity: 'MEDIUM',
+      });
+    }
+  }
+
+  return alerts.slice(0, 10);
 }
 
 export async function getNavigationOrderDetail(id: string, user: CurrentUser): Promise<NavigationOrderDetail> {
@@ -234,7 +450,6 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
     throw new NavigationServiceError('Navigační zakázka nebyla nalezena.', 'NOT_FOUND');
   }
 
-  // RBAC Check for SALES role
   if (user.role === 'SALES' && o.crmOrder.assignedUserId !== user.id) {
     const isOfferOwner = o.crmOrder.offerId
       ? Boolean(await prisma.offer.findFirst({ where: { id: o.crmOrder.offerId, createdByUserId: user.id } }))
@@ -243,6 +458,26 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
       throw new NavigationServiceError('K této navigační zakázce nemáte přístup.', 'FORBIDDEN');
     }
   }
+
+  // Fetch audit logs for history tab
+  const auditLogsRaw = await prisma.crmAuditLog.findMany({
+    where: {
+      OR: [
+        { entityId: o.id },
+        { entityId: o.crmOrderId },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+  });
+
+  const auditLogs = auditLogsRaw.map((log) => ({
+    id: log.id,
+    action: log.action,
+    userEmail: log.userEmail,
+    details: log.detailsJson,
+    createdAt: log.createdAt.toISOString(),
+  }));
 
   return {
     id: o.id,
@@ -310,6 +545,7 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
       invoiceId: bp.invoiceId,
       invoiceNumber: bp.invoice?.invoiceNumber || null,
     })),
+    auditLogs,
   };
 }
 
@@ -329,7 +565,6 @@ export async function attachPointInstallationPhoto(
       throw new NavigationServiceError('Navigační bod nebyl nalezen.', 'NOT_FOUND');
     }
 
-    // Vytvoříme jediný fotografický záznam s vazbami na nosič I plochu
     const photo = await tx.photo.create({
       data: {
         url: photoUrl,
@@ -341,7 +576,6 @@ export async function attachPointInstallationPhoto(
       },
     });
 
-    // Propojíme fotografii s bodem
     await tx.navigationPoint.update({
       where: { id: navigationPointId },
       data: {
