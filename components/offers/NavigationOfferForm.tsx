@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
@@ -61,7 +61,56 @@ export function NavigationOfferForm({
   const router = useRouter();
   const navigation = initialOffer?.navigation;
 
+  const [clientList, setClientList] = useState<ClientOption[]>(clients);
   const [clientId, setClientId] = useState(initialOffer?.clientId ?? clients[0]?.id ?? '');
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientContact, setNewClientContact] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [newClientIco, setNewClientIco] = useState('');
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [clientError, setClientError] = useState('');
+
+  async function handleCreateClient() {
+    if (!newClientName.trim()) {
+      setClientError('Zadejte název klienta / firmy.');
+      return;
+    }
+    setCreatingClient(true);
+    setClientError('');
+    try {
+      const res = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newClientName.trim(),
+          contactPerson: newClientContact.trim() || undefined,
+          email: newClientEmail.trim() || undefined,
+          phone: newClientPhone.trim() || undefined,
+          companyId: newClientIco.trim() || undefined,
+        }),
+      });
+      const data = (await res.json()) as ClientOption & { error?: string };
+      if (!res.ok) {
+        setClientError(data.error || 'Klienta se nepodařilo vytvořit.');
+        return;
+      }
+      setClientList((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name, 'cs')));
+      setClientId(data.id);
+      setShowClientModal(false);
+      setNewClientName('');
+      setNewClientContact('');
+      setNewClientEmail('');
+      setNewClientPhone('');
+      setNewClientIco('');
+    } catch {
+      setClientError('Chyba při komunikaci se serverem.');
+    } finally {
+      setCreatingClient(false);
+    }
+  }
+
   const [title, setTitle] = useState(initialOffer?.title ?? 'Navigační nabídka');
   const [campaignName, setCampaignName] = useState(initialOffer?.campaignName ?? '');
   const [validUntil, setValidUntil] = useState(initialOffer?.validUntil ?? '');
@@ -263,13 +312,23 @@ export function NavigationOfferForm({
         <section className="card space-y-3">
           <h2 className="text-lg font-bold text-slate-900">Zadání nabídky navigace</h2>
           <Field label="Klient">
-            <select className="input" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select className="input flex-1" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                {clientList.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-secondary text-xs py-2 px-2.5 whitespace-nowrap flex items-center gap-1 shrink-0"
+                onClick={() => setShowClientModal(true)}
+                title="Vytvořit nového klienta"
+              >
+                <UserPlus size={14} /> Nový
+              </button>
+            </div>
           </Field>
 
           <Field label="Název nabídky">
@@ -630,6 +689,96 @@ export function NavigationOfferForm({
             setActiveVisualizerPointId(null);
           }}
         />
+      )}
+      {showClientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+          <div className="card max-w-md w-full space-y-4 shadow-2xl bg-white border border-slate-200">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserPlus size={18} className="text-sky-600" /> Rychlé vytvoření nového klienta
+              </h3>
+              <button type="button" className="text-slate-400 hover:text-slate-600" onClick={() => setShowClientModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {clientError && (
+              <div className="p-2.5 bg-red-50 text-red-700 text-xs rounded-lg border border-red-200 font-medium">
+                {clientError}
+              </div>
+            )}
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold mb-1 text-slate-700">Název klienta / firmy *</label>
+                <input
+                  className="input w-full"
+                  placeholder="Např. Decathlon Ostrava s.r.o."
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700">IČO</label>
+                  <input
+                    className="input w-full"
+                    placeholder="12345678"
+                    value={newClientIco}
+                    onChange={(e) => setNewClientIco(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700">Kontaktní osoba</label>
+                  <input
+                    className="input w-full"
+                    placeholder="Jan Novák"
+                    value={newClientContact}
+                    onChange={(e) => setNewClientContact(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700">E-mail</label>
+                  <input
+                    className="input w-full"
+                    type="email"
+                    placeholder="jan.novak@firma.cz"
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-slate-700">Telefon</label>
+                  <input
+                    className="input w-full"
+                    placeholder="+420 777 123 456"
+                    value={newClientPhone}
+                    onChange={(e) => setNewClientPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+              <button type="button" className="btn btn-secondary text-xs" onClick={() => setShowClientModal(false)}>
+                Zrušit
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary text-xs flex items-center gap-1.5"
+                disabled={creatingClient}
+                onClick={handleCreateClient}
+              >
+                {creatingClient ? 'Ukládám...' : 'Vytvořit a vybrat klienta'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
