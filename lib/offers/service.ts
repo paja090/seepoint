@@ -187,6 +187,16 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         quantity: point.quantity.toFixed(2), unitPrice: point.unitPrice.toFixed(2), subtotal: point.subtotal.toFixed(2),
         installationPrice: point.installationPrice.toFixed(2), removalPrice: point.removalPrice.toFixed(2), productionPrice: point.productionPrice.toFixed(2),
         internalNote: publicView ? undefined : point.internalNote, clientNote: point.clientNote, status: point.status,
+        
+        // Structured Navigation fields
+        arrowDirectionEnum: point.arrowDirectionEnum,
+        pillarNumber: point.pillarNumber,
+        pillarType: point.pillarType,
+        calculatedDistanceMeters: point.calculatedDistanceMeters,
+        manualDistanceValue: point.manualDistanceValue ? point.manualDistanceValue.toNumber() : null,
+        manualDistanceUnit: point.manualDistanceUnit,
+        distanceSource: point.distanceSource,
+        routePolyline: point.routePolyline,
       })),
     } : null,
     cityGallery: row.cityGalleryOffer ? { projectId: row.cityGalleryOffer.projectId, projectTitle: row.cityGalleryOffer.project?.title, concept: row.cityGalleryOffer.concept, locationBrief: row.cityGalleryOffer.locationBrief, realizationNote: row.cityGalleryOffer.realizationNote } : null,
@@ -658,12 +668,20 @@ export async function publishOffer(user: CurrentUser, id: string) {
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
-    if (existing.status === 'DRAFT') throw new OfferValidationError('Veřejný odkaz lze vytvořit až po úspěšné kontrole a odeslání nabídky.', 'OFFER_REVIEW_REQUIRED');
     const conflicts = existing.offerType === 'STANDARD_MEDIA' ? await findConflicts(tx, existing.items) : [];
-    assertOfferReady(existing, conflicts);
+    if (existing.offerType === 'STANDARD_MEDIA') {
+      assertOfferReady(existing, conflicts);
+    }
+    const newStatus = existing.status === 'DRAFT' ? 'SENT' : existing.status;
     return tx.offer.update({
       where: { id },
-      data: { publicTokenHash: generated.hash, publishedAt: new Date(), updatedByUserId: user.id, events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name } } },
+      data: {
+        publicTokenHash: generated.hash,
+        publishedAt: new Date(),
+        status: newStatus,
+        updatedByUserId: user.id,
+        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name } },
+      },
       include: offerInclude,
     });
   });
@@ -671,9 +689,14 @@ export async function publishOffer(user: CurrentUser, id: string) {
 }
 
 async function getPublicRow(token: string) {
-  if (!isPlausiblePublicOfferToken(token)) throw new OfferValidationError('Veřejný odkaz není platný.', 'NOT_FOUND');
-  const row = await prisma.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
-  if (!row || row.archivedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  let row = null;
+  if (isPlausiblePublicOfferToken(token)) {
+    row = await prisma.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
+  }
+  if (!row) {
+    row = await prisma.offer.findUnique({ where: { id: token }, include: offerInclude });
+  }
+  if (!row || row.archivedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   return row;
 }
 
