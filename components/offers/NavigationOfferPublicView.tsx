@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import {
-  MapPin,
   Store,
   Compass,
   ArrowUp,
@@ -12,9 +11,6 @@ import {
   ArrowUpRight,
   RotateCcw,
   MoveHorizontal,
-  ChevronRight,
-  Image as ImageIcon,
-  CheckCircle2,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -72,12 +68,12 @@ export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
   }
 }
 
-export function formatDistanceBadge(point: any) {
+export function formatDistanceBadge(point: Record<string, unknown>) {
   if (point.distanceSource === 'MANUAL' && point.manualDistanceValue) {
     const unit = point.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm';
-    return `${point.manualDistanceValue} ${unit} od cíle`;
+    return `${String(point.manualDistanceValue)} ${unit} od cíle`;
   }
-  if (point.calculatedDistanceMeters) {
+  if (typeof point.calculatedDistanceMeters === 'number') {
     if (point.calculatedDistanceMeters >= 1000) {
       return `${(point.calculatedDistanceMeters / 1000).toFixed(1).replace('.', ',')} km od cíle`;
     }
@@ -100,8 +96,6 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
     label: navigation.targetName,
     address: navigation.targetAddress || undefined,
   };
-
-  const selectedPoint = navigation.points.find((p) => p.id === selectedPointId) || navigation.points[0];
 
   return (
     <section className="space-y-6">
@@ -154,17 +148,20 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
 
           <GoogleNavigationOfferMap
             target={target}
-            points={navigation.points.map((p) => ({
-              id: p.id,
-              label: p.label,
-              latitude: p.latitude,
-              longitude: p.longitude,
-              arrowDirectionEnum: (p as any).arrowDirectionEnum,
-              pillarNumber: (p as any).pillarNumber,
-              pillarType: (p as any).pillarType,
-              routePolyline: (p as any).routePolyline,
-              calculatedDistanceMeters: (p as any).calculatedDistanceMeters,
-            }))}
+            points={navigation.points.map((p) => {
+              const pObj = p as unknown as Record<string, unknown>;
+              return {
+                id: p.id,
+                label: p.label,
+                latitude: p.latitude,
+                longitude: p.longitude,
+                arrowDirectionEnum: typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined,
+                pillarNumber: typeof pObj.pillarNumber === 'string' ? pObj.pillarNumber : undefined,
+                pillarType: typeof pObj.pillarType === 'string' ? pObj.pillarType : undefined,
+                routePolyline: typeof pObj.routePolyline === 'string' ? pObj.routePolyline : undefined,
+                calculatedDistanceMeters: typeof pObj.calculatedDistanceMeters === 'number' ? pObj.calculatedDistanceMeters : undefined,
+              };
+            })}
             mode="point"
             onTargetSelect={() => {}}
             onPointMove={() => {}}
@@ -179,7 +176,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
           <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
             {navigation.points.map((point, index) => {
               const isSelected = point.id === selectedPointId;
-              const pAny = point as any;
+              const pObj = point as unknown as Record<string, unknown>;
 
               return (
                 <article
@@ -214,16 +211,16 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
 
                   {/* Metadata Row: Arrow + Distance + Pillar */}
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                    <ArrowBadge arrowEnum={pAny.arrowDirectionEnum} />
+                    <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} />
 
                     <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200">
                       <Compass size={13} className="text-sky-600" />
-                      {formatDistanceBadge(pAny)}
+                      {formatDistanceBadge(pObj)}
                     </span>
 
-                    {pAny.pillarNumber && (
+                    {Boolean(pObj.pillarNumber) && (
                       <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 border border-amber-200">
-                        📍 Sloup {pAny.pillarNumber}
+                        📍 Sloup {String(pObj.pillarNumber)}
                       </span>
                     )}
                   </div>
@@ -242,10 +239,10 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
                   )}
 
                   {/* Visualizer Photo Preview if available */}
-                  {(point as any).visualizedPhotoUrl && (
+                  {typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl && (
                     <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
                       <img
-                        src={(point as any).visualizedPhotoUrl}
+                        src={String(pObj.visualizedPhotoUrl)}
                         alt={`Vizualizace ${point.label}`}
                         className="h-28 w-full object-cover"
                       />
