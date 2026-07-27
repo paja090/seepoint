@@ -23,15 +23,34 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
   const [items, setItems] = useState(initialItems);
   const [activeItem, setActiveItem] = useState<MobileTaskItem | null>(initialItems[0] || null);
   const [photoUrl, setPhotoUrl] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
+
+  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show immediate local preview
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreview(previewUrl);
+
+    // Convert file to base64 data URL for photoUrl transmission
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   async function handleCompleteTask(e: React.FormEvent) {
     e.preventDefault();
     if (!activeItem) return;
     if (!activeItem.installedPhotoUrl && !photoUrl) {
-      setMsg('⚠️ Pro dokončení montáže musíte nahrát fotografii instalované plochy.');
+      setMsg('⚠️ Pro dokončení montáže musíte nahrát nebo vyfotit fotografii instalované plochy.');
       return;
     }
 
@@ -54,12 +73,13 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
       }
 
       setItems((prev) =>
-        prev.map((i) => (i.pointId === activeItem.pointId ? { ...i, status: 'INSTALLED' } : i))
+        prev.map((i) => (i.pointId === activeItem.pointId ? { ...i, status: 'INSTALLED', installedPhotoUrl: photoUrl || i.installedPhotoUrl } : i))
       );
 
-      setMsg('✅ Montáž byla úspěšně označena jako dokončená a fotka byla uložena.');
+      setMsg('✅ Montáž byla úspěšně označena jako dokončená a fotka z fotoaparátu byla uložena.');
       setActiveItem(null);
       setPhotoUrl('');
+      setPhotoPreview(null);
       setNote('');
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : 'Chyba při dokončení montáže.');
@@ -167,19 +187,64 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
 
           <form onSubmit={handleCompleteTask} className="space-y-4 pt-2 border-t border-slate-700">
             <h3 className="text-sm font-bold text-white flex items-center gap-1">
-              <Camera size={16} className="text-teal-400" /> Nahrajte fotku po instalaci
+              <Camera size={16} className="text-teal-400" /> Fotodokumentace z terénu
             </h3>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">URL Fotografie z terénu</label>
-              <input
-                type="text"
-                placeholder="https://..."
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                className="w-full rounded-xl bg-slate-900 border border-slate-700 p-3 text-xs text-white"
-              />
-            </div>
+            {/* Direct Mobile Camera Button & Preview */}
+            {photoPreview ? (
+              <div className="relative rounded-2xl overflow-hidden border border-emerald-500/50 bg-slate-900 p-2 space-y-2 text-center">
+                <img
+                  src={photoPreview}
+                  alt="Náhled pořízené fotky"
+                  className="w-full h-48 object-cover rounded-xl border border-slate-800"
+                />
+                <div className="flex items-center justify-between px-2 pb-1">
+                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 size={14} /> Fotka pořízena
+                  </span>
+                  <label className="text-xs font-bold text-sky-400 cursor-pointer hover:underline">
+                    📷 Vyfotit znovu
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleCameraCapture}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl border-2 border-dashed border-sky-500/40 bg-sky-950/20 hover:bg-sky-900/30 cursor-pointer transition-all text-center group active:scale-98">
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleCameraCapture}
+                  className="hidden"
+                />
+                <div className="w-14 h-14 rounded-full bg-sky-500/20 text-sky-400 group-hover:scale-110 flex items-center justify-center transition-all border border-sky-400/30 shadow-lg shadow-sky-500/10">
+                  <Camera size={28} />
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-white block">📷 Vyfotit mobilním telefonem</span>
+                  <span className="text-xs text-sky-300/70">Kliknutím spustíte fotoaparát v telefonu</span>
+                </div>
+              </label>
+            )}
+
+            {!photoPreview && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Nebo vložte URL / odkaz na fotku</label>
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={photoUrl}
+                  onChange={(e) => setPhotoUrl(e.target.value)}
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 p-3 text-xs text-white"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-slate-400 mb-1">Poznámka instalatéra</label>
