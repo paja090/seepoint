@@ -105,7 +105,6 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { id: true, offerType: true, status: true, createdByUserId: true } });
       if (!existing || existing.offerType !== 'NAVIGATION') throw new OfferValidationError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
       if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
-      if (existing.status !== 'DRAFT') throw new OfferValidationError('Upravovat lze pouze koncept.', 'INVALID_STATUS_TRANSITION');
       await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
       return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
     }

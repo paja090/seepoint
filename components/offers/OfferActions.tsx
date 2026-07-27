@@ -63,18 +63,15 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
       </div>
 
       <div className="space-y-3 p-5">
-        {status === 'DRAFT' && (
-          <>
-            <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : offerType === 'CITY_GALLERY' ? `/offers/${offerId}/city-gallery/edit` : `/offers/${offerId}/edit`}>
-              <FilePenLine aria-hidden="true" size={17} />
-              Upravit návrh
-            </a>
-            <a className={primaryButton} href={`/offers/${offerId}/preview`}>
-              <Eye aria-hidden="true" size={17} />
-              Zkontrolovat klientský náhled
-            </a>
-          </>
-        )}
+        <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : offerType === 'CITY_GALLERY' ? `/offers/${offerId}/city-gallery/edit` : `/offers/${offerId}/edit`}>
+          <FilePenLine aria-hidden="true" size={17} />
+          Upravit nabídku
+        </a>
+
+        <a className={primaryButton} href={`/offers/${offerId}/preview`}>
+          <Eye aria-hidden="true" size={17} />
+          Zkontrolovat klientský náhled
+        </a>
 
         {status === 'SENT' && (
           <>
@@ -103,17 +100,17 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           </>
         )}
 
-        {status !== 'DRAFT' && <div className="border-t border-slate-100 pt-3">
+        <div className="border-t border-slate-100 pt-3 space-y-2">
           <button className={secondaryButton} disabled={disabled} onClick={() => void action('publish')} type="button">
             <Link2 aria-hidden="true" size={17} />
-            Vytvořit veřejný odkaz
+            Vytvořit / získat veřejný odkaz pro klienta
           </button>
-        </div>}
+        </div>
 
-        {offerType === 'STANDARD_MEDIA' && <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
+        <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
           <Copy aria-hidden="true" size={17} />
           Duplikovat nabídku
-        </button>}
+        </button>
 
         {(status === 'DRAFT' || status === 'SENT') && (
           <button className="w-full px-3 py-2 text-sm font-semibold text-slate-500 transition hover:text-red-700 disabled:opacity-50" disabled={disabled} onClick={() => void action('expire')} type="button">

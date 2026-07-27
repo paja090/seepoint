@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { OfferProposal } from '@/components/offer/OfferProposal';
 import { OfferProcessStepper } from '@/components/offers/OfferProcessStepper';
+import { SpecializedOfferSummary } from '@/components/offers/SpecializedOfferSummary';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getOffer } from '@/lib/offers/service';
@@ -23,8 +24,12 @@ export default async function OfferPreviewPage({ params }: { params: Promise<{ i
           <div className="flex flex-wrap gap-2"><Link className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800" href={`/offers/${offer.id}`}><ArrowLeft aria-hidden="true" size={16} />Detail nabídky</Link><Link className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white" href={`/offers/${offer.id}/approval`}><ExternalLink aria-hidden="true" size={16} />Pokračovat na kontrolu a odeslání</Link></div>
         </header>
         <OfferProcessStepper current="preview" offerId={offer.id!} offerType={offer.offerType ?? 'STANDARD_MEDIA'} />
-        <div className="mb-6 flex items-start gap-3 rounded-xl bg-sky-50 p-4 text-sm text-sky-800 ring-1 ring-sky-200"><Info aria-hidden="true" className="mt-0.5 shrink-0" size={17} /><p><strong>Toto je stránka, kterou uvidí klient.</strong> Zobrazují se pouze fotografie označené jako vhodné pro klientské nabídky. Po vizuální kontrole pokračujte na finální audit a odeslání. Interní poznámky a identifikátory se klientovi neposílají.</p></div>
-        <OfferProposal offer={toProposalOffer(offer)} variant="internal" />
+        <div className="mb-6 flex items-start gap-3 rounded-xl bg-sky-50 p-4 text-sm text-sky-800 ring-1 ring-sky-200"><Info aria-hidden="true" className="mt-0.5 shrink-0" size={17} /><p><strong>Toto je stránka, kterou uvidí klient.</strong> Po vizuální kontrole pokračujte na finální audit a odeslání.</p></div>
+        {offer.offerType === 'NAVIGATION' || offer.offerType === 'CITY_GALLERY' ? (
+          <SpecializedOfferSummary offer={offer} />
+        ) : (
+          <OfferProposal offer={toProposalOffer(offer)} variant="internal" />
+        )}
       </AppShell>
     );
   } catch (error) {
