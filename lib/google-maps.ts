@@ -15,7 +15,8 @@ export type RouteComputeResult = {
 export async function computeGoogleRoute(
   origin: { latitude: number; longitude: number },
   destination: { latitude: number; longitude: number },
-  travelMode: 'DRIVING' | 'BICYCLING' | 'WALKING' = 'DRIVING'
+  travelMode: 'DRIVING' | 'BICYCLING' | 'WALKING' = 'DRIVING',
+  requestReferer?: string
 ): Promise<RouteComputeResult> {
   const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -47,7 +48,7 @@ export async function computeGoogleRoute(
       polylineQuality: 'OVERVIEW',
     };
 
-    const referer = process.env.APP_URL || 'https://seepoint.cz/';
+    const referer = requestReferer || process.env.APP_URL || 'https://seepoint.vercel.app/';
     const res = await fetch(url, {
       method: 'POST',
       headers: {
