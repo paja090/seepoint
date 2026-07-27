@@ -90,10 +90,10 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
 
   const tableRows = isNavigation
     ? navigationData.points.slice(0, 18).map((point, index) => {
-        const pAny = point as any;
+        const pAny = point as unknown as Record<string, unknown>;
         const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
           ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-          : pAny.calculatedDistanceMeters
+          : typeof pAny.calculatedDistanceMeters === 'number'
             ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
             : '—';
 
@@ -102,7 +102,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         return [
           { text: String(index + 1), color: MUTED, bold: true },
           { stack: [{ text: `${point.label}${pillarStr}`, bold: true }, { text: safe(point.address || point.navigationType), fontSize: 8, color: MUTED }] },
-          { text: formatArrowDirectionPdf(pAny.arrowDirectionEnum), fontSize: 8.5, bold: true, color: BLUE },
+          { text: formatArrowDirectionPdf(typeof pAny.arrowDirectionEnum === 'string' ? pAny.arrowDirectionEnum : null), fontSize: 8.5, bold: true, color: BLUE },
           { text: distStr, fontSize: 8.5, bold: true },
           { text: money(Number(point.subtotal)), alignment: 'right', bold: true },
         ];
