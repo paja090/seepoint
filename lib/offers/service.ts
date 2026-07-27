@@ -181,6 +181,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       targetLatitude: row.navigationOffer.targetLatitude,
       targetLongitude: row.navigationOffer.targetLongitude,
       targetNote: row.navigationOffer.targetNote,
+      proposalMode: row.navigationOffer.proposalMode || 'LOCATION_SELECTION',
+      graphicArtworkUrl: row.navigationOffer.graphicArtworkUrl,
       points: row.navigationOffer.points.map((point) => ({
         id: point.id, label: point.label, latitude: point.latitude, longitude: point.longitude, address: point.address,
         navigationType: point.navigationType, variant: point.variant, orientation: point.orientation,
@@ -198,6 +200,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         distanceSource: point.distanceSource,
         routePolyline: point.routePolyline,
         visualizedPhotoUrl: point.visualizedPhotoUrl,
+        isSelectedByClient: point.isSelectedByClient !== false,
       })),
     } : null,
     cityGallery: row.cityGalleryOffer ? { projectId: row.cityGalleryOffer.projectId, projectTitle: row.cityGalleryOffer.project?.title, concept: row.cityGalleryOffer.concept, locationBrief: row.cityGalleryOffer.locationBrief, realizationNote: row.cityGalleryOffer.realizationNote } : null,
@@ -689,7 +692,7 @@ export async function publishOffer(user: CurrentUser, id: string) {
   return { offer: serializeOffer(row), token: generated.token, path: `/offer/${generated.token}` };
 }
 
-async function getPublicRow(token: string) {
+export async function getPublicRow(token: string) {
   let row = null;
   if (isPlausiblePublicOfferToken(token)) {
     row = await prisma.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });

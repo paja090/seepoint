@@ -113,23 +113,21 @@ export function NavigationSignVisualizer({
     // 1. Draw Background Image
     ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
 
-    // 2. Draw Technical SeePOINT Pole Navigation Sign (670 mm x 900 mm)
+    // 2. Draw Realistic Vertical SeePOINT Pole Navigation Sign
     ctx.save();
     ctx.translate(signX, signY);
     ctx.rotate((signRotation * Math.PI) / 180);
     ctx.scale(signScale, signScale);
 
-    // Dimensions: 670 mm x 900 mm (exact ratio 0.744)
-    const width = 160;
-    const height = 215;
+    // Dimensions: Realistic Vertical SeePOINT Pole Sign
+    const width = 150;
+    const height = 195;
     const radius = 16;
 
-    // Pole & mounting brackets on right edge (as shown in technical drawing)
+    // Metallic pole & mounting brackets behind sign
     ctx.fillStyle = '#64748B';
-    ctx.fillRect(width / 2, -height / 2 + 35, 18, 16);
-    ctx.fillRect(width / 2, height / 2 - 51, 18, 16);
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(width / 2 + 18, -height / 2 - 20, 10, height + 40); // Pole
+    ctx.fillRect(width / 2, -height / 2 + 35, 14, 14);
+    ctx.fillRect(width / 2, height / 2 - 45, 14, 14);
 
     // Outer Drop Shadow
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
@@ -170,22 +168,20 @@ export function NavigationSignVisualizer({
     ctx.shadowColor = 'transparent';
     ctx.stroke();
 
-    // Inner Dashed Line for 670mm x 900mm Print Bounds (from technical drawing)
+    // Inner subtle border
     ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.beginPath();
-    ctx.roundRect(-width / 2 + 14, -height / 2 + 14, width - 28, height - 70, 8);
+    ctx.roundRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10, radius - 4);
     ctx.stroke();
-    ctx.setLineDash([]); // Reset dash
 
     // Render Graphic Artwork Image if uploaded
     if (graphicImage) {
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(-width / 2 + 15, -height / 2 + 15, width - 30, height - 72, 8);
+      ctx.roundRect(-width / 2 + 8, -height / 2 + 8, width - 16, height - 64, 8);
       ctx.clip();
-      ctx.drawImage(graphicImage, -width / 2 + 15, -height / 2 + 15, width - 30, height - 72);
+      ctx.drawImage(graphicImage, -width / 2 + 8, -height / 2 + 8, width - 16, height - 64);
       ctx.restore();
     } else {
       // Top Section: Client Brand / Logo Text
@@ -193,22 +189,22 @@ export function NavigationSignVisualizer({
       ctx.font = '900 18px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(signText.toUpperCase(), 0, -height / 2 + 60);
+      ctx.fillText(signText.toUpperCase(), 0, -height / 2 + 55);
 
       // Subtext line if present
       if (subText && subText !== '—') {
         ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
         ctx.fillStyle = theme === 'yellow' ? '#1e293b' : '#94a3b8';
-        ctx.fillText(subText.toUpperCase(), 0, -height / 2 + 85);
+        ctx.fillText(subText.toUpperCase(), 0, -height / 2 + 78);
       }
     }
 
-    // Bottom Section: Direction Arrow + Distance (matching technical drawing e.g. ⬅  1,3 km)
-    const badgeHeight = 46;
-    const badgeY = height / 2 - badgeHeight - 10;
-    const badgeWidth = width - 20;
+    // Bottom Section: Integrated Dark Distance & Direction Badge
+    const badgeHeight = 44;
+    const badgeY = height / 2 - badgeHeight - 12;
+    const badgeWidth = width - 24;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.beginPath();
     ctx.roundRect(-badgeWidth / 2, badgeY, badgeWidth, badgeHeight, 10);
     ctx.fill();
@@ -216,16 +212,12 @@ export function NavigationSignVisualizer({
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    // Arrow + Distance Layout matching drawing (e.g. ⬅ 1,3 km)
+    // Text in Badge: Distance + Arrow
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 17px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'left';
+    ctx.font = '800 15px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(arrow, -badgeWidth / 2 + 14, badgeY + badgeHeight / 2);
-
-    ctx.font = '900 15px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(distanceText, badgeWidth / 2 - 12, badgeY + badgeHeight / 2);
+    ctx.fillText(`${distanceText}    ${arrow}`, 0, badgeY + badgeHeight / 2);
 
     ctx.restore();
   }, [bgImage, graphicImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme]);
