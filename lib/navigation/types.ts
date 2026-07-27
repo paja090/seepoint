@@ -45,6 +45,52 @@ export const NAVIGATION_ORDER_STATUS_COLORS: Record<NavigationOrderStatus, strin
   DOKONCENO: 'bg-slate-900 text-white border-slate-900',
 };
 
+export type NavigationPhaseKey = 'COMMERCIAL' | 'CONTRACT' | 'PRODUCTION' | 'REALIZATION' | 'FINANCE';
+
+export const NAVIGATION_PHASES: Array<{
+  key: NavigationPhaseKey;
+  label: string;
+  statuses: NavigationOrderStatus[];
+  color: string;
+  description: string;
+}> = [
+  {
+    key: 'COMMERCIAL',
+    label: '1. Obchod',
+    statuses: ['POPTAVKA', 'NABIDKA', 'POTVRZENO_KLIENTEM'],
+    color: 'border-blue-500 bg-blue-50/50 text-blue-900',
+    description: 'Poptávka, tvorba nabídky a schválení klientem',
+  },
+  {
+    key: 'CONTRACT',
+    label: '2. Smlouva a podklady',
+    statuses: ['SMLOUVA_OBJEDNAVKA', 'GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY'],
+    color: 'border-amber-500 bg-amber-50/50 text-amber-900',
+    description: 'Podpis smlouvy, grafický návrh a schválení tiskových dat',
+  },
+  {
+    key: 'PRODUCTION',
+    label: '3. Výroba',
+    statuses: ['TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI'],
+    color: 'border-purple-500 bg-purple-50/50 text-purple-900',
+    description: 'Tisk cedulí, kompletace nosičů a příprava k výjezdu',
+  },
+  {
+    key: 'REALIZATION',
+    label: '4. Realizace',
+    statuses: ['INSTALACE', 'FOTODOKUMENTACE'],
+    color: 'border-orange-500 bg-orange-50/50 text-orange-900',
+    description: 'Montáž v terénu a pořízení fotodokumentace',
+  },
+  {
+    key: 'FINANCE',
+    label: '5. Finance & Uzavření',
+    statuses: ['PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'],
+    color: 'border-emerald-500 bg-emerald-50/50 text-emerald-900',
+    description: 'Generování fakturačních podkladů a ukončení zakázky',
+  },
+];
+
 export type NavigationPointItem = {
   id: string;
   label: string;
@@ -69,6 +115,15 @@ export type NavigationPointItem = {
   carrierCode?: string | null;
   surfaceName?: string | null;
   installedPhotoUrl?: string | null;
+};
+
+export type NavigationAuditLogItem = {
+  id: string;
+  action: string;
+  userEmail?: string | null;
+  userName?: string | null;
+  details?: string | null;
+  createdAt: string;
 };
 
 export type NavigationOrderDetail = {
@@ -113,4 +168,57 @@ export type NavigationOrderDetail = {
     invoiceId?: string | null;
     invoiceNumber?: string | null;
   }>;
+  auditLogs?: NavigationAuditLogItem[];
+};
+
+export type NavigationOrderListItem = {
+  id: string;
+  crmOrderId: string;
+  orderNumber: string;
+  title: string;
+  clientId: string;
+  clientName: string;
+  assignedUserId?: string | null;
+  assignedUserName?: string | null;
+  status: NavigationOrderStatus;
+  blockStatus?: NavigationBlockStatus | null;
+  targetName: string;
+  targetAddress?: string | null;
+  targetLatitude: number;
+  targetLongitude: number;
+  totalPrice: number;
+  pointsCount: number;
+  installedPointsCount: number;
+  photosCount: number;
+  rentStart?: string | null;
+  rentEnd?: string | null;
+  installationDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  daysInStatus: number;
+};
+
+export type NavigationDashboardStats = {
+  activeCount: number;
+  waitingForClientCount: number;
+  waitingForGraphicsCount: number;
+  inProductionCount: number;
+  readyForInstallationCount: number;
+  installationInProgressCount: number;
+  missingPhotosCount: number;
+  readyForBillingCount: number;
+  totalCount: number;
+};
+
+export type AttentionAlertItem = {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  clientName: string;
+  reason: string;
+  waitingDaysOrDeadline: string;
+  assignedUserName: string;
+  actionUrl: string;
+  actionLabel: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
 };
