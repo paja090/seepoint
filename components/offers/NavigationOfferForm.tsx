@@ -218,6 +218,65 @@ export function NavigationOfferForm({
     return { rental, production, installation, removal, subtotal, tax, totalWithTax };
   }, [points]);
 
+  async function computeClientDirections(
+    originLat: number,
+    originLng: number,
+    destLat: number,
+    destLng: number
+  ): Promise<{ calculatedDistanceMeters?: number; routePolyline?: string }> {
+    return new Promise((resolve) => {
+      try {
+        const googleMaps = window.google?.maps;
+        if (!googleMaps) return resolve({});
+
+        const gAny = googleMaps as unknown as {
+          DirectionsService: new () => {
+            route: (
+              req: Record<string, unknown>,
+              cb: (res: unknown, status: string) => void
+            ) => void;
+          };
+          TravelMode: { DRIVING: string };
+        };
+
+        if (!gAny.DirectionsService) return resolve({});
+
+        const ds = new gAny.DirectionsService();
+        ds.route(
+          {
+            origin: { lat: originLat, lng: originLng },
+            destination: { lat: destLat, lng: destLng },
+            travelMode: gAny.TravelMode.DRIVING || 'DRIVING',
+          },
+          (result: unknown, status: string) => {
+            if (status === 'OK' && result) {
+              const resObj = result as {
+                routes: Array<{
+                  legs: Array<{ distance?: { value: number } }>;
+                  overview_polyline?: string | { points?: string };
+                }>;
+              };
+              const route = resObj.routes[0];
+              const distMeters = route?.legs[0]?.distance?.value;
+              const rawPolyline = route?.overview_polyline;
+              const polyStr = typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points;
+
+              if (distMeters && polyStr) {
+                return resolve({
+                  calculatedDistanceMeters: distMeters,
+                  routePolyline: polyStr,
+                });
+              }
+            }
+            resolve({});
+          }
+        );
+      } catch {
+        resolve({});
+      }
+    });
+  }
+
   async function fetchRouteInfo(
     originLat: number,
     originLng: number,
@@ -225,6 +284,8 @@ export function NavigationOfferForm({
     destLng?: number
   ): Promise<{ calculatedDistanceMeters?: number; routePolyline?: string }> {
     if (!destLat || !destLng) return {};
+
+    // 1. Try server Routes API route
     try {
       const res = await fetch('/api/route', {
         method: 'POST',
@@ -236,7 +297,7 @@ export function NavigationOfferForm({
       });
       if (res.ok) {
         const data = (await res.json()) as { status: string; distanceMeters: number; polyline: string };
-        if (data.status === 'OK') {
+        if (data.status === 'OK' && data.distanceMeters > 0) {
           return {
             calculatedDistanceMeters: data.distanceMeters,
             routePolyline: data.polyline,
@@ -246,7 +307,10 @@ export function NavigationOfferForm({
     } catch {
       /* ignore */
     }
-    return {};
+
+    // 2. Client-side browser DirectionsService fallback
+    const clientResult = await computeClientDirections(originLat, originLng, destLat, destLng);
+    return clientResult;
   }
 
   const [recalculatingRoutes, setRecalculatingRoutes] = useState(false);
