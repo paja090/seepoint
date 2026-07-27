@@ -98,12 +98,13 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
             : '—';
 
         const pillarStr = pAny.pillarNumber ? ` [Sloup ${pAny.pillarNumber}]` : '';
+        const streetStr = point.address ? `📍 ${point.address}` : point.navigationType;
 
         return [
           { text: String(index + 1), color: MUTED, bold: true },
-          { stack: [{ text: `${point.label}${pillarStr}`, bold: true }, { text: safe(point.address || point.navigationType), fontSize: 8, color: MUTED }] },
+          { stack: [{ text: `${point.label}${pillarStr}`, bold: true }, { text: streetStr, fontSize: 8, color: MUTED }] },
           { text: formatArrowDirectionPdf(typeof pAny.arrowDirectionEnum === 'string' ? pAny.arrowDirectionEnum : null), fontSize: 8.5, bold: true, color: BLUE },
-          { text: distStr, fontSize: 8.5, bold: true },
+          { text: `${distStr} do cíle`, fontSize: 8.5, bold: true },
           { text: money(Number(point.subtotal)), alignment: 'right', bold: true },
         ];
       })
@@ -134,8 +135,8 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
   }));
 
   const clientMark = clientLogoDataUrl
-    ? { image: clientLogoDataUrl, fit: [95, 44], alignment: 'right', margin: [0, 2, 0, 0] }
-    : { text: offer.client.logoLabel, fontSize: 22, bold: true, color: BLUE, alignment: 'right', margin: [0, 9, 0, 0] };
+    ? { image: clientLogoDataUrl, fit: [110, 48], alignment: 'right', margin: [0, 2, 0, 0] }
+    : { text: offer.client.logoLabel || offer.client.name, fontSize: 18, bold: true, color: BLUE, alignment: 'right', margin: [0, 6, 0, 0] };
 
   const definition = {
     info: { title: offer.title, author: 'SeePOINT', subject: 'Nabídka venkovní reklamní kampaně' },

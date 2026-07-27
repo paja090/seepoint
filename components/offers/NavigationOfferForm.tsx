@@ -332,11 +332,12 @@ export function NavigationOfferForm({
     }
   }
 
-  async function mapClick(latitude: number, longitude: number) {
+  async function mapClick(latitude: number, longitude: number, address?: string) {
     if (mode === 'target') {
       const newTarget = { latitude, longitude };
       setTarget(newTarget);
       setMode('point');
+      if (address && !targetAddress) setTargetAddress(address);
       void recalculateAllRoutes(newTarget);
       return;
     }
@@ -350,9 +351,9 @@ export function NavigationOfferForm({
         label: `Navigační bod ${current.length + 1}`,
         latitude,
         longitude,
-        address: '',
+        address: address || '',
         navigationType: 'Směrová tabule',
-        variant: '120x80 cm',
+        variant: '670x900 mm',
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
@@ -654,11 +655,12 @@ export function NavigationOfferForm({
             void recalculateAllRoutes(newTarget);
           }}
           onMapClick={mapClick}
-          onPointMove={async (id, latitude, longitude) => {
-            updatePoint(id, { latitude, longitude });
+          onPointMove={async (id: string, latitude: number, longitude: number, _dist?: number, _poly?: string, address?: string) => {
+            const addrObj = typeof address === 'string' && address ? { address } : {};
+            updatePoint(id, { latitude, longitude, ...addrObj });
             if (target) {
               const routeInfo = await fetchRouteInfo(latitude, longitude, target.latitude, target.longitude);
-              updatePoint(id, { latitude, longitude, ...routeInfo });
+              updatePoint(id, { latitude, longitude, ...addrObj, ...routeInfo });
             }
           }}
           points={points}
