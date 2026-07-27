@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
   RotateCcw,
   MoveHorizontal,
+  FileDown,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -119,10 +120,21 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 backdrop-blur-xs min-w-[240px]">
-            <div className="text-xs font-bold text-slate-400">Celkový počet bodů trasy</div>
-            <div className="mt-1 text-2xl font-black text-white">{navigation.points.length} navigačních cedulí</div>
-            <div className="mt-1 text-xs text-sky-400 font-semibold">📍 Plně propojeno přes Google Maps Routes API</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 backdrop-blur-xs min-w-[200px]">
+              <div className="text-xs font-bold text-slate-400">Celkový počet bodů trasy</div>
+              <div className="mt-1 text-2xl font-black text-white">{navigation.points.length} navigačních cedulí</div>
+              <div className="mt-1 text-xs text-sky-400 font-semibold">📍 Google Maps Routes API</div>
+            </div>
+
+            <a
+              href={`/api/proposals/${offer.id}/pdf`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2.5 rounded-2xl bg-sky-500 px-5 py-3.5 text-xs font-black text-slate-950 shadow-lg hover:bg-sky-400 transition cursor-pointer shrink-0"
+            >
+              <FileDown size={18} /> Stáhnout PDF nabídku
+            </a>
           </div>
         </div>
 
