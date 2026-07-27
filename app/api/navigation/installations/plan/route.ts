@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const updateData: Record<string, any> = {};
+    const updateData: Prisma.NavigationPointUncheckedUpdateInput = {};
     if (plannedInstallationAt !== undefined) {
       updateData.plannedInstallationAt = plannedInstallationAt ? new Date(plannedInstallationAt) : null;
     }

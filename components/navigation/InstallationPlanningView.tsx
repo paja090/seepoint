@@ -4,18 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Calendar as CalendarIcon,
-  MapPin,
-  User,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
   List,
-  LayoutGrid,
   Printer,
   ChevronRight,
   ArrowLeft,
   Search,
-  Filter,
 } from 'lucide-react';
 
 export type PlanningPointItem = {
