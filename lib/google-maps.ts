@@ -17,7 +17,7 @@ export async function computeGoogleRoute(
   destination: { latitude: number; longitude: number },
   travelMode: 'DRIVING' | 'BICYCLING' | 'WALKING' = 'DRIVING'
 ): Promise<RouteComputeResult> {
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY;
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   if (!apiKey) {
     return {
@@ -113,7 +113,7 @@ export function getSignedStaticMapUrl(params: {
   markers?: Array<{ lat: number; lng: number; color?: string; label?: string }>;
   polyline?: string;
 }): string {
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY;
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const signingSecret = process.env.GOOGLE_MAPS_URL_SIGNING_SECRET;
 
   if (!apiKey) {
