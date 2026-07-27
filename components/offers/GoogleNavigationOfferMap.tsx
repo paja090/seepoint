@@ -83,22 +83,28 @@ export function GoogleNavigationOfferMap({
       return;
     }
 
-    if (window.google?.maps) {
+    const cbName = '__initGoogleMapsCallback';
+    (window as unknown as Record<string, unknown>)[cbName] = () => {
+      setMapsLoaded(true);
+    };
+
+    if (window.google?.maps?.Map) {
       setMapsLoaded(true);
       return;
     }
 
     const scriptId = 'google-maps-js-script';
     if (document.getElementById(scriptId)) {
-      setMapsLoaded(true);
+      if (window.google?.maps?.Map) {
+        setMapsLoaded(true);
+      }
       return;
     }
 
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&callback=${cbName}`;
     script.async = true;
-    script.onload = () => setMapsLoaded(true);
     script.onerror = () => setLoadError(true);
     document.head.appendChild(script);
   }, [apiKey]);
@@ -161,7 +167,7 @@ export function GoogleNavigationOfferMap({
   // Render Google Map
   useEffect(() => {
     const googleMaps = window.google?.maps;
-    if (!mapsLoaded || !containerRef.current || !googleMaps) return;
+    if (!mapsLoaded || !containerRef.current || !googleMaps || typeof googleMaps.Map !== 'function') return;
 
     if (!mapRef.current) {
       const center = target ? { lat: target.latitude, lng: target.longitude } : { lat: 49.82, lng: 15.48 };
