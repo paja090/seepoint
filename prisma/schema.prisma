@@ -933,6 +933,8 @@ model NavigationOffer {
   targetNote       String?
   googlePlaceId    String?
   formattedAddress String?
+  proposalMode     String   @default("LOCATION_SELECTION")
+  graphicArtworkUrl String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -999,6 +1001,7 @@ model NavigationPoint {
   routeStatus              NavigationRouteStatus?    @default(OK)
   arrowDirectionEnum       NavigationArrowDirection? @default(STRAIGHT)
   visualizedPhotoUrl       String?
+  isSelectedByClient       Boolean                   @default(true)
 
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt

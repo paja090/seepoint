@@ -72,15 +72,19 @@ export function parseNavigationOfferInput(raw: unknown) {
       routeStatus: 'OK' as const,
       arrowDirectionEnum: arrowDir,
       visualizedPhotoUrl: nullable(text(point.visualizedPhotoUrl)),
+      isSelectedByClient: point.isSelectedByClient !== false,
     };
   });
   const validUntil = text(input.validUntil);
   if (validUntil) parseDateOnly(validUntil, 'Platnost nabídky');
+  const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
     validUntil, internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), targetName, targetAddress: text(input.targetAddress),
     targetLatitude: coordinate(input.targetLatitude, 'latitude'), targetLongitude: coordinate(input.targetLongitude, 'longitude'), targetNote: text(input.targetNote), 
     googlePlaceId: nullable(text(input.googlePlaceId)), formattedAddress: nullable(text(input.formattedAddress)),
+    proposalMode: propMode,
+    graphicArtworkUrl: nullable(text(input.graphicArtworkUrl)),
     points,
   };
 }
@@ -107,9 +111,9 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       if (!existing || existing.offerType !== 'NAVIGATION') throw new OfferValidationError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
       if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
       await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
-      return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+      return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
     }
-    return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+    return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 

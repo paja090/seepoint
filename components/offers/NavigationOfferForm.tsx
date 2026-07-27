@@ -156,6 +156,9 @@ export function NavigationOfferForm({
   );
 
   const [mode, setMode] = useState<'target' | 'point'>(target ? 'point' : 'target');
+  const [proposalMode, setProposalMode] = useState<'LOCATION_SELECTION' | 'PRICED_QUOTE'>(
+    (initialOffer?.navigation as unknown as Record<string, unknown>)?.proposalMode === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION'
+  );
   const [results, setResults] = useState<Array<{ latitude: number; longitude: number; label: string }>>([]);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -443,7 +446,7 @@ export function NavigationOfferForm({
       targetLongitude: target.longitude,
       targetNote,
       internalNote,
-      clientMessage,
+      proposalMode,
       points,
     };
 
@@ -501,6 +504,43 @@ export function NavigationOfferForm({
             <input className="input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
           </Field>
         </section>
+
+        {/* Proposal Mode Toggle Banner */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Režim a fáze návrhu nabídky:</h3>
+              <p className="text-xs text-slate-500">
+                Ve Fázi 1 se klientovi zobrazí pouze nezávazný lokační návrh bodů bez cen. Klient si v odkazu sám zvolí preferované pozice.
+              </p>
+            </div>
+
+            <div className="inline-flex rounded-2xl bg-slate-100 p-1 border border-slate-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => setProposalMode('LOCATION_SELECTION')}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+                  proposalMode === 'LOCATION_SELECTION'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Fáze 1: Návrh rozmístění ZDARMA
+              </button>
+              <button
+                type="button"
+                onClick={() => setProposalMode('PRICED_QUOTE')}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition cursor-pointer ${
+                  proposalMode === 'PRICED_QUOTE'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Fáze 2: Cenová nabídka
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Target Store / Destination */}
         <section className="card space-y-3 border-2 border-sky-100 bg-sky-50/30">
