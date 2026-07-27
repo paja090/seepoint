@@ -71,6 +71,7 @@ export function parseNavigationOfferInput(raw: unknown) {
       routeCalculatedAt: point.routeCalculatedAt ? new Date(String(point.routeCalculatedAt)) : new Date(),
       routeStatus: 'OK' as const,
       arrowDirectionEnum: arrowDir,
+      visualizedPhotoUrl: nullable(text(point.visualizedPhotoUrl)),
     };
   });
   const validUntil = text(input.validUntil);

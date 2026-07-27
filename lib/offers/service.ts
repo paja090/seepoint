@@ -197,6 +197,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         manualDistanceUnit: point.manualDistanceUnit,
         distanceSource: point.distanceSource,
         routePolyline: point.routePolyline,
+        visualizedPhotoUrl: point.visualizedPhotoUrl,
       })),
     } : null,
     cityGallery: row.cityGalleryOffer ? { projectId: row.cityGalleryOffer.projectId, projectTitle: row.cityGalleryOffer.project?.title, concept: row.cityGalleryOffer.concept, locationBrief: row.cityGalleryOffer.locationBrief, realizationNote: row.cityGalleryOffer.realizationNote } : null,

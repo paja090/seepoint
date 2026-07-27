@@ -998,6 +998,7 @@ model NavigationPoint {
   routeCalculatedAt        DateTime?
   routeStatus              NavigationRouteStatus?    @default(OK)
   arrowDirectionEnum       NavigationArrowDirection? @default(STRAIGHT)
+  visualizedPhotoUrl       String?
 
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt

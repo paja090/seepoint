@@ -1,19 +1,38 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Download, Layers, Move, RefreshCw, Upload, X } from 'lucide-react';
+import { Check, Upload, X } from 'lucide-react';
 
-type SignTheme = 'blue' | 'green' | 'yellow' | 'red' | 'dark';
+type SignTheme = 'dark' | 'blue' | 'green' | 'yellow' | 'red';
+
+function getArrowChar(arrowEnum?: string): string {
+  switch (arrowEnum) {
+    case 'LEFT': return '⬅';
+    case 'RIGHT': return '➔';
+    case 'SLANTED_LEFT': return '↖';
+    case 'SLANTED_RIGHT': return '↗';
+    case 'U_TURN': return '↩';
+    case 'TWO_WAY': return '↔';
+    case 'STRAIGHT':
+    default: return '⬆';
+  }
+}
 
 export function NavigationSignVisualizer({
   pointLabel,
   initialSignText,
+  subText: initialSubText,
+  distanceText: initialDistanceText,
+  arrowDirectionEnum,
   orientation,
   onClose,
   onSaveVisualization,
 }: {
   pointLabel: string;
   initialSignText: string;
+  subText?: string;
+  distanceText?: string;
+  arrowDirectionEnum?: string;
   orientation?: string;
   onClose: () => void;
   onSaveVisualization: (dataUrl: string) => void;
@@ -22,16 +41,15 @@ export function NavigationSignVisualizer({
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
 
   // Sign properties
-  const [signText, setSignText] = useState(initialSignText || 'Název prodejny');
-  const [subText, setSubText] = useState('350 m k prodejně');
-  const [arrow, setArrow] = useState(
-    orientation?.includes('vlevo') ? '⬅' : orientation?.includes('rovně') ? '⬆' : '➔',
-  );
-  const [theme, setTheme] = useState<SignTheme>('blue');
+  const [signText, setSignText] = useState(initialSignText || 'NÁZEV ZNAČKY');
+  const [subText, setSubText] = useState(initialSubText || 'Směrová tabule');
+  const [distanceText, setDistanceText] = useState(initialDistanceText || '1,1 km');
+  const [arrow, setArrow] = useState(getArrowChar(arrowDirectionEnum || (orientation?.includes('vlevo') ? 'LEFT' : orientation?.includes('rovně') ? 'STRAIGHT' : 'RIGHT')));
+  const [theme, setTheme] = useState<SignTheme>('dark');
 
   // Sign position & size overlay on canvas
-  const [signX, setSignX] = useState(200);
-  const [signY, setSignY] = useState(150);
+  const [signX, setSignX] = useState(250);
+  const [signY, setSignY] = useState(180);
   const [signScale, setSignScale] = useState(1.0);
   const [signRotation, setSignRotation] = useState(0);
 
@@ -45,7 +63,7 @@ export function NavigationSignVisualizer({
     img.onload = () => setBgImage(img);
     // Standard street/pole background fallback canvas
     img.src =
-      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%23cbd5e1"/><path d="M 0 450 Q 400 380 800 450 L 800 600 L 0 600 Z" fill="%2364748b"/><rect x="480" y="80" width="16" height="520" fill="%23475569"/><circle cx="488" cy="80" fill="%23334155" r="12"/><text x="400" y="250" font-family="sans-serif" font-size="22" font-weight="bold" fill="%23475569" text-anchor="middle">Nahrajte fotku ulice nebo sloupu pro vizualizaci</text></svg>';
+      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%2394a3b8"/><path d="M 0 450 Q 400 380 800 450 L 800 600 L 0 600 Z" fill="%23475569"/><rect x="520" y="40" width="22" height="560" fill="%23334155"/><rect x="526" y="40" width="10" height="560" fill="%2364748b"/><text x="360" y="240" font-family="sans-serif" font-size="20" font-weight="bold" fill="%231e293b" text-anchor="middle">Nahrajte fotku ulice/sloupu pro vizualizaci</text></svg>';
   }, []);
 
   // Handle custom photo upload
@@ -57,8 +75,8 @@ export function NavigationSignVisualizer({
       const img = new Image();
       img.onload = () => {
         setBgImage(img);
-        setSignX(img.width / 2 - 100);
-        setSignY(img.height / 2 - 50);
+        setSignX(img.width / 2 - 50);
+        setSignY(img.height / 2 - 80);
       };
       img.src = event.target?.result as string;
     };
@@ -79,73 +97,105 @@ export function NavigationSignVisualizer({
     // 1. Draw Background Image
     ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
 
-    // 2. Draw Navigation Sign Overlay
+    // 2. Draw Realistic Vertical SeePOINT Pole Navigation Sign
     ctx.save();
     ctx.translate(signX, signY);
     ctx.rotate((signRotation * Math.PI) / 180);
     ctx.scale(signScale, signScale);
 
-    const width = 220;
-    const height = 90;
-    const radius = 12;
+    // Vertical dimensions based on real SeePOINT pole sign
+    const width = 150;
+    const height = 195;
+    const radius = 16;
 
-    // Theme styles
-    let bgGradient = ['#0284c7', '#0369a1'];
-    let textColor = '#ffffff';
-    let borderColor = '#ffffff';
+    // Metallic pole & mounting brackets behind sign
+    ctx.fillStyle = '#64748B';
+    ctx.fillRect(width / 2, -height / 2 + 35, 14, 14);
+    ctx.fillRect(width / 2, height / 2 - 45, 14, 14);
 
-    if (theme === 'green') {
-      bgGradient = ['#059669', '#047857'];
+    // Outer Drop Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 10;
+
+    // Theme plate background
+    let plateBg = ['#1E293B', '#0B0F19'];
+    let textColor = '#FFFFFF';
+    let borderColor = '#94A3B8';
+
+    if (theme === 'blue') {
+      plateBg = ['#0284c7', '#0369a1'];
+    } else if (theme === 'green') {
+      plateBg = ['#059669', '#047857'];
     } else if (theme === 'yellow') {
-      bgGradient = ['#f59e0b', '#d97706'];
+      plateBg = ['#f59e0b', '#d97706'];
       textColor = '#0f172a';
       borderColor = '#0f172a';
     } else if (theme === 'red') {
-      bgGradient = ['#e11d48', '#be123c'];
+      plateBg = ['#e11d48', '#be123c'];
     } else if (theme === 'dark') {
-      bgGradient = ['#1e293b', '#0f172a'];
+      plateBg = ['#182232', '#0A0E17'];
+      borderColor = '#CBD5E1';
     }
 
-    // Sign Board Shadow & Plate
-    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-    ctx.shadowBlur = 15;
-    ctx.shadowOffsetY = 8;
+    const grad = ctx.createLinearGradient(-width / 2, -height / 2, width / 2, height / 2);
+    grad.addColorStop(0, plateBg[0]);
+    grad.addColorStop(1, plateBg[1]);
 
-    const grad = ctx.createLinearGradient(0, 0, width, height);
-    grad.addColorStop(0, bgGradient[0]);
-    grad.addColorStop(1, bgGradient[1]);
-
+    // Draw main plate
     ctx.fillStyle = grad;
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 4;
-
-    // Rounded rectangle path
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
     ctx.roundRect(-width / 2, -height / 2, width, height, radius);
     ctx.fill();
     ctx.shadowColor = 'transparent';
     ctx.stroke();
 
-    // Inner Border Line
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = textColor;
+    // Inner subtle border
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
     ctx.beginPath();
     ctx.roundRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10, radius - 4);
     ctx.stroke();
 
-    // Text & Arrow Content
+    // Top Section: Client Brand / Logo Text
     ctx.fillStyle = textColor;
-    ctx.font = 'bold 16px sans-serif';
+    ctx.font = '900 18px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(signText.toUpperCase(), 0, -height / 2 + 55);
+
+    // Subtext line if present
+    if (subText && subText !== '—') {
+      ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = theme === 'yellow' ? '#1e293b' : '#94a3b8';
+      ctx.fillText(subText.toUpperCase(), 0, -height / 2 + 78);
+    }
+
+    // Bottom Section: Integrated Dark Distance & Direction Badge
+    const badgeHeight = 44;
+    const badgeY = height / 2 - badgeHeight - 12;
+    const badgeWidth = width - 24;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.roundRect(-badgeWidth / 2, badgeY, badgeWidth, badgeHeight, 10);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Text in Badge: Distance + Arrow
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '800 15px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    ctx.fillText(signText, 0, -12);
-
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`${subText} ${arrow}`, 0, 16);
+    ctx.fillText(`${distanceText}    ${arrow}`, 0, badgeY + badgeHeight / 2);
 
     ctx.restore();
-  }, [bgImage, signX, signY, signScale, signRotation, signText, subText, arrow, theme]);
+  }, [bgImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme]);
 
   function handleSave() {
     const canvas = canvasRef.current;
@@ -164,8 +214,8 @@ export function NavigationSignVisualizer({
               🎨
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Foto-vizualizátor navigační cedule</h2>
-              <p className="text-xs text-slate-400">Vložení grafické navigační cedule do fotky pro bod: {pointLabel}</p>
+              <h2 className="text-lg font-bold text-white">Foto-vizualizátor navigační cedule SeePOINT</h2>
+              <p className="text-xs text-slate-400">Vložení navigační cedule do fotky pro bod: {pointLabel}</p>
             </div>
           </div>
 
@@ -209,26 +259,26 @@ export function NavigationSignVisualizer({
             </section>
 
             <section className="space-y-3 border-t border-slate-800 pt-4">
-              <h3 className="text-sm font-bold text-sky-400">2. Text a smer navádění</h3>
+              <h3 className="text-sm font-bold text-sky-400">2. Text a navedení cedule</h3>
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Hlavní text na ceduli</label>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Hlavní název / Značka</label>
                 <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={signText} onChange={(e) => setSignText(e.target.value)} />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Doplňkový text / Vzdálenost</label>
-                <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={subText} onChange={(e) => setSubText(e.target.value)} />
+                <label className="block text-xs font-bold text-slate-400 mb-1">Vzdálenost (km / m)</label>
+                <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={distanceText} onChange={(e) => setDistanceText(e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">Směrová šipka</label>
-                <div className="flex gap-2">
-                  {['⬅', '➔', '⬆', '↗', '↖'].map((item) => (
+                <div className="grid grid-cols-4 gap-1.5">
+                  {['⬆', '➔', '⬅', '↖', '↗', '↩', '↔'].map((item) => (
                     <button
                       key={item}
                       type="button"
                       onClick={() => setArrow(item)}
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl font-bold border transition ${
+                      className={`flex h-9 items-center justify-center rounded-xl font-bold text-base border transition ${
                         arrow === item ? 'bg-sky-600 border-sky-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-300'
                       }`}
                     >
@@ -239,20 +289,20 @@ export function NavigationSignVisualizer({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Barevné provedení cedule</label>
-                <div className="flex gap-2">
+                <label className="block text-xs font-bold text-slate-400 mb-1">Provedení cedule</label>
+                <div className="flex gap-1.5 flex-wrap">
                   {[
+                    { key: 'dark', label: 'Tmavá SeePOINT', bg: 'bg-slate-800' },
                     { key: 'blue', label: 'Modrá', bg: 'bg-sky-600' },
                     { key: 'green', label: 'Zelená', bg: 'bg-emerald-600' },
                     { key: 'yellow', label: 'Žlutá', bg: 'bg-amber-500' },
                     { key: 'red', label: 'Červená', bg: 'bg-rose-600' },
-                    { key: 'dark', label: 'Tmavá', bg: 'bg-slate-800' },
                   ].map((t) => (
                     <button
                       key={t.key}
                       type="button"
                       onClick={() => setTheme(t.key as SignTheme)}
-                      className={`h-8 flex-1 rounded-xl font-bold text-[11px] border transition ${t.bg} ${
+                      className={`h-8 px-2.5 rounded-xl font-bold text-[11px] border transition ${t.bg} ${
                         theme === t.key ? 'ring-2 ring-white border-transparent' : 'border-slate-700 opacity-80'
                       }`}
                     >
@@ -264,7 +314,7 @@ export function NavigationSignVisualizer({
             </section>
 
             <section className="space-y-3 border-t border-slate-800 pt-4">
-              <h3 className="text-sm font-bold text-sky-400">3. Velikost a poloha cedule</h3>
+              <h3 className="text-sm font-bold text-sky-400">3. Velikost a natočení</h3>
               <div>
                 <div className="flex justify-between text-xs font-bold text-slate-400 mb-1">
                   <span>Velikost cedule:</span>
