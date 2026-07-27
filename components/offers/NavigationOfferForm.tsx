@@ -51,16 +51,6 @@ const newId = () =>
     ? crypto.randomUUID()
     : `point-${Date.now()}-${Math.random()}`;
 
-const DIRECTION_PRESETS = [
-  'Obousměrný (A/B)',
-  'Jednosměrný – Směr centrum',
-  'Jednosměrný – Směr výjezd z města',
-  'Jednosměrný – Pravá strana vozovky',
-  'Jednosměrný – Levá strana vozovky',
-  'Směr Kruhový objezd',
-  'Směr Parkoviště / Prodejna',
-];
-
 export function NavigationOfferForm({
   clients,
   initialOffer,
@@ -88,31 +78,31 @@ export function NavigationOfferForm({
 
   const [points, setPoints] = useState<DraftPoint[]>(
     () =>
-      navigation?.points.map((point: any) => ({
-        id: point.id,
-        label: point.label,
-        latitude: point.latitude,
-        longitude: point.longitude,
-        carrierId: point.carrierId ?? null,
-        address: point.address ?? '',
-        navigationType: point.navigationType ?? 'Směrová tabule',
-        variant: point.variant ?? '120x80 cm',
-        orientation: point.orientation ?? '',
+      navigation?.points.map((point: Record<string, unknown>) => ({
+        id: String(point.id),
+        label: String(point.label),
+        latitude: Number(point.latitude),
+        longitude: Number(point.longitude),
+        carrierId: (point.carrierId as string) ?? null,
+        address: String(point.address ?? ''),
+        navigationType: String(point.navigationType ?? 'Směrová tabule'),
+        variant: String(point.variant ?? '120x80 cm'),
+        orientation: String(point.orientation ?? ''),
         quantity: String(point.quantity ?? 1),
         unitPrice: String(point.unitPrice ?? 1500),
         productionPrice: String(point.productionPrice ?? 1200),
         installationPrice: String(point.installationPrice ?? 800),
         removalPrice: String(point.removalPrice ?? 400),
-        internalNote: point.internalNote ?? '',
-        clientNote: point.clientNote ?? '',
-        arrowDirectionEnum: point.arrowDirectionEnum || 'STRAIGHT',
-        pillarNumber: point.pillarNumber ?? '',
-        pillarType: point.pillarType ?? '',
+        internalNote: String(point.internalNote ?? ''),
+        clientNote: String(point.clientNote ?? ''),
+        arrowDirectionEnum: (point.arrowDirectionEnum as DraftPoint['arrowDirectionEnum']) || 'STRAIGHT',
+        pillarNumber: String(point.pillarNumber ?? ''),
+        pillarType: String(point.pillarType ?? ''),
         manualDistanceValue: point.manualDistanceValue ? String(point.manualDistanceValue) : '',
-        manualDistanceUnit: point.manualDistanceUnit || 'METERS',
-        distanceSource: point.distanceSource || 'CALCULATED',
-        routePolyline: point.routePolyline ?? undefined,
-        calculatedDistanceMeters: point.calculatedDistanceMeters ?? undefined,
+        manualDistanceUnit: (point.manualDistanceUnit as DraftPoint['manualDistanceUnit']) || 'METERS',
+        distanceSource: (point.distanceSource as DraftPoint['distanceSource']) || 'CALCULATED',
+        routePolyline: (point.routePolyline as string) ?? undefined,
+        calculatedDistanceMeters: (point.calculatedDistanceMeters as number) ?? undefined,
       })) ?? [],
   );
 
@@ -518,7 +508,7 @@ export function NavigationOfferForm({
                     <select
                       className="input font-bold text-sky-800"
                       value={point.arrowDirectionEnum || 'STRAIGHT'}
-                      onChange={(e) => updatePoint(point.id, { arrowDirectionEnum: e.target.value as any })}
+                      onChange={(e) => updatePoint(point.id, { arrowDirectionEnum: e.target.value as DraftPoint['arrowDirectionEnum'] })}
                     >
                       <option value="STRAIGHT">⬆ Rovně (STRAIGHT)</option>
                       <option value="LEFT">⬅ Vlevo (LEFT)</option>
@@ -552,7 +542,7 @@ export function NavigationOfferForm({
                     <select
                       className="input"
                       value={point.distanceSource || 'CALCULATED'}
-                      onChange={(e) => updatePoint(point.id, { distanceSource: e.target.value as any })}
+                      onChange={(e) => updatePoint(point.id, { distanceSource: e.target.value as DraftPoint['distanceSource'] })}
                     >
                       <option value="CALCULATED">⚡ Automaticky z Google Routes API</option>
                       <option value="MANUAL">✏️ Ručně nastavená vzdálenost</option>
@@ -573,7 +563,7 @@ export function NavigationOfferForm({
                         <select
                           className="input w-20 text-xs font-bold"
                           value={point.manualDistanceUnit || 'METERS'}
-                          onChange={(e) => updatePoint(point.id, { manualDistanceUnit: e.target.value as any })}
+                          onChange={(e) => updatePoint(point.id, { manualDistanceUnit: e.target.value as DraftPoint['manualDistanceUnit'] })}
                         >
                           <option value="METERS">m</option>
                           <option value="KILOMETERS">km</option>
