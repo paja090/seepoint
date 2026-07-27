@@ -36,6 +36,18 @@ export function parseNavigationOfferInput(raw: unknown) {
     const removalPrice = decimal(point.removalPrice, `Demontáž bodu ${index + 1}`);
     const productionPrice = decimal(point.productionPrice, `Výroba bodu ${index + 1}`);
     const subtotal = calculateNavigationPointSubtotal({ quantity, unitPrice, installationPrice, removalPrice, productionPrice });
+    
+    // Parse new Google Maps structured fields
+    const manualDistanceVal = point.manualDistanceValue !== undefined && point.manualDistanceValue !== null && point.manualDistanceValue !== '' 
+      ? decimal(point.manualDistanceValue, `Ruční vzdálenost bodu ${index + 1}`) 
+      : null;
+    const manualDistUnit = text(point.manualDistanceUnit) === 'KILOMETERS' ? ('KILOMETERS' as const) : text(point.manualDistanceUnit) === 'METERS' ? ('METERS' as const) : null;
+    const distSource = text(point.distanceSource) === 'MANUAL' ? ('MANUAL' as const) : ('CALCULATED' as const);
+    
+    const arrowDir = (['LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT', 'U_TURN', 'TWO_WAY'].includes(text(point.arrowDirectionEnum))
+      ? text(point.arrowDirectionEnum)
+      : 'STRAIGHT') as any;
+
     return {
       carrierId: text(point.carrierId) || null, sortOrder: index,
       latitude: coordinate(point.latitude, 'latitude'), longitude: coordinate(point.longitude, 'longitude'),
@@ -43,6 +55,22 @@ export function parseNavigationOfferInput(raw: unknown) {
       navigationType: text(point.navigationType) || 'Směrová tabule', variant: nullable(text(point.variant)), orientation: nullable(text(point.orientation)),
       quantity, unitPrice, subtotal, installationPrice, removalPrice, productionPrice,
       internalNote: nullable(text(point.internalNote)), clientNote: nullable(text(point.clientNote)),
+      
+      // New structured fields
+      pillarNumber: nullable(text(point.pillarNumber)),
+      pillarType: nullable(text(point.pillarType)),
+      calculatedDistanceMeters: typeof point.calculatedDistanceMeters === 'number' ? point.calculatedDistanceMeters : null,
+      manualDistanceValue: manualDistanceVal,
+      manualDistanceUnit: manualDistUnit,
+      distanceSource: distSource,
+      routePolyline: nullable(text(point.routePolyline)),
+      routeProvider: 'GOOGLE_ROUTES' as const,
+      routeDistanceMeters: typeof point.routeDistanceMeters === 'number' ? point.routeDistanceMeters : null,
+      routeDurationSeconds: typeof point.routeDurationSeconds === 'number' ? point.routeDurationSeconds : null,
+      routeTravelMode: 'DRIVING' as const,
+      routeCalculatedAt: point.routeCalculatedAt ? new Date(String(point.routeCalculatedAt)) : new Date(),
+      routeStatus: 'OK' as const,
+      arrowDirectionEnum: arrowDir,
     };
   });
   const validUntil = text(input.validUntil);
@@ -50,7 +78,9 @@ export function parseNavigationOfferInput(raw: unknown) {
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
     validUntil, internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), targetName, targetAddress: text(input.targetAddress),
-    targetLatitude: coordinate(input.targetLatitude, 'latitude'), targetLongitude: coordinate(input.targetLongitude, 'longitude'), targetNote: text(input.targetNote), points,
+    targetLatitude: coordinate(input.targetLatitude, 'latitude'), targetLongitude: coordinate(input.targetLongitude, 'longitude'), targetNote: text(input.targetNote), 
+    googlePlaceId: nullable(text(input.googlePlaceId)), formattedAddress: nullable(text(input.formattedAddress)),
+    points,
   };
 }
 
@@ -77,9 +107,9 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
       if (existing.status !== 'DRAFT') throw new OfferValidationError('Upravovat lze pouze koncept.', 'INVALID_STATUS_TRANSITION');
       await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
-      return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+      return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
     }
-    return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+    return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
