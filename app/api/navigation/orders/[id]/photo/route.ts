@@ -3,7 +3,7 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { attachPointInstallationPhoto } from '@/lib/navigation/navigation-service';
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('navigationProjects');
   if (isApiDenied(authResult)) return authResult;
 
   try {
@@ -21,6 +21,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, photo });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Chyba při nahrávání fotografie realizace.';
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

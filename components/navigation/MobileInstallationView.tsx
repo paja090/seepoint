@@ -36,14 +36,38 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
     const previewUrl = URL.createObjectURL(file);
     setPhotoPreview(previewUrl);
 
-    // Convert file to base64 data URL for photoUrl transmission
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        setPhotoUrl(reader.result);
+    // Compress high-res mobile photo using HTML5 Canvas to avoid payload limits
+    const img = new Image();
+    img.src = previewUrl;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_DIMENSION = 1200;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_DIMENSION) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        }
+      } else {
+        if (height > MAX_DIMENSION) {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        setPhotoUrl(compressedDataUrl);
+      } else {
+        setPhotoUrl(previewUrl);
       }
     };
-    reader.readAsDataURL(file);
   };
 
   async function handleCompleteTask(e: React.FormEvent) {
@@ -69,7 +93,11 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
             note,
           }),
         });
-        if (!res.ok) throw new Error('Nepodařilo se uložit fotku z montáže.');
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Nepodařilo se uložit fotku z montáže.');
+        }
       }
 
       setItems((prev) =>
