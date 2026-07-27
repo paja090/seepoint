@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X } from 'lucide-react';
+import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
@@ -218,12 +218,67 @@ export function NavigationOfferForm({
     return { rental, production, installation, removal, subtotal, tax, totalWithTax };
   }, [points]);
 
-  function mapClick(latitude: number, longitude: number) {
+  async function fetchRouteInfo(
+    originLat: number,
+    originLng: number,
+    destLat?: number,
+    destLng?: number
+  ): Promise<{ calculatedDistanceMeters?: number; routePolyline?: string }> {
+    if (!destLat || !destLng) return {};
+    try {
+      const res = await fetch('/api/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: { latitude: originLat, longitude: originLng },
+          destination: { latitude: destLat, longitude: destLng },
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { status: string; distanceMeters: number; polyline: string };
+        if (data.status === 'OK') {
+          return {
+            calculatedDistanceMeters: data.distanceMeters,
+            routePolyline: data.polyline,
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return {};
+  }
+
+  const [recalculatingRoutes, setRecalculatingRoutes] = useState(false);
+
+  async function recalculateAllRoutes(targetPos?: { latitude: number; longitude: number }) {
+    const activeTarget = targetPos || target;
+    if (!activeTarget || points.length === 0) return;
+    setRecalculatingRoutes(true);
+    try {
+      const updated = await Promise.all(
+        points.map(async (p) => {
+          const routeInfo = await fetchRouteInfo(p.latitude, p.longitude, activeTarget.latitude, activeTarget.longitude);
+          return { ...p, ...routeInfo };
+        })
+      );
+      setPoints(updated);
+    } finally {
+      setRecalculatingRoutes(false);
+    }
+  }
+
+  async function mapClick(latitude: number, longitude: number) {
     if (mode === 'target') {
-      setTarget({ latitude, longitude });
+      const newTarget = { latitude, longitude };
+      setTarget(newTarget);
       setMode('point');
+      void recalculateAllRoutes(newTarget);
       return;
     }
+
+    const routeInfo = target ? await fetchRouteInfo(latitude, longitude, target.latitude, target.longitude) : {};
+
     setPoints((current) => [
       ...current,
       {
@@ -248,6 +303,44 @@ export function NavigationOfferForm({
         manualDistanceValue: '',
         manualDistanceUnit: 'METERS',
         distanceSource: 'CALCULATED',
+        ...routeInfo,
+      },
+    ]);
+  }
+
+  async function handleAddPoint() {
+    setMode('point');
+    const offsetIndex = points.length + 1;
+    const lat = target ? target.latitude + 0.0015 * (offsetIndex % 2 === 0 ? 1 : -1) : 49.82;
+    const lng = target ? target.longitude + 0.0015 * (offsetIndex > 2 ? 1 : -1) : 15.48;
+
+    const routeInfo = target ? await fetchRouteInfo(lat, lng, target.latitude, target.longitude) : {};
+
+    setPoints((current) => [
+      ...current,
+      {
+        id: newId(),
+        label: `Navigační bod ${current.length + 1}`,
+        latitude: lat,
+        longitude: lng,
+        address: '',
+        navigationType: 'Směrová tabule',
+        variant: '120x80 cm',
+        orientation: 'Obousměrný (A/B)',
+        quantity: '1',
+        unitPrice: catalogDefaults.rentalPrice,
+        productionPrice: catalogDefaults.productionPrice,
+        installationPrice: catalogDefaults.installationPrice,
+        removalPrice: catalogDefaults.removalPrice,
+        internalNote: '',
+        clientNote: '',
+        arrowDirectionEnum: 'STRAIGHT',
+        pillarNumber: '',
+        pillarType: 'Sloup VO',
+        manualDistanceValue: '',
+        manualDistanceUnit: 'METERS',
+        distanceSource: 'CALCULATED',
+        ...routeInfo,
       },
     ]);
   }
@@ -449,25 +542,36 @@ export function NavigationOfferForm({
       {/* Main Interactive Map & Navigation Points */}
       <main className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
-                mode === 'point' ? 'bg-sky-600 text-white shadow-xs' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-              onClick={() => setMode('point')}
+              className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 transition flex items-center gap-1.5"
+              onClick={handleAddPoint}
               type="button"
             >
-              <Plus className="mr-1 inline" size={15} /> Přidávat navigační body
+              <Plus size={15} /> + Přidat navigační bod
             </button>
             <button
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
                 mode === 'target' ? 'bg-rose-600 text-white shadow-xs' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
               }`}
               onClick={() => setMode('target')}
               type="button"
             >
-              <Crosshair className="mr-1 inline" size={15} /> Určit cíl (Prodejnu)
+              <Crosshair size={15} /> Určit cíl (Prodejnu)
             </button>
+
+            {target && points.length > 0 && (
+              <button
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5"
+                onClick={() => void recalculateAllRoutes()}
+                disabled={recalculatingRoutes}
+                type="button"
+                title="Přepočítat jízdní trasy pro všechny bodů přes Google Routes API"
+              >
+                <RefreshCw size={14} className={recalculatingRoutes ? 'animate-spin text-sky-600' : ''} />
+                {recalculatingRoutes ? 'Přepočítávám trasy...' : 'Přepočítat reálné trasy'}
+              </button>
+            )}
           </div>
 
           <span className="text-xs font-semibold text-slate-500">
@@ -478,19 +582,20 @@ export function NavigationOfferForm({
         <GoogleNavigationOfferMap
           mode={mode}
           onTargetSelect={(place) => {
-            setTarget({ latitude: place.latitude, longitude: place.longitude });
+            const newTarget = { latitude: place.latitude, longitude: place.longitude };
+            setTarget(newTarget);
             setTargetName(place.label);
             setTargetAddress(place.address);
             setMode('point');
+            void recalculateAllRoutes(newTarget);
           }}
           onMapClick={mapClick}
-          onPointMove={(id, latitude, longitude, calculatedDistanceMeters, polyline) => {
-            updatePoint(id, {
-              latitude,
-              longitude,
-              ...(calculatedDistanceMeters !== undefined ? { calculatedDistanceMeters } : {}),
-              ...(polyline !== undefined ? { routePolyline: polyline } : {}),
-            });
+          onPointMove={async (id, latitude, longitude) => {
+            updatePoint(id, { latitude, longitude });
+            if (target) {
+              const routeInfo = await fetchRouteInfo(latitude, longitude, target.latitude, target.longitude);
+              updatePoint(id, { latitude, longitude, ...routeInfo });
+            }
           }}
           points={points}
           target={target ? { ...target, label: targetName || 'Cíl navigace', address: targetAddress } : undefined}
@@ -500,7 +605,13 @@ export function NavigationOfferForm({
         <section className="space-y-4">
           <div className="flex items-center justify-between border-b pb-3">
             <h2 className="text-xl font-bold text-slate-900">Vytipované navigační body na trase ({points.length})</h2>
-            <p className="text-xs text-slate-500">Kliknutím do mapy výše přidáte nový navigační bod.</p>
+            <button
+              type="button"
+              className="text-xs font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1"
+              onClick={handleAddPoint}
+            >
+              <Plus size={14} /> Přidat dalekosáhlý bod
+            </button>
           </div>
 
           {points.length === 0 ? (
