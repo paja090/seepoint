@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
-import { getRealRouteDistance, formatDistanceText } from '@/lib/routing';
-import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
+import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 
 type ClientOption = {
@@ -16,7 +15,11 @@ type ClientOption = {
   phone?: string | null;
 };
 
-type DraftPoint = NavigationMapPoint & {
+type DraftPoint = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
   address: string;
   navigationType: string;
   variant: string;
@@ -30,22 +33,23 @@ type DraftPoint = NavigationMapPoint & {
   clientNote: string;
   realDistanceText?: string;
   visualizedPhotoUrl?: string;
+  carrierId?: string | null;
+
+  // New structured fields
+  arrowDirectionEnum: 'LEFT' | 'RIGHT' | 'STRAIGHT' | 'SLANTED_LEFT' | 'SLANTED_RIGHT' | 'U_TURN' | 'TWO_WAY';
+  pillarNumber: string;
+  pillarType: string;
+  manualDistanceValue: string;
+  manualDistanceUnit: 'METERS' | 'KILOMETERS';
+  distanceSource: 'CALCULATED' | 'MANUAL';
+  routePolyline?: string;
+  calculatedDistanceMeters?: number;
 };
 
 const newId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `point-${Date.now()}-${Math.random()}`;
-
-const DIRECTION_PRESETS = [
-  'Obousměrný (A/B)',
-  'Jednosměrný – Směr centrum',
-  'Jednosměrný – Směr výjezd z města',
-  'Jednosměrný – Pravá strana vozovky',
-  'Jednosměrný – Levá strana vozovky',
-  'Směr Kruhový objezd',
-  'Směr Parkoviště / Prodejna',
-];
 
 export function NavigationOfferForm({
   clients,
@@ -74,13 +78,31 @@ export function NavigationOfferForm({
 
   const [points, setPoints] = useState<DraftPoint[]>(
     () =>
-      navigation?.points.map((point) => ({
-        ...point,
-        address: point.address ?? '',
-        variant: point.variant ?? '',
-        orientation: point.orientation ?? '',
-        internalNote: point.internalNote ?? '',
-        clientNote: point.clientNote ?? '',
+      navigation?.points.map((point: Record<string, unknown>) => ({
+        id: String(point.id),
+        label: String(point.label),
+        latitude: Number(point.latitude),
+        longitude: Number(point.longitude),
+        carrierId: (point.carrierId as string) ?? null,
+        address: String(point.address ?? ''),
+        navigationType: String(point.navigationType ?? 'Směrová tabule'),
+        variant: String(point.variant ?? '120x80 cm'),
+        orientation: String(point.orientation ?? ''),
+        quantity: String(point.quantity ?? 1),
+        unitPrice: String(point.unitPrice ?? 1500),
+        productionPrice: String(point.productionPrice ?? 1200),
+        installationPrice: String(point.installationPrice ?? 800),
+        removalPrice: String(point.removalPrice ?? 400),
+        internalNote: String(point.internalNote ?? ''),
+        clientNote: String(point.clientNote ?? ''),
+        arrowDirectionEnum: (point.arrowDirectionEnum as DraftPoint['arrowDirectionEnum']) || 'STRAIGHT',
+        pillarNumber: String(point.pillarNumber ?? ''),
+        pillarType: String(point.pillarType ?? ''),
+        manualDistanceValue: point.manualDistanceValue ? String(point.manualDistanceValue) : '',
+        manualDistanceUnit: (point.manualDistanceUnit as DraftPoint['manualDistanceUnit']) || 'METERS',
+        distanceSource: (point.distanceSource as DraftPoint['distanceSource']) || 'CALCULATED',
+        routePolyline: (point.routePolyline as string) ?? undefined,
+        calculatedDistanceMeters: (point.calculatedDistanceMeters as number) ?? undefined,
       })) ?? [],
   );
 
@@ -122,28 +144,6 @@ export function NavigationOfferForm({
     }
     void loadPriceCatalog();
   }, []);
-
-  // Compute real routing distances for points whenever points or target change
-  useEffect(() => {
-    if (!target) return;
-    let isCancelled = false;
-
-    async function updateDistances() {
-      for (const p of points) {
-        if (!p.realDistanceText) {
-          const res = await getRealRouteDistance(p.latitude, p.longitude, target!.latitude, target!.longitude);
-          if (!isCancelled) {
-            setPoints((curr) => curr.map((item) => (item.id === p.id ? { ...item, realDistanceText: res.formattedDistance } : item)));
-          }
-        }
-      }
-    }
-    void updateDistances();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [target, points]);
 
   const selectedClient = clients.find((client) => client.id === clientId);
 
@@ -193,6 +193,12 @@ export function NavigationOfferForm({
         removalPrice: catalogDefaults.removalPrice,
         internalNote: '',
         clientNote: '',
+        arrowDirectionEnum: 'STRAIGHT',
+        pillarNumber: '',
+        pillarType: 'Sloup VO',
+        manualDistanceValue: '',
+        manualDistanceUnit: 'METERS',
+        distanceSource: 'CALCULATED',
       },
     ]);
   }
@@ -410,14 +416,25 @@ export function NavigationOfferForm({
           </span>
         </div>
 
-        <NavigationPointMap
+        <GoogleNavigationOfferMap
           mode={mode}
+          onTargetSelect={(place) => {
+            setTarget({ latitude: place.latitude, longitude: place.longitude });
+            setTargetName(place.label);
+            setTargetAddress(place.address);
+            setMode('point');
+          }}
           onMapClick={mapClick}
-          onPointMove={(id, latitude, longitude) => {
-            updatePoint(id, { latitude, longitude, realDistanceText: undefined });
+          onPointMove={(id, latitude, longitude, calculatedDistanceMeters, polyline) => {
+            updatePoint(id, {
+              latitude,
+              longitude,
+              ...(calculatedDistanceMeters !== undefined ? { calculatedDistanceMeters } : {}),
+              ...(polyline !== undefined ? { routePolyline: polyline } : {}),
+            });
           }}
           points={points}
-          target={target ? { ...target, label: targetName || 'Cíl navigace' } : undefined}
+          target={target ? { ...target, label: targetName || 'Cíl navigace', address: targetAddress } : undefined}
         />
 
         {/* Itemized Points Editor & Photo Visualizer Trigger */}
@@ -486,6 +503,31 @@ export function NavigationOfferForm({
                     <input className="input" value={point.label} onChange={(e) => updatePoint(point.id, { label: e.target.value })} />
                   </Field>
 
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">Směrová šipka (Enum)</label>
+                    <select
+                      className="input font-bold text-sky-800"
+                      value={point.arrowDirectionEnum || 'STRAIGHT'}
+                      onChange={(e) => updatePoint(point.id, { arrowDirectionEnum: e.target.value as DraftPoint['arrowDirectionEnum'] })}
+                    >
+                      <option value="STRAIGHT">⬆ Rovně (STRAIGHT)</option>
+                      <option value="LEFT">⬅ Vlevo (LEFT)</option>
+                      <option value="RIGHT">➔ Vpravo (RIGHT)</option>
+                      <option value="SLANTED_LEFT">↖ Šikmo vlevo (SLANTED_LEFT)</option>
+                      <option value="SLANTED_RIGHT">↗ Šikmo vpravo (SLANTED_RIGHT)</option>
+                      <option value="U_TURN">↩ Otočení (U_TURN)</option>
+                      <option value="TWO_WAY">↔ Obousměrný (TWO_WAY)</option>
+                    </select>
+                  </div>
+
+                  <Field label="Číslo sloupu (pillarNumber)">
+                    <input className="input" placeholder="např. VO #142" value={point.pillarNumber || ''} onChange={(e) => updatePoint(point.id, { pillarNumber: e.target.value })} />
+                  </Field>
+
+                  <Field label="Typ sloupu / konstrukcí">
+                    <input className="input" placeholder="např. Sloup veřejného osvětlení" value={point.pillarType || ''} onChange={(e) => updatePoint(point.id, { pillarType: e.target.value })} />
+                  </Field>
+
                   <Field label="Typ navigačního nosiče">
                     <input className="input" value={point.navigationType} onChange={(e) => updatePoint(point.id, { navigationType: e.target.value })} />
                   </Field>
@@ -494,29 +536,49 @@ export function NavigationOfferForm({
                     <input className="input" value={point.variant} onChange={(e) => updatePoint(point.id, { variant: e.target.value })} />
                   </Field>
 
+                  {/* Distance Source & Values */}
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Orientace / Směr navedení</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1">Zdroj zobrazované vzdálenosti</label>
                     <select
                       className="input"
-                      value={DIRECTION_PRESETS.includes(point.orientation) ? point.orientation : 'custom'}
-                      onChange={(e) => {
-                        if (e.target.value !== 'custom') updatePoint(point.id, { orientation: e.target.value });
-                      }}
+                      value={point.distanceSource || 'CALCULATED'}
+                      onChange={(e) => updatePoint(point.id, { distanceSource: e.target.value as DraftPoint['distanceSource'] })}
                     >
-                      {DIRECTION_PRESETS.map((preset) => (
-                        <option key={preset} value={preset}>
-                          {preset}
-                        </option>
-                      ))}
-                      <option value="custom">Vlastní zadání směru…</option>
+                      <option value="CALCULATED">⚡ Automaticky z Google Routes API</option>
+                      <option value="MANUAL">✏️ Ručně nastavená vzdálenost</option>
                     </select>
-                    <input
-                      className="input mt-1 text-xs"
-                      placeholder="Vpisovaný text směru…"
-                      value={point.orientation}
-                      onChange={(e) => updatePoint(point.id, { orientation: e.target.value })}
-                    />
                   </div>
+
+                  {point.distanceSource === 'MANUAL' ? (
+                    <div>
+                      <label className="block text-xs font-bold text-amber-800 mb-1">Ruční hodnota a jednotka</label>
+                      <div className="flex gap-1">
+                        <input
+                          className="input flex-1"
+                          type="number"
+                          placeholder="250"
+                          value={point.manualDistanceValue || ''}
+                          onChange={(e) => updatePoint(point.id, { manualDistanceValue: e.target.value })}
+                        />
+                        <select
+                          className="input w-20 text-xs font-bold"
+                          value={point.manualDistanceUnit || 'METERS'}
+                          onChange={(e) => updatePoint(point.id, { manualDistanceUnit: e.target.value as DraftPoint['manualDistanceUnit'] })}
+                        >
+                          <option value="METERS">m</option>
+                          <option value="KILOMETERS">km</option>
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1">Vypočtená trasování z Google</label>
+                      <div className="input bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-between">
+                        <span>{point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters} m` : 'Nepočítáno'}</span>
+                        <span className="text-[10px] text-slate-400">Routes API</span>
+                      </div>
+                    </div>
+                  )}
 
                   <Field label="Počet ks">
                     <input className="input" min="0.01" step="0.01" type="number" value={point.quantity} onChange={(e) => updatePoint(point.id, { quantity: e.target.value })} />
