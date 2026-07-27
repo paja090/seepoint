@@ -1,29 +1,21 @@
-import { PrismaClient } from '@prisma/client';
-
+require('dotenv').config({ path: '.env.local' });
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function test() {
-  try {
-    console.log('Testing NavigationOrder list query...');
-    const orders = await prisma.navigationOrder.findMany({
-      take: 5,
-      include: {
-        crmOrder: {
-          include: {
-            client: { select: { id: true, name: true } },
-            assignedUser: { select: { id: true, name: true } },
-          },
-        },
-        points: true,
-        billingPeriods: true,
-      },
-    });
-    console.log('Successfully fetched navigation orders count:', orders.length);
-  } catch (err) {
-    console.error('Error during query:', err);
-  } finally {
-    await prisma.$disconnect();
-  }
+async function main() {
+  const orders = await prisma.navigationOrder.findMany({
+    take: 3,
+    select: { id: true, status: true, plannedInstallationAt: true, installerUserId: true },
+  });
+  console.log('SUCCESS: NavigationOrder query with new columns:', orders);
+
+  const points = await prisma.navigationPoint.findMany({
+    take: 3,
+    select: { id: true, label: true, routeOrder: true, plannedInstallationAt: true, qcStatus: true },
+  });
+  console.log('SUCCESS: NavigationPoint query with new columns:', points);
 }
 
-test();
+main().catch((err) => {
+  console.error('ERROR in DB query:', err);
+}).finally(() => prisma.$disconnect());

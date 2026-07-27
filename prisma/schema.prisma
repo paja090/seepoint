@@ -150,6 +150,44 @@ enum NavigationPointStatus {
   CANCELLED
 }
 
+enum NavigationDistanceSource {
+  CALCULATED
+  MANUAL
+}
+
+enum DistanceUnit {
+  METERS
+  KILOMETERS
+}
+
+enum NavigationRouteProvider {
+  GOOGLE_ROUTES
+  OSRM
+  MANUAL
+}
+
+enum NavigationTravelMode {
+  DRIVING
+  BICYCLING
+  WALKING
+}
+
+enum NavigationRouteStatus {
+  OK
+  NOT_FOUND
+  FAILED
+}
+
+enum NavigationArrowDirection {
+  LEFT
+  RIGHT
+  STRAIGHT
+  SLANTED_LEFT
+  SLANTED_RIGHT
+  U_TURN
+  TWO_WAY
+}
+
 enum CityGalleryProjectStatus {
   DRAFT
   PLANNED
@@ -886,15 +924,17 @@ model Offer {
 }
 
 model NavigationOffer {
-  id              String   @id @default(cuid())
-  offerId         String   @unique
-  targetName      String
-  targetAddress   String?
-  targetLatitude  Float
-  targetLongitude Float
-  targetNote      String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(cuid())
+  offerId          String   @unique
+  targetName       String
+  targetAddress    String?
+  targetLatitude   Float
+  targetLongitude  Float
+  targetNote       String?
+  googlePlaceId    String?
+  formattedAddress String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   offer                          Offer                           @relation(fields: [offerId], references: [id], onDelete: Cascade)
   points                         NavigationPoint[]
@@ -941,6 +981,23 @@ model NavigationPoint {
   issueNote             String?
   qcStatus              String?               @default("PENDING")
   qcNote                String?
+
+  targetLatitude           Float?
+  targetLongitude          Float?
+  pillarNumber             String?
+  pillarType               String?
+  calculatedDistanceMeters Int?
+  manualDistanceValue      Decimal?                  @db.Decimal(10, 2)
+  manualDistanceUnit       DistanceUnit?
+  distanceSource           NavigationDistanceSource  @default(CALCULATED)
+  routePolyline            String?
+  routeProvider            NavigationRouteProvider?  @default(GOOGLE_ROUTES)
+  routeDistanceMeters      Int?
+  routeDurationSeconds     Int?
+  routeTravelMode          NavigationTravelMode?     @default(DRIVING)
+  routeCalculatedAt        DateTime?
+  routeStatus              NavigationRouteStatus?    @default(OK)
+  arrowDirectionEnum       NavigationArrowDirection? @default(STRAIGHT)
 
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
