@@ -47,12 +47,14 @@ export async function computeGoogleRoute(
       polylineQuality: 'OVERVIEW',
     };
 
+    const referer = process.env.APP_URL || 'https://seepoint.cz/';
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
         'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+        'Referer': referer,
       },
       body: JSON.stringify(body),
     });

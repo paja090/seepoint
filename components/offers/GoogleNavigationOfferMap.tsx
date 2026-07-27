@@ -273,6 +273,48 @@ export function GoogleNavigationOfferMap({
           } catch {
             /* fallback */
           }
+        } else if ((googleMaps as unknown as Record<string, unknown>).DirectionsService) {
+          // Compute client-side driving route as instant fallback!
+          try {
+            const gAny = googleMaps as unknown as {
+              DirectionsService: new () => {
+                route: (
+                  req: Record<string, unknown>,
+                  cb: (res: unknown, status: string) => void
+                ) => void;
+              };
+              TravelMode: { DRIVING: string };
+            };
+
+            const ds = new gAny.DirectionsService();
+            ds.route(
+              {
+                origin: pointPos,
+                destination: { lat: target.latitude, lng: target.longitude },
+                travelMode: gAny.TravelMode.DRIVING || 'DRIVING',
+              },
+              (result: unknown, status: string) => {
+                if (status === 'OK' && result) {
+                  const resObj = result as {
+                    routes: Array<{
+                      legs: Array<{ distance?: { value: number } }>;
+                      overview_polyline?: string | { points?: string };
+                    }>;
+                  };
+                  const route = resObj.routes[0];
+                  const distMeters = route?.legs[0]?.distance?.value;
+                  const rawPolyline = route?.overview_polyline;
+                  const polyStr = typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points;
+
+                  if (distMeters && polyStr && !point.calculatedDistanceMeters) {
+                    onPointMove(point.id, point.latitude, point.longitude, distMeters, polyStr);
+                  }
+                }
+              }
+            );
+          } catch {
+            /* ignore */
+          }
         }
 
         const polyline = new googleMaps.Polyline({
