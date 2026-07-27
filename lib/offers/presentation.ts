@@ -71,6 +71,8 @@ export type ProposalOffer = {
   caseStudies: ProposalCaseStudy[];
   conditions: Array<{ id: string; text: string }>;
   navigationTarget?: { name: string; latitude: number; longitude: number } | null;
+  offerType?: string;
+  rawOffer?: OfferView;
 };
 
 export const MEDIA_TYPE_META: Record<ProposalMediaTypeKey, { label: string; tone: ProposalAccentTone; image: string }> = {
@@ -423,5 +425,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       { id: 'production', text: 'Tisk a montáž jsou kalkulovány na základě zvolených nosičů a rozměrů.' },
       { id: 'reservation', text: 'Potvrzením nabídky klientem vzniká závazná objednávka navigační kampaně.' },
     ],
+    offerType: offer.offerType,
+    rawOffer: offer,
   };
 }
