@@ -12,6 +12,7 @@ import {
   RotateCcw,
   MoveHorizontal,
   FileDown,
+  CheckCircle2,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -91,6 +92,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
   );
   const [submittingSelection, setSubmittingSelection] = useState(false);
   const [selectionSubmitted, setSelectionSubmitted] = useState(false);
+  const [graphicApproved, setGraphicApproved] = useState(false);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(
     navigation?.points[0]?.id || null,
   );
@@ -437,6 +439,24 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
             <p className="text-[11px] text-slate-500 pt-1">
               💡 Návrh grafiky cedule bude před výrobou zaslán klientovi k finální korektuře a odsouhlasení.
             </p>
+
+            {/* Interactive Client Graphic Approval Button */}
+            <div className="pt-2">
+              {graphicApproved ? (
+                <div className="rounded-xl border border-emerald-300 bg-emerald-100/90 p-3 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
+                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                  <span>✓ Grafický návrh navigační cedule byl odsouhlasen klientem!</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setGraphicApproved(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 transition shadow-xs cursor-pointer"
+                >
+                  <CheckCircle2 size={16} /> Odsouhlasit a schválit tento grafický návrh
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
