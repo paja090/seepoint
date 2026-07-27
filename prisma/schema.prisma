@@ -338,6 +338,8 @@ model User {
   performedClientMerges           ClientMergeLog[]
   navigationPriceAuditLogs        NavigationPriceAuditLog[]       @relation("NavigationPriceAuditUser")
   navigationPriceVersions         NavigationPriceVersion[]        @relation("NavigationPriceChangedUser")
+  assignedNavigationOrders        NavigationOrder[]               @relation("NavOrderInstaller")
+  assignedNavigationPoints        NavigationPoint[]               @relation("NavPointInstaller")
 }
 
 model UserSession {
@@ -925,6 +927,21 @@ model NavigationPoint {
   internalNote      String?
   clientNote        String?
   status            NavigationPointStatus @default(PLANNED)
+
+  routeOrder            Int?                  @default(0)
+  installerUserId       String?
+  plannedInstallationAt DateTime?
+  arrowDirection        String?
+  roadSide              String?
+  signOrientation       String?
+  distanceValue         Decimal?              @db.Decimal(10, 2)
+  distanceUnit          String?               @default("m")
+  issueReported         Boolean               @default(false)
+  issueType             String?
+  issueNote             String?
+  qcStatus              String?               @default("PENDING")
+  qcNote                String?
+
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
@@ -933,6 +950,7 @@ model NavigationPoint {
   carrier                      AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: SetNull)
   surface                      AdvertisingSurface?           @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
   installedPhoto               Photo?                        @relation("PointInstalledPhoto", fields: [installedPhotoId], references: [id], onDelete: SetNull)
+  installerUser                User?                         @relation("NavPointInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
   priceVersions                NavigationPriceVersion[]
   priceAuditLogs               NavigationPriceAuditLog[]
   navigationDocumentationItems NavigationDocumentationItem[]
@@ -2213,10 +2231,18 @@ model NavigationOrder {
   productionReadyAt  DateTime?
   installedAt        DateTime?
   invoicedAt         DateTime?
+
+  plannedInstallationAt DateTime?
+  installerUserId       String?
+  qcStatus              String?                 @default("PENDING")
+  qcApprovedAt          DateTime?
+  qcApprovedUserId      String?
+
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 
   crmOrder           CrmOrder                  @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  installerUser      User?                     @relation("NavOrderInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
   points             NavigationPoint[]
   billingPeriods     NavigationBillingPeriod[]
 
