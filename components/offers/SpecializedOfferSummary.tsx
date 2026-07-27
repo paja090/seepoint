@@ -1,10 +1,39 @@
-import { GalleryHorizontalEnd, MapPin, MapPinned } from 'lucide-react';
+import { GalleryHorizontalEnd } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
-
-const money = (value: string | null | undefined) => new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK' }).format(Number(value || 0));
+import { NavigationOfferPublicView } from './NavigationOfferPublicView';
 
 export function SpecializedOfferSummary({ offer }: { offer: OfferView }) {
-  if (offer.offerType === 'NAVIGATION' && offer.navigation) return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 bg-gradient-to-r from-sky-50 to-white p-6"><div className="flex items-center gap-3"><span className="rounded-xl bg-sky-100 p-2 text-sky-700"><MapPinned size={21} /></span><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-sky-700">Cíl navigace</p><h2 className="text-xl font-semibold">{offer.navigation.targetName}</h2></div></div><p className="mt-3 text-sm text-slate-600">{offer.navigation.targetAddress || `${offer.navigation.targetLatitude.toFixed(5)}, ${offer.navigation.targetLongitude.toFixed(5)}`}</p></div><div className="grid gap-4 p-6 lg:grid-cols-2">{offer.navigation.points.map((point, index) => <article className="rounded-xl border border-slate-200 p-4" key={point.id}><div className="flex items-start justify-between gap-3"><div className="flex gap-2"><MapPin className="mt-0.5 text-sky-600" size={17} /><div><strong className="text-sm">{index + 1}. {point.label}</strong><p className="mt-1 text-xs text-slate-500">{point.navigationType}{point.variant ? ` · ${point.variant}` : ''}{point.orientation ? ` · ${point.orientation}` : ''}</p></div></div><strong className="text-sm">{money(point.subtotal)}</strong></div><p className="mt-3 text-xs text-slate-500">GPS {point.latitude.toFixed(5)}, {point.longitude.toFixed(5)} · {point.quantity} ks × {money(point.unitPrice)}</p>{point.clientNote && <p className="mt-2 text-sm text-slate-600">{point.clientNote}</p>}</article>)}</div></section>;
-  if (offer.offerType === 'CITY_GALLERY') return <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-3"><span className="rounded-xl bg-fuchsia-100 p-2 text-fuchsia-700"><GalleryHorizontalEnd size={21} /></span><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-fuchsia-700">Galerie venku</p><h2 className="text-xl font-semibold">{offer.cityGallery?.projectTitle || offer.campaignName}</h2></div></div><dl className="mt-6 grid gap-5 md:grid-cols-3"><div><dt className="text-xs font-semibold text-slate-400">Koncept</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.cityGallery?.concept || 'Bude doplněno'}</dd></div><div><dt className="text-xs font-semibold text-slate-400">Lokalita</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.cityGallery?.locationBrief || 'Bude doplněno'}</dd></div><div><dt className="text-xs font-semibold text-slate-400">Realizace</dt><dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.cityGallery?.realizationNote || 'Bude doplněno'}</dd></div></dl></section>;
+  if (offer.offerType === 'NAVIGATION' && offer.navigation) {
+    return <NavigationOfferPublicView offer={offer} />;
+  }
+  if (offer.offerType === 'CITY_GALLERY') {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="rounded-xl bg-fuchsia-100 p-2 text-fuchsia-700">
+            <GalleryHorizontalEnd size={21} />
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[.16em] text-fuchsia-700">Galerie venku</p>
+            <h2 className="text-xl font-semibold">{offer.cityGallery?.projectTitle || offer.campaignName}</h2>
+          </div>
+        </div>
+        <dl className="mt-6 grid gap-5 md:grid-cols-3">
+          <div>
+            <dt className="text-xs font-semibold text-slate-400">Koncept</dt>
+            <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.cityGallery?.concept || 'Bude doplněno'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-400">Lokalita</dt>
+            <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.cityGallery?.locationBrief || 'Bude doplněno'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-400">Realizace</dt>
+            <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{offer.cityGallery?.realizationNote || 'Bude doplněno'}</dd>
+          </div>
+        </dl>
+      </section>
+    );
+  }
   return null;
 }
