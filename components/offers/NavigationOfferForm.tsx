@@ -856,6 +856,9 @@ export function NavigationOfferForm({
       {activePointForVisualizer && (
         <NavigationSignVisualizer
           initialSignText={targetName || activePointForVisualizer.label}
+          subText={activePointForVisualizer.navigationType || 'Směrová tabule'}
+          distanceText={activePointForVisualizer.realDistanceText || (activePointForVisualizer.calculatedDistanceMeters ? (activePointForVisualizer.calculatedDistanceMeters >= 1000 ? `${(activePointForVisualizer.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${activePointForVisualizer.calculatedDistanceMeters} m`) : '1,1 km')}
+          arrowDirectionEnum={activePointForVisualizer.arrowDirectionEnum}
           orientation={activePointForVisualizer.orientation}
           pointLabel={activePointForVisualizer.label}
           onClose={() => setActiveVisualizerPointId(null)}

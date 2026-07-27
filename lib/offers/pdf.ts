@@ -144,7 +144,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
     defaultStyle: { font: 'Roboto', fontSize: 9, color: NAVY, lineHeight: 1.15 },
     header: () => ({
       columns: [
-        { text: 'SeePOINT', bold: true, color: BLUE, fontSize: 12 },
+        { text: 'SeePOINT  •  OUTDOOR & NAVIGAČNÍ REKLAMA', bold: true, color: BLUE, fontSize: 10 },
         { text: `NABÍDKA  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
       ],
       margin: [38, 20, 38, 0],
@@ -203,6 +203,27 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         margin: [0, 0, 0, 8],
       },
       ...(!isNavigation && offer.carriers.length > 18 ? [{ text: `Dalších ${offer.carriers.length - 18} ploch je uvedeno v interaktivní nabídce.`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 12] }] : []),
+
+      // Embedded Visualizations in PDF
+      ...(isNavigation && navigationData && navigationData.points.some((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl)) ? [
+        { text: 'Grafické vizualizace umístění cedulí na trase', style: 'heading', margin: [0, 14, 0, 8] },
+        ...navigationData.points
+          .filter((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl))
+          .map((p, idx) => {
+            const pAny = p as unknown as Record<string, unknown>;
+            const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
+              ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
+              : typeof pAny.calculatedDistanceMeters === 'number'
+                ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
+                : '—';
+            return {
+              stack: [
+                { text: `Bod #${idx + 1}: ${p.label} (${distStr} do cíle)`, bold: true, fontSize: 9.5, color: NAVY, margin: [0, 6, 0, 4] },
+                { image: String(pAny.visualizedPhotoUrl), width: 518, margin: [0, 0, 0, 12] },
+              ],
+            };
+          }),
+      ] : []),
       { text: 'Cenová kalkulace', style: 'heading', pageBreak: 'before' },
       { text: 'Jednotlivé složky ceny jsou načtené z cenového katalogu a v nabídce přehledně oddělené.', color: MUTED, margin: [0, 0, 0, 12] },
       {
