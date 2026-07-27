@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, ArrowRight, ArrowLeft, ArrowUp, ArrowUpRight, ArrowUpLeft, RotateCcw } from 'lucide-react';
+import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';

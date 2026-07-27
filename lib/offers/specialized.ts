@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, NavigationArrowDirection } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import type { CurrentUser } from '@/lib/rbac';
 import { canAccessOffer, canManageOfferRole, OfferValidationError, parseDateOnly, serverOfferAuthor } from './domain';
@@ -45,8 +45,8 @@ export function parseNavigationOfferInput(raw: unknown) {
     const distSource = text(point.distanceSource) === 'MANUAL' ? ('MANUAL' as const) : ('CALCULATED' as const);
     
     const arrowDir = (['LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT', 'U_TURN', 'TWO_WAY'].includes(text(point.arrowDirectionEnum))
-      ? text(point.arrowDirectionEnum)
-      : 'STRAIGHT') as any;
+      ? (text(point.arrowDirectionEnum) as NavigationArrowDirection)
+      : ('STRAIGHT' as NavigationArrowDirection));
 
     return {
       carrierId: text(point.carrierId) || null, sortOrder: index,

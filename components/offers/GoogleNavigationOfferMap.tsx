@@ -1,12 +1,32 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Search, MapPin, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { Search, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
 import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
 
 declare global {
   interface Window {
-    google?: any;
+    google?: {
+      maps: {
+        Map: new (element: HTMLElement, options: Record<string, unknown>) => unknown;
+        Marker: new (options: Record<string, unknown>) => {
+          setMap: (map: unknown) => void;
+          addListener: (event: string, handler: (e: { latLng?: { lat: () => number; lng: () => number } }) => void) => void;
+        };
+        Polyline: new (options: Record<string, unknown>) => {
+          setMap: (map: unknown) => void;
+        };
+        LatLngBounds: new () => {
+          extend: (point: { lat: number; lng: number }) => void;
+        };
+        Point: new (x: number, y: number) => unknown;
+        geometry?: {
+          encoding?: {
+            decodePath: (encoded: string) => Array<{ lat: () => number; lng: () => number }>;
+          };
+        };
+      };
+    };
   }
 }
 
@@ -16,6 +36,14 @@ export type GoogleOfferMapPoint = NavigationMapPoint & {
   pillarType?: string;
   routePolyline?: string;
   calculatedDistanceMeters?: number;
+};
+
+type SearchResultItem = {
+  placeId: string;
+  title: string;
+  subtitle: string;
+  latitude: number;
+  longitude: number;
 };
 
 export function GoogleNavigationOfferMap({
@@ -37,16 +65,16 @@ export function GoogleNavigationOfferMap({
 
   // Places Autocomplete state
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Array<{ placeId: string; title: string; subtitle: string }>>([]);
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [sessionToken, setSessionToken] = useState<string>(() => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `st-${Date.now()}`);
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const polylinesRef = useRef<any[]>([]);
+  const mapRef = useRef<unknown>(null);
+  const markersRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
+  const polylinesRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
 
   // Load Google Maps Script
   useEffect(() => {
@@ -68,7 +96,7 @@ export function GoogleNavigationOfferMap({
 
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
     script.async = true;
     script.onload = () => setMapsLoaded(true);
     script.onerror = () => setLoadError(true);
@@ -86,7 +114,6 @@ export function GoogleNavigationOfferMap({
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        // Fetch geocoding/places predictions
         const res = await fetch(
           `/api/geocode?q=${encodeURIComponent(searchQuery)}&sessiontoken=${sessionToken}`
         );
@@ -94,12 +121,12 @@ export function GoogleNavigationOfferMap({
           const data = await res.json();
           if (Array.isArray(data)) {
             setSearchResults(
-              data.slice(0, 5).map((item: any) => ({
-                placeId: item.placeId || item.id || `loc-${item.latitude}-${item.longitude}`,
-                title: item.label?.split(',')[0] || item.label,
-                subtitle: item.label?.split(',').slice(1).join(',').trim() || '',
-                latitude: item.latitude,
-                longitude: item.longitude,
+              data.slice(0, 5).map((item: Record<string, unknown>) => ({
+                placeId: String(item.placeId || item.id || `loc-${item.latitude}-${item.longitude}`),
+                title: String(item.label || '').split(',')[0] || String(item.label || ''),
+                subtitle: String(item.label || '').split(',').slice(1).join(',').trim() || '',
+                latitude: Number(item.latitude),
+                longitude: Number(item.longitude),
               }))
             );
           }
@@ -118,7 +145,7 @@ export function GoogleNavigationOfferMap({
   }, [searchQuery, sessionToken, apiKey]);
 
   // Select Place Handler
-  const handleSelectPlace = (item: any) => {
+  const handleSelectPlace = (item: SearchResultItem) => {
     onTargetSelect({
       label: item.title,
       address: item.subtitle || item.title,
@@ -128,17 +155,17 @@ export function GoogleNavigationOfferMap({
     });
     setSearchQuery('');
     setSearchResults([]);
-    // Invalidate session token
     setSessionToken(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `st-${Date.now()}`);
   };
 
   // Render Google Map
   useEffect(() => {
-    if (!mapsLoaded || !containerRef.current || !window.google?.maps) return;
+    const googleMaps = window.google?.maps;
+    if (!mapsLoaded || !containerRef.current || !googleMaps) return;
 
     if (!mapRef.current) {
       const center = target ? { lat: target.latitude, lng: target.longitude } : { lat: 49.82, lng: 15.48 };
-      mapRef.current = new window.google.maps.Map(containerRef.current, {
+      const newMap = new googleMaps.Map(containerRef.current, {
         center,
         zoom: target ? 14 : 8,
         mapTypeControl: false,
@@ -146,11 +173,13 @@ export function GoogleNavigationOfferMap({
         fullscreenControl: true,
       });
 
-      mapRef.current.addListener('click', (e: any) => {
+      (newMap as { addListener: (evt: string, fn: (e: { latLng?: { lat: () => number; lng: () => number } }) => void) => void }).addListener('click', (e) => {
         if (e.latLng) {
           onMapClick(e.latLng.lat(), e.latLng.lng());
         }
       });
+
+      mapRef.current = newMap;
     }
 
     const map = mapRef.current;
@@ -161,14 +190,14 @@ export function GoogleNavigationOfferMap({
     markersRef.current = [];
     polylinesRef.current = [];
 
-    const bounds = new window.google.maps.LatLngBounds();
+    const bounds = new googleMaps.LatLngBounds();
 
     // 1. Target Marker (High quality SVG Glowing Brand Pin)
     if (target) {
       const targetPos = { lat: target.latitude, lng: target.longitude };
       bounds.extend(targetPos);
 
-      const targetMarker = new window.google.maps.Marker({
+      const targetMarker = new googleMaps.Marker({
         position: targetPos,
         map,
         title: `CÍL: ${target.label}`,
@@ -180,11 +209,11 @@ export function GoogleNavigationOfferMap({
           strokeColor: '#ffffff',
           strokeWeight: 2,
           scale: 2,
-          anchor: new window.google.maps.Point(12, 22),
+          anchor: new googleMaps.Point(12, 22),
         },
       });
 
-      targetMarker.addListener('dragend', (e: any) => {
+      targetMarker.addListener('dragend', (e) => {
         if (e.latLng) {
           onTargetSelect({
             label: target.label,
@@ -204,7 +233,7 @@ export function GoogleNavigationOfferMap({
       const pointPos = { lat: point.latitude, lng: point.longitude };
       bounds.extend(pointPos);
 
-      const marker = new window.google.maps.Marker({
+      const marker = new googleMaps.Marker({
         position: pointPos,
         map,
         title: point.label,
@@ -222,11 +251,11 @@ export function GoogleNavigationOfferMap({
           strokeColor: '#ffffff',
           strokeWeight: 2,
           scale: 1.8,
-          anchor: new window.google.maps.Point(12, 22),
+          anchor: new googleMaps.Point(12, 22),
         },
       });
 
-      marker.addListener('dragend', (e: any) => {
+      marker.addListener('dragend', (e) => {
         if (e.latLng) {
           onPointMove(point.id, e.latLng.lat(), e.latLng.lng());
         }
@@ -236,16 +265,17 @@ export function GoogleNavigationOfferMap({
 
       // Route polyline to target
       if (target) {
-        let polylinePath = [pointPos, { lat: target.latitude, lng: target.longitude }];
-        if (point.routePolyline && window.google?.maps?.geometry?.encoding) {
+        let polylinePath: Array<{ lat: number; lng: number }> = [pointPos, { lat: target.latitude, lng: target.longitude }];
+        if (point.routePolyline && googleMaps.geometry?.encoding) {
           try {
-            polylinePath = window.google.maps.geometry.encoding.decodePath(point.routePolyline);
+            const decoded = googleMaps.geometry.encoding.decodePath(point.routePolyline);
+            polylinePath = decoded.map((p) => ({ lat: p.lat(), lng: p.lng() }));
           } catch {
-            /* fallback to straight line */
+            /* fallback */
           }
         }
 
-        const polyline = new window.google.maps.Polyline({
+        const polyline = new googleMaps.Polyline({
           path: polylinePath,
           geodesic: true,
           strokeColor: '#0284c7',
@@ -258,10 +288,10 @@ export function GoogleNavigationOfferMap({
       }
     });
 
-    if (points.length > 0 || target) {
-      map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    if ((points.length > 0 || target) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
+      (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, points]);
+  }, [mapsLoaded, target, points, onMapClick, onPointMove, onTargetSelect]);
 
   // Graceful Leaflet Fallback if API key missing or load error
   if (loadError || !apiKey) {
