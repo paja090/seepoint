@@ -299,6 +299,11 @@ export function NavigationSignVisualizer({
               </div>
 
               <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Podtitul / Doplňkový text</label>
+                <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={subText} onChange={(e) => setSubText(e.target.value)} />
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">Grafický podklad / AI logo (670x900 mm)</label>
                 <label className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-sky-700/60 bg-sky-950/30 p-2.5 text-xs font-bold text-sky-300 hover:border-sky-500 hover:bg-sky-900/40 cursor-pointer transition">
                   <Upload size={15} /> {graphicImage ? '✓ Grafický AI podklad nahrán' : '🎨 Nahrát grafiku / AI podklad'}
