@@ -56,6 +56,9 @@ export function NavigationSignVisualizer({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // Custom AI Graphic Artwork overlay state
+  const [graphicImage, setGraphicImage] = useState<HTMLImageElement | null>(null);
+
   // Load a default background placeholder image on mount
   useEffect(() => {
     const img = new Image();
@@ -83,6 +86,19 @@ export function NavigationSignVisualizer({
     reader.readAsDataURL(file);
   }
 
+  // Handle custom graphic artwork / AI logo upload
+  function handleGraphicUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => setGraphicImage(img);
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
   // Draw scene on canvas whenever parameters change
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -97,21 +113,23 @@ export function NavigationSignVisualizer({
     // 1. Draw Background Image
     ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
 
-    // 2. Draw Realistic Vertical SeePOINT Pole Navigation Sign
+    // 2. Draw Technical SeePOINT Pole Navigation Sign (670 mm x 900 mm)
     ctx.save();
     ctx.translate(signX, signY);
     ctx.rotate((signRotation * Math.PI) / 180);
     ctx.scale(signScale, signScale);
 
-    // Vertical dimensions based on real SeePOINT pole sign
-    const width = 150;
-    const height = 195;
+    // Dimensions: 670 mm x 900 mm (exact ratio 0.744)
+    const width = 160;
+    const height = 215;
     const radius = 16;
 
-    // Metallic pole & mounting brackets behind sign
+    // Pole & mounting brackets on right edge (as shown in technical drawing)
     ctx.fillStyle = '#64748B';
-    ctx.fillRect(width / 2, -height / 2 + 35, 14, 14);
-    ctx.fillRect(width / 2, height / 2 - 45, 14, 14);
+    ctx.fillRect(width / 2, -height / 2 + 35, 18, 16);
+    ctx.fillRect(width / 2, height / 2 - 51, 18, 16);
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(width / 2 + 18, -height / 2 - 20, 10, height + 40); // Pole
 
     // Outer Drop Shadow
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
@@ -142,7 +160,7 @@ export function NavigationSignVisualizer({
     grad.addColorStop(0, plateBg[0]);
     grad.addColorStop(1, plateBg[1]);
 
-    // Draw main plate
+    // Draw main plate body
     ctx.fillStyle = grad;
     ctx.strokeStyle = borderColor;
     ctx.lineWidth = 3.5;
@@ -152,33 +170,45 @@ export function NavigationSignVisualizer({
     ctx.shadowColor = 'transparent';
     ctx.stroke();
 
-    // Inner subtle border
+    // Inner Dashed Line for 670mm x 900mm Print Bounds (from technical drawing)
     ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath();
-    ctx.roundRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10, radius - 4);
+    ctx.roundRect(-width / 2 + 14, -height / 2 + 14, width - 28, height - 70, 8);
     ctx.stroke();
+    ctx.setLineDash([]); // Reset dash
 
-    // Top Section: Client Brand / Logo Text
-    ctx.fillStyle = textColor;
-    ctx.font = '900 18px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(signText.toUpperCase(), 0, -height / 2 + 55);
+    // Render Graphic Artwork Image if uploaded
+    if (graphicImage) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(-width / 2 + 15, -height / 2 + 15, width - 30, height - 72, 8);
+      ctx.clip();
+      ctx.drawImage(graphicImage, -width / 2 + 15, -height / 2 + 15, width - 30, height - 72);
+      ctx.restore();
+    } else {
+      // Top Section: Client Brand / Logo Text
+      ctx.fillStyle = textColor;
+      ctx.font = '900 18px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(signText.toUpperCase(), 0, -height / 2 + 60);
 
-    // Subtext line if present
-    if (subText && subText !== '—') {
-      ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = theme === 'yellow' ? '#1e293b' : '#94a3b8';
-      ctx.fillText(subText.toUpperCase(), 0, -height / 2 + 78);
+      // Subtext line if present
+      if (subText && subText !== '—') {
+        ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = theme === 'yellow' ? '#1e293b' : '#94a3b8';
+        ctx.fillText(subText.toUpperCase(), 0, -height / 2 + 85);
+      }
     }
 
-    // Bottom Section: Integrated Dark Distance & Direction Badge
-    const badgeHeight = 44;
-    const badgeY = height / 2 - badgeHeight - 12;
-    const badgeWidth = width - 24;
+    // Bottom Section: Direction Arrow + Distance (matching technical drawing e.g. ⬅  1,3 km)
+    const badgeHeight = 46;
+    const badgeY = height / 2 - badgeHeight - 10;
+    const badgeWidth = width - 20;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.beginPath();
     ctx.roundRect(-badgeWidth / 2, badgeY, badgeWidth, badgeHeight, 10);
     ctx.fill();
@@ -186,16 +216,19 @@ export function NavigationSignVisualizer({
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    // Text in Badge: Distance + Arrow
+    // Arrow + Distance Layout matching drawing (e.g. ⬅ 1,3 km)
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '800 15px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
+    ctx.font = '900 17px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
+    ctx.fillText(arrow, -badgeWidth / 2 + 14, badgeY + badgeHeight / 2);
 
-    ctx.fillText(`${distanceText}    ${arrow}`, 0, badgeY + badgeHeight / 2);
+    ctx.font = '900 15px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(distanceText, badgeWidth / 2 - 12, badgeY + badgeHeight / 2);
 
     ctx.restore();
-  }, [bgImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme]);
+  }, [bgImage, graphicImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme]);
 
   function handleSave() {
     const canvas = canvasRef.current;
@@ -263,6 +296,19 @@ export function NavigationSignVisualizer({
               <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">Hlavní název / Značka</label>
                 <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={signText} onChange={(e) => setSignText(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Podtitul / Doplňkový text</label>
+                <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={subText} onChange={(e) => setSubText(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Grafický podklad / AI logo (670x900 mm)</label>
+                <label className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-sky-700/60 bg-sky-950/30 p-2.5 text-xs font-bold text-sky-300 hover:border-sky-500 hover:bg-sky-900/40 cursor-pointer transition">
+                  <Upload size={15} /> {graphicImage ? '✓ Grafický AI podklad nahrán' : '🎨 Nahrát grafiku / AI podklad'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleGraphicUpload} />
+                </label>
               </div>
 
               <div>

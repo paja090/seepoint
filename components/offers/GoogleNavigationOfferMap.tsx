@@ -25,6 +25,12 @@ declare global {
             decodePath: (encoded: string) => Array<{ lat: () => number; lng: () => number }>;
           };
         };
+        Geocoder?: new () => {
+          geocode: (
+            request: { location: { lat: number; lng: number } },
+            callback: (results: Array<{ formatted_address: string }> | null, status: string) => void
+          ) => void;
+        };
       };
     };
   }
@@ -58,8 +64,8 @@ export function GoogleNavigationOfferMap({
   points: GoogleOfferMapPoint[];
   mode: 'target' | 'point';
   onTargetSelect: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }) => void;
-  onPointMove: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string) => void;
-  onMapClick: (latitude: number, longitude: number) => void;
+  onPointMove: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string, address?: string) => void;
+  onMapClick: (latitude: number, longitude: number, address?: string) => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -182,7 +188,17 @@ export function GoogleNavigationOfferMap({
 
       (newMap as { addListener: (evt: string, fn: (e: { latLng?: { lat: () => number; lng: () => number } }) => void) => void }).addListener('click', (e) => {
         if (e.latLng) {
-          onMapClick(e.latLng.lat(), e.latLng.lng());
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          if (window.google?.maps?.Geocoder) {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+              const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : '';
+              onMapClick(lat, lng, street);
+            });
+          } else {
+            onMapClick(lat, lng);
+          }
         }
       });
 
@@ -222,13 +238,29 @@ export function GoogleNavigationOfferMap({
 
       targetMarker.addListener('dragend', (e) => {
         if (e.latLng) {
-          onTargetSelect({
-            label: target.label,
-            address: target.address || '',
-            latitude: e.latLng.lat(),
-            longitude: e.latLng.lng(),
-            placeId: target.placeId,
-          });
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          if (window.google?.maps?.Geocoder) {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+              const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : target.address;
+              onTargetSelect({
+                label: target.label,
+                address: street || '',
+                latitude: lat,
+                longitude: lng,
+                placeId: target.placeId,
+              });
+            });
+          } else {
+            onTargetSelect({
+              label: target.label,
+              address: target.address || '',
+              latitude: lat,
+              longitude: lng,
+              placeId: target.placeId,
+            });
+          }
         }
       });
 
@@ -264,7 +296,17 @@ export function GoogleNavigationOfferMap({
 
       marker.addListener('dragend', (e) => {
         if (e.latLng) {
-          onPointMove(point.id, e.latLng.lat(), e.latLng.lng());
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          if (window.google?.maps?.Geocoder) {
+            const geocoder = new window.google.maps.Geocoder();
+            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+              const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : ((point as unknown as Record<string, unknown>).address as string | undefined);
+              onPointMove(point.id, lat, lng, undefined, undefined, street);
+            });
+          } else {
+            onPointMove(point.id, lat, lng);
+          }
         }
       });
 

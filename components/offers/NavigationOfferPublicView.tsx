@@ -88,6 +88,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(
     navigation?.points[0]?.id || null,
   );
+  const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
 
   if (!navigation) return null;
 
@@ -252,12 +253,21 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
 
                   {/* Visualizer Photo Preview if available */}
                   {typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl && (
-                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                    <div
+                      className="mt-3 overflow-hidden rounded-xl border border-slate-200 cursor-zoom-in relative group"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveLightboxImage(String(pObj.visualizedPhotoUrl));
+                      }}
+                    >
                       <img
                         src={String(pObj.visualizedPhotoUrl)}
                         alt={`Vizualizace ${point.label}`}
-                        className="h-28 w-full object-cover"
+                        className="h-32 w-full object-cover group-hover:scale-105 transition duration-300"
                       />
+                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-black">
+                        🔍 Kliknutím zvětšíte snímek
+                      </div>
                     </div>
                   )}
                 </article>
@@ -266,6 +276,35 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
           </div>
         </div>
       </div>
+
+      {/* Photo Lightbox Modal */}
+      {activeLightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md cursor-zoom-out"
+          onClick={() => setActiveLightboxImage(null)}
+        >
+          <div
+            className="relative max-h-[92vh] max-w-[92vw] overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={activeLightboxImage}
+              alt="Detail vizualizace"
+              className="max-h-[82vh] max-w-[85vw] object-contain"
+            />
+            <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950 p-4 text-white text-xs font-bold">
+              <span>🔍 Detail fotodokumentace / vizualizace navigační cedule SeePOINT</span>
+              <button
+                type="button"
+                className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700 transition"
+                onClick={() => setActiveLightboxImage(null)}
+              >
+                ✕ Zavřít (Esc)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
