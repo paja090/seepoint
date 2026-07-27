@@ -10,7 +10,7 @@ import {
   NAVIGATION_ORDER_STATUS_COLORS,
   NavigationOrderListItem,
 } from '@/lib/navigation/types';
-import { MapPin, Compass, AlertTriangle, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
+import { MapPin, Compass, ChevronRight } from 'lucide-react';
 
 export function NavigationKanbanView({
   initialOrders,

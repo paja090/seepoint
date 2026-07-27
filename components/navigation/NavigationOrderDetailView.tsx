@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import {
-  Compass,
   MapPin,
   Camera,
   Edit3,
@@ -15,13 +14,9 @@ import {
   Clock,
   ChevronRight,
   ArrowLeft,
-  FileText,
   Calendar,
-  Layers,
-  HelpCircle,
   RotateCcw,
 } from 'lucide-react';
-import { NavigationOrderStatus } from '@prisma/client';
 import type { NavigationOrderDetail, NavigationPointItem } from '@/lib/navigation/types';
 import {
   NAVIGATION_ORDER_STATUS_COLORS,
@@ -31,9 +26,11 @@ import {
 } from '@/lib/navigation/types';
 import Link from 'next/link';
 
+export type NavigationTabKey = 'overview' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
+
 export function NavigationOrderDetailView({ order }: { order: NavigationOrderDetail }) {
   const [currentOrder, setCurrentOrder] = useState<NavigationOrderDetail>(order);
-  const [activeTab, setActiveTab] = useState<'overview' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<NavigationTabKey>('overview');
   const [transitioning, setTransitioning] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -384,7 +381,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id as NavigationTabKey)}
                 className={`pb-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
                   activeTab === tab.id
                     ? 'border-sky-600 text-sky-700'
@@ -666,7 +663,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                       <p className="font-bold text-[11px]">{item.label}</p>
                       {!item.isDone && (
                         <button
-                          onClick={() => setActiveTab(item.tabTarget as any)}
+                          onClick={() => setActiveTab(item.tabTarget as NavigationTabKey)}
                           className="mt-1 text-[10px] font-bold text-amber-800 hover:underline flex items-center gap-0.5"
                         >
                           {item.actionLabel} <ChevronRight size={10} />

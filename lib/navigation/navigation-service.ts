@@ -1,4 +1,4 @@
-import { Prisma, PhotoType, NavigationOrderStatus } from '@prisma/client';
+import { Prisma, PhotoType, NavigationOrderStatus, NavigationBlockStatus } from '@prisma/client';
 import { prisma } from '../db.ts';
 import type { CurrentUser } from '../rbac.ts';
 import {
@@ -158,7 +158,7 @@ export async function listNavigationOrders(
   }
 
   if (filters.blockStatus) {
-    where.blockStatus = filters.blockStatus as any;
+    where.blockStatus = filters.blockStatus as NavigationBlockStatus;
   }
 
   if (user.role === 'SALES') {

@@ -5,18 +5,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  MapPin,
-  Calendar,
   Layers,
-  Filter,
-  Search,
   LayoutGrid,
   List,
-  Map as MapIcon,
-  Phone,
-  User,
   ArrowRight,
-  ExternalLink,
 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
