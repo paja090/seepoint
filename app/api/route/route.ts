@@ -15,7 +15,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Origin and destination coordinates are required.' }, { status: 400 });
     }
 
-    const result = await computeGoogleRoute(body.origin, body.destination, body.travelMode || 'DRIVING');
+    const reqReferer = request.headers.get('referer') || request.headers.get('origin') || undefined;
+    const result = await computeGoogleRoute(body.origin, body.destination, body.travelMode || 'DRIVING', reqReferer);
     return NextResponse.json(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Route calculation failed';
