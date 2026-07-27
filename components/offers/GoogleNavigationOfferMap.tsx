@@ -96,7 +96,7 @@ export function GoogleNavigationOfferMap({
 
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry,marker&loading=async`;
     script.async = true;
     script.onload = () => setMapsLoaded(true);
     script.onerror = () => setLoadError(true);
@@ -171,6 +171,7 @@ export function GoogleNavigationOfferMap({
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: true,
+        mapId: 'DEMO_MAP_ID',
       });
 
       (newMap as { addListener: (evt: string, fn: (e: { latLng?: { lat: () => number; lng: () => number } }) => void) => void }).addListener('click', (e) => {
