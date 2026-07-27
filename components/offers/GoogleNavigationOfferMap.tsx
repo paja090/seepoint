@@ -61,7 +61,7 @@ export function GoogleNavigationOfferMap({
   onPointMove: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string) => void;
   onMapClick: (latitude: number, longitude: number) => void;
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY;
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   // Places Autocomplete state
   const [searchQuery, setSearchQuery] = useState('');
