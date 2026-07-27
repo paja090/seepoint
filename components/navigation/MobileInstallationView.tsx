@@ -1,12 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { Camera, MapPin, CheckCircle2, ExternalLink, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Camera,
+  MapPin,
+  CheckCircle2,
+  ExternalLink,
+  ArrowLeft,
+  AlertTriangle,
+  Navigation as NavigationIcon,
+  RotateCcw,
+  Clock,
+  User,
+  Wifi,
+  ChevronRight,
+} from 'lucide-react';
 import Link from 'next/link';
 
 export type MobileTaskItem = {
   id: string;
   orderNumber: string;
+  clientName: string;
   targetName: string;
   pointId: string;
   label: string;
@@ -15,28 +29,69 @@ export type MobileTaskItem = {
   longitude: number;
   orientation?: string | null;
   navigationType: string;
+  carrierCode?: string | null;
+  surfaceName?: string | null;
   installedPhotoUrl?: string | null;
+  beforePhotoUrl?: string | null;
   status: string;
+  routeOrder?: number;
+  issueReported?: boolean;
+  issueType?: string | null;
+  issueNote?: string | null;
+  plannedInstallationAt?: string | null;
 };
 
-export function MobileInstallationView({ initialItems }: { initialItems: MobileTaskItem[] }) {
-  const [items, setItems] = useState(initialItems);
-  const [activeItem, setActiveItem] = useState<MobileTaskItem | null>(initialItems[0] || null);
+export const ISSUE_TYPES = [
+  'Sloup nebyl nalezen',
+  'Sloup neodpovídá dokumentaci',
+  'Místo je obsazené jiným nájemcem',
+  'Montáž není technicky možná',
+  'Poškozená konstrukce nebo nosič',
+  'Chybí cedule z tisku',
+  'Nesprávný motiv grafiky',
+  'Překážka nebo vegetace v místě',
+  'Jiný provozní problém',
+];
+
+export function MobileInstallationView({
+  initialItems,
+  userName = 'Montážní pracovník',
+}: {
+  initialItems: MobileTaskItem[];
+  userName?: string;
+}) {
+  const [items, setItems] = useState<MobileTaskItem[]>(initialItems);
+  const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'done' | 'issues'>('today');
+  const [activeItem, setActiveItem] = useState<MobileTaskItem | null>(null);
+
+  // Photos state for active task
+  const [beforePhotoUrl, setBeforePhotoUrl] = useState('');
+  const [beforePhotoPreview, setBeforePhotoPreview] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
+  const [showSuccessScreen, setShowSuccessScreen] = useState(false);
 
-  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Field Issue state
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [issueType, setIssueType] = useState(ISSUE_TYPES[0]);
+  const [issueNote, setIssueNote] = useState('');
+  const [issuePhotoUrl, setIssuePhotoUrl] = useState('');
+  const [issuePhotoPreview, setIssuePhotoPreview] = useState<string | null>(null);
 
-    // Show immediate local preview
+  const todayStr = new Date().toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'numeric' });
+
+  // Filtered lists
+  const todayItems = items.filter((i) => i.status !== 'INSTALLED' && !i.issueReported);
+  const upcomingItems = items.filter((i) => i.status === 'WAITING' || i.status === 'PLANNED');
+  const doneItems = items.filter((i) => i.status === 'INSTALLED');
+  const issueItems = items.filter((i) => i.issueReported);
+
+  // Photo handlers with client-side Canvas compression
+  const compressImage = (file: File, callback: (compressedDataUrl: string) => void) => {
     const previewUrl = URL.createObjectURL(file);
-    setPhotoPreview(previewUrl);
-
-    // Compress high-res mobile photo using HTML5 Canvas to avoid payload limits
     const img = new Image();
     img.src = previewUrl;
     img.onload = () => {
@@ -62,19 +117,40 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, width, height);
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
-        setPhotoUrl(compressedDataUrl);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        callback(dataUrl);
       } else {
-        setPhotoUrl(previewUrl);
+        callback(previewUrl);
       }
     };
+  };
+
+  const handleBeforeCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBeforePhotoPreview(URL.createObjectURL(file));
+    compressImage(file, setBeforePhotoUrl);
+  };
+
+  const handleAfterCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoPreview(URL.createObjectURL(file));
+    compressImage(file, setPhotoUrl);
+  };
+
+  const handleIssueCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIssuePhotoPreview(URL.createObjectURL(file));
+    compressImage(file, setIssuePhotoUrl);
   };
 
   async function handleCompleteTask(e: React.FormEvent) {
     e.preventDefault();
     if (!activeItem) return;
     if (!activeItem.installedPhotoUrl && !photoUrl) {
-      setMsg('⚠️ Pro dokončení montáže musíte nahrát nebo vyfotit fotografii instalované plochy.');
+      setMsg('⚠️ Pro dokončení montáže musíte vyfotit fotografii po instalaci.');
       return;
     }
 
@@ -90,7 +166,7 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
             navigationPointId: activeItem.pointId,
             photoUrl,
             photoType: 'AFTER_INSTALLATION',
-            note,
+            note: note || 'Fotografie po instalaci',
           }),
         });
 
@@ -101,197 +177,484 @@ export function MobileInstallationView({ initialItems }: { initialItems: MobileT
       }
 
       setItems((prev) =>
-        prev.map((i) => (i.pointId === activeItem.pointId ? { ...i, status: 'INSTALLED', installedPhotoUrl: photoUrl || i.installedPhotoUrl } : i))
+        prev.map((i) =>
+          i.pointId === activeItem.pointId
+            ? { ...i, status: 'INSTALLED', installedPhotoUrl: photoUrl || i.installedPhotoUrl }
+            : i
+        )
       );
 
-      setMsg('✅ Montáž byla úspěšně označena jako dokončená a fotka z fotoaparátu byla uložena.');
-      setActiveItem(null);
-      setPhotoUrl('');
-      setPhotoPreview(null);
-      setNote('');
+      setShowSuccessScreen(true);
     } catch (err: unknown) {
-      setMsg(err instanceof Error ? err.message : 'Chyba při dokončení montáže.');
+      setMsg(`⚠️ ${err instanceof Error ? err.message : 'Chyba při ukládání.'}`);
     } finally {
       setSubmitting(false);
     }
   }
 
+  async function handleReportIssue(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeItem) return;
+
+    setSubmitting(true);
+    setMsg('');
+
+    try {
+      const res = await fetch(`/api/navigation/orders/${activeItem.id}/issue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          navigationPointId: activeItem.pointId,
+          issueType,
+          issueNote,
+          photoUrl: issuePhotoUrl,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Nepodařilo se nahlásit problém v terénu.');
+      }
+
+      setItems((prev) =>
+        prev.map((i) =>
+          i.pointId === activeItem.pointId
+            ? { ...i, issueReported: true, issueType, issueNote }
+            : i
+        )
+      );
+
+      setShowIssueModal(false);
+      setActiveItem(null);
+      setMsg(`Problém u bodu "${activeItem.label}" byl zaznamenán a předán správci.`);
+    } catch (err: unknown) {
+      setMsg(`⚠️ ${err instanceof Error ? err.message : 'Chyba při hlášení problému.'}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const openNextTask = () => {
+    const remaining = todayItems.filter((i) => i.pointId !== activeItem?.pointId);
+    if (remaining.length > 0) {
+      setActiveItem(remaining[0]);
+      setPhotoUrl('');
+      setPhotoPreview(null);
+      setBeforePhotoUrl('');
+      setBeforePhotoPreview(null);
+      setNote('');
+      setShowSuccessScreen(false);
+    } else {
+      setActiveItem(null);
+      setShowSuccessScreen(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-4 font-sans">
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans pb-12">
       {/* Top Mobile Bar */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-        <Link href="/navigation" className="flex items-center gap-1 text-xs font-bold text-sky-400">
-          <ArrowLeft size={16} /> Zpět do modulu
-        </Link>
-        <span className="text-xs font-bold bg-sky-500/20 text-sky-300 px-3 py-1 rounded-full border border-sky-500/30">
-          📱 Montážní rozhraní
-        </span>
-      </div>
-
-      <div className="py-4">
-        <h1 className="text-xl font-bold text-white">Montážní plán pro terén</h1>
-        <p className="text-xs text-slate-400">Seznam lokalit ke schváleným navigačním instalacím.</p>
-      </div>
-
-      {msg && (
-        <div className="mb-4 rounded-xl bg-slate-800 border border-slate-700 p-3 text-xs font-semibold text-sky-300">
-          {msg}
-        </div>
-      )}
-
-      {/* Task List */}
-      {!activeItem ? (
-        items.length === 0 ? (
-          <div className="p-8 text-center rounded-2xl bg-slate-800/60 border border-slate-800 space-y-3 my-4">
-            <CheckCircle2 size={44} className="mx-auto text-emerald-400 opacity-70" />
-            <h3 className="text-base font-bold text-white">Žádné plánované montáže v terénu</h3>
-            <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-              V systému aktuálně nejsou žádné navigační zakázky ve fázi instalace.
-              Jakmile zakázka v CRM postoupí do fáze „Připraveno k instalaci“, zobrazí se v tomto seznamu.
-            </p>
-            <div className="pt-2">
-              <Link href="/navigation" className="inline-flex items-center gap-1.5 text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-xl transition-all">
-                Přejít na přehled navigačních zakázek
-              </Link>
+      <div className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link href="/navigation" className="p-1 text-slate-400 hover:text-white">
+              <ArrowLeft size={20} />
+            </Link>
+            <div>
+              <span className="text-xs font-bold text-sky-400 flex items-center gap-1">
+                <User size={13} /> {userName}
+              </span>
+              <h1 className="text-sm font-black text-white capitalize">{todayStr}</h1>
             </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {items.map((item, idx) => (
-              <div
-                key={item.pointId}
-                onClick={() => setActiveItem(item)}
-                className="p-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-sky-500 cursor-pointer space-y-2 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-sky-400">#{idx + 1} · {item.orderNumber}</span>
-                  {item.status === 'INSTALLED' ? (
-                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 size={14} /> Hotovo
-                    </span>
-                  ) : (
-                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
-                      ⏳ Čeká na montáž
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-base font-bold text-white">{item.label} ({item.navigationType})</h2>
-                <p className="text-xs text-slate-400 flex items-center gap-1">
-                  <MapPin size={12} className="text-rose-400" /> {item.targetName} {item.address ? `· ${item.address}` : ''}
+
+          <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-800">
+            <Wifi size={13} /> Online 🟢
+          </div>
+        </div>
+      </div>
+
+      {/* Main Container */}
+      <div className="max-w-lg mx-auto p-4 space-y-4">
+        {/* If Active Task Detail is Open */}
+        {activeItem ? (
+          showSuccessScreen ? (
+            /* Success Screen */
+            <div className="rounded-3xl border border-emerald-500/40 bg-emerald-950/40 p-6 text-center space-y-6 animate-fade-in my-8">
+              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <CheckCircle2 size={48} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-white">Montáž úspěšně dokončena!</h2>
+                <p className="text-sm text-slate-300">
+                  Fotografie i údaje o bodu <b>{activeItem.label}</b> byly bezpečně uloženy do systému.
                 </p>
               </div>
-            ))}
-          </div>
-        )
-      ) : (
-        /* Active Task Detail View */
-        <div className="rounded-2xl bg-slate-800 border border-slate-700 p-5 space-y-4">
-          <button
-            onClick={() => setActiveItem(null)}
-            className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1"
-          >
-            ➔ Zpět na seznam úkolů
-          </button>
 
-          <div>
-            <span className="text-xs font-bold text-sky-400">{activeItem.orderNumber}</span>
-            <h2 className="text-xl font-bold text-white">{activeItem.label}</h2>
-            <p className="text-xs text-slate-300">Cíl: {activeItem.targetName}</p>
-          </div>
+              <div className="space-y-3 pt-4">
+                {todayItems.filter((i) => i.pointId !== activeItem.pointId).length > 0 ? (
+                  <button
+                    onClick={openNextTask}
+                    className="w-full btn min-h-[52px] bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-base font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    Další bod na trase <ChevronRight size={20} />
+                  </button>
+                ) : null}
 
-          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-2 text-xs">
-            <p><strong>Typ:</strong> {activeItem.navigationType}</p>
-            <p><strong>Směr:</strong> {activeItem.orientation || 'Neuveden'}</p>
-            <p><strong>GPS:</strong> {activeItem.latitude}, {activeItem.longitude}</p>
-            <a
-              href={`https://www.google.com/maps/search/?api=1&query=${activeItem.latitude},${activeItem.longitude}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 font-bold text-sky-400 underline pt-1"
-            >
-              <ExternalLink size={14} /> Navigovat přes Google Maps
-            </a>
-          </div>
+                <button
+                  onClick={() => {
+                    setActiveItem(null);
+                    setShowSuccessScreen(false);
+                  }}
+                  className="w-full btn min-h-[52px] border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white text-base font-bold rounded-2xl"
+                >
+                  Zpět na dnešní plán 🏠
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Execution Step-by-Step Task Detail */
+            <div className="space-y-4">
+              <button
+                onClick={() => setActiveItem(null)}
+                className="text-xs font-bold text-sky-400 hover:underline flex items-center gap-1"
+              >
+                ← Zpět na seznam bodů
+              </button>
 
-          <form onSubmit={handleCompleteTask} className="space-y-4 pt-2 border-t border-slate-700">
-            <h3 className="text-sm font-bold text-white flex items-center gap-1">
-              <Camera size={16} className="text-teal-400" /> Fotodokumentace z terénu
-            </h3>
+              <div className="rounded-3xl border border-slate-800 bg-slate-950 p-5 space-y-4 shadow-xl">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-xs font-black text-sky-400 bg-sky-950 px-2.5 py-1 rounded-md border border-sky-800">
+                      {activeItem.orderNumber}
+                    </span>
+                    <h2 className="text-lg font-black text-white mt-2">{activeItem.label}</h2>
+                    <p className="text-xs text-slate-400">Klient: <b className="text-slate-200">{activeItem.clientName}</b></p>
+                    <p className="text-xs text-slate-400">Cíl: <b className="text-slate-200">{activeItem.targetName}</b></p>
+                  </div>
 
-            {/* Direct Mobile Camera Button & Preview */}
-            {photoPreview ? (
-              <div className="relative rounded-2xl overflow-hidden border border-emerald-500/50 bg-slate-900 p-2 space-y-2 text-center">
-                <img
-                  src={photoPreview}
-                  alt="Náhled pořízené fotky"
-                  className="w-full h-48 object-cover rounded-xl border border-slate-800"
-                />
-                <div className="flex items-center justify-between px-2 pb-1">
-                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 size={14} /> Fotka pořízena
-                  </span>
-                  <label className="text-xs font-bold text-sky-400 cursor-pointer hover:underline">
-                    📷 Vyfotit znovu
+                  <button
+                    onClick={() => setShowIssueModal(true)}
+                    className="btn border border-amber-800/80 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1"
+                  >
+                    <AlertTriangle size={14} /> Nahlásit problém
+                  </button>
+                </div>
+
+                {/* Step 1: Navigation */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                    <span className="flex items-center gap-1.5"><MapPin size={16} className="text-rose-500" /> Adresa & GPS</span>
+                    <span>{activeItem.navigationType}</span>
+                  </div>
+                  <p className="text-xs text-slate-400">{activeItem.address || 'Adresa neuvedena'}</p>
+
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${activeItem.latitude},${activeItem.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full btn min-h-[48px] bg-sky-600 hover:bg-sky-500 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2"
+                  >
+                    <NavigationIcon size={18} /> Spustit navigaci na místo
+                  </a>
+                </div>
+
+                {/* Step 2: Fyzický sloup / Nosič */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-2 text-xs">
+                  <span className="font-bold text-slate-300 block">Fyzické ověření sloupu / nosiče</span>
+                  {activeItem.carrierCode ? (
+                    <span className="inline-block text-xs font-bold text-sky-300 bg-sky-950 px-2.5 py-1 rounded-md border border-sky-800">
+                      Nosič: {activeItem.carrierCode} {activeItem.surfaceName ? `(${activeItem.surfaceName})` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">Plánovaný bod bez nosiče</span>
+                  )}
+                  {activeItem.orientation && (
+                    <p className="text-slate-400 mt-1">Směr cedule: <b>{activeItem.orientation}</b></p>
+                  )}
+                </div>
+
+                {/* Step 3: Fotodokumentace PŘED a PO montáži */}
+                <form onSubmit={handleCompleteTask} className="space-y-4 pt-2">
+                  <div className="space-y-3">
+                    <label className="block text-xs font-bold text-slate-300 uppercase">
+                      1. Fotografovat PŘED montáží (Volitelné)
+                    </label>
+                    {beforePhotoPreview ? (
+                      <div className="relative aspect-video rounded-2xl overflow-hidden border border-slate-700 bg-slate-900">
+                        <img src={beforePhotoPreview} alt="Před" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBeforePhotoPreview(null);
+                            setBeforePhotoUrl('');
+                          }}
+                          className="absolute bottom-2 right-2 bg-slate-950/80 text-xs font-bold text-white px-3 py-1.5 rounded-xl border border-slate-700"
+                        >
+                          Vyfotit znovu
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center min-h-[90px] rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/40 hover:bg-slate-900 cursor-pointer text-slate-400">
+                        <Camera size={24} />
+                        <span className="text-xs font-bold mt-1">Vyfotit stav PŘED montáží</span>
+                        <input type="file" accept="image/*" capture="environment" onChange={handleBeforeCapture} className="hidden" />
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-xs font-bold text-emerald-400 uppercase">
+                      2. Fotografovat PO montáži (Povinné *)
+                    </label>
+                    {photoPreview ? (
+                      <div className="relative aspect-video rounded-2xl overflow-hidden border-2 border-emerald-500 bg-slate-900">
+                        <img src={photoPreview} alt="Po" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoPreview(null);
+                            setPhotoUrl('');
+                          }}
+                          className="absolute bottom-2 right-2 bg-slate-950/80 text-xs font-bold text-white px-3 py-1.5 rounded-xl border border-slate-700"
+                        >
+                          Vyfotit znovu
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center min-h-[120px] rounded-2xl border-2 border-dashed border-emerald-500/60 bg-emerald-950/20 hover:bg-emerald-950/40 cursor-pointer text-emerald-400">
+                        <Camera size={32} />
+                        <span className="text-sm font-bold mt-1">Stisknout pro vyfocení instalované cedule</span>
+                        <input type="file" accept="image/*" capture="environment" onChange={handleAfterCapture} className="hidden" />
+                      </label>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Montážní poznámka</label>
                     <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleCameraCapture}
-                      className="hidden"
+                      type="text"
+                      placeholder="např. Uchyceno na 2 nerez pásky Bandimex..."
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      className="w-full rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
                     />
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-2.5 p-6 rounded-2xl border-2 border-dashed border-sky-500/40 bg-sky-950/20 hover:bg-sky-900/30 cursor-pointer transition-all text-center group active:scale-98">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleCameraCapture}
-                  className="hidden"
-                />
-                <div className="w-14 h-14 rounded-full bg-sky-500/20 text-sky-400 group-hover:scale-110 flex items-center justify-center transition-all border border-sky-400/30 shadow-lg shadow-sky-500/10">
-                  <Camera size={28} />
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-white block">📷 Vyfotit mobilním telefonem</span>
-                  <span className="text-xs text-sky-300/70">Kliknutím spustíte fotoaparát v telefonu</span>
-                </div>
-              </label>
-            )}
+                  </div>
 
-            {!photoPreview && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Nebo vložte URL / odkaz na fotku</label>
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={photoUrl}
-                  onChange={(e) => setPhotoUrl(e.target.value)}
-                  className="w-full rounded-xl bg-slate-900 border border-slate-700 p-3 text-xs text-white"
-                />
+                  {msg && <div className="text-xs font-bold text-amber-400">{msg}</div>}
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full btn min-h-[56px] bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-base font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <CheckCircle2 size={22} /> {submitting ? 'Ukládám...' : 'Potvrdit dokončení montáže bodu'}
+                  </button>
+                </form>
               </div>
-            )}
+            </div>
+          )
+        ) : (
+          /* Home Dashboard & Tasks List */
+          <div className="space-y-4">
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
+                <span className="text-slate-400 block text-[10px] uppercase font-bold">Celkem</span>
+                <span className="text-lg font-black text-white">{items.length}</span>
+              </div>
+              <div className="rounded-2xl border border-sky-800/80 bg-sky-950/40 p-3">
+                <span className="text-sky-400 block text-[10px] uppercase font-bold">Zbývá</span>
+                <span className="text-lg font-black text-sky-300">{todayItems.length}</span>
+              </div>
+              <div className="rounded-2xl border border-emerald-800/80 bg-emerald-950/40 p-3">
+                <span className="text-emerald-400 block text-[10px] uppercase font-bold">Hotovo</span>
+                <span className="text-lg font-black text-emerald-300">{doneItems.length}</span>
+              </div>
+              <div className="rounded-2xl border border-amber-800/80 bg-amber-950/40 p-3">
+                <span className="text-amber-400 block text-[10px] uppercase font-bold">Problémy</span>
+                <span className="text-lg font-black text-amber-300">{issueItems.length}</span>
+              </div>
+            </div>
+
+            {/* Mobile Navigation Tabs */}
+            <div className="flex rounded-2xl bg-slate-950 p-1 border border-slate-800 text-xs font-bold">
+              <button
+                onClick={() => setActiveTab('today')}
+                className={`flex-1 py-2.5 rounded-xl transition-all ${
+                  activeTab === 'today' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-400'
+                }`}
+              >
+                Dnes ({todayItems.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('upcoming')}
+                className={`flex-1 py-2.5 rounded-xl transition-all ${
+                  activeTab === 'upcoming' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-400'
+                }`}
+              >
+                Další ({upcomingItems.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('done')}
+                className={`flex-1 py-2.5 rounded-xl transition-all ${
+                  activeTab === 'done' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400'
+                }`}
+              >
+                Hotovo ({doneItems.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('issues')}
+                className={`flex-1 py-2.5 rounded-xl transition-all ${
+                  activeTab === 'issues' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-400'
+                }`}
+              >
+                Problémy ({issueItems.length})
+              </button>
+            </div>
+
+            {/* List of Tasks */}
+            <div className="space-y-3">
+              {(activeTab === 'today' ? todayItems : activeTab === 'upcoming' ? upcomingItems : activeTab === 'done' ? doneItems : issueItems).length === 0 ? (
+                <div className="rounded-3xl border border-slate-800 bg-slate-950 p-8 text-center text-slate-500">
+                  <CheckCircle2 size={40} className="mx-auto mb-2 text-slate-700" />
+                  <p className="font-bold text-slate-300">Žádné body v této sekci</p>
+                </div>
+              ) : (
+                (activeTab === 'today' ? todayItems : activeTab === 'upcoming' ? upcomingItems : activeTab === 'done' ? doneItems : issueItems).map((item, idx) => (
+                  <div
+                    key={item.pointId}
+                    className="rounded-3xl border border-slate-800 bg-slate-950 p-4 space-y-3 shadow-md"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-sky-950 text-sky-300 border border-sky-800 w-6 h-6 flex items-center justify-center text-xs font-black">
+                          {idx + 1}
+                        </span>
+                        <div>
+                          <span className="text-xs font-black text-sky-400">{item.orderNumber}</span>
+                          <h3 className="font-bold text-white text-base leading-tight">{item.label}</h3>
+                        </div>
+                      </div>
+
+                      {item.status === 'INSTALLED' ? (
+                        <span className="text-xs font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800">
+                          ✓ Namontováno
+                        </span>
+                      ) : item.issueReported ? (
+                        <span className="text-xs font-bold text-amber-400 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-800">
+                          ⚠️ Problém
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <p>Klient: <b className="text-slate-200">{item.clientName}</b></p>
+                      <p className="flex items-center gap-1">
+                        <MapPin size={13} className="text-rose-500 shrink-0" /> {item.address || item.targetName}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between gap-2">
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${item.latitude},${item.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn border border-slate-800 bg-slate-900 hover:bg-slate-800 text-sky-400 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1"
+                      >
+                        <NavigationIcon size={14} /> Navigovat
+                      </a>
+
+                      <button
+                        onClick={() => {
+                          setActiveItem(item);
+                          setPhotoUrl('');
+                          setPhotoPreview(null);
+                          setBeforePhotoUrl('');
+                          setBeforePhotoPreview(null);
+                          setNote('');
+                        }}
+                        className="btn bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-sm"
+                      >
+                        Otevřít úkol <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Field Issue Modal */}
+      {showIssueModal && activeItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+          <form onSubmit={handleReportIssue} className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4 text-slate-100">
+            <h3 className="text-lg font-black text-amber-400 flex items-center gap-2">
+              <AlertTriangle size={20} /> Nahlásit problém v terénu
+            </h3>
+            <p className="text-xs text-slate-400">
+              Bod <b>{activeItem.label}</b> nebyl namontován z důvodu překážky nebo závady.
+            </p>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Poznámka instalatéra</label>
-              <input
-                type="text"
-                placeholder="např. Montáž proběhla na pravý sloup osvětlení..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="w-full rounded-xl bg-slate-900 border border-slate-700 p-3 text-xs text-white"
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Typ problému</label>
+              <select
+                value={issueType}
+                onChange={(e) => setIssueType(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs font-semibold text-white"
+              >
+                {ISSUE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Popis závady nebo překážky</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Stručně popište situaci v terénu..."
+                value={issueNote}
+                onChange={(e) => setIssueNote(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-white focus:border-sky-500 focus:outline-none"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 font-bold text-sm text-white rounded-xl shadow-lg flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 size={18} /> {submitting ? 'Ukládám...' : 'Potvrdit dokončení montáže'}
-            </button>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1">Fotografie problému</label>
+              {issuePhotoPreview ? (
+                <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
+                  <img src={issuePhotoPreview} alt="Závada" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950 hover:bg-slate-900 cursor-pointer text-slate-400 text-xs font-bold">
+                  <Camera size={20} />
+                  <span className="mt-1">Vyfotit závadu v terénu</span>
+                  <input type="file" accept="image/*" capture="environment" onChange={handleIssueCapture} className="hidden" />
+                </label>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowIssueModal(false)}
+                className="btn border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-bold px-4 py-2.5 rounded-xl"
+              >
+                Zrušit
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-black px-4 py-2.5 rounded-xl"
+              >
+                Odeslat hlášení problému
+              </button>
+            </div>
           </form>
         </div>
       )}
