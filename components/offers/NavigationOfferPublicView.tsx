@@ -376,7 +376,8 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
       </div>
 
       {/* Graphic Artwork Proof Section (670 x 900 mm) */}
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+      {(navigation as unknown as Record<string, unknown>).includeGraphicProof !== false && (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 font-extrabold text-lg">
@@ -497,6 +498,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Photo Lightbox Modal */}
       {activeLightboxImage && (
