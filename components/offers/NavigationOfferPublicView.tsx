@@ -13,6 +13,7 @@ import {
   MoveHorizontal,
   FileDown,
   CheckCircle2,
+  ClipboardList,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -205,6 +206,16 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
               className="inline-flex items-center gap-2.5 rounded-2xl bg-sky-500 px-5 py-3.5 text-xs font-black text-slate-950 shadow-lg hover:bg-sky-400 transition cursor-pointer shrink-0"
             >
               <FileDown size={18} /> Stáhnout PDF nabídku
+            </a>
+
+            <a
+              href={`/api/proposals/${offer.id}/installation-sheet`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2.5 rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3.5 text-xs font-bold text-slate-200 shadow-lg hover:bg-slate-800 transition cursor-pointer shrink-0"
+              title="Stáhnout montážní protokol s GPS a sloupky VO pro instalační techniky"
+            >
+              <ClipboardList size={18} className="text-amber-400" /> Montážní list
             </a>
           </div>
         </div>

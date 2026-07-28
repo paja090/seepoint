@@ -726,6 +726,17 @@ export function NavigationOfferForm({
           {saving ? 'Ukládám nabídku…' : 'Uložit nabídku navigace'}
         </button>
 
+        {initialOffer?.id && (
+          <a
+            href={`/api/proposals/${initialOffer.id}/installation-sheet`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-950 hover:bg-amber-100 transition shadow-xs cursor-pointer"
+          >
+            📋 Stáhnout Montážní list pro techniky (PDF)
+          </a>
+        )}
+
         {message && <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 border border-amber-200" role="alert">{message}</p>}
       </aside>
 

@@ -260,3 +260,155 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
   };
   return pdfMake.createPdf(definition).getBuffer();
 }
+
+export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<Buffer> {
+  configurePdfMake();
+
+  const navigationData = offer.rawOffer?.navigation;
+  let staticMapDataUrl: string | undefined = undefined;
+
+  if (navigationData) {
+    const markers = [
+      { lat: navigationData.targetLatitude, lng: navigationData.targetLongitude, color: 'red', label: 'T' },
+      ...navigationData.points.map((p, idx) => ({
+        lat: p.latitude,
+        lng: p.longitude,
+        color: 'blue',
+        label: String(idx + 1),
+      })),
+    ];
+    staticMapDataUrl = await fetchStaticMapDataUrl({ markers, size: '600x260' });
+  }
+
+  const dateStr = new Date().toLocaleDateString('cs-CZ');
+
+  const pointRows = navigationData?.points.map((p, idx) => {
+    const pAny = p as unknown as Record<string, unknown>;
+    const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
+      ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
+      : typeof pAny.calculatedDistanceMeters === 'number'
+        ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
+        : '—';
+
+    return [
+      { text: `#${idx + 1}`, bold: true, alignment: 'center' },
+      { text: `${p.label}\n${safe(p.address)}`, fontSize: 8 },
+      { text: safe(String(pAny.pillarNumber || '—')), alignment: 'center', bold: true },
+      { text: `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`, fontSize: 7.5, color: MUTED },
+      { text: formatArrowDirectionPdf(String(pAny.arrowDirectionEnum || 'STRAIGHT')), fontSize: 8 },
+      { text: distStr, fontSize: 8, alignment: 'center' },
+      { text: '[   ] Splněno', fontSize: 8, bold: true, alignment: 'center' },
+    ];
+  }) || [];
+
+  const definition = {
+    info: { title: `Montážní list - ${offer.title}`, author: 'SeePOINT', subject: 'Montážní protokol a instrukce pro techniky' },
+    pageSize: 'A4',
+    pageMargins: [38, 38, 38, 38],
+    defaultStyle: { font: 'Roboto', fontSize: 9, color: NAVY, lineHeight: 1.15 },
+    header: () => ({
+      columns: [
+        { text: 'SeePOINT  •  MONTÁŽNÍ PROTOKOL & TISKOVÉ DATA', bold: true, color: BLUE, fontSize: 9 },
+        { text: `MONT-LIST  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
+      ],
+      margin: [38, 16, 38, 0],
+    }),
+    footer: (currentPage: number, pageCount: number) => ({
+      columns: [
+        { text: 'SeePOINT s.r.o.  •  Technické oddělení a montáže', color: MUTED, fontSize: 7.5 },
+        { text: `Strana ${currentPage} z ${pageCount}`, alignment: 'right', color: MUTED, fontSize: 7.5 },
+      ],
+      margin: [38, 0, 38, 14],
+    }),
+    content: [
+      {
+        table: {
+          widths: ['*', 140],
+          body: [[
+            { stack: [
+              { text: 'MONTÁŽNÍ LIST A PROTOKOL UMÍSTĚNÍ', color: BLUE, bold: true, fontSize: 9 },
+              { text: offer.title, fontSize: 18, bold: true, color: NAVY, margin: [0, 4, 0, 2] },
+              { text: `Klient: ${offer.client.name}  •  Vygenerováno: ${dateStr}`, fontSize: 9, color: MUTED },
+            ], margin: [12, 10, 8, 10] },
+            { stack: [
+              { text: 'CÍLOVÁ PROVOZOVNA', fontSize: 7.5, color: MUTED },
+              { text: safe(navigationData?.targetName), bold: true, fontSize: 10, margin: [0, 2, 0, 0] },
+              { text: safe(navigationData?.targetAddress), fontSize: 8, color: MUTED },
+            ], margin: [8, 10, 12, 10] },
+          ]],
+        },
+        layout: { fillColor: LIGHT, hLineColor: () => LIGHT, vLineColor: () => LIGHT },
+        margin: [0, 0, 0, 14],
+      },
+
+      ...(staticMapDataUrl ? [{ image: staticMapDataUrl, width: 518, margin: [0, 0, 0, 14] }] : []),
+
+      { text: 'Seznam navigačních bodů pro montáž na sloupy VO', style: 'heading' },
+      {
+        table: {
+          headerRows: 1,
+          widths: [24, '*', 45, 90, 75, 45, 60],
+          body: [
+            [
+              { text: 'Bod', style: 'tableHeader', alignment: 'center' },
+              { text: 'Název a adresa pozice', style: 'tableHeader' },
+              { text: 'Sloup VO', style: 'tableHeader', alignment: 'center' },
+              { text: 'GPS Souřadnice', style: 'tableHeader' },
+              { text: 'Směr šipky', style: 'tableHeader' },
+              { text: 'Do cíle', style: 'tableHeader', alignment: 'center' },
+              { text: 'Stav', style: 'tableHeader', alignment: 'center' },
+            ],
+            ...pointRows,
+          ],
+        },
+        layout: { fillColor: (rowIndex: number) => rowIndex === 0 ? NAVY : rowIndex % 2 === 0 ? '#F8FAFC' : null, hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0', paddingTop: () => 5, paddingBottom: () => 5 },
+        margin: [0, 0, 0, 14],
+      },
+
+      // Visualized photos of points for installers
+      ...(navigationData && navigationData.points.some((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl)) ? [
+        { text: 'Fotodokumentace a přesný zákres umístění cedulí', style: 'heading', pageBreak: 'before' },
+        ...navigationData.points
+          .filter((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl))
+          .map((p, idx) => {
+            const pAny = p as unknown as Record<string, unknown>;
+            return {
+              stack: [
+                { text: `Bod #${idx + 1}: ${p.label} (Sloup VO č. ${safe(String(pAny.pillarNumber || '—'))})`, bold: true, fontSize: 10, color: NAVY, margin: [0, 8, 0, 4] },
+                { text: `GPS: ${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}  •  Směr šipky: ${formatArrowDirectionPdf(String(pAny.arrowDirectionEnum || 'STRAIGHT'))}`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 6] },
+                { image: String(pAny.visualizedPhotoUrl), width: 518, margin: [0, 0, 0, 14] },
+              ],
+            };
+          }),
+      ] : []),
+
+      // Protocol Confirmation Box
+      {
+        table: {
+          widths: ['*'],
+          body: [[
+            { stack: [
+              { text: 'PŘEDÁVACÍ PROTOKOL O DOKONČENÍ MONTÁŽE', bold: true, fontSize: 10, color: NAVY, margin: [0, 0, 0, 6] },
+              { text: 'Tento protokol stvrzuje řádnou instalaci navigačních prvků SeePOINT v souladu s vyhláškou a specifikací.', fontSize: 8, color: MUTED, margin: [0, 0, 0, 10] },
+              {
+                columns: [
+                  { stack: [{ text: 'Montážní četa / Technik:', fontSize: 8, color: MUTED }, { text: '_______________________________', margin: [0, 4, 0, 0] }] },
+                  { stack: [{ text: 'Datum dokončení:', fontSize: 8, color: MUTED }, { text: '____. ____. 2026', margin: [0, 4, 0, 0] }] },
+                  { stack: [{ text: 'Podpis technika:', fontSize: 8, color: MUTED }, { text: '_______________________________', margin: [0, 4, 0, 0] }] },
+                ],
+              },
+            ], margin: [12, 10, 12, 10] },
+          ]],
+        },
+        layout: { fillColor: '#F8FAFC', hLineColor: () => '#CBD5E1', vLineColor: () => '#CBD5E1' },
+        margin: [0, 10, 0, 0],
+      },
+    ],
+    styles: {
+      heading: { fontSize: 13, bold: true, color: NAVY, margin: [0, 0, 0, 8] },
+      tableHeader: { color: '#FFFFFF', bold: true, fontSize: 8 },
+    },
+  };
+
+  return pdfMake.createPdf(definition).getBuffer();
+}
