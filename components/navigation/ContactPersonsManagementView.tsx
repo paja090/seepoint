@@ -139,7 +139,7 @@ export function ContactPersonsManagementView({
 
         {initialContacts.length === 0 && (
           <div className="col-span-full rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 font-medium">
-            Zatím nebyla přidána žádná kontaktní osoba. Klikněte na "Přidat kontaktní osobu".
+            Zatím nebyla přidána žádná kontaktní osoba. Klikněte na &quot;Přidat kontaktní osobu&quot;.
           </div>
         )}
       </div>

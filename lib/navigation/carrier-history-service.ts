@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { MediaType } from '@prisma/client';
 
 export type HistoryEventType =
   | 'INSTALLATION'
@@ -88,7 +89,7 @@ export async function createCarrierSurface(data: {
       carrierId: data.carrierId,
       name: data.name,
       sidePosition: data.sidePosition || 'Strana A',
-      mediaType: (data.mediaType as any) || 'OTHER',
+      mediaType: (data.mediaType as MediaType) || MediaType.OTHER,
       currentClientId: data.currentClientId || null,
       contractId: data.contractId || null,
       artworkUrl: data.artworkUrl || null,
