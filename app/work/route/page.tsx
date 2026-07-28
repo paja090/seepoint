@@ -53,6 +53,7 @@ export default async function WorkRoutePage() {
             requestedBy: order.requestedBy,
             description: order.description,
             locationNote: order.locationNote,
+            mediaLabel: order.mediaLabel,
             scheduledAt: order.scheduledAt.toISOString(),
             status: order.status,
             priority: order.priority,
