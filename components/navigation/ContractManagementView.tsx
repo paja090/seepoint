@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Plus, FileText, Calendar, User, Phone, Mail, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Plus, FileText, Phone, Mail, ShieldAlert } from 'lucide-react';
 
 type ClientOption = { id: string; name: string };
 
@@ -275,7 +275,7 @@ export function ContractManagementView({
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-4">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Datum začátku</label>
                   <input className="input w-full" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
@@ -288,6 +288,15 @@ export function ContractManagementView({
                   <label className="block font-bold text-slate-700 mb-1">Měsíční nájem (Kč)</label>
                   <input className="input w-full" type="number" value={monthlyPrice} onChange={(e) => setMonthlyPrice(e.target.value)} />
                 </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Upozornit dní předem</label>
+                  <input className="input w-full" type="number" value={alertDaysBefore} onChange={(e) => setAlertDaysBefore(e.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Poznámka ke smlouvě</label>
+                <input className="input w-full" placeholder="Interní poznámka..." value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
 
               {message && <p className="text-xs font-bold text-rose-600">{message}</p>}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Clock, Plus, Layers, Image as ImageIcon, Wrench, Shield, ArrowRight, UserCheck, Calendar } from 'lucide-react';
+import { MapPin, Clock, Plus, Image as ImageIcon, UserCheck, Calendar } from 'lucide-react';
 
 type CarrierItem = {
   id: string;
@@ -403,6 +403,11 @@ export function CarrierDetailTimelineView({
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Měsíční nájemné (Kč)</label>
                 <input className="input w-full" type="number" value={rentPrice} onChange={(e) => setRentPrice(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">URL grafického motivu (volitelné)</label>
+                <input className="input w-full" placeholder="https://..." value={artworkUrl} onChange={(e) => setArtworkUrl(e.target.value)} />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

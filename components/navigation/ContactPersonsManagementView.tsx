@@ -55,10 +55,9 @@ export function ContactPersonsManagementView({
           contactType,
           name,
           agencyName,
-          role,
           phone,
-          email,
           isPrimary,
+          role,
           note,
         }),
       });
@@ -200,6 +199,11 @@ export function ContactPersonsManagementView({
                   <label className="block font-bold text-slate-700 mb-1">E-mail</label>
                   <input className="input w-full" type="email" placeholder="jan@novak.cz" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Interní poznámka</label>
+                <input className="input w-full" placeholder="Poznámka ke kontaktu..." value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
 
               <div className="flex items-center gap-2 pt-1">
