@@ -225,6 +225,13 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
             };
           }),
       ] : []),
+
+      // Graphic Artwork Proof Section in PDF (670 x 900 mm)
+      ...(isNavigation && navigationData && (navigationData as unknown as Record<string, unknown>).includeGraphicProof !== false && (navigationData as unknown as Record<string, unknown>).graphicArtworkUrl ? [
+        { text: 'Grafický motiv a provedení cedule (670 × 900 mm)', style: 'heading', margin: [0, 14, 0, 8] },
+        { text: 'Tiskový motiv oboustranné plástve SeePOINT pro montáž na sloupy veřejného osvětlení:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 8] },
+        { image: String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl), width: 240, alignment: 'center', margin: [0, 4, 0, 16] },
+      ] : []),
       { text: 'Cenová kalkulace', style: 'heading', pageBreak: 'before' },
       { text: 'Jednotlivé složky ceny jsou načtené z cenového katalogu a v nabídce přehledně oddělené.', color: MUTED, margin: [0, 0, 0, 12] },
       {
