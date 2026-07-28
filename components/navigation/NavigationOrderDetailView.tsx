@@ -479,7 +479,17 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                           <div className="text-[11px] text-slate-500">{p.orientation}</div>
                         </td>
                         <td className="p-3">
-                          {p.carrierCode ? (
+                          {p.carrierId ? (
+                            <a
+                              href={`/navigation/carriers/${p.carrierId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-bold text-sky-800 bg-sky-50 px-2 py-1 rounded hover:bg-sky-100 transition"
+                              title="Zobrazit časovou osu historie nosiče, audity a plochy na tomto sloupu"
+                            >
+                              📌 Nosič: {p.carrierCode || 'Sloup VO'} {p.surfaceName ? `(${p.surfaceName})` : ''} 📜
+                            </a>
+                          ) : p.carrierCode ? (
                             <span className="inline-flex items-center text-xs font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded">
                               Nosič: {p.carrierCode} {p.surfaceName ? `(${p.surfaceName})` : ''}
                             </span>
