@@ -440,21 +440,58 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
               💡 Návrh grafiky cedule bude před výrobou zaslán klientovi k finální korektuře a odsouhlasení.
             </p>
 
-            {/* Interactive Client Graphic Approval Button */}
-            <div className="pt-2">
-              {graphicApproved ? (
-                <div className="rounded-xl border border-emerald-300 bg-emerald-100/90 p-3 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
-                  <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
-                  <span>✓ Grafický návrh navigační cedule byl odsouhlasen klientem!</span>
+            {/* Interactive Client Graphic Approval & Upload Controls */}
+            <div className="pt-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {graphicApproved ? (
+                  <div className="rounded-xl border border-emerald-300 bg-emerald-100/90 p-3 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
+                    <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
+                    <span>✓ Grafický návrh navigační cedule byl odsouhlasen klientem!</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setGraphicApproved(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 transition shadow-xs cursor-pointer"
+                  >
+                    <CheckCircle2 size={16} /> Odsouhlasit a schválit tento grafický návrh
+                  </button>
+                )}
+
+                {/* Client File Upload Button */}
+                <label className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-bold text-sky-900 hover:bg-sky-100 transition cursor-pointer">
+                  <span>📤 Nahrát vlastní logo / grafické podklady</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,.ai,.eps,.svg"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = async (ev) => {
+                        const dataUrl = ev.target?.result as string;
+                        try {
+                          await fetch(`/api/proposals/${offer.id}/artwork`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ clientArtworkUrl: dataUrl, clientArtworkFileName: file.name }),
+                          });
+                          alert(`Podklady "${file.name}" byly úspěšně nahrány obchodníkovi!`);
+                        } catch {
+                          alert('Chyba při nahrávání podkladů');
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
+
+              {typeof (navigation as unknown as Record<string, unknown>).clientArtworkFileName === 'string' && (
+                <div className="text-[11px] font-bold text-slate-600 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+                  📁 Nahrané podklady od klienta: {String((navigation as unknown as Record<string, unknown>).clientArtworkFileName)}
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setGraphicApproved(true)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 transition shadow-xs cursor-pointer"
-                >
-                  <CheckCircle2 size={16} /> Odsouhlasit a schválit tento grafický návrh
-                </button>
               )}
             </div>
           </div>

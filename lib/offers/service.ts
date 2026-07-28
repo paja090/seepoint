@@ -183,6 +183,9 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       targetNote: row.navigationOffer.targetNote,
       proposalMode: row.navigationOffer.proposalMode || 'LOCATION_SELECTION',
       graphicArtworkUrl: row.navigationOffer.graphicArtworkUrl,
+      includeGraphicProof: row.navigationOffer.includeGraphicProof !== false,
+      clientArtworkUrl: row.navigationOffer.clientArtworkUrl,
+      clientArtworkFileName: row.navigationOffer.clientArtworkFileName,
       points: row.navigationOffer.points.map((point) => ({
         id: point.id, label: point.label, latitude: point.latitude, longitude: point.longitude, address: point.address,
         navigationType: point.navigationType, variant: point.variant, orientation: point.orientation,

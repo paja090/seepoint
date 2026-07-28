@@ -933,9 +933,12 @@ model NavigationOffer {
   targetNote       String?
   googlePlaceId    String?
   formattedAddress String?
-  proposalMode     String   @default("LOCATION_SELECTION")
-  graphicArtworkUrl String?
-  createdAt        DateTime @default(now())
+  proposalMode          String   @default("LOCATION_SELECTION")
+  graphicArtworkUrl     String?
+  includeGraphicProof   Boolean  @default(true)
+  clientArtworkUrl      String?
+  clientArtworkFileName String?
+  createdAt             DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   offer                          Offer                           @relation(fields: [offerId], references: [id], onDelete: Cascade)

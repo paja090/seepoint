@@ -164,6 +164,9 @@ export function NavigationOfferForm({
       ? String((initialOffer?.navigation as unknown as Record<string, unknown>)?.graphicArtworkUrl)
       : null
   );
+  const [includeGraphicProof, setIncludeGraphicProof] = useState<boolean>(
+    (initialOffer?.navigation as unknown as Record<string, unknown>)?.includeGraphicProof !== false
+  );
   const [results, setResults] = useState<Array<{ latitude: number; longitude: number; label: string }>>([]);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -453,6 +456,7 @@ export function NavigationOfferForm({
       internalNote,
       proposalMode,
       graphicArtworkUrl,
+      includeGraphicProof,
       points,
     };
 
@@ -550,11 +554,23 @@ export function NavigationOfferForm({
           </div>
         </div>
 
-        {/* AI Graphic Artwork Motiv Uploader */}
+        {/* AI Graphic Artwork Motiv Uploader & Proof Toggle */}
         <section className="card space-y-3 border-2 border-sky-200 bg-sky-50/40">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-sky-950">
-            🎨 Grafický motiv cedule (AI / ChatGPT)
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-sky-950">
+              🎨 Grafický motiv cedule (AI / ChatGPT)
+            </h2>
+            <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-sky-900">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={includeGraphicProof}
+                onChange={(e) => setIncludeGraphicProof(e.target.checked)}
+              />
+              <span>Zobrazit v nabídce</span>
+            </label>
+          </div>
+
           <p className="text-xs text-slate-600 font-medium">
             Vložte fotku vizuálu / náhledu grafiky cedule (vygenerovanou z AI / ChatGPT / Midjourney nebo z grafického studia), kterou uvidí klient v nabídce i PDF ke schválení.
           </p>
@@ -588,6 +604,25 @@ export function NavigationOfferForm({
               >
                 Odstranit
               </button>
+            </div>
+          )}
+
+          {/* Client Uploaded Artwork Download Link if available */}
+          {typeof (initialOffer?.navigation as unknown as Record<string, unknown>)?.clientArtworkUrl === 'string' && (
+            <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-bold text-emerald-950 space-y-2">
+              <div className="flex items-center justify-between">
+                <span>📁 Klient nahrál vlastní grafické podklady:</span>
+                <span className="text-[10px] text-emerald-700 font-mono">
+                  {String((initialOffer?.navigation as unknown as Record<string, unknown>)?.clientArtworkFileName || 'podklady.png')}
+                </span>
+              </div>
+              <a
+                href={String((initialOffer?.navigation as unknown as Record<string, unknown>)?.clientArtworkUrl)}
+                download={String((initialOffer?.navigation as unknown as Record<string, unknown>)?.clientArtworkFileName || 'podklady.png')}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition"
+              >
+                📥 Stáhnout podklady od klienta
+              </a>
             </div>
           )}
         </section>
