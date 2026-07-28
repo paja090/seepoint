@@ -257,7 +257,7 @@ export function CarrierDetailTimelineView({
 
             {surfaces.length === 0 && (
               <div className="col-span-full rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 font-medium">
-                Zatím na tomto sloupu nebyla založena žádná samostatná reklamní plocha. Klikněte na "Přidat reklamní plochu".
+                Zatím na tomto sloupu nebyla založena žádná samostatná reklamní plocha. Klikněte na &quot;Přidat reklamní plochu&quot;.
               </div>
             )}
           </div>
