@@ -88,6 +88,33 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           </>
         )}
 
+        {offerType === 'NAVIGATION' && (
+          <button
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 shadow-xs cursor-pointer"
+            disabled={disabled}
+            onClick={async () => {
+              setBusy('convert-navigation');
+              try {
+                const res = await fetch('/api/navigation/orders', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ offerId }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Převod do realizace selhal');
+                router.push('/navigation?view=kanban');
+              } catch (err) {
+                setMessage(err instanceof Error ? err.message : 'Chyba při převodu nabídky');
+              } finally {
+                setBusy('');
+              }
+            }}
+            type="button"
+          >
+            🚀 Převést do Realizace & Plánu montáží
+          </button>
+        )}
+
         {status === 'ACCEPTED' && canConvert && offerType === 'STANDARD_MEDIA' && (
           <>
             <button className={primaryButton} disabled={disabled || converted} onClick={() => void action('convert-to-occupancy', { targetStatus: 'OCCUPIED' })} type="button">
