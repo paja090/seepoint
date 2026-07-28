@@ -104,6 +104,18 @@ export default async function NavigationDashboardPage({
           📱 Mobilní Montáže
         </Link>
         <Link
+          href="/navigation/contracts"
+          className="pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap"
+        >
+          📄 Evidence smluv
+        </Link>
+        <Link
+          href="/navigation/contacts"
+          className="pb-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-900 whitespace-nowrap"
+        >
+          👥 Kontaktní osoby
+        </Link>
+        <Link
           href="/navigation?status=PRIPRAVENO_K_FAKTURACI"
           className={`pb-2.5 border-b-2 whitespace-nowrap transition-all ${
             status === 'PRIPRAVENO_K_FAKTURACI' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-900'

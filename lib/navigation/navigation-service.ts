@@ -92,8 +92,9 @@ export async function convertOfferToNavigationOrder(
       },
     });
 
-    if (navData?.points && navData.points.length > 0) {
-      for (const p of navData.points) {
+    const selectedPoints = navData?.points?.filter((p) => p.isSelectedByClient !== false) || [];
+    if (selectedPoints.length > 0) {
+      for (const p of selectedPoints) {
         await tx.navigationPoint.create({
           data: {
             navigationOrderId: navOrder.id,
@@ -398,14 +399,46 @@ export async function getNavigationAttentionAlerts(user: CurrentUser): Promise<A
       });
     }
 
-    // 4. Připraveno k fakturaci
-    if (o.status === 'PRIPRAVENO_K_FAKTURACI') {
+    // 4. Chybí grafika / podklady
+    if (o.status === 'GRAFICKE_PODKLADY' || o.status === 'SCHVALENI_GRAFIKY' || o.blockStatus === 'CEKA_NA_GRAFIKU') {
+      alerts.push({
+        id: `graphics-${o.id}`,
+        orderId: o.id,
+        orderNumber,
+        clientName,
+        reason: 'Chybí schválený grafický motiv cedule pro výrobu',
+        waitingDaysOrDeadline: 'Chybí grafika',
+        assignedUserName,
+        actionUrl: `/navigation/orders/${o.id}`,
+        actionLabel: 'Nahrát / Schválit grafiku',
+        severity: 'HIGH',
+      });
+    }
+
+    // 5. Čeká na instalaci
+    if (o.status === 'PRIPRAVENO_K_INSTALACI' || o.blockStatus === 'CEKA_NA_INSTALACI') {
+      alerts.push({
+        id: `install-${o.id}`,
+        orderId: o.id,
+        orderNumber,
+        clientName,
+        reason: 'Výroba dokončena – čeká na výjezd montážní čety v terénu',
+        waitingDaysOrDeadline: 'K instalaci',
+        assignedUserName,
+        actionUrl: `/navigation/installations/planning`,
+        actionLabel: 'Naplánovat montáž',
+        severity: 'MEDIUM',
+      });
+    }
+
+    // 6. Připraveno k fakturaci
+    if (o.status === 'PRIPRAVENO_K_FAKTURACI' || o.blockStatus === 'CEKA_NA_FAKTURACI') {
       alerts.push({
         id: `billing-${o.id}`,
         orderId: o.id,
         orderNumber,
         clientName,
-        reason: 'Montáž i dokumentace schválena – čení na vystavení faktury',
+        reason: 'Montáž i dokumentace schválena – čeká na vystavení faktury',
         waitingDaysOrDeadline: 'K fakturaci',
         assignedUserName,
         actionUrl: `/navigation/orders/${o.id}`,
@@ -415,7 +448,37 @@ export async function getNavigationAttentionAlerts(user: CurrentUser): Promise<A
     }
   }
 
-  return alerts.slice(0, 10);
+  // 7. Kontrola končících smluv (Evidence smluv - Automatické upozornění)
+  const expiringContracts = await prisma.navigationContract.findMany({
+    where: {
+      status: 'ACTIVE',
+      endDate: {
+        lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // Next 30 days
+      },
+    },
+    include: {
+      client: { select: { name: true } },
+    },
+    take: 5,
+  });
+
+  for (const c of expiringContracts) {
+    const daysLeft = Math.ceil((new Date(c.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    alerts.push({
+      id: `contract-${c.id}`,
+      orderId: c.navigationOrderId || c.id,
+      orderNumber: c.contractNumber,
+      clientName: c.client.name,
+      reason: daysLeft < 0 ? `Smlouva #${c.contractNumber} vypršela pred ${Math.abs(daysLeft)} dny` : `Smlouva #${c.contractNumber} končí za ${daysLeft} dní`,
+      waitingDaysOrDeadline: daysLeft < 0 ? 'Vypršela' : `${daysLeft} dní`,
+      assignedUserName: c.responsiblePerson || 'Obchodník',
+      actionUrl: `/navigation/contracts`,
+      actionLabel: 'Prodloužit smlouvu',
+      severity: daysLeft <= 7 ? 'HIGH' : 'MEDIUM',
+    });
+  }
+
+  return alerts.slice(0, 15);
 }
 
 export async function getNavigationOrderDetail(id: string, user: CurrentUser): Promise<NavigationOrderDetail> {
