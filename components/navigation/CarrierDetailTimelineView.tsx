@@ -93,8 +93,8 @@ export function CarrierDetailTimelineView({
       setEventTitle('');
       setEventDescription('');
       router.refresh();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při zápisu do historie');
     } finally {
       setSavingHistory(false);
     }
@@ -118,8 +118,8 @@ export function CarrierDetailTimelineView({
       if (!res.ok) throw new Error('Vytvoření reklamní plochy selhalo');
       setShowSurfaceModal(false);
       router.refresh();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při vytváření reklamní plochy');
     } finally {
       setSavingSurface(false);
     }

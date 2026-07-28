@@ -69,8 +69,8 @@ export function ContactPersonsManagementView({
       setPhone('');
       setEmail('');
       router.refresh();
-    } catch (err: any) {
-      setMessage(err.message || 'Chyba uložení kontaktu');
+    } catch (err: unknown) {
+      setMessage(err instanceof Error ? err.message : 'Chyba uložení kontaktu');
     } finally {
       setSaving(false);
     }

@@ -88,8 +88,8 @@ export function ContractManagementView({
       if (!res.ok) throw new Error(data.error || 'Vytvoření smlouvy selhalo');
       setShowModal(false);
       router.refresh();
-    } catch (err: any) {
-      setMessage(err.message || 'Chyba uložení smlouvy');
+    } catch (err: unknown) {
+      setMessage(err instanceof Error ? err.message : 'Chyba uložení smlouvy');
     } finally {
       setSaving(false);
     }
@@ -208,7 +208,7 @@ export function ContractManagementView({
             {initialContracts.length === 0 && (
               <tr>
                 <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
-                  Zatím nebyla evidována žádná smlouva. Klikněte na "Nová smlouva" pro přidání.
+                  Zatím nebyla evidována žádná smlouva. Klikněte na &quot;Nová smlouva&quot; pro přidání.
                 </td>
               </tr>
             )}

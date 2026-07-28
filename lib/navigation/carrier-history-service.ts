@@ -21,7 +21,7 @@ export async function logCarrierHistoryEvent(data: {
   clientId?: string | null;
   clientName?: string | null;
   photoUrl?: string | null;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }) {
   return prisma.carrierHistoryLog.create({
     data: {
@@ -73,7 +73,7 @@ export async function createCarrierSurface(data: {
   carrierId: string;
   name: string;
   sidePosition?: string;
-  mediaType?: any;
+  mediaType?: string;
   currentClientId?: string;
   contractId?: string;
   artworkUrl?: string;
@@ -88,7 +88,7 @@ export async function createCarrierSurface(data: {
       carrierId: data.carrierId,
       name: data.name,
       sidePosition: data.sidePosition || 'Strana A',
-      mediaType: data.mediaType || 'OTHER',
+      mediaType: (data.mediaType as any) || 'OTHER',
       currentClientId: data.currentClientId || null,
       contractId: data.contractId || null,
       artworkUrl: data.artworkUrl || null,

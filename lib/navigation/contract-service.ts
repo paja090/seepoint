@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import type { CurrentUser } from '@/lib/rbac';
 
@@ -25,7 +26,7 @@ export async function listNavigationContracts(
   _user: CurrentUser,
   filters?: { clientId?: string; status?: string; query?: string }
 ) {
-  const where: any = {};
+  const where: Prisma.NavigationContractWhereInput = {};
   if (filters?.clientId) where.clientId = filters.clientId;
   if (filters?.status) where.status = filters.status;
   if (filters?.query) {
