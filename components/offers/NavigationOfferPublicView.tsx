@@ -94,6 +94,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
   const [submittingSelection, setSubmittingSelection] = useState(false);
   const [selectionSubmitted, setSelectionSubmitted] = useState(false);
   const [graphicApproved, setGraphicApproved] = useState(false);
+  const [converting, setConverting] = useState(false);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(
     navigation?.points[0]?.id || null,
   );
@@ -217,6 +218,32 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
             >
               <ClipboardList size={18} className="text-amber-400" /> Montážní list
             </a>
+
+            <button
+              type="button"
+              disabled={converting}
+              onClick={async () => {
+                setConverting(true);
+                try {
+                  const res = await fetch('/api/navigation/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ offerId: offer.id }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || 'Převod do realizace selhal');
+                  window.location.href = '/navigation?view=kanban';
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : 'Chyba při převodu nabídky');
+                } finally {
+                  setConverting(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3.5 text-xs font-black text-slate-950 shadow-lg hover:bg-emerald-400 transition cursor-pointer shrink-0 disabled:opacity-50"
+              title="Převést schválenou nabídku do zakázky a plánu montáží"
+            >
+              <span>{converting ? 'Převádím…' : '🚀 Převést do Realizace'}</span>
+            </button>
           </div>
         </div>
 
