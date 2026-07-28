@@ -80,6 +80,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                     <TableCell>
                       <div className="flex flex-wrap gap-2">
                         <Link className="table-action" href={`/carriers/${carrier.id}`}>Detail</Link>
+                        <Link className="table-action text-sky-700 font-bold" href={`/navigation/carriers/${carrier.id}`}>📜 Audit & Časová osa</Link>
                         <Link className="table-action" href={`/map?carrier=${carrier.id}`}><MapPinned size={14} className="mr-1" />Mapa</Link>
                         <Link className="table-action" href={`/carriers/${carrier.id}`}>Upravit</Link>
                       </div>
