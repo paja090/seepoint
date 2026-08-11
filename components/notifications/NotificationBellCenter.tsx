@@ -65,8 +65,8 @@ export function NotificationBellCenter() {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-xs sm:bg-transparent" onClick={() => setOpen(false)} />
+          <div className="fixed inset-x-3 top-16 z-50 max-h-[85vh] overflow-hidden sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-96 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <Bell size={18} className="text-amber-600" />
