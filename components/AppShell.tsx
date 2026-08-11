@@ -9,6 +9,15 @@ type NavGroup = { label: string; items: NavItem[] };
 
 const navGroups: NavGroup[] = [
   {
+    label: '📱 Terénní práce (Montážníci)',
+    items: [
+      ['/mobile-photos', '📱 Mobilní foto z terénu', 'camera', 'work'],
+      ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
+      ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
+      ['/my-work-entries', '⏱️ Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
+    ],
+  },
+  {
     label: 'Přehled',
     items: [
       ['/dashboard', 'Dashboard', 'barChart3', 'dashboard'],
@@ -19,7 +28,6 @@ const navGroups: NavGroup[] = [
     label: 'Projekty Navigace',
     items: [
       ['/navigation', ' Navigace (Přehled)', 'mapPinned', 'navigationProjects'],
-      ['/mobile-photos', '📱 Mobilní foto z terénu', 'camera', 'navigationProjects'],
       ['/navigation/contracts', '📄 Evidence smluv', 'fileText', 'navigationProjects'],
       ['/navigation/contacts', '👥 Kontaktní osoby', 'users', 'navigationProjects'],
       ['/navigation/documentation', '📷 Fotodokumentace reporty', 'camera', 'navigationDocumentation'],
@@ -41,19 +49,17 @@ const navGroups: NavGroup[] = [
     items: [
       ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
       ['/tasks', 'Úkoly', 'clipboardList', 'tasks'],
-      ['/my-tasks', 'Moje úkoly', 'calendarCheck', 'myTasks'],
-      ['/work-entries', 'Odvedená práce', 'fileText', 'workEntries'],
-      ['/my-work-entries', 'Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
+      ['/work-entries', 'Odvedená práce (všichni)', 'fileText', 'workEntries'],
       ['/settlements', 'Vyúčtování', 'fileText', 'settlements'],
-      ['/my-settlements', 'Moje vyúčtování', 'fileText', 'mySettlements'],
       ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
     ],
   },
   {
-    label: 'Provoz',
+    label: 'Provoz & Plánování',
     items: [
       ['/work', 'Plán práce', 'briefcaseBusiness', 'work'],
       ['/work/route', 'Pracovní výjezd', 'route', 'work'],
+      ['/mobile-photos', 'Mobilní fotodokumentace', 'camera', 'work'],
     ],
   },
   {
