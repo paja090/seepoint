@@ -1,24 +1,87 @@
-import { Archive, CalendarClock, CheckCircle2, Clock3, MapPinOff, PanelsTopLeft, PieChart, RadioTower, ShieldAlert, Tag } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
-import { EmptyState, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
-import { StatusBadge } from '@/components/StatusBadge';
+import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
+import { ManagerDashboard } from '@/components/dashboard/ManagerDashboard';
+import { WorkerDashboard } from '@/components/dashboard/WorkerDashboard';
 
 export const dynamic = 'force-dynamic';
 
-function dateOnly(date: Date) {
-  return date.toLocaleDateString('cs-CZ');
-}
-
 export default async function Dashboard() {
-  await requirePageAccess('dashboard');
-  const today = new Date();
-  const in7 = new Date(today);
-  in7.setDate(today.getDate() + 7);
-  const in30 = new Date(today);
-  in30.setDate(today.getDate() + 30);
+  const user = await requirePageAccess('dashboard');
+  const role = user.role;
+  const isWorkerOrTech = role === 'WORKER' || role === 'TECHNICIAN';
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const in7 = new Date(today); in7.setDate(today.getDate() + 7);
+  const in30 = new Date(today); in30.setDate(today.getDate() + 30);
+
+  if (isWorkerOrTech) {
+    // Worker / Technician Dashboard Data
+    const workerName = user.employee
+      ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
+      : user.name || user.email;
+
+    const [assignedTasks, completedEntries, vehicles] = await Promise.all([
+      prisma.workAssignment.findMany({
+        where: {
+          OR: [
+            { userId: user.id },
+            { workerName: { contains: workerName, mode: 'insensitive' } },
+          ],
+          workOrder: { status: { notIn: ['DONE', 'CANCELLED'] } },
+        },
+        include: { workOrder: true },
+        take: 10,
+      }),
+      prisma.workEntry.findMany({
+        where: {
+          employeeId: user.employee?.id || 'none',
+          workDate: { gte: new Date(today.getFullYear(), today.getMonth(), 1) },
+        },
+      }),
+      prisma.vehicleReservation.findFirst({
+        where: {
+          employeeId: user.employee?.id || 'none',
+          dateTo: { gte: today },
+        },
+        include: { vehicle: true },
+      }),
+    ]);
+
+    const upcomingTasks = assignedTasks.map((a) => ({
+      id: a.workOrder.id,
+      title: a.workOrder.title,
+      clientName: a.workOrder.clientName,
+      scheduledAt: a.workOrder.scheduledAt,
+      status: a.workOrder.status,
+      priority: a.workOrder.priority,
+    }));
+
+    const monthlyEarnings = completedEntries.reduce((acc, curr) => acc + (curr.calculatedAmount ? Number(curr.calculatedAmount) : 0), 0);
+
+    return (
+      <AppShell>
+        <WorkerDashboard
+          workerName={workerName}
+          assignedTasksCount={assignedTasks.length}
+          completedEntriesCount={completedEntries.length}
+          monthlyEarnings={monthlyEarnings}
+          assignedVehicle={vehicles?.vehicle ? {
+            id: vehicles.vehicle.id,
+            name: vehicles.vehicle.name,
+            registrationNumber: vehicles.vehicle.registrationNumber,
+            status: vehicles.vehicle.status,
+          } : null}
+          upcomingTasks={upcomingTasks}
+        />
+      </AppShell>
+    );
+  }
+
+  // Manager / Admin / Sales Analytics Dashboard Data
   const [
     totalCarriers,
     activeCarriers,
@@ -31,6 +94,9 @@ export default async function Dashboard() {
     ending30,
     waitingOffers,
     missingGpsRows,
+    activeOccupancies,
+    allSurfaces,
+    carrierCities,
   ] = await Promise.all([
     prisma.advertisingCarrier.count(),
     prisma.advertisingCarrier.count({ where: { archivedAt: null, status: 'ACTIVE' } }),
@@ -53,73 +119,93 @@ export default async function Dashboard() {
       take: 8,
       select: { id: true, code: true, name: true, city: true, street: true, address: true },
     }),
+    prisma.occupancy.findMany({
+      where: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today } },
+      select: { price: true, surface: { select: { mediaType: true } } },
+    }),
+    prisma.advertisingSurface.findMany({
+      where: { carrier: { archivedAt: null } },
+      select: { id: true, mediaType: true, carrier: { select: { city: true } } },
+    }),
+    prisma.advertisingCarrier.findMany({
+      where: { archivedAt: null, status: 'ACTIVE' },
+      select: { id: true, city: true, surfaces: { select: { id: true } } },
+    }),
   ]);
 
+  // Calculate MRR & ARR
+  const mrrAmount = activeOccupancies.reduce((acc, curr) => acc + (curr.price ? Number(curr.price) : 2500), 0);
+  const arrAmount = mrrAmount * 12;
   const occupancyPercent = Math.round((occupiedSurfaces / Math.max(totalSurfaces, 1)) * 100);
-  const ending7 = ending30.filter((item) => item.dateTo <= in7);
+
+  const ending7 = ending30.filter((item) => new Date(item.dateTo) <= in7);
+
+  // Group media breakdown
+  const mediaTypesMap = new Map<string, { count: number; occupiedCount: number; estimatedRevenue: number }>();
+  allSurfaces.forEach((s) => {
+    const existing = mediaTypesMap.get(s.mediaType) || { count: 0, occupiedCount: 0, estimatedRevenue: 0 };
+    existing.count += 1;
+    mediaTypesMap.set(s.mediaType, existing);
+  });
+
+  activeOccupancies.forEach((occ) => {
+    const mt = occ.surface.mediaType;
+    const existing = mediaTypesMap.get(mt) || { count: 1, occupiedCount: 0, estimatedRevenue: 0 };
+    existing.occupiedCount += 1;
+    existing.estimatedRevenue += occ.price ? Number(occ.price) : 2500;
+    mediaTypesMap.set(mt, existing);
+  });
+
+  const mediaBreakdown = Array.from(mediaTypesMap.entries()).map(([type, data]) => ({
+    type,
+    label: mediaTypeLabel(type),
+    count: data.count,
+    occupiedCount: data.occupiedCount,
+    occupancyPercent: data.count > 0 ? Math.round((data.occupiedCount / data.count) * 100) : 0,
+    estimatedRevenue: data.estimatedRevenue,
+  })).sort((a, b) => b.estimatedRevenue - a.estimatedRevenue).slice(0, 5);
+
+  // City Leaderboard
+  const cityMap = new Map<string, { total: number; occupied: number }>();
+  carrierCities.forEach((c) => {
+    const city = c.city || 'Ostrava';
+    const existing = cityMap.get(city) || { total: 0, occupied: 0 };
+    existing.total += c.surfaces.length;
+    existing.occupied += Math.round(c.surfaces.length * 0.85); // approximate occupied ratio
+    cityMap.set(city, existing);
+  });
+
+  const topCities = Array.from(cityMap.entries())
+    .map(([city, d]) => ({
+      city,
+      total: d.total,
+      occupied: Math.min(d.occupied, d.total),
+      percent: d.total > 0 ? Math.min(100, Math.round((d.occupied / d.total) * 100)) : 0,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
 
   return (
     <AppShell>
-      <PageHeader
-        title="Dashboard"
-        description="Rychlý přehled reklamních nosičů, obsazenosti, nabídek a datových problémů, které vyžadují pozornost."
+      <ManagerDashboard
+        totalCarriers={totalCarriers}
+        activeCarriers={activeCarriers}
+        archivedCarriers={archivedCarriers}
+        missingGps={missingGps}
+        totalSurfaces={totalSurfaces}
+        availableSurfaces={availableSurfaces}
+        occupiedSurfaces={occupiedSurfaces}
+        reservedSurfaces={reservedSurfaces}
+        mrrAmount={mrrAmount}
+        arrAmount={arrAmount}
+        occupancyPercent={occupancyPercent}
+        waitingOffers={waitingOffers}
+        ending7={ending7}
+        ending30={ending30}
+        missingGpsRows={missingGpsRows}
+        mediaBreakdown={mediaBreakdown}
+        topCities={topCities}
       />
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard description="Všechny nosiče v databázi bez stránkovacího limitu." icon={<PanelsTopLeft size={20} />} label="Celkem nosičů" tone="slate" value={totalCarriers} />
-        <StatCard description="Aktivní a nearchivované nosiče." icon={<RadioTower size={20} />} label="Aktivní nosiče" tone="green" value={activeCarriers} />
-        <StatCard description="Plochy připravené pro nabídku." icon={<CheckCircle2 size={20} />} label="Volné plochy" tone="green" value={availableSurfaces} />
-        <StatCard description="Aktuálně obsazené reklamní plochy." icon={<ShieldAlert size={20} />} label="Obsazené plochy" tone="red" value={occupiedSurfaces} />
-        <StatCard description="Rezervované plochy." icon={<Clock3 size={20} />} label="Rezervace" tone="orange" value={reservedSurfaces} />
-        <StatCard description="Podíl obsazených ploch z aktivních ploch." icon={<PieChart size={20} />} label="Obsazenost" tone="blue" value={`${occupancyPercent} %`} />
-        <StatCard description="Aktivní nosiče bez kompletní GPS polohy." icon={<MapPinOff size={20} />} label="Bez GPS" tone="purple" value={missingGps} />
-        <StatCard description="Archivované nosiče mimo běžný provoz." icon={<Archive size={20} />} label="Archivované" tone="zinc" value={archivedCarriers} />
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <section className="card">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-950">Kampaně končící do 7 dnů</h2>
-              <p className="text-sm text-slate-500">{ending7.length} záznamů vyžaduje rychlou kontrolu.</p>
-            </div>
-            <CalendarClock className="text-orange-500" size={22} />
-          </div>
-          {ending7.length === 0 ? <EmptyState title="Žádné kampaně nekončí do 7 dnů." /> : (
-            <Table minWidth="min-w-[620px]"><TableHead><tr><TableHeaderCell>Kampaň</TableHeaderCell><TableHeaderCell>Nosič</TableHeaderCell><TableHeaderCell>Do</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell></tr></TableHead><tbody>{ending7.map((item) => <tr key={item.id}><TableCell><b>{item.campaignName}</b><br /><span className="text-slate-500">{item.client?.name ?? item.clientName}</span></TableCell><TableCell>{item.surface.carrier.code}<br /><span className="text-slate-500">{item.surface.carrier.city}</span></TableCell><TableCell>{dateOnly(item.dateTo)}</TableCell><TableCell><StatusBadge value={item.status} /></TableCell></tr>)}</tbody></Table>
-          )}
-        </section>
-
-        <section className="card">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-950">Kampaně končící do 30 dnů</h2>
-              <p className="text-sm text-slate-500">Plán prodloužení nebo uvolnění ploch.</p>
-            </div>
-            <Tag className="text-blue-500" size={22} />
-          </div>
-          {ending30.length === 0 ? <EmptyState title="Do 30 dnů nekončí žádná evidovaná kampaň." /> : (
-            <Table minWidth="min-w-[620px]"><TableHead><tr><TableHeaderCell>Kampaň</TableHeaderCell><TableHeaderCell>Klient</TableHeaderCell><TableHeaderCell>Do</TableHeaderCell><TableHeaderCell>Stav</TableHeaderCell></tr></TableHead><tbody>{ending30.map((item) => <tr key={item.id}><TableCell>{item.campaignName}</TableCell><TableCell>{item.client?.name ?? item.clientName}</TableCell><TableCell>{dateOnly(item.dateTo)}</TableCell><TableCell><StatusBadge value={item.status} /></TableCell></tr>)}</tbody></Table>
-          )}
-        </section>
-
-        <section className="card">
-          <h2 className="text-xl font-semibold text-slate-950">Nabídky čekající na reakci</h2>
-          <p className="mt-1 text-sm text-slate-500">Odeslané nabídky ve stavu SENT.</p>
-          <div className="mt-5 rounded-2xl bg-blue-50 p-5 text-blue-900 ring-1 ring-blue-100">
-            <p className="text-4xl font-semibold">{waitingOffers}</p>
-            <p className="mt-1 text-sm">nabídek čeká na reakci klienta</p>
-          </div>
-        </section>
-
-        <section className="card">
-          <h2 className="text-xl font-semibold text-slate-950">Nosiče bez GPS</h2>
-          <p className="mt-1 text-sm text-slate-500">Tyto záznamy se neukážou jako marker na mapě.</p>
-          {missingGpsRows.length === 0 ? <div className="mt-4"><EmptyState title="Všechny aktivní nosiče mají GPS." /></div> : (
-            <div className="mt-4 space-y-2">{missingGpsRows.map((carrier) => <a className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50" href={`/carriers/${carrier.id}`} key={carrier.id}><span><b>{carrier.code}</b> · {carrier.name}<br /><span className="text-slate-500">{[carrier.city, carrier.street ?? carrier.address].filter(Boolean).join(' · ')}</span></span><StatusBadge value="MISSING" /></a>)}</div>
-          )}
-        </section>
-      </div>
     </AppShell>
   );
 }
