@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
+import { RoleSwitcherButton } from './RoleSwitcherButton';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 
@@ -26,7 +27,7 @@ export function ResponsiveAppShell({
   visibleGroups,
 }: {
   children: React.ReactNode;
-  user: { id: string; name: string; email: string; role: AppRole };
+  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[] };
   visibleGroups: NavGroup[];
 }) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -74,6 +75,7 @@ export function ResponsiveAppShell({
         </div>
 
         <div className="flex items-center gap-2">
+          <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} compact />
           <Link
             href="/mobile-photos"
             className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition"

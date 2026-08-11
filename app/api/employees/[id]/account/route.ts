@@ -8,7 +8,7 @@ import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 
-type AccountInput = { action?: 'enableAccess' | 'invite' | 'suspend' | 'restore' | 'role'; role?: Role };
+type AccountInput = { action?: 'enableAccess' | 'invite' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[] };
 
 function activationUrl(token: string) {
   return `${process.env.APP_URL ?? 'http://localhost:3000'}/activate/${token}`;
@@ -29,10 +29,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (existing) {
       if (existing.employee) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
       if (actor.role !== 'ADMIN' && existing.role === 'ADMIN') return NextResponse.json({ error: 'Administrátorský účet může propojit pouze administrátor.' }, { status: 403 });
-      await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, role: existing.role } });
+      await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, role: existing.role, roles: existing.roles } });
       return NextResponse.json({ ok: true, linkedExistingAccount: true });
     }
-    const user = await prisma.user.create({ data: { name: `${employee.firstName} ${employee.lastName}`, email: employee.email, role: employee.role, employee: { connect: { id: employee.id } } } });
+    const rolesToAssign = body.roles && body.roles.length ? body.roles : (employee.roles.length ? employee.roles : [employee.role]);
+    const primaryRole = body.role || employee.role;
+    const user = await prisma.user.create({
+      data: {
+        name: `${employee.firstName} ${employee.lastName}`,
+        email: employee.email,
+        role: primaryRole,
+        roles: rolesToAssign,
+        employee: { connect: { id: employee.id } },
+      },
+    });
     try {
       const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = activationUrl(token);
       await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);
@@ -47,7 +57,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!target) return NextResponse.json({ error: 'Zaměstnanec nemá uživatelský účet.' }, { status: 404 });
   if (!canManageTarget(actor.role, target.role)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat tento účet.' }, { status: 403 });
   if (actor.id === target.id && body.action === 'role') return NextResponse.json({ error: 'Nemůžete změnit vlastní roli.' }, { status: 400 });
-  if (body.action === 'role' && (!body.role || !canAssignRole(actor.role, body.role))) return NextResponse.json({ error: 'Tuto roli nemůžete přiřadit.' }, { status: 403 });
 
   if (body.action === 'invite') {
     const limited = await enforceRateLimit(request, hashRateLimitIdentity(target.id), rateLimitPolicies.resendInvitation);
@@ -60,18 +69,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'suspend' || body.action === 'role') {
+    const primaryRole = body.role || target.role;
+    const rolesArray = body.roles && body.roles.length ? body.roles : Array.from(new Set([primaryRole, ...(target.roles || [])]));
     try {
       await prisma.$transaction(async (transaction) => {
         const activeAdminCount = await transaction.user.count({ where: { role: 'ADMIN', status: 'ACTIVE', OR: [{ employee: null }, { employee: { is: { isActive: true } } }] } });
-        if (wouldRemoveLastActiveAdmin({ targetRole: target.role, nextRole: body.role, suspending: body.action === 'suspend', activeAdminCount })) throw new Error('LAST_ADMIN');
-        if (body.action === 'suspend') { await transaction.user.update({ where: { id: target.id }, data: { status: 'SUSPENDED', sessionVersion: { increment: 1 }, sessions: { deleteMany: {} } } }); await transaction.userToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } }); }
-        else await Promise.all([transaction.user.update({ where: { id: target.id }, data: { role: body.role! } }), transaction.employee.update({ where: { id }, data: { role: body.role! } })]);
+        if (wouldRemoveLastActiveAdmin({ targetRole: target.role, nextRole: primaryRole, suspending: body.action === 'suspend', activeAdminCount })) throw new Error('LAST_ADMIN');
+        if (body.action === 'suspend') {
+          await transaction.user.update({ where: { id: target.id }, data: { status: 'SUSPENDED', sessionVersion: { increment: 1 }, sessions: { deleteMany: {} } } });
+          await transaction.userToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } });
+        } else {
+          await Promise.all([
+            transaction.user.update({ where: { id: target.id }, data: { role: primaryRole, roles: rolesArray } }),
+            transaction.employee.update({ where: { id }, data: { role: primaryRole, roles: rolesArray } }),
+          ]);
+        }
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
       if (error instanceof Error && error.message === 'LAST_ADMIN') return NextResponse.json({ error: 'Posledního aktivního administrátora nelze deaktivovat ani zbavit role.' }, { status: 409 });
       throw error;
     }
-    await audit(body.action === 'suspend' ? 'ACCOUNT_SUSPENDED' : 'ROLE_CHANGED', target.id, actor.id, body.action === 'role' ? { from: target.role, to: body.role! } : undefined);
+    await audit(body.action === 'suspend' ? 'ACCOUNT_SUSPENDED' : 'ROLE_CHANGED', target.id, actor.id, body.action === 'role' ? { from: target.role, to: primaryRole, roles: rolesArray } : undefined);
     return NextResponse.json({ ok: true });
   }
 

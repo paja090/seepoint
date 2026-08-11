@@ -1,2 +1,258 @@
-'use client'; import { useState } from 'react'; import { useRouter } from 'next/navigation'; import { roles,roleLabel,type AppRole } from '@/lib/rbac';
-export function AccountAdmin({employeeId,status,role,lastLoginAt,canSetAdmin}:{employeeId:string;status:string|null;role:AppRole;lastLoginAt:string|null;canSetAdmin:boolean}){const router=useRouter();const[busy,setBusy]=useState(false);const[msg,setMsg]=useState('');async function act(action:string,nextRole?:string){setBusy(true);setMsg('');const r=await fetch(`/api/employees/${employeeId}/account`,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({action,role:nextRole})});const data=await r.json();setBusy(false);setMsg(data.error??data.warning??(data.activationUrl?`Vývojová aktivační URL: ${data.activationUrl}`:'Změna byla uložena.'));if(r.ok)router.refresh()}return <section className="card mt-6"><h2 className="text-xl font-bold">Přístup do aplikace</h2>{!status?<><p className="mt-2 text-sm">Účet zatím není vytvořen.</p><button disabled={busy} className="mt-4 rounded-lg bg-slate-950 px-3 py-2 text-white" onClick={()=>act('enableAccess')}>Povolit přístup</button></>:<><p className="mt-2 text-sm">Stav účtu: <b>{status}</b> · poslední přihlášení: {lastLoginAt?new Date(lastLoginAt).toLocaleString('cs-CZ'):'—'}</p><div className="mt-4 flex flex-wrap gap-2">{status==='INVITED'&&<button disabled={busy} className="rounded-lg border px-3 py-2" onClick={()=>act('invite')}>Odeslat novou pozvánku</button>}{status==='SUSPENDED'?<button disabled={busy} className="rounded-lg bg-emerald-700 px-3 py-2 text-white" onClick={()=>act('restore')}>Obnovit účet</button>:<button disabled={busy} className="rounded-lg bg-amber-600 px-3 py-2 text-white" onClick={()=>act('suspend')}>Pozastavit účet</button>}<select disabled={busy} className="input max-w-52" value={role} onChange={e=>act('role',e.target.value)}>{roles.filter(r=>canSetAdmin||r!=='ADMIN').map(r=><option key={r} value={r}>{roleLabel(r)}</option>)}</select></div></>}{msg&&<p className="mt-3 break-all text-sm">{msg}</p>}</section>}
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Check, ShieldCheck, Mail, Send, UserCheck, Lock } from 'lucide-react';
+import { roles, roleLabel, type AppRole } from '@/lib/rbac';
+
+interface AccountAdminProps {
+  employeeId: string;
+  status: string | null;
+  role: AppRole;
+  rolesList?: AppRole[];
+  lastLoginAt: string | null;
+  canSetAdmin: boolean;
+}
+
+export function AccountAdmin({
+  employeeId,
+  status,
+  role: initialPrimaryRole,
+  rolesList = [],
+  lastLoginAt,
+  canSetAdmin,
+}: AccountAdminProps) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  // Initial selected roles array
+  const initialRoles = Array.from(
+    new Set([initialPrimaryRole, ...(rolesList || [])])
+  ) as AppRole[];
+
+  const [selectedRoles, setSelectedRoles] = useState<AppRole[]>(initialRoles);
+  const [primaryRole, setPrimaryRole] = useState<AppRole>(initialPrimaryRole);
+
+  function toggleRole(targetRole: AppRole) {
+    if (selectedRoles.includes(targetRole)) {
+      if (selectedRoles.length === 1) return; // Must keep at least one role
+      const next = selectedRoles.filter((r) => r !== targetRole);
+      setSelectedRoles(next);
+      if (primaryRole === targetRole && next.length > 0) {
+        setPrimaryRole(next[0]);
+      }
+    } else {
+      setSelectedRoles([...selectedRoles, targetRole]);
+    }
+  }
+
+  async function saveRoles() {
+    setBusy(true);
+    setMsg('');
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/account`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'role',
+          role: primaryRole,
+          roles: selectedRoles,
+        }),
+      });
+      const data = await res.json();
+      setBusy(false);
+      setMsg(data.error ?? data.warning ?? 'Přiřazené funkce a role byly úspěšně uloženy.');
+      if (res.ok) router.refresh();
+    } catch {
+      setBusy(false);
+      setMsg('Chyba při ukládání rolí.');
+    }
+  }
+
+  async function act(action: string) {
+    setBusy(true);
+    setMsg('');
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/account`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action, role: primaryRole, roles: selectedRoles }),
+      });
+      const data = await res.json();
+      setBusy(false);
+      setMsg(
+        data.error ??
+          data.warning ??
+          (data.activationUrl
+            ? `✉️ Pozvánka odeslána! (Testovací odkaz: ${data.activationUrl})`
+            : 'Změna účtu byla uložena.')
+      );
+      if (res.ok) router.refresh();
+    } catch {
+      setBusy(false);
+      setMsg('Chyba při komunikaci se serverem.');
+    }
+  }
+
+  const availableRoleOptions = roles.filter((r) => canSetAdmin || r !== 'ADMIN');
+
+  return (
+    <section className="card mt-6">
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-4">
+        <ShieldCheck className="h-6 w-6 text-emerald-600" />
+        <div>
+          <h2 className="text-xl font-bold text-slate-950">Přístup do Aplikace & Přiřazené Funkce</h2>
+          <p className="text-xs text-slate-500">
+            Správa přihlašovacího účtu zaměstnance, pozvánky e-mailem a kombinování rolí (Obchodník, Pracovník, Admin...)
+          </p>
+        </div>
+      </div>
+
+      {!status ? (
+        <div className="mt-5 space-y-4">
+          <div className="rounded-2xl bg-amber-50 p-4 border border-amber-200 text-amber-900 text-sm">
+            <p className="font-bold">Účet zatím není vytvořen.</p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              Po povolení přístupu bude pracovníkovi odeslána pozvánka s odkazem pro nastavení hesla.
+            </p>
+          </div>
+
+          <button
+            disabled={busy}
+            className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition active:scale-95 disabled:opacity-50"
+            onClick={() => act('enableAccess')}
+          >
+            <Send size={16} />
+            <span>Povolit přístup & Odeslat pozvánku e-mailem</span>
+          </button>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-6">
+          {/* Account Status Badge & Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-200">
+            <div>
+              <p className="text-xs text-slate-500">Stav uživatelského účtu</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-black ${
+                  status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  <UserCheck size={14} />
+                  <span>{status === 'ACTIVE' ? 'Aktivní (Přihlašuje se)' : 'Pozván (INVITED)'}</span>
+                </span>
+                <span className="text-xs text-slate-500">
+                  Poslední přihlášení: <b>{lastLoginAt ? new Date(lastLoginAt).toLocaleString('cs-CZ') : 'Zatím nepřihlášen'}</b>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {status === 'INVITED' && (
+                <button
+                  disabled={busy}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition active:scale-95"
+                  onClick={() => act('invite')}
+                >
+                  <Mail size={14} />
+                  <span>Odeslat novou pozvánku</span>
+                </button>
+              )}
+
+              {status === 'SUSPENDED' ? (
+                <button
+                  disabled={busy}
+                  className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-600 transition"
+                  onClick={() => act('restore')}
+                >
+                  Obnovit účet
+                </button>
+              ) : (
+                <button
+                  disabled={busy}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-500 transition"
+                  onClick={() => act('suspend')}
+                >
+                  Pozastavit účet
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Multiple Roles Selection Box */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <ShieldCheck size={18} className="text-emerald-600" />
+                <span>Přiřazené funkce & Role (Více rolí pro 1 zaměstnance)</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Zaměstnanec může mít zároveň roli Pracovníka i Obchodníka či Administrátora a v mobilu si mezi nimi 1-klikem přepínat.
+              </p>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {availableRoleOptions.map((r) => {
+                const isChecked = selectedRoles.includes(r);
+                const isPrimary = primaryRole === r;
+
+                return (
+                  <div
+                    key={r}
+                    onClick={() => toggleRole(r)}
+                    className={`cursor-pointer flex items-center justify-between rounded-xl border p-3 text-xs font-bold transition ${
+                      isChecked
+                        ? 'border-emerald-500 bg-emerald-50/60 text-slate-900 shadow-sm'
+                        : 'border-slate-200 bg-slate-50/50 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`flex h-5 w-5 items-center justify-center rounded-md border ${
+                        isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {isChecked && <Check size={14} />}
+                      </div>
+                      <span>{roleLabel(r)}</span>
+                    </div>
+
+                    {isChecked && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPrimaryRole(r);
+                        }}
+                        className={`rounded-md px-2 py-0.5 text-[10px] font-black transition ${
+                          isPrimary
+                            ? 'bg-emerald-700 text-white'
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                        title="Nastavit jako výchozí primární roli"
+                      >
+                        {isPrimary ? '★ Primární' : 'Nastavit primární'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                Přiřazené role: <b>{selectedRoles.map((r) => roleLabel(r)).join(', ')}</b> (Primární: <b>{roleLabel(primaryRole)}</b>)
+              </p>
+              <button
+                disabled={busy}
+                onClick={saveRoles}
+                className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition active:scale-95 shadow-md shadow-emerald-600/20"
+              >
+                Uložit přiřazené funkce
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg && <p className="mt-4 rounded-xl bg-slate-900 p-3 text-xs font-semibold text-emerald-400 break-all">{msg}</p>}
+    </section>
+  );
+}

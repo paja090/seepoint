@@ -1,12 +1,13 @@
 import 'server-only';
 import { cookies } from 'next/headers';
+import { Role } from '@prisma/client';
 import { prisma } from './db';
 import { hashToken, newToken } from './auth-crypto';
 export { hashPassword, hashToken, newToken, validatePassword, verifyPassword } from './auth-crypto';
 
 export const SESSION_COOKIE = 'seepoint_session';
+export const ACTIVE_ROLE_COOKIE = 'seepoint_active_role';
 const SESSION_DAYS = 14;
-
 
 export async function createSession(userId: string, sessionVersion: number) {
   const jar = await cookies();
@@ -23,16 +24,43 @@ export async function destroySession() {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await prisma.userSession.deleteMany({ where: { tokenHash: hashToken(token) } });
   jar.delete(SESSION_COOKIE);
+  jar.delete(ACTIVE_ROLE_COOKIE);
 }
 
 export async function getCurrentUser() {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const session = await prisma.userSession.findUnique({ where: { tokenHash: hashToken(token) }, include: { user: { include: { employee: true } } } });
+  const session = await prisma.userSession.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: { user: { include: { employee: true } } },
+  });
   if (!session || session.expiresAt <= new Date() || session.sessionVersion !== session.user.sessionVersion || session.user.status !== 'ACTIVE' || session.user.employee?.isActive === false) return null;
-  return session.user;
-}
 
+  const user = session.user;
+  const activeRoleCookie = jar.get(ACTIVE_ROLE_COOKIE)?.value;
+
+  // Combine primary role, user roles array, and employee roles array
+  const rawRoles = [
+    user.role,
+    ...(user.roles || []),
+    ...(user.employee?.role ? [user.employee.role] : []),
+    ...(user.employee?.roles || []),
+  ];
+  const allowedRoles = Array.from(new Set(rawRoles)) as Role[];
+
+  let activeRole: Role = user.role;
+  if (activeRoleCookie && allowedRoles.includes(activeRoleCookie as Role)) {
+    activeRole = activeRoleCookie as Role;
+  }
+
+  return {
+    ...user,
+    role: activeRole,
+    primaryRole: user.role,
+    allowedRoles,
+  };
+}
 
 export async function invalidateUserSessions(userId: string) {
   const [user] = await prisma.$transaction([prisma.user.update({ where: { id: userId }, data: { sessionVersion: { increment: 1 } } }), prisma.userSession.deleteMany({ where: { userId } })]);

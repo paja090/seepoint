@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 import { NotificationBellCenter } from '@/components/notifications/NotificationBellCenter';
+import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 
 const pageTitles: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
@@ -26,7 +27,7 @@ const pageTitles: Array<[string, string]> = [
   ['/settings', 'Nastavení'],
 ];
 
-export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole } }) {
+export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[] } }) {
   const pathname = usePathname();
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
@@ -43,6 +44,7 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
         Rychlé hledání bude napojené v další iteraci
       </div>
       <div className="flex items-center gap-3">
+        <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} />
         <div className="hidden text-right sm:block">
           <p className="text-sm font-semibold text-slate-900">{user.name}</p>
           <p className="text-xs text-slate-500">{roleLabel(user.role)}</p>
