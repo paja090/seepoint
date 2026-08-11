@@ -5,6 +5,7 @@ import { createOfferPdf } from '@/lib/offers/pdf';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getPublicClientLogo, getPublicOffer } from '@/lib/offers/service';
 import type { OfferView } from '@/lib/offers/view-model';
+import { canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,14 @@ async function loadClientLogo(token: string): Promise<string | undefined> {
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
   const token = (await params).token;
   try {
-    const offer = toProposalOffer(await getPublicOffer(token) as OfferView);
+    const offerView = await getPublicOffer(token) as OfferView;
+    if (!canDownloadOfferPdf(offerView)) {
+      return NextResponse.json(
+        { error: 'Cenové PDF bude dostupné až po výběru navigačních bodů a přípravě cenové nabídky.' },
+        { status: 409 },
+      );
+    }
+    const offer = toProposalOffer(offerView);
     const pdf = await createOfferPdf(offer, await loadClientLogo(token));
     return new Response(new Uint8Array(pdf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename(offer.title))}`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
   } catch (error) {

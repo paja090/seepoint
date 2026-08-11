@@ -149,6 +149,10 @@ export type NavigationOrderDetail = {
   targetLatitude: number;
   targetLongitude: number;
   targetNote?: string | null;
+  graphicArtworkUrl?: string | null;
+  clientArtworkUrl?: string | null;
+  clientArtworkFileName?: string | null;
+  includeGraphicProof?: boolean;
   graphicsApprovedAt?: string | null;
   productionReadyAt?: string | null;
   installedAt?: string | null;

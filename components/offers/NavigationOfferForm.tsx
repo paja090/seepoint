@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
+import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 
@@ -33,6 +34,7 @@ type DraftPoint = {
   clientNote: string;
   realDistanceText?: string;
   visualizedPhotoUrl?: string;
+  isSelectedByClient?: boolean;
   carrierId?: string | null;
 
   // New structured fields
@@ -53,16 +55,18 @@ const newId = () =>
 
 export function NavigationOfferForm({
   clients,
+  initialClientId,
   initialOffer,
 }: {
   clients: ClientOption[];
+  initialClientId?: string;
   initialOffer?: OfferView;
 }) {
   const router = useRouter();
   const navigation = initialOffer?.navigation;
 
   const [clientList, setClientList] = useState<ClientOption[]>(clients);
-  const [clientId, setClientId] = useState(initialOffer?.clientId ?? clients[0]?.id ?? '');
+  const [clientId, setClientId] = useState(initialOffer?.clientId ?? initialClientId ?? clients[0]?.id ?? '');
   const [showClientModal, setShowClientModal] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientContact, setNewClientContact] = useState('');
@@ -152,6 +156,8 @@ export function NavigationOfferForm({
         distanceSource: (point.distanceSource as DraftPoint['distanceSource']) || 'CALCULATED',
         routePolyline: (point.routePolyline as string) ?? undefined,
         calculatedDistanceMeters: (point.calculatedDistanceMeters as number) ?? undefined,
+        visualizedPhotoUrl: typeof point.visualizedPhotoUrl === 'string' ? point.visualizedPhotoUrl : undefined,
+        isSelectedByClient: point.isSelectedByClient !== false,
       })) ?? [],
   );
 
@@ -162,6 +168,11 @@ export function NavigationOfferForm({
   const [graphicArtworkUrl, setGraphicArtworkUrl] = useState<string | null>(
     typeof (initialOffer?.navigation as unknown as Record<string, unknown>)?.graphicArtworkUrl === 'string'
       ? String((initialOffer?.navigation as unknown as Record<string, unknown>)?.graphicArtworkUrl)
+      : null
+  );
+  const [targetPhotoUrl, setTargetPhotoUrl] = useState<string | null>(
+    typeof (initialOffer?.navigation as unknown as Record<string, unknown>)?.targetPhotoUrl === 'string'
+      ? String((initialOffer?.navigation as unknown as Record<string, unknown>)?.targetPhotoUrl)
       : null
   );
   const [includeGraphicProof, setIncludeGraphicProof] = useState<boolean>(
@@ -205,7 +216,7 @@ export function NavigationOfferForm({
     void loadPriceCatalog();
   }, []);
 
-  const selectedClient = clients.find((client) => client.id === clientId);
+  const selectedClient = clientList.find((client) => client.id === clientId);
 
   // Financial summary breakdown
   const totals = useMemo(() => {
@@ -453,7 +464,9 @@ export function NavigationOfferForm({
       targetLatitude: target.latitude,
       targetLongitude: target.longitude,
       targetNote,
+      targetPhotoUrl,
       internalNote,
+      clientMessage,
       proposalMode,
       graphicArtworkUrl,
       includeGraphicProof,
@@ -667,6 +680,46 @@ export function NavigationOfferForm({
             <textarea className="input min-h-16 text-xs" placeholder="Instrukce k příjezdu, parkoviště…" value={targetNote} onChange={(e) => setTargetNote(e.target.value)} />
           </Field>
 
+          <div className="rounded-xl border border-sky-200 bg-white p-3 space-y-3">
+            <div>
+              <p className="text-xs font-bold text-slate-900">Fotografie cílové provozovny</p>
+              <p className="mt-1 text-[11px] text-slate-500">Zobrazí se klientovi v hlavičce nabídky společně s jeho logem.</p>
+            </div>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-sky-400 px-3 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-50">
+              <Upload size={15} />
+              {targetPhotoUrl ? 'Změnit fotografii provozovny' : 'Nahrát fotografii provozovny'}
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                type="file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                    setMessage('Fotografie provozovny musí být ve formátu JPG, PNG nebo WebP.');
+                    return;
+                  }
+                  if (file.size > 5 * 1024 * 1024) {
+                    setMessage('Fotografie provozovny může mít maximálně 5 MB.');
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setTargetPhotoUrl(String(reader.result));
+                    setMessage('');
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            {targetPhotoUrl ? (
+              <div className="relative overflow-hidden rounded-xl border border-slate-200">
+                <img alt="Fotografie cílové provozovny" className="h-36 w-full object-cover" src={targetPhotoUrl} />
+                <button className="absolute right-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold text-white" onClick={() => setTargetPhotoUrl(null)} type="button">Odstranit</button>
+              </div>
+            ) : null}
+          </div>
+
           <button className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900" onClick={() => setMode('target')} type="button">
             <MapPin size={15} /> Změnit cíl kliknutím na mapě
           </button>
@@ -726,7 +779,7 @@ export function NavigationOfferForm({
           {saving ? 'Ukládám nabídku…' : 'Uložit nabídku navigace'}
         </button>
 
-        {initialOffer?.id && (
+        {initialOffer?.id && canDownloadInstallationSheet(initialOffer) && (
           <a
             href={`/api/proposals/${initialOffer.id}/installation-sheet`}
             target="_blank"
@@ -869,6 +922,26 @@ export function NavigationOfferForm({
                     </div>
                   </div>
                 )}
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100">
+                  <Upload size={14} />
+                  {point.visualizedPhotoUrl ? 'Nahradit hotovou vizualizaci' : 'Nahrát hotovou vizualizaci'}
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+                        setMessage('Vizualizace musí být JPG, PNG nebo WebP do 5 MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => updatePoint(point.id, { visualizedPhotoUrl: String(reader.result) });
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <Field label="Označení bodu">

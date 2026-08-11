@@ -19,9 +19,10 @@ const navGroups: NavGroup[] = [
     label: 'Projekty Navigace',
     items: [
       ['/navigation', ' Navigace (Přehled)', 'mapPinned', 'navigationProjects'],
+      ['/mobile-photos', '📱 Mobilní foto z terénu', 'camera', 'navigationProjects'],
       ['/navigation/contracts', '📄 Evidence smluv', 'fileText', 'navigationProjects'],
       ['/navigation/contacts', '👥 Kontaktní osoby', 'users', 'navigationProjects'],
-      ['/navigation/documentation', '📷 Fotodokumentace', 'camera', 'navigationDocumentation'],
+      ['/navigation/documentation', '📷 Fotodokumentace reporty', 'camera', 'navigationDocumentation'],
       ['/projects/city-gallery', 'Galerie venku', 'galleryHorizontalEnd', 'cityGallery'],
     ],
   },

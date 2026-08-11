@@ -2,6 +2,13 @@ import { Prisma } from '@prisma/client';
 import type { AppRole, CurrentUser } from '@/lib/rbac';
 
 export const OFFER_STATUSES = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'] as const;
+
+export function shouldCreateNavigationOrderAfterAcceptance(input: {
+  offerType: string;
+  proposalMode?: string | null;
+}) {
+  return input.offerType === 'NAVIGATION' && input.proposalMode === 'PRICED_QUOTE';
+}
 export type OfferStatusValue = typeof OFFER_STATUSES[number];
 
 export type OfferItemInput = {
@@ -311,7 +318,7 @@ export function stripPublicOfferSecrets<T extends Record<string, unknown>>(sourc
   if (Array.isArray(result.items)) result.items = result.items.map((raw) => { const item = { ...(raw as Record<string, unknown>) }; delete item.id; delete item.surfaceId; delete item.note; if (item.surface && typeof item.surface === 'object') { const surface = { ...(item.surface as Record<string, unknown>) }; delete surface.status; item.surface = surface; } return item; });
   if (Array.isArray(result.charges)) result.charges = result.charges.map((raw) => { const charge = { ...(raw as Record<string, unknown>) }; delete charge.id; delete charge.priceRuleId; return charge; });
   if (Array.isArray(result.packageSelections)) result.packageSelections = result.packageSelections.map((raw) => { const selection = { ...(raw as Record<string, unknown>) }; delete selection.id; delete selection.packageId; return selection; });
-  if (result.navigation && typeof result.navigation === 'object') { const navigation = { ...(result.navigation as Record<string, unknown>) }; if (Array.isArray(navigation.points)) navigation.points = navigation.points.map((raw) => { const point = { ...(raw as Record<string, unknown>) }; delete point.id; delete point.carrierId; delete point.internalNote; delete point.status; return point; }); result.navigation = navigation; }
+  if (result.navigation && typeof result.navigation === 'object') { const navigation = { ...(result.navigation as Record<string, unknown>) }; if (Array.isArray(navigation.points)) navigation.points = navigation.points.map((raw, index) => { const point: Record<string, unknown> = { ...(raw as Record<string, unknown>), id: `point-${index + 1}` }; delete point.carrierId; delete point.internalNote; delete point.status; return point; }); result.navigation = navigation; }
   if (result.cityGallery && typeof result.cityGallery === 'object') { const gallery = { ...(result.cityGallery as Record<string, unknown>) }; delete gallery.projectId; result.cityGallery = gallery; }
   return result as T;
 }

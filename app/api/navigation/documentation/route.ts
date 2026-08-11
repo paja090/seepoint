@@ -63,12 +63,12 @@ export async function POST(request: Request) {
     const { token, hash } = generateSecureToken();
 
     // Query active navigation points for this client / offer
-    const points = await prisma.navigationPoint.findMany({
+    let points = await prisma.navigationPoint.findMany({
       where: {
-        navigationOffer: {
-          offer: {
+        navigationOrder: {
+          crmOrder: {
             clientId,
-            ...(offerId ? { id: offerId } : {}),
+            ...(offerId ? { offerId } : {}),
           },
         },
         status: { notIn: ['REMOVED', 'CANCELLED'] },
@@ -86,6 +86,26 @@ export async function POST(request: Request) {
       orderBy: { sortOrder: 'asc' },
     });
 
+    if (points.length === 0) {
+      points = await prisma.navigationPoint.findMany({
+        where: {
+          navigationOffer: { offer: { clientId, ...(offerId ? { id: offerId } : {}) } },
+          status: { notIn: ['REMOVED', 'CANCELLED'] },
+        },
+        include: {
+          carrier: {
+            include: {
+              photos: {
+                where: { isPrivate: false },
+                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+              },
+            },
+          },
+        },
+        orderBy: { sortOrder: 'asc' },
+      });
+    }
+
     let itemInputs: Array<{
       navigationPointId?: string;
       carrierId?: string;
@@ -98,7 +118,7 @@ export async function POST(request: Request) {
       itemInputs = points.map((point, index) => ({
         navigationPointId: point.id,
         carrierId: point.carrierId ?? undefined,
-        selectedPhotoId: point.carrier?.photos[0]?.id ?? undefined,
+        selectedPhotoId: point.installedPhotoId ?? point.carrier?.photos[0]?.id ?? undefined,
         sortOrder: index,
         isVisible: true,
       }));

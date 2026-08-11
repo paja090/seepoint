@@ -4,6 +4,7 @@ import { createInstallationSheetPdf } from '@/lib/offers/pdf';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getPublicOffer } from '@/lib/offers/service';
 import type { OfferView } from '@/lib/offers/view-model';
+import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,14 @@ const filename = (title: string) => `montazni-list-${title.toLowerCase().normali
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
   const token = (await params).token;
   try {
-    const offer = toProposalOffer(await getPublicOffer(token) as OfferView);
+    const offerView = await getPublicOffer(token) as OfferView;
+    if (!canDownloadInstallationSheet(offerView)) {
+      return NextResponse.json(
+        { error: 'Montážní list bude dostupný až po přijetí cenové nabídky klientem.' },
+        { status: 409 },
+      );
+    }
+    const offer = toProposalOffer(offerView);
     const pdf = await createInstallationSheetPdf(offer);
     return new Response(new Uint8Array(pdf), {
       headers: {

@@ -83,19 +83,45 @@ export function isGoogleDriveMockEnabled() {
   return process.env.NODE_ENV !== 'production' && process.env.GOOGLE_DRIVE_MOCK_ENABLED === 'true';
 }
 
+type AccessTokenProvider = () => Promise<string>;
+
+export async function resolveGoogleDriveAccessToken(
+  hasOAuthCredentials: boolean,
+  hasServiceAccountCredentials: boolean,
+  getOAuthToken: AccessTokenProvider,
+  getServiceAccountToken: AccessTokenProvider,
+) {
+  if (hasOAuthCredentials) {
+    try {
+      return await getOAuthToken();
+    } catch (error) {
+      if (!hasServiceAccountCredentials) throw error;
+      console.warn('Google Drive OAuth failed; falling back to the service account.');
+    }
+  }
+
+  if (hasServiceAccountCredentials) return getServiceAccountToken();
+
+  throw new GoogleDriveConfigurationError(
+    'Chybí konfigurace Google Drive OAuth nebo Google Service Account.',
+  );
+}
+
 async function getAccessToken() {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const configuredPrivateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
-  if (clientId && clientSecret && refreshToken) {
+  const getOAuthToken = async () => {
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
+        client_id: clientId!,
+        client_secret: clientSecret!,
+        refresh_token: refreshToken!,
         grant_type: 'refresh_token',
       }),
       cache: 'no-store',
@@ -105,53 +131,53 @@ async function getAccessToken() {
       throw new Error(`Google OAuth autentizace selhala: ${data.error_description ?? response.statusText}`);
     }
     return data.access_token;
-  }
+  };
 
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  let privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  const getServiceAccountToken = async () => {
+    if (!email || !configuredPrivateKey) {
+      throw new GoogleDriveConfigurationError(
+        'Chybí konfigurace Google Drive OAuth nebo Google Service Account.',
+      );
+    }
+    const privateKey = configuredPrivateKey.replace(/\\n/g, '\n');
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+    const now = Math.floor(Date.now() / 1000);
+    const claimSet = Buffer.from(
+      JSON.stringify({
+        iss: email,
+        scope: 'https://www.googleapis.com/auth/drive',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: now + 3600,
+        iat: now,
+      }),
+    ).toString('base64url');
 
-  if (!email || !privateKey) {
-    throw new GoogleDriveConfigurationError(
-      'Chybí konfigurace Google Drive OAuth nebo Google Service Account.'
-    );
-  }
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(`${header}.${claimSet}`);
+    const signature = sign.sign(privateKey, 'base64url');
+    const jwt = `${header}.${claimSet}.${signature}`;
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt,
+      }),
+      cache: 'no-store',
+    });
+    const data = (await response.json()) as { access_token?: string; error_description?: string };
+    if (!response.ok || !data.access_token) {
+      throw new Error(`Google Service Account autentizace selhala: ${data.error_description ?? response.statusText}`);
+    }
+    return data.access_token;
+  };
 
-  // Support Vercel multi-line environment variables
-  privateKey = privateKey.replace(/\\n/g, '\n');
-
-  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-  const now = Math.floor(Date.now() / 1000);
-  const claimSet = Buffer.from(
-    JSON.stringify({
-      iss: email,
-      scope: 'https://www.googleapis.com/auth/drive',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: now + 3600,
-      iat: now,
-    })
-  ).toString('base64url');
-
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(`${header}.${claimSet}`);
-  const signature = sign.sign(privateKey, 'base64url');
-  const jwt = `${header}.${claimSet}.${signature}`;
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-    cache: 'no-store',
-  });
-
-  const data = (await response.json()) as { access_token?: string; error_description?: string };
-  if (!response.ok || !data.access_token) {
-    throw new Error(`Google Service Account autentizace selhala: ${data.error_description ?? response.statusText}`);
-  }
-
-  return data.access_token;
+  return resolveGoogleDriveAccessToken(
+    Boolean(clientId && clientSecret && refreshToken),
+    Boolean(email && configuredPrivateKey),
+    getOAuthToken,
+    getServiceAccountToken,
+  );
 }
 
 async function getOrCreatePhotoFolder(accessToken: string) {

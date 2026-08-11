@@ -1,6 +1,7 @@
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { prisma } from '@/lib/db';
+import { convertOfferToNavigationOrderInTransaction } from '@/lib/navigation/navigation-service';
 import {
   assertOfferTransition,
   assertAvailability,
@@ -15,6 +16,7 @@ import {
   planOfferConversion,
   recoverFixedDiscount,
   serverOfferAuthor,
+  shouldCreateNavigationOrderAfterAcceptance,
   stripPublicOfferSecrets,
   type OfferInput,
   type OfferStatusValue,
@@ -181,7 +183,13 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       targetLatitude: row.navigationOffer.targetLatitude,
       targetLongitude: row.navigationOffer.targetLongitude,
       targetNote: row.navigationOffer.targetNote,
+      targetPhotoUrl: row.navigationOffer.targetPhotoUrl,
       proposalMode: row.navigationOffer.proposalMode || 'LOCATION_SELECTION',
+      selectionSubmitted: row.events.some((event) => {
+        const metadata = event.metadata as Record<string, unknown> | null;
+        return metadata?.action === 'navigation-selection'
+          || (event.actorName === 'Klient (veřejný odkaz)' && event.message?.includes('k nacenění'));
+      }),
       graphicArtworkUrl: row.navigationOffer.graphicArtworkUrl,
       includeGraphicProof: row.navigationOffer.includeGraphicProof !== false,
       clientArtworkUrl: row.navigationOffer.clientArtworkUrl,
@@ -695,6 +703,31 @@ export async function publishOffer(user: CurrentUser, id: string) {
   return { offer: serializeOffer(row), token: generated.token, path: `/offer/${generated.token}` };
 }
 
+export async function prepareOfferDelivery(user: CurrentUser, id: string, emailDraft?: { clientMessage?: string }) {
+  const generated = createPublicOfferToken();
+  const row = await prisma.$transaction(async (tx) => {
+    const existing = await getOfferRow(tx, id);
+    assertAccess(user, existing);
+    if (existing.status !== 'DRAFT' && existing.status !== 'SENT') {
+      throw new OfferValidationError('Odeslat lze pouze novou nebo již odeslanou nabídku.', 'INVALID_STATUS_TRANSITION');
+    }
+    const conflicts = existing.offerType === 'STANDARD_MEDIA' ? await findConflicts(tx, existing.items) : [];
+    assertOfferReady(existing, conflicts);
+    return tx.offer.update({
+      where: { id },
+      data: {
+        publicTokenHash: generated.hash,
+        publishedAt: new Date(),
+        clientMessage: emailDraft?.clientMessage ?? existing.clientMessage,
+        updatedByUserId: user.id,
+        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name } },
+      },
+      include: offerInclude,
+    });
+  });
+  return { offer: serializeOffer(row), token: generated.token, path: `/offer/${generated.token}` };
+}
+
 export async function getPublicRow(token: string) {
   let row = null;
   if (isPlausiblePublicOfferToken(token)) {
@@ -730,10 +763,25 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     if (!isPlausiblePublicOfferToken(token)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
     const row = await tx.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
     if (!row || row.archivedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
-    if (action === 'question') {
-      if (!message) throw new OfferValidationError('Napište prosím dotaz.');
-      await tx.offerEvent.create({ data: { offerId: row.id, type: 'QUESTION', actorName, actorEmail, message } });
-      return { status: row.status, message: 'Dotaz byl uložen. Obchodník se vám ozve.' };
+    if (action === 'question' || action === 'revision') {
+      if (!message) throw new OfferValidationError(action === 'revision' ? 'Popište prosím požadovanou úpravu.' : 'Napište prosím dotaz.');
+      const storedMessage = action === 'revision' ? `Požadavek na úpravu: ${message}` : message;
+      await tx.offerEvent.create({
+        data: {
+          offerId: row.id,
+          type: 'QUESTION',
+          actorName,
+          actorEmail,
+          message: storedMessage,
+          metadata: { responseType: action, channel: 'public-token' },
+        },
+      });
+      return {
+        status: row.status,
+        message: action === 'revision'
+          ? 'Požadavek na úpravu byl uložen. Obchodník se vám ozve.'
+          : 'Dotaz byl uložen. Obchodník se vám ozve.',
+      };
     }
     const target = action === 'accept' ? 'ACCEPTED' : action === 'reject' ? 'REJECTED' : null;
     if (!target) throw new OfferValidationError('Akce není podporována.');
@@ -750,6 +798,21 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
         events: { create: { type: target, fromStatus: row.status, toStatus: target, actorName, actorEmail, message: message || null, metadata: { consent: true, channel: 'public-token' } } },
       },
     });
+
+    if (
+      target === 'ACCEPTED'
+      && row.createdByUser
+      && shouldCreateNavigationOrderAfterAcceptance({
+        offerType: row.offerType,
+        proposalMode: row.navigationOffer?.proposalMode,
+      })
+    ) {
+      await convertOfferToNavigationOrderInTransaction(tx, row.id, {
+        id: row.createdByUser.id,
+        email: row.createdByUser.email,
+      });
+    }
+
     return { status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

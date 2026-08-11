@@ -65,9 +65,9 @@ export function MobileInstallationView({
   const [activeItem, setActiveItem] = useState<MobileTaskItem | null>(null);
 
   // Photos state for active task
-  const [beforePhotoUrl, setBeforePhotoUrl] = useState('');
+  const [beforePhotoFile, setBeforePhotoFile] = useState<File | null>(null);
   const [beforePhotoPreview, setBeforePhotoPreview] = useState<string | null>(null);
-  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -125,18 +125,42 @@ export function MobileInstallationView({
     };
   };
 
+  const compressImageFile = (file: File, callback: (compressedFile: File) => void) => {
+    const previewUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = previewUrl;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxDimension = 1200;
+      const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        callback(file);
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        callback(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file);
+        URL.revokeObjectURL(previewUrl);
+      }, 'image/jpeg', 0.82);
+    };
+  };
+
   const handleBeforeCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setBeforePhotoPreview(URL.createObjectURL(file));
-    compressImage(file, setBeforePhotoUrl);
+    compressImageFile(file, setBeforePhotoFile);
   };
 
   const handleAfterCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoPreview(URL.createObjectURL(file));
-    compressImage(file, setPhotoUrl);
+    compressImageFile(file, setPhotoFile);
   };
 
   const handleIssueCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,7 +173,7 @@ export function MobileInstallationView({
   async function handleCompleteTask(e: React.FormEvent) {
     e.preventDefault();
     if (!activeItem) return;
-    if (!activeItem.installedPhotoUrl && !photoUrl) {
+    if (!activeItem.installedPhotoUrl && !photoFile) {
       setMsg('⚠️ Pro dokončení montáže musíte vyfotit fotografii po instalaci.');
       return;
     }
@@ -158,28 +182,29 @@ export function MobileInstallationView({
     setMsg('');
 
     try {
-      if (photoUrl) {
+      let savedPhotoUrl = activeItem.installedPhotoUrl;
+      if (photoFile) {
+        const form = new FormData();
+        form.append('navigationPointId', activeItem.pointId);
+        form.append('afterPhoto', photoFile);
+        if (beforePhotoFile) form.append('beforePhoto', beforePhotoFile);
+        if (note) form.append('note', note);
         const res = await fetch(`/api/navigation/orders/${activeItem.id}/photo`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            navigationPointId: activeItem.pointId,
-            photoUrl,
-            photoType: 'AFTER_INSTALLATION',
-            note: note || 'Fotografie po instalaci',
-          }),
+          body: form,
         });
 
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: string; photo?: { url?: string } };
         if (!res.ok) {
           throw new Error(data.error || 'Nepodařilo se uložit fotku z montáže.');
         }
+        savedPhotoUrl = data.photo?.url || savedPhotoUrl;
       }
 
       setItems((prev) =>
         prev.map((i) =>
           i.pointId === activeItem.pointId
-            ? { ...i, status: 'INSTALLED', installedPhotoUrl: photoUrl || i.installedPhotoUrl }
+            ? { ...i, status: 'INSTALLED', installedPhotoUrl: savedPhotoUrl || i.installedPhotoUrl }
             : i
         )
       );
@@ -238,9 +263,9 @@ export function MobileInstallationView({
     const remaining = todayItems.filter((i) => i.pointId !== activeItem?.pointId);
     if (remaining.length > 0) {
       setActiveItem(remaining[0]);
-      setPhotoUrl('');
+      setPhotoFile(null);
       setPhotoPreview(null);
-      setBeforePhotoUrl('');
+      setBeforePhotoFile(null);
       setBeforePhotoPreview(null);
       setNote('');
       setShowSuccessScreen(false);
@@ -386,7 +411,7 @@ export function MobileInstallationView({
                           type="button"
                           onClick={() => {
                             setBeforePhotoPreview(null);
-                            setBeforePhotoUrl('');
+                            setBeforePhotoFile(null);
                           }}
                           className="absolute bottom-2 right-2 bg-slate-950/80 text-xs font-bold text-white px-3 py-1.5 rounded-xl border border-slate-700"
                         >
@@ -413,7 +438,7 @@ export function MobileInstallationView({
                           type="button"
                           onClick={() => {
                             setPhotoPreview(null);
-                            setPhotoUrl('');
+                            setPhotoFile(null);
                           }}
                           className="absolute bottom-2 right-2 bg-slate-950/80 text-xs font-bold text-white px-3 py-1.5 rounded-xl border border-slate-700"
                         >
@@ -567,9 +592,9 @@ export function MobileInstallationView({
                       <button
                         onClick={() => {
                           setActiveItem(item);
-                          setPhotoUrl('');
+                          setPhotoFile(null);
                           setPhotoPreview(null);
-                          setBeforePhotoUrl('');
+                          setBeforePhotoFile(null);
                           setBeforePhotoPreview(null);
                           setNote('');
                         }}

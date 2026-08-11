@@ -44,7 +44,22 @@ export function OfferApproval({ offer, conflicts }: { offer: OfferView; conflict
             {assets.length === 0 ? <p className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200"><CheckCircle2 aria-hidden="true" size={16} />Všechny podklady jsou kompletní.</p> : <div className="space-y-2.5">{assets.map((asset) => <div className="flex items-center gap-3 rounded-xl border border-slate-200 p-3" key={asset.id}><span className={`grid size-9 place-items-center rounded-lg text-white ${asset.kind === 'photo' ? 'bg-purple-600' : 'bg-sky-600'}`}>{asset.kind === 'photo' ? <Camera aria-hidden="true" size={16} /> : <MapPinOff aria-hidden="true" size={16} />}</span><div className="min-w-0 flex-1"><p className="font-medium text-slate-900">{asset.code} · {asset.city}</p><p className="text-xs text-slate-500">{asset.surface} · {asset.kind === 'photo' ? 'chybí fotografie viditelná klientovi' : 'chybí GPS souřadnice'}</p></div><Link className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700" href={`/carriers?q=${encodeURIComponent(asset.code)}`}>Doplnit</Link></div>)}</div>}
           </section>}
         </div>
-        <aside className="lg:sticky lg:top-24 lg:self-start"><OfferSendControl canSend={canSend} missingCount={errorCount} offerId={offer.id!} status={offer.status} /></aside>
+        <aside className="lg:sticky lg:top-24 lg:self-start"><OfferSendControl
+          canSend={canSend}
+          emailPreview={{
+            recipient: offer.contactEmail || offer.client.email || '',
+            campaignName: offer.campaignName,
+            contactName: offer.contactPerson || offer.client.contactPerson || offer.client.name,
+            validUntil: offer.validUntil,
+            locationSelection: offer.offerType === 'NAVIGATION' && (offer.navigation as unknown as { proposalMode?: string } | null)?.proposalMode !== 'PRICED_QUOTE',
+            salespersonName: offer.createdBy.name,
+            salespersonEmail: offer.createdBy.email || '',
+          }}
+          initialMessage={offer.clientMessage || 'Připravili jsme pro Vás novou nabídku.'}
+          missingCount={errorCount}
+          offerId={offer.id!}
+          status={offer.status}
+        /></aside>
       </div>
 
       <footer className="flex items-center justify-between border-t border-slate-200 pt-6"><Link className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700" href={`/offers/${offer.id}/preview`}>← Zpět na klientský náhled</Link>{offer.status !== 'DRAFT' && <Link className="rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white" href={`/offers/${offer.id}`}>Pokračovat na detail nabídky →</Link>}</footer>

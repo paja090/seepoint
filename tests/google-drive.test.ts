@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isGoogleDriveMockEnabled, listImagesInFolder, verifyFileInFolder, uploadPhotoToGoogleDrive, downloadPhotoFromGoogleDrive } from '../lib/google-drive.ts';
+import { isGoogleDriveMockEnabled, listImagesInFolder, verifyFileInFolder, uploadPhotoToGoogleDrive, downloadPhotoFromGoogleDrive, resolveGoogleDriveAccessToken } from '../lib/google-drive.ts';
 
 // Cast process.env to allow modification of NODE_ENV in tests
 const env = process.env as Record<string, string | undefined>;
@@ -190,4 +190,29 @@ test('7. listImagesInFolder lists files in the mock folder', async () => {
     env.GOOGLE_DRIVE_MOCK_ENABLED = originalMockEnabled;
     env.GOOGLE_DRIVE_FOLDER_ID = originalFolderId;
   }
+});
+
+test('8. expired OAuth falls back to a configured service account', async () => {
+  let serviceAccountCalled = false;
+  const token = await resolveGoogleDriveAccessToken(
+    true,
+    true,
+    async () => { throw new Error('Token has been expired or revoked.'); },
+    async () => { serviceAccountCalled = true; return 'service-account-token'; },
+  );
+
+  assert.equal(token, 'service-account-token');
+  assert.equal(serviceAccountCalled, true);
+});
+
+test('9. OAuth error remains visible when no fallback is configured', async () => {
+  await assert.rejects(
+    resolveGoogleDriveAccessToken(
+      true,
+      false,
+      async () => { throw new Error('Token has been expired or revoked.'); },
+      async () => 'unused',
+    ),
+    /expired or revoked/,
+  );
 });

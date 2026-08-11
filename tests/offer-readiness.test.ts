@@ -34,3 +34,20 @@ test('audit blokuje prošlou platnost a chybějící kontakt', () => {
   const failed = offerReadinessChecks(offer, [], '2026-07-16').filter((check) => check.status === 'error').map((check) => check.id);
   assert.deepEqual(failed.slice(0, 2), ['client', 'validity']);
 });
+
+test('navigační nabídka vyžaduje klientský vizuál u každého bodu', () => {
+  const offer = standardOffer(true);
+  offer.offerType = 'NAVIGATION';
+  offer.navigation = {
+    targetName: 'Provozovna', targetLatitude: 49.7, targetLongitude: 18.2,
+    points: [{
+      id: 'point-1', label: 'Bod 1', latitude: 49.71, longitude: 18.21,
+      navigationType: 'Směrová tabule', quantity: '1', unitPrice: '1000', subtotal: '1000',
+      installationPrice: '0', removalPrice: '0', productionPrice: '0', status: 'PLANNED',
+    }],
+  };
+  const visualCheck = offerReadinessChecks(offer, [], '2026-07-16').find((check) => check.id === 'navigationVisuals');
+  assert.equal(visualCheck?.status, 'error');
+  (offer.navigation.points[0] as unknown as Record<string, unknown>).visualizedPhotoUrl = 'data:image/jpeg;base64,example';
+  assert.equal(offerReadinessChecks(offer, [], '2026-07-16').find((check) => check.id === 'navigationVisuals')?.status, 'ok');
+});

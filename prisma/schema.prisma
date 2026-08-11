@@ -944,6 +944,7 @@ model NavigationOffer {
   targetLatitude   Float
   targetLongitude  Float
   targetNote       String?
+  targetPhotoUrl   String?
   googlePlaceId    String?
   formattedAddress String?
   proposalMode          String   @default("LOCATION_SELECTION")
@@ -1326,6 +1327,16 @@ model Photo {
   isPrimary        Boolean   @default(false)
   isClientVisible  Boolean   @default(false)
   isPrivate        Boolean   @default(false)
+  capturedLatitude       Float?
+  capturedLongitude      Float?
+  capturedAccuracyMeters Float?
+  capturedByWorkerUserId String?
+  capturedByWorkerName   String?
+  storageProvider        String    @default("LOCAL") // GOOGLE_DRIVE, LOCAL
+  aiStatus               String?   @default("PENDING") // PENDING, ANALYZED, FAILED
+  aiSuggestedCarrierCode String?
+  aiConfidence           Float?
+  aiLabels               Json?
   createdAt        DateTime  @default(now())
 
   carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)

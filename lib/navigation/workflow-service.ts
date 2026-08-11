@@ -58,18 +58,10 @@ export async function validateStatusTransition(navigationOrderId: string, target
     );
   }
 
-  // Restrikce 1: Přechod do PRIPRAVENO_K_INSTALACI vyžaduje přiřazenou plochu u každého bodu
-  if (targetStatus === 'PRIPRAVENO_K_INSTALACI') {
-    const unassignedPoint = navOrder.points.find((p) => !p.surfaceId && !p.carrierId);
-    if (unassignedPoint) {
-      throw new NavigationWorkflowError(
-        `Bod "${unassignedPoint.label}" nemá přiřazenu reálnou reklamní plochu ani nosič.`,
-        'MISSING_SURFACE'
-      );
-    }
-  }
+  // Fyzický nosič a jeho plocha vznikají až potvrzením realizace bodu.
+  // Před montáží je zdrojem pravdy unikátní bod vybraný klientem v nabídce.
 
-  // Restrikce 2: Přechod z INSTALACE do FOTODOKUMENTACE / PRIPRAVENO_K_FAKTURACI vyžaduje nahranou fotografii
+  // Restrikce 1: Přechod z INSTALACE do FOTODOKUMENTACE / PRIPRAVENO_K_FAKTURACI vyžaduje nahranou fotografii
   if (['FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI'].includes(targetStatus)) {
     const missingPhotoPoint = navOrder.points.find((p) => !p.installedPhotoId);
     if (missingPhotoPoint) {
@@ -80,7 +72,7 @@ export async function validateStatusTransition(navigationOrderId: string, target
     }
   }
 
-  // Restrikce 3: Fakturováno vyžaduje fakturační období s vygenerovanou fakturou
+  // Restrikce 2: Fakturováno vyžaduje fakturační období s vygenerovanou fakturou
   if (targetStatus === 'FAKTUROVANO') {
     const hasInvoicedPeriod = navOrder.billingPeriods.some((bp) => bp.invoiceId !== null);
     if (!hasInvoicedPeriod) {
@@ -91,7 +83,7 @@ export async function validateStatusTransition(navigationOrderId: string, target
     }
   }
 
-  // Restrikce 4: Dokončeno nelze nastavit, pokud existuje otevřený deinstalační úkol
+  // Restrikce 3: Dokončeno nelze nastavit, pokud existuje otevřený deinstalační úkol
   if (targetStatus === 'DOKONCENO') {
     const pendingDeinstallation = navOrder.crmOrder.crmTasks.find(
       (t) => t.title.toLowerCase().includes('deinstalace') && t.status !== 'DONE' && t.status !== 'CANCELLED'
@@ -167,6 +159,46 @@ export async function transitionNavigationOrderStatus(
         ...(targetStatus === 'FAKTUROVANO' ? { invoicedAt: new Date() } : {}),
       },
     });
+
+    const crmStatus = targetStatus === 'DOKONCENO'
+      ? 'COMPLETED'
+      : targetStatus === 'FAKTUROVANO'
+        ? 'ACTIVE'
+        : ['INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI'].includes(targetStatus)
+          ? 'IN_REALIZATION'
+          : ['TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI'].includes(targetStatus)
+            ? 'READY_FOR_PRODUCTION'
+            : ['GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY'].includes(targetStatus)
+              ? 'WAITING_FOR_MATERIALS'
+              : targetStatus === 'POPTAVKA' || targetStatus === 'NABIDKA'
+                ? 'DRAFT'
+                : 'CONFIRMED';
+    await tx.crmOrder.update({
+      where: { id: navOrder.crmOrderId },
+      data: { status: crmStatus },
+    });
+
+    const contractCompletedStatuses: NavigationOrderStatus[] = [
+      'GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI',
+      'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO',
+    ];
+    const printCompletedStatuses: NavigationOrderStatus[] = [
+      'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE',
+      'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO',
+    ];
+    const completedTaskTitles: string[] = [];
+    if (contractCompletedStatuses.includes(targetStatus)) completedTaskTitles.push('Smlouva / Objednávka');
+    if (printCompletedStatuses.includes(targetStatus)) completedTaskTitles.push('Tisk navigačních cedulí');
+    if (completedTaskTitles.length > 0) {
+      await tx.crmTask.updateMany({
+        where: {
+          crmOrderId: navOrder.crmOrderId,
+          status: { in: ['TODO', 'IN_PROGRESS'] },
+          OR: completedTaskTitles.map((title) => ({ title: { contains: title } })),
+        },
+        data: { status: 'DONE', completedAt: new Date() },
+      });
+    }
 
     // Zápis do audit logu
     await tx.crmAuditLog.create({

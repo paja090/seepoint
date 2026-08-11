@@ -34,7 +34,7 @@ export type ReportRow = {
   client: { id: string; name: string; email?: string | null };
   offer?: { id: string; campaignName: string | null; title: string } | null;
   createdBy?: { id: string; name: string } | null;
-  _count: { items: number };
+  _count?: { items: number };
 };
 
 export function NavigationDocumentationAdmin({
@@ -126,7 +126,11 @@ export function NavigationDocumentationAdmin({
 
       const data = await response.json();
       if (response.ok && data.report) {
-        setReports((curr) => [data.report, ...curr]);
+        const createdReport = {
+          ...data.report,
+          _count: data.report._count ?? { items: data.report.items?.length ?? 0 },
+        };
+        setReports((curr) => [createdReport, ...curr]);
         setShowCreateModal(false);
         loadReportDetail(data.report.id);
       }
@@ -335,7 +339,7 @@ export function NavigationDocumentationAdmin({
                       </div>
                       <p className="text-xs text-slate-600">{r.title}</p>
                       <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>{r._count.items} navigací</span>
+                        <span>{r._count?.items ?? 0} navigací</span>
                         <span>{new Date(r.createdAt).toLocaleDateString('cs-CZ')}</span>
                       </div>
                     </button>
