@@ -10,9 +10,7 @@ import {
   LayoutDashboard,
   Map,
   Route,
-  UserRound,
   LogOut,
-  ChevronRight,
 } from 'lucide-react';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
@@ -96,14 +94,14 @@ export function ResponsiveAppShell({
 
       {/* SLIDE-OVER DRAWER (Mobile) / FIXED SIDEBAR (Desktop) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform bg-slate-950 px-4 py-4 text-white transition-transform duration-300 ease-in-out lg:translate-x-0 lg:w-72 lg:overflow-y-auto lg:border-r lg:border-slate-900 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-80 max-w-[85vw] flex-col bg-slate-950 px-4 py-4 text-white transition-transform duration-300 ease-in-out lg:translate-x-0 lg:w-72 lg:border-r lg:border-slate-900 ${
           mobileDrawerOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        <div className="mb-6 flex items-center justify-between px-2">
+        <div className="mb-4 flex shrink-0 items-center justify-between px-2">
           <div>
-            <img alt="SeePOINT Outdoor reklama" className="h-16 w-auto" src="/seepoint-logo.svg" />
-            <p className="mt-1 text-[11px] text-slate-400 font-medium">Interní administrační systém</p>
+            <img alt="SeePOINT Outdoor reklama" className="h-14 w-auto" src="/seepoint-logo.svg" />
+            <p className="mt-1 text-[10px] font-medium text-slate-400">Interní administrační systém</p>
           </div>
           <button
             onClick={() => setMobileDrawerOpen(false)}
@@ -114,14 +112,14 @@ export function ResponsiveAppShell({
           </button>
         </div>
 
-        {/* User Card in Mobile Drawer */}
-        <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-xs font-black text-slate-950">
+        {/* User Card in Sidebar */}
+        <div className="mb-4 shrink-0 rounded-2xl border border-slate-800 bg-slate-900/80 p-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-full bg-emerald-500 text-xs font-black text-slate-950">
               {initials}
             </div>
-            <div>
-              <p className="text-xs font-bold text-white">{user.name}</p>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-white">{user.name}</p>
               <p className="text-[10px] text-slate-400">{roleLabel(user.role)}</p>
             </div>
           </div>
@@ -134,14 +132,14 @@ export function ResponsiveAppShell({
           </button>
         </div>
 
-        {/* Navigation Groups */}
-        <nav className="space-y-6 overflow-y-auto max-h-[calc(100vh-200px)] pb-12 pr-1">
+        {/* Single Clean Scrollable Navigation Area (No Double Scrollbars) */}
+        <nav className="flex-1 space-y-5 overflow-y-auto pr-1 pb-6 text-xs scrollbar-thin scrollbar-thumb-slate-800">
           {visibleGroups.map((group) => (
             <section key={group.label}>
-              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                 {group.label}
               </p>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {group.items.map(([href, label, icon]) => (
                   <AppNavLink href={href} icon={icon} key={href} label={label} />
                 ))}
