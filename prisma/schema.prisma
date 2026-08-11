@@ -464,6 +464,7 @@ model Employee {
   settlements          Settlement[]
   vehicleReservations  VehicleReservation[]
   fuelExpenses         VehicleFuelExpense[]
+  absences             EmployeeAbsence[]
   billingProfile       EmployeeBillingProfile?
   rates                EmployeeRate[]
   photos               Photo[]
@@ -813,6 +814,37 @@ model VehicleFuelExpense {
   @@index([vehicleId])
   @@index([employeeId])
   @@index([createdAt])
+}
+
+enum AbsenceType {
+  VACATION
+  SICK_LEAVE
+  PERSONAL_LEAVE
+  HOME_OFFICE
+}
+
+enum AbsenceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model EmployeeAbsence {
+  id          String        @id @default(cuid())
+  employeeId  String
+  type        AbsenceType   @default(VACATION)
+  dateFrom    DateTime
+  dateTo      DateTime
+  note        String?
+  status      AbsenceStatus @default(APPROVED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([dateFrom, dateTo])
+  @@index([status])
 }
 
 model ChatMessage {

@@ -51,18 +51,18 @@ export function RoleSwitcherButton({
       <button
         onClick={() => setOpen(!open)}
         disabled={switching}
-        className={`flex items-center gap-1.5 rounded-xl border text-xs font-bold transition active:scale-95 ${
+        className={`flex items-center gap-1 rounded-xl border text-xs font-bold transition active:scale-95 ${
           compact
-            ? 'bg-slate-900 border-slate-700 px-2.5 py-1 text-slate-200 hover:bg-slate-800'
+            ? 'bg-slate-900 border-slate-700 px-2 py-1 text-slate-200 hover:bg-slate-800'
             : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20 px-3 py-1.5'
         }`}
-        title="Přepnout zobrazení role"
+        title="Přepnout roli"
       >
-        <RefreshCw size={14} className={`text-emerald-600 ${switching ? 'animate-spin' : ''}`} />
-        <span>
-          {compact ? `Role: ${roleLabel(currentRole)}` : `Přepnout roli: ${roleLabel(currentRole)}`}
+        <RefreshCw size={13} className={`text-emerald-400 ${switching ? 'animate-spin' : ''}`} />
+        <span className="truncate max-w-[90px] sm:max-w-none">
+          {compact ? roleLabel(currentRole) : `Přepnout roli: ${roleLabel(currentRole)}`}
         </span>
-        <ChevronDown size={14} className="opacity-70" />
+        <ChevronDown size={13} className="opacity-70" />
       </button>
 
       {open && (

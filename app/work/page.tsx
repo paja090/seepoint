@@ -22,7 +22,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
   const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
 
-  const [orders, clients, carriers, employees] = await Promise.all([
+  const [orders, clients, carriers, employees, rawAbsences] = await Promise.all([
     prisma.workOrder.findMany({
       include: { assignments: true, workTasks: { include: { assignedTo: true } }, items: { include: { carrier: true } } },
       orderBy: { scheduledAt: 'asc' },
@@ -31,6 +31,11 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     prisma.advertisingCarrier.findMany({ orderBy: [{ city: 'asc' }, { name: 'asc' }], select: { id: true, code: true, name: true, city: true } }),
     prisma.employee.findMany({ where: { isActive: true }, orderBy: { firstName: 'asc' }, select: { id: true, firstName: true, lastName: true } }),
+    prisma.employeeAbsence.findMany({
+      where: { dateTo: { gte: new Date() } },
+      include: { employee: true },
+      orderBy: { dateFrom: 'asc' },
+    }),
   ]);
 
   const currentUserName = user.employee

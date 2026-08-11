@@ -62,36 +62,28 @@ export function ResponsiveAppShell({
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 lg:flex">
       {/* MOBILE TOP BAR (hidden on lg) */}
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950 px-4 text-white lg:hidden">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950 px-3.5 text-white lg:hidden">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setMobileDrawerOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-slate-200 border border-slate-800 hover:bg-slate-800 active:scale-95 transition"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-slate-200 border border-slate-800 hover:bg-slate-800 active:scale-95 transition"
             aria-label="Otevřít menu"
           >
-            <Menu size={22} />
+            <Menu size={20} />
           </button>
           <Link href="/dashboard" className="inline-flex items-center">
-            <img alt="SeePOINT Logo" className="h-9 w-auto" src="/seepoint-logo.svg" />
+            <img alt="SeePOINT Logo" className="h-8 w-auto" src="/seepoint-logo.svg" />
           </Link>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} compact />
           <Link
             href="/chat"
-            className="flex items-center gap-1 rounded-xl bg-indigo-600 px-2.5 py-1.5 text-xs font-black text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 active:scale-95 transition"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 active:scale-95 transition"
             title="Týmový Chat & Účtenky paliva"
           >
-            <MessageSquare size={15} />
-            <span>Chat</span>
-          </Link>
-          <Link
-            href="/team"
-            className="flex items-center justify-center h-8 w-8 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700 hover:bg-slate-700 active:scale-95 transition"
-            title="Telefonní seznam týmu"
-          >
-            <Phone size={15} />
+            <MessageSquare size={17} />
           </Link>
         </div>
       </header>
