@@ -52,10 +52,10 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: action === 'approve' ? 'accept' : action === 'reject' ? 'reject' : 'question',
+          action: action === 'approve' ? 'accept' : action === 'reject' ? 'reject' : action,
           name,
           email,
-          message: action === 'revision' ? `Požadavek na úpravu: ${message}` : message,
+          message,
           consent,
         }),
       });

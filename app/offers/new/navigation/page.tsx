@@ -5,8 +5,9 @@ import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewNavigationOfferPage() {
+export default async function NewNavigationOfferPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
   await requirePageAccess('offers');
   const { clients } = await getSpecializedOfferOptions();
-  return <AppShell><NavigationOfferForm clients={clients} /></AppShell>;
+  const { clientId } = await searchParams;
+  return <AppShell><NavigationOfferForm clients={clients} initialClientId={clientId} /></AppShell>;
 }

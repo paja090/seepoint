@@ -12,6 +12,7 @@ import {
   planOfferConversion,
   recoverFixedDiscount,
   serverOfferAuthor,
+  shouldCreateNavigationOrderAfterAcceptance,
   stripPublicOfferSecrets,
 } from '../lib/offers/domain.ts';
 import { createPublicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from '../lib/offers/token.ts';
@@ -129,6 +130,7 @@ test('veřejná navigace a Galerie venku neodhalí interní ID ani poznámky', (
   const publicJson = stripPublicOfferSecrets({ navigation: { targetName: 'Cíl', points: [{ id: 'point-secret', carrierId: 'carrier-secret', internalNote: 'TAJNÁ NAVIGACE', status: 'PLANNED', clientNote: 'Viditelné klientovi' }] }, cityGallery: { projectId: 'project-secret', concept: 'Veřejný koncept' } });
   const serialized = JSON.stringify(publicJson);
   assert.equal(serialized.includes('point-secret'), false);
+  assert.equal(serialized.includes('point-1'), true);
   assert.equal(serialized.includes('carrier-secret'), false);
   assert.equal(serialized.includes('TAJNÁ NAVIGACE'), false);
   assert.equal(serialized.includes('project-secret'), false);
@@ -139,4 +141,10 @@ test('převod je idempotentní a částečný stav se zastaví před zápisy', (
   assert.equal(planOfferConversion(['a', 'b'], []), 'create');
   assert.equal(planOfferConversion(['a', 'b'], ['b', 'a']), 'idempotent');
   assert.throws(() => planOfferConversion(['a', 'b'], ['a']), (error: unknown) => error instanceof OfferValidationError && error.code === 'PARTIAL_CONVERSION');
+});
+
+test('schválení cenové navigační nabídky automaticky zakládá realizační zakázku', () => {
+  assert.equal(shouldCreateNavigationOrderAfterAcceptance({ offerType: 'NAVIGATION', proposalMode: 'PRICED_QUOTE' }), true);
+  assert.equal(shouldCreateNavigationOrderAfterAcceptance({ offerType: 'NAVIGATION', proposalMode: 'LOCATION_SELECTION' }), false);
+  assert.equal(shouldCreateNavigationOrderAfterAcceptance({ offerType: 'STANDARD_MEDIA', proposalMode: null }), false);
 });

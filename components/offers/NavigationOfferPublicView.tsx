@@ -16,6 +16,8 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
+import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
+import { canUploadNavigationArtwork } from '@/lib/offers/navigation-artwork-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 
 const money = (val: string | number | null | undefined) =>
@@ -85,16 +87,28 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
   return 'Trasa vypočítávána';
 }
 
-export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
+export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
   const navigation = offer.navigation;
+  const effectiveProposalKey = proposalKey ?? offer.id;
   const isLocationSelectionPhase = (navigation as unknown as Record<string, unknown>).proposalMode !== 'PRICED_QUOTE';
+  const showOfferPdf = canDownloadOfferPdf(offer);
+  const showInstallationSheet = canDownloadInstallationSheet(offer);
+  const targetPhotoUrl = (navigation as unknown as Record<string, unknown> | null)?.targetPhotoUrl;
+  const missingVisualCount = navigation?.points.filter((point) => !((point as unknown as Record<string, unknown>).visualizedPhotoUrl)).length ?? 0;
   const [selectedPointIds, setSelectedPointIds] = useState<string[]>(() =>
     navigation?.points.filter((p) => (p as unknown as Record<string, unknown>).isSelectedByClient !== false).map((p) => p.id) || []
   );
   const [submittingSelection, setSubmittingSelection] = useState(false);
-  const [selectionSubmitted, setSelectionSubmitted] = useState(false);
-  const [graphicApproved, setGraphicApproved] = useState(false);
-  const [converting, setConverting] = useState(false);
+  const [selectionSubmitted, setSelectionSubmitted] = useState(
+    (navigation as unknown as Record<string, unknown> | null)?.selectionSubmitted === true,
+  );
+  const [selectionMessage, setSelectionMessage] = useState('');
+  const [uploadedArtworkName, setUploadedArtworkName] = useState(() => {
+    const value = (navigation as unknown as Record<string, unknown> | null)?.clientArtworkFileName;
+    return typeof value === 'string' ? value : '';
+  });
+  const [artworkMessage, setArtworkMessage] = useState('');
+  const artworkUploadEnabled = canUploadNavigationArtwork(offer);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(
     navigation?.points[0]?.id || null,
   );
@@ -107,24 +121,48 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
   }
 
   async function handleConfirmClientSelection() {
+    if (!effectiveProposalKey) return;
     setSubmittingSelection(true);
+    setSelectionMessage('');
     try {
-      const res = await fetch(`/api/proposals/${offer.id}/selection`, {
+      const res = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/selection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selectedPointIds }),
       });
       if (res.ok) {
         setSelectionSubmitted(true);
+      } else {
+        const data = await res.json().catch(() => null) as { error?: string } | null;
+        setSelectionMessage(data?.error || 'Výběr bodů se nepodařilo odeslat.');
       }
     } catch {
-      // Ignore
+      setSelectionMessage('Výběr bodů se nepodařilo odeslat.');
     } finally {
       setSubmittingSelection(false);
     }
   }
 
   if (!navigation) return null;
+
+  const priceRows = navigation.points.map((point) => {
+    const quantity = Number(point.quantity || 0);
+    const rental = quantity * Number(point.unitPrice || 0);
+    const production = quantity * Number(point.productionPrice || 0);
+    const installation = quantity * Number(point.installationPrice || 0);
+    const removal = quantity * Number(point.removalPrice || 0);
+    return { point, quantity, rental, production, installation, removal, subtotal: rental + production + installation + removal };
+  });
+  const priceTotals = priceRows.reduce((sum, row) => ({
+    rental: sum.rental + row.rental,
+    production: sum.production + row.production,
+    installation: sum.installation + row.installation,
+    removal: sum.removal + row.removal,
+    subtotal: sum.subtotal + row.subtotal,
+  }), { rental: 0, production: 0, installation: 0, removal: 0, subtotal: 0 });
+  const taxRate = Number(offer.taxRate || 21);
+  const taxAmount = Number(offer.taxAmount ?? priceTotals.subtotal * taxRate / 100);
+  const totalWithTax = Number(offer.totalWithTax ?? priceTotals.subtotal + taxAmount);
 
   const target = {
     latitude: navigation.targetLatitude,
@@ -163,7 +201,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
             </span>
             <div>
               <h4 className="text-sm font-black uppercase tracking-wider text-emerald-900">
-                Fáze 2: Schválená cenová nabídka navigační sítě
+                Fáze 2: Cenová nabídka navigační sítě
               </h4>
               <p className="text-xs text-emerald-800 font-medium">
                 Kompletní rozpočet pronájmu, výroby a instalace navigačních cedulí pro vybrané pozice.
@@ -191,6 +229,13 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
             <p className="text-sm font-medium text-slate-300">
               📍 {navigation.targetAddress || `${navigation.targetLatitude.toFixed(5)}, ${navigation.targetLongitude.toFixed(5)}`}
             </p>
+            {typeof targetPhotoUrl === 'string' && targetPhotoUrl ? (
+              <img
+                alt={`Cílová provozovna ${navigation.targetName}`}
+                className="mt-4 h-36 w-full max-w-md rounded-2xl border border-sky-700/60 object-cover shadow-lg"
+                src={targetPhotoUrl}
+              />
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -200,50 +245,24 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
               <div className="mt-1 text-xs text-sky-400 font-semibold">📍 Google Maps Routes API</div>
             </div>
 
-            <a
-              href={`/api/proposals/${offer.id}/pdf`}
+            {effectiveProposalKey && showOfferPdf ? <a
+              href={`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/pdf`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2.5 rounded-2xl bg-sky-500 px-5 py-3.5 text-xs font-black text-slate-950 shadow-lg hover:bg-sky-400 transition cursor-pointer shrink-0"
             >
               <FileDown size={18} /> Stáhnout PDF nabídku
-            </a>
+            </a> : null}
 
-            <a
-              href={`/api/proposals/${offer.id}/installation-sheet`}
+            {effectiveProposalKey && showInstallationSheet ? <a
+              href={`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/installation-sheet`}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2.5 rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3.5 text-xs font-bold text-slate-200 shadow-lg hover:bg-slate-800 transition cursor-pointer shrink-0"
               title="Stáhnout montážní protokol s GPS a sloupky VO pro instalační techniky"
             >
               <ClipboardList size={18} className="text-amber-400" /> Montážní list
-            </a>
-
-            <button
-              type="button"
-              disabled={converting}
-              onClick={async () => {
-                setConverting(true);
-                try {
-                  const res = await fetch('/api/navigation/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ offerId: offer.id }),
-                  });
-                  const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || 'Převod do realizace selhal');
-                  window.location.href = '/navigation?view=kanban';
-                } catch (err) {
-                  alert(err instanceof Error ? err.message : 'Chyba při převodu nabídky');
-                } finally {
-                  setConverting(false);
-                }
-              }}
-              className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3.5 text-xs font-black text-slate-950 shadow-lg hover:bg-emerald-400 transition cursor-pointer shrink-0 disabled:opacity-50"
-              title="Převést schválenou nabídku do zakázky a plánu montáží"
-            >
-              <span>{converting ? 'Převádím…' : '🚀 Převést do Realizace'}</span>
-            </button>
+            </a> : null}
           </div>
         </div>
 
@@ -338,11 +357,12 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
                     {isLocationSelectionPhase ? (
                       <button
                         type="button"
+                        disabled={selectionSubmitted}
                         onClick={(e) => {
                           e.stopPropagation();
                           togglePointSelection(point.id);
                         }}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-70 ${
                           isSelected
                             ? 'bg-emerald-600 text-white shadow-xs'
                             : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
@@ -350,12 +370,7 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
                       >
                         {isSelected ? '✓ Vybráno' : '+ Vybrat'}
                       </button>
-                    ) : (
-                      <div className="text-right">
-                        <div className="font-black text-slate-900 text-sm">{money(point.subtotal)}</div>
-                        <div className="text-[11px] text-slate-400">za bod</div>
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Metadata Row: Arrow + Distance + Pillar */}
@@ -398,14 +413,19 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
                     >
                       <img
                         src={String(pObj.visualizedPhotoUrl)}
-                        alt={`Vizualizace ${point.label}`}
-                        className="h-32 w-full object-cover group-hover:scale-105 transition duration-300"
+                        alt={`Fotografie a vizualizace nosiče – ${point.label}`}
+                        className="h-48 w-full object-cover group-hover:scale-105 transition duration-300"
                       />
                       <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-black">
                         🔍 Kliknutím zvětšíte snímek
                       </div>
                     </div>
                   )}
+                  {isLocationSelectionPhase && !pObj.visualizedPhotoUrl ? (
+                    <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                      Fotografie umístění a vizualizace nosiče zatím nebyla přiložena.
+                    </div>
+                  ) : null}
                 </article>
               );
             })}
@@ -413,8 +433,92 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
         </div>
       </div>
 
-      {/* Graphic Artwork Proof Section (670 x 900 mm) */}
-      {(navigation as unknown as Record<string, unknown>).includeGraphicProof !== false && (
+      {!isLocationSelectionPhase ? (
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" aria-labelledby="navigation-pricing-heading">
+          <div className="border-b border-slate-200 bg-slate-950 px-6 py-5 text-white">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-400">Položkový rozpočet</p>
+            <h2 className="mt-1 text-xl font-black" id="navigation-pricing-heading">Kompletní cenová nabídka</h2>
+            <p className="mt-1 text-sm text-slate-300">Přehled ceny každého navigačního bodu včetně výroby, montáže a následné demontáže.</p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Navigační bod</th>
+                  <th className="px-4 py-3 text-right">Počet</th>
+                  <th className="px-4 py-3 text-right">Pronájem</th>
+                  <th className="px-4 py-3 text-right">Výroba a tisk</th>
+                  <th className="px-4 py-3 text-right">Montáž</th>
+                  <th className="px-4 py-3 text-right">Demontáž</th>
+                  <th className="px-5 py-3 text-right">Celkem bez DPH</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {priceRows.map(({ point, quantity, rental, production, installation, removal, subtotal }) => (
+                  <tr key={point.id}>
+                    <td className="px-5 py-4">
+                      <p className="font-bold text-slate-900">{point.label}</p>
+                      <p className="mt-1 text-xs text-slate-500">{point.navigationType}{point.variant ? ` · ${point.variant}` : ''}</p>
+                    </td>
+                    <td className="px-4 py-4 text-right font-semibold text-slate-700">{quantity.toLocaleString('cs-CZ')} ks</td>
+                    <td className="px-4 py-4 text-right text-slate-700">{money(rental)}</td>
+                    <td className="px-4 py-4 text-right text-slate-700">{money(production)}</td>
+                    <td className="px-4 py-4 text-right text-slate-700">{money(installation)}</td>
+                    <td className="px-4 py-4 text-right text-slate-700">{money(removal)}</td>
+                    <td className="px-5 py-4 text-right font-black text-slate-950">{money(subtotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid gap-5 border-t border-slate-200 bg-slate-50 p-6 lg:grid-cols-[1fr_360px]">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Pronájem bodů</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.rental)}</dd></div>
+              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Výroba a tisk</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.production)}</dd></div>
+              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Montáž</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.installation)}</dd></div>
+              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Demontáž</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.removal)}</dd></div>
+            </dl>
+            <dl className="space-y-3 rounded-2xl bg-slate-950 p-5 text-white">
+              <div className="flex justify-between gap-4 text-sm"><dt className="text-slate-300">Cena bez DPH</dt><dd className="font-bold">{money(priceTotals.subtotal)}</dd></div>
+              <div className="flex justify-between gap-4 text-sm"><dt className="text-slate-300">DPH {taxRate.toLocaleString('cs-CZ')} %</dt><dd className="font-bold">{money(taxAmount)}</dd></div>
+              <div className="flex justify-between gap-4 border-t border-slate-700 pt-3 text-lg"><dt className="font-black">Celkem včetně DPH</dt><dd className="font-black text-emerald-400">{money(totalWithTax)}</dd></div>
+            </dl>
+          </div>
+        </section>
+      ) : null}
+
+      {isLocationSelectionPhase ? (
+        <div className="rounded-3xl border border-amber-200 bg-white p-6 text-center shadow-sm">
+          {selectionSubmitted ? (
+            <div className="mx-auto max-w-2xl">
+              <CheckCircle2 className="mx-auto text-emerald-600" size={36} />
+              <h2 className="mt-3 text-xl font-black text-slate-950">Výběr bodů byl odeslán</h2>
+              <p className="mt-2 text-sm text-slate-600">SeePOINT nyní připraví přesnou cenovou nabídku pouze pro vámi vybrané pozice.</p>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-2xl">
+              <h2 className="text-xl font-black text-slate-950">Potvrďte vybrané navigační body</h2>
+              <p className="mt-2 text-sm text-slate-600">Tímto krokem ještě neschvalujete cenu ani realizaci. Odesíláte pouze výběr {selectedPointIds.length} z {navigation.points.length} bodů k nacenění.</p>
+              {missingVisualCount > 0 ? <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">Před potvrzením musí SeePOINT doplnit fotografie a vizualizace u {missingVisualCount} bodů.</p> : null}
+              <button
+                type="button"
+                disabled={submittingSelection || selectedPointIds.length === 0 || missingVisualCount > 0}
+                onClick={() => void handleConfirmClientSelection()}
+                className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                <CheckCircle2 size={18} />
+                {submittingSelection ? 'Odesílám výběr…' : 'Potvrdit body k nacenění'}
+              </button>
+              {selectionMessage ? <p className="mt-3 text-sm font-semibold text-red-700" role="alert">{selectionMessage}</p> : null}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* Graphic artwork and technical specification */}
+      {!isLocationSelectionPhase && (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -423,15 +527,15 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
             </span>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Grafický náhled a motiv navigační cedule SeePOINT
+                Grafický návrh a technické provedení navigační cedule
               </h3>
               <p className="text-xs text-slate-500">
-                Standardní rozměr plástve: 670 mm (šířka) × 900 mm (výška) • Oboustranné provedení na sloup
+                Přesný formát a tvar panelu se řídí pravidly města a konkrétním místem instalace.
               </p>
             </div>
           </div>
           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl">
-            Provedení 670 × 900 mm
+            Rozměr dle lokality
           </span>
         </div>
 
@@ -453,10 +557,16 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
                 className="w-full h-36 object-contain rounded-lg"
               />
             ) : (
-              <div className="text-center pt-6 space-y-1">
-                <div className="text-xs font-bold tracking-widest text-sky-400 uppercase">SeePOINT</div>
-                <div className="text-sm font-black uppercase text-white leading-tight">{navigation.targetName}</div>
-                <div className="text-[10px] text-slate-400 font-semibold uppercase">NAVIGAČNÍ REKLAMA</div>
+              <div className="flex min-h-32 items-center justify-center px-2 pt-4 text-center">
+                {offer.client.logoUrl ? (
+                  <img
+                    src={offer.client.logoUrl}
+                    alt={`Logo ${offer.client.name} na navigační ceduli`}
+                    className="max-h-24 w-full object-contain"
+                  />
+                ) : (
+                  <div className="text-sm font-black uppercase leading-tight text-white">{navigation.targetName}</div>
+                )}
               </div>
             )}
 
@@ -468,37 +578,21 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
           </div>
 
           <div className="space-y-3 text-xs text-slate-600">
-            <h4 className="font-bold text-slate-900 text-sm">Specifikace navigačního prvku SeePOINT:</h4>
+            <h4 className="font-bold text-slate-900 text-sm">Specifikace navigačního prvku:</h4>
             <ul className="space-y-1.5 list-disc list-inside font-medium text-slate-700">
-              <li>Formát plakátu / cedule: <strong>670 mm × 900 mm</strong></li>
-              <li>Materiál: Odolný hliníkový oboustranný panel s UV laminací</li>
-              <li>Montáž: Certifikované sloupové nerezové svorky na sloupy veřejného osvětlení</li>
-              <li>Dopravní navedení: Reflexní prvky se směrovou šipkou a kilometráží k cíli</li>
+              <li>Rozměr: <strong>Ostrava 900 × 670 mm</strong>; Havířov používá odlišný tvar s horním půlkruhem, jeho přesný rozměr bude doplněn po ověření.</li>
+              <li>Materiál: odolný panel <strong>DIBOND</strong>, standardně jednostranný; podle umístění může být proveden oboustranně.</li>
+              <li>Grafika: černý podklad bez reflexních prvků, logo klienta, směrová šipka a vzdálenost k cíli.</li>
+              <li>Uchycení: nerezovými páskami na sloup veřejného osvětlení nebo určený sloupek.</li>
             </ul>
             <p className="text-[11px] text-slate-500 pt-1">
-              💡 Návrh grafiky cedule bude před výrobou zaslán klientovi k finální korektuře a odsouhlasení.
+              💡 Přesný rozměr pro danou lokalitu a finální grafický návrh budou před výrobou zaslány klientovi ke korektuře a odsouhlasení.
             </p>
 
-            {/* Interactive Client Graphic Approval & Upload Controls */}
+            {/* Client graphic upload becomes available after accepting the priced quote. */}
             <div className="pt-3 space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                {graphicApproved ? (
-                  <div className="rounded-xl border border-emerald-300 bg-emerald-100/90 p-3 text-xs font-bold text-emerald-900 flex items-center gap-2 shadow-xs">
-                    <CheckCircle2 size={16} className="text-emerald-700 shrink-0" />
-                    <span>✓ Grafický návrh navigační cedule byl odsouhlasen klientem!</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setGraphicApproved(true)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 transition shadow-xs cursor-pointer"
-                  >
-                    <CheckCircle2 size={16} /> Odsouhlasit a schválit tento grafický návrh
-                  </button>
-                )}
-
-                {/* Client File Upload Button */}
-                <label className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-bold text-sky-900 hover:bg-sky-100 transition cursor-pointer">
+                {artworkUploadEnabled ? <label className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-bold text-sky-900 hover:bg-sky-100 transition cursor-pointer">
                   <span>📤 Nahrát vlastní logo / grafické podklady</span>
                   <input
                     type="file"
@@ -507,31 +601,44 @@ export function NavigationOfferPublicView({ offer }: { offer: OfferView }) {
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
+                      if (file.size > 3 * 1024 * 1024) {
+                        setArtworkMessage('Soubor může mít maximálně 3 MB.');
+                        return;
+                      }
                       const reader = new FileReader();
                       reader.onload = async (ev) => {
                         const dataUrl = ev.target?.result as string;
                         try {
-                          await fetch(`/api/proposals/${offer.id}/artwork`, {
+                          if (!effectiveProposalKey) throw new Error('Chybí identifikátor nabídky.');
+                          const response = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/artwork`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ clientArtworkUrl: dataUrl, clientArtworkFileName: file.name }),
                           });
-                          alert(`Podklady "${file.name}" byly úspěšně nahrány obchodníkovi!`);
+                          const result = await response.json().catch(() => null) as { error?: string } | null;
+                          if (!response.ok) throw new Error(result?.error || 'Nahrání podkladů selhalo.');
+                          setUploadedArtworkName(file.name);
+                          setArtworkMessage('Podklady byly úspěšně předány obchodníkovi SeePOINT.');
                         } catch {
-                          alert('Chyba při nahrávání podkladů');
+                          setArtworkMessage('Podklady se nepodařilo nahrát.');
                         }
                       };
                       reader.readAsDataURL(file);
                     }}
                   />
-                </label>
+                </label> : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                    Grafické podklady nahrajete zde po schválení cenové nabídky. SeePOINT následně připraví finální návrh k samostatné korektuře před výrobou.
+                  </div>
+                )}
               </div>
 
-              {typeof (navigation as unknown as Record<string, unknown>).clientArtworkFileName === 'string' && (
+              {uploadedArtworkName ? (
                 <div className="text-[11px] font-bold text-slate-600 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
-                  📁 Nahrané podklady od klienta: {String((navigation as unknown as Record<string, unknown>).clientArtworkFileName)}
+                  📁 Nahrané podklady od klienta: {uploadedArtworkName}
                 </div>
-              )}
+              ) : null}
+              {artworkMessage ? <p className="text-xs font-semibold text-slate-700" role="status">{artworkMessage}</p> : null}
             </div>
           </div>
         </div>

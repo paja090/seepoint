@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { pointIds, orderId, installerUserId, plannedInstallationAt, routeOrder } = body;
+    const { pointIds, installerUserId, plannedInstallationAt, routeOrder } = body;
 
     if (!pointIds || !Array.isArray(pointIds) || pointIds.length === 0) {
       return NextResponse.json(
@@ -35,13 +35,26 @@ export async function POST(req: NextRequest) {
         data: updateData,
       });
 
-      if (orderId && plannedInstallationAt) {
-        await tx.navigationOrder.update({
-          where: { id: orderId },
+      if (plannedInstallationAt) {
+        const affectedPoints = await tx.navigationPoint.findMany({
+          where: { id: { in: pointIds }, navigationOrderId: { not: null } },
+          select: { navigationOrderId: true },
+        });
+        const orderIds = [...new Set(affectedPoints.flatMap((point) => point.navigationOrderId ? [point.navigationOrderId] : []))];
+        await tx.navigationOrder.updateMany({
+          where: { id: { in: orderIds } },
           data: {
             plannedInstallationAt: new Date(plannedInstallationAt),
             installationDate: new Date(plannedInstallationAt),
             ...(installerUserId ? { installerUserId } : {}),
+          },
+        });
+        await tx.navigationOrder.updateMany({
+          where: {
+            id: { in: orderIds },
+            status: { in: ['POPTAVKA', 'NABIDKA', 'POTVRZENO_KLIENTEM', 'SMLOUVA_OBJEDNAVKA', 'GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI'] },
+          },
+          data: {
             status: 'PRIPRAVENO_K_INSTALACI',
             blockStatus: 'CEKA_NA_INSTALACI',
           },

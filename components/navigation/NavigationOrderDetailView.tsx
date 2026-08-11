@@ -34,6 +34,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
   const [transitioning, setTransitioning] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   // Revert Status Modal
   const [showRevertModal, setShowRevertModal] = useState(false);
@@ -46,13 +47,6 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [priceReason, setPriceReason] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
-
-  // Photo Upload Modal
-  const [selectedPointForPhoto, setSelectedPointForPhoto] = useState<NavigationPointItem | null>(null);
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [photoType, setPhotoType] = useState('AFTER_INSTALLATION');
-  const [photoNote, setPhotoNote] = useState('');
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const statusLabel = NAVIGATION_ORDER_STATUS_LABELS[currentOrder.status] || currentOrder.status;
   const statusColor = NAVIGATION_ORDER_STATUS_COLORS[currentOrder.status] || 'bg-slate-100 text-slate-800';
@@ -71,10 +65,10 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
       tabTarget: 'graphics',
     },
     {
-      key: 'carriers',
-      label: 'Přiřazené nosiče u všech bodů',
-      isDone: currentOrder.points.every((p) => p.carrierId !== null && p.carrierId !== undefined),
-      actionLabel: 'Přiřadit nosiče',
+      key: 'points',
+      label: 'Body převzaté ze schválené nabídky',
+      isDone: currentOrder.points.length > 0,
+      actionLabel: 'Zkontrolovat body',
       tabTarget: 'points',
     },
     {
@@ -124,6 +118,29 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
       setErrorMsg(err instanceof Error ? err.message : 'Chyba při přechodu stavu.');
     } finally {
       setTransitioning(false);
+    }
+  }
+
+  async function handleCreateAndSendInvoice() {
+    setCreatingInvoice(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const response = await fetch(`/api/navigation/orders/${currentOrder.id}/invoice`, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Fakturu se nepodařilo vytvořit nebo odeslat.');
+      setCurrentOrder((previous) => ({
+        ...previous,
+        billingPeriods: [
+          ...previous.billingPeriods.filter((period) => period.id !== data.billingPeriod.id),
+          data.billingPeriod,
+        ],
+      }));
+      setSuccessMsg(data.message);
+    } catch (error: unknown) {
+      setErrorMsg(error instanceof Error ? error.message : 'Fakturu se nepodařilo vytvořit nebo odeslat.');
+    } finally {
+      setCreatingInvoice(false);
     }
   }
 
@@ -189,44 +206,6 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
       setErrorMsg(err instanceof Error ? err.message : 'Chyba při ukládání ceny.');
     } finally {
       setSavingPrice(false);
-    }
-  }
-
-  async function handleUploadPhoto(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedPointForPhoto || !photoUrl) return;
-    setUploadingPhoto(true);
-    setErrorMsg('');
-
-    try {
-      const res = await fetch(`/api/navigation/orders/${currentOrder.id}/photo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          navigationPointId: selectedPointForPhoto.id,
-          photoUrl,
-          photoType,
-          note: photoNote,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Chyba při nahrávání fotky.');
-
-      setSuccessMsg(`Fotografie pro bod "${selectedPointForPhoto.label}" byla úspěšně nahrána a propojena s plochou i nosičem.`);
-      setSelectedPointForPhoto(null);
-      setPhotoUrl('');
-      setPhotoNote('');
-
-      const detailRes = await fetch(`/api/navigation/orders/${currentOrder.id}`);
-      if (detailRes.ok) {
-        const detailData = await detailRes.json();
-        if (detailData.order) setCurrentOrder(detailData.order);
-      }
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Chyba při nahrávání fotky.');
-    } finally {
-      setUploadingPhoto(false);
     }
   }
 
@@ -462,7 +441,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                       <th className="p-3">#</th>
                       <th className="p-3">Název / Označení</th>
                       <th className="p-3">Typ & Směr</th>
-                      <th className="p-3">Fyzický nosič / Plocha</th>
+                      <th className="p-3">Vybraný bod / Pozice</th>
                       <th className="p-3">Množství</th>
                       <th className="p-3">Cena za ks</th>
                       <th className="p-3">Celkem без DPH</th>
@@ -485,16 +464,20 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-xs font-bold text-sky-800 bg-sky-50 px-2 py-1 rounded hover:bg-sky-100 transition"
-                              title="Zobrazit časovou osu historie nosiče, audity a plochy na tomto sloupu"
+                              title="Tento unikátní nosič vznikl potvrzením realizace bodu"
                             >
-                              📌 Nosič: {p.carrierCode || 'Sloup VO'} {p.surfaceName ? `(${p.surfaceName})` : ''} 📜
+                              ✅ Založeno realizací: {p.carrierCode || p.label}
                             </a>
-                          ) : p.carrierCode ? (
-                            <span className="inline-flex items-center text-xs font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded">
-                              Nosič: {p.carrierCode} {p.surfaceName ? `(${p.surfaceName})` : ''}
-                            </span>
                           ) : (
-                            <span className="text-xs text-slate-400 font-medium">Plánovaný bod</span>
+                            <div className="space-y-1">
+                              <span className="inline-flex rounded-md bg-violet-50 px-2 py-1 text-xs font-bold text-violet-800">
+                                Nový unikátní bod
+                              </span>
+                              <p className="max-w-64 text-[10px] text-slate-500">
+                                {p.address || `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`}
+                                {' · '}Nosič a plocha vzniknou až potvrzením montáže.
+                              </p>
+                            </div>
                           )}
                         </td>
                         <td className="p-3">{p.quantity} ks</td>
@@ -509,12 +492,6 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                             className="text-xs font-bold text-sky-700 hover:underline inline-flex items-center gap-1"
                           >
                             <Edit3 size={13} /> Upravit cenu
-                          </button>
-                          <button
-                            onClick={() => setSelectedPointForPhoto(p)}
-                            className="text-xs font-bold text-teal-700 hover:underline inline-flex items-center gap-1"
-                          >
-                            <Camera size={13} /> Nahrát fotku
                           </button>
                         </td>
                       </tr>
@@ -532,9 +509,27 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
               <p className="text-xs text-slate-500">
                 Schválené grafické podklady pro výrobu navigačních cedulí a klientské vizualizace.
               </p>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
-                🎨 Všechny podklady jsou schváleny a připraveny k výrobě.
-              </div>
+              {currentOrder.graphicArtworkUrl || currentOrder.clientArtworkUrl ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {currentOrder.graphicArtworkUrl && (
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                      <p className="mb-2 text-xs font-bold text-sky-900">Motiv vložený do nabídky</p>
+                      <img src={currentOrder.graphicArtworkUrl} alt="Grafický motiv z nabídky" className="h-56 w-full rounded-lg bg-white object-contain" />
+                    </div>
+                  )}
+                  {currentOrder.clientArtworkUrl && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                      <p className="mb-2 text-xs font-bold text-emerald-900">Podklady nahrané klientem</p>
+                      <img src={currentOrder.clientArtworkUrl} alt="Grafické podklady klienta" className="h-56 w-full rounded-lg bg-white object-contain" />
+                      <p className="mt-2 text-[11px] text-emerald-800">{currentOrder.clientArtworkFileName || 'Grafické podklady'}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-xs text-amber-800">
+                  🎨 K této nabídce nebyl nahrán žádný motiv ani grafický podklad.
+                </div>
+              )}
             </div>
           )}
 
@@ -558,7 +553,15 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
           {/* Tab: Photos */}
           {activeTab === 'photos' && (
             <div className="card space-y-4">
-              <h3 className="text-base font-bold text-slate-900">Fotodokumentace realizace</h3>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Fotodokumentace realizace</h3>
+                  <p className="text-xs text-slate-500">Fotografie se pořizují a ukládají výhradně v montážním rozhraní.</p>
+                </div>
+                <Link href="/navigation/installations" className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white hover:bg-teal-700">
+                  <Camera size={14} /> Otevřít montážní rozhraní
+                </Link>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
                 {currentOrder.points.map((p) => (
                   <div key={p.id} className="rounded-xl border border-slate-200 p-3 bg-slate-50 space-y-2">
@@ -576,12 +579,6 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                         <span className="text-[11px] mt-1">Chybí fotka</span>
                       </div>
                     )}
-                    <button
-                      onClick={() => setSelectedPointForPhoto(p)}
-                      className="w-full mt-2 btn bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold py-1.5 rounded-lg flex items-center justify-center gap-1"
-                    >
-                      <Camera size={13} /> {p.installedPhotoUrl ? 'Změnit fotku' : 'Nahrát fotku'}
-                    </button>
                   </div>
                 ))}
               </div>
@@ -593,7 +590,17 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
             <div className="card space-y-4">
               <h3 className="text-base font-bold text-slate-900">Fakturační období zakázky</h3>
               {currentOrder.billingPeriods.length === 0 ? (
-                <p className="text-xs text-slate-500">Zatím nebylo vygenerováno žádné fakturační období.</p>
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">Zatím nebylo vygenerováno žádné fakturační období.</p>
+                  <button
+                    type="button"
+                    onClick={handleCreateAndSendInvoice}
+                    disabled={creatingInvoice}
+                    className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    {creatingInvoice ? 'Vytvářím a odesílám…' : 'Vytvořit a odeslat fakturu klientovi'}
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {currentOrder.billingPeriods.map((bp) => (
@@ -612,6 +619,16 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                       </div>
                     </div>
                   ))}
+                  {currentOrder.billingPeriods.some((period) => period.status !== 'SENT') && (
+                    <button
+                      type="button"
+                      onClick={handleCreateAndSendInvoice}
+                      disabled={creatingInvoice}
+                      className="mt-3 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                    >
+                      {creatingInvoice ? 'Odesílám…' : 'Odeslat vystavenou fakturu klientovi'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -808,71 +825,6 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
         </div>
       )}
 
-      {/* Modal: Upload Photo */}
-      {selectedPointForPhoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-          <form onSubmit={handleUploadPhoto} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900">Nahrát fotku: {selectedPointForPhoto.label}</h3>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">URL fotografie</label>
-              <input
-                type="text"
-                required
-                placeholder="https://..."
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 p-2 text-xs font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Typ fotografie</label>
-              <select
-                value={photoType}
-                onChange={(e) => setPhotoType(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 p-2 text-xs font-semibold"
-              >
-                <option value="AFTER_INSTALLATION">Po instalaci</option>
-                <option value="BEFORE_INSTALLATION">Před instalací</option>
-                <option value="SURFACE">Konkrétní plocha</option>
-                <option value="CARRIER">Celý nosič</option>
-                <option value="CONTROL">Kontrolní fotografie</option>
-                <option value="DAMAGE">Závada</option>
-                <option value="AFTER_DEINSTALLATION">Po deinstalaci</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Poznámka k fotografii</label>
-              <input
-                type="text"
-                placeholder="Volitelná poznámka montéra..."
-                value={photoNote}
-                onChange={(e) => setPhotoNote(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 p-2 text-xs"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedPointForPhoto(null)}
-                className="btn border border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold px-4 py-2 rounded-lg"
-              >
-                Zrušit
-              </button>
-              <button
-                type="submit"
-                disabled={uploadingPhoto}
-                className="btn bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-4 py-2 rounded-lg"
-              >
-                {uploadingPhoto ? 'Ukládám...' : 'Uložit fotografii'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }

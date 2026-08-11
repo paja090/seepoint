@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma, PhotoType, NavigationOrderStatus, NavigationBlockStatus } from '@prisma/client';
 import { prisma } from '../db.ts';
 import type { CurrentUser } from '../rbac.ts';
@@ -19,12 +20,14 @@ export class NavigationServiceError extends Error {
   }
 }
 
-export async function convertOfferToNavigationOrder(
+type NavigationOrderActor = Pick<CurrentUser, 'id' | 'email'>;
+
+async function convertOfferToNavigationOrderWithTransaction(
+  tx: Prisma.TransactionClient,
   offerId: string,
-  actorUser: CurrentUser
+  actorUser: NavigationOrderActor
 ) {
-  return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('seepoint-crm-order-number'))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('seepoint-crm-order-number'))`;
 
     const offer = await tx.offer.findUnique({
       where: { id: offerId },
@@ -98,7 +101,9 @@ export async function convertOfferToNavigationOrder(
         await tx.navigationPoint.create({
           data: {
             navigationOrderId: navOrder.id,
-            carrierId: p.carrierId,
+            // Body nabídky jsou unikátní budoucí pozice. Fyzický nosič se zakládá
+            // až po skutečné montáži, nikdy se nekopíruje z nabídky.
+            carrierId: null,
             sortOrder: p.sortOrder,
             latitude: p.latitude,
             longitude: p.longitude,
@@ -137,8 +142,22 @@ export async function convertOfferToNavigationOrder(
       },
     });
 
-    return navOrder;
-  });
+  return navOrder;
+}
+
+export function convertOfferToNavigationOrderInTransaction(
+  tx: Prisma.TransactionClient,
+  offerId: string,
+  actorUser: NavigationOrderActor
+) {
+  return convertOfferToNavigationOrderWithTransaction(tx, offerId, actorUser);
+}
+
+export async function convertOfferToNavigationOrder(
+  offerId: string,
+  actorUser: CurrentUser
+) {
+  return prisma.$transaction((tx) => convertOfferToNavigationOrderWithTransaction(tx, offerId, actorUser));
 }
 
 export async function listNavigationOrders(
@@ -490,6 +509,18 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
           client: { select: { id: true, name: true, email: true, phone: true, contactPerson: true } },
           contact: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
           assignedUser: { select: { id: true, name: true } },
+          offer: {
+            select: {
+              navigationOffer: {
+                select: {
+                  graphicArtworkUrl: true,
+                  clientArtworkUrl: true,
+                  clientArtworkFileName: true,
+                  includeGraphicProof: true,
+                },
+              },
+            },
+          },
         },
       },
       points: {
@@ -565,6 +596,10 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
     targetLatitude: o.targetLatitude,
     targetLongitude: o.targetLongitude,
     targetNote: o.targetNote,
+    graphicArtworkUrl: o.crmOrder.offer?.navigationOffer?.graphicArtworkUrl ?? null,
+    clientArtworkUrl: o.crmOrder.offer?.navigationOffer?.clientArtworkUrl ?? null,
+    clientArtworkFileName: o.crmOrder.offer?.navigationOffer?.clientArtworkFileName ?? null,
+    includeGraphicProof: o.crmOrder.offer?.navigationOffer?.includeGraphicProof ?? true,
     graphicsApprovedAt: o.graphicsApprovedAt ? o.graphicsApprovedAt.toISOString() : null,
     productionReadyAt: o.productionReadyAt ? o.productionReadyAt.toISOString() : null,
     installedAt: o.installedAt ? o.installedAt.toISOString() : null,
@@ -612,41 +647,154 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
   };
 }
 
-export async function attachPointInstallationPhoto(
+export type StoredInstallationPhoto = {
+  id: string;
+  driveFileId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  type: Extract<PhotoType, 'BEFORE_INSTALLATION' | 'AFTER_INSTALLATION'>;
+  note?: string;
+};
+
+function cityFromAddress(address?: string | null) {
+  const parts = address?.split(',').map((part) => part.trim()).filter(Boolean) ?? [];
+  return parts.at(-1) || 'Neuvedeno';
+}
+
+export async function attachPointInstallationPhotos(
+  navigationOrderId: string,
   navigationPointId: string,
-  photoUrl: string,
-  photoType: PhotoType = 'AFTER_INSTALLATION',
-  note?: string
+  photos: StoredInstallationPhoto[],
+  capturedBy: { userId: string; userName: string },
 ) {
+  const afterPhoto = photos.find((photo) => photo.type === 'AFTER_INSTALLATION');
+  if (!afterPhoto) {
+    throw new NavigationServiceError('Fotografie po montáži je povinná.', 'MISSING_INSTALLATION_PHOTO');
+  }
+
   return prisma.$transaction(async (tx) => {
     const point = await tx.navigationPoint.findUnique({
       where: { id: navigationPointId },
-      select: { id: true, carrierId: true, surfaceId: true },
+      include: {
+        navigationOrder: {
+          include: {
+            crmOrder: {
+              select: {
+                orderNumber: true,
+                clientId: true,
+                offer: {
+                  select: {
+                    navigationOffer: {
+                      select: { graphicArtworkUrl: true, clientArtworkUrl: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (!point) {
+    if (!point || point.navigationOrderId !== navigationOrderId || !point.navigationOrder) {
       throw new NavigationServiceError('Navigační bod nebyl nalezen.', 'NOT_FOUND');
     }
 
-    const photo = await tx.photo.create({
-      data: {
-        url: photoUrl,
-        type: photoType,
-        carrierId: point.carrierId || null,
-        surfaceId: point.surfaceId || null,
-        note: note || 'Fotografie z montáže navigačního bodu',
-        isClientVisible: true,
-      },
-    });
+    const sourceKey = `NAVIGATION_POINT:${point.id}`;
+    let carrierId = point.carrierId;
+    if (!carrierId) {
+      const carrier = await tx.advertisingCarrier.upsert({
+        where: { sourceKey },
+        update: {
+          name: point.label,
+          latitude: point.latitude,
+          longitude: point.longitude,
+          address: point.address,
+        },
+        create: {
+          code: `NAV-${point.navigationOrder.crmOrder.orderNumber.replace(/^ZAK-/, '')}-${point.id.slice(-6).toUpperCase()}`,
+          name: point.label,
+          type: 'NAVIGATION',
+          latitude: point.latitude,
+          longitude: point.longitude,
+          gpsStatus: 'UNVERIFIED',
+          address: point.address,
+          city: cityFromAddress(point.address || point.navigationOrder.targetAddress),
+          status: 'ACTIVE',
+          description: `Unikátní navigační bod realizovaný ze zakázky ${point.navigationOrder.crmOrder.orderNumber}`,
+          sourceSystem: 'NAVIGATION_REALIZATION',
+          sourceKey,
+        },
+      });
+      carrierId = carrier.id;
+    }
+
+    const surfaceSourceKey = `NAVIGATION_POINT_SURFACE:${point.id}`;
+    const surface = point.surfaceId
+      ? await tx.advertisingSurface.findUniqueOrThrow({ where: { id: point.surfaceId } })
+      : await tx.advertisingSurface.upsert({
+          where: { sourceKey: surfaceSourceKey },
+          update: {
+            carrierId,
+            currentClientId: point.navigationOrder.crmOrder.clientId,
+            name: point.label,
+            orientation: point.orientation,
+            status: 'OCCUPIED',
+          },
+          create: {
+            carrierId,
+            currentClientId: point.navigationOrder.crmOrder.clientId,
+            name: point.label,
+            mediaType: 'NAVIGATION_SIGN',
+            sourcePosition: point.label,
+            sourceKey: surfaceSourceKey,
+            directionDescription: point.orientation,
+            destinationName: point.navigationOrder.targetName,
+            orientation: point.orientation,
+            status: 'OCCUPIED',
+            artworkUrl:
+              point.navigationOrder.crmOrder.offer?.navigationOffer?.clientArtworkUrl
+              ?? point.navigationOrder.crmOrder.offer?.navigationOffer?.graphicArtworkUrl
+              ?? null,
+            note: `Vzniklo realizací bodu ze zakázky ${point.navigationOrder.crmOrder.orderNumber}`,
+          },
+        });
+
+    const createdPhotos = [];
+    for (const stored of photos) {
+      createdPhotos.push(await tx.photo.create({
+        data: {
+          id: stored.id || randomUUID(),
+          url: `/api/photos/${stored.id}/file`,
+          driveFileId: stored.driveFileId,
+          fileName: stored.fileName,
+          mimeType: stored.mimeType,
+          size: stored.size,
+          type: stored.type,
+          carrierId,
+          surfaceId: surface.id,
+          note: stored.note || (stored.type === 'BEFORE_INSTALLATION' ? 'Stav před montáží' : 'Stav po montáži'),
+          isClientVisible: stored.type === 'AFTER_INSTALLATION',
+          storageProvider: 'GOOGLE_DRIVE',
+          capturedByWorkerUserId: capturedBy.userId,
+          capturedByWorkerName: capturedBy.userName,
+        },
+      }));
+    }
+
+    const installedPhoto = createdPhotos.find((photo) => photo.id === afterPhoto.id)!;
 
     await tx.navigationPoint.update({
       where: { id: navigationPointId },
       data: {
-        installedPhotoId: photo.id,
+        carrierId,
+        surfaceId: surface.id,
+        installedPhotoId: installedPhoto.id,
         status: 'INSTALLED',
       },
     });
 
-    return photo;
+    return { photo: installedPhoto, carrierId, surfaceId: surface.id };
   });
 }

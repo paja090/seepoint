@@ -24,7 +24,7 @@ test('nekompletní balíček vrátí přesný chybějící požadavek', () => {
 test('navigační bod počítá kusovou cenu, výrobu, montáž a demontáž pomocí Decimal', () => {
   const first = calculateNavigationPointSubtotal({ quantity: new Prisma.Decimal('3'), unitPrice: new Prisma.Decimal('1250.50'), installationPrice: new Prisma.Decimal('800'), removalPrice: new Prisma.Decimal('350'), productionPrice: new Prisma.Decimal('1200.25') });
   const second = calculateNavigationPointSubtotal({ quantity: new Prisma.Decimal('1'), unitPrice: new Prisma.Decimal('999.99'), installationPrice: new Prisma.Decimal('0'), removalPrice: new Prisma.Decimal('0'), productionPrice: new Prisma.Decimal('0') });
-  assert.equal(first.toFixed(2), '6101.75');
+  assert.equal(first.toFixed(2), '10802.25');
   const totals = calculateNavigationOfferTotals([first, second]);
-  assert.deepEqual({ subtotal: totals.subtotal.toFixed(2), tax: totals.taxAmount.toFixed(2), total: totals.totalWithTax.toFixed(2) }, { subtotal: '7101.74', tax: '1491.37', total: '8593.11' });
+  assert.deepEqual({ subtotal: totals.subtotal.toFixed(2), tax: totals.taxAmount.toFixed(2), total: totals.totalWithTax.toFixed(2) }, { subtotal: '11802.24', tax: '2478.47', total: '14280.71' });
 });

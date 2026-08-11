@@ -134,6 +134,8 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           offerType={offer.offerType ?? 'STANDARD_MEDIA'}
           offerId={offer.id!}
           status={offer.status}
+          navigationProposalMode={(offer.navigation as unknown as { proposalMode?: string } | null)?.proposalMode}
+          navigationSelectionSubmitted={(offer.navigation as unknown as { selectionSubmitted?: boolean } | null)?.selectionSubmitted}
         />
       </div>
     </AppShell>

@@ -20,12 +20,14 @@ type OfferActionsProps = {
   converted: boolean;
   canConvert: boolean;
   offerType: 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY';
+  navigationProposalMode?: string;
+  navigationSelectionSubmitted?: boolean;
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50';
 
-export function OfferActions({ offerId, status, converted, canConvert, offerType }: OfferActionsProps) {
+export function OfferActions({ offerId, status, converted, canConvert, offerType, navigationProposalMode, navigationSelectionSubmitted }: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -54,6 +56,7 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
   }
 
   const disabled = Boolean(busy);
+  const isNavigationLocationSelection = offerType === 'NAVIGATION' && navigationProposalMode !== 'PRICED_QUOTE';
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -63,9 +66,16 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
       </div>
 
       <div className="space-y-3 p-5">
+        {isNavigationLocationSelection && navigationSelectionSubmitted ? (
+          <a className={primaryButton} href={`/offers/${offerId}/navigation/edit`}>
+            <FilePenLine aria-hidden="true" size={17} />
+            Připravit cenovou nabídku (fáze 2)
+          </a>
+        ) : null}
+
         <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : offerType === 'CITY_GALLERY' ? `/offers/${offerId}/city-gallery/edit` : `/offers/${offerId}/edit`}>
           <FilePenLine aria-hidden="true" size={17} />
-          Upravit nabídku
+          {isNavigationLocationSelection ? 'Upravit lokační návrh' : 'Upravit nabídku'}
         </a>
 
         <a className={primaryButton} href={`/offers/${offerId}/preview`}>
@@ -73,7 +83,7 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           Zkontrolovat klientský náhled
         </a>
 
-        {status === 'SENT' && (
+        {status === 'SENT' && !isNavigationLocationSelection && (
           <>
             {canConvert && (
               <button className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50" disabled={disabled} onClick={() => void action('accept')} type="button">
@@ -88,7 +98,7 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           </>
         )}
 
-        {offerType === 'NAVIGATION' && (
+        {offerType === 'NAVIGATION' && status === 'ACCEPTED' && canConvert && !converted ? (
           <button
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 shadow-xs cursor-pointer"
             disabled={disabled}
@@ -113,7 +123,7 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           >
             🚀 Převést do Realizace & Plánu montáží
           </button>
-        )}
+        ) : null}
 
         {status === 'ACCEPTED' && canConvert && offerType === 'STANDARD_MEDIA' && (
           <>

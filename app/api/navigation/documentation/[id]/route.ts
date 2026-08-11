@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
       items: {
         include: {
-          navigationPoint: true,
+          navigationPoint: { include: { installedPhoto: true } },
           carrier: {
             include: {
               photos: {
@@ -48,11 +48,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // Auto-heal empty items if report has 0 items
   if (report.items.length === 0) {
-    const points = await prisma.navigationPoint.findMany({
+    let points = await prisma.navigationPoint.findMany({
       where: {
-        navigationOffer: {
-          offer: { clientId },
-        },
+        navigationOrder: { crmOrder: { clientId, ...(report.offerId ? { offerId: report.offerId } : {}) } },
         status: { notIn: ['REMOVED', 'CANCELLED'] },
       },
       include: {
@@ -68,6 +66,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       orderBy: { sortOrder: 'asc' },
     });
 
+    if (points.length === 0) {
+      points = await prisma.navigationPoint.findMany({
+        where: {
+          navigationOffer: { offer: { clientId } },
+          status: { notIn: ['REMOVED', 'CANCELLED'] },
+        },
+        include: {
+          carrier: {
+            include: {
+              photos: {
+                where: { isPrivate: false },
+                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+              },
+            },
+          },
+        },
+        orderBy: { sortOrder: 'asc' },
+      });
+    }
+
     let itemInputs: Array<{
       reportId: string;
       navigationPointId?: string;
@@ -82,7 +100,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         reportId,
         navigationPointId: point.id,
         carrierId: point.carrierId ?? undefined,
-        selectedPhotoId: point.carrier?.photos[0]?.id ?? undefined,
+        selectedPhotoId: point.installedPhotoId ?? point.carrier?.photos[0]?.id ?? undefined,
         sortOrder: index,
         isVisible: true,
       }));
@@ -138,7 +156,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           },
           items: {
             include: {
-              navigationPoint: true,
+              navigationPoint: { include: { installedPhoto: true } },
               carrier: {
                 include: {
                   photos: {
@@ -157,6 +175,98 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         report = updatedReport;
       }
     }
+  }
+
+  const legacyOfferItems = report.items.filter(
+    (item) => item.navigationPoint && !item.navigationPoint.navigationOrderId,
+  );
+  if (legacyOfferItems.length > 0) {
+    const operationalPoints = await prisma.navigationPoint.findMany({
+      where: {
+        navigationOrder: { crmOrder: { clientId, ...(report.offerId ? { offerId: report.offerId } : {}) } },
+        label: { in: legacyOfferItems.map((item) => item.navigationPoint!.label) },
+      },
+      include: {
+        installedPhoto: true,
+        carrier: {
+          include: {
+            photos: {
+              where: { isPrivate: false },
+              orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+            },
+          },
+        },
+      },
+    });
+    const operationalByLabel = new Map(operationalPoints.map((point) => [point.label, point]));
+    const replacements = legacyOfferItems.flatMap((item) => {
+      const point = operationalByLabel.get(item.navigationPoint!.label);
+      return point ? [{ item, point }] : [];
+    });
+    if (replacements.length > 0) {
+      await prisma.$transaction(
+        replacements.map(({ item, point }) =>
+          prisma.navigationDocumentationItem.update({
+            where: { id: item.id },
+            data: {
+              navigationPointId: point.id,
+              carrierId: point.carrierId,
+              selectedPhotoId: point.installedPhotoId,
+            },
+          }),
+        ),
+      );
+      report = {
+        ...report,
+        items: report.items.map((item) => {
+          const point = item.navigationPoint ? operationalByLabel.get(item.navigationPoint.label) : undefined;
+          if (!point) return item;
+          return {
+            ...item,
+            navigationPointId: point.id,
+            carrierId: point.carrierId,
+            selectedPhotoId: point.installedPhotoId,
+            navigationPoint: point,
+            carrier: point.carrier,
+            selectedPhoto: point.installedPhoto,
+          };
+        }),
+      };
+    }
+  }
+
+  const missingInstalledSelections = report.items.filter(
+    (item) => !item.selectedPhotoId && item.navigationPoint?.installedPhoto,
+  );
+  if (missingInstalledSelections.length > 0) {
+    await prisma.$transaction(
+      missingInstalledSelections.map((item) =>
+        prisma.navigationDocumentationItem.update({
+          where: { id: item.id },
+          data: { selectedPhotoId: item.navigationPoint!.installedPhoto!.id },
+        }),
+      ),
+    );
+    report = {
+      ...report,
+      items: report.items.map((item) => {
+        const installedPhoto = item.navigationPoint?.installedPhoto;
+        if (item.selectedPhotoId || !installedPhoto) return item;
+        return {
+          ...item,
+          selectedPhotoId: installedPhoto.id,
+          selectedPhoto: installedPhoto,
+          carrier: item.carrier
+            ? {
+                ...item.carrier,
+                photos: item.carrier.photos.some((photo) => photo.id === installedPhoto.id)
+                  ? item.carrier.photos
+                  : [installedPhoto, ...item.carrier.photos],
+              }
+            : item.carrier,
+        };
+      }),
+    };
   }
 
   const warnings = runPrePublishChecks(report.client.email, report.items, report.periodFrom);
