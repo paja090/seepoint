@@ -19,6 +19,7 @@ import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
 import { RoleSwitcherButton } from './RoleSwitcherButton';
 import { NotificationBellCenter } from './notifications/NotificationBellCenter';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 
@@ -209,6 +210,9 @@ export function ResponsiveAppShell({
         <AppTopbar user={user} />
         <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-4 sm:py-6 lg:px-8">{children}</div>
       </main>
+
+      {/* 📱 PWA Mobile Install Prompt */}
+      <PwaInstallPrompt />
 
       {/* 💬 FLOATING CHAT BUTTON (FAB) IN BOTTOM RIGHT */}
       <Link
