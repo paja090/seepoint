@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Camera, Car, ClipboardList, ClipboardCheck, FileText, FileUp, GalleryHorizontalEnd, Map, MapPinned, PanelsTopLeft, PhoneCall, Route, Settings, UserRound, Users } from 'lucide-react';
+import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Camera, Car, ClipboardList, ClipboardCheck, FileText, FileUp, GalleryHorizontalEnd, Map, MapPinned, MessageSquare, PanelsTopLeft, PhoneCall, Route, Settings, UserRound, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -19,6 +19,7 @@ export type AppNavIcon =
   | 'map'
   | 'mapPinned'
   | 'galleryHorizontalEnd'
+  | 'messageSquare'
   | 'panelsTopLeft'
   | 'phone'
   | 'route'
@@ -41,6 +42,7 @@ const icons = {
   map: Map,
   mapPinned: MapPinned,
   galleryHorizontalEnd: GalleryHorizontalEnd,
+  messageSquare: MessageSquare,
   panelsTopLeft: PanelsTopLeft,
   phone: PhoneCall,
   route: Route,
