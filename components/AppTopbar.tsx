@@ -1,6 +1,6 @@
 'use client';
 
-import { Camera, LogOut, Search, UserRound } from 'lucide-react';
+import { Camera, LogOut, MessageSquare, PhoneCall, Search, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
@@ -50,9 +50,12 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
           <p className="text-xs text-slate-500">{roleLabel(user.role)}</p>
         </div>
         <NotificationBellCenter />
-        <Link href="/mobile-photos" className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 transition" title="Mobilní fotodokumentace z terénu">
-          <Camera size={16} />
-          <span className="hidden sm:inline">📱 Foto z terénu</span>
+        <Link href="/chat" className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition" title="💬 Týmový Chat & Účtenky za palivo">
+          <MessageSquare size={16} />
+          <span className="hidden md:inline">Chat & Účtenky</span>
+        </Link>
+        <Link href="/team" className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition" title="📞 Telefonní seznam týmu SeePOINT">
+          <PhoneCall size={17} />
         </Link>
         <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-950 text-sm font-semibold text-white" title={user.email}>{initials}</div>
         <Link className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" href="/profile" title="Můj profil"><UserRound size={18} /></Link>

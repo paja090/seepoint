@@ -11,6 +11,8 @@ import {
   Map,
   Route,
   LogOut,
+  MessageSquare,
+  Phone,
 } from 'lucide-react';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
@@ -74,14 +76,22 @@ export function ResponsiveAppShell({
           </Link>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} compact />
           <Link
-            href="/mobile-photos"
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition"
+            href="/chat"
+            className="flex items-center gap-1 rounded-xl bg-indigo-600 px-2.5 py-1.5 text-xs font-black text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-500 active:scale-95 transition"
+            title="Týmový Chat & Účtenky paliva"
           >
-            <Camera size={16} />
-            <span>Foto</span>
+            <MessageSquare size={15} />
+            <span>Chat</span>
+          </Link>
+          <Link
+            href="/team"
+            className="flex items-center justify-center h-8 w-8 rounded-xl bg-slate-800 text-emerald-400 border border-slate-700 hover:bg-slate-700 active:scale-95 transition"
+            title="Telefonní seznam týmu"
+          >
+            <Phone size={15} />
           </Link>
         </div>
       </header>
