@@ -16,6 +16,16 @@ export const dynamic = 'force-dynamic';
 const occupancyStatuses = ['AVAILABLE', 'NEGOTIATION', 'RESERVED', 'OCCUPIED', 'FINISHED', 'CANCELLED', 'OUT_OF_SERVICE'] as const;
 const mediaTypes = ['NAVIGATION_SIGN', 'BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BANNER', 'FACADE', 'LED_SCREEN', 'PROMO_BENCH', 'PROMO_HORIZON', 'CITY_POSTER', 'PROMO_TOWER', 'PROMO_MINITOWER', 'OTHER'] as const;
 
+export const CzechOccupancyStatusLabels: Record<string, string> = {
+  AVAILABLE: '🟢 Volné k pronájmu (Available)',
+  RESERVED: '🟧 Rezervováno (Předběžně)',
+  NEGOTIATION: '🟦 V jednání (Nabídka odeslána)',
+  OCCUPIED: '🟥 Obsazeno / Schváleno (Platná kampaň)',
+  FINISHED: '⚪ Ukončená kampaň',
+  CANCELLED: '❌ Zrušeno',
+  OUT_OF_SERVICE: '⚠️ Mimo provoz / Oprava',
+};
+
 type SearchParams = Record<string, string | string[] | undefined>;
 
 function first(value: string | string[] | undefined) { return Array.isArray(value) ? value[0] : value; }
@@ -62,13 +72,33 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const activeFilters = Object.entries(params).map(([key, value]) => [key, clean(value)] as const).filter(([, value]) => Boolean(value));
   const selectedStatus = clean(params.status);
+  const selectedMediaType = clean(params.mediaType);
+  const selectedCity = clean(params.city);
+  const searchQuery = clean(params.q);
 
   try {
     const where = buildWhere(params);
     const today = new Date();
     const in7 = new Date(today); in7.setDate(today.getDate() + 7);
     const in30 = new Date(today); in30.setDate(today.getDate() + 30);
-    const [dbRows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, allSurfaces] = await Promise.all([
+
+    const surfaceFilter: Prisma.AdvertisingSurfaceWhereInput = {
+      carrier: {
+        archivedAt: null,
+        ...(selectedCity ? { city: { contains: selectedCity, mode: 'insensitive' } } : {}),
+      },
+      ...(isMediaType(selectedMediaType) ? { mediaType: selectedMediaType } : {}),
+      ...(searchQuery ? {
+        OR: [
+          { name: { contains: searchQuery, mode: 'insensitive' } },
+          { carrier: { code: { contains: searchQuery, mode: 'insensitive' } } },
+          { carrier: { name: { contains: searchQuery, mode: 'insensitive' } } },
+          { carrier: { city: { contains: searchQuery, mode: 'insensitive' } } },
+        ],
+      } : {}),
+    };
+
+    const [dbRows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, filteredSurfaces] = await Promise.all([
       prisma.occupancy.findMany({
         where,
         include: { client: true, surface: { include: { carrier: true } } },
@@ -86,7 +116,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         select: { id: true, name: true },
       }),
       prisma.advertisingSurface.findMany({
-        where: { carrier: { archivedAt: null } },
+        where: surfaceFilter,
         include: { carrier: true },
         orderBy: [{ carrier: { city: 'asc' } }, { name: 'asc' }],
         take: 500,
@@ -124,7 +154,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     }));
 
     if (selectedStatus === 'AVAILABLE') {
-      const freeSurfaces = allSurfaces.filter((s) => !occupiedSurfaceIds.has(s.id));
+      const freeSurfaces = filteredSurfaces.filter((s) => !occupiedSurfaceIds.has(s.id));
       tableRows = freeSurfaces.map((s) => ({
         id: `avail-${s.id}`,
         surfaceId: s.id,
@@ -150,7 +180,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       }));
     }
 
-    const surfaceOptions = allSurfaces.map((s) => ({
+    const surfaceOptions = filteredSurfaces.map((s) => ({
       id: s.id,
       name: s.name,
       mediaType: mediaTypeLabel(s.mediaType),
@@ -188,14 +218,14 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
 
         <FilterBar>
           <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-6" method="get">
-            <label className="text-sm font-medium">Hledání<input className="input mt-1" name="q" defaultValue={clean(params.q) ?? ''} placeholder="Kampaň, klient, kód" /></label>
-            <label className="text-sm font-medium">Klient<input className="input mt-1" name="client" defaultValue={clean(params.client) ?? ''} /></label>
-            <label className="text-sm font-medium">Přiřazení klienta<select className="input mt-1" name="clientResolution" defaultValue={clientResolutionFilter(clean(params.clientResolution))}><option value="all">Všechny</option><option value="resolved">Klient přiřazen</option><option value="unresolved">Klient neurčen</option></select></label>
-            <label className="text-sm font-medium">Město<input className="input mt-1" name="city" defaultValue={clean(params.city) ?? ''} /></label>
-            <label className="text-sm font-medium">Typ média<select className="input mt-1" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}><option value="">Všechna média</option>{mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}</select></label>
-            <label className="text-sm font-medium">Stav<select className="input mt-1" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{item === 'AVAILABLE' ? '🟢 AVAILABLE (Volné nosiče)' : item}</option>)}</select></label>
+            <label className="text-sm font-medium">Hledání<input className="input mt-1" name="q" defaultValue={clean(params.q) ?? ''} placeholder="Kampaň, klient, kód..." /></label>
+            <label className="text-sm font-medium">Klient<input className="input mt-1" name="client" defaultValue={clean(params.client) ?? ''} placeholder="Jméno klienta" /></label>
+            <label className="text-sm font-medium">Přiřazení klienta<select className="input mt-1 font-semibold" name="clientResolution" defaultValue={clientResolutionFilter(clean(params.clientResolution))}><option value="all">Všechny záznamy</option><option value="resolved">Klient přiřazen</option><option value="unresolved">Klient neurčen</option></select></label>
+            <label className="text-sm font-medium">Město / Lokalita<input className="input mt-1" name="city" defaultValue={clean(params.city) ?? ''} placeholder="Ostrava, Praha..." /></label>
+            <label className="text-sm font-medium">Typ média<select className="input mt-1 font-semibold" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}><option value="">Všechna média</option>{mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}</select></label>
+            <label className="text-sm font-medium">Stav obsazenosti<select className="input mt-1 font-semibold" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{CzechOccupancyStatusLabels[item] || item}</option>)}</select></label>
             <div className="grid grid-cols-2 gap-2"><label className="text-sm font-medium">Od<input className="input mt-1" name="dateFrom" type="date" defaultValue={clean(params.dateFrom) ?? ''} /></label><label className="text-sm font-medium">Do<input className="input mt-1" name="dateTo" type="date" defaultValue={clean(params.dateTo) ?? ''} /></label></div>
-            <div className="flex flex-wrap items-center gap-2 md:col-span-3 xl:col-span-6"><Button type="submit">Filtrovat</Button><Button href="/occupancy" variant="secondary">Vymazat filtry</Button></div>
+            <div className="flex flex-wrap items-center gap-2 md:col-span-3 xl:col-span-6"><Button type="submit">Filtrovat výsledky</Button><Button href="/occupancy" variant="secondary">Vymazat filtry</Button></div>
           </form>
         </FilterBar>
 
@@ -208,8 +238,8 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           {tableRows.length === 0 ? (
             <div className="p-5">
               <EmptyState
-                title="Žádné nosiče nevyhovují filtru."
-                description="Zkuste zrušit filtry nebo změnit zadané město."
+                title="Žádné nosiče nevyhovují zadanému filtru."
+                description="Zkuste vymazat filtry nebo vybrat jiné typy médií či město."
               />
             </div>
           ) : (
