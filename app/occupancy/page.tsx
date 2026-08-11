@@ -21,7 +21,7 @@ export const CzechOccupancyStatusLabels: Record<string, string> = {
   RESERVED: '🟧 Rezervováno (Předběžně)',
   NEGOTIATION: '🟦 V jednání (Nabídka odeslána)',
   OCCUPIED: 'libre / 🟥 Obsazeno / Schváleno (Platná kampaň)',
-  FINISHED: '⚪ Ukončená kampaň (Automaticky uvolněno)',
+  FINISHED: '⚪ Ukončená kampaň (Historie)',
   CANCELLED: '❌ Zrušeno',
   OUT_OF_SERVICE: '⚠️ Mimo provoz / Oprava',
 };
@@ -141,36 +141,36 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         .map((r) => r.surfaceId)
     );
 
-    let tableRows = dbRows.map((row) => {
-      const isPast = new Date(row.dateTo) < today && ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(row.status);
-      const computedStatus = isPast ? 'FINISHED' : (row.status as string);
+    // Filter out expired campaigns unless specifically filtering by FINISHED
+    const activeDbRows = selectedStatus === 'FINISHED'
+      ? dbRows.filter((r) => new Date(r.dateTo) < today || r.status === 'FINISHED')
+      : dbRows.filter((r) => new Date(r.dateTo) >= today && r.status !== 'FINISHED');
 
-      return {
-        id: row.id,
-        surfaceId: row.surfaceId,
-        clientId: row.clientId,
-        clientName: isPast ? `${row.clientName} (Ukončená kampaň - Uvolněno)` : row.clientName,
-        campaignName: isPast ? `${row.campaignName} [UKONČENO]` : row.campaignName,
-        dateFrom: row.dateFrom.toISOString(),
-        dateTo: row.dateTo.toISOString(),
-        status: computedStatus,
-        price: row.price?.toString() ?? null,
-        client: row.client ? { name: row.client.name } : null,
-        surface: {
-          id: row.surface.id,
-          name: row.surface.name,
-          mediaType: row.surface.mediaType,
-          carrier: {
-            id: row.surface.carrier.id,
-            code: row.surface.carrier.code,
-            city: row.surface.carrier.city,
-            name: row.surface.carrier.name,
-          },
+    let tableRows = activeDbRows.map((row) => ({
+      id: row.id,
+      surfaceId: row.surfaceId,
+      clientId: row.clientId,
+      clientName: row.clientName,
+      campaignName: row.campaignName,
+      dateFrom: row.dateFrom.toISOString(),
+      dateTo: row.dateTo.toISOString(),
+      status: row.status as string,
+      price: row.price?.toString() ?? null,
+      client: row.client ? { name: row.client.name } : null,
+      surface: {
+        id: row.surface.id,
+        name: row.surface.name,
+        mediaType: row.surface.mediaType,
+        carrier: {
+          id: row.surface.carrier.id,
+          code: row.surface.carrier.code,
+          city: row.surface.carrier.city,
+          name: row.surface.carrier.name,
         },
-      };
-    });
+      },
+    }));
 
-    if (selectedStatus === 'AVAILABLE') {
+    if (selectedStatus === 'AVAILABLE' || (!selectedStatus && tableRows.length === 0)) {
       const freeSurfaces = filteredSurfaces.filter((s) => !activeOccupiedSurfaceIds.has(s.id));
       tableRows = freeSurfaces.map((s) => ({
         id: `avail-${s.id}`,
@@ -214,7 +214,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       <AppShell>
         <PageHeader
           title="Obsazenost & Volné Plochy k Kampaním"
-          description="Přehled, filtrování volných reklamních ploch a hromadné rezervace kampaní pro obchodníky. Prošlé kampaně se automaticky uvolňují k pronájmu."
+          description="Přehled, filtrování volných reklamních ploch a hromadné rezervace kampaní pro obchodníky. Prošlé kampaně automaticky mizí z tabulky a plochy se ihned stávají volnými."
           actions={<Button href="/offers" variant="secondary">Vytvořit nabídku</Button>}
         />
 
@@ -229,7 +229,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           <StatCard icon={<ShieldAlert size={20} />} label="Aktuálně obsazeno" tone="red" value={occupiedCount} />
           <StatCard icon={<Clock3 size={20} />} label="Rezervace" tone="orange" value={reservedCount} />
           <StatCard icon={<Handshake size={20} />} label="Jednání" tone="blue" value={negotiationCount} />
-          <StatCard icon={<TimerReset size={20} />} label="Končí do 7 dnů (Lze předrezervovat)" tone="orange" value={ending7Count} />
+          <StatCard icon={<TimerReset size={20} />} label="Končí do 7 dnů (Předrezervace)" tone="orange" value={ending7Count} />
           <StatCard icon={<CalendarClock size={20} />} label="Končí do 30 dnů" tone="slate" value={ending30Count} />
         </div>
 
@@ -247,7 +247,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         </FilterBar>
 
         <section className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          Nalezeno <strong>{tableRows.length}</strong> záznamů. Prošlé kampaně jsou automaticky označené jako uvolněné pro nový pronájem.
+          Nalezeno <strong>{tableRows.length}</strong> aktivních záznamů. Prošlé kampaně automaticky zmizely a plochy jsou uvolněné pro nový pronájem.
           <span className="ml-3 text-slate-500">Aktivní filtry: {activeFilters.length ? activeFilters.map(([key, value]) => `${key}=${value}`).join(', ') : 'žádné'}</span>
         </section>
 
