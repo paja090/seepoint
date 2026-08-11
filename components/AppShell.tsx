@@ -10,6 +10,7 @@ const navGroups: NavGroup[] = [
       ['/dashboard', '📊 Nástěnka / Přehled', 'barChart3', 'dashboard'],
       ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
       ['/chat', '💬 Týmový Chat & Účtenky', 'messageSquare', 'team'],
+      ['/vacations', '🌴 Dovolená & Volno', 'calendarRange', 'team'],
       ['/mobile-photos', '📱 Mobilní foto z terénu', 'camera', 'work'],
       ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
       ['/my-work-entries', '⏱️ Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
