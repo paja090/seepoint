@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
+import { NotificationBellCenter } from '@/components/notifications/NotificationBellCenter';
 
 const pageTitles: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
@@ -46,6 +47,7 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
           <p className="text-sm font-semibold text-slate-900">{user.name}</p>
           <p className="text-xs text-slate-500">{roleLabel(user.role)}</p>
         </div>
+        <NotificationBellCenter />
         <Link href="/mobile-photos" className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 transition" title="Mobilní fotodokumentace z terénu">
           <Camera size={16} />
           <span className="hidden sm:inline">📱 Foto z terénu</span>

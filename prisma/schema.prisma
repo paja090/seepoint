@@ -1460,8 +1460,10 @@ model WorkOrder {
   updatedAt        DateTime        @updatedAt
 
   crmOrderId       String?
+  navigationOrderId String?
   client           Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
   crmOrder         CrmOrder?        @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  navigationOrder  NavigationOrder? @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
   assignments      WorkAssignment[]
   items            WorkOrderItem[]
   workTasks        WorkTask[]
@@ -2334,6 +2336,7 @@ model NavigationOrder {
   points             NavigationPoint[]
   billingPeriods     NavigationBillingPeriod[]
   navigationContracts NavigationContract[]
+  workOrders         WorkOrder[]
 
   @@index([status])
 }
