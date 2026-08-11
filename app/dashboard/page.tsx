@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
 import { ManagerDashboard } from '@/components/dashboard/ManagerDashboard';
 import { WorkerDashboard } from '@/components/dashboard/WorkerDashboard';
+import { SalesDashboard } from '@/components/dashboard/SalesDashboard';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,7 @@ export default async function Dashboard() {
   const user = await requirePageAccess('dashboard');
   const role = user.role;
   const isWorkerOrTech = role === 'WORKER' || role === 'TECHNICIAN';
+  const isSales = role === 'SALES';
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -109,6 +111,7 @@ export default async function Dashboard() {
     ending30,
     waitingOffers,
     missingGpsRows,
+    activeOffersList,
   ] = await Promise.all([
     prisma.advertisingCarrier.count(),
     prisma.advertisingCarrier.count({ where: { archivedAt: null, status: 'ACTIVE' } }),
@@ -151,7 +154,7 @@ export default async function Dashboard() {
       where: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } },
       include: { client: true, surface: { include: { carrier: true } } },
       orderBy: { dateTo: 'asc' },
-      take: 10,
+      take: 15,
     }),
     prisma.offer.count({ where: { status: 'SENT' } }),
     prisma.advertisingCarrier.findMany({
@@ -159,6 +162,12 @@ export default async function Dashboard() {
       orderBy: [{ city: 'asc' }, { code: 'asc' }],
       take: 8,
       select: { id: true, code: true, name: true, city: true, street: true, address: true },
+    }),
+    prisma.offer.findMany({
+      where: { status: { in: ['DRAFT', 'SENT'] } },
+      include: { client: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
     }),
   ]);
 
@@ -241,6 +250,50 @@ export default async function Dashboard() {
     occupancyPercent: data.count > 0 ? Math.round((data.occupiedSet.size / data.count) * 100) : 0,
     estimatedRevenue: data.revenue,
   })).sort((a, b) => b.estimatedRevenue - a.estimatedRevenue).slice(0, 5);
+
+  if (isSales) {
+    const salesFirstName = user.employee?.firstName
+      ? user.employee.firstName
+      : (user.name ? user.name.split(' ')[0] : 'Obchodníku');
+
+    return (
+      <AppShell>
+        <SalesDashboard
+        salesName={salesFirstName}
+        activeOffers={activeOffersList.map((o) => ({
+          id: o.id,
+          title: o.title,
+          clientName: o.client.name,
+          totalAmount: o.totalPrice ? Number(o.totalPrice) : 0,
+          validUntil: o.validUntil,
+          status: o.status,
+          createdAt: o.createdAt,
+        }))}
+        renewals={ending30.map((o) => ({
+          id: o.id,
+          campaignName: o.campaignName,
+          clientName: o.clientName,
+          dateTo: o.dateTo,
+          status: o.status,
+          contactPhone: o.client?.phone || null,
+          contactEmail: o.client?.email || null,
+          surface: {
+            carrier: {
+              code: o.surface.carrier.code,
+              city: o.surface.carrier.city,
+              name: o.surface.carrier.name,
+            },
+          },
+        }))}
+          availableSurfacesCount={availableSurfaces}
+          totalSurfacesCount={totalSurfaces}
+          occupancyPercent={occupancyPercent}
+          topCities={topCities}
+          mediaBreakdown={mediaBreakdown}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
