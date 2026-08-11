@@ -49,6 +49,8 @@ export async function POST(request: Request) {
     channel?: string;
     content?: string;
     imageUrl?: string;
+    assignedToUserId?: string;
+    assignedToUserName?: string;
     fuelExpense?: {
       vehicleId: string;
       amount: number;
@@ -113,7 +115,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Vyberte vozidlo a popište závadu.' }, { status: 400 });
     }
 
-    // Log a service record entry in the database
     await prisma.vehicleServiceRecord.create({
       data: {
         vehicleId: vf.vehicleId,
@@ -123,7 +124,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // If critical or high severity, change vehicle status to SERVICE
     if (vf.severity === 'CRITICAL' || vf.severity === 'HIGH') {
       await prisma.vehicle.update({
         where: { id: vf.vehicleId },
@@ -149,6 +149,8 @@ export async function POST(request: Request) {
       content,
       imageUrl: body.imageUrl || null,
       fuelExpenseId: fuelExpenseId || null,
+      assignedToUserId: body.assignedToUserId || null,
+      assignedToUserName: body.assignedToUserName || null,
     },
   });
 
@@ -167,4 +169,34 @@ export async function POST(request: Request) {
   }).catch(() => null);
 
   return NextResponse.json(msg, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null) as {
+    messageId: string;
+    assignedToUserId?: string | null;
+    assignedToUserName?: string | null;
+    isResolved?: boolean;
+  } | null;
+
+  if (!body || !body.messageId) {
+    return NextResponse.json({ error: 'Chybí ID zprávy.' }, { status: 400 });
+  }
+
+  const updatedMsg = await prisma.chatMessage.update({
+    where: { id: body.messageId },
+    data: {
+      assignedToUserId: body.assignedToUserId !== undefined ? body.assignedToUserId : undefined,
+      assignedToUserName: body.assignedToUserName !== undefined ? body.assignedToUserName : undefined,
+      isResolved: body.isResolved !== undefined ? body.isResolved : undefined,
+      resolvedAt: body.isResolved ? new Date() : null,
+    },
+  });
+
+  return NextResponse.json(updatedMsg);
 }

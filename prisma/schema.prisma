@@ -848,19 +848,24 @@ model EmployeeAbsence {
 }
 
 model ChatMessage {
-  id            String   @id @default(cuid())
-  channel       String   @default("general")
-  userId        String
-  userName      String
-  userRole      String
-  content       String
-  imageUrl      String?
-  fuelExpenseId String?
-  createdAt     DateTime @default(now())
+  id                 String    @id @default(cuid())
+  channel            String    @default("general")
+  userId             String
+  userName           String
+  userRole           String
+  content            String
+  imageUrl           String?
+  fuelExpenseId      String?
+  assignedToUserId   String?
+  assignedToUserName String?
+  isResolved         Boolean   @default(false)
+  resolvedAt         DateTime?
+  createdAt          DateTime  @default(now())
 
   reads ChatRead[]
 
   @@index([channel, createdAt])
+  @@index([assignedToUserId])
 }
 
 model ChatRead {
