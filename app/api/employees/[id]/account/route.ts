@@ -55,8 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const target = employee.user;
   if (!target) return NextResponse.json({ error: 'Zaměstnanec nemá uživatelský účet.' }, { status: 404 });
-  if (!canManageTarget(actor.role, target.role)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat tento účet.' }, { status: 403 });
-  if (actor.id === target.id && body.action === 'role') return NextResponse.json({ error: 'Nemůžete změnit vlastní roli.' }, { status: 400 });
+  if (actor.id !== target.id && !canManageTarget(actor.role, target.role)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat tento účet.' }, { status: 403 });
 
   if (body.action === 'invite') {
     const limited = await enforceRateLimit(request, hashRateLimitIdentity(target.id), rateLimitPolicies.resendInvitation);
