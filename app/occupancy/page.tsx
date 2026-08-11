@@ -1,10 +1,9 @@
 import Link from 'next/link';
-import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset, Route } from 'lucide-react';
+import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset } from 'lucide-react';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
-import { StatusBadge } from '@/components/StatusBadge';
-import { Button, EmptyState, ErrorState, FilterBar, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
+import { Button, EmptyState, ErrorState, FilterBar, PageHeader, StatCard } from '@/components/ui';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { prisma } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
@@ -24,7 +23,6 @@ function clean(value: string | string[] | undefined) { return first(value)?.trim
 function parseDate(value: string | undefined) { if (!value) return undefined; const date = new Date(`${value}T00:00:00.000Z`); return Number.isNaN(date.getTime()) ? undefined : date; }
 function isOccupancyStatus(value: string | undefined): value is typeof occupancyStatuses[number] { return Boolean(value && occupancyStatuses.includes(value as typeof occupancyStatuses[number])); }
 function isMediaType(value: string | undefined): value is typeof mediaTypes[number] { return Boolean(value && mediaTypes.includes(value as typeof mediaTypes[number])); }
-function dateOnly(date: Date) { return date.toISOString().slice(0, 10); }
 
 function buildWhere(params: SearchParams) {
   const q = clean(params.q);
@@ -49,7 +47,7 @@ function buildWhere(params: SearchParams) {
   if (client) where.clientName = { contains: client, mode: 'insensitive' };
   if (clientResolution === 'resolved') where.clientId = { not: null };
   if (clientResolution === 'unresolved') where.clientId = null;
-  if (isOccupancyStatus(status)) where.status = status;
+  if (isOccupancyStatus(status) && status !== 'AVAILABLE') where.status = status;
   if (dateFrom && dateTo) Object.assign(where, { dateFrom: { lte: dateTo }, dateTo: { gte: dateFrom } });
   else if (dateFrom) where.dateTo = { gte: dateFrom };
   else if (dateTo) where.dateFrom = { lte: dateTo };
@@ -63,25 +61,25 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
   const user = await requirePageAccess('occupancy');
   const params = await searchParams;
   const activeFilters = Object.entries(params).map(([key, value]) => [key, clean(value)] as const).filter(([, value]) => Boolean(value));
+  const selectedStatus = clean(params.status);
 
   try {
     const where = buildWhere(params);
     const today = new Date();
     const in7 = new Date(today); in7.setDate(today.getDate() + 7);
     const in30 = new Date(today); in30.setDate(today.getDate() + 30);
-    const [total, rows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, surfaces] = await Promise.all([
-      prisma.occupancy.count({ where }),
+    const [dbRows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, allSurfaces] = await Promise.all([
       prisma.occupancy.findMany({
         where,
         include: { client: true, surface: { include: { carrier: true } } },
         orderBy: [{ dateTo: 'asc' }, { dateFrom: 'asc' }],
         take: 500,
       }),
-      prisma.occupancy.count({ where: { ...where, status: 'OCCUPIED' } }),
-      prisma.occupancy.count({ where: { ...where, status: 'RESERVED' } }),
-      prisma.occupancy.count({ where: { ...where, status: 'NEGOTIATION' } }),
-      prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in7 } } }),
-      prisma.occupancy.count({ where: { ...where, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } } }),
+      prisma.occupancy.count({ where: { status: 'OCCUPIED' } }),
+      prisma.occupancy.count({ where: { status: 'RESERVED' } }),
+      prisma.occupancy.count({ where: { status: 'NEGOTIATION' } }),
+      prisma.occupancy.count({ where: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in7 } } }),
+      prisma.occupancy.count({ where: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } } }),
       prisma.client.findMany({
         where: { active: true },
         orderBy: { name: 'asc' },
@@ -91,11 +89,68 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         where: { carrier: { archivedAt: null } },
         include: { carrier: true },
         orderBy: [{ carrier: { city: 'asc' } }, { name: 'asc' }],
-        take: 300,
+        take: 500,
       }),
     ]);
 
-    const surfaceOptions = surfaces.map((s) => ({
+    const occupiedSurfaceIds = new Set(
+      dbRows
+        .filter((r) => ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(r.status))
+        .map((r) => r.surfaceId)
+    );
+
+    let tableRows = dbRows.map((row) => ({
+      id: row.id,
+      surfaceId: row.surfaceId,
+      clientId: row.clientId,
+      clientName: row.clientName,
+      campaignName: row.campaignName,
+      dateFrom: row.dateFrom.toISOString(),
+      dateTo: row.dateTo.toISOString(),
+      status: row.status as string,
+      price: row.price?.toString() ?? null,
+      client: row.client ? { name: row.client.name } : null,
+      surface: {
+        id: row.surface.id,
+        name: row.surface.name,
+        mediaType: row.surface.mediaType,
+        carrier: {
+          id: row.surface.carrier.id,
+          code: row.surface.carrier.code,
+          city: row.surface.carrier.city,
+          name: row.surface.carrier.name,
+        },
+      },
+    }));
+
+    if (selectedStatus === 'AVAILABLE') {
+      const freeSurfaces = allSurfaces.filter((s) => !occupiedSurfaceIds.has(s.id));
+      tableRows = freeSurfaces.map((s) => ({
+        id: `avail-${s.id}`,
+        surfaceId: s.id,
+        clientId: null,
+        clientName: '🟢 Volná plocha k pronájmu',
+        campaignName: 'VOLNÁ PLOCHA K PRONÁJMU',
+        dateFrom: today.toISOString(),
+        dateTo: in30.toISOString(),
+        status: 'AVAILABLE',
+        price: null,
+        client: null,
+        surface: {
+          id: s.id,
+          name: s.name,
+          mediaType: s.mediaType,
+          carrier: {
+            id: s.carrier.id,
+            code: s.carrier.code,
+            city: s.carrier.city,
+            name: s.carrier.name,
+          },
+        },
+      }));
+    }
+
+    const surfaceOptions = allSurfaces.map((s) => ({
       id: s.id,
       name: s.name,
       mediaType: mediaTypeLabel(s.mediaType),
@@ -111,8 +166,8 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     return (
       <AppShell>
         <PageHeader
-          title="Obsazenost & Rezervace kampaní"
-          description="Přehled a rychlá rezervace reklamních ploch pro obchodníky. Kontrola konfliktů, správa kampaní a převod na montáž."
+          title="Obsazenost & Volné Plochy k Kampaním"
+          description="Přehled, filtrování volných reklamních ploch a hromadné rezervace kampaní pro obchodníky."
           actions={<Button href="/offers" variant="secondary">Vytvořit nabídku</Button>}
         />
 
@@ -138,50 +193,28 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
             <label className="text-sm font-medium">Přiřazení klienta<select className="input mt-1" name="clientResolution" defaultValue={clientResolutionFilter(clean(params.clientResolution))}><option value="all">Všechny</option><option value="resolved">Klient přiřazen</option><option value="unresolved">Klient neurčen</option></select></label>
             <label className="text-sm font-medium">Město<input className="input mt-1" name="city" defaultValue={clean(params.city) ?? ''} /></label>
             <label className="text-sm font-medium">Typ média<select className="input mt-1" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}><option value="">Všechna média</option>{mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}</select></label>
-            <label className="text-sm font-medium">Stav<select className="input mt-1" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label className="text-sm font-medium">Stav<select className="input mt-1" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{item === 'AVAILABLE' ? '🟢 AVAILABLE (Volné nosiče)' : item}</option>)}</select></label>
             <div className="grid grid-cols-2 gap-2"><label className="text-sm font-medium">Od<input className="input mt-1" name="dateFrom" type="date" defaultValue={clean(params.dateFrom) ?? ''} /></label><label className="text-sm font-medium">Do<input className="input mt-1" name="dateTo" type="date" defaultValue={clean(params.dateTo) ?? ''} /></label></div>
             <div className="flex flex-wrap items-center gap-2 md:col-span-3 xl:col-span-6"><Button type="submit">Filtrovat</Button><Button href="/occupancy" variant="secondary">Vymazat filtry</Button></div>
           </form>
         </FilterBar>
 
         <section className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          Nalezeno <strong>{total}</strong> záznamů, zobrazeno <strong>{rows.length}</strong>.
+          Nalezeno <strong>{tableRows.length}</strong> záznamů.
           <span className="ml-3 text-slate-500">Aktivní filtry: {activeFilters.length ? activeFilters.map(([key, value]) => `${key}=${value}`).join(', ') : 'žádné'}</span>
         </section>
 
         <section className="card !p-0">
-          {rows.length === 0 ? (
+          {tableRows.length === 0 ? (
             <div className="p-5">
               <EmptyState
-                title="Zatím není evidována žádná obsazenost."
-                description="Jakmile obchodník vytvoří rezervaci, jednání nebo obsazenost ve formuláři výše, zobrazí se v této tabulce."
+                title="Žádné nosiče nevyhovují filtru."
+                description="Zkuste zrušit filtry nebo změnit zadané město."
               />
             </div>
           ) : (
             <OccupancyTableWithBulk
-              rows={rows.map((row) => ({
-                id: row.id,
-                surfaceId: row.surfaceId,
-                clientId: row.clientId,
-                clientName: row.clientName,
-                campaignName: row.campaignName,
-                dateFrom: row.dateFrom.toISOString(),
-                dateTo: row.dateTo.toISOString(),
-                status: row.status,
-                price: row.price?.toString(),
-                client: row.client ? { name: row.client.name } : null,
-                surface: {
-                  id: row.surface.id,
-                  name: row.surface.name,
-                  mediaType: row.surface.mediaType,
-                  carrier: {
-                    id: row.surface.carrier.id,
-                    code: row.surface.carrier.code,
-                    city: row.surface.carrier.city,
-                    name: row.surface.carrier.name,
-                  },
-                },
-              }))}
+              rows={tableRows}
               clients={clients}
             />
           )}
