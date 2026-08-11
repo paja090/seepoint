@@ -8,8 +8,19 @@ import { formatWorkDate, formatWorkPrice, workPriorityLabels, workPriorityStyles
 
 export const dynamic = 'force-dynamic';
 
-export default async function WorkPlanPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+function cleanParam(v: string | string[] | undefined) {
+  return Array.isArray(v) ? v[0]?.trim() : v?.trim();
+}
+
+export default async function WorkPlanPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePageAccess('work');
+  const params = await searchParams;
+
+  const initialCarrierCode = cleanParam(params.carrierCode) || '';
+  const initialClientName = cleanParam(params.clientName) || '';
+  const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
+  const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
 
   const [orders, clients, carriers, employees] = await Promise.all([
     prisma.workOrder.findMany({
@@ -110,6 +121,10 @@ export default async function WorkPlanPage() {
           carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
           employees={employeeOptions}
           currentUserName={currentUserName}
+          initialCarrierCode={initialCarrierCode}
+          initialClientName={initialClientName}
+          initialCampaignDateFrom={initialCampaignDateFrom}
+          initialCampaignDateTo={initialCampaignDateTo}
         />
 
         <section className="space-y-3">
