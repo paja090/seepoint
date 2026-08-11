@@ -116,6 +116,13 @@ export function BulkOccupancyBookingModal({
           >
             Zrušit výprodej
           </button>
+          <a
+            href={`/work?carrierCode=${encodeURIComponent(selectedSurfaces.map((s) => s.carrierCode).join(', '))}&quantity=${selectedSurfaces.length}&title=${encodeURIComponent(`Hromadná montáž kampaně (${selectedSurfaces.length} ks nosičů)`)}`}
+            className="flex items-center gap-1.5 rounded-2xl bg-sky-600 px-4 py-2.5 text-xs font-black text-white hover:bg-sky-500 active:scale-95 transition"
+            title="Naplánovat 1 celistvou zakázku pro celou kampaň v Plánu práce"
+          >
+            <span>🚗 Hromadná montáž ({selectedSurfaces.length} ks)</span>
+          </a>
           <button
             onClick={() => setOpen(true)}
             className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition"
