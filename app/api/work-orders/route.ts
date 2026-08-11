@@ -48,6 +48,28 @@ export async function POST(request: Request) {
   if (!title || !description || !scheduledAt || !requestedBy) return NextResponse.json({ error: 'Vyplňte název, datum práce, zadavatele a zadání.' }, { status: 400 });
   if (!workRequesters.includes(requestedBy as (typeof workRequesters)[number])) return NextResponse.json({ error: 'Vyberte platného zadavatele úkolu.' }, { status: 400 });
 
+  const clientId = text(input, 'clientId');
+  const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
+  if (clientId && !client) return NextResponse.json({ error: 'Vybraný klient už neexistuje.' }, { status: 400 });
+  const clientName = text(input, 'clientName') || client?.name || 'Bez klienta';
+
+  // Duplicate Work Order check: prevent duplicate tasks within 24h
+  const existingDuplicate = await prisma.workOrder.findFirst({
+    where: {
+      title,
+      clientName,
+      status: { not: 'CANCELLED' },
+      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    },
+  });
+
+  if (existingDuplicate) {
+    return NextResponse.json(
+      { error: `⚠️ Duplicitní úkol: Podobný pracovní úkol "${title}" byl pro tohoto klienta již dnes naplánován.` },
+      { status: 409 }
+    );
+  }
+
   const deadlineAt = optionalDate(input, 'deadlineAt');
   const campaignDateFrom = optionalDate(input, 'campaignDateFrom');
   const campaignDateTo = optionalDate(input, 'campaignDateTo');
@@ -62,10 +84,6 @@ export async function POST(request: Request) {
   const price = optionalPrice(input);
   if (price === null) return NextResponse.json({ error: 'Cena musí být kladné číslo s nejvýše dvěma desetinnými místy.' }, { status: 400 });
 
-  const clientId = text(input, 'clientId');
-  const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;
-  if (clientId && !client) return NextResponse.json({ error: 'Vybraný klient už neexistuje.' }, { status: 400 });
-  const clientName = text(input, 'clientName') || client?.name || 'Bez klienta';
   const carrierCode = text(input, 'carrierCode');
   const carrier = carrierCode ? await prisma.advertisingCarrier.findUnique({ where: { code: carrierCode }, select: { id: true } }) : null;
   if (carrierCode && !carrier) return NextResponse.json({ error: 'Vyberte existující nosič z nabídky.' }, { status: 400 });
