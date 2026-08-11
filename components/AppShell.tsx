@@ -7,11 +7,13 @@ const navGroups: NavGroup[] = [
   {
     label: '📱 Terénní práce (Montážníci)',
     items: [
+      ['/dashboard', '📊 Nástěnka / Přehled', 'barChart3', 'dashboard'],
+      ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
       ['/mobile-photos', '📱 Mobilní foto z terénu', 'camera', 'work'],
       ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
-      ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
       ['/my-work-entries', '⏱️ Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
       ['/my-settlements', '💰 Moje vyúčtování', 'fileText', 'mySettlements'],
+      ['/team', '📞 Kontakty týmu SeePOINT', 'phone', 'team'],
       ['/vehicles', '🚘 Vozidla a vozíky', 'car', 'vehicles'],
     ],
   },
@@ -19,7 +21,7 @@ const navGroups: NavGroup[] = [
     label: 'Přehled',
     items: [
       ['/dashboard', 'Dashboard', 'barChart3', 'dashboard'],
-      ['/map', 'Mapa', 'map', 'map'],
+      ['/map', 'Mapa nosičů', 'map', 'map'],
     ],
   },
   {
@@ -43,27 +45,21 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Interní provoz',
-    items: [
-      ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
-      ['/tasks', 'Úkoly', 'clipboardList', 'tasks'],
-      ['/work-entries', 'Odvedená práce (všichni)', 'fileText', 'workEntries'],
-      ['/settlements', 'Vyúčtování (všichni)', 'fileText', 'settlements'],
-      ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
-    ],
-  },
-  {
     label: 'Provoz & Plánování',
     items: [
       ['/work', 'Plán práce', 'briefcaseBusiness', 'work'],
-      ['/work/route', 'Pracovní výjezd', 'route', 'work'],
-      ['/mobile-photos', 'Mobilní fotodokumentace', 'camera', 'work'],
+      ['/tasks', 'Všechny úkoly', 'clipboardList', 'tasks'],
+      ['/work-entries', 'Odvedená práce (všichni)', 'fileText', 'workEntries'],
+      ['/settlements', 'Vyúčtování (všichni)', 'fileText', 'settlements'],
+      ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
+      ['/team', '📞 Kontakty týmu SeePOINT', 'phone', 'team'],
     ],
   },
   {
-    label: 'Data',
+    label: 'Správa & Data',
     items: [
-      ['/import', 'Import', 'fileUp', 'import'],
+      ['/employees', 'Zaměstnanci (Správa)', 'userRound', 'employees'],
+      ['/import', 'Import dat', 'fileUp', 'import'],
       ['/settings', 'Nastavení', 'settings', 'settings'],
     ],
   },
@@ -74,11 +70,24 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
   if (!user) redirect('/login');
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
 
+  // Filter groups and eliminate duplicate links within each role's view
+  const seenHrefs = new Set<string>();
+
   const visibleGroups = navGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(([, , , section]) => canAccess(user.role, section as AppSection)),
-    }))
+    .map((group) => {
+      const groupItems = group.items.filter(([href, , , section]) => {
+        if (!canAccess(user.role, section as AppSection)) return false;
+        // Don't show duplicate links for worker/technician
+        if (seenHrefs.has(href)) return false;
+        seenHrefs.add(href);
+        return true;
+      });
+
+      return {
+        ...group,
+        items: groupItems,
+      };
+    })
     .filter((group) => group.items.length > 0);
 
   const userName = user.employee
