@@ -9,7 +9,7 @@ import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { prisma } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
 import { clientResolutionFilter } from '@/lib/occupancy-client';
-import { OccupancyClientPairing } from '@/components/OccupancyClientPairing';
+import { OccupancyTableWithBulk } from '@/components/OccupancyTableWithBulk';
 import { QuickOccupancyBookingForm } from '@/components/QuickOccupancyBookingForm';
 
 export const dynamic = 'force-dynamic';
@@ -151,74 +151,39 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
 
         <section className="card !p-0">
           {rows.length === 0 ? (
-            <div className="p-5"><EmptyState title="Zatím není evidována žádná obsazenost." description="Jakmile obchodník vytvoří rezervaci, jednání nebo obsazenost ve formuláři výše, zobrazí se v této tabulce." /></div>
+            <div className="p-5">
+              <EmptyState
+                title="Zatím není evidována žádná obsazenost."
+                description="Jakmile obchodník vytvoří rezervaci, jednání nebo obsazenost ve formuláři výše, zobrazí se v této tabulce."
+              />
+            </div>
           ) : (
-            <Table minWidth="min-w-[980px]">
-              <TableHead>
-                <tr>
-                  <TableHeaderCell>Nosič</TableHeaderCell>
-                  <TableHeaderCell>Plocha</TableHeaderCell>
-                  <TableHeaderCell>Klient</TableHeaderCell>
-                  <TableHeaderCell>Kampaň</TableHeaderCell>
-                  <TableHeaderCell>Od</TableHeaderCell>
-                  <TableHeaderCell>Do</TableHeaderCell>
-                  <TableHeaderCell>Stav</TableHeaderCell>
-                  <TableHeaderCell>Akce & Montáž</TableHeaderCell>
-                </tr>
-              </TableHead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr className="hover:bg-slate-50/60" key={row.id}>
-                    <TableCell>
-                      <Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>
-                        {row.surface.carrier.code}
-                      </Link>
-                      <br />
-                      <span className="text-slate-500">{row.surface.carrier.city}</span>
-                    </TableCell>
-                    <TableCell>
-                      {row.surface.name}
-                      <br />
-                      <span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span>
-                    </TableCell>
-                    <TableCell>
-                      <OccupancyClientPairing
-                        occupancyId={row.id}
-                        surfaceId={row.surfaceId}
-                        initialClientId={row.clientId}
-                        initialClientName={row.clientName}
-                        matchedClientName={row.client?.name}
-                        clients={clients}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <b>{row.campaignName}</b>
-                      {row.price && <span className="block text-xs font-bold text-emerald-700">{Number(row.price).toLocaleString('cs-CZ')} Kč</span>}
-                    </TableCell>
-                    <TableCell>{dateOnly(row.dateFrom)}</TableCell>
-                    <TableCell>{dateOnly(row.dateTo)}</TableCell>
-                    <TableCell><StatusBadge value={row.status} /></TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>
-                          Detail
-                        </Link>
-                        {['OCCUPIED', 'RESERVED'].includes(row.status) && (
-                          <Link
-                            className="flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
-                            href={`/work?carrierCode=${row.surface.carrier.code}&clientName=${encodeURIComponent(row.clientName || '')}&campaignDateFrom=${dateOnly(row.dateFrom)}&campaignDateTo=${dateOnly(row.dateTo)}`}
-                            title="Vytvořit pracovní úkol / montáž v Plánu práce"
-                          >
-                            <Route size={12} />
-                            <span>Montáž</span>
-                          </Link>
-                        )}
-                      </div>
-                    </TableCell>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
+            <OccupancyTableWithBulk
+              rows={rows.map((row) => ({
+                id: row.id,
+                surfaceId: row.surfaceId,
+                clientId: row.clientId,
+                clientName: row.clientName,
+                campaignName: row.campaignName,
+                dateFrom: row.dateFrom.toISOString(),
+                dateTo: row.dateTo.toISOString(),
+                status: row.status,
+                price: row.price?.toString(),
+                client: row.client ? { name: row.client.name } : null,
+                surface: {
+                  id: row.surface.id,
+                  name: row.surface.name,
+                  mediaType: row.surface.mediaType,
+                  carrier: {
+                    id: row.surface.carrier.id,
+                    code: row.surface.carrier.code,
+                    city: row.surface.carrier.city,
+                    name: row.surface.carrier.name,
+                  },
+                },
+              }))}
+              clients={clients}
+            />
           )}
         </section>
       </AppShell>

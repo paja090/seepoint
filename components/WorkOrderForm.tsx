@@ -14,6 +14,10 @@ type WorkOrderFormProps = {
   carriers: CarrierOption[];
   employees?: EmployeeOption[];
   currentUserName?: string;
+  initialCarrierCode?: string;
+  initialClientName?: string;
+  initialCampaignDateFrom?: string;
+  initialCampaignDateTo?: string;
 };
 
 // Ceník úkolové práce (pro automatický výpočet ceny)
@@ -25,7 +29,16 @@ const pieceRateCatalog: Record<string, number> = {
   'SERVIS / OPRAVA STOJANOVÉHO SLOUPE': 600,
 };
 
-export function WorkOrderForm({ clients, carriers, employees = [], currentUserName = '' }: WorkOrderFormProps) {
+export function WorkOrderForm({
+  clients,
+  carriers,
+  employees = [],
+  currentUserName = '',
+  initialCarrierCode = '',
+  initialClientName = '',
+  initialCampaignDateFrom = '',
+  initialCampaignDateTo = '',
+}: WorkOrderFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -157,7 +170,17 @@ export function WorkOrderForm({ clients, carriers, employees = [], currentUserNa
         {/* Title & Dates */}
         <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
           Název pracovní zakázky *
-          <input className="input mt-1 w-full font-bold" name="title" required placeholder="Např. Montáž navigací Koupelny Ostrava" />
+          <input
+            className="input mt-1 w-full font-bold"
+            name="title"
+            required
+            defaultValue={
+              initialCarrierCode
+                ? `Montáž nosiče ${initialCarrierCode}${initialClientName ? ` — ${initialClientName}` : ''}`
+                : ''
+            }
+            placeholder="Např. Montáž navigací Koupelny Ostrava"
+          />
         </label>
 
         <label className="font-bold text-slate-800 text-sm">
@@ -321,7 +344,7 @@ export function WorkOrderForm({ clients, carriers, employees = [], currentUserNa
 
         <label className="font-bold text-slate-800 text-sm">
           Název klienta (pokud není v seznamu)
-          <input className="input mt-1 w-full" name="clientName" placeholder="Název klienta" />
+          <input className="input mt-1 w-full" name="clientName" defaultValue={initialClientName} placeholder="Název klienta" />
         </label>
 
         <label className="font-bold text-slate-800 text-sm">
@@ -347,7 +370,7 @@ export function WorkOrderForm({ clients, carriers, employees = [], currentUserNa
         {/* Carrier list */}
         <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
           Propojený nosič VO
-          <input className="input mt-1 w-full" list="work-carriers" name="carrierCode" placeholder="Začněte psát kód, město nebo název" />
+          <input className="input mt-1 w-full font-bold text-sky-900 bg-sky-50" list="work-carriers" name="carrierCode" defaultValue={initialCarrierCode} placeholder="Začněte psát kód, město nebo název" />
           <datalist id="work-carriers">
             {carriers.map((carrier) => (
               <option key={carrier.id} value={carrier.code}>
@@ -355,6 +378,16 @@ export function WorkOrderForm({ clients, carriers, employees = [], currentUserNa
               </option>
             ))}
           </datalist>
+        </label>
+
+        <label className="font-bold text-slate-800 text-sm">
+          Platnost kampaně od
+          <input className="input mt-1 w-full" name="campaignDateFrom" type="date" defaultValue={initialCampaignDateFrom} />
+        </label>
+
+        <label className="font-bold text-slate-800 text-sm">
+          Platnost kampaně do
+          <input className="input mt-1 w-full" name="campaignDateTo" type="date" defaultValue={initialCampaignDateTo} />
         </label>
 
         <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
