@@ -1,7 +1,6 @@
 import React from 'react';
 
 export const roles = ['ADMIN', 'MANAGER', 'SALES', 'TECHNICIAN', 'WORKER', 'ACCOUNTANT', 'VIEWER'] as const;
-
 export type AppRole = typeof roles[number];
 
 export type CurrentUser = {
@@ -9,6 +8,7 @@ export type CurrentUser = {
   name: string;
   email: string;
   role: AppRole;
+  allowedRoles?: AppRole[];
 };
 
 export type AppSection =
@@ -112,6 +112,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'navigationDocumentation',
   ],
   WORKER: [
+    'dashboard',
     'work',
     'myTasks',
     'mySettlements',
@@ -133,8 +134,10 @@ const permissions: Record<AppRole, AppSection[]> = {
   ],
 };
 
-export function canAccess(role: AppRole, section: AppSection) {
-  return permissions[role].includes(section);
+export function canAccess(role: AppRole | string, section: AppSection) {
+  const rolePermissions = permissions[role as AppRole];
+  if (!rolePermissions) return false;
+  return rolePermissions.includes(section);
 }
 
 export function canViewSensitiveEmployeeData(role: AppRole) {
@@ -151,14 +154,15 @@ export function canViewAllSettlements(role: AppRole) {
 
 export function roleLabel(role: AppRole | string) {
   const labels: Record<string, string> = {
-    ADMIN: 'Admin',
+    ADMIN: 'Administrátor',
     MANAGER: 'Manažer',
     SALES: 'Obchodník',
-    TECHNICIAN: 'Technik',
-    WORKER: 'Pracovník',
+    TECHNICIAN: 'Technik (Servisák)',
+    WORKER: 'Pracovník (Montážník)',
     ACCOUNTANT: 'Účetní',
     VIEWER: 'Náhled',
   };
+
   return labels[role] ?? role;
 }
 
