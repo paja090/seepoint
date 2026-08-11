@@ -113,6 +113,13 @@ export function OccupancyTableWithBulk({
         <tbody>
           {rows.map((row) => {
             const isSelected = selectedSurfaceIds.includes(row.surface.id);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dateToObj = new Date(row.dateTo);
+            dateToObj.setHours(0, 0, 0, 0);
+            const diffDays = Math.ceil((dateToObj.getTime() - today.getTime()) / (1000 * 3600 * 24));
+            const isEndingSoon = diffDays >= 0 && diffDays <= 7 && ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(row.status);
+            const freeFromDate = new Date(dateToObj.getTime() + 86400000).toISOString().slice(0, 10);
 
             return (
               <tr
@@ -156,6 +163,11 @@ export function OccupancyTableWithBulk({
                 <TableCell>
                   <b>{row.campaignName}</b>
                   {row.price && <span className="block text-xs font-bold text-emerald-700">{Number(row.price).toLocaleString('cs-CZ')} Kč</span>}
+                  {isEndingSoon && (
+                    <span className="mt-1 block rounded-lg bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black text-amber-900">
+                      ⏳ Končí za {diffDays === 0 ? 'dnes' : `${diffDays} dní`} (Volná od {freeFromDate})
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>{new Date(row.dateFrom).toISOString().slice(0, 10)}</TableCell>
                 <TableCell>{new Date(row.dateTo).toISOString().slice(0, 10)}</TableCell>
