@@ -107,6 +107,13 @@ export function ResponsiveAppShell({
         <div className="flex items-center gap-2 shrink-0">
           <NotificationBellCenter />
           <Link
+            href="/team"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-emerald-400 border border-slate-800 hover:bg-slate-800 active:scale-95 transition"
+            title="📞 Kontakty týmu SeePOINT"
+          >
+            <PhoneCall size={17} />
+          </Link>
+          <Link
             href="/profile"
             className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-xs font-black text-slate-950 ring-2 ring-emerald-500/30"
             title="Můj profil"
