@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   Clock,
   Paperclip,
+  AlertTriangle,
+  FileImage,
 } from 'lucide-react';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
@@ -63,7 +65,7 @@ interface ActiveUser {
 const channels = [
   { id: 'general', label: '📢 Celý Tým SeePOINT', description: 'Všeobecný firemní chat a aktuality' },
   { id: 'installations', label: '🛠️ Montáže & Zakázky', description: 'Diskuze k výjezdům a terénním montážím' },
-  { id: 'vehicles', label: '🚗 Auta & Účtenky Paliva', description: 'Nahrávání benzínu, nafty a stavu autoparku' },
+  { id: 'vehicles', label: '🚗 Auta, Vozíky & Závady', description: 'Benzín, nafta, servisy a hlásení poruch vozidel' },
   { id: 'sales', label: '🏷️ Obchod & Nabídky', description: 'Dotazy k rezervacím nosičů a klientům' },
 ];
 
@@ -75,7 +77,10 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
   const [imageUrl, setImageUrl] = useState('');
   const [sending, setSending] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+
+  // Modal states
   const [showFuelModal, setShowFuelModal] = useState(false);
+  const [showFaultModal, setShowFaultModal] = useState(false);
 
   // Fuel modal form state
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || '');
@@ -84,8 +89,34 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
   const [fuelOdometer, setFuelOdometer] = useState('');
   const [fuelNote, setFuelNote] = useState('');
 
+  // Vehicle fault modal state
+  const [faultTitle, setFaultTitle] = useState('');
+  const [faultDescription, setFaultDescription] = useState('');
+  const [faultSeverity, setFaultSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('HIGH');
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const previousMessageCount = useRef<number>(0);
+
+  // Handle direct photo selection from camera or gallery
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 8MB)
+    if (file.size > 8 * 1024 * 1024) {
+      alert('Soubor je příliš velký. Vyberte fotku do 8 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setImageUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   // Sound chime synthesizer via Web Audio API
   function playNewMessageChime() {
@@ -95,8 +126,8 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
       osc.connect(gain);
@@ -115,7 +146,6 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
       if (!res.ok) return;
       const data: ChatMessageData[] = await res.json();
 
-      // Check if new message arrived from someone else
       if (isPolling && data.length > previousMessageCount.current) {
         const newest = data[data.length - 1];
         if (newest.userId !== currentUser.id) {
@@ -149,7 +179,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
     const interval = setInterval(() => {
       fetchMessages(true);
       fetchPresence();
-    }, 4000); // 4s poll interval for real-time responsiveness
+    }, 4000);
     return () => clearInterval(interval);
   }, [activeChannel]);
 
@@ -232,9 +262,53 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
     }
   }
 
+  async function handleSendVehicleFault(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedVehicleId || !faultTitle.trim() || sending) return;
+
+    try {
+      setSending(true);
+      const vehicleObj = vehicles.find((v) => v.id === selectedVehicleId);
+      const vehicleName = vehicleObj ? vehicleObj.label : 'Služební auto';
+
+      const res = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: 'vehicles',
+          content: `🚨 NAHLÁŠENÍ PORUCHY / ZÁVADY NA AUTO (${vehicleName}):\nZávada: ${faultTitle}\nDetail: ${faultDescription || 'Bez popisu'}\nZávažnost: ${faultSeverity}`,
+          imageUrl: imageUrl || null,
+          vehicleFault: {
+            vehicleId: selectedVehicleId,
+            title: faultTitle,
+            description: faultDescription,
+            severity: faultSeverity,
+            photoUrl: imageUrl || undefined,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        setShowFaultModal(false);
+        setFaultTitle('');
+        setFaultDescription('');
+        setImageUrl('');
+        setActiveChannel('vehicles');
+        await fetchMessages();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Závadu se nepodařilo nahlásit.');
+      }
+    } catch {
+      alert('Chyba při nahlášení závady.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div className="flex flex-col lg:flex-row h-full rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
-      {/* 🚀 Sidebar Channels & Active Users (Hidden on small screens when viewing messages) */}
+      {/* 🚀 Sidebar Channels & Active Users */}
       <div className="w-full lg:w-72 bg-slate-950 p-4 text-white flex flex-col justify-between border-r border-slate-800">
         <div>
           {/* Header & Sound Toggle */}
@@ -273,14 +347,22 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
             })}
           </div>
 
-          {/* Quick Fuel Receipt Button */}
-          <div className="mt-6">
+          {/* Quick Action Buttons: Fuel & Fault Reporting */}
+          <div className="mt-5 space-y-2">
             <button
               onClick={() => setShowFuelModal(true)}
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 active:scale-95 transition"
             >
               <Fuel size={16} />
-              <span>⛽ Nahrat Účtenku za Benzin</span>
+              <span>⛽ Nahrat Účtenku za Palivo</span>
+            </button>
+
+            <button
+              onClick={() => setShowFaultModal(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white shadow-md hover:bg-rose-500 active:scale-95 transition"
+            >
+              <AlertTriangle size={16} />
+              <span>⚠️ Nahlásit Závadu na Autě</span>
             </button>
           </div>
         </div>
@@ -364,11 +446,11 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
 
                     {/* Image Attachment */}
                     {msg.imageUrl && (
-                      <div className="mt-2 overflow-hidden rounded-xl border border-slate-700">
+                      <div className="mt-2.5 overflow-hidden rounded-xl border border-slate-700">
                         <img
                           src={msg.imageUrl}
-                          alt="Příloha"
-                          className="max-h-60 w-full object-cover cursor-pointer hover:opacity-90 transition"
+                          alt="Příloha fotka z terénu"
+                          className="max-h-64 w-full object-cover cursor-pointer hover:opacity-90 transition"
                           onClick={() => window.open(msg.imageUrl!, '_blank')}
                         />
                       </div>
@@ -398,32 +480,41 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Bar */}
+        {/* Input Bar with File Picker for Mobile Photos */}
         <form onSubmit={handleSendMessage} className="border-t border-slate-200 bg-white p-4 space-y-3">
           {imageUrl && (
-            <div className="flex items-center justify-between rounded-xl bg-slate-100 p-2 text-xs">
-              <span className="truncate text-slate-700 font-mono">📷 Příloha fotky připojena</span>
+            <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 border border-emerald-200 text-xs">
+              <div className="flex items-center gap-2">
+                <FileImage size={16} className="text-emerald-700" />
+                <span className="font-bold text-emerald-900">📷 Fotka z fotoaparátu / galerii připojena</span>
+              </div>
               <button
                 type="button"
                 onClick={() => setImageUrl('')}
-                className="text-slate-500 hover:text-red-600"
+                className="text-slate-500 hover:text-red-600 font-bold"
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </div>
           )}
 
           <div className="flex items-center gap-2">
+            {/* Hidden HTML File Input for Mobile Camera / Device Storage */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
             <button
               type="button"
-              onClick={() => {
-                const url = prompt('Zadejte URL adresu fotky nebo zadejte odkaz:');
-                if (url) setImageUrl(url.trim());
-              }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 transition"
-              title="Připojit fotku / obrázek"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition shadow-xs"
+              title="Vyfotit fototoaparátem nebo vybrat fotku"
             >
-              <Camera size={18} />
+              <Camera size={20} />
             </button>
 
             <input
@@ -437,7 +528,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
             <button
               type="submit"
               disabled={sending || (!inputText.trim() && !imageUrl)}
-              className="flex h-10 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-xs font-bold text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50"
+              className="flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-xs font-bold text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50"
             >
               <Send size={16} />
               <span className="hidden sm:inline">Odeslat</span>
@@ -453,7 +544,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div className="flex items-center gap-2">
                 <Fuel className="h-5 w-5 text-amber-600" />
-                <h3 className="font-bold text-slate-950">Nahrát Účtenku za Palivo / Benzin</h3>
+                <h3 className="font-bold text-slate-950">Nahrát Účtenku za Palivo</h3>
               </div>
               <button
                 onClick={() => setShowFuelModal(false)}
@@ -519,14 +610,15 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Odkaz na fotku účtenky / URL</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
-                />
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fotka účtenky</label>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                >
+                  <Camera size={16} />
+                  <span>{imageUrl ? '📷 Fotka vybraná' : 'Vyfotit / Vybrat účtenku'}</span>
+                </button>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -543,7 +635,112 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
                   disabled={sending || !fuelAmount}
                   className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-black text-slate-950 hover:bg-amber-400 shadow-md transition disabled:opacity-50"
                 >
-                  Uložit Účtenku a Odeslat
+                  Uložit Účtenku
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ Vehicle Fault / Damage Modal */}
+      {showFaultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-rose-600" />
+                <h3 className="font-bold text-slate-950">Nahlásit Závadu na Vozidle / Vozíku</h3>
+              </div>
+              <button
+                onClick={() => setShowFaultModal(false)}
+                className="rounded-xl p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendVehicleFault} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Vyberte Vozidlo / Vozík*</label>
+                <select
+                  value={selectedVehicleId}
+                  onChange={(e) => setSelectedVehicleId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
+                  required
+                >
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Název závady / Poruchy*</label>
+                <input
+                  type="text"
+                  placeholder="Např. Defekt pneu, svítí kontrolka motoru, poškozené světlo..."
+                  value={faultTitle}
+                  onChange={(e) => setFaultTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Závažnost poruchy</label>
+                <select
+                  value={faultSeverity}
+                  onChange={(e) => setFaultSeverity(e.target.value as any)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
+                >
+                  <option value="LOW">Lehká (Vozidlo normálně pojízdné)</option>
+                  <option value="MEDIUM">Střední (Nutná oprava v nejbližších dnech)</option>
+                  <option value="HIGH">Vysoká (Předat do servisu)</option>
+                  <option value="CRITICAL">🚨 Kritická (Vozidlo nepojízdné / odstavit)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Podrobný popis závady</label>
+                <textarea
+                  rows={2}
+                  placeholder="Popište přesný stav a okolnosti poruchy..."
+                  value={faultDescription}
+                  onChange={(e) => setFaultDescription(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Fotodokumentace poškození</label>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                >
+                  <Camera size={16} />
+                  <span>{imageUrl ? '📷 Fotka vybraná' : 'Vyfotit / Připojit fotku poruchy'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowFaultModal(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Zrušit
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={sending || !faultTitle.trim()}
+                  className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-black text-white hover:bg-rose-500 shadow-md transition disabled:opacity-50"
+                >
+                  Nahlásit Závadu
                 </button>
               </div>
             </form>

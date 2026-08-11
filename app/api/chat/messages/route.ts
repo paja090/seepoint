@@ -58,6 +58,13 @@ export async function POST(request: Request) {
       receiptUrl?: string;
       note?: string;
     };
+    vehicleFault?: {
+      vehicleId: string;
+      title: string;
+      description?: string;
+      severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      photoUrl?: string;
+    };
   } | null;
 
   if (!body) {
@@ -67,6 +74,10 @@ export async function POST(request: Request) {
   const channel = body.channel || 'general';
   let content = body.content?.trim() || '';
   let fuelExpenseId: string | undefined = undefined;
+
+  const userName = user.employee
+    ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
+    : user.name || user.email;
 
   // Handle fuel receipt expense creation if attached
   if (body.fuelExpense) {
@@ -95,13 +106,39 @@ export async function POST(request: Request) {
     }
   }
 
+  // Handle vehicle fault reporting if attached
+  if (body.vehicleFault) {
+    const vf = body.vehicleFault;
+    if (!vf.vehicleId || !vf.title) {
+      return NextResponse.json({ error: 'Vyberte vozidlo a popište závadu.' }, { status: 400 });
+    }
+
+    // Log a service record entry in the database
+    await prisma.vehicleServiceRecord.create({
+      data: {
+        vehicleId: vf.vehicleId,
+        date: new Date(),
+        title: `⚠️ Hlášená závada: ${vf.title}`,
+        description: `Nahlásil: ${userName}. Popis: ${vf.description || 'Bez podrobného popisu'}. Fotodokumentace: ${vf.photoUrl || body.imageUrl || 'Bez fotky'}.`,
+      },
+    });
+
+    // If critical or high severity, change vehicle status to SERVICE
+    if (vf.severity === 'CRITICAL' || vf.severity === 'HIGH') {
+      await prisma.vehicle.update({
+        where: { id: vf.vehicleId },
+        data: { status: 'SERVICE' },
+      }).catch(() => null);
+    }
+
+    if (!content) {
+      content = `🚨 NAHLÁŠENÍ ZÁVADY NA VOZIDLE: ${vf.title}\nPopis: ${vf.description || 'Bez popisu'}\nZávažnost: ${vf.severity || 'MEDIUM'}`;
+    }
+  }
+
   if (!content && !body.imageUrl) {
     return NextResponse.json({ error: 'Zpráva nesmí být prázdná.' }, { status: 400 });
   }
-
-  const userName = user.employee
-    ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
-    : user.name || user.email;
 
   const msg = await prisma.chatMessage.create({
     data: {
