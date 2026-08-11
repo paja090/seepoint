@@ -34,7 +34,7 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
   async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-6 backdrop-blur">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktuální stránka</p>
         <h2 className="truncate text-lg font-semibold text-slate-950">{title}</h2>
