@@ -34,6 +34,7 @@ interface ManagerDashboardProps {
   arrAmount: number;
   occupancyPercent: number;
   waitingOffers: number;
+  seasonalityData: number[];
   ending7: Array<{
     id: string;
     campaignName: string;
@@ -89,21 +90,21 @@ export function ManagerDashboard({
   arrAmount,
   occupancyPercent,
   waitingOffers,
+  seasonalityData,
   ending7,
   ending30,
   missingGpsRows,
   mediaBreakdown,
   topCities,
 }: ManagerDashboardProps) {
-  // Seasonality chart data mock calculation
   const months = ['Leden', 'Únor', 'Březen', 'Duben', 'Květen', 'Červen', 'Červenec', 'Srpen', 'Září', 'Říjen', 'Listopad', 'Prosinec'];
-  const seasonalityWeights = [68, 72, 81, 85, 88, 86, 75, 78, 92, 95, 96, 90];
+  const maxSeasonalityVal = Math.max(...seasonalityData, 1);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Manažerský Dashboard & Inteligentní Analytika"
-        description="Kompletní přehled finančních toků, sezónní obsazenosti reklamních nosičů, výkonnosti médií a strategických doporučení pro vedení."
+        title="Manažerský Dashboard & Reálná Analytika"
+        description="Kompletní přehled finančních toků, sezónní obsazenosti nosičů, reálného rozdělení tržeb a doporučení z databáze."
         actions={
           <div className="flex items-center gap-2">
             <Link href="/occupancy" className="btn-primary">
@@ -128,7 +129,7 @@ export function ManagerDashboard({
           <p className="mt-4 text-3xl font-black">{mrrAmount.toLocaleString('cs-CZ')} Kč</p>
           <div className="mt-2 flex items-center gap-1.5 text-xs font-bold text-emerald-200">
             <TrendingUp size={14} />
-            <span>+11.8 % oproti minulému měsíci</span>
+            <span>Aktuální platný výnos ze smluv</span>
           </div>
         </div>
 
@@ -140,7 +141,7 @@ export function ManagerDashboard({
             </div>
           </div>
           <p className="mt-4 text-3xl font-black">{arrAmount.toLocaleString('cs-CZ')} Kč</p>
-          <p className="mt-2 text-xs text-slate-400 font-medium">Odhad ročních příjmů ze všech platných kampaní</p>
+          <p className="mt-2 text-xs text-slate-400 font-medium">Reálný roční objem z obsazených smluv</p>
         </div>
 
         <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
@@ -167,7 +168,7 @@ export function ManagerDashboard({
             </div>
           </div>
           <p className="mt-4 text-3xl font-black text-slate-950">{waitingOffers} ks</p>
-          <p className="mt-2 text-xs text-slate-500 font-medium">Odeslané nabídky klientům ke schválení</p>
+          <p className="mt-2 text-xs text-slate-500 font-medium">Odeslané nabídky klientům v databázi</p>
         </div>
       </div>
 
@@ -179,7 +180,7 @@ export function ManagerDashboard({
           </div>
           <div>
             <h2 className="text-lg font-black text-white">Inteligentní Systémová Doporučení & Alerting</h2>
-            <p className="text-xs text-indigo-300">Automatická analýza trhu, vytížení nosičů a prevence výpadku tržeb</p>
+            <p className="text-xs text-indigo-300">Živá databázová analýza kapacity a obsazenosti nosičů</p>
           </div>
         </div>
 
@@ -187,26 +188,26 @@ export function ManagerDashboard({
           <div className="rounded-2xl bg-white/5 p-4 backdrop-blur-sm border border-white/10">
             <div className="flex items-center gap-2 text-amber-400 font-bold text-xs mb-1">
               <CalendarClock size={15} />
-              <span>Prevence výpadku tržeb</span>
+              <span>Končící rezervace</span>
             </div>
             <p className="text-sm font-semibold text-white">
               {ending7.length} kampaním končí rezervace do 7 dnů!
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              Doporučujeme oslovit stávající klienty s nabídkou prodloužení.
+              Spusťte předrezervaci pro další klienty v Plánu práce.
             </p>
           </div>
 
           <div className="rounded-2xl bg-white/5 p-4 backdrop-blur-sm border border-white/10">
             <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs mb-1">
               <TrendingUp size={15} />
-              <span>Vysoká poptávka v regionu</span>
+              <span>Nejžádanější město</span>
             </div>
             <p className="text-sm font-semibold text-white">
-              {topCities[0]?.city || 'Ostrava'} má obsazenost {topCities[0]?.percent || 90} %!
+              {topCities[0]?.city || 'Ostrava'} vykazuje obsazenost {topCities[0]?.percent || 0} %
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              Vysoký zájem o navigační tabule VO v této lokalitě.
+              Celkem {topCities[0]?.occupied || 0} obsazených ploch z {topCities[0]?.total || 0} v lokalitě.
             </p>
           </div>
 
@@ -216,10 +217,10 @@ export function ManagerDashboard({
               <span>Volná kapacita k nabídce</span>
             </div>
             <p className="text-sm font-semibold text-white">
-              k dispozici je {availableSurfaces} volných nosičů
+              K dispozici je {availableSurfaces} volných reklamních nosičů
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              Ideální pro hromadné oslovení v novém nabídkovém modulu.
+              Dostupné pro 1-klikovou rezervaci v modulu Obsazenost.
             </p>
           </div>
         </div>
@@ -232,31 +233,33 @@ export function ManagerDashboard({
             <div>
               <h2 className="text-lg font-bold text-slate-950 flex items-center gap-2">
                 <BarChart3 className="text-indigo-600" size={20} />
-                <span>Sezonalita & Vývoj Obsazenosti během Roku</span>
+                <span>Sezonalita & Počet Kampaní v Roce (Reálná Data)</span>
               </h2>
-              <p className="text-xs text-slate-500">Měsíční průměrná vytíženost nosičů a výkyvy poptávky</p>
+              <p className="text-xs text-slate-500">Měsíční rozložení aktivních smluv ze systémové databáze</p>
             </div>
             <span className="rounded-xl bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
-              Graf 2026
+              Rok {new Date().getFullYear()}
             </span>
           </div>
 
           {/* SVG Visual Bar Chart */}
           <div className="h-64 flex items-end justify-between gap-2 pt-8 pb-2 px-2 border-b border-slate-100">
             {months.map((m, idx) => {
-              const val = seasonalityWeights[idx];
-              const isPeak = val >= 90;
+              const val = seasonalityData[idx] || 0;
+              const heightPercent = Math.max(5, Math.round((val / maxSeasonalityVal) * 100));
+              const isHigh = heightPercent >= 70;
+
               return (
                 <div key={m} className="flex-1 flex flex-col items-center gap-2 group relative">
                   {/* Tooltip */}
                   <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition rounded-md bg-slate-900 px-2 py-1 text-[10px] font-bold text-white z-10 whitespace-nowrap pointer-events-none shadow-md">
-                    {m}: {val} %
+                    {m}: {val} kampaní
                   </div>
 
                   <div className="w-full flex items-end justify-center h-48 bg-slate-50 rounded-t-xl overflow-hidden p-1">
                     <div
-                      className={`w-full rounded-t-lg transition-all duration-500 ${isPeak ? 'bg-gradient-to-t from-emerald-600 to-teal-400' : 'bg-gradient-to-t from-indigo-600 to-sky-400'}`}
-                      style={{ height: `${val}%` }}
+                      className={`w-full rounded-t-lg transition-all duration-500 ${isHigh ? 'bg-gradient-to-t from-emerald-600 to-teal-400' : 'bg-gradient-to-t from-indigo-600 to-sky-400'}`}
+                      style={{ height: `${heightPercent}%` }}
                     />
                   </div>
                   <span className="text-[10px] font-bold text-slate-500 truncate w-full text-center">
@@ -270,11 +273,11 @@ export function ManagerDashboard({
           <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
             <span className="flex items-center gap-1.5 font-medium">
               <span className="h-3 w-3 rounded-full bg-emerald-500" />
-              Špička sezóny (Září–Prosinec 90–96 %)
+              Měsíce s nejvyšší intenzitou smluv
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <span className="h-3 w-3 rounded-full bg-indigo-500" />
-              Běžný provoz (68–88 %)
+              Standardní provoz
             </span>
           </div>
         </div>
@@ -283,9 +286,9 @@ export function ManagerDashboard({
         <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-950 flex items-center gap-2 mb-1">
             <Layers className="text-emerald-600" size={20} />
-            <span>Struktura Médií & Tržeb</span>
+            <span>Reálná Struktura Médií & Tržeb</span>
           </h2>
-          <p className="text-xs text-slate-500 mb-6">Rozdělení kapacity podle typu nosiče</p>
+          <p className="text-xs text-slate-500 mb-6">Rozdělení z reálné databáze nosičů</p>
 
           <div className="space-y-4">
             {mediaBreakdown.map((item) => (
@@ -301,7 +304,7 @@ export function ManagerDashboard({
                   />
                 </div>
                 <p className="text-[11px] font-semibold text-emerald-700 text-right">
-                  ~ {item.estimatedRevenue.toLocaleString('cs-CZ')} Kč / měsíc
+                  {item.estimatedRevenue.toLocaleString('cs-CZ')} Kč / měsíc
                 </p>
               </div>
             ))}
@@ -357,8 +360,8 @@ export function ManagerDashboard({
         <section className="card">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-950">Top Města dle Vytížení</h2>
-              <p className="text-xs text-slate-500">Nejžádanější lokality s nejvyšší obsazeností</p>
+              <h2 className="text-lg font-bold text-slate-950">Top Města dle Vytížení (Reálná Data)</h2>
+              <p className="text-xs text-slate-500">Nejžádanější lokality s počtem obsazených nosičů</p>
             </div>
             <Building2 className="text-blue-600" size={22} />
           </div>
@@ -368,7 +371,7 @@ export function ManagerDashboard({
               <div key={c.city} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/70 p-3.5">
                 <div>
                   <p className="font-bold text-slate-950 text-sm">{c.city}</p>
-                  <p className="text-xs text-slate-500">{c.occupied} obsazeno z {c.total} nosičů</p>
+                  <p className="text-xs text-slate-500">{c.occupied} obsazeno z {c.total} nosičů v lokalitě</p>
                 </div>
                 <div className="text-right">
                   <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-900">

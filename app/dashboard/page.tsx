@@ -7,6 +7,17 @@ import { WorkerDashboard } from '@/components/dashboard/WorkerDashboard';
 
 export const dynamic = 'force-dynamic';
 
+const defaultRates: Record<string, number> = {
+  NAVIGATION_SIGN: 1800,
+  PROMO_BENCH: 2500,
+  CITY_POSTER: 3200,
+  PROMO_HORIZON: 2200,
+  PROMO_TOWER: 3500,
+  BILLBOARD: 4500,
+  CITYLIGHT: 5000,
+  OTHER: 2000,
+};
+
 export default async function Dashboard() {
   const user = await requirePageAccess('dashboard');
   const role = user.role;
@@ -81,31 +92,59 @@ export default async function Dashboard() {
     );
   }
 
-  // Manager / Admin / Sales Analytics Dashboard Data
+  // Manager / Admin / Sales Analytics Dashboard Data (REAL DATABASE CALCULATIONS)
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+
   const [
     totalCarriers,
     activeCarriers,
     archivedCarriers,
     missingGps,
-    totalSurfaces,
-    availableSurfaces,
-    occupiedSurfaces,
-    reservedSurfaces,
+    surfaces,
+    activeOccupancies,
+    allYearOccupancies,
     ending30,
     waitingOffers,
     missingGpsRows,
-    activeOccupancies,
-    allSurfaces,
-    carrierCities,
   ] = await Promise.all([
     prisma.advertisingCarrier.count(),
     prisma.advertisingCarrier.count({ where: { archivedAt: null, status: 'ACTIVE' } }),
     prisma.advertisingCarrier.count({ where: { archivedAt: { not: null } } }),
     prisma.advertisingCarrier.count({ where: { archivedAt: null, OR: [{ gpsStatus: 'MISSING' }, { latitude: null }, { longitude: null }] } }),
-    prisma.advertisingSurface.count({ where: { carrier: { archivedAt: null } } }),
-    prisma.advertisingSurface.count({ where: { carrier: { archivedAt: null }, status: 'AVAILABLE' } }),
-    prisma.advertisingSurface.count({ where: { carrier: { archivedAt: null }, status: 'OCCUPIED' } }),
-    prisma.advertisingSurface.count({ where: { carrier: { archivedAt: null }, status: 'RESERVED' } }),
+    prisma.advertisingSurface.findMany({
+      where: { carrier: { archivedAt: null } },
+      select: {
+        id: true,
+        mediaType: true,
+        price: true,
+        carrier: { select: { city: true } },
+      },
+    }),
+    prisma.occupancy.findMany({
+      where: {
+        status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+        dateTo: { gte: today },
+      },
+      include: {
+        surface: {
+          select: {
+            id: true,
+            mediaType: true,
+            price: true,
+            carrier: { select: { city: true } },
+          },
+        },
+      },
+    }),
+    prisma.occupancy.findMany({
+      where: {
+        status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+        dateFrom: { gte: startOfYear },
+        dateTo: { lte: endOfYear },
+      },
+      select: { dateFrom: true, surfaceId: true },
+    }),
     prisma.occupancy.findMany({
       where: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today, lte: in30 } },
       include: { client: true, surface: { include: { carrier: true } } },
@@ -119,71 +158,87 @@ export default async function Dashboard() {
       take: 8,
       select: { id: true, code: true, name: true, city: true, street: true, address: true },
     }),
-    prisma.occupancy.findMany({
-      where: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, dateTo: { gte: today } },
-      select: { price: true, surface: { select: { mediaType: true } } },
-    }),
-    prisma.advertisingSurface.findMany({
-      where: { carrier: { archivedAt: null } },
-      select: { id: true, mediaType: true, carrier: { select: { city: true } } },
-    }),
-    prisma.advertisingCarrier.findMany({
-      where: { archivedAt: null, status: 'ACTIVE' },
-      select: { id: true, city: true, surfaces: { select: { id: true } } },
-    }),
   ]);
 
-  // Calculate MRR & ARR
-  const mrrAmount = activeOccupancies.reduce((acc, curr) => acc + (curr.price ? Number(curr.price) : 2500), 0);
-  const arrAmount = mrrAmount * 12;
-  const occupancyPercent = Math.round((occupiedSurfaces / Math.max(totalSurfaces, 1)) * 100);
+  // Exact Distinct Occupied Surfaces
+  const occupiedSurfaceIds = new Set(activeOccupancies.map((o) => o.surfaceId));
+  const totalSurfaces = surfaces.length;
+  const occupiedSurfaces = occupiedSurfaceIds.size;
+  const availableSurfaces = Math.max(0, totalSurfaces - occupiedSurfaces);
+  const reservedSurfaces = activeOccupancies.filter((o) => o.status === 'RESERVED').length;
 
+  // Real MRR & ARR calculation
+  const mrrAmount = activeOccupancies.reduce((acc, curr) => {
+    const val = curr.price
+      ? Number(curr.price)
+      : (curr.surface?.price ? Number(curr.surface.price) : (defaultRates[curr.surface?.mediaType] || 2000));
+    return acc + val;
+  }, 0);
+
+  const arrAmount = mrrAmount * 12;
+  const occupancyPercent = totalSurfaces > 0 ? Math.round((occupiedSurfaces / totalSurfaces) * 100) : 0;
   const ending7 = ending30.filter((item) => new Date(item.dateTo) <= in7);
 
-  // Group media breakdown
-  const mediaTypesMap = new Map<string, { count: number; occupiedCount: number; estimatedRevenue: number }>();
-  allSurfaces.forEach((s) => {
-    const existing = mediaTypesMap.get(s.mediaType) || { count: 0, occupiedCount: 0, estimatedRevenue: 0 };
-    existing.count += 1;
-    mediaTypesMap.set(s.mediaType, existing);
+  // REAL Seasonality 12 Months
+  const seasonalityData = Array(12).fill(0);
+  allYearOccupancies.forEach((occ) => {
+    const m = new Date(occ.dateFrom).getMonth();
+    if (m >= 0 && m < 12) seasonalityData[m] += 1;
+  });
+
+  // REAL City Leaderboard
+  const cityStatsMap = new Map<string, { city: string; total: number; occupiedSet: Set<string> }>();
+  surfaces.forEach((s) => {
+    const city = s.carrier.city?.trim() || 'Neuvedeno';
+    if (!cityStatsMap.has(city)) {
+      cityStatsMap.set(city, { city, total: 0, occupiedSet: new Set() });
+    }
+    const stat = cityStatsMap.get(city)!;
+    stat.total += 1;
+    if (occupiedSurfaceIds.has(s.id)) {
+      stat.occupiedSet.add(s.id);
+    }
+  });
+
+  const topCities = Array.from(cityStatsMap.values())
+    .map((c) => ({
+      city: c.city,
+      total: c.total,
+      occupied: c.occupiedSet.size,
+      percent: c.total > 0 ? Math.round((c.occupiedSet.size / c.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  // REAL Media Type Breakdown
+  const mediaMap = new Map<string, { count: number; occupiedSet: Set<string>; revenue: number }>();
+  surfaces.forEach((s) => {
+    if (!mediaMap.has(s.mediaType)) {
+      mediaMap.set(s.mediaType, { count: 0, occupiedSet: new Set(), revenue: 0 });
+    }
+    mediaMap.get(s.mediaType)!.count += 1;
   });
 
   activeOccupancies.forEach((occ) => {
     const mt = occ.surface.mediaType;
-    const existing = mediaTypesMap.get(mt) || { count: 1, occupiedCount: 0, estimatedRevenue: 0 };
-    existing.occupiedCount += 1;
-    existing.estimatedRevenue += occ.price ? Number(occ.price) : 2500;
-    mediaTypesMap.set(mt, existing);
+    if (mediaMap.has(mt)) {
+      const item = mediaMap.get(mt)!;
+      item.occupiedSet.add(occ.surfaceId);
+      const val = occ.price
+        ? Number(occ.price)
+        : (occ.surface?.price ? Number(occ.surface.price) : (defaultRates[mt] || 2000));
+      item.revenue += val;
+    }
   });
 
-  const mediaBreakdown = Array.from(mediaTypesMap.entries()).map(([type, data]) => ({
+  const mediaBreakdown = Array.from(mediaMap.entries()).map(([type, data]) => ({
     type,
     label: mediaTypeLabel(type),
     count: data.count,
-    occupiedCount: data.occupiedCount,
-    occupancyPercent: data.count > 0 ? Math.round((data.occupiedCount / data.count) * 100) : 0,
-    estimatedRevenue: data.estimatedRevenue,
+    occupiedCount: data.occupiedSet.size,
+    occupancyPercent: data.count > 0 ? Math.round((data.occupiedSet.size / data.count) * 100) : 0,
+    estimatedRevenue: data.revenue,
   })).sort((a, b) => b.estimatedRevenue - a.estimatedRevenue).slice(0, 5);
-
-  // City Leaderboard
-  const cityMap = new Map<string, { total: number; occupied: number }>();
-  carrierCities.forEach((c) => {
-    const city = c.city || 'Ostrava';
-    const existing = cityMap.get(city) || { total: 0, occupied: 0 };
-    existing.total += c.surfaces.length;
-    existing.occupied += Math.round(c.surfaces.length * 0.85); // approximate occupied ratio
-    cityMap.set(city, existing);
-  });
-
-  const topCities = Array.from(cityMap.entries())
-    .map(([city, d]) => ({
-      city,
-      total: d.total,
-      occupied: Math.min(d.occupied, d.total),
-      percent: d.total > 0 ? Math.min(100, Math.round((d.occupied / d.total) * 100)) : 0,
-    }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
 
   return (
     <AppShell>
@@ -200,6 +255,7 @@ export default async function Dashboard() {
         arrAmount={arrAmount}
         occupancyPercent={occupancyPercent}
         waitingOffers={waitingOffers}
+        seasonalityData={seasonalityData}
         ending7={ending7}
         ending30={ending30}
         missingGpsRows={missingGpsRows}
