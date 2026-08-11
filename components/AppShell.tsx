@@ -92,6 +92,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         name: userName,
         email: user.email || '',
         role: user.role,
+        allowedRoles: user.allowedRoles || [user.role],
       }}
       visibleGroups={visibleGroups}
     >

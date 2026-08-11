@@ -342,6 +342,7 @@ model User {
   name           String
   email          String     @unique
   role           Role       @default(VIEWER)
+  roles          Role[]     @default([])
   passwordHash   String?
   mustChangePassword Boolean @default(false)
   status         UserStatus @default(INVITED)
@@ -446,6 +447,7 @@ model Employee {
   position       String?
   positions      String[]       @default([])
   role           Role           @default(WORKER)
+  roles          Role[]         @default([])
   employmentType EmploymentType @default(EMPLOYEE)
   ico            String?
   dateOfBirth    DateTime?
