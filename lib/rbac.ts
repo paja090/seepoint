@@ -25,6 +25,7 @@ export type AppSection =
   | 'cityGallery'
   | 'work'
   | 'employees'
+  | 'team'
   | 'tasks'
   | 'myTasks'
   | 'settlements'
@@ -50,6 +51,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'cityGallery',
     'work',
     'employees',
+    'team',
     'tasks',
     'myTasks',
     'settlements',
@@ -74,6 +76,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'cityGallery',
     'work',
     'employees',
+    'team',
     'tasks',
     'myTasks',
     'settlements',
@@ -97,6 +100,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'mySettlements',
     'vehicles',
     'work',
+    'team',
   ],
   TECHNICIAN: [
     'dashboard',
@@ -110,6 +114,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'mySettlements',
     'navigationProjects',
     'navigationDocumentation',
+    'team',
   ],
   WORKER: [
     'dashboard',
@@ -119,6 +124,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'myWorkEntries',
     'vehicles',
     'navigationProjects',
+    'team',
   ],
   ACCOUNTANT: [
     'dashboard',
@@ -126,11 +132,13 @@ const permissions: Record<AppRole, AppSection[]> = {
     'settlements',
     'mySettlements',
     'workEntries',
+    'team',
   ],
   VIEWER: [
     'dashboard',
     'map',
     'carriers',
+    'team',
   ],
 };
 

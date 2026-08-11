@@ -54,6 +54,8 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const internalTaskCount = orders.reduce((sum, order) => sum + order.workTasks.length, 0);
   const listOrders = orders.slice(0, 40);
 
+  const canCreateWorkOrder = !['WORKER', 'TECHNICIAN'].includes(user.role);
+
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl space-y-6">
@@ -116,16 +118,28 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
           carrierCode: order.items[0]?.carrier?.code,
         }))} />
 
-        <WorkOrderForm
-          clients={clients.map((client) => ({ id: client.id, label: client.name }))}
-          carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
-          employees={employeeOptions}
-          currentUserName={currentUserName}
-          initialCarrierCode={initialCarrierCode}
-          initialClientName={initialClientName}
-          initialCampaignDateFrom={initialCampaignDateFrom}
-          initialCampaignDateTo={initialCampaignDateTo}
-        />
+        {canCreateWorkOrder ? (
+          <WorkOrderForm
+            clients={clients.map((client) => ({ id: client.id, label: client.name }))}
+            carriers={carriers.map((carrier) => ({ id: carrier.id, code: carrier.code, label: `${carrier.city} · ${carrier.name}` }))}
+            employees={employeeOptions}
+            currentUserName={currentUserName}
+            initialCarrierCode={initialCarrierCode}
+            initialClientName={initialClientName}
+            initialCampaignDateFrom={initialCampaignDateFrom}
+            initialCampaignDateTo={initialCampaignDateTo}
+          />
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-700 text-sm flex items-center gap-3">
+            <span className="text-xl">ℹ️</span>
+            <div>
+              <p className="font-bold">Zadávání zakázek do plánu práce</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pracovník i technik má přístup k přehledu plánu práce pro čtení a orientaci v zakázkách. Nové úkoly zadává Obchodník nebo Manažer. Své přiřazené zakázky spravujte v záložce <Link href="/my-tasks" className="font-bold text-emerald-700 underline">Moje úkoly</Link>.
+              </p>
+            </div>
+          </div>
+        )}
 
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-4">

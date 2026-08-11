@@ -30,10 +30,12 @@ export default async function Dashboard() {
   const in30 = new Date(today); in30.setDate(today.getDate() + 30);
 
   if (isWorkerOrTech) {
-    // Worker / Technician Dashboard Data
     const workerName = user.employee
       ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
       : user.name || user.email;
+    const firstName = user.employee?.firstName
+      ? user.employee.firstName
+      : (user.name ? user.name.split(' ')[0] : 'Kolego');
 
     const [assignedTasks, completedEntries, vehicles] = await Promise.all([
       prisma.workAssignment.findMany({
@@ -76,7 +78,7 @@ export default async function Dashboard() {
     return (
       <AppShell>
         <WorkerDashboard
-          workerName={workerName}
+          workerName={firstName}
           assignedTasksCount={assignedTasks.length}
           completedEntriesCount={completedEntries.length}
           monthlyEarnings={monthlyEarnings}
