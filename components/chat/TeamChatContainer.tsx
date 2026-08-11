@@ -22,6 +22,8 @@ import {
   Paperclip,
   AlertTriangle,
   FileImage,
+  UserCheck,
+  CheckCircle,
 } from 'lucide-react';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
@@ -49,6 +51,10 @@ interface ChatMessageData {
   content: string;
   imageUrl?: string | null;
   fuelExpenseId?: string | null;
+  assignedToUserId?: string | null;
+  assignedToUserName?: string | null;
+  isResolved?: boolean;
+  resolvedAt?: string | null;
   createdAt: string;
   reads?: Array<{ userId: string; readAt: string }>;
 }
@@ -63,10 +69,11 @@ interface ActiveUser {
 }
 
 const channels = [
-  { id: 'general', label: '📢 Celý Tým SeePOINT', description: 'Všeobecný firemní chat a aktuality' },
-  { id: 'installations', label: '🛠️ Montáže & Zakázky', description: 'Diskuze k výjezdům a terénním montážím' },
+  { id: 'general', label: '📢 Celý Tým SeePOINT', description: 'Všeobecný firemní chat a oficiální oznamy' },
+  { id: 'installations', label: '🛠️ Montáže & Zakázky', description: 'Diskuze k výjezdům, montážím a fotkám z terénu' },
   { id: 'vehicles', label: '🚗 Auta, Vozíky & Závady', description: 'Benzín, nafta, servisy a hlásení poruch vozidel' },
   { id: 'sales', label: '🏷️ Obchod & Nabídky', description: 'Dotazy k rezervacím nosičů a klientům' },
+  { id: 'urgent', label: '⚡ Urgentní Problémy & Incidenty', description: 'Havárie, poškozené nosiče a neodkladné úkoly' },
 ];
 
 export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerProps) {
@@ -81,6 +88,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
   // Modal states
   const [showFuelModal, setShowFuelModal] = useState(false);
   const [showFaultModal, setShowFaultModal] = useState(false);
+  const [assigningMsgId, setAssigningMsgId] = useState<string | null>(null);
 
   // Fuel modal form state
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || '');
@@ -103,7 +111,6 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 8MB)
     if (file.size > 8 * 1024 * 1024) {
       alert('Soubor je příliš velký. Vyberte fotku do 8 MB.');
       return;
@@ -218,6 +225,46 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
     }
   }
 
+  async function handleAssignSolver(messageId: string, solverId: string, solverName: string) {
+    try {
+      const res = await fetch('/api/chat/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId,
+          assignedToUserId: solverId,
+          assignedToUserName: solverName,
+        }),
+      });
+
+      if (res.ok) {
+        setAssigningMsgId(null);
+        await fetchMessages();
+      }
+    } catch {
+      alert('Chyba při přiřazování řešitele.');
+    }
+  }
+
+  async function handleToggleResolved(messageId: string, currentResolvedStatus: boolean) {
+    try {
+      const res = await fetch('/api/chat/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId,
+          isResolved: !currentResolvedStatus,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchMessages();
+      }
+    } catch {
+      alert('Chyba změny stavu.');
+    }
+  }
+
   async function handleSendFuelExpense(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedVehicleId || !fuelAmount || Number(fuelAmount) <= 0 || sending) return;
@@ -276,7 +323,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           channel: 'vehicles',
-          content: `🚨 NAHLÁŠENÍ PORUCHY / ZÁVADY NA AUTO (${vehicleName}):\nZávada: ${faultTitle}\nDetail: ${faultDescription || 'Bez popisu'}\nZávažnost: ${faultSeverity}`,
+          content: `🚨 NAHLÁŠENÍ PORUCHY NA VOZIDLE (${vehicleName}):\nZávada: ${faultTitle}\nDetail: ${faultDescription || 'Bez popisu'}\nZávažnost: ${faultSeverity}`,
           imageUrl: imageUrl || null,
           vehicleFault: {
             vehicleId: selectedVehicleId,
@@ -347,7 +394,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
             })}
           </div>
 
-          {/* Quick Action Buttons: Fuel & Fault Reporting */}
+          {/* Quick Action Buttons */}
           <div className="mt-5 space-y-2">
             <button
               onClick={() => setShowFuelModal(true)}
@@ -436,12 +483,33 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
                   </div>
 
                   <div
-                    className={`max-w-md rounded-2xl p-4 shadow-xs border ${
+                    className={`max-w-md rounded-2xl p-4 shadow-xs border relative group ${
                       isMe
                         ? 'bg-slate-950 text-white border-slate-900 rounded-br-none'
                         : 'bg-white text-slate-950 border-slate-200 rounded-bl-none'
                     }`}
                   >
+                    {/* Assignment & Resolution Badges */}
+                    {msg.assignedToUserName && (
+                      <div className="mb-2 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-500/30">
+                        <div className="flex items-center gap-1.5">
+                          <UserCheck size={14} className="text-amber-600" />
+                          <span>Řeší: <b>{msg.assignedToUserName}</b></span>
+                        </div>
+
+                        <button
+                          onClick={() => handleToggleResolved(msg.id, !!msg.isResolved)}
+                          className={`rounded-lg px-2 py-0.5 text-[10px] font-black transition ${
+                            msg.isResolved
+                              ? 'bg-emerald-500 text-slate-950'
+                              : 'bg-slate-200 text-slate-800 hover:bg-slate-300'
+                          }`}
+                        >
+                          {msg.isResolved ? '✓ Vyřešeno' : 'Označit vyřešené'}
+                        </button>
+                      </div>
+                    )}
+
                     <p className="text-sm font-normal whitespace-pre-wrap">{msg.content}</p>
 
                     {/* Image Attachment */}
@@ -455,6 +523,36 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
                         />
                       </div>
                     )}
+
+                    {/* Assign Solver Quick Action */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-200/20 flex items-center justify-between text-[11px]">
+                      {!msg.assignedToUserName && (
+                        <button
+                          onClick={() => setAssigningMsgId(assigningMsgId === msg.id ? null : msg.id)}
+                          className="flex items-center gap-1 text-slate-400 hover:text-emerald-400 transition font-semibold"
+                        >
+                          <UserCheck size={13} />
+                          <span>Přidělit řešitele</span>
+                        </button>
+                      )}
+
+                      {/* Dropdown Menu for Assigning Solver */}
+                      {assigningMsgId === msg.id && (
+                        <div className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 p-2 space-y-1 text-xs text-white">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase">Vyberte řešitele problému:</p>
+                          {activeUsers.map((u) => (
+                            <button
+                              key={u.id}
+                              onClick={() => handleAssignSolver(msg.id, u.id, u.name)}
+                              className="w-full text-left rounded-lg px-2 py-1.5 hover:bg-slate-800 font-semibold flex items-center justify-between"
+                            >
+                              <span>{u.name}</span>
+                              <span className="text-[10px] text-slate-400">{u.roleLabel}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Read Receipts */}
