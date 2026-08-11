@@ -5,6 +5,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { WorkOrderRatesManager } from '@/components/WorkOrderRatesManager';
+import { WorkOrderAcknowledgeButton } from '@/components/WorkOrderAcknowledgeButton';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
 import { prisma } from '@/lib/db';
 import { formatWorkDate, formatWorkPrice, workPriorityLabels, workPriorityStyles, workStatusLabels, workStatusStyles, workTypeLabels } from '@/lib/work';
@@ -55,7 +56,17 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           <aside className="space-y-6">
             <WorkOrderActions id={order.id} status={order.status} priority={order.priority} price={order.price?.toString() ?? null} ftdSent={order.ftdSent} invoiced={order.invoiced} requestedBy={order.requestedBy} />
             <section className="card"><h2 className="text-lg font-bold">Zadavatel</h2><p className="mt-2 text-sm">{order.requestedBy || 'Neuveden'}</p><p className="mt-1 text-xs text-slate-500">Zadavatel určuje prioritu a cenu a po potvrzení fotodokumentace vystavuje fakturu.</p></section>
-            <section className="card"><h2 className="text-lg font-bold">Pracovníci</h2><p className="mt-2 text-sm">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Zatím nepřiřazeni'}</p><p className="mt-1 text-xs text-slate-500">Pracovník potvrzuje nahrání fotodokumentace.</p></section>
+            <section className="card">
+              <h2 className="text-lg font-bold">Pracovníci</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-900">{order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Zatím nepřiřazeni'}</p>
+              <div className="mt-3">
+                <WorkOrderAcknowledgeButton
+                  workOrderId={order.id}
+                  initialAcknowledged={order.assignments.some((a) => Boolean(a.acknowledgedAt))}
+                  initialAcknowledgedAt={order.assignments.find((a) => Boolean(a.acknowledgedAt))?.acknowledgedAt?.toISOString()}
+                />
+              </div>
+            </section>
             <section className="card"><h2 className="text-lg font-bold">Kontakt na místě</h2><p className="mt-2 text-sm">{order.contactName || 'Neuveden'}</p>{order.contactPhone && <a className="mt-1 block text-sm font-medium text-sky-700" href={`tel:${order.contactPhone}`}>{order.contactPhone}</a>}</section>
           </aside>
         </div>

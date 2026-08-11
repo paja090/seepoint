@@ -1477,11 +1477,13 @@ model WorkOrder {
 }
 
 model WorkAssignment {
-  id          String   @id @default(cuid())
-  workOrderId String
-  userId      String?
-  workerName  String
-  createdAt   DateTime @default(now())
+  id             String    @id @default(cuid())
+  workOrderId    String
+  userId         String?
+  workerName     String
+  acknowledgedAt DateTime?
+  note           String?
+  createdAt      DateTime  @default(now())
 
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
