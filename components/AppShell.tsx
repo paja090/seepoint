@@ -1,8 +1,7 @@
 import { canAccess, type AppSection } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
-import { ResponsiveAppShell, type NavGroup, type NavItem } from './ResponsiveAppShell';
-import type { AppNavIcon } from './AppNavLink';
+import { ResponsiveAppShell, type NavGroup } from './ResponsiveAppShell';
 
 const navGroups: NavGroup[] = [
   {
@@ -12,6 +11,8 @@ const navGroups: NavGroup[] = [
       ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
       ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
       ['/my-work-entries', '⏱️ Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
+      ['/my-settlements', '💰 Moje vyúčtování', 'fileText', 'mySettlements'],
+      ['/vehicles', '🚘 Vozidla a vozíky', 'car', 'vehicles'],
     ],
   },
   {
@@ -25,8 +26,8 @@ const navGroups: NavGroup[] = [
     label: 'Projekty Navigace',
     items: [
       ['/navigation', ' Navigace (Přehled)', 'mapPinned', 'navigationProjects'],
-      ['/navigation/contracts', '📄 Evidence smluv', 'fileText', 'navigationProjects'],
-      ['/navigation/contacts', '👥 Kontaktní osoby', 'users', 'navigationProjects'],
+      ['/navigation/contracts', '📄 Evidence smluv', 'fileText', 'navigationContracts'],
+      ['/navigation/contacts', '👥 Kontaktní osoby', 'users', 'navigationContacts'],
       ['/navigation/documentation', '📷 Fotodokumentace reporty', 'camera', 'navigationDocumentation'],
       ['/projects/city-gallery', 'Galerie venku', 'galleryHorizontalEnd', 'cityGallery'],
     ],
@@ -47,7 +48,7 @@ const navGroups: NavGroup[] = [
       ['/employees', 'Zaměstnanci', 'userRound', 'employees'],
       ['/tasks', 'Úkoly', 'clipboardList', 'tasks'],
       ['/work-entries', 'Odvedená práce (všichni)', 'fileText', 'workEntries'],
-      ['/settlements', 'Vyúčtování', 'fileText', 'settlements'],
+      ['/settlements', 'Vyúčtování (všichni)', 'fileText', 'settlements'],
       ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
     ],
   },

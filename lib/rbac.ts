@@ -19,6 +19,8 @@ export type AppSection =
   | 'clients'
   | 'offers'
   | 'navigationProjects'
+  | 'navigationContracts'
+  | 'navigationContacts'
   | 'navigationDocumentation'
   | 'cityGallery'
   | 'work'
@@ -34,13 +36,101 @@ export type AppSection =
   | 'myWorkEntries';
 
 const permissions: Record<AppRole, AppSection[]> = {
-  ADMIN: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'navigationProjects', 'navigationDocumentation', 'cityGallery', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'import', 'settings', 'workEntries', 'myWorkEntries'],
-  MANAGER: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'navigationProjects', 'navigationDocumentation', 'cityGallery', 'work', 'employees', 'tasks', 'myTasks', 'settlements', 'mySettlements', 'vehicles', 'workEntries', 'myWorkEntries'],
-  SALES: ['dashboard', 'map', 'carriers', 'occupancy', 'clients', 'offers', 'navigationProjects', 'navigationDocumentation', 'cityGallery'],
-  TECHNICIAN: ['dashboard', 'map', 'carriers', 'work', 'tasks', 'myTasks', 'vehicles', 'myWorkEntries', 'navigationProjects', 'navigationDocumentation'],
-  WORKER: ['work', 'myTasks', 'mySettlements', 'myWorkEntries', 'navigationProjects'],
-  ACCOUNTANT: ['dashboard', 'employees', 'settlements', 'mySettlements', 'workEntries'],
-  VIEWER: ['dashboard', 'map', 'carriers'],
+  ADMIN: [
+    'dashboard',
+    'map',
+    'carriers',
+    'occupancy',
+    'clients',
+    'offers',
+    'navigationProjects',
+    'navigationContracts',
+    'navigationContacts',
+    'navigationDocumentation',
+    'cityGallery',
+    'work',
+    'employees',
+    'tasks',
+    'myTasks',
+    'settlements',
+    'mySettlements',
+    'vehicles',
+    'import',
+    'settings',
+    'workEntries',
+    'myWorkEntries',
+  ],
+  MANAGER: [
+    'dashboard',
+    'map',
+    'carriers',
+    'occupancy',
+    'clients',
+    'offers',
+    'navigationProjects',
+    'navigationContracts',
+    'navigationContacts',
+    'navigationDocumentation',
+    'cityGallery',
+    'work',
+    'employees',
+    'tasks',
+    'myTasks',
+    'settlements',
+    'mySettlements',
+    'vehicles',
+    'workEntries',
+    'myWorkEntries',
+  ],
+  SALES: [
+    'dashboard',
+    'map',
+    'carriers',
+    'occupancy',
+    'clients',
+    'offers',
+    'navigationProjects',
+    'navigationContracts',
+    'navigationContacts',
+    'navigationDocumentation',
+    'cityGallery',
+    'mySettlements',
+    'vehicles',
+    'work',
+  ],
+  TECHNICIAN: [
+    'dashboard',
+    'map',
+    'carriers',
+    'work',
+    'tasks',
+    'myTasks',
+    'vehicles',
+    'myWorkEntries',
+    'mySettlements',
+    'navigationProjects',
+    'navigationDocumentation',
+  ],
+  WORKER: [
+    'work',
+    'myTasks',
+    'mySettlements',
+    'myWorkEntries',
+    'vehicles',
+    'navigationProjects',
+  ],
+  ACCOUNTANT: [
+    'dashboard',
+    'employees',
+    'settlements',
+    'mySettlements',
+    'workEntries',
+  ],
+  VIEWER: [
+    'dashboard',
+    'map',
+    'carriers',
+  ],
 };
 
 export function canAccess(role: AppRole, section: AppSection) {
