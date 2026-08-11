@@ -1,11 +1,8 @@
 import { canAccess, type AppSection } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/auth';
-import { AppNavLink, type AppNavIcon } from './AppNavLink';
-import { AppTopbar } from './AppTopbar';
 import { redirect } from 'next/navigation';
-
-type NavItem = [string, string, AppNavIcon, AppSection];
-type NavGroup = { label: string; items: NavItem[] };
+import { ResponsiveAppShell, type NavGroup, type NavItem } from './ResponsiveAppShell';
+import type { AppNavIcon } from './AppNavLink';
 
 const navGroups: NavGroup[] = [
   {
@@ -75,34 +72,29 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
+
   const visibleGroups = navGroups
-    .map((group) => ({ ...group, items: group.items.filter(([, , , section]) => canAccess(user.role, section)) }))
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(([, , , section]) => canAccess(user.role, section as AppSection)),
+    }))
     .filter((group) => group.items.length > 0);
 
+  const userName = user.employee
+    ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
+    : user.email || 'Uživatel';
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950 lg:flex">
-      <aside className="border-b border-slate-900 bg-slate-950 px-4 py-4 text-white lg:fixed lg:inset-y-0 lg:w-72 lg:overflow-y-auto lg:border-b-0 lg:border-r">
-        <div className="mb-6 px-2">
-          <div className="inline-flex max-w-full">
-            <img alt="SeePOINT Outdoor reklama" className="h-20 w-auto max-w-full" src="/seepoint-logo.svg" />
-          </div>
-          <p className="mt-3 text-xs text-slate-400">Interní administrační systém</p>
-        </div>
-        <nav className="space-y-6">
-          {visibleGroups.map((group) => (
-            <section key={group.label}>
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{group.label}</p>
-              <div className="space-y-1">
-                {group.items.map(([href, label, icon]) => <AppNavLink href={href} icon={icon} key={href} label={label} />)}
-              </div>
-            </section>
-          ))}
-        </nav>
-      </aside>
-      <main className="min-w-0 flex-1 lg:pl-72">
-        <AppTopbar user={user} />
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 lg:px-8">{children}</div>
-      </main>
-    </div>
+    <ResponsiveAppShell
+      user={{
+        id: user.id,
+        name: userName,
+        email: user.email || '',
+        role: user.role,
+      }}
+      visibleGroups={visibleGroups}
+    >
+      {children}
+    </ResponsiveAppShell>
   );
 }
