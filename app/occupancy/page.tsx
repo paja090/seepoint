@@ -20,7 +20,7 @@ export const CzechOccupancyStatusLabels: Record<string, string> = {
   AVAILABLE: '🟢 Volné k pronájmu (Available)',
   RESERVED: '🟧 Rezervováno (Předběžně)',
   NEGOTIATION: '🟦 V jednání (Nabídka odeslána)',
-  OCCUPIED: '🟥 Obsazeno / Schváleno (Platná kampaň)',
+  OCCUPIED: 'libre / 🟥 Obsazeno / Schváleno (Platná kampaň)',
   FINISHED: '⚪ Ukončená kampaň',
   CANCELLED: '❌ Zrušeno',
   OUT_OF_SERVICE: '⚠️ Mimo provoz / Oprava',
@@ -43,7 +43,14 @@ function buildWhere(params: SearchParams) {
   const mediaType = clean(params.mediaType);
   const dateFrom = parseDate(clean(params.dateFrom));
   const dateTo = parseDate(clean(params.dateTo));
-  const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = { carrier: { archivedAt: null } };
+
+  const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = {
+    status: { not: 'OUT_OF_SERVICE' },
+    carrier: {
+      archivedAt: null,
+      status: 'ACTIVE',
+    },
+  };
   const where: Prisma.OccupancyWhereInput = {};
 
   if (q) where.OR = [
@@ -62,7 +69,7 @@ function buildWhere(params: SearchParams) {
   else if (dateFrom) where.dateTo = { gte: dateFrom };
   else if (dateTo) where.dateFrom = { lte: dateTo };
   if (isMediaType(mediaType)) surfaceWhere.mediaType = mediaType;
-  if (city) surfaceWhere.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null };
+  if (city) surfaceWhere.carrier = { city: { contains: city, mode: 'insensitive' }, archivedAt: null, status: 'ACTIVE' };
   where.surface = surfaceWhere;
   return where;
 }
@@ -82,9 +89,12 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     const in7 = new Date(today); in7.setDate(today.getDate() + 7);
     const in30 = new Date(today); in30.setDate(today.getDate() + 30);
 
+    // Filter surfaces strictly to exclude inactive, maintenance, archived carriers & surfaces
     const surfaceFilter: Prisma.AdvertisingSurfaceWhereInput = {
+      status: { not: 'OUT_OF_SERVICE' },
       carrier: {
         archivedAt: null,
+        status: 'ACTIVE',
         ...(selectedCity ? { city: { contains: selectedCity, mode: 'insensitive' } } : {}),
       },
       ...(isMediaType(selectedMediaType) ? { mediaType: selectedMediaType } : {}),
@@ -197,7 +207,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       <AppShell>
         <PageHeader
           title="Obsazenost & Volné Plochy k Kampaním"
-          description="Přehled, filtrování volných reklamních ploch a hromadné rezervace kampaní pro obchodníky."
+          description="Přehled, filtrování volných aktivních reklamních ploch a hromadné rezervace kampaní pro obchodníky."
           actions={<Button href="/offers" variant="secondary">Vytvořit nabídku</Button>}
         />
 
@@ -230,7 +240,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         </FilterBar>
 
         <section className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          Nalezeno <strong>{tableRows.length}</strong> záznamů.
+          Nalezeno <strong>{tableRows.length}</strong> aktivních záznamů.
           <span className="ml-3 text-slate-500">Aktivní filtry: {activeFilters.length ? activeFilters.map(([key, value]) => `${key}=${value}`).join(', ') : 'žádné'}</span>
         </section>
 
@@ -238,8 +248,8 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           {tableRows.length === 0 ? (
             <div className="p-5">
               <EmptyState
-                title="Žádné nosiče nevyhovují zadanému filtru."
-                description="Zkuste vymazat filtry nebo vybrat jiné typy médií či město."
+                title="Žádné aktivní nosiče nevyhovují zadanému filtru."
+                description="Zkuste vymazat filtry nebo vybrat jiné typy médií či město. Inaktivní, demontované a archivované nosiče jsou automaticky vyřazeny."
               />
             </div>
           ) : (
