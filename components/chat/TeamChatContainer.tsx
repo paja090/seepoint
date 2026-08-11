@@ -33,6 +33,12 @@ interface VehicleOption {
   label: string;
 }
 
+interface TeamMemberOption {
+  id: string;
+  name: string;
+  position?: string | null;
+}
+
 interface TeamChatContainerProps {
   currentUser: {
     id: string;
@@ -40,6 +46,7 @@ interface TeamChatContainerProps {
     role: AppRole;
   };
   vehicles: VehicleOption[];
+  teamMembers?: TeamMemberOption[];
 }
 
 interface ChatMessageData {
@@ -76,7 +83,7 @@ const channels = [
   { id: 'urgent', label: '⚡ Urgentní Problémy & Incidenty', description: 'Havárie, poškozené nosiče a neodkladné úkoly' },
 ];
 
-export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerProps) {
+export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: TeamChatContainerProps) {
   const [activeChannel, setActiveChannel] = useState('general');
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
@@ -353,10 +360,32 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
     }
   }
 
+  const solverOptions = teamMembers.length > 0
+    ? teamMembers
+    : activeUsers.map((u) => ({ id: u.id, name: u.name, position: u.roleLabel }));
+
   return (
     <div className="flex flex-col lg:flex-row h-full rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
-      {/* 🚀 Sidebar Channels & Active Users */}
-      <div className="w-full lg:w-72 bg-slate-950 p-4 text-white flex flex-col justify-between border-r border-slate-800">
+      {/* 📱 Mobile Channel Tab Selector Bar (Visible only on mobile/tablet screens) */}
+      <div className="flex lg:hidden overflow-x-auto border-b border-slate-800 bg-slate-950 p-2.5 text-white gap-2 scrollbar-none shrink-0">
+        {channels.map((ch) => {
+          const isActive = activeChannel === ch.id;
+          return (
+            <button
+              key={ch.id}
+              onClick={() => setActiveChannel(ch.id)}
+              className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                isActive ? 'bg-emerald-500 text-slate-950 font-black' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {ch.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 🚀 Sidebar Channels & Active Users (Desktop) */}
+      <div className="hidden lg:flex w-72 bg-slate-950 p-4 text-white flex-col justify-between border-r border-slate-800 shrink-0">
         <div>
           {/* Header & Sound Toggle */}
           <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
@@ -436,21 +465,36 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
       </div>
 
       {/* 💬 Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-slate-50">
+      <div className="flex-1 flex flex-col bg-slate-50 min-w-0">
         {/* Active Channel Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 py-3.5 shadow-xs">
           <div>
             <h3 className="font-bold text-slate-950">
               {channels.find((c) => c.id === activeChannel)?.label}
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 truncate max-w-sm">
               {channels.find((c) => c.id === activeChannel)?.description}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <Clock size={14} className="text-emerald-600" />
-            <span>Aktualizace v reálném čase</span>
+          {/* Mobile Quick Action Buttons (Fuel & Fault) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => setShowFuelModal(true)}
+              className="lg:hidden flex h-8 px-2.5 items-center gap-1 rounded-xl bg-amber-500 text-[11px] font-black text-slate-950"
+              title="Účtenka palivo"
+            >
+              <Fuel size={14} />
+              <span className="hidden sm:inline">Účtenka</span>
+            </button>
+            <button
+              onClick={() => setShowFaultModal(true)}
+              className="lg:hidden flex h-8 px-2.5 items-center gap-1 rounded-xl bg-rose-600 text-[11px] font-black text-white"
+              title="Závada na autě"
+            >
+              <AlertTriangle size={14} />
+              <span className="hidden sm:inline">Závada</span>
+            </button>
           </div>
         </div>
 
@@ -491,7 +535,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
                   >
                     {/* Assignment & Resolution Badges */}
                     {msg.assignedToUserName && (
-                      <div className="mb-2 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-500/30">
+                      <div className="mb-2.5 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-500/30">
                         <div className="flex items-center gap-1.5">
                           <UserCheck size={14} className="text-amber-600" />
                           <span>Řeší: <b>{msg.assignedToUserName}</b></span>
@@ -538,16 +582,16 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
 
                       {/* Dropdown Menu for Assigning Solver */}
                       {assigningMsgId === msg.id && (
-                        <div className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 p-2 space-y-1 text-xs text-white">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase">Vyberte řešitele problému:</p>
-                          {activeUsers.map((u) => (
+                        <div className="mt-2 w-full rounded-xl bg-slate-900 border border-slate-700 p-2 space-y-1 text-xs text-white z-10">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Vyberte pracovníka pro vyřešení:</p>
+                          {solverOptions.map((u) => (
                             <button
                               key={u.id}
                               onClick={() => handleAssignSolver(msg.id, u.id, u.name)}
                               className="w-full text-left rounded-lg px-2 py-1.5 hover:bg-slate-800 font-semibold flex items-center justify-between"
                             >
                               <span>{u.name}</span>
-                              <span className="text-[10px] text-slate-400">{u.roleLabel}</span>
+                              <span className="text-[10px] text-slate-400">{u.position || 'Pracovník'}</span>
                             </button>
                           ))}
                         </div>
@@ -609,7 +653,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition shadow-xs"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition shadow-xs shrink-0"
               title="Vyfotit fototoaparátem nebo vybrat fotku"
             >
               <Camera size={20} />
@@ -626,7 +670,7 @@ export function TeamChatContainer({ currentUser, vehicles }: TeamChatContainerPr
             <button
               type="submit"
               disabled={sending || (!inputText.trim() && !imageUrl)}
-              className="flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-xs font-bold text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50"
+              className="flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-xs font-bold text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50 shrink-0"
             >
               <Send size={16} />
               <span className="hidden sm:inline">Odeslat</span>

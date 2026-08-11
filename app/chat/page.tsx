@@ -8,14 +8,27 @@ export const dynamic = 'force-dynamic';
 export default async function ChatPage() {
   const user = await requirePageAccess('team');
 
-  const vehicles = await prisma.vehicle.findMany({
-    select: {
-      id: true,
-      name: true,
-      registrationNumber: true,
-    },
-    orderBy: { name: 'asc' },
-  });
+  const [vehicles, employees] = await Promise.all([
+    prisma.vehicle.findMany({
+      select: {
+        id: true,
+        name: true,
+        registrationNumber: true,
+      },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.employee.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        position: true,
+      },
+      orderBy: { lastName: 'asc' },
+    }),
+  ]);
 
   const currentUserData = {
     id: user.id,
@@ -33,6 +46,11 @@ export default async function ChatPage() {
           vehicles={vehicles.map((v) => ({
             id: v.id,
             label: `${v.name}${v.registrationNumber ? ` (${v.registrationNumber})` : ''}`,
+          }))}
+          teamMembers={employees.map((e) => ({
+            id: e.id,
+            name: `${e.firstName} ${e.lastName}`.trim(),
+            position: e.position || null,
           }))}
         />
       </div>
