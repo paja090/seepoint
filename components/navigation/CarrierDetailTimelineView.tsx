@@ -15,6 +15,7 @@ type CarrierItem = {
   longitude?: number | null;
   structureCode?: string | null;
   status: string;
+  type?: string | null;
 };
 
 type HistoryLogItem = {
@@ -55,6 +56,7 @@ export function CarrierDetailTimelineView({
   clients: { id: string; name: string }[];
 }) {
   const router = useRouter();
+  const isNavigation = carrier.type === 'NAVIGATION' || Boolean(carrier.structureCode);
   const [activeTab, setActiveTab] = useState<'surfaces' | 'history'>('surfaces');
 
   // New History Event Modal State
@@ -67,8 +69,8 @@ export function CarrierDetailTimelineView({
 
   // New Surface Modal State
   const [showSurfaceModal, setShowSurfaceModal] = useState(false);
-  const [surfaceName, setSurfaceName] = useState('Plástev 670×900 mm');
-  const [sidePosition, setSidePosition] = useState('Strana B');
+  const [surfaceName, setSurfaceName] = useState(isNavigation ? 'Plástev 670×900 mm' : 'Reklamní plocha');
+  const [sidePosition, setSidePosition] = useState('Strana A');
   const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id || '');
   const [artworkUrl, setArtworkUrl] = useState('');
   const [rentPrice, setRentPrice] = useState('1500');
@@ -143,17 +145,17 @@ export function CarrierDetailTimelineView({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-xl bg-sky-100 px-3 py-1 text-xs font-black text-sky-800">
-                Sloup VO #{carrier.code}
+              <span className={`rounded-xl px-3 py-1 text-xs font-black ${isNavigation ? 'bg-sky-100 text-sky-900 border border-sky-300' : 'bg-slate-100 text-slate-800 border border-slate-300'}`}>
+                {isNavigation ? `Sloup VO #${carrier.code}` : `Nosič #${carrier.code}`}
               </span>
-              {carrier.structureCode && (
+              {isNavigation && carrier.structureCode && (
                 <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
                   Číslo sloupu: {carrier.structureCode}
                 </span>
               )}
             </div>
             <h2 className="mt-2 text-xl font-extrabold text-slate-900">
-              {carrier.city}, {carrier.street || carrier.address || 'Sloup veřejného osvětlení'}
+              {carrier.city}, {carrier.street || carrier.address || carrier.name}
             </h2>
             {carrier.latitude && carrier.longitude && (
               <div className="mt-1 flex items-center gap-2 text-xs font-bold text-slate-500">
@@ -169,7 +171,7 @@ export function CarrierDetailTimelineView({
               onClick={() => setShowSurfaceModal(true)}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-black text-white hover:bg-sky-500 transition shadow-xs cursor-pointer"
             >
-              <Plus size={16} /> Přidat reklamní plochu na sloup
+              <Plus size={16} /> {isNavigation ? 'Přidat reklamní plochu na sloup' : 'Přidat reklamní plochu na nosič'}
             </button>
             <button
               type="button"
@@ -188,14 +190,14 @@ export function CarrierDetailTimelineView({
             onClick={() => setActiveTab('surfaces')}
             className={`pb-3 border-b-2 transition ${activeTab === 'surfaces' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
           >
-            🖼️ Reklamní plochy na sloupu ({surfaces.length})
+            🖼️ Reklamní plochy ({surfaces.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('history')}
             className={`pb-3 border-b-2 transition ${activeTab === 'history' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
           >
-            📜 Časová osa & Audit historii ({history.length})
+            📜 Časová osa & Audit historie ({history.length})
           </button>
         </div>
       </div>
@@ -204,7 +206,7 @@ export function CarrierDetailTimelineView({
       {activeTab === 'surfaces' && (
         <div className="space-y-4">
           <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Každá plocha na tomto sloupu má samostatného klienta, pronájem, grafiku a historii:
+            Každá reklamní plocha na tomto nosiči má samostatného klienta, pronájem, grafiku a historii:
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -257,7 +259,7 @@ export function CarrierDetailTimelineView({
 
             {surfaces.length === 0 && (
               <div className="col-span-full rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 font-medium">
-                Zatím na tomto sloupu nebyla založena žádná samostatná reklamní plocha. Klikněte na &quot;Přidat reklamní plochu&quot;.
+                Zatím na tomto nosiči nebyla založena žádná samostatná reklamní plocha. Klikněte na &quot;Přidat reklamní plochu&quot;.
               </div>
             )}
           </div>
@@ -286,7 +288,7 @@ export function CarrierDetailTimelineView({
                       <span className="text-xs font-bold text-slate-400">
                         {new Date(h.performedAt).toLocaleString('cs-CZ')}
                       </span>
-                      <span className="text-xs font-bold text-slate-600">• Provvedl: {h.performedBy || 'Technik'}</span>
+                      <span className="text-xs font-bold text-slate-600">• Provedl: {h.performedBy || 'Technik'}</span>
                     </div>
 
                     <h4 className="text-sm font-extrabold text-slate-900">{h.title}</h4>
@@ -320,7 +322,7 @@ export function CarrierDetailTimelineView({
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Zapsat zásah do historie nosiče</h3>
-              <button type="button" className="text-slate-400 font-bold" onClick={() => setShowHistoryModal(false)}>✕</button>
+              <button type="button" className="text-slate-400 font-bold cursor-pointer" onClick={() => setShowHistoryModal(false)}>✕</button>
             </div>
 
             <form onSubmit={handleCreateHistoryLog} className="space-y-3 text-xs">
@@ -340,13 +342,13 @@ export function CarrierDetailTimelineView({
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Název úkonu / Popis</label>
-                <input className="input w-full" placeholder="Např. Výměna poničené plástve po bouřce" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} required />
+                <input className="input w-full" placeholder="Např. Výměna poničeného banneru po bouřce" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} required />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Plocha na sloupu (volitelné)</label>
+                <label className="block font-bold text-slate-700 mb-1">Plocha na nosiči (volitelné)</label>
                 <select className="input w-full" value={selectedSurfaceId} onChange={(e) => setSelectedSurfaceId(e.target.value)}>
-                  <option value="">Celý sloup VO</option>
+                  <option value="">Celý nosič</option>
                   {surfaces.map((s) => (
                     <option key={s.id} value={s.id}>{s.name} ({s.sidePosition || 'Plocha'})</option>
                   ))}
@@ -374,14 +376,16 @@ export function CarrierDetailTimelineView({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">Nová reklamní plocha na sloupu</h3>
-              <button type="button" className="text-slate-400 font-bold" onClick={() => setShowSurfaceModal(false)}>✕</button>
+              <h3 className="text-base font-bold text-slate-900">
+                {isNavigation ? 'Nová reklamní plocha na sloupu' : 'Nová reklamní plocha na nosiči'}
+              </h3>
+              <button type="button" className="text-slate-400 font-bold cursor-pointer" onClick={() => setShowSurfaceModal(false)}>✕</button>
             </div>
 
             <form onSubmit={handleCreateSurface} className="space-y-3 text-xs">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Pozice na sloupu</label>
+                  <label className="block font-bold text-slate-700 mb-1">Pozice / Strana</label>
                   <input className="input w-full" value={sidePosition} onChange={(e) => setSidePosition(e.target.value)} required />
                 </div>
                 <div>
