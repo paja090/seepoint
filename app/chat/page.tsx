@@ -40,7 +40,7 @@ export default async function ChatPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl h-[calc(100vh-6rem)] flex flex-col space-y-4">
+      <div className="mx-auto max-w-7xl h-[calc(100dvh-9rem)] lg:h-[calc(100vh-6rem)] flex flex-col space-y-4 pb-2 lg:pb-0">
         <TeamChatContainer
           currentUser={currentUserData}
           vehicles={vehicles.map((v) => ({
