@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Carrier, Client } from '@/lib/types';
 import { mediaTypeLabel, carrierTypeLabel } from '@/lib/carrier-filters';
 import { CarrierArchiveActions } from './CarrierArchiveActions';
@@ -8,7 +9,8 @@ import { NavigationSurfaceManager } from './NavigationSurfaceManager';
 import { OccupancyActions } from './OccupancyActions';
 import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
-import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info } from 'lucide-react';
+import { QrCodeGeneratorModal } from './qr/QrCodeGeneratorModal';
+import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode } from 'lucide-react';
 
 function getCarrierBadgeMeta(type: Carrier['type']) {
   switch (type) {
@@ -73,6 +75,8 @@ export function CarrierDetail({
     carrier.photos.length +
     carrier.surfaces.reduce((sum, surface) => sum + (surface.photos?.length || 0), 0);
 
+  const [showQrModal, setShowQrModal] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* 🚀 Header & Category Badge */}
@@ -91,6 +95,13 @@ export function CarrierDetail({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowQrModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-black text-white shadow-sm hover:bg-sky-500 transition cursor-pointer"
+          >
+            <QrCode size={15} /> QR Štítek
+          </button>
           <a className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition" href="#carrier-form">
             Upravit nosič
           </a>
@@ -103,6 +114,19 @@ export function CarrierDetail({
           <CarrierArchiveActions carrier={carrier} />
         </div>
       </div>
+
+      <QrCodeGeneratorModal
+        carrier={{
+          id: carrier.id,
+          code: carrier.code,
+          name: carrier.name,
+          city: carrier.city,
+          type: carrier.type,
+          structureCode: carrier.structureCode,
+        }}
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
+      />
 
       {carrier.archivedAt && (
         <section className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-xs text-rose-900">
