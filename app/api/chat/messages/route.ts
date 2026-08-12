@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { roleLabel } from '@/lib/rbac';
 import { NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) {

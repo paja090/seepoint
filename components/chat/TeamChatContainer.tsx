@@ -113,23 +113,63 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousMessageCount = useRef<number>(0);
 
-  // Handle direct photo selection from camera or gallery
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+  // Compress camera/gallery photo on client side to max 1600px / ~300KB to prevent HTTP 413 errors
+  function compressImageForChat(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_WIDTH = 1600;
+          const MAX_HEIGHT = 1600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return resolve(e.target?.result as string);
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => reject(new Error('Chyba při načítání obrázku.'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Soubor se nepodařilo přečíst.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Handle direct photo selection from camera or gallery with automatic compression
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Soubor je příliš velký. Vyberte fotku do 8 MB.');
-      return;
+    try {
+      const compressedDataUrl = await compressImageForChat(file);
+      setImageUrl(compressedDataUrl);
+    } catch {
+      alert('Fotografii se nepodařilo zpracovat. Zkuste vybrat jinou fotku.');
+    } finally {
+      e.target.value = '';
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setImageUrl(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
   }
 
   // Sound chime synthesizer via Web Audio API
