@@ -69,6 +69,10 @@ export function CarrierDetail({
       ? { latitude: carrier.latitude, longitude: carrier.longitude }
       : null;
 
+  const totalPhotosCount =
+    carrier.photos.length +
+    carrier.surfaces.reduce((sum, surface) => sum + (surface.photos?.length || 0), 0);
+
   return (
     <div className="space-y-6">
       {/* 🚀 Header & Category Badge */}
@@ -91,7 +95,7 @@ export function CarrierDetail({
             Upravit nosič
           </a>
           <a className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition" href="#photo-gallery">
-            Fotografie ({carrier.photos.length})
+            Fotografie ({totalPhotosCount})
           </a>
           <a className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition" href="#surfaces">
             Plochy ({carrier.surfaces.length})
