@@ -4,19 +4,15 @@ import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   Plus,
-  CheckSquare,
-  Square,
+  Circle,
+  CheckCircle2,
   Building2,
   Wrench,
   Camera,
   Trash2,
   X,
-  CheckCircle2,
-  Filter,
-  Image,
-  Tag,
-  Clock,
-  UserCheck,
+  Calendar,
+  Info,
 } from 'lucide-react';
 
 export type ShoppingItem = {
@@ -44,8 +40,6 @@ export function CompanyShoppingListModal({
 }) {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<'ALL' | 'OFFICE' | 'WORKSHOP'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'TO_BUY' | 'PURCHASED' | 'ALL'>('TO_BUY');
 
   // Form states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -204,113 +198,62 @@ export function CompanyShoppingListModal({
 
   if (!isOpen) return null;
 
-  const filteredItems = items.filter((item) => {
-    if (activeCategory !== 'ALL' && item.category !== activeCategory) return false;
-    if (statusFilter === 'TO_BUY' && item.isPurchased) return false;
-    if (statusFilter === 'PURCHASED' && !item.isPurchased) return false;
-    return true;
-  });
+  // Split unpurchased items by section
+  const officeToBuy = items.filter((i) => i.category === 'OFFICE' && !i.isPurchased);
+  const workshopToBuy = items.filter((i) => i.category === 'WORKSHOP' && !i.isPurchased);
 
-  const officeToBuyCount = items.filter((i) => i.category === 'OFFICE' && !i.isPurchased).length;
-  const workshopToBuyCount = items.filter((i) => i.category === 'WORKSHOP' && !i.isPurchased).length;
+  // Filter items purchased in the last 14 days
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 86400000);
+  const recentPurchased = items.filter(
+    (i) => i.isPurchased && i.purchasedAt && new Date(i.purchasedAt) >= fourteenDaysAgo
+  );
+
+  const officePurchased = recentPurchased.filter((i) => i.category === 'OFFICE');
+  const workshopPurchased = recentPurchased.filter((i) => i.category === 'WORKSHOP');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overscroll-none animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl rounded-3xl bg-slate-900 border border-slate-800 text-slate-100 shadow-2xl overflow-hidden flex flex-col h-[85dvh] sm:h-auto sm:max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
+      <div className="w-full max-w-4xl rounded-3xl bg-slate-900 border border-slate-800 text-slate-100 shadow-2xl overflow-hidden flex flex-col h-[90dvh] sm:max-h-[92vh]">
+        {/* Header - NÁKUPY */}
+        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/80">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-400 font-black text-slate-950 shadow-md">
               <ShoppingBag size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white tracking-tight">
-                🛒 Firemní nákupy & Zásoby
+              <h2 className="text-xl font-black text-white tracking-widest uppercase">
+                NÁKUPY
               </h2>
               <p className="text-xs font-bold text-slate-400">
-                Nákupní seznam pro Kancelář & Dílnu SeePOINT
+                Firemní nákupní seznam SeePOINT
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-3.5 py-1.5 text-xs font-black text-slate-950 hover:brightness-110 active:scale-95 transition shadow-md"
+            >
+              <Plus size={16} />
+              <span>Přidat věc k nákupu</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        {/* Category Tabs & Add Trigger Bar */}
-        <div className="p-4 bg-slate-900/90 border-b border-slate-800 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Category Tabs */}
-            <div className="flex items-center gap-1.5 rounded-2xl bg-slate-950 p-1 border border-slate-800">
-              <button
-                type="button"
-                onClick={() => setActiveCategory('ALL')}
-                className={`rounded-xl px-3 py-1.5 text-xs font-extrabold transition ${
-                  activeCategory === 'ALL'
-                    ? 'bg-slate-800 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Všechny sekce ({items.filter((i) => !i.isPurchased).length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveCategory('OFFICE')}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition ${
-                  activeCategory === 'OFFICE'
-                    ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-purple-400 hover:bg-purple-950/40'
-                }`}
-              >
-                <Building2 size={14} />
-                <span>🏢 Kancelář ({officeToBuyCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveCategory('WORKSHOP')}
-                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-extrabold transition ${
-                  activeCategory === 'WORKSHOP'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'text-amber-400 hover:bg-amber-950/40'
-                }`}
-              >
-                <Wrench size={14} />
-                <span>🛠️ Dílna & Výroba ({workshopToBuyCount})</span>
-              </button>
-            </div>
-
-            {/* Right Controls: Filter & Add Button */}
-            <div className="flex items-center gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-bold text-slate-300 outline-none focus:border-amber-500"
-              >
-                <option value="TO_BUY">🛒 Chybí (K nákupu)</option>
-                <option value="PURCHASED">✓ Koupeno (Historie)</option>
-                <option value="ALL">📋 Všechny položky</option>
-              </select>
-
-              <button
-                type="button"
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-3.5 py-1.5 text-xs font-black text-slate-950 hover:brightness-110 active:scale-95 transition shadow-md"
-              >
-                <Plus size={16} />
-                <span>Přidat věc k nákupu</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Collapsible Form to Add Item */}
-          {showAddForm && (
-            <form onSubmit={handleAddItem} className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3 animate-in fade-in duration-200">
+        {/* Collapsible Form to Add Item */}
+        {showAddForm && (
+          <div className="p-4 bg-slate-950/90 border-b border-slate-800">
+            <form onSubmit={handleAddItem} className="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3 animate-in fade-in duration-200">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <p className="text-xs font-black text-amber-400 uppercase tracking-wider">
                   ➕ Nový požadavek na nákup
@@ -337,7 +280,7 @@ export function CompanyShoppingListModal({
                     placeholder="Např. Papír A4, Vrtáky 8mm, Páska 50mm"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
                   />
                 </div>
 
@@ -348,10 +291,10 @@ export function CompanyShoppingListModal({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
                   >
-                    <option value="WORKSHOP">🛠️ Dílna & Výroba (Nářadí, pásky, materiál)</option>
-                    <option value="OFFICE">🏢 Kancelář (Papír, toner, káva, potřeby)</option>
+                    <option value="WORKSHOP">🛠️ DÍLNA (Nářadí, pásky, materiál)</option>
+                    <option value="OFFICE">🏢 KANCELÁŘ (Papír, toner, káva, potřeby)</option>
                   </select>
                 </div>
               </div>
@@ -366,27 +309,27 @@ export function CompanyShoppingListModal({
                     placeholder="Např. 2 krabice, 50 ks, 1 balení"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
                   />
                 </div>
 
                 <div>
                   <label className="text-[11px] font-extrabold text-slate-400 block mb-1">
-                    Poznámka / Značka / Kde koupit (volitelné)
+                    Poznámka / Značka (volitelné)
                   </label>
                   <input
                     type="text"
                     placeholder="Např. BauMax Ostrava, značka Pattex"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
                   />
                 </div>
               </div>
 
               <div>
                 <label className="text-[11px] font-extrabold text-slate-400 block mb-1">
-                  Fotka dílu / štítku (Vyfotit mobilní kalkulačkou/galerií)
+                  Fotka dílu / štítku (Vyfotit z fotoaparátu / Vybrat z galerie)
                 </label>
                 <input
                   type="file"
@@ -400,7 +343,7 @@ export function CompanyShoppingListModal({
                   <div className="flex items-center justify-between rounded-xl border border-emerald-800 bg-emerald-950/60 p-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img src={imageUrl} alt="Náhled fotky" className="h-10 w-10 rounded-lg object-cover border border-emerald-600 shrink-0" />
-                      <span className="text-xs font-bold text-emerald-300 truncate">📷 Fotka z fotogalerie/fotoaparátu připojena</span>
+                      <span className="text-xs font-bold text-emerald-300 truncate">📷 Fotka z mobilu připojena</span>
                     </div>
                     <button
                       type="button"
@@ -414,7 +357,7 @@ export function CompanyShoppingListModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-800 bg-slate-900 p-3 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-800 bg-slate-950 p-3 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition"
                   >
                     <Camera size={16} className="text-amber-400" />
                     <span>📷 Vyfotit fotoaparátem / Vybrat z galerie</span>
@@ -430,119 +373,275 @@ export function CompanyShoppingListModal({
                 {submitting ? 'Ukládám…' : '✓ Přidat do nákupního seznamu'}
               </button>
             </form>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Checklist Content List */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 overscroll-contain touch-pan-y">
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 overscroll-contain touch-pan-y">
           {loading ? (
             <div className="py-12 text-center text-xs font-bold text-slate-500">
               Načítám nákupní seznam…
             </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 p-8 text-center text-xs font-bold text-slate-500 space-y-1">
-              <p>V tomto výběru nejsou žádné položky.</p>
-              <p className="text-slate-400">Přidejte novou věc tlačítkem výše.</p>
-            </div>
           ) : (
-            filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-2xl border p-3.5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                  item.isPurchased
-                    ? 'border-slate-800/80 bg-slate-950/60 opacity-60'
-                    : 'border-slate-800 bg-slate-900 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-start gap-3 min-w-0">
-                  {/* Interactive Checkbox */}
-                  <button
-                    type="button"
-                    onClick={() => togglePurchased(item)}
-                    className="mt-0.5 text-amber-400 hover:text-amber-300 transition shrink-0"
-                    title={item.isPurchased ? 'Označit jako k nákupu' : 'Označit jako koupeno'}
-                  >
-                    {item.isPurchased ? (
-                      <CheckSquare size={22} className="text-emerald-400" />
-                    ) : (
-                      <Square size={22} className="text-slate-400 hover:text-amber-400" />
-                    )}
-                  </button>
-
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {item.category === 'OFFICE' ? (
-                        <span className="rounded-md bg-purple-950 border border-purple-800 px-2 py-0.5 text-[10px] font-black text-purple-300">
-                          🏢 Kancelář
-                        </span>
-                      ) : (
-                        <span className="rounded-md bg-amber-950 border border-amber-800 px-2 py-0.5 text-[10px] font-black text-amber-300">
-                          🛠️ Dílna & Výroba
-                        </span>
-                      )}
-
-                      {item.quantity && (
-                        <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-black text-slate-200">
-                          📦 {item.quantity}
-                        </span>
-                      )}
-
-                      {item.isPurchased && (
-                        <span className="rounded-md bg-emerald-950 border border-emerald-800 px-2 py-0.5 text-[10px] font-black text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 size={12} />
-                          Koupeno ({item.purchasedByUserName || 'Koupeno'})
-                        </span>
-                      )}
+            <>
+              {/* TOP SPLIT SECTION: 💼 KANCELÁŘ vs 🛠️ DÍLNA (2-Column Layout) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 🏢 KANCELÁŘ COLUMN */}
+                <div className="rounded-2xl border border-blue-500/20 bg-slate-950/60 p-4 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-blue-500/30 pb-2.5 mb-3">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-blue-400" />
+                        <h3 className="font-extrabold text-sm text-blue-400 tracking-wider uppercase">
+                          🏢 KANCELÁŘ
+                        </h3>
+                      </div>
+                      <span className="rounded-full bg-blue-950 border border-blue-800 px-2.5 py-0.5 text-[10px] font-black text-blue-300">
+                        {officeToBuy.length} chybí
+                      </span>
                     </div>
 
-                    <p
-                      className={`text-sm font-black text-white ${
-                        item.isPurchased ? 'line-through text-slate-400' : ''
-                      }`}
-                    >
-                      {item.title}
-                    </p>
+                    <div className="space-y-2">
+                      {officeToBuy.length === 0 ? (
+                        <div className="py-6 text-center text-xs font-bold text-slate-500 border border-dashed border-slate-800/80 rounded-xl">
+                          V Kanceláři nic nechybí 👍
+                        </div>
+                      ) : (
+                        officeToBuy.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-start justify-between gap-2.5 rounded-xl border border-slate-800 bg-slate-900/90 p-3 hover:border-slate-700 transition"
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => togglePurchased(item)}
+                                className="mt-0.5 text-slate-500 hover:text-emerald-400 transition shrink-0"
+                                title="Označit jako koupeno"
+                              >
+                                <Circle size={20} />
+                              </button>
 
-                    {item.note && (
-                      <p className="text-xs font-bold text-slate-400">
-                        📝 {item.note}
-                      </p>
-                    )}
+                              <div className="min-w-0 space-y-0.5">
+                                <p className="text-xs font-black text-white leading-snug">
+                                  {item.title}
+                                </p>
 
-                    <p className="text-[11px] font-extrabold text-slate-500">
-                      Zadal/a: {item.addedByUserName} · {new Date(item.createdAt).toLocaleDateString('cs-CZ')}
-                    </p>
+                                {item.quantity && (
+                                  <span className="inline-block rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-extrabold text-slate-300">
+                                    📦 {item.quantity}
+                                  </span>
+                                )}
+
+                                {item.note && (
+                                  <p className="text-[11px] font-medium text-slate-400">
+                                    📝 {item.note}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {item.imageUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewImage(item.imageUrl!)}
+                                  className="h-10 w-10 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 hover:scale-105 transition"
+                                  title="Zobrazit fotku dílu"
+                                >
+                                  <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => deleteItem(item.id)}
+                                className="rounded-lg p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 transition"
+                                title="Odstranit"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Right Photo Thumbnail & Delete Button */}
-                <div className="flex items-center gap-2 self-end sm:self-center">
-                  {item.imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setPreviewImage(item.imageUrl!)}
-                      className="relative h-12 w-12 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 hover:scale-105 transition"
-                      title="Zobrazit fotku dílu"
-                    >
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                  )}
+                {/* 🛠️ DÍLNA COLUMN */}
+                <div className="rounded-2xl border border-emerald-500/20 bg-slate-950/60 p-4 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-emerald-500/30 pb-2.5 mb-3">
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-5 w-5 text-emerald-400" />
+                        <h3 className="font-extrabold text-sm text-emerald-400 tracking-wider uppercase">
+                          🛠️ DÍLNA & VÝROBA
+                        </h3>
+                      </div>
+                      <span className="rounded-full bg-emerald-950 border border-emerald-800 px-2.5 py-0.5 text-[10px] font-black text-emerald-300">
+                        {workshopToBuy.length} chybí
+                      </span>
+                    </div>
 
-                  <button
-                    type="button"
-                    onClick={() => deleteItem(item.id)}
-                    className="rounded-xl p-2 text-slate-500 hover:text-red-400 hover:bg-slate-800 transition"
-                    title="Odstranit"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                    <div className="space-y-2">
+                      {workshopToBuy.length === 0 ? (
+                        <div className="py-6 text-center text-xs font-bold text-slate-500 border border-dashed border-slate-800/80 rounded-xl">
+                          Na Dílně nic nechybí 👍
+                        </div>
+                      ) : (
+                        workshopToBuy.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-start justify-between gap-2.5 rounded-xl border border-slate-800 bg-slate-900/90 p-3 hover:border-slate-700 transition"
+                          >
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => togglePurchased(item)}
+                                className="mt-0.5 text-slate-500 hover:text-emerald-400 transition shrink-0"
+                                title="Označit jako koupeno"
+                              >
+                                <Circle size={20} />
+                              </button>
+
+                              <div className="min-w-0 space-y-0.5">
+                                <p className="text-xs font-black text-white leading-snug">
+                                  {item.title}
+                                </p>
+
+                                {item.quantity && (
+                                  <span className="inline-block rounded-md bg-slate-800 px-2 py-0.5 text-[10px] font-extrabold text-slate-300">
+                                    📦 {item.quantity}
+                                  </span>
+                                )}
+
+                                {item.note && (
+                                  <p className="text-[11px] font-medium text-slate-400">
+                                    📝 {item.note}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {item.imageUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewImage(item.imageUrl!)}
+                                  className="h-10 w-10 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 hover:scale-105 transition"
+                                  title="Zobrazit fotku dílu"
+                                >
+                                  <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => deleteItem(item.id)}
+                                className="rounded-lg p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 transition"
+                                title="Odstranit"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            ))
+
+              {/* BOTTOM SECTION: 📅 ZAKOUPENO V POSLEDNÍCH 14 DNECH */}
+              <div className="rounded-2xl border border-amber-500/20 bg-slate-950/80 p-4 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-amber-400" />
+                    <h4 className="text-xs font-black text-amber-400 uppercase tracking-widest">
+                      📅 ZAKOUPENO V POSLEDNÍCH 14 DNECH
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-extrabold text-slate-400">
+                    {recentPurchased.length} položek
+                  </span>
+                </div>
+
+                {recentPurchased.length === 0 ? (
+                  <div className="py-4 text-center text-xs font-bold text-slate-500">
+                    V posledních 14 dnech nebyly zakoupeny žádné položky.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Office Purchased */}
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black uppercase text-purple-400 tracking-wider">🏢 Kancelář</p>
+                      {officePurchased.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic">Žádné zakoupené položky</p>
+                      ) : (
+                        officePurchased.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/60 p-2 text-xs border border-slate-800/60 opacity-75 hover:opacity-100 transition"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => togglePurchased(item)}
+                                className="text-emerald-400 hover:text-amber-400 shrink-0"
+                                title="Vrátit k nákupu"
+                              >
+                                <CheckCircle2 size={16} />
+                              </button>
+                              <span className="line-through text-slate-300 font-semibold truncate">{item.title}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                              {item.purchasedAt ? new Date(item.purchasedAt).toLocaleDateString('cs-CZ') : '_ / _ / _'}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Workshop Purchased */}
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">🛠️ Dílna & Výroba</p>
+                      {workshopPurchased.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic">Žádné zakoupené položky</p>
+                      ) : (
+                        workshopPurchased.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-2 rounded-lg bg-slate-900/60 p-2 text-xs border border-slate-800/60 opacity-75 hover:opacity-100 transition"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => togglePurchased(item)}
+                                className="text-emerald-400 hover:text-amber-400 shrink-0"
+                                title="Vrátit k nákupu"
+                              >
+                                <CheckCircle2 size={16} />
+                              </button>
+                              <span className="line-through text-slate-300 font-semibold truncate">{item.title}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                              {item.purchasedAt ? new Date(item.purchasedAt).toLocaleDateString('cs-CZ') : '_ / _ / _'}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer Info Note */}
+                <div className="pt-2 border-t border-slate-900 flex items-center gap-2 text-[11px] font-bold text-slate-400">
+                  <Info size={14} className="text-amber-400 shrink-0" />
+                  <span>Položky se automaticky odstraní po 14 dnech od zakoupení.</span>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
