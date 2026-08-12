@@ -130,6 +130,10 @@ export function CompanyShoppingListModal({
   useEffect(() => {
     if (isOpen) {
       fetchItems();
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
     }
   }, [isOpen]);
 
@@ -211,8 +215,8 @@ export function CompanyShoppingListModal({
   const workshopToBuyCount = items.filter((i) => i.category === 'WORKSHOP' && !i.isPurchased).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl rounded-3xl bg-slate-900 border border-slate-800 text-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overscroll-none animate-in fade-in duration-200">
+      <div className="w-full max-w-3xl rounded-3xl bg-slate-900 border border-slate-800 text-slate-100 shadow-2xl overflow-hidden flex flex-col h-[85dvh] sm:h-auto sm:max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
           <div className="flex items-center gap-3">
@@ -430,7 +434,7 @@ export function CompanyShoppingListModal({
         </div>
 
         {/* Checklist Content List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 overscroll-contain touch-pan-y">
           {loading ? (
             <div className="py-12 text-center text-xs font-bold text-slate-500">
               Načítám nákupní seznam…
