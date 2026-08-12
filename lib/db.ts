@@ -59,7 +59,104 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
     mimeType: photo.mimeType ?? undefined,
     size: photo.size ?? undefined,
   });
-  return { id: carrier.id, name: carrier.name, code: carrier.code, type: carrier.type, latitude: carrier.latitude ?? undefined, longitude: carrier.longitude ?? undefined, gpsStatus: carrier.gpsStatus, street: carrier.street ?? undefined, address: carrier.address ?? undefined, locality: carrier.locality ?? undefined, city: carrier.city, region: carrier.region ?? undefined, cadastralArea: carrier.cadastralArea ?? undefined, structureCode: carrier.structureCode ?? undefined, mountingType: carrier.mountingType, status: carrier.status, description: carrier.description ?? undefined, placementDescription: carrier.placementDescription ?? undefined, note: carrier.note ?? undefined, archivedAt: carrier.archivedAt?.toISOString(), archivedBy: carrier.archivedBy ?? undefined, archiveReason: carrier.archiveReason ?? undefined, sourceSystem: carrier.sourceSystem ?? undefined, sourceSheet: carrier.sourceSheet ?? undefined, sourceRow: carrier.sourceRow ?? undefined, importBatchId: carrier.importBatchId ?? undefined, photos: carrier.photos.map(mapPhoto), surfaces: carrier.surfaces.map((surface) => ({ id: surface.id, carrierId: surface.carrierId, currentClientId: surface.currentClientId ?? undefined, currentClient: surface.currentClient ? { id: surface.currentClient.id, name: surface.currentClient.name } : undefined, name: surface.name, mediaType: surface.mediaType, sourcePosition: surface.sourcePosition ?? undefined, directionDescription: surface.directionDescription ?? undefined, destinationName: surface.destinationName ?? undefined, distanceMeters: surface.distanceMeters ?? undefined, rawMediaType: surface.rawMediaType ?? undefined, size: surface.size ?? undefined, orientation: surface.orientation ?? undefined, status: surface.status, price: surface.price?.toNumber(), note: surface.note ?? undefined, photos: surface.photos.map(mapPhoto), occupancies: surface.occupancies.map(serializeOccupancy) })) };
+  const todayStr = new Date().toISOString().slice(0, 10);
+  return {
+    id: carrier.id,
+    name: carrier.name,
+    code: carrier.code,
+    type: carrier.type,
+    latitude: carrier.latitude ?? undefined,
+    longitude: carrier.longitude ?? undefined,
+    gpsStatus: carrier.gpsStatus,
+    street: carrier.street ?? undefined,
+    address: carrier.address ?? undefined,
+    locality: carrier.locality ?? undefined,
+    city: carrier.city,
+    region: carrier.region ?? undefined,
+    cadastralArea: carrier.cadastralArea ?? undefined,
+    structureCode: carrier.structureCode ?? undefined,
+    mountingType: carrier.mountingType,
+    status: carrier.status,
+    description: carrier.description ?? undefined,
+    placementDescription: carrier.placementDescription ?? undefined,
+    note: carrier.note ?? undefined,
+    archivedAt: carrier.archivedAt?.toISOString(),
+    archivedBy: carrier.archivedBy ?? undefined,
+    archiveReason: carrier.archiveReason ?? undefined,
+    sourceSystem: carrier.sourceSystem ?? undefined,
+    sourceSheet: carrier.sourceSheet ?? undefined,
+    sourceRow: carrier.sourceRow ?? undefined,
+    importBatchId: carrier.importBatchId ?? undefined,
+    photos: carrier.photos.map(mapPhoto),
+    surfaces: carrier.surfaces.map((surface) => {
+      // Find current active occupancy running today (dateFrom <= today && dateTo >= today)
+      const activeOccupancy = surface.occupancies.find((o) => {
+        if (!['OCCUPIED', 'RESERVED'].includes(o.status)) return false;
+        const dateFromStr = dateOnly(o.dateFrom)!;
+        const dateToStr = dateOnly(o.dateTo)!;
+        return dateFromStr <= todayStr && dateToStr >= todayStr;
+      });
+
+      // Find upcoming reservation starting in the future (dateFrom > today)
+      const upcomingReservation = !activeOccupancy
+        ? surface.occupancies.find((o) => {
+            if (!['OCCUPIED', 'RESERVED'].includes(o.status)) return false;
+            const dateFromStr = dateOnly(o.dateFrom)!;
+            return dateFromStr > todayStr;
+          })
+        : null;
+
+      let derivedStatus: SurfaceStatus = surface.status;
+      let derivedClientId: string | undefined = surface.currentClientId ?? undefined;
+      let derivedClient = surface.currentClient
+        ? { id: surface.currentClient.id, name: surface.currentClient.name }
+        : undefined;
+
+      if (surface.status !== 'OUT_OF_SERVICE') {
+        if (activeOccupancy) {
+          derivedStatus = activeOccupancy.status === 'RESERVED' ? 'RESERVED' : 'OCCUPIED';
+          derivedClientId = activeOccupancy.clientId ?? undefined;
+          derivedClient = {
+            id: activeOccupancy.clientId ?? `client-${activeOccupancy.id}`,
+            name: activeOccupancy.clientName,
+          };
+        } else if (upcomingReservation) {
+          derivedStatus = 'RESERVED';
+          derivedClientId = upcomingReservation.clientId ?? undefined;
+          derivedClient = {
+            id: upcomingReservation.clientId ?? `client-${upcomingReservation.id}`,
+            name: upcomingReservation.clientName,
+          };
+        } else if (carrier.type !== 'NAVIGATION') {
+          // Campaign ended and no upcoming reservation: Bench/Billboard/CLP automatically becomes AVAILABLE & clears client
+          derivedStatus = 'AVAILABLE';
+          derivedClientId = undefined;
+          derivedClient = undefined;
+        }
+      }
+
+      return {
+        id: surface.id,
+        carrierId: surface.carrierId,
+        currentClientId: derivedClientId,
+        currentClient: derivedClient,
+        name: surface.name,
+        mediaType: surface.mediaType,
+        sourcePosition: surface.sourcePosition ?? undefined,
+        directionDescription: surface.directionDescription ?? undefined,
+        destinationName: surface.destinationName ?? undefined,
+        distanceMeters: surface.distanceMeters ?? undefined,
+        rawMediaType: surface.rawMediaType ?? undefined,
+        size: surface.size ?? undefined,
+        orientation: surface.orientation ?? undefined,
+        status: derivedStatus,
+        price: surface.price?.toNumber(),
+        note: surface.note ?? undefined,
+        photos: surface.photos.map(mapPhoto),
+        occupancies: surface.occupancies.map(serializeOccupancy),
+      };
+    }),
+  };
 }
 
 export function buildCarrierWhere(filters: CarrierFilters = {}): Prisma.AdvertisingCarrierWhereInput {
