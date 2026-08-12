@@ -20,6 +20,7 @@ import { AppTopbar } from './AppTopbar';
 import { RoleSwitcherButton } from './RoleSwitcherButton';
 import { NotificationBellCenter } from './notifications/NotificationBellCenter';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
+import { WeatherClockWidget } from './WeatherClockWidget';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 
@@ -105,7 +106,8 @@ export function ResponsiveAppShell({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <WeatherClockWidget compact />
           <NotificationBellCenter />
           <Link
             href="/team"
