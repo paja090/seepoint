@@ -13,29 +13,47 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const channel = searchParams.get('channel') || 'general';
+  const before = searchParams.get('before');
 
-  // Fetch channel messages
-  const messages = await prisma.chatMessage.findMany({
-    where: { channel },
+  let whereClause: any = { channel };
+
+  if (before) {
+    const refMsg = await prisma.chatMessage.findUnique({
+      where: { id: before },
+      select: { createdAt: true },
+    });
+
+    if (refMsg) {
+      whereClause.createdAt = { lt: refMsg.createdAt };
+    }
+  }
+
+  // Fetch channel messages - newest first, then reverse to chronological order
+  const messagesDesc = await prisma.chatMessage.findMany({
+    where: whereClause,
     include: {
       reads: {
         select: { userId: true, readAt: true },
       },
     },
-    orderBy: { createdAt: 'asc' },
-    take: 100,
+    orderBy: { createdAt: 'desc' },
+    take: 50,
   });
 
-  // Mark latest message as read by current user
-  if (messages.length > 0) {
+  const messages = messagesDesc.reverse();
+
+  // Mark latest message as read by current user if fetching initial messages
+  if (!before && messages.length > 0) {
     const lastMsg = messages[messages.length - 1];
-    await prisma.chatRead.upsert({
-      where: {
-        messageId_userId: { messageId: lastMsg.id, userId: user.id },
-      },
-      update: { readAt: new Date() },
-      create: { messageId: lastMsg.id, userId: user.id },
-    }).catch(() => null);
+    await prisma.chatRead
+      .upsert({
+        where: {
+          messageId_userId: { messageId: lastMsg.id, userId: user.id },
+        },
+        update: { readAt: new Date() },
+        create: { messageId: lastMsg.id, userId: user.id },
+      })
+      .catch(() => null);
   }
 
   return NextResponse.json(messages);
