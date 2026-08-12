@@ -408,29 +408,10 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
 
   return (
     <div className="flex flex-col lg:flex-row h-full rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
-      {/* 📱 Mobile Channel & Rubrik Selector + Actions Header (< lg) */}
-      <div className="flex lg:hidden flex-col border-b border-slate-800 bg-slate-950 p-3 space-y-2.5 shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 shrink-0">
-            <MessageSquare size={14} />
-            <span>Rubrika / Skupina:</span>
-          </span>
-
-          <select
-            value={activeChannel}
-            onChange={(e) => setActiveChannel(e.target.value)}
-            className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white outline-none focus:border-emerald-500 max-w-[200px]"
-          >
-            {channels.map((ch) => (
-              <option key={ch.id} value={ch.id}>
-                {ch.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Horizontal Channel Pills */}
-        <div className="flex overflow-x-auto gap-2 scrollbar-none py-0.5">
+      {/* 📱 Mobile Sleek Header Bar (< lg) */}
+      <div className="flex lg:hidden flex-col border-b border-slate-800 bg-slate-950 p-2.5 space-y-2 shrink-0">
+        {/* Horizontal Channel Tabs */}
+        <div className="flex overflow-x-auto gap-1.5 scrollbar-none py-0.5">
           {channels.map((ch) => {
             const isActive = activeChannel === ch.id;
             return (
@@ -448,8 +429,8 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
           })}
         </div>
 
-        {/* Quick Action Buttons Bar */}
-        <div className="flex overflow-x-auto gap-2 pt-1 border-t border-slate-900 scrollbar-none">
+        {/* Mobile Quick Action Buttons Bar */}
+        <div className="flex overflow-x-auto gap-2 pt-1.5 border-t border-slate-900 scrollbar-none">
           <button
             type="button"
             onClick={() => setShowShoppingModal(true)}
@@ -578,26 +559,6 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
             <p className="text-xs text-slate-500 truncate max-w-sm">
               {channels.find((c) => c.id === activeChannel)?.description}
             </p>
-          </div>
-
-          {/* Mobile Quick Action Buttons (Fuel & Fault) */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              onClick={() => setShowFuelModal(true)}
-              className="lg:hidden flex h-8 px-2.5 items-center gap-1 rounded-xl bg-amber-500 text-[11px] font-black text-slate-950"
-              title="Účtenka palivo"
-            >
-              <Fuel size={14} />
-              <span className="hidden sm:inline">Účtenka</span>
-            </button>
-            <button
-              onClick={() => setShowFaultModal(true)}
-              className="lg:hidden flex h-8 px-2.5 items-center gap-1 rounded-xl bg-rose-600 text-[11px] font-black text-white"
-              title="Závada na autě"
-            >
-              <AlertTriangle size={14} />
-              <span className="hidden sm:inline">Závada</span>
-            </button>
           </div>
         </div>
 
