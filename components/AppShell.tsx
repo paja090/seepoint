@@ -19,6 +19,7 @@ const navGroups: NavGroup[] = [
   {
     label: '🏢 Obchod & CRM',
     items: [
+      ['/analytics', '📊 Analytics & Tržby', 'barChart3', 'clients'],
       ['/clients/dashboard', '🎯 CRM Dashboard', 'barChart3', 'clients'],
       ['/clients', '👥 Klienti & Adresář', 'users', 'clients'],
       ['/offers', '📄 Nabídky', 'badgeDollarSign', 'offers'],
