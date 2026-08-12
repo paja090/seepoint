@@ -38,11 +38,26 @@ export async function GET(req: Request) {
             status: true,
             artworkUrl: true,
             currentClient: { select: { name: true } },
+            photos: {
+              orderBy: { createdAt: 'desc' },
+              take: 5,
+              select: {
+                id: true,
+                url: true,
+                storageProvider: true,
+                capturedLatitude: true,
+                capturedLongitude: true,
+                capturedByWorkerName: true,
+                createdAt: true,
+                aiStatus: true,
+                aiConfidence: true,
+              },
+            },
           },
         },
         photos: {
           orderBy: { createdAt: 'desc' },
-          take: 3,
+          take: 5,
           select: {
             id: true,
             url: true,
@@ -63,7 +78,28 @@ export async function GET(req: Request) {
       if (!isNaN(lat) && !isNaN(lng) && c.latitude && c.longitude) {
         distanceKm = calculateDistanceKm(lat, lng, c.latitude, c.longitude);
       }
-      return { ...c, distanceKm };
+
+      // Combine direct carrier photos AND photos attached to individual surfaces (e.g. Side A / Side B)
+      const surfacePhotos = c.surfaces.flatMap((s) => s.photos || []);
+      const allPhotos = [...(c.photos || []), ...surfacePhotos];
+
+      // Remove duplicate photos by ID & sort by newest
+      const uniquePhotosMap = new Map();
+      allPhotos.forEach((p) => {
+        if (!uniquePhotosMap.has(p.id)) {
+          uniquePhotosMap.set(p.id, p);
+        }
+      });
+
+      const sortedPhotos = Array.from(uniquePhotosMap.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      return {
+        ...c,
+        photos: sortedPhotos,
+        distanceKm,
+      };
     });
 
     if (!isNaN(lat) && !isNaN(lng)) {
