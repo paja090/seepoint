@@ -7,8 +7,8 @@ function getCarrierBadgeMeta(type: string) {
       return {
         label: '🧭 Navigační tabule (VO / Troleje)',
         badgeClass: 'bg-sky-100 text-sky-900 border-sky-300',
-        imageUrl: 'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?auto=format&fit=crop&w=600&q=80',
-        objectPosition: 'object-center',
+        imageUrl: '/images/media-types/navigation.jpg',
+        objectPosition: 'object-[center_30%]',
       };
     case 'PROMO_BENCH':
       return {
@@ -28,8 +28,8 @@ function getCarrierBadgeMeta(type: string) {
       return {
         label: '💡 Citylight (Prosvětlený CLP)',
         badgeClass: 'bg-yellow-100 text-yellow-900 border-yellow-300',
-        imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80',
-        objectPosition: 'object-center',
+        imageUrl: '/images/media-types/citylight.jpg',
+        objectPosition: 'object-[center_35%]',
       };
     case 'PROMO_TOWER':
       return {
