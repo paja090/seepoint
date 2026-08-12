@@ -57,8 +57,60 @@ export function CompanyShoppingListModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Image preview popup
+  // Image preview popup & file input
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  function compressImage(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const maxDim = 1600;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(e.target?.result as string);
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Chyba při načítání obrázku.'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Chyba při čtení souboru.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setSubmitting(true);
+      const compressedDataUrl = await compressImage(file);
+      setImageUrl(compressedDataUrl);
+    } catch (err) {
+      alert('Fotku se nepodařilo zpracovat.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchItems = async () => {
     setLoading(true);
@@ -330,15 +382,40 @@ export function CompanyShoppingListModal({
 
               <div>
                 <label className="text-[11px] font-extrabold text-slate-400 block mb-1">
-                  Odkaz na fotku dílu / štítku (volitelné)
+                  Fotka dílu / štítku (Vyfotit mobilní kalkulačkou/galerií)
                 </label>
                 <input
-                  type="url"
-                  placeholder="https://... (URL fotky ze štítku nebo dílu)"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-bold text-white outline-none focus:border-amber-500"
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
                 />
+
+                {imageUrl ? (
+                  <div className="flex items-center justify-between rounded-xl border border-emerald-800 bg-emerald-950/60 p-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img src={imageUrl} alt="Náhled fotky" className="h-10 w-10 rounded-lg object-cover border border-emerald-600 shrink-0" />
+                      <span className="text-xs font-bold text-emerald-300 truncate">📷 Fotka z fotogalerie/fotoaparátu připojena</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-red-400 transition shrink-0"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-800 bg-slate-900 p-3 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                  >
+                    <Camera size={16} className="text-amber-400" />
+                    <span>📷 Vyfotit fotoaparátem / Vybrat z galerie</span>
+                  </button>
+                )}
               </div>
 
               <button

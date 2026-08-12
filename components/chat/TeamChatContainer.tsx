@@ -954,17 +954,6 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         </div>
       )}
 
-      {/* 🛒 FLOATING ACTION BUTTON FOR SHOPPING LIST (Plovoucí tlačítko vpravo dole) */}
-      <button
-        type="button"
-        onClick={() => setShowShoppingModal(true)}
-        className="fixed bottom-24 right-4 lg:bottom-6 lg:right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-400 px-4 py-3 text-xs font-black text-slate-950 shadow-2xl shadow-orange-500/50 ring-4 ring-slate-950 hover:scale-105 active:scale-95 transition"
-        title="🛒 Firemní nákupy (Kancelář & Dílna)"
-      >
-        <ShoppingBag size={20} className="shrink-0" />
-        <span className="font-black tracking-tight">🛒 Firemní nákupy</span>
-      </button>
-
       {/* Company Shopping List Modal */}
       <CompanyShoppingListModal
         isOpen={showShoppingModal}
