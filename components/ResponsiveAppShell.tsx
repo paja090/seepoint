@@ -19,6 +19,7 @@ import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
 import { RoleSwitcherButton } from './RoleSwitcherButton';
 import { NotificationBellCenter } from './notifications/NotificationBellCenter';
+import { InAppToastNotifier } from './notifications/InAppToastNotifier';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { WeatherClockWidget } from './WeatherClockWidget';
 import type { AppRole } from '@/lib/rbac';
@@ -220,6 +221,9 @@ export function ResponsiveAppShell({
 
       {/* 📱 PWA Mobile Install Prompt */}
       <PwaInstallPrompt />
+
+      {/* 🔔 Real-time In-App Toast Notifier */}
+      <InAppToastNotifier />
 
       {/* 💬 FLOATING CHAT BUTTON (FAB) IN BOTTOM RIGHT */}
       <Link
