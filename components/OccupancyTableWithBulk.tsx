@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
 import { OccupancyClientPairing } from '@/components/OccupancyClientPairing';
 import { BulkOccupancyBookingModal } from '@/components/BulkOccupancyBookingModal';
+import { useOfferBasket } from '@/context/OfferBasketContext';
 
 type SurfaceItem = {
   id: string;
@@ -65,6 +66,8 @@ export function OccupancyTableWithBulk({
     }
   };
 
+  const { toggleSurface, isSurfaceSelected } = useOfferBasket();
+
   const selectedSurfacesInfo = rows
     .filter((r) => selectedSurfaceIds.includes(r.surface.id))
     .map((r) => ({
@@ -73,6 +76,9 @@ export function OccupancyTableWithBulk({
       carrierCode: r.surface.carrier.code,
       carrierCity: r.surface.carrier.city || '',
       carrierName: r.surface.carrier.name,
+      price: r.price,
+      mediaType: r.surface.mediaType,
+      carrierId: r.surface.carrier.id,
     }));
 
   return (
@@ -174,6 +180,29 @@ export function OccupancyTableWithBulk({
                 <TableCell><StatusBadge value={row.status} /></TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleSurface({
+                          id: row.surface.id,
+                          name: row.surface.name,
+                          carrierId: row.surface.carrier.id,
+                          carrierCode: row.surface.carrier.code,
+                          carrierName: row.surface.carrier.name,
+                          city: row.surface.carrier.city || '',
+                          price: typeof row.price === 'number' ? row.price : row.price ? parseFloat(String(row.price)) : undefined,
+                          mediaType: row.surface.mediaType,
+                        })
+                      }
+                      className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition shadow-2xs ${
+                        isSurfaceSelected(row.surface.id)
+                          ? 'bg-sky-500 text-slate-950 hover:bg-sky-400'
+                          : 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
+                      }`}
+                      title="Přidat nebo odebrat tuto plochu z košíku nabídek"
+                    >
+                      {isSurfaceSelected(row.surface.id) ? '✓ V nabídce' : '📋 + Nabídka'}
+                    </button>
                     <Link className="table-action" href={`/carriers/${row.surface.carrier.id}`}>
                       Detail
                     </Link>

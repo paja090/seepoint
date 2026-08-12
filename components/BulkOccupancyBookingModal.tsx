@@ -2,7 +2,8 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Zap, CheckCircle2, ShieldAlert, X, Calendar, User, Tag, MapPin } from 'lucide-react';
+import { Zap, CheckCircle2, ShieldAlert, X, Calendar, User, Tag, MapPin, FileText } from 'lucide-react';
+import { useOfferBasket } from '@/context/OfferBasketContext';
 
 type SurfaceInfo = {
   id: string;
@@ -10,6 +11,9 @@ type SurfaceInfo = {
   carrierCode: string;
   carrierCity: string;
   carrierName: string;
+  price?: string | number | null;
+  mediaType?: string;
+  carrierId?: string;
 };
 
 type ClientOption = {
@@ -91,10 +95,29 @@ export function BulkOccupancyBookingModal({
     }
   };
 
+  const { toggleSurface, isSurfaceSelected } = useOfferBasket();
+
+  const addAllToBasket = () => {
+    selectedSurfaces.forEach((s) => {
+      if (!isSurfaceSelected(s.id)) {
+        toggleSurface({
+          id: s.id,
+          name: s.name,
+          carrierId: s.carrierId || s.id,
+          carrierCode: s.carrierCode,
+          carrierName: s.carrierName,
+          city: s.carrierCity,
+          price: typeof s.price === 'number' ? s.price : s.price ? parseFloat(String(s.price)) : undefined,
+          mediaType: s.mediaType || undefined,
+        });
+      }
+    });
+  };
+
   return (
     <>
       {/* Sticky Bottom Action Bar for Salespeople */}
-      <div className="fixed bottom-4 inset-x-4 z-40 mx-auto max-w-4xl rounded-3xl bg-slate-950 px-6 py-4 text-white shadow-2xl border border-slate-800 flex items-center justify-between animate-in slide-in-from-bottom-4 duration-300">
+      <div className="fixed bottom-4 inset-x-4 z-40 mx-auto max-w-5xl rounded-3xl bg-slate-950 px-6 py-4 text-white shadow-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-slate-950 font-black">
             <Zap size={22} />
@@ -104,17 +127,27 @@ export function BulkOccupancyBookingModal({
               Vybráno {selectedSurfaces.length} reklamních ploch pro kampaň
             </p>
             <p className="text-xs text-slate-400 font-medium">
-              Excel-style hromadné osazení jedním kliknutím
+              Excel-style hromadný výběr
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={onClearSelection}
             className="rounded-xl px-3 py-2 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900"
           >
             Zrušit výprodej
+          </button>
+          <button
+            type="button"
+            onClick={addAllToBasket}
+            className="flex items-center gap-1.5 rounded-2xl border border-sky-400 bg-sky-500/20 px-4 py-2.5 text-xs font-black text-sky-200 hover:bg-sky-500 hover:text-slate-950 active:scale-95 transition shadow-sm"
+            title="Přidat všechny vybrané nosiče z Excel tabulky do košíku klientské nabídky"
+          >
+            <FileText size={15} />
+            <span>📋 Přidat do nabídky ({selectedSurfaces.length} ks)</span>
           </button>
           <a
             href={`/work?carrierCode=${encodeURIComponent(selectedSurfaces.map((s) => s.carrierCode).join(', '))}&quantity=${selectedSurfaces.length}&title=${encodeURIComponent(`Hromadná montáž kampaně (${selectedSurfaces.length} ks nosičů)`)}`}
@@ -124,6 +157,7 @@ export function BulkOccupancyBookingModal({
             <span>🚗 Hromadná montáž ({selectedSurfaces.length} ks)</span>
           </a>
           <button
+            type="button"
             onClick={() => setOpen(true)}
             className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition"
           >
