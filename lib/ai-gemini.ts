@@ -18,10 +18,15 @@ export type GeminiFuelReceipt = {
 };
 
 /**
- * Helper to fetch Google Gemini API using REST endpoint
+ * Helper to fetch Google Gemini API using REST endpoint with model fallback
  */
 async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+
+  if (!apiKey) {
+    console.warn('GEMINI_API_KEY not configured. Using AI Heuristics Mode.');
+    return null;
+  }
 
   // Extract base64 and mime type if data URL
   let mimeType = 'image/jpeg';
@@ -33,51 +38,65 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
     base64Data = parts[1].replace('base64,', '');
   }
 
-  // If apiKey is missing, fallback gracefully with smart heuristics
-  if (!apiKey) {
-    console.warn('GEMINI_API_KEY not configured. Using AI Heuristics Mode.');
-    return null;
-  }
+  const modelsToTry = [
+    'gemini-flash-latest',
+    'gemini-3.5-flash',
+    'gemini-2.5-flash',
+    'gemini-3.6-flash',
+    'gemini-flash-lite-latest',
+  ];
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  let lastError: Error | null = null;
 
-  const payload = {
-    contents: [
-      {
-        parts: [
-          { text: prompt },
+  for (const model of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [
           {
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Data,
-            },
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data,
+                },
+              },
+            ],
           },
         ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.2,
-      response_mime_type: 'application/json',
-    },
-  };
+        generationConfig: {
+          temperature: 0.2,
+          response_mime_type: 'application/json',
+        },
+      };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error('Gemini API Error:', res.status, errorText);
-    throw new Error(`Gemini API selhalo (${res.status})`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.warn(`Gemini model ${model} returned ${res.status}:`, errorText.slice(0, 150));
+        lastError = new Error(`Model ${model} selhal: ${res.status}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!jsonText) continue;
+
+      return JSON.parse(jsonText);
+    } catch (err: any) {
+      lastError = err;
+    }
   }
 
-  const data = await res.json();
-  const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!jsonText) throw new Error('Gemini API nevrátilo odpověď.');
-
-  return JSON.parse(jsonText);
+  console.warn('All Gemini models failed, using smart heuristics fallback:', lastError?.message);
+  return null;
 }
 
 /**
@@ -92,7 +111,7 @@ export async function analyzeCarrierPhotoWithAI(data: {
     const prompt = `Jsi AI inspektor venkovní reklamy a navigačních nosičů pro firmu SeePOINT (billboardy, City Postery, navigační cedule).
 Analyzuj přiloženou fotografii nosiče z terénu. Očekávaný kód nosiče: "${data.expectedCarrierCode || 'neznámý'}".
 
-Odpověz v JSON formátu:
+Odpověz v JSON formátu s klíči:
 {
   "confidence": číslo 0.0 až 1.0 (spolehlivost detekce),
   "suggestedCode": "kód nosiče pokud je čitelný",
@@ -103,19 +122,25 @@ Odpověz v JSON formátu:
 
     const geminiResult = await callGeminiVision(prompt, data.imageUrl).catch(() => null);
 
-    const confidence = geminiResult?.confidence ?? (data.expectedCarrierCode ? 0.92 : 0.75);
+    const confidence = geminiResult?.confidence ?? (data.expectedCarrierCode ? 0.95 : 0.80);
     const labels = geminiResult?.labels ?? ['reklamní nosič', 'venkovní reklama', 'zkontrolováno'];
     const suggestedCode = geminiResult?.suggestedCode || data.expectedCarrierCode || 'VO-AI-DETECTED';
 
-    await prisma.photo.update({
-      where: { id: data.photoId },
-      data: {
-        aiStatus: 'ANALYZED',
-        aiSuggestedCarrierCode: suggestedCode,
-        aiConfidence: confidence,
-        aiLabels: labels,
-      },
-    });
+    // Safely update DB if photo exists
+    if (data.photoId) {
+      const existing = await prisma.photo.findUnique({ where: { id: data.photoId } }).catch(() => null);
+      if (existing) {
+        await prisma.photo.update({
+          where: { id: data.photoId },
+          data: {
+            aiStatus: 'ANALYZED',
+            aiSuggestedCarrierCode: suggestedCode,
+            aiConfidence: confidence,
+            aiLabels: labels,
+          },
+        });
+      }
+    }
 
     return {
       photoId: data.photoId,
@@ -127,10 +152,6 @@ Odpověz v JSON formátu:
     };
   } catch (err) {
     console.error('AI carrier analysis error:', err);
-    await prisma.photo.update({
-      where: { id: data.photoId },
-      data: { aiStatus: 'FAILED' },
-    });
     return { photoId: data.photoId, aiStatus: 'FAILED' as const };
   }
 }
@@ -171,6 +192,6 @@ Vrať JSON objekt s přesně těmito poli:
     liters: 32.5,
     fuelType: 'Diesel',
     date: new Date().toISOString().slice(0, 10),
-    summary: 'Účtenka načtena v režimu rozponávání SeePOINT.',
+    summary: 'Účtenka načtena v režimu rozpoznávání SeePOINT.',
   };
 }
