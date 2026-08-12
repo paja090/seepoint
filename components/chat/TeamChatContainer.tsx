@@ -113,6 +113,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   const [faultSeverity, setFaultSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('HIGH');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousMessageCount = useRef<number>(0);
 
@@ -123,20 +124,16 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const MAX_WIDTH = 1600;
-          const MAX_HEIGHT = 1600;
+          const maxDim = 1600;
           let width = img.width;
           let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round((height * MAX_WIDTH) / width);
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round((width * MAX_HEIGHT) / height);
-              height = MAX_HEIGHT;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
             }
           }
 
@@ -149,7 +146,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
           }
 
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.78);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
           resolve(compressedDataUrl);
         };
         img.onerror = () => reject(new Error('Chyba při načítání obrázku.'));
@@ -241,8 +238,10 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   }, [activeChannel]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  }, [messages.length]);
 
   async function handleSendMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -409,52 +408,75 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
 
   return (
     <div className="flex flex-col lg:flex-row h-full rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
-      {/* 📱 Mobile Channel Tab Selector Bar (Visible only on mobile/tablet screens) */}
-      <div className="flex lg:hidden overflow-x-auto border-b border-slate-800 bg-slate-950 p-2.5 text-white gap-2 scrollbar-none shrink-0">
-        {channels.map((ch) => {
-          const isActive = activeChannel === ch.id;
-          return (
-            <button
-              key={ch.id}
-              onClick={() => setActiveChannel(ch.id)}
-              className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
-                isActive ? 'bg-emerald-500 text-slate-950 font-black' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              {ch.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* 📱 Mobile Channel & Rubrik Selector + Actions Header (< lg) */}
+      <div className="flex lg:hidden flex-col border-b border-slate-800 bg-slate-950 p-3 space-y-2.5 shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 shrink-0">
+            <MessageSquare size={14} />
+            <span>Rubrika / Skupina:</span>
+          </span>
 
-      {/* 📱 Mobile Quick Actions Bar for Shopping, Fuel & Faults (< lg) */}
-      <div className="flex lg:hidden overflow-x-auto border-b border-slate-800 bg-slate-900 px-2.5 py-2 text-white gap-2 scrollbar-none shrink-0">
-        <button
-          type="button"
-          onClick={() => setShowShoppingModal(true)}
-          className="flex items-center gap-1.5 shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md active:scale-95 transition"
-        >
-          <ShoppingBag size={15} />
-          <span>🛒 Firemní nákupy</span>
-        </button>
+          <select
+            value={activeChannel}
+            onChange={(e) => setActiveChannel(e.target.value)}
+            className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-black text-white outline-none focus:border-emerald-500 max-w-[200px]"
+          >
+            {channels.map((ch) => (
+              <option key={ch.id} value={ch.id}>
+                {ch.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setShowFuelModal(true)}
-          className="flex items-center gap-1.5 shrink-0 rounded-xl bg-amber-500/20 border border-amber-500/40 px-3 py-1.5 text-xs font-bold text-amber-300 active:scale-95 transition"
-        >
-          <Fuel size={14} />
-          <span>⛽ Palivo</span>
-        </button>
+        {/* Horizontal Channel Pills */}
+        <div className="flex overflow-x-auto gap-2 scrollbar-none py-0.5">
+          {channels.map((ch) => {
+            const isActive = activeChannel === ch.id;
+            return (
+              <button
+                key={ch.id}
+                type="button"
+                onClick={() => setActiveChannel(ch.id)}
+                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition whitespace-nowrap ${
+                  isActive ? 'bg-emerald-500 text-slate-950 font-black shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                {ch.label}
+              </button>
+            );
+          })}
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setShowFaultModal(true)}
-          className="flex items-center gap-1.5 shrink-0 rounded-xl bg-rose-950/80 border border-rose-800/80 px-3 py-1.5 text-xs font-bold text-rose-300 active:scale-95 transition"
-        >
-          <AlertTriangle size={14} />
-          <span>⚠️ Závada</span>
-        </button>
+        {/* Quick Action Buttons Bar */}
+        <div className="flex overflow-x-auto gap-2 pt-1 border-t border-slate-900 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setShowShoppingModal(true)}
+            className="flex items-center gap-1.5 shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md active:scale-95 transition"
+          >
+            <ShoppingBag size={15} />
+            <span>🛒 Firemní nákupy</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowFuelModal(true)}
+            className="flex items-center gap-1.5 shrink-0 rounded-xl bg-amber-500/20 border border-amber-500/40 px-3 py-1.5 text-xs font-bold text-amber-300 active:scale-95 transition"
+          >
+            <Fuel size={14} />
+            <span>⛽ Palivo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowFaultModal(true)}
+            className="flex items-center gap-1.5 shrink-0 rounded-xl bg-rose-950/80 border border-rose-800/80 px-3 py-1.5 text-xs font-bold text-rose-300 active:scale-95 transition"
+          >
+            <AlertTriangle size={14} />
+            <span>⚠️ Závada</span>
+          </button>
+        </div>
       </div>
 
       {/* 🚀 Sidebar Channels & Active Users (Desktop) */}
@@ -580,7 +602,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         </div>
 
         {/* Message Feed */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4" ref={messagesContainerRef}>
           {messages.length === 0 ? (
             <div className="py-16 text-center text-slate-400">
               <MessageSquare className="mx-auto h-10 w-10 text-slate-300 mb-2" />
