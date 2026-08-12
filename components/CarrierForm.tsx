@@ -154,12 +154,20 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       <input className="input" placeholder="Město" aria-label="Město" required value={form.city ?? ''} onChange={(event) => set('city', event.target.value)} />
       <input className="input" placeholder="Lokalita" aria-label="Lokalita" value={form.locality ?? ''} onChange={(event) => set('locality', event.target.value)} />
       <input className="input" placeholder="Katastrální území" aria-label="Katastrální území" value={form.cadastralArea ?? ''} onChange={(event) => set('cadastralArea', event.target.value)} />
-      <div className="grid grid-cols-2 gap-2">
-        <input className="input" placeholder="Číslo sloupu / stožáru" aria-label="Číslo sloupu nebo stožáru" value={form.structureCode ?? ''} onChange={(event) => set('structureCode', event.target.value)} />
-        <select className="input" aria-label="Typ uchycení" value={form.mountingType ?? 'UNKNOWN'} onChange={(event) => set('mountingType', event.target.value)}>
-          {mountingTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
-        </select>
-      </div>
+      {form.type === 'NAVIGATION' && (
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-sky-50/70 p-3 border border-sky-200">
+          <label className="block text-xs font-bold text-sky-900">
+            <span>Číslo sloupu / stožáru VO</span>
+            <input className="input mt-1" placeholder="Např. VO 4012" aria-label="Číslo sloupu nebo stožáru" value={form.structureCode ?? ''} onChange={(event) => set('structureCode', event.target.value)} />
+          </label>
+          <label className="block text-xs font-bold text-sky-900">
+            <span>Typ uchycení</span>
+            <select className="input mt-1" aria-label="Typ uchycení" value={form.mountingType ?? 'UNKNOWN'} onChange={(event) => set('mountingType', event.target.value)}>
+              {mountingTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
       <textarea className="input" placeholder="Popis nosiče" aria-label="Popis nosiče" value={form.description ?? ''} onChange={(event) => set('description', event.target.value)} />
       <textarea className="input" placeholder="Popis umístění" aria-label="Popis umístění" value={form.placementDescription ?? ''} onChange={(event) => set('placementDescription', event.target.value)} />
       <textarea className="input" placeholder="Poznámka" aria-label="Poznámka" value={form.note ?? ''} onChange={(event) => set('note', event.target.value)} />
