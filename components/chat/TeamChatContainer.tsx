@@ -110,6 +110,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   const [fuelLiters, setFuelLiters] = useState('');
   const [fuelOdometer, setFuelOdometer] = useState('');
   const [fuelNote, setFuelNote] = useState('');
+  const [aiScanningFuel, setAiScanningFuel] = useState(false);
 
   // Vehicle fault modal state
   const [faultTitle, setFaultTitle] = useState('');
@@ -169,6 +170,26 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
     try {
       const compressedDataUrl = await compressImageForChat(file);
       setImageUrl(compressedDataUrl);
+
+      // If fuel modal is open, trigger AI OCR analysis
+      if (showFuelModal) {
+        setAiScanningFuel(true);
+        fetch('/api/fuel/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: compressedDataUrl }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.ok && data.data) {
+              if (data.data.amountCzk) setFuelAmount(String(data.data.amountCzk));
+              if (data.data.liters) setFuelLiters(String(data.data.liters));
+              if (data.data.vendor) setFuelNote(`${data.data.vendor} (${data.data.fuelType || 'Palivo'})`);
+            }
+          })
+          .catch(() => null)
+          .finally(() => setAiScanningFuel(false));
+      }
     } catch {
       alert('Fotografii se nepodařilo zpracovat. Zkuste vybrat jinou fotku.');
     } finally {
@@ -934,14 +955,26 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Fotka účtenky</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Fotka účtenky *</span>
+                  {aiScanningFuel && (
+                    <span className="text-[10px] font-extrabold text-amber-600 flex items-center gap-1 animate-pulse">
+                      <Sparkles size={12} /> AI čte účtenku...
+                    </span>
+                  )}
+                  {!aiScanningFuel && imageUrl && (
+                    <span className="text-[10px] font-extrabold text-emerald-600 flex items-center gap-1">
+                      <Sparkles size={12} /> ✨ AI automaticky vyčetla údaje
+                    </span>
+                  )}
+                </label>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
                 >
                   <Camera size={16} />
-                  <span>{imageUrl ? '📷 Fotka vybraná' : 'Vyfotit / Vybrat účtenku'}</span>
+                  <span>{imageUrl ? '📷 Účtenka nahrána' : '✨ Vyfotit účtenku (AI přečte cenu i litry)'}</span>
                 </button>
               </div>
 
