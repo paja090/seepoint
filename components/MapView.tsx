@@ -220,12 +220,12 @@ export function MapView({
         </div>
       </section>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="relative min-h-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+        <section className="relative min-h-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm isolate z-0">
           <div ref={mapElementRef} className="h-[calc(100vh-12rem)] min-h-[520px] w-full" role="application" aria-label="Mapa reklamních nosičů" />
-          {!mapReady && <div className="absolute inset-0 grid place-items-center bg-slate-100 text-sm text-slate-500">Načítám mapu…</div>}
-          {mapReady && filteredItems.length === 0 && <div className="pointer-events-none absolute left-1/2 top-4 z-[500] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium shadow">Filtru neodpovídá žádný nosič</div>}
-          {mapReady && filteredItems.length > 0 && mappableItems.length === 0 && !editingSelectedLocation && <div className="pointer-events-none absolute left-1/2 top-4 z-[500] -translate-x-1/2 rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow">Vyfiltrované nosiče zatím nemají GPS</div>}
-          <div className={`pointer-events-none absolute bottom-7 left-3 z-[500] rounded-lg px-3 py-2 text-xs shadow ${editingSelectedLocation ? 'bg-sky-950 text-white' : 'bg-white/90 text-slate-600'}`}>{editingSelectedLocation ? 'Klikněte do mapy na novou polohu nosiče.' : 'Kliknutím do mapy přidáte nový nosič.'}</div>
+          {!mapReady && <div className="absolute inset-0 grid place-items-center bg-slate-100 text-sm text-slate-500 z-10">Načítám mapu…</div>}
+          {mapReady && filteredItems.length === 0 && <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-medium shadow">Filtru neodpovídá žádný nosič</div>}
+          {mapReady && filteredItems.length > 0 && mappableItems.length === 0 && !editingSelectedLocation && <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 shadow">Vyfiltrované nosiče zatím nemají GPS</div>}
+          <div className={`pointer-events-none absolute bottom-7 left-3 z-20 rounded-lg px-3 py-2 text-xs shadow ${editingSelectedLocation ? 'bg-sky-950 text-white' : 'bg-white/90 text-slate-600'}`}>{editingSelectedLocation ? 'Klikněte do mapy na novou polohu nosiče.' : 'Kliknutím do mapy přidáte nový nosič.'}</div>
         </section>
         <aside className="card max-h-[calc(100vh-8rem)] overflow-auto">
           {draft ? <>
