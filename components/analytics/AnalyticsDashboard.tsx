@@ -143,9 +143,9 @@ export function AnalyticsDashboard({
         <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5 text-xs text-sky-950 flex items-start gap-2.5">
           <span className="text-base">🧭</span>
           <div>
-            <strong className="font-extrabold block">Specifika Navigačních směrových tabulí VO:</strong>
+            <strong className="font-extrabold block">Logika výpočtu Měsíčních Nájmů (MRR) & Obsazenosti:</strong>
             <p className="text-[11px] text-sky-900 mt-0.5 font-medium leading-relaxed">
-              U navigačních nosičů na sloupech VO se nemění grafika jako u billboardů – směrové plástve zůstávají instalované stálé a klient hradí nepřetržitý stálý měsíční nájem (např. 1 000 Kč / ks) po celou dobu trvání platné smlouvy.
+              Systém u všech reklamních i navigačních nosičů započítává <strong>výhradně stálý měsíční nájem</strong> po dobu platnosti smlouvy. Jednorázové poplatky za výrobu grafiky, tisk, montáž nebo demontáž se do opakovaného měsíčního výnosu nezapočítávají.
             </p>
           </div>
         </div>

@@ -5,6 +5,20 @@ import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard';
 
 export const dynamic = 'force-dynamic';
 
+const defaultRates: Record<string, number> = {
+  NAVIGATION: 1000,
+  NAVIGATION_SIGN: 1000,
+  PROMO_BENCH: 1500,
+  CITY_POSTER: 2500,
+  CITYLIGHT: 2500,
+  PROMO_TOWER: 2500,
+  PROMO_HORIZON: 2200,
+  BILLBOARD: 3500,
+  BIGBOARD: 8000,
+  LED_SCREEN: 12000,
+  OTHER: 2000,
+};
+
 export default async function AnalyticsPage() {
   await requirePageAccess('clients');
 
@@ -30,7 +44,17 @@ export default async function AnalyticsPage() {
         id: true,
         name: true,
         mediaType: true,
+        status: true,
         price: true,
+        currentClientId: true,
+        contractId: true,
+        contract: {
+          select: {
+            id: true,
+            monthlyPrice: true,
+            status: true,
+          },
+        },
         carrierId: true,
         carrier: {
           select: { city: true, type: true },
@@ -77,24 +101,35 @@ export default async function AnalyticsPage() {
   let occupiedSurfacesCount = 0;
 
   surfaces.forEach((surface) => {
-    const isNavigation = surface.carrier.type === 'NAVIGATION' || surface.mediaType === 'NAVIGATION_SIGN';
-    const hasActiveOccupancy = surface.occupancies.length > 0;
-    
-    // For NAVIGATION: directional graphics stay fixed for contract duration (1-5 years) with continuous monthly rent
-    const isOccupied = isNavigation
-      ? (hasActiveOccupancy || Boolean(surface.price && Number(surface.price) > 0))
-      : hasActiveOccupancy;
+    // Surface is occupied if explicitly set as OCCUPIED/RESERVED, linked to a contract/client, or has active occupancy
+    const isOccupied =
+      surface.status === 'OCCUPIED' ||
+      surface.status === 'RESERVED' ||
+      Boolean(surface.currentClientId) ||
+      Boolean(surface.contractId) ||
+      surface.occupancies.length > 0;
 
-    const occPrice = isNavigation
-      ? (surface.occupancies[0]?.price ? Number(surface.occupancies[0].price) : (surface.price ? Number(surface.price) : 1000))
-      : (surface.occupancies[0]?.price ? Number(surface.occupancies[0].price) : (surface.price ? Number(surface.price) : 0));
+    // Monthly rental price logic (excl. 1-time setup/manufacturing fees)
+    let monthlyRentPrice = 0;
+    if (isOccupied) {
+      if (surface.contract?.monthlyPrice && Number(surface.contract.monthlyPrice) > 0) {
+        monthlyRentPrice = Number(surface.contract.monthlyPrice);
+      } else if (surface.occupancies[0]?.price && Number(surface.occupancies[0].price) > 0) {
+        monthlyRentPrice = Number(surface.occupancies[0].price);
+      } else if (surface.price && Number(surface.price) > 0) {
+        monthlyRentPrice = Number(surface.price);
+      } else {
+        const typeKey = surface.carrier.type || surface.mediaType || 'OTHER';
+        monthlyRentPrice = defaultRates[typeKey] || defaultRates[surface.mediaType] || 1000;
+      }
+    }
 
     if (isOccupied) {
       occupiedSurfacesCount++;
-      totalRevenue += occPrice;
+      totalRevenue += monthlyRentPrice;
     }
 
-    // By Type
+    // By Carrier Type
     const typeKey = surface.carrier.type || 'OTHER';
     if (!typeMap[typeKey]) {
       typeMap[typeKey] = { count: 0, occupiedCount: 0, revenue: 0 };
@@ -102,7 +137,7 @@ export default async function AnalyticsPage() {
     typeMap[typeKey].count++;
     if (isOccupied) {
       typeMap[typeKey].occupiedCount++;
-      typeMap[typeKey].revenue += occPrice;
+      typeMap[typeKey].revenue += monthlyRentPrice;
     }
 
     // By City
@@ -113,7 +148,7 @@ export default async function AnalyticsPage() {
     cityMap[cityKey].surfaceCount++;
     if (isOccupied) {
       cityMap[cityKey].occupiedCount++;
-      cityMap[cityKey].revenue += occPrice;
+      cityMap[cityKey].revenue += monthlyRentPrice;
     }
   });
 
