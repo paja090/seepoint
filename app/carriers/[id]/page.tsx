@@ -71,6 +71,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
             longitude: carrier.longitude,
             structureCode: carrier.structureCode,
             status: carrier.status,
+            type: carrier.type,
           }}
           history={JSON.parse(JSON.stringify(history))}
           surfaces={JSON.parse(JSON.stringify(surfaces))}
