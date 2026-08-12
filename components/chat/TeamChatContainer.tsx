@@ -475,7 +475,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
     : activeUsers.map((u) => ({ id: u.id, name: u.name, position: u.roleLabel }));
 
   return (
-    <div className="flex flex-col lg:flex-row h-full rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full min-h-0 flex-1 rounded-3xl border border-slate-200 bg-white shadow-md overflow-hidden">
       {/* 📱 Mobile Sleek Header Bar (< lg) */}
       <div className="flex lg:hidden flex-col border-b border-slate-800 bg-slate-950 p-2.5 space-y-2 shrink-0">
         {/* Horizontal Channel Tabs */}
@@ -526,6 +526,24 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
             <span>⚠️ Závada</span>
           </button>
         </div>
+
+        {/* Mobile Active Presence Bar */}
+        {activeUsers.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 border-t border-slate-900 scrollbar-none text-xs shrink-0">
+            <span className="font-extrabold text-[10px] text-emerald-400 shrink-0 flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
+              <span>Aktivní v týmu ({activeUsers.length}):</span>
+            </span>
+            {activeUsers.map((u) => (
+              <span
+                key={u.id}
+                className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-0.5 text-[10px] font-bold text-slate-200 shrink-0 border border-slate-800"
+              >
+                <span>{u.name}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 🚀 Sidebar Channels & Active Users (Desktop) */}
@@ -617,9 +635,9 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
       </div>
 
       {/* 💬 Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-slate-50 min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden bg-slate-50">
         {/* Active Channel Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 py-3.5 shadow-xs">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 py-3.5 shadow-xs shrink-0">
           <div>
             <h3 className="font-bold text-slate-950">
               {channels.find((c) => c.id === activeChannel)?.label}
@@ -631,7 +649,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         </div>
 
         {/* Message Feed */}
-        <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4" ref={messagesContainerRef}>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 space-y-4" ref={messagesContainerRef}>
           {hasMoreOlder && messages.length > 0 && (
             <div className="flex justify-center py-1">
               <button

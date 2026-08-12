@@ -9,13 +9,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   }
 
-  // Active users in last 30 minutes
-  const activeThreshold = new Date(Date.now() - 30 * 60 * 1000);
-
+  // Fetch active users in the system
   const activeUsers = await prisma.user.findMany({
     where: {
       status: 'ACTIVE',
-      lastLoginAt: { gte: activeThreshold },
     },
     select: {
       id: true,
@@ -34,12 +31,13 @@ export async function GET() {
       },
     },
     orderBy: { lastLoginAt: 'desc' },
+    take: 30,
   });
 
   return NextResponse.json(
     activeUsers.map((u) => ({
       id: u.id,
-      name: u.employee ? `${u.employee.firstName} ${u.employee.lastName}` : u.name,
+      name: u.employee ? `${u.employee.firstName} ${u.employee.lastName}`.trim() : u.name,
       roleLabel: roleLabel(u.role),
       position: u.employee?.position || null,
       photoUrl: u.employee?.photos[0]?.url || null,
