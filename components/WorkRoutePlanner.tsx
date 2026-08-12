@@ -86,10 +86,62 @@ export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlanne
 
   const workers = useMemo(() => [...new Set(initialOrders.flatMap((order) => order.workers))]
     .sort((left, right) => left.localeCompare(right, 'cs')), [initialOrders]);
-  const dayOrders = useMemo(() => initialOrders
-    .filter((order) => localDate(order.scheduledAt) === selectedDate)
-    .filter((order) => worker === 'ALL' || order.workers.includes(worker))
-    .sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime()), [initialOrders, selectedDate, worker]);
+  const [optimizeRoute, setOptimizeRoute] = useState(false);
+
+  function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  const dayOrders = useMemo(() => {
+    const raw = initialOrders
+      .filter((order) => localDate(order.scheduledAt) === selectedDate)
+      .filter((order) => worker === 'ALL' || order.workers.includes(worker));
+
+    if (!optimizeRoute || raw.length <= 1) {
+      return raw.sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime());
+    }
+
+    const unvisited = [...raw];
+    const sorted: RouteOrder[] = [];
+
+    const startIdx = unvisited.findIndex((o) => hasCoordinates(o.carrier));
+    let current = unvisited.splice(startIdx >= 0 ? startIdx : 0, 1)[0];
+    sorted.push(current);
+
+    while (unvisited.length > 0) {
+      if (hasCoordinates(current.carrier)) {
+        const cLat = current.carrier.latitude;
+        const cLng = current.carrier.longitude;
+        let nearestIdx = 0;
+        let minDistance = Infinity;
+
+        unvisited.forEach((item, idx) => {
+          if (hasCoordinates(item.carrier)) {
+            const dist = getDistanceKm(cLat, cLng, item.carrier.latitude, item.carrier.longitude);
+            if (dist < minDistance) {
+              minDistance = dist;
+              nearestIdx = idx;
+            }
+          }
+        });
+
+        current = unvisited.splice(nearestIdx, 1)[0];
+        sorted.push(current);
+      } else {
+        current = unvisited.splice(0, 1)[0];
+        sorted.push(current);
+      }
+    }
+
+    return sorted;
+  }, [initialOrders, selectedDate, worker, optimizeRoute]);
+
   const locatedOrders = useMemo(() => dayOrders.filter((order) => hasCoordinates(order.carrier)), [dayOrders]);
   const fullRouteUrl = routeUrl(dayOrders);
 
@@ -178,8 +230,24 @@ export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlanne
           <button className="rounded-xl border bg-white px-3 py-2 font-medium" onClick={() => setSelectedDate((value) => changeDate(value, 1))} type="button" aria-label="Další den">→</button>
         </div>
         <label className="text-sm font-medium">Datum<input className="input mt-1" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
-        <label className="text-sm font-medium">Pracovník<select className="input mt-1" value={worker} onChange={(event) => setWorker(event.target.value)}><option value="ALL">Všichni pracovníci</option>{workers.map((name) => <option key={name} value={name}>{name}</option>)}</select></label>
-        {fullRouteUrl && <a className="rounded-xl bg-sky-700 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-sky-800" href={fullRouteUrl} rel="noreferrer" target="_blank">Navigovat celou trasu ↗</a>}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOptimizeRoute((v) => !v)}
+            className={`rounded-xl px-4 py-3 text-center text-sm font-bold transition shadow-xs cursor-pointer ${
+              optimizeRoute
+                ? 'bg-emerald-600 text-white hover:bg-emerald-500 ring-2 ring-emerald-300'
+                : 'bg-slate-900 text-white hover:bg-slate-800'
+            }`}
+          >
+            {optimizeRoute ? '⚡ Nejkratší trasa aktivní' : '⚡ Seřadit podle nejkratší trasy'}
+          </button>
+          {fullRouteUrl && (
+            <a className="rounded-xl bg-sky-700 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-sky-800 transition" href={fullRouteUrl} rel="noreferrer" target="_blank">
+              🧭 Navigovat celou trasu ↗
+            </a>
+          )}
+        </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
