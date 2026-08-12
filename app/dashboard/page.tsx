@@ -171,20 +171,34 @@ export default async function Dashboard() {
     }),
   ]);
 
-  // Exact Distinct Occupied Surfaces
+  // Exact Distinct Occupied Surfaces (including Navigation continuous monthly rentals)
   const occupiedSurfaceIds = new Set(activeOccupancies.map((o) => o.surfaceId));
+  surfaces.forEach((s) => {
+    if (s.mediaType === 'NAVIGATION_SIGN' && s.price && Number(s.price) > 0) {
+      occupiedSurfaceIds.add(s.id);
+    }
+  });
+
   const totalSurfaces = surfaces.length;
   const occupiedSurfaces = occupiedSurfaceIds.size;
   const availableSurfaces = Math.max(0, totalSurfaces - occupiedSurfaces);
   const reservedSurfaces = activeOccupancies.filter((o) => o.status === 'RESERVED').length;
 
-  // Real MRR & ARR calculation
-  const mrrAmount = activeOccupancies.reduce((acc, curr) => {
+  // Real MRR & ARR calculation (including Navigation continuous monthly contracts)
+  let mrrAmount = activeOccupancies.reduce((acc, curr) => {
     const val = curr.price
       ? Number(curr.price)
       : (curr.surface?.price ? Number(curr.surface.price) : (defaultRates[curr.surface?.mediaType] || 2000));
     return acc + val;
   }, 0);
+
+  surfaces.forEach((s) => {
+    if (s.mediaType === 'NAVIGATION_SIGN' && s.price && Number(s.price) > 0) {
+      if (!activeOccupancies.some((occ) => occ.surfaceId === s.id)) {
+        mrrAmount += Number(s.price);
+      }
+    }
+  });
 
   const arrAmount = mrrAmount * 12;
   const occupancyPercent = totalSurfaces > 0 ? Math.round((occupiedSurfaces / totalSurfaces) * 100) : 0;

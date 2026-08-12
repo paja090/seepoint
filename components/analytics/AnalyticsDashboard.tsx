@@ -140,6 +140,16 @@ export function AnalyticsDashboard({
           </span>
         </div>
 
+        <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5 text-xs text-sky-950 flex items-start gap-2.5">
+          <span className="text-base">🧭</span>
+          <div>
+            <strong className="font-extrabold block">Specifika Navigačních směrových tabulí VO:</strong>
+            <p className="text-[11px] text-sky-900 mt-0.5 font-medium leading-relaxed">
+              U navigačních nosičů na sloupech VO se nemění grafika jako u billboardů – směrové plástve zůstávají instalované stálé a klient hradí nepřetržitý stálý měsíční nájem (např. 1 000 Kč / ks) po celou dobu trvání platné smlouvy.
+            </p>
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {typeList.map((t) => {
             const badge = getCarrierBadgeMeta(t.type);
