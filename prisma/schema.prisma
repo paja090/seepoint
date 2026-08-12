@@ -2564,3 +2564,24 @@ model CarrierHistoryLog {
   @@index([eventType])
 }
 
+model CompanyShoppingItem {
+  id                  String    @id @default(cuid())
+  category            String    // "OFFICE" (Kancelář) or "WORKSHOP" (Dílna & Výroba)
+  title               String
+  quantity            String?
+  note                String?
+  imageUrl            String?
+  isPurchased         Boolean   @default(false)
+  addedByUserId       String?
+  addedByUserName     String
+  purchasedByUserId   String?
+  purchasedByUserName String?
+  purchasedAt         DateTime?
+  pricePaid           Decimal?  @db.Decimal(10, 2)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([category])
+  @@index([isPurchased])
+}
+
