@@ -10,7 +10,7 @@ export type BasketSurface = {
   carrierName: string;
   city: string;
   price?: number;
-  mediaType: string;
+  mediaType?: string;
   photoUrl?: string;
 };
 
