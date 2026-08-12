@@ -49,16 +49,27 @@ export function CarrierDetail({
   const isNavigation = carrier.type === 'NAVIGATION';
   const badgeMeta = getCarrierBadgeMeta(carrier.type);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
   const campaigns = carrier.surfaces.flatMap((surface) =>
     surface.occupancies.map((occupancy) => ({ ...occupancy, surface: surface.name }))
   );
+  
+  // Currently active campaign running today (dateFrom <= today && dateTo >= today)
   const activeCampaigns = campaigns.filter(
     (campaign) =>
-      campaign.status === 'OCCUPIED' || campaign.status === 'RESERVED' || campaign.status === 'NEGOTIATION'
+      ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(campaign.status) &&
+      campaign.dateFrom <= todayStr &&
+      campaign.dateTo >= todayStr
   );
-  const primaryCampaign = activeCampaigns
-    .slice()
-    .sort((left, right) => left.dateTo.localeCompare(right.dateTo))[0];
+
+  // Upcoming reservation in the future (dateFrom > today)
+  const upcomingCampaigns = campaigns.filter(
+    (campaign) =>
+      ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(campaign.status) &&
+      campaign.dateFrom > todayStr
+  );
+
+  const primaryCampaign = activeCampaigns[0] ?? upcomingCampaigns[0];
   const daysToEnd = primaryCampaign
     ? Math.ceil((new Date(`${primaryCampaign.dateTo}T00:00:00.000Z`).getTime() - Date.now()) / 86_400_000)
     : undefined;
