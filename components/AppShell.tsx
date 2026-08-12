@@ -9,13 +9,10 @@ const navGroups: NavGroup[] = [
     items: [
       ['/dashboard', '📊 Nástěnka / Přehled', 'barChart3', 'dashboard'],
       ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
-      ['/chat', '💬 Týmový Chat & Účtenky', 'messageSquare', 'team'],
       ['/vacations', '🌴 Dovolená & Volno', 'calendarRange', 'team'],
-      ['/mobile-photos', '📱 Mobilní foto z terénu', 'camera', 'work'],
       ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
       ['/my-work-entries', '⏱️ Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],
       ['/my-settlements', '💰 Moje vyúčtování', 'fileText', 'mySettlements'],
-      ['/team', '📞 Kontakty týmu SeePOINT', 'phone', 'team'],
       ['/vehicles', '🚘 Vozidla a vozíky', 'car', 'vehicles'],
     ],
   },
@@ -29,7 +26,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Projekty Navigace',
     items: [
-      ['/navigation', ' Navigace (Přehled)', 'mapPinned', 'navigationProjects'],
+      ['/navigation', 'Navigace (Přehled)', 'mapPinned', 'navigationProjects'],
       ['/navigation/contracts', '📄 Evidence smluv', 'fileText', 'navigationContracts'],
       ['/navigation/contacts', '👥 Kontaktní osoby', 'users', 'navigationContacts'],
       ['/navigation/documentation', '📷 Fotodokumentace reporty', 'camera', 'navigationDocumentation'],
@@ -54,7 +51,6 @@ const navGroups: NavGroup[] = [
       ['/work-entries', 'Odvedená práce (všichni)', 'fileText', 'workEntries'],
       ['/settlements', 'Vyúčtování (všichni)', 'fileText', 'settlements'],
       ['/vehicles', 'Vozidla a vozíky', 'car', 'vehicles'],
-      ['/team', '📞 Kontakty týmu SeePOINT', 'phone', 'team'],
     ],
   },
   {
@@ -79,7 +75,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
     .map((group) => {
       const groupItems = group.items.filter(([href, , , section]) => {
         if (!canAccess(user.role, section as AppSection)) return false;
-        // Don't show duplicate links for worker/technician
+        // Don't show duplicate links
         if (seenHrefs.has(href)) return false;
         seenHrefs.add(href);
         return true;
