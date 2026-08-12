@@ -427,6 +427,36 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         })}
       </div>
 
+      {/* 📱 Mobile Quick Actions Bar for Shopping, Fuel & Faults (< lg) */}
+      <div className="flex lg:hidden overflow-x-auto border-b border-slate-800 bg-slate-900 px-2.5 py-2 text-white gap-2 scrollbar-none shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowShoppingModal(true)}
+          className="flex items-center gap-1.5 shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-3 py-1.5 text-xs font-black text-slate-950 shadow-md active:scale-95 transition"
+        >
+          <ShoppingBag size={15} />
+          <span>🛒 Firemní nákupy</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowFuelModal(true)}
+          className="flex items-center gap-1.5 shrink-0 rounded-xl bg-amber-500/20 border border-amber-500/40 px-3 py-1.5 text-xs font-bold text-amber-300 active:scale-95 transition"
+        >
+          <Fuel size={14} />
+          <span>⛽ Palivo</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowFaultModal(true)}
+          className="flex items-center gap-1.5 shrink-0 rounded-xl bg-rose-950/80 border border-rose-800/80 px-3 py-1.5 text-xs font-bold text-rose-300 active:scale-95 transition"
+        >
+          <AlertTriangle size={14} />
+          <span>⚠️ Závada</span>
+        </button>
+      </div>
+
       {/* 🚀 Sidebar Channels & Active Users (Desktop) */}
       <div className="hidden lg:flex w-72 bg-slate-950 p-4 text-white flex-col justify-between border-r border-slate-800 shrink-0">
         <div>
