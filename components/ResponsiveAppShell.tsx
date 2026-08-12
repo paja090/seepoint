@@ -204,7 +204,7 @@ export function ResponsiveAppShell({
         </aside>
 
         {/* MAIN CONTENT AREA */}
-        <main className="min-w-0 flex-1 lg:pl-72 pb-16 lg:pb-0">
+        <main className="min-w-0 flex-1 lg:pl-72 pt-14 lg:pt-0 pb-16 lg:pb-0">
           <AppTopbar user={user} />
           <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-4 sm:py-6 lg:px-8">{children}</div>
         </main>
