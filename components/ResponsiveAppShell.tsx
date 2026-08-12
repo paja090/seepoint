@@ -112,6 +112,13 @@ export function ResponsiveAppShell({
           </div>
 
           <div className="flex items-center gap-2">
+            <Link
+              href="/chat"
+              className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-emerald-400 hover:text-white border border-slate-700 transition shadow-2xs"
+              title="💬 Týmový Chat & Nákupy"
+            >
+              <MessageSquare size={17} />
+            </Link>
             <NotificationBellCenter />
             <Link
               href="/team"
@@ -240,6 +247,16 @@ export function ResponsiveAppShell({
             title="Mobilní foto"
           >
             <Camera size={22} />
+          </Link>
+
+          <Link
+            href="/chat"
+            className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
+              pathname === '/chat' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare size={20} />
+            <span>Chat</span>
           </Link>
 
           <Link
