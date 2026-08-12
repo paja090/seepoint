@@ -16,6 +16,7 @@ import {
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { OfferPipeline } from '@/components/offers/OfferPipeline';
+import { OffersPageClientActions } from '@/components/offers/OffersPageClientActions';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   Button,
@@ -105,7 +106,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
   return (
     <AppShell>
       <PageHeader
-        actions={<Button href="/offers/new"><Plus aria-hidden="true" size={17} /> Nový návrh kampaně</Button>}
+        actions={<OffersPageClientActions clients={clients} />}
         description="Přehled obchodního trychtýře od prvního návrhu po schválenou kampaň a převod na obsazenost."
         title="Sales dashboard"
       />
