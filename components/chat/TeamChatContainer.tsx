@@ -29,6 +29,7 @@ import {
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 import { CompanyShoppingListModal } from './CompanyShoppingListModal';
+import { CarrierPhotoUploadModal } from '../carriers/CarrierPhotoUploadModal';
 
 interface VehicleOption {
   id: string;
@@ -100,6 +101,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   const [showFuelModal, setShowFuelModal] = useState(false);
   const [showFaultModal, setShowFaultModal] = useState(false);
   const [showShoppingModal, setShowShoppingModal] = useState(false);
+  const [showCarrierPhotoModal, setShowCarrierPhotoModal] = useState(false);
   const [assigningMsgId, setAssigningMsgId] = useState<string | null>(null);
 
   // Fuel modal form state
@@ -519,11 +521,20 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
 
           <button
             type="button"
+            onClick={() => setShowCarrierPhotoModal(true)}
+            className="flex items-center gap-1.5 shrink-0 rounded-xl bg-teal-950/80 border border-teal-800/80 px-3 py-1.5 text-xs font-bold text-teal-300 active:scale-95 transition"
+          >
+            <Camera size={14} />
+            <span>📷 Vyfotit plochu</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowFaultModal(true)}
             className="flex items-center gap-1.5 shrink-0 rounded-xl bg-rose-950/80 border border-rose-800/80 px-3 py-1.5 text-xs font-bold text-rose-300 active:scale-95 transition"
           >
             <AlertTriangle size={14} />
-            <span>⚠️ Závada</span>
+            <span>⚠️ Závada auta</span>
           </button>
         </div>
 
@@ -587,6 +598,14 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
 
           {/* Quick Action Buttons */}
           <div className="mt-5 space-y-2">
+            <button
+              onClick={() => setShowCarrierPhotoModal(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-teal-950/60 border border-teal-800/60 px-4 py-2.5 text-xs font-bold text-teal-300 hover:bg-teal-600 hover:text-white active:scale-95 transition"
+            >
+              <Camera size={16} />
+              <span>📷 Vyfotit & Dokumentovat Plochu</span>
+            </button>
+
             <button
               onClick={() => setShowShoppingModal(true)}
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md hover:brightness-110 active:scale-95 transition"
@@ -1058,6 +1077,13 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         isOpen={showShoppingModal}
         onClose={() => setShowShoppingModal(false)}
         currentUserName={currentUser.name}
+      />
+
+      {/* Carrier Photo Upload Modal */}
+      <CarrierPhotoUploadModal
+        isOpen={showCarrierPhotoModal}
+        onClose={() => setShowCarrierPhotoModal(false)}
+        onSuccess={() => fetchMessages()}
       />
     </div>
   );
