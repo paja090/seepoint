@@ -8,6 +8,7 @@ import { roleLabel } from '@/lib/rbac';
 import { NotificationBellCenter } from '@/components/notifications/NotificationBellCenter';
 import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 import { QuickSearchInput } from '@/components/QuickSearchInput';
+import { WeatherClockWidget } from '@/components/WeatherClockWidget';
 
 const pageTitles: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
@@ -36,27 +37,41 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
 
   return (
     <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-6 backdrop-blur">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktuální stránka</p>
-        <h2 className="truncate text-lg font-semibold text-slate-950">{title}</h2>
+      <div className="min-w-0 flex items-center gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktuální stránka</p>
+          <h2 className="truncate text-lg font-semibold text-slate-950">{title}</h2>
+        </div>
       </div>
+
       <QuickSearchInput />
+
       <div className="flex items-center gap-3">
+        {/* 🌤️ Live Weather & Clock Widget */}
+        <WeatherClockWidget />
+
         <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} />
+
         <div className="hidden text-right sm:block">
           <p className="text-sm font-semibold text-slate-900">{user.name}</p>
           <p className="text-xs text-slate-500">{roleLabel(user.role)}</p>
         </div>
+
         <NotificationBellCenter />
+
         <Link href="/chat" className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition" title="💬 Týmový Chat & Účtenky za palivo">
           <MessageSquare size={16} />
           <span className="hidden md:inline">Chat & Účtenky</span>
         </Link>
+
         <Link href="/team" className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition" title="📞 Telefonní seznam týmu SeePOINT">
           <PhoneCall size={17} />
         </Link>
+
         <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-950 text-sm font-semibold text-white" title={user.email}>{initials}</div>
+
         <Link className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" href="/profile" title="Můj profil"><UserRound size={18} /></Link>
+
         <button className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" onClick={logout} title="Odhlásit">
           <LogOut size={18} />
         </button>
