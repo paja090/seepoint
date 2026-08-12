@@ -687,17 +687,17 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         </div>
 
         {/* Input Bar with File Picker for Mobile Photos */}
-        <form onSubmit={handleSendMessage} className="border-t border-slate-200 bg-white p-4 space-y-3">
+        <form onSubmit={handleSendMessage} className="sticky bottom-0 z-30 border-t border-slate-200 bg-white p-3 sm:p-4 space-y-2 shrink-0 shadow-lg">
           {imageUrl && (
-            <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2.5 border border-emerald-200 text-xs">
-              <div className="flex items-center gap-2">
-                <FileImage size={16} className="text-emerald-700" />
-                <span className="font-bold text-emerald-900">📷 Fotka z fotoaparátu / galerii připojena</span>
+            <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2 border border-emerald-200 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileImage size={16} className="text-emerald-700 shrink-0" />
+                <span className="font-bold text-emerald-900 truncate">📷 Fotka z fotoaparátu / galerii připojena</span>
               </div>
               <button
                 type="button"
                 onClick={() => setImageUrl('')}
-                className="text-slate-500 hover:text-red-600 font-bold"
+                className="text-slate-500 hover:text-red-600 font-bold shrink-0 ml-2"
               >
                 <X size={16} />
               </button>
@@ -718,7 +718,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition shadow-xs shrink-0"
-              title="Vyfotit fototoaparátem nebo vybrat fotku"
+              title="Vyfotit fotoaparátem nebo vybrat fotku"
             >
               <Camera size={20} />
             </button>
@@ -728,16 +728,16 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={`Napište zprávu do skupiny ${channels.find((c) => c.id === activeChannel)?.label}...`}
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+              className="flex-1 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
             />
 
             <button
               type="submit"
               disabled={sending || (!inputText.trim() && !imageUrl)}
-              className="flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-xs font-bold text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50 shrink-0"
+              className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 text-xs font-black text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50 shrink-0"
             >
               <Send size={16} />
-              <span className="hidden sm:inline">Odeslat</span>
+              <span>Odeslat</span>
             </button>
           </div>
         </form>
@@ -954,11 +954,11 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         </div>
       )}
 
-      {/* 🛒 FLOATING ACTION BUTTON IN BOTTOM RIGHT CORNER (Plovoucí tlačítko vpravo dole) */}
+      {/* 🛒 FLOATING ACTION BUTTON FOR SHOPPING LIST (Plovoucí tlačítko vpravo dole) */}
       <button
         type="button"
         onClick={() => setShowShoppingModal(true)}
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-400 px-4 py-3 text-xs font-black text-slate-950 shadow-2xl shadow-orange-500/50 ring-4 ring-slate-950 hover:scale-105 active:scale-95 transition"
+        className="fixed bottom-24 right-4 lg:bottom-6 lg:right-6 z-40 flex items-center gap-2 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-400 px-4 py-3 text-xs font-black text-slate-950 shadow-2xl shadow-orange-500/50 ring-4 ring-slate-950 hover:scale-105 active:scale-95 transition"
         title="🛒 Firemní nákupy (Kancelář & Dílna)"
       >
         <ShoppingBag size={20} className="shrink-0" />
