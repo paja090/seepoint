@@ -77,8 +77,17 @@ export default async function AnalyticsPage() {
   let occupiedSurfacesCount = 0;
 
   surfaces.forEach((surface) => {
-    const isOccupied = surface.occupancies.length > 0;
-    const occPrice = surface.occupancies[0]?.price ? Number(surface.occupancies[0].price) : (surface.price ? Number(surface.price) : 0);
+    const isNavigation = surface.carrier.type === 'NAVIGATION' || surface.mediaType === 'NAVIGATION_SIGN';
+    const hasActiveOccupancy = surface.occupancies.length > 0;
+    
+    // For NAVIGATION: directional graphics stay fixed for contract duration (1-5 years) with continuous monthly rent
+    const isOccupied = isNavigation
+      ? (hasActiveOccupancy || Boolean(surface.price && Number(surface.price) > 0))
+      : hasActiveOccupancy;
+
+    const occPrice = isNavigation
+      ? (surface.occupancies[0]?.price ? Number(surface.occupancies[0].price) : (surface.price ? Number(surface.price) : 1000))
+      : (surface.occupancies[0]?.price ? Number(surface.occupancies[0].price) : (surface.price ? Number(surface.price) : 0));
 
     if (isOccupied) {
       occupiedSurfacesCount++;
