@@ -107,7 +107,9 @@ export function ResponsiveAppShell({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <WeatherClockWidget compact />
+          <div className="hidden sm:block">
+            <WeatherClockWidget compact />
+          </div>
           <NotificationBellCenter />
           <Link
             href="/team"
@@ -185,7 +187,10 @@ export function ResponsiveAppShell({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-800/80">
+          <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-2">
+            <div className="lg:hidden flex justify-center">
+              <WeatherClockWidget compact />
+            </div>
             <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} />
           </div>
         </div>
