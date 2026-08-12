@@ -7,6 +7,7 @@ import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 import { NotificationBellCenter } from '@/components/notifications/NotificationBellCenter';
 import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
+import { QuickSearchInput } from '@/components/QuickSearchInput';
 
 const pageTitles: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
@@ -39,10 +40,7 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktuální stránka</p>
         <h2 className="truncate text-lg font-semibold text-slate-950">{title}</h2>
       </div>
-      <div className="hidden min-w-72 max-w-xl flex-1 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 md:flex">
-        <Search size={16} className="mr-2 text-slate-400" />
-        Rychlé hledání bude napojené v další iteraci
-      </div>
+      <QuickSearchInput />
       <div className="flex items-center gap-3">
         <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} />
         <div className="hidden text-right sm:block">
