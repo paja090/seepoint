@@ -7,6 +7,7 @@ import type { Carrier, CarrierStatus, Client } from '@/lib/types';
 import { carrierMapColor } from '@/lib/mock-data';
 import { CarrierDetail } from './CarrierDetail';
 import { CarrierForm } from './CarrierForm';
+import { CarrierMapCard } from './CarrierMapCard';
 
 type LeafletModule = typeof import('leaflet');
 type StatusFilter = 'ALL' | CarrierStatus;
@@ -232,22 +233,25 @@ export function MapView({
             <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Nový nosič</h2><button className="text-sm text-slate-500 hover:text-slate-900" onClick={() => setDraft(undefined)}>Zrušit</button></div>
             <CarrierForm carrier={draft} onSaved={(carrier) => { setItems((current) => [...current, carrier]); setDraft(undefined); setSelectedId(carrier.id); }} />
           </> : selected ? <>
-            {editingSelectedLocation ? <section className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-labelledby="location-editor-heading">
-              <h2 id="location-editor-heading" className="font-bold text-sky-950">{hasCoordinates(selected) ? 'Upravit polohu nosiče' : 'Doplnit polohu nosiče'}</h2>
-              <p className="mt-1 text-sm text-sky-900">Klikněte do mapy na správné místo a potom polohu uložte.</p>
-              {pendingLocation && <p className="mt-3 rounded-lg bg-white px-3 py-2 font-mono text-xs text-slate-700">{pendingLocation.latitude.toFixed(6)}, {pendingLocation.longitude.toFixed(6)}</p>}
-              {locationError && <p className="mt-3 text-sm text-red-700" role="alert">{locationError}</p>}
-              <div className="mt-4 flex gap-2">
-                <button type="button" className="rounded-xl bg-sky-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!pendingLocation || locationSaving} onClick={() => void saveLocation()}>{locationSaving ? 'Ukládám…' : 'Uložit polohu'}</button>
-                <button type="button" className="rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950" disabled={locationSaving} onClick={cancelLocationEdit}>Zrušit</button>
-              </div>
-            </section> : <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-slate-100 pb-4">
-              <button type="button" className="text-sm font-medium text-emerald-700 hover:text-emerald-900 disabled:cursor-not-allowed disabled:text-slate-400" disabled={!hasCoordinates(selected)} onClick={focusSelected}>{hasCoordinates(selected) ? 'Zobrazit na mapě' : 'GPS chybí'}</button>
-              <button type="button" className="text-sm font-medium text-sky-700 hover:text-sky-900" onClick={startLocationEdit}>{hasCoordinates(selected) ? 'Upravit polohu' : 'Doplnit polohu'}</button>
-              <Link className="ml-auto text-sm font-medium text-slate-700 hover:text-slate-950" href={`/carriers/${selected.id}`}>Otevřít celý detail →</Link>
-            </div>}
-            <CarrierDetail carrier={selected} canEdit={canEdit} />
-          </> : <p className="text-sm text-slate-500">Vyberte nosič na mapě.</p>}
+            {editingSelectedLocation ? (
+              <section className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-labelledby="location-editor-heading">
+                <h2 id="location-editor-heading" className="font-bold text-sky-950">{hasCoordinates(selected) ? 'Upravit polohu nosiče' : 'Doplnit polohu nosiče'}</h2>
+                <p className="mt-1 text-sm text-sky-900">Klikněte do mapy na správné místo a potom polohu uložte.</p>
+                {pendingLocation && <p className="mt-3 rounded-lg bg-white px-3 py-2 font-mono text-xs text-slate-700">{pendingLocation.latitude.toFixed(6)}, {pendingLocation.longitude.toFixed(6)}</p>}
+                {locationError && <p className="mt-3 text-sm text-red-700" role="alert">{locationError}</p>}
+                <div className="mt-4 flex gap-2">
+                  <button type="button" className="rounded-xl bg-sky-950 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!pendingLocation || locationSaving} onClick={() => void saveLocation()}>{locationSaving ? 'Ukládám…' : 'Uložit polohu'}</button>
+                  <button type="button" className="rounded-xl border border-sky-300 bg-white px-4 py-2 text-sm font-medium text-sky-950" disabled={locationSaving} onClick={cancelLocationEdit}>Zrušit</button>
+                </div>
+              </section>
+            ) : null}
+
+            <CarrierMapCard
+              carrier={selected}
+              onStartLocationEdit={startLocationEdit}
+              onFocusMap={focusSelected}
+            />
+          </> : <p className="text-sm text-slate-500 font-semibold p-4">Vyberte nosič na mapě.</p>}
         </aside>
       </div>
     </div>
