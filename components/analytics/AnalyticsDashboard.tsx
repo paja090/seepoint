@@ -13,13 +13,13 @@ function getCarrierBadgeMeta(type: string) {
       return {
         label: '🪑 Reklamní Lavička',
         badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
-        imageUrl: 'https://images.unsplash.com/photo-1541535881962-3bb380b08458?auto=format&fit=crop&w=600&q=80',
+        imageUrl: '/images/media-types/promo-bench.jpg',
       };
     case 'CITY_POSTER':
       return {
         label: '🖼️ City Poster (CLP)',
         badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
-        imageUrl: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=600&q=80',
+        imageUrl: '/images/media-types/city-poster.jpg',
       };
     case 'CITYLIGHT':
       return {
@@ -31,7 +31,7 @@ function getCarrierBadgeMeta(type: string) {
       return {
         label: '🗼 Promo Tower',
         badgeClass: 'bg-teal-100 text-teal-900 border-teal-300',
-        imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
+        imageUrl: '/images/media-types/promo-tower.jpg',
       };
     case 'PROMO_HORIZON':
       return {
