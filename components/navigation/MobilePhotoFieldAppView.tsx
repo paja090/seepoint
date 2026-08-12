@@ -8,14 +8,16 @@ import {
   Upload,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
   Search,
   HardDrive,
   Cloud,
   ChevronRight,
-  ShieldCheck,
-  UserCheck,
   Compass,
+  TreeDeciduous,
+  RotateCw,
+  Sun,
+  Lightbulb,
+  X,
 } from 'lucide-react';
 
 type NearbyCarrier = {
@@ -58,6 +60,11 @@ export function MobilePhotoFieldAppView() {
   const [radiusKm, setRadiusKm] = useState(2.0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCarrier, setSelectedCarrier] = useState<NearbyCarrier | null>(null);
+
+  // Photo Metadata State
+  const [side, setSide] = useState<'SIDE_A' | 'SIDE_B' | 'BOTH'>('SIDE_A');
+  const [purpose, setPurpose] = useState<'CLIENT_REPORT' | 'DAMAGE' | 'INSPECTION' | 'MOTIF_CHANGE'>('CLIENT_REPORT');
+  const [damageType, setDamageType] = useState<string>('OVERGROWN');
 
   // Camera & Photo State
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -148,6 +155,11 @@ export function MobilePhotoFieldAppView() {
       const fd = new FormData();
       fd.append('file', photoFile);
       fd.append('carrierId', selectedCarrier.id);
+      fd.append('side', side);
+      fd.append('purpose', purpose);
+      if (purpose === 'DAMAGE') {
+        fd.append('damageType', damageType);
+      }
       if (coords) {
         fd.append('latitude', String(coords.lat));
         fd.append('longitude', String(coords.lng));
@@ -163,9 +175,7 @@ export function MobilePhotoFieldAppView() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Nahrání fotografie selhalo');
 
-      setUploadSuccessMsg(
-        `Fotografie byla úspěšně uložena (${data.photo.storageProvider === 'GOOGLE_DRIVE' ? 'Google Drive Cloud' : 'Lokální úložiště'}) a odeslána k AI rozpoznání.`
-      );
+      setUploadSuccessMsg(data.message || 'Fotografie byla úspěšně uložena!');
       setPhotoFile(null);
       setPreviewUrl(null);
       setPhotoNote('');
@@ -186,7 +196,7 @@ export function MobilePhotoFieldAppView() {
   });
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 pb-12">
+    <div className="mx-auto max-w-lg space-y-4 pb-16">
       {/* Mobile Top Bar */}
       <div className="rounded-3xl bg-slate-900 p-5 text-white shadow-xl border border-slate-800">
         <div className="flex items-center justify-between">
@@ -236,7 +246,7 @@ export function MobilePhotoFieldAppView() {
           <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
           <input
             type="text"
-            placeholder="Hledat kód nebo miasto..."
+            placeholder="Hledat kód nebo město..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 shadow-sm focus:border-slate-400 focus:outline-none"
@@ -314,7 +324,7 @@ export function MobilePhotoFieldAppView() {
               <div className={`mt-3 flex items-center justify-between border-t pt-2.5 text-[11px] font-medium ${isSelected ? 'border-emerald-800/60 text-emerald-200' : 'border-slate-100 text-slate-500'}`}>
                 <span>{c.surfaces.length} reklamních ploch</span>
                 <span className="flex items-center gap-1 font-bold">
-                  <Camera size={13} /> {c.photos.length} fotek zaevidováno
+                  <Camera size={13} /> {c.photos.length} fotek v DB
                 </span>
               </div>
             </div>
@@ -324,10 +334,10 @@ export function MobilePhotoFieldAppView() {
 
       {/* Selected Carrier Shutter & Upload Drawer */}
       {selectedCarrier && (
-        <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-slate-800 bg-slate-950 p-5 text-white shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-slate-800 bg-slate-950 p-5 text-white shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom duration-300 max-h-[85dvh] overflow-y-auto overscroll-contain touch-pan-y">
           <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-800" />
           
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Vybraný nosič pro fotodokumentaci</span>
               <h2 className="text-base font-black text-white">{selectedCarrier.code} — {selectedCarrier.name}</h2>
@@ -346,15 +356,151 @@ export function MobilePhotoFieldAppView() {
 
           {/* Messages */}
           {uploadSuccessMsg && (
-            <div className="mb-3 flex items-center gap-2 rounded-2xl bg-emerald-950/90 p-3 text-xs font-bold text-emerald-300 border border-emerald-700/60">
-              <CheckCircle2 size={16} className="shrink-0" />
+            <div className="mb-4 flex items-center gap-2 rounded-2xl bg-emerald-950/90 p-3 text-xs font-bold text-emerald-300 border border-emerald-700/60">
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
               <span>{uploadSuccessMsg}</span>
             </div>
           )}
           {uploadErrorMsg && (
-            <div className="mb-3 flex items-center gap-2 rounded-2xl bg-rose-950/90 p-3 text-xs font-bold text-rose-300 border border-rose-700/60">
-              <AlertTriangle size={16} className="shrink-0" />
+            <div className="mb-4 flex items-center gap-2 rounded-2xl bg-rose-950/90 p-3 text-xs font-bold text-rose-300 border border-rose-700/60">
+              <AlertTriangle size={16} className="shrink-0 text-rose-400" />
               <span>{uploadErrorMsg}</span>
+            </div>
+          )}
+
+          {/* 1. Side Selection */}
+          <div className="mb-4">
+            <label className="text-[11px] font-black uppercase text-amber-400 tracking-wider block mb-1.5">
+              1. Která strana plochy byla vyfocena?
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setSide('SIDE_A')}
+                className={`rounded-xl border p-2 text-center transition ${
+                  side === 'SIDE_A'
+                    ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-black">🅰️ Strana A</span>
+                <span className="text-[9px] text-slate-400">Přední</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSide('SIDE_B')}
+                className={`rounded-xl border p-2 text-center transition ${
+                  side === 'SIDE_B'
+                    ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-black">🅱️ Strana B</span>
+                <span className="text-[9px] text-slate-400">Zadní</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSide('BOTH')}
+                className={`rounded-xl border p-2 text-center transition ${
+                  side === 'BOTH'
+                    ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-black">🔀 Obě strany</span>
+                <span className="text-[9px] text-slate-400">Celá plocha</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 2. Photo Purpose Selection */}
+          <div className="mb-4">
+            <label className="text-[11px] font-black uppercase text-amber-400 tracking-wider block mb-1.5">
+              2. Účel fotografie
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPurpose('CLIENT_REPORT')}
+                className={`rounded-xl border p-2 text-left transition ${
+                  purpose === 'CLIENT_REPORT'
+                    ? 'border-blue-500 bg-blue-950/60 text-blue-300 font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-bold text-white">📸 Doložení klienta</span>
+                <span className="text-[9px] text-slate-400">Fotoreport výlepu</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPurpose('DAMAGE')}
+                className={`rounded-xl border p-2 text-left transition ${
+                  purpose === 'DAMAGE'
+                    ? 'border-rose-500 bg-rose-950/80 text-rose-300 font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-bold text-rose-300">🚨 Závada / Poškození</span>
+                <span className="text-[9px] text-rose-400/80">Odešle alert do Chatu</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 3. Specific Damage Types (if purpose === 'DAMAGE') */}
+          {purpose === 'DAMAGE' && (
+            <div className="mb-4 rounded-2xl border border-rose-500/40 bg-rose-950/30 p-3 space-y-2">
+              <label className="text-[11px] font-black uppercase text-rose-300 tracking-wider block">
+                ⚠️ Jaká závada nastala?
+              </label>
+
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDamageType('OVERGROWN')}
+                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
+                    damageType === 'OVERGROWN' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  <TreeDeciduous size={14} className="text-emerald-400 shrink-0" />
+                  <span>🌳 Zarostlá (prořez)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDamageType('TURNED')}
+                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
+                    damageType === 'TURNED' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  <RotateCw size={14} className="text-amber-400 shrink-0" />
+                  <span>🔄 Vytočená / hnutá</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDamageType('FADED')}
+                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
+                    damageType === 'FADED' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  <Sun size={14} className="text-amber-300 shrink-0" />
+                  <span>☀️ Vybledlý tisk</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDamageType('DAMAGED_STRUCTURE')}
+                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
+                    damageType === 'DAMAGED_STRUCTURE' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  <AlertTriangle size={14} className="text-rose-400 shrink-0" />
+                  <span>🚨 Rozbitá konstrukce</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -371,14 +517,14 @@ export function MobilePhotoFieldAppView() {
           {!previewUrl ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 py-4 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-base"
+              className="w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3.5 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-sm mb-3"
             >
-              <Camera size={22} /> POŘÍDIT FOTOGRAFII FOTOAPARÁTEM
+              <Camera size={20} /> POŘÍDIT FOTOGRAFII FOTOAPARÁTEM
             </button>
           ) : (
-            <div className="space-y-3">
-              <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 max-h-48">
-                <img src={previewUrl} alt="Preview" className="w-full object-cover max-h-48" />
+            <div className="space-y-3 mb-3">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 max-h-44">
+                <img src={previewUrl} alt="Preview" className="w-full object-cover max-h-44" />
                 <div className="absolute top-2 right-2 flex gap-1">
                   <span className="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] font-bold text-emerald-400 backdrop-blur border border-slate-700 flex items-center gap-1">
                     <Compass size={11} /> GPS Razítko zapsáno
@@ -388,7 +534,7 @@ export function MobilePhotoFieldAppView() {
 
               <input
                 type="text"
-                placeholder="Poznámka k fotografii (např. Po instalaci grafiky)"
+                placeholder="Poznámka k fotografii (volitelné)"
                 value={photoNote}
                 onChange={(e) => setPhotoNote(e.target.value)}
                 className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
@@ -404,14 +550,20 @@ export function MobilePhotoFieldAppView() {
                 <button
                   onClick={handleUploadPhoto}
                   disabled={uploading}
-                  className="flex-2 flex items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-xs font-black text-slate-950 hover:bg-emerald-400 active:scale-98 transition disabled:opacity-50"
+                  className={`flex-2 flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-black text-slate-950 transition disabled:opacity-50 ${
+                    purpose === 'DAMAGE' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
+                  }`}
                 >
                   {uploading ? (
                     <RefreshCw size={16} className="animate-spin" />
                   ) : (
                     <Upload size={16} />
                   )}
-                  {uploading ? 'Ukládám fotku & AI...' : 'Uložit fotku s GPS & AI'}
+                  {uploading
+                    ? 'Ukládám…'
+                    : purpose === 'DAMAGE'
+                    ? '🚨 Nahlásit Závadu do Chatu'
+                    : 'Uložit fotku s GPS'}
                 </button>
               </div>
             </div>
@@ -419,8 +571,8 @@ export function MobilePhotoFieldAppView() {
 
           {/* Recent Photos for this Carrier */}
           {selectedCarrier.photos.length > 0 && (
-            <div className="mt-4 border-t border-slate-800/80 pt-3">
-              <span className="text-[11px] font-bold text-slate-400 block mb-2">Poslední fotografie nosiče:</span>
+            <div className="mt-3 border-t border-slate-800/80 pt-3">
+              <span className="text-[11px] font-bold text-slate-400 block mb-2">Všechny fotografie nosiče i ploch ({selectedCarrier.photos.length}):</span>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {selectedCarrier.photos.map((p) => (
                   <div key={p.id} className="shrink-0 relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 group">
