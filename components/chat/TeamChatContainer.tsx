@@ -88,6 +88,8 @@ const channels = [
 export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: TeamChatContainerProps) {
   const [activeChannel, setActiveChannel] = useState('general');
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [inputText, setInputText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -194,23 +196,93 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   }
 
   // Fetch messages for active channel
-  async function fetchMessages(isPolling = false) {
+  async function fetchMessages(isPolling = false, isInitial = false) {
     try {
       const res = await fetch(`/api/chat/messages?channel=${activeChannel}`);
       if (!res.ok) return;
       const data: ChatMessageData[] = await res.json();
 
-      if (isPolling && data.length > previousMessageCount.current) {
-        const newest = data[data.length - 1];
-        if (newest.userId !== currentUser.id) {
-          playNewMessageChime();
-        }
+      if (data.length < 50) {
+        setHasMoreOlder(false);
       }
 
-      previousMessageCount.current = data.length;
-      setMessages(data);
+      if (isPolling) {
+        if (data.length > 0) {
+          const newest = data[data.length - 1];
+          setMessages((prev) => {
+            if (prev.length === 0) return data;
+            const lastKnown = prev[prev.length - 1];
+            if (newest && lastKnown && newest.id !== lastKnown.id) {
+              if (newest.userId !== currentUser.id) {
+                playNewMessageChime();
+              }
+              const existingIds = new Set(prev.map((m) => m.id));
+              const newItems = data.filter((m) => !existingIds.has(m.id));
+              if (newItems.length === 0) return prev;
+              return [...prev, ...newItems];
+            }
+            return prev;
+          });
+
+          const container = messagesContainerRef.current;
+          if (container) {
+            const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+            if (isNearBottom) {
+              requestAnimationFrame(() => {
+                container.scrollTop = container.scrollHeight;
+              });
+            }
+          }
+        }
+      } else {
+        setMessages(data);
+        if (isInitial) {
+          requestAnimationFrame(() => {
+            if (messagesContainerRef.current) {
+              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            }
+          });
+        }
+      }
     } catch {
       // Ignore polling errors
+    }
+  }
+
+  // Load older messages on demand
+  async function loadOlderMessages() {
+    if (loadingOlder || !messages.length || !hasMoreOlder) return;
+    const firstMsgId = messages[0].id;
+    try {
+      setLoadingOlder(true);
+      const res = await fetch(`/api/chat/messages?channel=${activeChannel}&before=${firstMsgId}`);
+      if (!res.ok) return;
+      const olderData: ChatMessageData[] = await res.json();
+
+      if (!olderData.length || olderData.length < 50) {
+        setHasMoreOlder(false);
+      }
+
+      if (olderData.length > 0) {
+        const container = messagesContainerRef.current;
+        const oldScrollHeight = container ? container.scrollHeight : 0;
+
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const uniqueOlder = olderData.filter((m) => !existingIds.has(m.id));
+          return [...uniqueOlder, ...prev];
+        });
+
+        requestAnimationFrame(() => {
+          if (container) {
+            container.scrollTop = container.scrollHeight - oldScrollHeight;
+          }
+        });
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setLoadingOlder(false);
     }
   }
 
@@ -228,20 +300,16 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   }
 
   useEffect(() => {
-    fetchMessages();
+    setMessages([]);
+    setHasMoreOlder(true);
+    fetchMessages(false, true);
     fetchPresence();
     const interval = setInterval(() => {
-      fetchMessages(true);
+      fetchMessages(true, false);
       fetchPresence();
     }, 4000);
     return () => clearInterval(interval);
   }, [activeChannel]);
-
-  useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-  }, [messages.length]);
 
   async function handleSendMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -564,6 +632,19 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
 
         {/* Message Feed */}
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4" ref={messagesContainerRef}>
+          {hasMoreOlder && messages.length > 0 && (
+            <div className="flex justify-center py-1">
+              <button
+                type="button"
+                onClick={loadOlderMessages}
+                disabled={loadingOlder}
+                className="rounded-full bg-white border border-slate-300 px-4 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-100 hover:text-slate-900 active:scale-95 transition disabled:opacity-50"
+              >
+                {loadingOlder ? '⏳ Načítám starší zprávy…' : '📜 Načíst starší zprávy'}
+              </button>
+            </div>
+          )}
+
           {messages.length === 0 ? (
             <div className="py-16 text-center text-slate-400">
               <MessageSquare className="mx-auto h-10 w-10 text-slate-300 mb-2" />
