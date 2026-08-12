@@ -24,9 +24,11 @@ import {
   FileImage,
   UserCheck,
   CheckCircle,
+  ShoppingBag,
 } from 'lucide-react';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
+import { CompanyShoppingListModal } from './CompanyShoppingListModal';
 
 interface VehicleOption {
   id: string;
@@ -95,6 +97,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   // Modal states
   const [showFuelModal, setShowFuelModal] = useState(false);
   const [showFaultModal, setShowFaultModal] = useState(false);
+  const [showShoppingModal, setShowShoppingModal] = useState(false);
   const [assigningMsgId, setAssigningMsgId] = useState<string | null>(null);
 
   // Fuel modal form state
@@ -466,19 +469,27 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
           {/* Quick Action Buttons */}
           <div className="mt-5 space-y-2">
             <button
-              onClick={() => setShowFuelModal(true)}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-amber-400 active:scale-95 transition"
+              onClick={() => setShowShoppingModal(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-2.5 text-xs font-black text-slate-950 shadow-md hover:brightness-110 active:scale-95 transition"
             >
-              <Fuel size={16} />
-              <span>⛽ Nahrat Účtenku za Palivo</span>
+              <ShoppingBag size={16} />
+              <span>🛒 Firemní Nákupy (Kancelář / Dílna)</span>
+            </button>
+
+            <button
+              onClick={() => setShowFuelModal(true)}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-amber-500/20 border border-amber-500/40 px-4 py-2 text-xs font-bold text-amber-300 hover:bg-amber-500 hover:text-slate-950 active:scale-95 transition"
+            >
+              <Fuel size={15} />
+              <span>⛽ Účtenka za Palivo</span>
             </button>
 
             <button
               onClick={() => setShowFaultModal(true)}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white shadow-md hover:bg-rose-500 active:scale-95 transition"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-rose-950/60 border border-rose-800/60 px-4 py-2 text-xs font-bold text-rose-300 hover:bg-rose-600 hover:text-white active:scale-95 transition"
             >
-              <AlertTriangle size={16} />
-              <span>⚠️ Nahlásit Závadu na Autě</span>
+              <AlertTriangle size={15} />
+              <span>⚠️ Závada na Autě</span>
             </button>
           </div>
         </div>
@@ -929,6 +940,13 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
           </div>
         </div>
       )}
+
+      {/* Company Shopping List Modal */}
+      <CompanyShoppingListModal
+        isOpen={showShoppingModal}
+        onClose={() => setShowShoppingModal(false)}
+        currentUserName={currentUser.name}
+      />
     </div>
   );
 }
