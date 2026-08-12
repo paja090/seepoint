@@ -4,20 +4,65 @@ import { DollarSign, TrendingUp, Percent, PanelsTopLeft, Building2, Calendar, Aw
 function getCarrierBadgeMeta(type: string) {
   switch (type) {
     case 'NAVIGATION':
-      return { label: '🧭 Navigační tabule (VO / Troleje)', badgeClass: 'bg-sky-100 text-sky-900 border-sky-300' };
+      return {
+        label: '🧭 Navigační tabule (VO / Troleje)',
+        badgeClass: 'bg-sky-100 text-sky-900 border-sky-300',
+        imageUrl: 'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?auto=format&fit=crop&w=600&q=80',
+      };
     case 'PROMO_BENCH':
-      return { label: '🪑 Reklamní Lavička', badgeClass: 'bg-amber-100 text-amber-900 border-amber-300' };
+      return {
+        label: '🪑 Reklamní Lavička',
+        badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+        imageUrl: 'https://images.unsplash.com/photo-1541535881962-3bb380b08458?auto=format&fit=crop&w=600&q=80',
+      };
     case 'CITY_POSTER':
+      return {
+        label: '🖼️ City Poster (CLP)',
+        badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
+        imageUrl: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=600&q=80',
+      };
     case 'CITYLIGHT':
-      return { label: '🖼️ City Poster / City Light (CLP)', badgeClass: 'bg-purple-100 text-purple-900 border-purple-300' };
+      return {
+        label: '💡 Citylight (Prosvětlený CLP)',
+        badgeClass: 'bg-yellow-100 text-yellow-900 border-yellow-300',
+        imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80',
+      };
+    case 'PROMO_TOWER':
+      return {
+        label: '🗼 Promo Tower',
+        badgeClass: 'bg-teal-100 text-teal-900 border-teal-300',
+        imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
+      };
+    case 'PROMO_HORIZON':
+      return {
+        label: '🌅 Promo Horizon',
+        badgeClass: 'bg-orange-100 text-orange-900 border-orange-300',
+        imageUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80',
+      };
     case 'BILLBOARD':
-      return { label: '📐 Billboard (Euroformát 5.1x2.4 m)', badgeClass: 'bg-blue-100 text-blue-900 border-blue-300' };
+      return {
+        label: '📐 Billboard (Euroformát 5.1x2.4 m)',
+        badgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
+        imageUrl: 'https://images.unsplash.com/photo-1617854818583-09e7f077a156?auto=format&fit=crop&w=600&q=80',
+      };
     case 'BIGBOARD':
-      return { label: '🏢 Bigboard (9.6x3.6 m)', badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300' };
+      return {
+        label: '🏢 Bigboard (9.6x3.6 m)',
+        badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+        imageUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=600&q=80',
+      };
     case 'LED_SCREEN':
-      return { label: '📺 Digitální LED Obrazovka', badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300' };
+      return {
+        label: '📺 Digitální LED Obrazovka',
+        badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+        imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80',
+      };
     default:
-      return { label: `📍 ${type}`, badgeClass: 'bg-slate-100 text-slate-800 border-slate-300' };
+      return {
+        label: `📍 ${type}`,
+        badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
+        imageUrl: 'https://images.unsplash.com/photo-1541535881962-3bb380b08458?auto=format&fit=crop&w=600&q=80',
+      };
   }
 }
 
@@ -154,25 +199,38 @@ export function AnalyticsDashboard({
           {typeList.map((t) => {
             const badge = getCarrierBadgeMeta(t.type);
             return (
-              <div key={t.type} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 shadow-2xs hover:shadow-md transition">
-                <div className="flex items-center justify-between">
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black border ${badge.badgeClass}`}>
-                    {badge.label}
-                  </span>
-                  <span className="text-xs font-extrabold text-slate-900">{t.occupancyRate}% obsazeno</span>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 transition-all duration-500"
-                    style={{ width: `${t.occupancyRate}%` }}
+              <div key={t.type} className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-lg transition flex flex-col justify-between group">
+                {/* Photo Banner Header */}
+                <div className="relative h-32 w-full overflow-hidden bg-slate-950">
+                  <img
+                    src={badge.imageUrl}
+                    alt={badge.label}
+                    className="h-full w-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-300"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent" />
+                  <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black border shadow-xs ${badge.badgeClass}`}>
+                      {badge.label}
+                    </span>
+                    <span className="rounded-md bg-slate-950/80 backdrop-blur-xs px-2 py-0.5 text-[11px] font-black text-emerald-400 border border-emerald-500/30">
+                      {t.occupancyRate}% obsazeno
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60">
-                  <span className="text-slate-500 font-bold">{t.occupiedCount} z {t.surfaceCount} ploch</span>
-                  <span className="font-black text-slate-900">{Math.round(t.revenue).toLocaleString('cs-CZ')} Kč / měsíc</span>
+                <div className="p-4 space-y-3">
+                  {/* Progress Bar */}
+                  <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 transition-all duration-500"
+                      style={{ width: `${t.occupancyRate}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                    <span className="text-slate-500 font-bold">{t.occupiedCount} z {t.surfaceCount} ploch</span>
+                    <span className="font-black text-slate-950">{Math.round(t.revenue).toLocaleString('cs-CZ')} Kč / měsíc</span>
+                  </div>
                 </div>
               </div>
             );
