@@ -7,11 +7,11 @@ import { OfferStatusBadge } from './OfferStatusBadge';
 
 function MetaItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
-      <div className="mt-0.5 rounded-lg bg-slate-50 p-2 text-sky-600 ring-1 ring-slate-200">{icon}</div>
+    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+      <div className="mt-0.5 rounded-lg bg-sky-100 p-2 text-sky-800 ring-1 ring-sky-200">{icon}</div>
       <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
-        <p className="mt-0.5 text-sm font-semibold text-slate-800">{value}</p>
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700">{label}</p>
+        <p className="mt-0.5 text-sm font-black text-slate-950">{value}</p>
       </div>
     </div>
   );
