@@ -107,10 +107,7 @@ export function ResponsiveAppShell({
             </button>
 
             <Link href="/dashboard" className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 font-black text-slate-950 text-sm shadow-md">
-                SP
-              </span>
-              <span className="font-extrabold text-sm tracking-tight text-white">SeePOINT</span>
+              <img src="/seepoint-logo.svg" alt="SeePOINT Outdoor reklama" className="h-7 w-auto" />
             </Link>
           </div>
 
@@ -149,13 +146,7 @@ export function ResponsiveAppShell({
         >
           <div className="mb-4 flex items-center justify-between px-2">
             <Link href="/dashboard" className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 font-black text-slate-950 text-sm shadow-lg shadow-emerald-500/20">
-                SP
-              </div>
-              <div>
-                <span className="font-black text-base tracking-tight text-white block leading-tight">SeePOINT</span>
-                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">OOH Management</span>
-              </div>
+              <img src="/seepoint-logo.svg" alt="SeePOINT Outdoor reklama" className="h-10 w-auto" />
             </Link>
 
             <button
