@@ -10,6 +10,7 @@ import { OccupancyActions } from './OccupancyActions';
 import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 import { QrCodeGeneratorModal } from './qr/QrCodeGeneratorModal';
+import { useOfferBasket } from '@/context/OfferBasketContext';
 import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode } from 'lucide-react';
 
 function getCarrierBadgeMeta(type: Carrier['type']) {
@@ -48,6 +49,7 @@ export function CarrierDetail({
 }) {
   const isNavigation = carrier.type === 'NAVIGATION';
   const badgeMeta = getCarrierBadgeMeta(carrier.type);
+  const { toggleSurface, isSurfaceSelected } = useOfferBasket();
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const campaigns = carrier.surfaces.flatMap((surface) =>
@@ -285,7 +287,32 @@ export function CarrierDetail({
                     {mediaTypeLabel(surface.mediaType)} · Klient: <strong className="text-slate-800">{surface.currentClient?.name ?? 'bez klienta'}</strong>
                   </p>
                 </div>
-                <StatusBadge value={surface.status} />
+                <div className="flex items-center gap-2">
+                  <StatusBadge value={surface.status} />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      toggleSurface({
+                        id: surface.id,
+                        name: surface.name,
+                        carrierId: carrier.id,
+                        carrierCode: carrier.code,
+                        carrierName: carrier.name,
+                        city: carrier.city,
+                        price: surface.price,
+                        mediaType: surface.mediaType,
+                        photoUrl: surface.photos?.[0]?.url,
+                      })
+                    }
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
+                      isSurfaceSelected(surface.id)
+                        ? 'bg-sky-500 text-slate-950 hover:bg-sky-400'
+                        : 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
+                    }`}
+                  >
+                    {isSurfaceSelected(surface.id) ? '✓ V nabídce' : '📋 + Nabídka'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

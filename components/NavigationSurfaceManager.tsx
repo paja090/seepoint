@@ -1,8 +1,7 @@
-'use client';
-
 import { useState } from 'react';
 import type { Client, Surface } from '@/lib/types';
 import { StatusBadge } from './StatusBadge';
+import { useOfferBasket } from '@/context/OfferBasketContext';
 
 type ClientOption = Pick<Client, 'id' | 'name'>;
 
@@ -95,8 +94,8 @@ export function NavigationSurfaceManager({
   const [updateGpsOnMerge, setUpdateGpsOnMerge] = useState(true);
   const [searchFilter, setSearchFilter] = useState('');
 
-  // Surface Move / Detach state
   const [moveModalSurfaceId, setMoveModalSurfaceId] = useState<string | null>(null);
+  const { toggleSurface, isSurfaceSelected } = useOfferBasket();
 
   function openOccupyModal(surface: Surface) {
     setActiveModalSurfaceId(surface.id);
@@ -744,6 +743,29 @@ export function NavigationSurfaceManager({
                         type="button"
                       >
                         {isOutOfService ? 'Obnovit provoz' : 'Mimo provoz'}
+                      </button>
+                      <button
+                        className={`rounded-xl px-3 py-2 font-bold transition shadow-2xs ${
+                          isSurfaceSelected(surface.id)
+                            ? 'bg-sky-500 text-slate-950 hover:bg-sky-400'
+                            : 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
+                        }`}
+                        onClick={() =>
+                          toggleSurface({
+                            id: surface.id,
+                            name: surface.name,
+                            carrierId: surface.carrierId,
+                            carrierCode: 'NOSIC',
+                            carrierName: surface.name,
+                            city: 'Ostrava',
+                            price: surface.price,
+                            mediaType: surface.mediaType,
+                            photoUrl: surface.photos?.[0]?.url,
+                          })
+                        }
+                        type="button"
+                      >
+                        {isSurfaceSelected(surface.id) ? '✓ V nabídce' : '📋 + Do nabídky'}
                       </button>
                     </div>
 
