@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     try {
       const driveRes = await uploadPhotoToGoogleDrive(file, fileName, photoId);
       driveFileId = driveRes.id;
-      photoUrl = `/api/photos/drive/${driveFileId}`;
+      photoUrl = `/api/photos/${photoId}/file`;
       storageProvider = 'GOOGLE_DRIVE';
     } catch (driveErr) {
       console.warn('Google Drive storage fallback to local:', driveErr);

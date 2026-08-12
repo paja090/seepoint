@@ -641,7 +641,38 @@ export function NavigationSurfaceManager({
                   </div>
                 )}
 
-                {/* AI Extracted Result Banner */}
+                {/* 📸 Photos attached to this individual surface */}
+                {surface.photos && surface.photos.length > 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                      <span>📸 Fotografie pozice ({surface.photos.length})</span>
+                      <a href="#photo-gallery" className="text-[11px] text-sky-600 hover:underline">
+                        Otevřít celou galerii
+                      </a>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {surface.photos.map((p) => (
+                        <a
+                          key={p.id}
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-300 bg-slate-900 group shadow-2xs"
+                        >
+                          <img
+                            src={p.url}
+                            alt={p.note || surface.name}
+                            className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-2.5 text-center text-xs text-slate-500">
+                    <span>📷 K této pozici zatím není vybraná konkrétní fotka (fotky nosiče najdete v hlavní galerii níže).</span>
+                  </div>
+                )}
                 {isAiActive && aiResult && (
                   <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-3 text-xs space-y-2 shadow-sm">
                     <div className="flex items-center justify-between">
