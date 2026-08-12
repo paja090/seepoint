@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 const occupancyStatuses = ['AVAILABLE', 'NEGOTIATION', 'RESERVED', 'OCCUPIED', 'FINISHED', 'CANCELLED', 'OUT_OF_SERVICE'] as const;
 const mediaTypes = ['NAVIGATION_SIGN', 'BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BANNER', 'FACADE', 'LED_SCREEN', 'PROMO_BENCH', 'PROMO_HORIZON', 'CITY_POSTER', 'PROMO_TOWER', 'PROMO_MINITOWER', 'OTHER'] as const;
 
-export const CzechOccupancyStatusLabels: Record<string, string> = {
+const CzechOccupancyStatusLabels: Record<string, string> = {
   AVAILABLE: '🟢 Volné k pronájmu (Available)',
   RESERVED: '🟧 Rezervováno (Předběžně)',
   NEGOTIATION: '🟦 V jednání (Nabídka odeslána)',

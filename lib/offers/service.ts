@@ -96,6 +96,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     taxAmount: value(row.taxAmount),
     totalWithTax: value(row.totalWithTax ?? row.totalPrice),
     hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash),
+    publicToken: publicView ? undefined : (row as Record<string, unknown>).publicTokenHash as string | undefined,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     acceptedAt: row.acceptedAt?.toISOString() ?? null,

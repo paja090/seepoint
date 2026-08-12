@@ -234,8 +234,22 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
                     <TableCell>{offer.validUntil ? new Date(`${offer.validUntil}T00:00:00Z`).toLocaleDateString('cs-CZ') : 'Neuvedena'}</TableCell>
                     <TableCell>{offer.offerType === 'NAVIGATION' ? offer.navigation?.points.length ?? 0 : offer.offerType === 'CITY_GALLERY' ? 1 : offer.items.length}<div className="mt-1 text-xs text-slate-500">{offer.offerType === 'NAVIGATION' ? offer.navigation?.targetName : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.projectTitle || 'Koncept' : [...new Set(offer.items.map((item) => item.groupLabel))].slice(0, 3).join(' · ')}</div></TableCell>
                     <TableCell><b>{money(offer.totalWithTax)}</b></TableCell>
-                    <TableCell><StatusBadge value={offer.status} /></TableCell>
-                    <TableCell><Link className="table-action" href={`/offers/${offer.id}`}>Detail</Link></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <Link className="table-action" href={`/offers/${offer.id}`}>
+                          Detail
+                        </Link>
+                        {offer.hasPublicLink && (
+                          <Link
+                            href={`/offers/${offer.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-800 hover:bg-sky-100 transition shadow-2xs"
+                            title="Zobrazit nabídku"
+                          >
+                            📄 PDF & Odkaz
+                          </Link>
+                        )}
+                      </div>
+                    </TableCell>
                   </tr>
                 ))}</tbody>
               </Table>
