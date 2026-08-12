@@ -238,7 +238,7 @@ export function AnalyticsDashboard({
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                    <span className="text-slate-500 font-bold">{t.occupiedCount} z {t.surfaceCount} ploch</span>
+                    <span className="text-slate-700 font-extrabold">{t.occupiedCount} z {t.surfaceCount} ploch</span>
                     <span className="font-black text-slate-950">{Math.round(t.revenue).toLocaleString('cs-CZ')} Kč / měsíc</span>
                   </div>
                 </div>

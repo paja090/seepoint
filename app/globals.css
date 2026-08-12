@@ -11,15 +11,24 @@ html {
 }
 
 body {
-  @apply bg-slate-100 text-slate-900 antialiased;
+  @apply bg-slate-100 text-slate-900 antialiased font-sans;
 }
 
 .input {
-  @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-4 focus:ring-slate-200/70;
+  @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-sky-500 focus:ring-4 focus:ring-sky-100;
 }
 
 .card {
-  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60;
+  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 text-slate-950;
+}
+
+/* High Contrast Helpers */
+.text-muted-light {
+  @apply text-slate-600 font-medium;
+}
+
+.text-muted-dark {
+  @apply text-slate-300 font-medium;
 }
 
 .table-action {
