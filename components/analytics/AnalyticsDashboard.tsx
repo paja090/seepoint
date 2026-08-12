@@ -8,60 +8,70 @@ function getCarrierBadgeMeta(type: string) {
         label: '🧭 Navigační tabule (VO / Troleje)',
         badgeClass: 'bg-sky-100 text-sky-900 border-sky-300',
         imageUrl: 'https://images.unsplash.com/photo-1572949645841-094f3a9c4c94?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
     case 'PROMO_BENCH':
       return {
         label: '🪑 Reklamní Lavička',
         badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
         imageUrl: '/images/media-types/promo-bench.jpg',
+        objectPosition: 'object-[center_60%]',
       };
     case 'CITY_POSTER':
       return {
         label: '🖼️ City Poster (CLP)',
         badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
         imageUrl: '/images/media-types/city-poster.jpg',
+        objectPosition: 'object-[center_40%]',
       };
     case 'CITYLIGHT':
       return {
         label: '💡 Citylight (Prosvětlený CLP)',
         badgeClass: 'bg-yellow-100 text-yellow-900 border-yellow-300',
         imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
     case 'PROMO_TOWER':
       return {
         label: '🗼 Promo Tower',
         badgeClass: 'bg-teal-100 text-teal-900 border-teal-300',
         imageUrl: '/images/media-types/promo-tower.jpg',
+        objectPosition: 'object-[center_45%]',
       };
     case 'PROMO_HORIZON':
       return {
         label: '🌅 Promo Horizon',
         badgeClass: 'bg-orange-100 text-orange-900 border-orange-300',
         imageUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
     case 'BILLBOARD':
       return {
         label: '📐 Billboard (Euroformát 5.1x2.4 m)',
         badgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
         imageUrl: 'https://images.unsplash.com/photo-1617854818583-09e7f077a156?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
     case 'BIGBOARD':
       return {
         label: '🏢 Bigboard (9.6x3.6 m)',
         badgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300',
         imageUrl: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
     case 'LED_SCREEN':
       return {
         label: '📺 Digitální LED Obrazovka',
         badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300',
         imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
     default:
       return {
         label: `📍 ${type}`,
         badgeClass: 'bg-slate-100 text-slate-800 border-slate-300',
         imageUrl: 'https://images.unsplash.com/photo-1541535881962-3bb380b08458?auto=format&fit=crop&w=600&q=80',
+        objectPosition: 'object-center',
       };
   }
 }
@@ -201,11 +211,11 @@ export function AnalyticsDashboard({
             return (
               <div key={t.type} className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-lg transition flex flex-col justify-between group">
                 {/* Photo Banner Header */}
-                <div className="relative h-32 w-full overflow-hidden bg-slate-950">
+                <div className="relative h-44 w-full overflow-hidden bg-slate-950">
                   <img
                     src={badge.imageUrl}
                     alt={badge.label}
-                    className="h-full w-full object-cover opacity-85 group-hover:scale-105 transition-transform duration-300"
+                    className={`h-full w-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-300 ${badge.objectPosition || 'object-center'}`}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent" />
                   <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between gap-2">
