@@ -17,7 +17,7 @@ export async function GET() {
   const now = new Date();
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [myAssignments, myAssignedChatMsgs, recentVehicleFaults] = await Promise.all([
+  const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults] = await Promise.all([
     // Tasks assigned to user
     prisma.workAssignment.findMany({
       where: {
@@ -48,6 +48,17 @@ export async function GET() {
         assignedToUserId: user.id,
         isResolved: { not: true },
       },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    }),
+    // New chat messages that the current user has not read yet.
+    prisma.chatMessage.findMany({
+      where: {
+        userId: { not: user.id },
+        createdAt: { gte: last24h },
+        reads: { none: { userId: user.id } },
+      },
+      select: { id: true, channel: true, userName: true, content: true, imageUrl: true, createdAt: true },
       take: 10,
       orderBy: { createdAt: 'desc' },
     }),
@@ -83,6 +94,15 @@ export async function GET() {
       linkUrl: '/chat',
       isUrgent: false,
       createdAt: c.createdAt.toISOString(),
+    })),
+    ...unreadChatMessages.map((message) => ({
+      id: `chat-message-${message.id}`,
+      type: 'CHAT_MESSAGE',
+      title: `💬 Nová zpráva od ${message.userName}`,
+      description: message.content.slice(0, 100) || (message.imageUrl ? 'Přidána nová fotografie.' : 'Nová zpráva v týmovém chatu.'),
+      linkUrl: `/chat?channel=${encodeURIComponent(message.channel)}`,
+      isUrgent: message.channel === 'urgent',
+      createdAt: message.createdAt.toISOString(),
     })),
     ...recentVehicleFaults.map((vf) => ({
       id: `fault-${vf.id}`,

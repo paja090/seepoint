@@ -5,8 +5,9 @@ import { TeamChatContainer } from '@/components/chat/TeamChatContainer';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ChatPage() {
+export default async function ChatPage({ searchParams }: { searchParams: Promise<{ channel?: string }> }) {
   const user = await requirePageAccess('team');
+  const { channel } = await searchParams;
 
   const [vehicles, employees] = await Promise.all([
     prisma.vehicle.findMany({
@@ -42,6 +43,7 @@ export default async function ChatPage() {
     <AppShell>
       <div className="mx-auto max-w-7xl h-[calc(100dvh-7.5rem)] lg:h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
         <TeamChatContainer
+          initialChannel={channel}
           currentUser={currentUserData}
           vehicles={vehicles.map((v) => ({
             id: v.id,

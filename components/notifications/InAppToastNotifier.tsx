@@ -18,6 +18,7 @@ export function InAppToastNotifier() {
   const [activeToast, setActiveToast] = useState<ToastItem | null>(null);
   const previousCountRef = useRef<number>(0);
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
 
   // Web Audio Chime Synthesizer
   function playAlertChime(isUrgent = false) {
@@ -52,11 +53,25 @@ export function InAppToastNotifier() {
       const data = await res.json();
       const items: ToastItem[] = data.items || [];
 
+      if (!initializedRef.current) {
+        const stored = sessionStorage.getItem('seepoint-seen-notification-ids');
+        let storedIds: string[] = [];
+        try {
+          const parsed = stored ? JSON.parse(stored) : [];
+          storedIds = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+        } catch {
+          storedIds = [];
+        }
+        seenIdsRef.current = new Set(storedIds);
+        initializedRef.current = true;
+      }
+
       if (items.length > 0) {
         // Find newest unseen notification
         const newest = items.find((item) => !seenIdsRef.current.has(item.id));
         if (newest) {
           seenIdsRef.current.add(newest.id);
+          sessionStorage.setItem('seepoint-seen-notification-ids', JSON.stringify([...seenIdsRef.current].slice(-100)));
           setActiveToast(newest);
           playAlertChime(newest.isUrgent);
 

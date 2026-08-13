@@ -27,11 +27,11 @@ export async function POST(req: Request) {
         description: photo.note || 'Přiřazení plochy potvrzeno montérem.', performedBy: workerName, photoUrl: photo.url,
       }) },
       { name: 'chat', run: async () => {
-        if (photo.type !== 'DAMAGE' && !photo.isClientVisible) return;
+        if (photo.type !== 'DAMAGE') return;
         await prisma.chatMessage.create({ data: {
-          channel: photo.type === 'DAMAGE' ? 'urgent' : 'installations', userId: user?.id || 'MOBILE_WORKER',
+          channel: 'urgent', userId: user?.id || 'MOBILE_WORKER',
           userName: workerName, userRole: user?.role || 'WORKER', imageUrl: photo.url,
-          content: `${photo.type === 'DAMAGE' ? '🚨 Závada' : '📸 Klientská fotodokumentace'} – ${surface.carrier.name} (${surface.carrier.code}), ${surface.name}`,
+          content: `🚨 Závada – ${surface.carrier.name} (${surface.carrier.code}), ${surface.name}`,
         } });
       } },
     ]);
