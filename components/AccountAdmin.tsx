@@ -25,6 +25,8 @@ export function AccountAdmin({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [temporaryPassword, setTemporaryPassword] = useState('');
+  const [temporaryPasswordConfirmation, setTemporaryPasswordConfirmation] = useState('');
 
   // Initial selected roles array
   const initialRoles = Array.from(
@@ -92,6 +94,33 @@ export function AccountAdmin({
     } catch {
       setBusy(false);
       setMsg('Chyba při komunikaci se serverem.');
+    }
+  }
+
+  async function setTemporaryAccessPassword() {
+    setMsg('');
+    if (temporaryPassword !== temporaryPasswordConfirmation) {
+      setMsg('Potvrzení dočasného hesla se neshoduje.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/account`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'setTemporaryPassword', temporaryPassword, temporaryPasswordConfirmation }),
+      });
+      const data = await res.json();
+      setBusy(false);
+      setMsg(data.error ?? data.message ?? 'Dočasné heslo bylo nastaveno.');
+      if (res.ok) {
+        setTemporaryPassword('');
+        setTemporaryPasswordConfirmation('');
+        router.refresh();
+      }
+    } catch {
+      setBusy(false);
+      setMsg('Dočasné heslo se nepodařilo nastavit.');
     }
   }
 
@@ -176,6 +205,32 @@ export function AccountAdmin({
                 </button>
               )}
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <Lock className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+              <div>
+                <h3 className="text-sm font-black text-amber-950">Nastavit dočasné heslo</h3>
+                <p className="mt-1 text-xs text-amber-800">Zaměstnanec se tímto heslem přihlásí pouze pro první vstup. Aplikace ho ihned přesměruje na povinnou změnu hesla. Staré session a pozvánky se zneplatní.</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-bold text-slate-800">Dočasné heslo
+                <input className="input mt-1" type="password" value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} minLength={12} autoComplete="new-password" placeholder="Alespoň 12 znaků, písmeno a číslo" />
+              </label>
+              <label className="text-xs font-bold text-slate-800">Potvrzení hesla
+                <input className="input mt-1" type="password" value={temporaryPasswordConfirmation} onChange={(event) => setTemporaryPasswordConfirmation(event.target.value)} minLength={12} autoComplete="new-password" />
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={busy || !temporaryPassword || !temporaryPasswordConfirmation}
+              onClick={setTemporaryAccessPassword}
+              className="rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50"
+            >
+              Nastavit dočasné heslo a aktivovat účet
+            </button>
           </div>
 
           {/* Multiple Roles Selection Box */}
