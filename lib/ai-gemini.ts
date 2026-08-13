@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 export type GeminiCarrierAnalysis = {
   confidence: number;
   suggestedCode?: string;
+  detectedClient?: string | null;
   detectedDamage?: string | null;
   labels: string[];
   summary: string;
@@ -90,8 +91,8 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
       if (!jsonText) continue;
 
       return JSON.parse(jsonText);
-    } catch (err: any) {
-      lastError = err;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error('Neznámá chyba Gemini API');
     }
   }
 
@@ -106,15 +107,18 @@ export async function analyzeCarrierPhotoWithAI(data: {
   photoId: string;
   imageUrl: string;
   expectedCarrierCode?: string;
+  expectedClient?: string | null;
 }) {
   try {
     const prompt = `Jsi AI inspektor venkovní reklamy a navigačních nosičů pro firmu SeePOINT (billboardy, City Postery, navigační cedule).
 Analyzuj přiloženou fotografii nosiče z terénu. Očekávaný kód nosiče: "${data.expectedCarrierCode || 'neznámý'}".
+Očekávaný klient na motivu: "${data.expectedClient || 'neznámý'}".
 
 Odpověz v JSON formátu s klíči:
 {
   "confidence": číslo 0.0 až 1.0 (spolehlivost detekce),
   "suggestedCode": "kód nosiče pokud je čitelný",
+  "detectedClient": "výrazně rozpoznaný klient nebo logo, jinak null",
   "detectedDamage": null nebo text závady ("Zarostlé větvě", "Vytočená konstrukce", "Vybledlý tisk", "Prasklé sklo", "Nesvítí"),
   "labels": ["seznam", "detekovaných", "prvků"],
   "summary": "Stručné zhodnocení stavu (1 věta česky)"
@@ -148,6 +152,7 @@ Odpověz v JSON formátu s klíči:
       aiSuggestedCarrierCode: suggestedCode,
       aiConfidence: confidence,
       aiLabels: labels,
+      detectedClient: geminiResult?.detectedClient || null,
       summary: geminiResult?.summary || 'Fotografie byla úspěšně zpracována a zkontrolována AI.',
     };
   } catch (err) {

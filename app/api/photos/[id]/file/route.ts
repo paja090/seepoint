@@ -11,9 +11,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   try {
     const photo = await prisma.photo.findUnique({
       where: { id: (await params).id },
-      select: { driveFileId: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true },
+      select: { driveFileId: true, content: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true },
     });
-    if (!photo?.driveFileId) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
+    if (!photo || (!photo.driveFileId && !photo.content)) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
 
     let allowed = false;
     const isManagerOrAdmin = user.role === 'ADMIN' || user.role === 'MANAGER';
@@ -37,7 +37,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     }
 
     if (!allowed) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
-    const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
+    if (photo.content) {
+      return new Response(photo.content, { status: 200, headers: {'Content-Type':photo.mimeType??'application/octet-stream','Content-Disposition':`inline; filename*=UTF-8''${encodeURIComponent(photo.fileName??'photo')}`,'Cache-Control':'private, max-age=3600','X-Content-Type-Options':'nosniff'} });
+    }
+    const file = await downloadPhotoFromGoogleDrive(photo.driveFileId!);
     if (!file.ok || !file.body) return NextResponse.json({ error: 'Fotografii se nepodařilo načíst.' }, { status: file.status === 404 ? 404 : 502 });
     return new Response(file.body, { status:200, headers:{'Content-Type':photo.mimeType??file.headers.get('Content-Type')??'application/octet-stream','Content-Disposition':`inline; filename*=UTF-8''${encodeURIComponent(photo.fileName??'photo')}`,'Cache-Control':'private, max-age=3600','X-Content-Type-Options':'nosniff'} });
   } catch (error) {

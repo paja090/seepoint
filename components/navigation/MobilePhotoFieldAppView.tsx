@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import {
   Camera,
   MapPin,
@@ -16,8 +17,6 @@ import {
   TreeDeciduous,
   RotateCw,
   Sun,
-  Lightbulb,
-  X,
 } from 'lucide-react';
 
 type NearbyCarrier = {
@@ -32,8 +31,14 @@ type NearbyCarrier = {
   surfaces: Array<{
     id: string;
     name: string;
+    side: 'SIDE_A' | 'SIDE_B' | null;
     status: string;
-    currentClient?: { name: string } | null;
+    currentClient: { id: string | null; name: string } | null;
+    currentCampaign: { id: string; name: string } | null;
+    occupiedFrom: string | null;
+    occupiedUntil: string | null;
+    latestPhotoUrl: string | null;
+    artworkUrl: string | null;
   }>;
   photos: Array<{
     id: string;
@@ -48,6 +53,31 @@ type NearbyCarrier = {
   }>;
 };
 
+function surfaceClientLabel(surface: NearbyCarrier['surfaces'][number]) {
+  if (surface.status === 'RESERVED') return surface.currentClient ? `REZERVOVÁNO – ${surface.currentClient.name}` : 'REZERVOVÁNO – klient nezjištěn';
+  if (surface.currentClient) return surface.currentClient.name;
+  if (surface.status === 'AVAILABLE') return 'VOLNÁ PLOCHA';
+  return 'Klient nezjištěn';
+}
+
+function surfaceSideLabel(surface: NearbyCarrier['surfaces'][number]) {
+  if (surface.side === 'SIDE_A') return 'Strana A';
+  if (surface.side === 'SIDE_B') return 'Strana B';
+  return surface.name;
+}
+
+function formatCzechDate(value: string | null) {
+  return value ? new Date(value).toLocaleDateString('cs-CZ') : null;
+}
+
+type ClientMismatch = {
+  photoId: string;
+  expectedSurfaceId: string | null;
+  expectedClient: string;
+  detectedClient: string;
+  confidence: number;
+};
+
 export function MobilePhotoFieldAppView() {
   // GPS State
   const [coords, setCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
@@ -60,6 +90,7 @@ export function MobilePhotoFieldAppView() {
   const [radiusKm, setRadiusKm] = useState(2.0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCarrier, setSelectedCarrier] = useState<NearbyCarrier | null>(null);
+  const [selectedSurfaceId, setSelectedSurfaceId] = useState<string | null>(null);
 
   // Photo Metadata State
   const [side, setSide] = useState<'SIDE_A' | 'SIDE_B' | 'BOTH'>('SIDE_A');
@@ -72,13 +103,29 @@ export function MobilePhotoFieldAppView() {
   const [uploading, setUploading] = useState(false);
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
   const [uploadErrorMsg, setUploadErrorMsg] = useState<string | null>(null);
+  const [clientMismatch, setClientMismatch] = useState<ClientMismatch | null>(null);
   const [photoNote, setPhotoNote] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+
+  const clearPreview = () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
+    setPreviewUrl(null);
+    setPhotoFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
 
   // Auto request location on load
   useEffect(() => {
     requestLocation();
+    // Geolocation is intentionally requested once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const requestLocation = () => {
@@ -138,15 +185,31 @@ export function MobilePhotoFieldAppView() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setUploadSuccessMsg(null);
-      setUploadErrorMsg(null);
+      try {
+        if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
+          throw new Error('Vybraný soubor není podporovaná fotografie.');
+        }
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        const nextPreviewUrl = URL.createObjectURL(file);
+        previewUrlRef.current = nextPreviewUrl;
+        setPhotoFile(file);
+        setPreviewUrl(nextPreviewUrl);
+        setUploadSuccessMsg(null);
+        setUploadErrorMsg(null);
+      } catch (error) {
+        console.error('[mobile-photos/camera]', error);
+        clearPreview();
+        setUploadErrorMsg('Fotografii se nepodařilo načíst z fotoaparátu. Zkuste ji pořídit znovu.');
+      }
     }
   };
 
   const handleUploadPhoto = async () => {
     if (!photoFile || !selectedCarrier) return;
+    if (!coords) {
+      setUploadErrorMsg('Před uložením fotografie je nutné získat GPS polohu.');
+      return;
+    }
     setUploading(true);
     setUploadSuccessMsg(null);
     setUploadErrorMsg(null);
@@ -155,37 +218,67 @@ export function MobilePhotoFieldAppView() {
       const fd = new FormData();
       fd.append('file', photoFile);
       fd.append('carrierId', selectedCarrier.id);
+      if (selectedSurfaceId && side !== 'BOTH') fd.append('surfaceId', selectedSurfaceId);
       fd.append('side', side);
       fd.append('purpose', purpose);
       if (purpose === 'DAMAGE') {
         fd.append('damageType', damageType);
       }
-      if (coords) {
-        fd.append('latitude', String(coords.lat));
-        fd.append('longitude', String(coords.lng));
-        fd.append('accuracyMeters', String(coords.accuracy));
-      }
+      fd.append('latitude', String(coords.lat));
+      fd.append('longitude', String(coords.lng));
+      fd.append('accuracyMeters', String(coords.accuracy));
       fd.append('note', photoNote.trim() || 'Mobilní fotodokumentace v terénu');
 
-      const res = await fetch('/api/mobile-photos/upload', {
+      const uploadUrl = new URL('/api/mobile-photos/upload', window.location.origin);
+      const res = await fetch(uploadUrl.toString(), {
         method: 'POST',
         body: fd,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Nahrání fotografie selhalo');
+      const responseText = await res.text();
+      let data: { error?: string; code?: string; message?: string; warnings?: string[]; clientMismatch?: ClientMismatch | null } = {};
+      try { data = responseText ? JSON.parse(responseText) : {}; } catch { /* filtered below */ }
+      if (!res.ok) {
+        const messages: Record<string, string> = {
+          GPS_REQUIRED: 'Před uložením fotografie je nutné získat GPS polohu.',
+          DATABASE_ERROR: 'Fotografii se nepodařilo zapsat do databáze. Zkuste akci zopakovat.',
+          INVALID_IMAGE: 'Formát fotografie není podporován.',
+        };
+        throw new Error(messages[data.code || ''] || 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
+      }
 
-      setUploadSuccessMsg(data.message || 'Fotografie byla úspěšně uložena!');
-      setPhotoFile(null);
-      setPreviewUrl(null);
+      const warningText = data.warnings?.includes('google-drive')
+        ? ' Google Drive nebyl dostupný; použit byl bezpečný záložní zápis.'
+        : data.warnings?.includes('chat') ? ' Fotografie je uložena, ale zprávu do chatu se nepodařilo odeslat.' : '';
+      setClientMismatch(data.clientMismatch || null);
+      setUploadSuccessMsg(data.clientMismatch ? null : (data.message || 'Fotografie byla úspěšně uložena!') + warningText);
+      clearPreview();
       setPhotoNote('');
 
       // Refresh list
       fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm);
     } catch (err: unknown) {
-      setUploadErrorMsg(err instanceof Error ? err.message : 'Nahrání fotografie selhalo');
+      console.error('[mobile-photos/upload]', err);
+      setUploadErrorMsg(err instanceof Error && err.message ? err.message : 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const confirmPhotoSurface = async (surfaceId: string) => {
+    if (!clientMismatch) return;
+    try {
+      const res = await fetch(new URL('/api/mobile-photos/confirm', window.location.origin).toString(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId: clientMismatch.photoId, surfaceId }),
+      });
+      if (!res.ok) throw new Error();
+      setClientMismatch(null);
+      setUploadSuccessMsg('Přiřazení fotografie k ploše bylo potvrzeno.');
+      await fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm);
+    } catch (error) {
+      console.error('[mobile-photos/confirm]', error);
+      setUploadErrorMsg('Přiřazení fotografie se nepodařilo potvrdit. Zkuste akci zopakovat.');
     }
   };
 
@@ -289,19 +382,40 @@ export function MobilePhotoFieldAppView() {
           const isSelected = selectedCarrier?.id === c.id;
           const distM = c.distanceKm ? Math.round(c.distanceKm * 1000) : null;
           const distText = distM !== null ? (distM < 1000 ? `${distM} m` : `${c.distanceKm?.toFixed(1)} km`) : null;
+          const thumbnail = c.surfaces.find((surface) => surface.latestPhotoUrl)?.latestPhotoUrl || c.photos[0]?.url || null;
 
           return (
             <div
               key={c.id}
-              onClick={() => setSelectedCarrier(c)}
+              onClick={() => {
+                const defaultSurface = c.surfaces.find((surface) => surface.side === 'SIDE_A') || c.surfaces[0] || null;
+                setSelectedCarrier(c);
+                setSelectedSurfaceId(defaultSurface?.id || null);
+                if (defaultSurface?.side) setSide(defaultSurface.side);
+              }}
               className={`group relative cursor-pointer rounded-3xl border p-4 transition-all duration-200 shadow-sm ${
                 isSelected
                   ? 'border-emerald-500 bg-emerald-950/90 text-white ring-2 ring-emerald-500/40'
                   : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-md text-slate-900'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div>
+              {thumbnail ? (
+                <Image src={thumbnail} alt={`Aktuální vzhled ${c.name}`} width={560} height={256} unoptimized className="mb-3 h-32 w-full rounded-2xl border border-slate-200/20 object-cover" />
+              ) : (
+                <div className="mb-3 flex h-20 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><Camera size={24} /></div>
+              )}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 space-y-1.5">
+                    {c.surfaces.length ? c.surfaces.map((surface) => (
+                      <div key={surface.id} className={`rounded-xl px-3 py-2 ${isSelected ? 'bg-emerald-900/70' : 'bg-emerald-50'}`}>
+                        <div className={`text-sm font-black ${isSelected ? 'text-emerald-200' : 'text-emerald-900'}`}>{surfaceClientLabel(surface)}</div>
+                        <div className={`text-[10px] font-bold ${isSelected ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                          {surfaceSideLabel(surface)}{surface.currentCampaign ? ` · ${surface.currentCampaign.name}` : ''}
+                        </div>
+                      </div>
+                    )) : <div className="font-black text-slate-500">Klient nezjištěn</div>}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className={`rounded-lg px-2 py-0.5 text-xs font-black tracking-wide ${isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-white'}`}>
                       {c.code}
@@ -337,7 +451,7 @@ export function MobilePhotoFieldAppView() {
         <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-slate-800 bg-slate-950 p-5 text-white shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom duration-300 max-h-[85dvh] overflow-y-auto overscroll-contain touch-pan-y">
           <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-800" />
           
-          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+          <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-3">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Vybraný nosič pro fotodokumentaci</span>
               <h2 className="text-base font-black text-white">{selectedCarrier.code} — {selectedCarrier.name}</h2>
@@ -345,13 +459,30 @@ export function MobilePhotoFieldAppView() {
             <button
               onClick={() => {
                 setSelectedCarrier(null);
-                setPreviewUrl(null);
-                setPhotoFile(null);
+                setSelectedSurfaceId(null);
+                clearPreview();
               }}
               className="text-xs font-bold text-slate-400 hover:text-white px-2 py-1"
             >
               Zavřít
             </button>
+          </div>
+
+          <div className="mb-4 rounded-2xl border border-emerald-700/60 bg-emerald-950/50 p-3">
+            <div className="mb-2 text-[10px] font-black uppercase tracking-widest text-emerald-400">Aktuálně na ploše</div>
+            <div className="space-y-2">
+              {selectedCarrier.surfaces.length ? selectedCarrier.surfaces.map((surface) => (
+                <button key={surface.id} type="button" onClick={() => {
+                  setSelectedSurfaceId(surface.id);
+                  if (surface.side) setSide(surface.side);
+                }} className={`w-full rounded-xl border p-3 text-left ${selectedSurfaceId === surface.id ? 'border-emerald-400 bg-emerald-900/60' : 'border-slate-700 bg-slate-900/70'}`}>
+                  <div className="text-[10px] font-bold uppercase text-slate-400">{surfaceSideLabel(surface)}</div>
+                  <div className="text-base font-black text-white">{surfaceClientLabel(surface)}</div>
+                  {surface.currentCampaign && <div className="text-xs text-emerald-300">Kampaň: {surface.currentCampaign.name}</div>}
+                  {surface.occupiedUntil && <div className="text-[11px] text-slate-400">Obsazeno do: {formatCzechDate(surface.occupiedUntil)}</div>}
+                </button>
+              )) : <div className="text-sm font-bold text-slate-400">Plochy nosiče nejsou evidovány.</div>}
+            </div>
           </div>
 
           {/* Messages */}
@@ -367,42 +498,40 @@ export function MobilePhotoFieldAppView() {
               <span>{uploadErrorMsg}</span>
             </div>
           )}
+          {clientMismatch && (
+            <div className="mb-4 rounded-2xl border border-amber-500/70 bg-amber-950/70 p-3 text-xs text-amber-100">
+              <div className="font-black">⚠️ Fotografie možná neodpovídá vybrané ploše.</div>
+              <div className="mt-1">Očekávaný klient: <strong>{clientMismatch.expectedClient}</strong></div>
+              <div>Rozpoznaný motiv / klient: <strong>{clientMismatch.detectedClient}</strong></div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" disabled={!clientMismatch.expectedSurfaceId} onClick={() => clientMismatch.expectedSurfaceId && confirmPhotoSurface(clientMismatch.expectedSurfaceId)} className="rounded-xl bg-amber-400 px-2 py-2 font-black text-slate-950 disabled:opacity-50">Přesto uložit</button>
+                <button type="button" onClick={() => { setSelectedSurfaceId(null); setUploadErrorMsg('Vyberte níže správnou plochu a potvrďte přiřazení.'); }} className="rounded-xl border border-amber-400 px-2 py-2 font-black">Vybrat jinou plochu</button>
+              </div>
+              {selectedSurfaceId && selectedSurfaceId !== clientMismatch.expectedSurfaceId && (
+                <button type="button" onClick={() => confirmPhotoSurface(selectedSurfaceId)} className="mt-2 w-full rounded-xl bg-emerald-500 px-2 py-2 font-black text-slate-950">Přiřadit k vybrané ploše</button>
+              )}
+            </div>
+          )}
 
           {/* 1. Side Selection */}
           <div className="mb-4">
             <label className="text-[11px] font-black uppercase text-amber-400 tracking-wider block mb-1.5">
               1. Která strana plochy byla vyfocena?
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setSide('SIDE_A')}
-                className={`rounded-xl border p-2 text-center transition ${
-                  side === 'SIDE_A'
-                    ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
-                    : 'border-slate-800 bg-slate-900 text-slate-400'
-                }`}
-              >
-                <span className="block text-xs font-black">🅰️ Strana A</span>
-                <span className="text-[9px] text-slate-400">Přední</span>
-              </button>
+            <div className="grid grid-cols-2 gap-2">
+              {selectedCarrier.surfaces.map((surface) => (
+                <button key={surface.id} type="button" onClick={() => {
+                  setSelectedSurfaceId(surface.id);
+                  setSide(surface.side || 'SIDE_A');
+                }} className={`rounded-xl border p-2 text-center transition ${selectedSurfaceId === surface.id && side !== 'BOTH' ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold' : 'border-slate-800 bg-slate-900 text-slate-400'}`}>
+                  <span className="block text-xs font-black">{surface.side === 'SIDE_A' ? '🅰️ ' : surface.side === 'SIDE_B' ? '🅱️ ' : ''}{surfaceSideLabel(surface)}</span>
+                  <span className="block truncate text-[10px] font-bold text-white">{surfaceClientLabel(surface)}</span>
+                </button>
+              ))}
 
               <button
                 type="button"
-                onClick={() => setSide('SIDE_B')}
-                className={`rounded-xl border p-2 text-center transition ${
-                  side === 'SIDE_B'
-                    ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
-                    : 'border-slate-800 bg-slate-900 text-slate-400'
-                }`}
-              >
-                <span className="block text-xs font-black">🅱️ Strana B</span>
-                <span className="text-[9px] text-slate-400">Zadní</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSide('BOTH')}
+                onClick={() => { setSide('BOTH'); setSelectedSurfaceId(null); }}
                 className={`rounded-xl border p-2 text-center transition ${
                   side === 'BOTH'
                     ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300 font-bold'
@@ -524,7 +653,7 @@ export function MobilePhotoFieldAppView() {
           ) : (
             <div className="space-y-3 mb-3">
               <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 max-h-44">
-                <img src={previewUrl} alt="Preview" className="w-full object-cover max-h-44" />
+                <Image src={previewUrl} alt="Náhled pořízené fotografie" width={560} height={352} unoptimized className="w-full object-cover max-h-44" />
                 <div className="absolute top-2 right-2 flex gap-1">
                   <span className="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] font-bold text-emerald-400 backdrop-blur border border-slate-700 flex items-center gap-1">
                     <Compass size={11} /> GPS Razítko zapsáno
@@ -576,7 +705,7 @@ export function MobilePhotoFieldAppView() {
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {selectedCarrier.photos.map((p) => (
                   <div key={p.id} className="shrink-0 relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 group">
-                    <img src={p.url} alt="Carrier photo" className="w-full h-full object-cover" />
+                    <Image src={p.url} alt="Fotografie nosiče" fill sizes="80px" unoptimized className="object-cover" />
                     <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 px-1 py-0.5 text-[9px] text-slate-300 text-center truncate flex items-center justify-center gap-0.5">
                       {p.storageProvider === 'GOOGLE_DRIVE' ? <Cloud size={9} className="text-sky-400" /> : <HardDrive size={9} className="text-emerald-400" />}
                       {new Date(p.createdAt).toLocaleDateString('cs-CZ')}

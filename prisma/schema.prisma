@@ -1423,6 +1423,7 @@ model Photo {
   capturedByWorkerUserId String?
   capturedByWorkerName   String?
   storageProvider        String    @default("LOCAL") // GOOGLE_DRIVE, LOCAL
+  content                Bytes?
   aiStatus               String?   @default("PENDING") // PENDING, ANALYZED, FAILED
   aiSuggestedCarrierCode String?
   aiConfidence           Float?
