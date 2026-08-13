@@ -42,10 +42,13 @@ export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictV
     const pointsReady = Boolean(offer.navigation?.points.length && offer.navigation.points.every((point) => point.label && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)));
     const visualsReady = Boolean(offer.navigation?.points.length && offer.navigation.points.every((point) => Boolean((point as unknown as Record<string, unknown>).visualizedPhotoUrl)));
     const missingVisuals = offer.navigation?.points.filter((point) => !((point as unknown as Record<string, unknown>).visualizedPhotoUrl)).length ?? 0;
+    const sitePhotosReady = Boolean(offer.navigation?.points.length && offer.navigation.points.every((point) => Boolean(point.sitePhotoId)));
+    const missingSitePhotos = offer.navigation?.points.filter((point) => !point.sitePhotoId).length ?? 0;
     return [
       ...common,
       { id: 'target', label: 'Cíl navigace', detail: targetReady ? 'Cíl má název a GPS pozici.' : 'Doplňte cíl a jeho GPS pozici.', status: targetReady ? 'ok' : 'error' },
       { id: 'points', label: 'Navigační body', detail: pointsReady ? `${offer.navigation?.points.length ?? 0} bodů má název a GPS pozici.` : 'Přidejte alespoň jeden kompletní navigační bod.', status: pointsReady ? 'ok' : 'error' },
+      { id: 'navigationSitePhotos', label: 'Terénní fotografie sloupů', detail: sitePhotosReady ? 'Každý návrhový bod má fotografii reálného sloupu.' : `Nahrajte fotografii reálného sloupu u ${missingSitePhotos} navigačních bodů a podle ní ověřte polohu.`, status: sitePhotosReady ? 'ok' : 'error' },
       { id: 'navigationVisuals', label: 'Fotografie a vizualizace bodů', detail: visualsReady ? 'Každý navigační bod má klientský vizuál umístění.' : `Doplňte fotografii nebo vizualizaci u ${missingVisuals} navigačních bodů.`, status: visualsReady ? 'ok' : 'error' },
     ];
   }

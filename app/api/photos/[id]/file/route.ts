@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
 import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
+import { canAccessOffer } from '@/lib/offers/domain';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   try {
     const photo = await prisma.photo.findUnique({
       where: { id: (await params).id },
-      select: { driveFileId: true, content: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true, carrierId: true, surfaceId: true },
+      select: { driveFileId: true, content: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true, carrierId: true, surfaceId: true, siteNavigationPoint: { select: { navigationOffer: { select: { offer: { select: { createdByUserId: true } } } } } } },
     });
     if (!photo || (!photo.driveFileId && !photo.content)) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
 
@@ -34,7 +35,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       allowed = user.employee?.id === photo.employeeId || canAccess(user.role, 'employees');
     } else {
       allowed = canAccess(user.role, 'carriers')
-        || (canAccess(user.role, 'navigationProjects') && Boolean(photo.carrierId || photo.surfaceId));
+        || (canAccess(user.role, 'navigationProjects') && Boolean(photo.carrierId || photo.surfaceId || photo.siteNavigationPoint))
+        || (canAccess(user.role, 'offers') && Boolean(photo.siteNavigationPoint) && canAccessOffer(user, photo.siteNavigationPoint?.navigationOffer?.offer.createdByUserId ?? null));
     }
 
     if (!allowed) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });

@@ -1,4 +1,4 @@
-import type { ClientPricingSegment, MediaType, OfferPriceCategory, OfferType } from '@prisma/client';
+import type { ClientPricingSegment, MediaType, MountingType, OfferPriceCategory, OfferType } from '@prisma/client';
 
 export type AiOfferRequest = {
   action?: 'preview' | 'confirm';
@@ -20,6 +20,8 @@ export type AiOfferRequest = {
   targetLongitude?: number;
   maxRadiusKm?: number;
   selectedSurfaceIds?: string[];
+  selectedCandidateIds?: string[];
+  candidateMountingTypes?: Record<string, MountingType>;
 };
 
 export type AiResolvedClient = {
@@ -38,10 +40,12 @@ export type AiPriceSnapshot = {
   unitPrice: number;
   validFrom: string | null;
   validTo: string | null;
+  mountingType: MountingType | null;
 };
 
 export type AiOfferItemPreview = {
-  surfaceId: string;
+  selectionId: string;
+  surfaceId: string | null;
   carrierId: string;
   carrierCode: string;
   title: string;
@@ -55,6 +59,15 @@ export type AiOfferItemPreview = {
   unit: string;
   catalogPrice: number | null;
   finalPrice: number | null;
+  rentalTotal?: number | null;
+  mountingType?: MountingType | null;
+  pricingOptions?: Array<{
+    mountingType: MountingType;
+    label: string;
+    rentalTotal: number | null;
+    total: number | null;
+    componentPrices: Partial<Record<OfferPriceCategory, AiPriceSnapshot | null>>;
+  }>;
   price: AiPriceSnapshot | null;
   score: number;
   reasons: string[];

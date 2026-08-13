@@ -72,6 +72,7 @@ export function parseNavigationOfferInput(raw: unknown) {
       routeStatus: 'OK' as const,
       arrowDirectionEnum: arrowDir,
       visualizedPhotoUrl: nullable(text(point.visualizedPhotoUrl)),
+      sitePhotoId: nullable(text(point.sitePhotoId)),
       isSelectedByClient: point.isSelectedByClient !== false,
     };
   });

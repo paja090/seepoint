@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { deletePhotoFromGoogleDrive, GoogleDriveConfigurationError, uploadPhotoToGoogleDrive } from '@/lib/google-drive';
+import { canAccessOffer } from '@/lib/offers/domain';
 
 export const runtime = 'nodejs';
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
@@ -19,10 +20,16 @@ export async function POST(request: Request) {
     const carrierId = form.get('carrierId') ? String(form.get('carrierId')) : null;
     const surfaceId = form.get('surfaceId') ? String(form.get('surfaceId')) : null;
     const employeeId = form.get('employeeId') ? String(form.get('employeeId')) : null;
-    if ([carrierId, surfaceId, employeeId].filter(Boolean).length !== 1) return NextResponse.json({ error: 'Fotografie musí patřit právě jednomu nosiči, ploše nebo zaměstnanci.' }, { status: 400 });
-    const auth = await requireApiAccess(employeeId ? 'employees' : 'carriers'); if (isApiDenied(auth)) return auth;
+    const navigationPointId = form.get('navigationPointId') ? String(form.get('navigationPointId')) : null;
+    if ([carrierId, surfaceId, employeeId, navigationPointId].filter(Boolean).length !== 1) return NextResponse.json({ error: 'Fotografie musí patřit právě jednomu nosiči, ploše, navigačnímu bodu nebo zaměstnanci.' }, { status: 400 });
+    const auth = await requireApiAccess(employeeId ? 'employees' : navigationPointId ? 'offers' : 'carriers'); if (isApiDenied(auth)) return auth;
     if (employeeId && auth.role !== 'ADMIN') return NextResponse.json({ error: 'Fotografii zaměstnance může měnit pouze administrátor.' }, { status: 403 });
-    const targetExists = carrierId ? await prisma.advertisingCarrier.count({ where: { id: carrierId } }) : surfaceId ? await prisma.advertisingSurface.count({ where: { id: surfaceId } }) : await prisma.employee.count({ where: { id: employeeId! } });
+    if (navigationPointId) {
+      const point = await prisma.navigationPoint.findUnique({ where: { id: navigationPointId }, select: { navigationOffer: { select: { offer: { select: { createdByUserId: true } } } } } });
+      if (!point) return NextResponse.json({ error: 'Cílový navigační bod neexistuje.' }, { status: 404 });
+      if (!canAccessOffer(auth, point.navigationOffer?.offer.createdByUserId ?? null)) return NextResponse.json({ error: 'K navigačnímu bodu nemáte přístup.' }, { status: 403 });
+    }
+    const targetExists = carrierId ? await prisma.advertisingCarrier.count({ where: { id: carrierId } }) : surfaceId ? await prisma.advertisingSurface.count({ where: { id: surfaceId } }) : navigationPointId ? await prisma.navigationPoint.count({ where: { id: navigationPointId } }) : await prisma.employee.count({ where: { id: employeeId! } });
     if (!targetExists) return NextResponse.json({ error: 'Cílový záznam neexistuje.' }, { status: 404 });
     const rawType = String(form.get('type') ?? (employeeId ? 'EMPLOYEE_PROFILE' : 'CARRIER'));
     if (!PHOTO_TYPES.has(rawType)) return NextResponse.json({ error: 'Neplatný typ fotografie.' }, { status: 400 });
@@ -34,6 +41,8 @@ export async function POST(request: Request) {
         await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE id = ${carrierId} FOR UPDATE`;
       } else if (surfaceId) {
         await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE id = ${surfaceId} FOR UPDATE`;
+      } else if (navigationPointId) {
+        await tx.$executeRaw`SELECT id FROM "NavigationPoint" WHERE id = ${navigationPointId} FOR UPDATE`;
       }
 
       const count = await tx.photo.count({
@@ -53,7 +62,7 @@ export async function POST(request: Request) {
 
       const isPrimary = !employeeId && hasPrimary === 0;
 
-      return tx.photo.create({
+      const created = await tx.photo.create({
         data: {
           id: photoId,
           url: `/api/photos/${photoId}/file`,
@@ -70,6 +79,8 @@ export async function POST(request: Request) {
           note: form.get('note') ? String(form.get('note')) : null,
         },
       });
+      if (navigationPointId) await tx.navigationPoint.update({ where: { id: navigationPointId }, data: { sitePhotoId: created.id } });
+      return created;
     });
     return NextResponse.json(photo, { status: 201 });
   } catch (error) {

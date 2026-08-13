@@ -75,7 +75,7 @@ export async function generateStandardMediaPreview(input: {
     if (affordable.length) selected = affordable;
   }
   const items = selected.map(({ surface, price, totalPrice, score, reasons }) => ({
-    surfaceId: surface.id, carrierId: surface.carrierId, carrierCode: surface.carrier.code,
+    selectionId: surface.id, surfaceId: surface.id, carrierId: surface.carrierId, carrierCode: surface.carrier.code,
     title: `${surface.carrier.name} – ${surface.name}`, mediaType: surface.mediaType, city: surface.carrier.city,
     latitude: surface.carrier.latitude, longitude: surface.carrier.longitude,
     dateFrom: input.dateFrom.toISOString().slice(0, 10), dateTo: input.dateTo.toISOString().slice(0, 10),

@@ -1069,6 +1069,7 @@ model NavigationPoint {
   carrierId         String?
   surfaceId         String?
   installedPhotoId  String?
+  sitePhotoId       String?               @unique
   sortOrder         Int                   @default(0)
   latitude          Float
   longitude         Float
@@ -1129,6 +1130,7 @@ model NavigationPoint {
   carrier                      AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: SetNull)
   surface                      AdvertisingSurface?           @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
   installedPhoto               Photo?                        @relation("PointInstalledPhoto", fields: [installedPhotoId], references: [id], onDelete: SetNull)
+  sitePhoto                    Photo?                        @relation("PointSitePhoto", fields: [sitePhotoId], references: [id], onDelete: SetNull)
   installerUser                User?                         @relation("NavPointInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
   priceVersions                NavigationPriceVersion[]
   priceAuditLogs               NavigationPriceAuditLog[]
@@ -1317,6 +1319,7 @@ model OfferPriceRule {
   label             String
   description       String?
   mediaType         MediaType?
+  mountingType      MountingType?
   pricingSegment    ClientPricingSegment  @default(COMMERCIAL)
   city              String?
   validFrom         DateTime?
@@ -1342,6 +1345,7 @@ model OfferPriceRule {
   @@index([category, active, sortOrder])
   @@index([mediaType, active])
   @@index([pricingSegment, mediaType, category, active])
+  @@index([pricingSegment, mediaType, mountingType, category, active])
   @@index([validFrom, validTo])
 }
 
@@ -1470,6 +1474,7 @@ model Photo {
   crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
   navigationDocumentationItems NavigationDocumentationItem[]
   installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
+  siteNavigationPoint          NavigationPoint?               @relation("PointSitePhoto")
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])

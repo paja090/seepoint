@@ -8,6 +8,58 @@ export type RouteComputeResult = {
   error?: string;
 };
 
+export type GeocodeResult = {
+  latitude: number;
+  longitude: number;
+  formattedAddress: string;
+};
+
+export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const query = address.trim();
+  if (!query) return null;
+
+  if (apiKey) try {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('address', query);
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('language', 'cs');
+    url.searchParams.set('region', 'cz');
+    const response = await fetch(url, {
+      headers: { Referer: process.env.APP_URL || 'https://seepoint.vercel.app/' },
+      cache: 'no-store',
+    });
+    if (response.ok) {
+      const data = await response.json() as {
+        status?: string;
+        results?: Array<{ formatted_address?: string; geometry?: { location?: { lat?: number; lng?: number } } }>;
+      };
+      const first = data.status === 'OK' ? data.results?.[0] : undefined;
+      const latitude = first?.geometry?.location?.lat;
+      const longitude = first?.geometry?.location?.lng;
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+        return { latitude: latitude!, longitude: longitude!, formattedAddress: first?.formatted_address || query };
+      }
+    }
+  } catch { /* Fall through to the existing OpenStreetMap geocoder. */ }
+
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/search');
+    url.searchParams.set('format', 'jsonv2');
+    url.searchParams.set('limit', '1');
+    url.searchParams.set('countrycodes', 'cz');
+    url.searchParams.set('q', query);
+    const response = await fetch(url, { headers: { 'User-Agent': 'SeePOINT-internal/1.0' }, cache: 'no-store' });
+    if (!response.ok) return null;
+    const rows = await response.json() as Array<{ lat?: string; lon?: string; display_name?: string }>;
+    const first = rows[0];
+    const latitude = Number(first?.lat);
+    const longitude = Number(first?.lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return { latitude, longitude, formattedAddress: first?.display_name || query };
+  } catch { return null; }
+}
+
 /**
  * Computes route driving distance and polyline using Google Routes API (New).
  * Only called on point creation, drag end, or explicit recalculation request.
