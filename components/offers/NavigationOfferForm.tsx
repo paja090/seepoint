@@ -34,6 +34,8 @@ type DraftPoint = {
   clientNote: string;
   realDistanceText?: string;
   visualizedPhotoUrl?: string;
+  sitePhotoId?: string;
+  sitePhotoUrl?: string;
   isSelectedByClient?: boolean;
   carrierId?: string | null;
 
@@ -157,6 +159,8 @@ export function NavigationOfferForm({
         routePolyline: (point.routePolyline as string) ?? undefined,
         calculatedDistanceMeters: (point.calculatedDistanceMeters as number) ?? undefined,
         visualizedPhotoUrl: typeof point.visualizedPhotoUrl === 'string' ? point.visualizedPhotoUrl : undefined,
+        sitePhotoId: typeof point.sitePhotoId === 'string' ? point.sitePhotoId : undefined,
+        sitePhotoUrl: typeof point.sitePhotoUrl === 'string' ? point.sitePhotoUrl : undefined,
         isSelectedByClient: point.isSelectedByClient !== false,
       })) ?? [],
   );
@@ -434,6 +438,28 @@ export function NavigationOfferForm({
 
   function updatePoint(id: string, changes: Partial<DraftPoint>) {
     setPoints((current) => current.map((point) => (point.id === id ? { ...point, ...changes } : point)));
+  }
+
+  async function uploadSitePhoto(point: DraftPoint, file: File) {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 4 * 1024 * 1024) {
+      setMessage('Fotografie sloupu musí být JPG, PNG nebo WebP do 4 MB.');
+      return;
+    }
+    const persisted = initialOffer?.navigation?.points.some((candidate) => candidate.id === point.id);
+    if (!persisted) {
+      setMessage('Nejprve nabídku uložte. Potom lze k bodu nahrát fotografii sloupu.');
+      return;
+    }
+    const form = new FormData();
+    form.set('file', file);
+    form.set('navigationPointId', point.id);
+    form.set('type', 'LOCATION');
+    form.set('note', `Terénní fotografie návrhového bodu ${point.label}`);
+    const response = await fetch('/api/photos', { method: 'POST', body: form });
+    const data = await response.json() as { id?: string; url?: string; error?: string };
+    if (!response.ok || !data.id || !data.url) return setMessage(data.error ?? 'Fotografii sloupu se nepodařilo uložit.');
+    updatePoint(point.id, { sitePhotoId: data.id, sitePhotoUrl: data.url });
+    setMessage('Fotografie sloupu byla uložena. Nyní ověřte polohu a typ konstrukce.');
   }
 
   async function geocode() {
@@ -913,6 +939,14 @@ export function NavigationOfferForm({
                 </div>
 
                 {/* Render preview of generated sign visualization if available */}
+                <div className={`rounded-xl border p-3 ${point.sitePhotoUrl ? 'border-emerald-200 bg-emerald-50/50' : 'border-amber-200 bg-amber-50/60'}`}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {point.sitePhotoUrl ? <img alt={`Reálný sloup pro ${point.label}`} className="h-20 w-28 rounded-lg border object-cover" src={point.sitePhotoUrl} /> : <div className="grid h-20 w-28 place-items-center rounded-lg border border-dashed border-amber-300 text-amber-700"><ImageIcon size={22} /></div>}
+                    <div className="min-w-0 flex-1"><p className="text-xs font-bold text-slate-900">Reálná fotografie sloupu – povinné terénní ověření</p><p className="mt-1 text-[11px] text-slate-600">AI bod je pouze návrh. Vyfoťte vhodný sloup a podle skutečnosti upravte bod i typ konstrukce.</p></div>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50"><Upload size={14} />{point.sitePhotoUrl ? 'Nahradit fotografii sloupu' : 'Nahrát fotografii sloupu'}<input accept="image/jpeg,image/png,image/webp" className="hidden" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadSitePhoto(point, file); event.target.value = ''; }} /></label>
+                  </div>
+                </div>
+
                 {point.visualizedPhotoUrl && (
                   <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-2.5">
                     <img alt="Vizualizace" className="h-16 w-24 object-cover rounded-lg border" src={point.visualizedPhotoUrl} />

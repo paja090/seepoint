@@ -91,7 +91,7 @@ export type OfferView = {
     targetLatitude: number;
     targetLongitude: number;
     targetNote?: string | null;
-    points: Array<{ id: string; label: string; latitude: number; longitude: number; address?: string | null; navigationType: string; variant?: string | null; orientation?: string | null; quantity: string; unitPrice: string; subtotal: string; installationPrice: string; removalPrice: string; productionPrice: string; internalNote?: string | null; clientNote?: string | null; status: string }>;
+    points: Array<{ id: string; label: string; latitude: number; longitude: number; address?: string | null; navigationType: string; variant?: string | null; orientation?: string | null; quantity: string; unitPrice: string; subtotal: string; installationPrice: string; removalPrice: string; productionPrice: string; internalNote?: string | null; clientNote?: string | null; status: string; sitePhotoId?: string | null; sitePhotoUrl?: string | null }>;
   } | null;
   cityGallery?: { projectId?: string | null; projectTitle?: string | null; concept?: string | null; locationBrief?: string | null; realizationNote?: string | null } | null;
   packageSelections?: Array<{ id: string; packageId?: string | null; packageName: string; selectionMode: string; standardPrice?: string | null; packagePrice?: string | null }>;
@@ -107,6 +107,7 @@ export type OfferPriceRuleOption = {
   label: string;
   description?: string | null;
   mediaType?: string | null;
+  mountingType?: string | null;
   pricingSegment: 'COMMERCIAL' | 'CULTURE_SPORT' | 'PUBLIC_NONPROFIT' | 'CUSTOM';
   city?: string | null;
   validFrom?: string | null;

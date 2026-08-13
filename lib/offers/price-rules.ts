@@ -1,4 +1,4 @@
-import { ClientPricingSegment, MediaType, OfferPriceCalculation, OfferPriceCategory, Prisma } from '@prisma/client';
+import { ClientPricingSegment, MediaType, MountingType, OfferPriceCalculation, OfferPriceCategory, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import type { CurrentUser } from '@/lib/rbac';
 import { OfferValidationError } from './domain';
@@ -7,7 +7,7 @@ const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 
 export type OfferPriceRuleView = {
   id: string; code: string; category: OfferPriceCategory; label: string; description: string | null;
-  mediaType: MediaType | null; pricingSegment: ClientPricingSegment; city: string | null;
+  mediaType: MediaType | null; mountingType: MountingType | null; pricingSegment: ClientPricingSegment; city: string | null;
   validFrom: Date | null; validTo: Date | null; minDurationMonths: number | null; maxDurationMonths: number | null;
   calculation: OfferPriceCalculation; unit: string; unitPrice: string; defaultSelected: boolean; active: boolean; sortOrder: number;
 };
@@ -26,6 +26,8 @@ export function parsePriceRule(raw: unknown) {
   if (!Object.values(OfferPriceCalculation).includes(input.calculation as OfferPriceCalculation)) throw new OfferValidationError('Způsob výpočtu není platný.');
   const mediaType = text(input.mediaType);
   if (mediaType && !Object.values(MediaType).includes(mediaType as MediaType)) throw new OfferValidationError('Typ média není platný.');
+  const mountingType = text(input.mountingType);
+  if (mountingType && !Object.values(MountingType).includes(mountingType as MountingType)) throw new OfferValidationError('Typ uchycení není platný.');
   const pricingSegment = text(input.pricingSegment) || 'COMMERCIAL';
   if (!Object.values(ClientPricingSegment).includes(pricingSegment as ClientPricingSegment)) throw new OfferValidationError('Cenový segment není platný.');
   const parseDate = (value: unknown, labelText: string) => {
@@ -42,7 +44,7 @@ export function parsePriceRule(raw: unknown) {
   if (unitPrice.lt(0)) throw new OfferValidationError('Cena nesmí být záporná.');
   return {
     code, category: input.category as OfferPriceCategory, label, description: text(input.description) || null,
-    mediaType: mediaType ? mediaType as MediaType : null, pricingSegment: pricingSegment as ClientPricingSegment,
+    mediaType: mediaType ? mediaType as MediaType : null, mountingType: mountingType ? mountingType as MountingType : null, pricingSegment: pricingSegment as ClientPricingSegment,
     city: text(input.city) || null, validFrom, validTo, minDurationMonths, maxDurationMonths,
     calculation: input.calculation as OfferPriceCalculation, unit, unitPrice: unitPrice.toDecimalPlaces(2),
     defaultSelected: input.defaultSelected === true, active: input.active !== false,

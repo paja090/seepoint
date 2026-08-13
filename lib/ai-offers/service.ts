@@ -21,6 +21,10 @@ function parseRequest(raw: unknown): AiOfferRequest {
   if (!prompt) throw new OfferValidationError('Zadejte požadavek klienta.');
   const request = { ...value, prompt } as AiOfferRequest;
   request.selectedSurfaceIds = Array.isArray(value.selectedSurfaceIds) ? value.selectedSurfaceIds.filter((id): id is string => typeof id === 'string' && id.length > 0) : undefined;
+  request.selectedCandidateIds = Array.isArray(value.selectedCandidateIds) ? value.selectedCandidateIds.filter((id): id is string => typeof id === 'string' && id.length > 0) : undefined;
+  request.candidateMountingTypes = value.candidateMountingTypes && typeof value.candidateMountingTypes === 'object'
+    ? Object.fromEntries(Object.entries(value.candidateMountingTypes as Record<string, unknown>).filter((entry): entry is [string, 'LIGHT_POLE' | 'TRACTION' | 'COLUMN' | 'POLE' | 'OTHER' | 'UNKNOWN'] => typeof entry[1] === 'string' && ['LIGHT_POLE', 'TRACTION', 'COLUMN', 'POLE', 'OTHER', 'UNKNOWN'].includes(entry[1])))
+    : undefined;
   if (request.offerType && !offerTypes.includes(request.offerType)) throw new OfferValidationError('Typ nabídky není platný.');
   if (request.pricingSegment && !pricingSegments.includes(request.pricingSegment)) throw new OfferValidationError('Cenový segment není platný.');
   return request;
@@ -70,16 +74,17 @@ async function auditAiConfirmation(offerId: string, user: CurrentUser, preview: 
 }
 
 async function confirmStandard(user: CurrentUser, request: AiOfferRequest, client: AiResolvedClient, preview: AiOfferPreview) {
+  if (preview.items.some((item) => !item.surfaceId)) throw new OfferValidationError('Standardní návrh obsahuje neplatnou plochu. Připravte návrh znovu.');
   const result = await createOffer(user, {
     clientId: client.id, title: `AI návrh – ${request.city || client.name}`, campaignName: request.prompt,
     pricingTier: client.pricingSegment, budget: request.budget ? String(request.budget) : '', taxRate: '21', confirmNegotiation: false, chargeSelections: [],
     internalNote: `AI Copilot: ${request.prompt}`, clientMessage: 'Na základě zadání jsme připravili transparentní návrh dostupných reklamních ploch.',
-    items: preview.items.map((item) => ({ surfaceId: item.surfaceId, dateFrom: item.dateFrom, dateTo: item.dateTo, quantity: String(item.quantity), unit: item.unit, unitPrice: String(item.price?.unitPrice ?? 0), discountPercent: '0', discountAmount: '0', customTitle: item.title, clientDescription: item.reasons.join(' ') })),
+    items: preview.items.map((item) => ({ surfaceId: item.surfaceId!, dateFrom: item.dateFrom, dateTo: item.dateTo, quantity: String(item.quantity), unit: item.unit, unitPrice: String(item.price?.unitPrice ?? 0), discountPercent: '0', discountAmount: '0', customTitle: item.title, clientDescription: item.reasons.join(' ') })),
   });
   const offerId = result.offer.id!;
   await prisma.$transaction([
     prisma.offer.update({ where: { id: offerId }, data: { pricingSegment: client.pricingSegment } }),
-    ...preview.items.map((item) => prisma.offerItem.updateMany({ where: { offerId, surfaceId: item.surfaceId }, data: {
+    ...preview.items.map((item) => prisma.offerItem.updateMany({ where: { offerId, surfaceId: item.surfaceId! }, data: {
       priceRuleId: item.price?.ruleId ?? null, pricingSegment: client.pricingSegment,
       catalogPrice: item.price?.unitPrice ?? null, finalPrice: item.price?.unitPrice ?? null, priceSource: item.price ? 'OFFER_PRICE_RULE' : 'MISSING',
       priceValidFrom: item.price?.validFrom ? new Date(item.price.validFrom) : null, priceValidTo: item.price?.validTo ? new Date(item.price.validTo) : null,
@@ -96,19 +101,26 @@ async function confirmNavigation(user: CurrentUser, request: AiOfferRequest, cli
     targetName: preview.target.name, targetAddress: preview.target.address, targetLatitude: preview.target.latitude, targetLongitude: preview.target.longitude,
     proposalMode: 'LOCATION_SELECTION',
     points: preview.items.map((item) => ({
-      carrierId: item.carrierId, surfaceId: item.surfaceId, latitude: item.latitude, longitude: item.longitude, address: item.title,
+      carrierId: null, surfaceId: null, latitude: item.latitude, longitude: item.longitude, address: item.title,
       label: item.carrierCode, navigationType: 'Směrová tabule', quantity: 1,
-      unitPrice: (item.componentPrices?.RENTAL?.unitPrice ?? 0) * preview.durationMonths,
+      unitPrice: item.rentalTotal ?? 0,
       installationPrice: item.componentPrices?.INSTALLATION?.unitPrice ?? 0, removalPrice: item.componentPrices?.REMOVAL?.unitPrice ?? 0,
-      productionPrice: item.componentPrices?.PRODUCTION?.unitPrice ?? 0, calculatedDistanceMeters: item.distanceMeters,
+      productionPrice: (item.componentPrices?.PRODUCTION?.unitPrice ?? 0) + (item.componentPrices?.PRINT?.unitPrice ?? 0), calculatedDistanceMeters: item.distanceMeters,
       routeDistanceMeters: item.distanceMeters, routeDurationSeconds: item.routeDurationSeconds, routePolyline: item.routePolyline,
-      arrowDirectionEnum: item.arrowDirection, clientNote: item.reasons.join(' '),
+      arrowDirectionEnum: item.arrowDirection, pillarType: item.mountingType ?? '', clientNote: item.reasons.join(' '),
+      internalNote: item.finalPrice === null ? 'AI návrhový bod bez potvrzené ceny. Vyžaduje fotografii a terénní ověření konstrukce.' : 'AI návrhový bod. Typ konstrukce a cenu potvrďte podle fotografie z terénu.',
     })),
   });
   await prisma.offer.update({ where: { id: result.id }, data: { pricingSegment: client.pricingSegment } });
   const points = await prisma.navigationPoint.findMany({ where: { navigationOffer: { offerId: result.id } }, orderBy: { sortOrder: 'asc' } });
-  await prisma.$transaction(points.map((point, index) => prisma.navigationPoint.update({ where: { id: point.id }, data: { priceSnapshot: preview.items[index]?.componentPrices ?? {} } })));
-  await prisma.navigationPriceVersion.createMany({ data: points.map((point) => ({
+  await prisma.$transaction(points.map((point, index) => prisma.navigationPoint.update({ where: { id: point.id }, data: { priceSnapshot: {
+    status: preview.items[index]?.finalPrice === null ? 'MISSING' : 'PROVISIONAL',
+    mountingType: preview.items[index]?.mountingType ?? null,
+    components: preview.items[index]?.componentPrices ?? {},
+    requiresSitePhoto: true,
+  } } })));
+  const pricedPoints = points.flatMap((point, index) => preview.items[index]?.finalPrice === null ? [] : [{ point, item: preview.items[index] }]);
+  if (pricedPoints.length) await prisma.navigationPriceVersion.createMany({ data: pricedPoints.map(({ point }) => ({
     navigationPointId: point.id, validFrom: new Date(preview.dateFrom), validTo: new Date(preview.dateTo), unitPrice: point.unitPrice,
     installationPrice: point.installationPrice, removalPrice: point.removalPrice, productionPrice: point.productionPrice, subtotal: point.subtotal,
     reason: `AI ceníkový snapshot – segment ${client.pricingSegment}`, changedByUserId: user.id,
@@ -129,7 +141,7 @@ export async function confirmAiOffer(user: CurrentUser, raw: unknown) {
     await prisma.offer.update({ where: { id: offerId }, data: { pricingSegment: client.pricingSegment } });
   } else offerId = await confirmStandard(user, request, client, preview);
   await auditAiConfirmation(offerId, user, preview);
-  return { ok: true, offerId, offerType: preview.offerType, redirectUrl: `/offers/${offerId}`, warnings: preview.warnings };
+  return { ok: true, offerId, offerType: preview.offerType, redirectUrl: preview.offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : `/offers/${offerId}`, warnings: preview.warnings };
 }
 
 export async function handleAiOffer(user: CurrentUser, raw: unknown) {

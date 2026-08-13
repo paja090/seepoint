@@ -52,4 +52,39 @@ test('pricing segment and historical price snapshot fields exist in schema', () 
   assert.match(schema, /pricingSegment\s+ClientPricingSegment/);
   assert.match(schema, /catalogPrice\s+Decimal\?/);
   assert.match(schema, /overrideReason\s+String\?/);
+  assert.match(schema, /mountingType\s+MountingType\?/);
+});
+
+test('navigation catalog migration contains the supplied Ostrava prices', () => {
+  const migration = readFileSync(new URL('../prisma/migrations/20260813180000_navigation_ostrava_price_catalog/migration.sql', import.meta.url), 'utf8');
+  assert.match(migration, /NAV_OSR_RENTAL_LIGHT_POLE_12M[\s\S]*9500/);
+  assert.match(migration, /NAV_OSR_RENTAL_TRACTION_12M[\s\S]*12000/);
+  assert.match(migration, /NAV_OSR_RENTAL_COLUMN_12M[\s\S]*12000/);
+  assert.match(migration, /NAV_OSR_INSTALLATION[\s\S]*800/);
+  assert.match(migration, /NAV_OSR_REMOVAL[\s\S]*600/);
+  assert.match(migration, /NAV_OSR_FRAME_DFLEX[\s\S]*1960/);
+  assert.match(migration, /NAV_OSR_PRINT_UV_DIBOND[\s\S]*600/);
+});
+
+test('navigation confirmation records missing prices as an explicit draft state', () => {
+  const service = readFileSync(new URL('../lib/ai-offers/service.ts', import.meta.url), 'utf8');
+  assert.match(service, /status: preview\.items\[index\]\?\.finalPrice === null \? 'MISSING' : 'PROVISIONAL'/);
+  assert.match(service, /requiresSitePhoto: true/);
+  assert.doesNotMatch(service, /unitPrice:\s*\(item\.componentPrices\?\.RENTAL\?\.unitPrice\s*\?\?\s*0\)/);
+});
+
+test('navigation target can be geocoded from an address', () => {
+  const generator = readFileSync(new URL('../lib/ai-offers/navigation-generator.ts', import.meta.url), 'utf8');
+  assert.match(generator, /geocodeAddress/);
+  assert.match(generator, /selectedCandidateIds/);
+  assert.match(generator, /approachOrigins/);
+  assert.doesNotMatch(generator, /advertisingSurface\.findMany|advertisingCarrier\.findMany/);
+});
+
+test('AI navigation points are new proposals requiring a real pole photo', () => {
+  const service = readFileSync(new URL('../lib/ai-offers/service.ts', import.meta.url), 'utf8');
+  const workflow = readFileSync(new URL('../lib/offers/workflow.ts', import.meta.url), 'utf8');
+  assert.match(service, /carrierId: null, surfaceId: null/);
+  assert.match(service, /requiresSitePhoto: true/);
+  assert.match(workflow, /navigationSitePhotos/);
 });
