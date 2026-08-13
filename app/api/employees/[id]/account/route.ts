@@ -2,12 +2,12 @@ import { Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { canAssignRole, canManageTarget, wouldRemoveLastActiveAdmin } from '@/lib/account-policy';
 import { audit } from '@/lib/audit';
-import { getCurrentUser, hashPassword, issueUserToken, validatePassword } from '@/lib/auth';
+import { getCurrentUser, hashPassword, issueUserToken } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
-import { normalizeAuthEmail } from '@/lib/auth-onboarding';
+import { normalizeAuthEmail, temporaryPasswordError } from '@/lib/auth-onboarding';
 
 type AccountInput = { action?: 'enableAccess' | 'invite' | 'setTemporaryPassword' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[]; temporaryPassword?: string; temporaryPasswordConfirmation?: string };
 
@@ -74,13 +74,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'setTemporaryPassword') {
-    if (!body.temporaryPassword || !validatePassword(body.temporaryPassword)) {
-      return NextResponse.json({ error: 'Dočasné heslo musí mít alespoň 12 znaků a obsahovat písmeno i číslo.' }, { status: 400 });
+    const validationError = temporaryPasswordError(body.temporaryPassword ?? '', body.temporaryPasswordConfirmation ?? '');
+    if (validationError) {
+      console.info('[employees/account] Temporary password rejected', {
+        targetUserId: target.id,
+        reason: validationError,
+      });
+      return NextResponse.json({ error: validationError }, { status: 400 });
     }
-    if (body.temporaryPassword !== body.temporaryPasswordConfirmation) {
-      return NextResponse.json({ error: 'Potvrzení dočasného hesla se neshoduje.' }, { status: 400 });
-    }
-    const passwordHash = await hashPassword(body.temporaryPassword);
+    const passwordHash = await hashPassword(body.temporaryPassword!);
     await prisma.$transaction(async (transaction) => {
       await transaction.user.update({
         where: { id: target.id },
