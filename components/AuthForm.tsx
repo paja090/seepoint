@@ -1,20 +1,22 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export function AuthForm({
   mode,
   token,
   purpose,
+  defaultEmail = '',
+  initialMessage = '',
 }: {
   mode: 'login' | 'forgot' | 'password';
   token?: string;
   purpose?: 'activation' | 'reset';
+  defaultEmail?: string;
+  initialMessage?: string;
 }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(initialMessage);
   const [error, setError] = useState('');
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -23,6 +25,11 @@ export function AuthForm({
     setError('');
 
     const values = Object.fromEntries(new FormData(event.currentTarget));
+    if (mode === 'password' && values.password !== values.passwordConfirmation) {
+      setLoading(false);
+      setError('Zadaná hesla se neshodují.');
+      return;
+    }
     const endpoint =
       mode === 'login'
         ? '/api/auth/login'
@@ -50,7 +57,7 @@ export function AuthForm({
           : 'Přihlašování úspěšné…'
       );
       setTimeout(() => {
-        router.replace(result.redirectTo ?? '/dashboard');
+        window.location.replace(result.redirectTo ?? '/dashboard');
       }, 500);
     } else {
       setMessage(result.message || 'Pokyny byly odeslány.');
@@ -68,6 +75,7 @@ export function AuthForm({
             type="email"
             autoComplete="email"
             required
+            defaultValue={defaultEmail}
           />
         </label>
       )}
@@ -81,6 +89,20 @@ export function AuthForm({
             type="password"
             minLength={mode === 'password' ? 12 : undefined}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            required
+          />
+        </label>
+      )}
+
+      {mode === 'password' && (
+        <label className="block text-sm font-medium">
+          Potvrzení nového hesla
+          <input
+            className="input mt-1"
+            name="passwordConfirmation"
+            type="password"
+            minLength={12}
+            autoComplete="new-password"
             required
           />
         </label>

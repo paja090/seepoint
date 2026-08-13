@@ -2,13 +2,14 @@ import { Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { canAssignRole, canManageTarget, wouldRemoveLastActiveAdmin } from '@/lib/account-policy';
 import { audit } from '@/lib/audit';
-import { getCurrentUser, issueUserToken } from '@/lib/auth';
+import { getCurrentUser, hashPassword, issueUserToken, validatePassword } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { normalizeAuthEmail } from '@/lib/auth-onboarding';
 
-type AccountInput = { action?: 'enableAccess' | 'invite' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[] };
+type AccountInput = { action?: 'enableAccess' | 'invite' | 'setTemporaryPassword' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[]; temporaryPassword?: string; temporaryPasswordConfirmation?: string };
 
 function activationUrl(token: string) {
   return `${process.env.APP_URL ?? 'http://localhost:3000'}/activate/${token}`;
@@ -25,23 +26,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.action === 'enableAccess' && !employee.user) {
     if (!employee.email) return NextResponse.json({ error: 'Pro přístup do aplikace musí mít zaměstnanec e-mail.' }, { status: 400 });
     if (!canAssignRole(actor.role, employee.role)) return NextResponse.json({ error: 'Manažer nemůže vytvořit administrátorský účet.' }, { status: 403 });
-    const existing = await prisma.user.findUnique({ where: { email: employee.email }, include: { employee: true } });
+    const normalizedEmail = normalizeAuthEmail(employee.email);
+    const existing = await prisma.user.findFirst({ where: { email: { equals: normalizedEmail, mode: 'insensitive' } }, include: { employee: true } });
     if (existing) {
       if (existing.employee) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
       if (actor.role !== 'ADMIN' && existing.role === 'ADMIN') return NextResponse.json({ error: 'Administrátorský účet může propojit pouze administrátor.' }, { status: 403 });
-      await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, role: existing.role, roles: existing.roles } });
+      await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, email: normalizedEmail, role: existing.role, roles: existing.roles } });
       return NextResponse.json({ ok: true, linkedExistingAccount: true });
     }
     const rolesToAssign = body.roles && body.roles.length ? body.roles : (employee.roles.length ? employee.roles : [employee.role]);
     const primaryRole = body.role || employee.role;
-    const user = await prisma.user.create({
-      data: {
-        name: `${employee.firstName} ${employee.lastName}`,
-        email: employee.email,
-        role: primaryRole,
-        roles: rolesToAssign,
-        employee: { connect: { id: employee.id } },
-      },
+    const user = await prisma.$transaction(async (transaction) => {
+      const created = await transaction.user.create({
+        data: {
+          name: `${employee.firstName} ${employee.lastName}`,
+          email: normalizedEmail,
+          role: primaryRole,
+          roles: rolesToAssign,
+          employee: { connect: { id: employee.id } },
+        },
+      });
+      await transaction.employee.update({ where: { id: employee.id }, data: { email: normalizedEmail } });
+      return created;
     });
     try {
       const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = activationUrl(token);
@@ -65,6 +71,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const token = await issueUserToken(target.id, 'ACTIVATION', 48); const url = activationUrl(token);
     await sendActivationEmail(target.email, url); await audit('INVITATION_RESENT', target.id, actor.id);
     return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
+  }
+
+  if (body.action === 'setTemporaryPassword') {
+    if (!body.temporaryPassword || !validatePassword(body.temporaryPassword)) {
+      return NextResponse.json({ error: 'Dočasné heslo musí mít alespoň 12 znaků a obsahovat písmeno i číslo.' }, { status: 400 });
+    }
+    if (body.temporaryPassword !== body.temporaryPasswordConfirmation) {
+      return NextResponse.json({ error: 'Potvrzení dočasného hesla se neshoduje.' }, { status: 400 });
+    }
+    const passwordHash = await hashPassword(body.temporaryPassword);
+    await prisma.$transaction(async (transaction) => {
+      await transaction.user.update({
+        where: { id: target.id },
+        data: {
+          passwordHash,
+          status: 'ACTIVE',
+          mustChangePassword: true,
+          sessionVersion: { increment: 1 },
+          sessions: { deleteMany: {} },
+        },
+      });
+      await transaction.employee.update({ where: { id }, data: { isActive: true } });
+      await transaction.userToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } });
+      await transaction.userAuditLog.create({
+        data: {
+          action: 'PASSWORD_CHANGED',
+          targetUserId: target.id,
+          actorUserId: actor.id,
+          metadata: { source: 'ADMIN_TEMPORARY_PASSWORD', mustChangePassword: true },
+        },
+      });
+    });
+    console.info('[employees/account] Temporary password issued', { targetUserId: target.id, actorUserId: actor.id });
+    return NextResponse.json({ ok: true, message: 'Dočasné heslo bylo nastaveno. Zaměstnanec si ho po prvním přihlášení musí změnit.' });
   }
 
   if (body.action === 'suspend' || body.action === 'role') {
