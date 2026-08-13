@@ -107,6 +107,12 @@ export type OfferPriceRuleOption = {
   label: string;
   description?: string | null;
   mediaType?: string | null;
+  pricingSegment: 'COMMERCIAL' | 'CULTURE_SPORT' | 'PUBLIC_NONPROFIT' | 'CUSTOM';
+  city?: string | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  minDurationMonths?: number | null;
+  maxDurationMonths?: number | null;
   calculation: 'PER_SURFACE' | 'FLAT';
   unit: string;
   unitPrice: string;

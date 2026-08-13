@@ -56,3 +56,16 @@ export async function runPostSaveTasks(tasks: Array<{ name: string; run: () => P
   });
   return warnings;
 }
+
+export async function runWithRetry<T>(operation: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= Math.max(1, attempts); attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      console.error(`[mobile-photos/upload] Pokus ${attempt}/${attempts} selhal`, error);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Operace selhala');
+}

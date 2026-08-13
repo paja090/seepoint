@@ -125,6 +125,13 @@ enum ClientResolutionStatus {
   UNRESOLVED
 }
 
+enum ClientPricingSegment {
+  COMMERCIAL
+  CULTURE_SPORT
+  PUBLIC_NONPROFIT
+  CUSTOM
+}
+
 enum OfferStatus {
   DRAFT
   SENT
@@ -338,47 +345,48 @@ enum ReservationStatus {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  name           String
-  email          String     @unique
-  role           Role       @default(VIEWER)
-  roles          Role[]     @default([])
-  passwordHash   String?
-  mustChangePassword Boolean @default(false)
-  status         UserStatus @default(INVITED)
-  lastLoginAt    DateTime?
-  sessionVersion Int        @default(1)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                 String     @id @default(cuid())
+  name               String
+  email              String     @unique
+  role               Role       @default(VIEWER)
+  roles              Role[]     @default([])
+  passwordHash       String?
+  mustChangePassword Boolean    @default(false)
+  status             UserStatus @default(INVITED)
+  lastLoginAt        DateTime?
+  sessionVersion     Int        @default(1)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  importBatches          ImportBatch[]
-  workAssignments        WorkAssignment[]
-  employee               Employee?
-  sessions               UserSession[]
-  tokens                 UserToken[]
-  auditActions           UserAuditLog[]   @relation("AuditActor")
-  auditTargets           UserAuditLog[]   @relation("AuditTarget")
-  createdOffers          Offer[]          @relation("OfferCreatedBy")
-  updatedOffers          Offer[]          @relation("OfferUpdatedBy")
-  offerEvents            OfferEvent[]
-  createdOfferPriceRules          OfferPriceRule[]                @relation("OfferPriceRuleCreatedBy")
-  updatedOfferPriceRules          OfferPriceRule[]                @relation("OfferPriceRuleUpdatedBy")
+  importBatches                  ImportBatch[]
+  workAssignments                WorkAssignment[]
+  employee                       Employee?
+  sessions                       UserSession[]
+  tokens                         UserToken[]
+  auditActions                   UserAuditLog[]                  @relation("AuditActor")
+  auditTargets                   UserAuditLog[]                  @relation("AuditTarget")
+  createdOffers                  Offer[]                         @relation("OfferCreatedBy")
+  updatedOffers                  Offer[]                         @relation("OfferUpdatedBy")
+  offerEvents                    OfferEvent[]
+  createdOfferPriceRules         OfferPriceRule[]                @relation("OfferPriceRuleCreatedBy")
+  updatedOfferPriceRules         OfferPriceRule[]                @relation("OfferPriceRuleUpdatedBy")
+  offerItemPriceOverrides        OfferItem[]                     @relation("OfferItemPriceOverride")
   navigationDocumentationReports NavigationDocumentationReport[]
   navigationReportAuditLogs      NavigationReportAuditLog[]
-  assignedClients                 Client[]                        @relation("ClientAssignedUser")
-  assignedCrmOrders               CrmOrder[]                      @relation("CrmOrderAssignedUser")
-  assignedRealizations            CrmRealization[]                @relation("CrmRealizationAssignedUser")
-  assignedContracts               ClientContract[]                @relation("ClientContractAssignedUser")
-  communicationAuthorLogs         ClientCommunication[]           @relation("CommunicationAuthor")
-  assignedCrmTasks                CrmTask[]                       @relation("CrmTaskAssignedUser")
-  createdCrmTasks                 CrmTask[]                       @relation("CrmTaskCreatedUser")
-  uploadedClientDocuments         ClientDocument[]                @relation("ClientDocumentUploader")
-  crmAuditLogs                    CrmAuditLog[]
-  performedClientMerges           ClientMergeLog[]
-  navigationPriceAuditLogs        NavigationPriceAuditLog[]       @relation("NavigationPriceAuditUser")
-  navigationPriceVersions         NavigationPriceVersion[]        @relation("NavigationPriceChangedUser")
-  assignedNavigationOrders        NavigationOrder[]               @relation("NavOrderInstaller")
-  assignedNavigationPoints        NavigationPoint[]               @relation("NavPointInstaller")
+  assignedClients                Client[]                        @relation("ClientAssignedUser")
+  assignedCrmOrders              CrmOrder[]                      @relation("CrmOrderAssignedUser")
+  assignedRealizations           CrmRealization[]                @relation("CrmRealizationAssignedUser")
+  assignedContracts              ClientContract[]                @relation("ClientContractAssignedUser")
+  communicationAuthorLogs        ClientCommunication[]           @relation("CommunicationAuthor")
+  assignedCrmTasks               CrmTask[]                       @relation("CrmTaskAssignedUser")
+  createdCrmTasks                CrmTask[]                       @relation("CrmTaskCreatedUser")
+  uploadedClientDocuments        ClientDocument[]                @relation("ClientDocumentUploader")
+  crmAuditLogs                   CrmAuditLog[]
+  performedClientMerges          ClientMergeLog[]
+  navigationPriceAuditLogs       NavigationPriceAuditLog[]       @relation("NavigationPriceAuditUser")
+  navigationPriceVersions        NavigationPriceVersion[]        @relation("NavigationPriceChangedUser")
+  assignedNavigationOrders       NavigationOrder[]               @relation("NavOrderInstaller")
+  assignedNavigationPoints       NavigationPoint[]               @relation("NavPointInstaller")
 }
 
 model UserSession {
@@ -533,39 +541,40 @@ model EmployeeRate {
 }
 
 model Client {
-  id              String       @id @default(cuid())
+  id              String               @id @default(cuid())
   name            String
-  normalizedName  String       @unique
+  normalizedName  String               @unique
   companyId       String?
   tradingName     String?
   dic             String?
   billingStreet   String?
   billingCity     String?
   billingZip      String?
-  billingCountry  String?      @default("CZ")
+  billingCountry  String?              @default("CZ")
   shippingStreet  String?
   shippingCity    String?
   shippingZip     String?
-  shippingCountry String?      @default("CZ")
+  shippingCountry String?              @default("CZ")
   website         String?
   contactPerson   String?
   email           String?
   phone           String?
-  externalCode    String?      @unique
-  status          ClientStatus @default(ACTIVE)
-  clientType      ClientType   @default(DIRECT_CLIENT)
-  source          ClientSource @default(WEBSITE)
+  externalCode    String?              @unique
+  status          ClientStatus         @default(ACTIVE)
+  clientType      ClientType           @default(DIRECT_CLIENT)
+  pricingSegment  ClientPricingSegment @default(COMMERCIAL)
+  source          ClientSource         @default(WEBSITE)
   assignedUserId  String?
   rating          String?
-  lastActivityAt  DateTime     @default(now())
+  lastActivityAt  DateTime             @default(now())
   note            String?
-  logoDriveFileId String?      @unique
+  logoDriveFileId String?              @unique
   logoFileName    String?
   logoMimeType    String?
   logoUpdatedAt   DateTime?
-  active          Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  active          Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   assignedUser                   User?                           @relation("ClientAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
   currentSurfaces                AdvertisingSurface[]            @relation("CurrentSurfaceClient")
@@ -618,9 +627,9 @@ model AdvertisingCarrier {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  importBatch      ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
-  surfaces         AdvertisingSurface[]
-  photos           Photo[]
+  importBatch                  ImportBatch?                  @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  surfaces                     AdvertisingSurface[]
+  photos                       Photo[]
   workItems                    WorkOrderItem[]
   workTasks                    WorkTask[]
   crmRealizations              CrmRealization[]
@@ -796,17 +805,17 @@ model VehicleServiceRecord {
 }
 
 model VehicleFuelExpense {
-  id           String   @id @default(cuid())
-  vehicleId    String
-  employeeId   String?
-  userId       String?
-  amount       Decimal  @db.Decimal(12, 2)
-  liters       Decimal? @db.Decimal(10, 2)
-  odometer     Int?
-  fuelType     String   @default("DIESEL")
-  receiptUrl   String?
-  note         String?
-  createdAt    DateTime @default(now())
+  id         String   @id @default(cuid())
+  vehicleId  String
+  employeeId String?
+  userId     String?
+  amount     Decimal  @db.Decimal(12, 2)
+  liters     Decimal? @db.Decimal(10, 2)
+  odometer   Int?
+  fuelType   String   @default("DIESEL")
+  receiptUrl String?
+  note       String?
+  createdAt  DateTime @default(now())
 
   vehicle  Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
@@ -830,15 +839,15 @@ enum AbsenceStatus {
 }
 
 model EmployeeAbsence {
-  id          String        @id @default(cuid())
-  employeeId  String
-  type        AbsenceType   @default(VACATION)
-  dateFrom    DateTime
-  dateTo      DateTime
-  note        String?
-  status      AbsenceStatus @default(APPROVED)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id         String        @id @default(cuid())
+  employeeId String
+  type       AbsenceType   @default(VACATION)
+  dateFrom   DateTime
+  dateTo     DateTime
+  note       String?
+  status     AbsenceStatus @default(APPROVED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
@@ -907,17 +916,17 @@ model AdvertisingSurface {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  carrier       AdvertisingCarrier   @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  currentClient Client?              @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
-  contract      NavigationContract?  @relation(fields: [contractId], references: [id], onDelete: SetNull)
-  importBatch   ImportBatch?         @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
-  occupancies     Occupancy[]
-  offerItems      OfferItem[]
-  photos          Photo[]
-  workItems       WorkOrderItem[]
-  crmRealizations CrmRealization[]
+  carrier          AdvertisingCarrier  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  currentClient    Client?             @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
+  contract         NavigationContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  importBatch      ImportBatch?        @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  occupancies      Occupancy[]
+  offerItems       OfferItem[]
+  photos           Photo[]
+  workItems        WorkOrderItem[]
+  crmRealizations  CrmRealization[]
   navigationPoints NavigationPoint[]
-  historyLogs     CarrierHistoryLog[]
+  historyLogs      CarrierHistoryLog[]
 
   @@index([carrierId])
   @@index([currentClientId])
@@ -927,15 +936,15 @@ model AdvertisingSurface {
 }
 
 model Occupancy {
-  id                     String          @id @default(cuid())
+  id                     String                 @id @default(cuid())
   surfaceId              String
   clientId               String?
   clientName             String
   campaignName           String
   dateFrom               DateTime
   dateTo                 DateTime
-  status                 OccupancyStatus @default(RESERVED)
-  price                  Decimal?        @db.Decimal(12, 2)
+  status                 OccupancyStatus        @default(RESERVED)
+  price                  Decimal?               @db.Decimal(12, 2)
   note                   String?
   createdBy              String?
   updatedBy              String?
@@ -950,10 +959,10 @@ model Occupancy {
   sourceColumn           Int?
   clientResolutionStatus ClientResolutionStatus @default(RESOLVED)
   statusDerivation       String?
-  sourceKey              String?         @unique
+  sourceKey              String?                @unique
   importBatchId          String?
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   surface     AdvertisingSurface @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
   client      Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
@@ -969,30 +978,31 @@ model Occupancy {
 }
 
 model Offer {
-  id                    String      @id @default(cuid())
+  id                    String               @id @default(cuid())
   clientId              String
   title                 String
   campaignName          String?
-  pricingTier           String      @default("komerce")
+  pricingTier           String               @default("komerce")
+  pricingSegment        ClientPricingSegment @default(COMMERCIAL)
   contactPerson         String?
   contactEmail          String?
   contactPhone          String?
   campaignGoal          String?
-  budget                Decimal?    @db.Decimal(12, 2)
-  status                OfferStatus @default(DRAFT)
-  offerType             OfferType   @default(STANDARD_MEDIA)
+  budget                Decimal?             @db.Decimal(12, 2)
+  status                OfferStatus          @default(DRAFT)
+  offerType             OfferType            @default(STANDARD_MEDIA)
   validUntil            DateTime?
   note                  String?
   internalNote          String?
   clientMessage         String?
-  currency              String      @default("CZK")
-  taxRate               Decimal     @default(21) @db.Decimal(5, 2)
-  subtotal              Decimal?    @db.Decimal(12, 2)
-  discountAmount        Decimal?    @db.Decimal(12, 2)
-  taxAmount             Decimal?    @db.Decimal(12, 2)
-  totalPrice            Decimal?    @db.Decimal(12, 2)
-  totalWithTax          Decimal?    @db.Decimal(12, 2)
-  publicTokenHash       String?     @unique
+  currency              String               @default("CZK")
+  taxRate               Decimal              @default(21) @db.Decimal(5, 2)
+  subtotal              Decimal?             @db.Decimal(12, 2)
+  discountAmount        Decimal?             @db.Decimal(12, 2)
+  taxAmount             Decimal?             @db.Decimal(12, 2)
+  totalPrice            Decimal?             @db.Decimal(12, 2)
+  totalWithTax          Decimal?             @db.Decimal(12, 2)
+  publicTokenHash       String?              @unique
   publishedAt           DateTime?
   sentAt                DateTime?
   acceptedAt            DateTime?
@@ -1003,22 +1013,22 @@ model Offer {
   createdBy             String?
   createdByUserId       String?
   updatedByUserId       String?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
 
-  client                          Client                          @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  createdByUser                   User?                           @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  updatedByUser                   User?                           @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
-  items                           OfferItem[]
-  occupancies                     Occupancy[]
-  events                          OfferEvent[]
-  charges                         OfferCharge[]
-  navigationOffer                 NavigationOffer?
-  cityGalleryOffer                CityGalleryOffer?
-  packageSelections               OfferPackageSelection[]
-  navigationDocumentationReports  NavigationDocumentationReport[]
-  crmOrder                        CrmOrder?
-  navigationContracts             NavigationContract[]
+  client                         Client                          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdByUser                  User?                           @relation("OfferCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser                  User?                           @relation("OfferUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  items                          OfferItem[]
+  occupancies                    Occupancy[]
+  events                         OfferEvent[]
+  charges                        OfferCharge[]
+  navigationOffer                NavigationOffer?
+  cityGalleryOffer               CityGalleryOffer?
+  packageSelections              OfferPackageSelection[]
+  navigationDocumentationReports NavigationDocumentationReport[]
+  crmOrder                       CrmOrder?
+  navigationContracts            NavigationContract[]
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -1027,23 +1037,23 @@ model Offer {
 }
 
 model NavigationOffer {
-  id               String   @id @default(cuid())
-  offerId          String   @unique
-  targetName       String
-  targetAddress    String?
-  targetLatitude   Float
-  targetLongitude  Float
-  targetNote       String?
-  targetPhotoUrl   String?
-  googlePlaceId    String?
-  formattedAddress String?
+  id                    String   @id @default(cuid())
+  offerId               String   @unique
+  targetName            String
+  targetAddress         String?
+  targetLatitude        Float
+  targetLongitude       Float
+  targetNote            String?
+  targetPhotoUrl        String?
+  googlePlaceId         String?
+  formattedAddress      String?
   proposalMode          String   @default("LOCATION_SELECTION")
   graphicArtworkUrl     String?
   includeGraphicProof   Boolean  @default(true)
   clientArtworkUrl      String?
   clientArtworkFileName String?
   createdAt             DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt             DateTime @updatedAt
 
   offer                          Offer                           @relation(fields: [offerId], references: [id], onDelete: Cascade)
   points                         NavigationPoint[]
@@ -1073,22 +1083,23 @@ model NavigationPoint {
   installationPrice Decimal               @default(0) @db.Decimal(12, 2)
   removalPrice      Decimal               @default(0) @db.Decimal(12, 2)
   productionPrice   Decimal               @default(0) @db.Decimal(12, 2)
+  priceSnapshot     Json?
   internalNote      String?
   clientNote        String?
   status            NavigationPointStatus @default(PLANNED)
 
-  routeOrder            Int?                  @default(0)
+  routeOrder            Int?      @default(0)
   installerUserId       String?
   plannedInstallationAt DateTime?
   arrowDirection        String?
   roadSide              String?
   signOrientation       String?
-  distanceValue         Decimal?              @db.Decimal(10, 2)
-  distanceUnit          String?               @default("m")
-  issueReported         Boolean               @default(false)
+  distanceValue         Decimal?  @db.Decimal(10, 2)
+  distanceUnit          String?   @default("m")
+  issueReported         Boolean   @default(false)
   issueType             String?
   issueNote             String?
-  qcStatus              String?               @default("PENDING")
+  qcStatus              String?   @default("PENDING")
   qcNote                String?
 
   targetLatitude           Float?
@@ -1110,8 +1121,8 @@ model NavigationPoint {
   visualizedPhotoUrl       String?
   isSelectedByClient       Boolean                   @default(true)
 
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   navigationOffer              NavigationOffer?              @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
   navigationOrder              NavigationOrder?              @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
@@ -1196,14 +1207,14 @@ model NavigationDocumentationItem {
 }
 
 model NavigationReportAuditLog {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   reportId       String
   actorUserId    String
   action         String
   recipientEmail String?
   tokenExpiresAt DateTime?
   message        String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   report    NavigationDocumentationReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   actorUser User                          @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
@@ -1300,29 +1311,38 @@ model OfferPackageSelection {
 }
 
 model OfferPriceRule {
-  id              String                @id @default(cuid())
-  code            String                @unique
-  category        OfferPriceCategory
-  label           String
-  description     String?
-  mediaType       MediaType?
-  calculation     OfferPriceCalculation @default(PER_SURFACE)
-  unit            String
-  unitPrice       Decimal               @db.Decimal(12, 2)
-  defaultSelected Boolean               @default(false)
-  active          Boolean               @default(true)
-  sortOrder       Int                   @default(0)
-  createdByUserId String?
-  updatedByUserId String?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  id                String                @id @default(cuid())
+  code              String                @unique
+  category          OfferPriceCategory
+  label             String
+  description       String?
+  mediaType         MediaType?
+  pricingSegment    ClientPricingSegment  @default(COMMERCIAL)
+  city              String?
+  validFrom         DateTime?
+  validTo           DateTime?
+  minDurationMonths Int?
+  maxDurationMonths Int?
+  calculation       OfferPriceCalculation @default(PER_SURFACE)
+  unit              String
+  unitPrice         Decimal               @db.Decimal(12, 2)
+  defaultSelected   Boolean               @default(false)
+  active            Boolean               @default(true)
+  sortOrder         Int                   @default(0)
+  createdByUserId   String?
+  updatedByUserId   String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   createdBy User?         @relation("OfferPriceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   updatedBy User?         @relation("OfferPriceRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
   charges   OfferCharge[]
+  items     OfferItem[]
 
   @@index([category, active, sortOrder])
   @@index([mediaType, active])
+  @@index([pricingSegment, mediaType, category, active])
+  @@index([validFrom, validTo])
 }
 
 model OfferCharge {
@@ -1348,32 +1368,44 @@ model OfferCharge {
 }
 
 model OfferItem {
-  id                 String   @id @default(cuid())
+  id                 String               @id @default(cuid())
   offerId            String
   packageSelectionId String?
   surfaceId          String
+  priceRuleId        String?
+  pricingSegment     ClientPricingSegment @default(COMMERCIAL)
+  catalogPrice       Decimal?             @db.Decimal(12, 2)
+  finalPrice         Decimal?             @db.Decimal(12, 2)
+  priceSource        String?
+  priceValidFrom     DateTime?
+  priceValidTo       DateTime?
+  overrideReason     String?
+  overrideByUserId   String?
   dateFrom           DateTime
   dateTo             DateTime
-  quantity           Decimal  @default(1) @db.Decimal(10, 2)
-  unit               String   @default("plocha")
-  unitPrice          Decimal? @db.Decimal(12, 2)
-  discountPercent    Decimal  @default(0) @db.Decimal(5, 2)
-  discountAmount     Decimal  @default(0) @db.Decimal(12, 2)
-  subtotal           Decimal? @db.Decimal(12, 2)
-  sortOrder          Int      @default(0)
+  quantity           Decimal              @default(1) @db.Decimal(10, 2)
+  unit               String               @default("plocha")
+  unitPrice          Decimal?             @db.Decimal(12, 2)
+  discountPercent    Decimal              @default(0) @db.Decimal(5, 2)
+  discountAmount     Decimal              @default(0) @db.Decimal(12, 2)
+  subtotal           Decimal?             @db.Decimal(12, 2)
+  sortOrder          Int                  @default(0)
   groupLabel         String?
   customTitle        String?
   clientDescription  String?
-  price              Decimal? @db.Decimal(12, 2)
+  price              Decimal?             @db.Decimal(12, 2)
   note               String?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime             @default(now())
 
   offer            Offer                  @relation(fields: [offerId], references: [id], onDelete: Cascade)
   surface          AdvertisingSurface     @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  priceRule        OfferPriceRule?        @relation(fields: [priceRuleId], references: [id], onDelete: SetNull)
+  overrideBy       User?                  @relation("OfferItemPriceOverride", fields: [overrideByUserId], references: [id], onDelete: SetNull)
   packageSelection OfferPackageSelection? @relation(fields: [packageSelectionId], references: [id], onDelete: SetNull)
 
   @@index([offerId])
   @@index([surfaceId])
+  @@index([priceRuleId])
   @@index([packageSelectionId])
   @@index([dateFrom, dateTo])
 }
@@ -1399,24 +1431,24 @@ model OfferEvent {
 }
 
 model Photo {
-  id              String    @id @default(cuid())
-  carrierId       String?
-  surfaceId       String?
-  employeeId      String?
-  taskId          String?
-  workEntryId      String?
-  crmRealizationId String?
-  url              String
-  driveFileId      String?
-  fileName         String?
-  mimeType         String?
-  size             Int?
-  type             PhotoType @default(CARRIER)
-  note             String?
-  sortOrder        Int       @default(0)
-  isPrimary        Boolean   @default(false)
-  isClientVisible  Boolean   @default(false)
-  isPrivate        Boolean   @default(false)
+  id                     String    @id @default(cuid())
+  carrierId              String?
+  surfaceId              String?
+  employeeId             String?
+  taskId                 String?
+  workEntryId            String?
+  crmRealizationId       String?
+  url                    String
+  driveFileId            String?
+  fileName               String?
+  mimeType               String?
+  size                   Int?
+  type                   PhotoType @default(CARRIER)
+  note                   String?
+  sortOrder              Int       @default(0)
+  isPrimary              Boolean   @default(false)
+  isClientVisible        Boolean   @default(false)
+  isPrivate              Boolean   @default(false)
   capturedLatitude       Float?
   capturedLongitude      Float?
   capturedAccuracyMeters Float?
@@ -1428,11 +1460,11 @@ model Photo {
   aiSuggestedCarrierCode String?
   aiConfidence           Float?
   aiLabels               Json?
-  createdAt        DateTime  @default(now())
+  createdAt              DateTime  @default(now())
 
-  carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  surface   AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
-  employee  Employee?           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  carrier                      AdvertisingCarrier?           @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  surface                      AdvertisingSurface?           @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  employee                     Employee?                     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   task                         WorkTask?                     @relation(fields: [taskId], references: [id], onDelete: SetNull)
   workEntry                    WorkEntry?                    @relation(fields: [workEntryId], references: [id], onDelete: SetNull)
   crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
@@ -1550,17 +1582,17 @@ model WorkOrder {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  crmOrderId       String?
+  crmOrderId        String?
   navigationOrderId String?
-  client           Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  crmOrder         CrmOrder?        @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
-  navigationOrder  NavigationOrder? @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
-  assignments      WorkAssignment[]
-  items            WorkOrderItem[]
-  workTasks        WorkTask[]
-  workEntries      WorkEntry[]
-  rates            WorkOrderRate[]
-  crmRealizations  CrmRealization[]
+  client            Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  crmOrder          CrmOrder?        @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  navigationOrder   NavigationOrder? @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
+  assignments       WorkAssignment[]
+  items             WorkOrderItem[]
+  workTasks         WorkTask[]
+  workEntries       WorkEntry[]
+  rates             WorkOrderRate[]
+  crmRealizations   CrmRealization[]
 
   @@index([scheduledAt, status])
   @@index([priority, scheduledAt])
@@ -2132,17 +2164,17 @@ model CrmOrder {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  client         Client                @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  contact        ClientContact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  branch         ClientBranch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  offer          Offer?                @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  assignedUser   User?                 @relation("CrmOrderAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
-  realizations   CrmRealization[]
-  clientInvoices ClientInvoice[]
-  documents      ClientDocument[]
-  communications ClientCommunication[]
-  crmTasks       CrmTask[]
-  workOrders     WorkOrder[]
+  client          Client                @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  contact         ClientContact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  branch          ClientBranch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  offer           Offer?                @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  assignedUser    User?                 @relation("CrmOrderAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  realizations    CrmRealization[]
+  clientInvoices  ClientInvoice[]
+  documents       ClientDocument[]
+  communications  ClientCommunication[]
+  crmTasks        CrmTask[]
+  workOrders      WorkOrder[]
   navigationOrder NavigationOrder?
 
   @@index([clientId])
@@ -2225,11 +2257,11 @@ model ClientInvoice {
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
-  client    Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  crmOrder  CrmOrder?           @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
-  items     ClientInvoiceItem[]
-  documents ClientDocument[]
-  crmTasks  CrmTask[]
+  client                   Client                    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  crmOrder                 CrmOrder?                 @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  items                    ClientInvoiceItem[]
+  documents                ClientDocument[]
+  crmTasks                 CrmTask[]
   navigationBillingPeriods NavigationBillingPeriod[]
 
   @@index([clientId])
@@ -2404,11 +2436,11 @@ model NavigationOrder {
   installationDate   DateTime?
   deinstallationDate DateTime?
 
-  targetName         String
-  targetAddress      String?
-  targetLatitude     Float
-  targetLongitude    Float
-  targetNote         String?
+  targetName      String
+  targetAddress   String?
+  targetLatitude  Float
+  targetLongitude Float
+  targetNote      String?
 
   graphicsApprovedAt DateTime?
   productionReadyAt  DateTime?
@@ -2417,19 +2449,19 @@ model NavigationOrder {
 
   plannedInstallationAt DateTime?
   installerUserId       String?
-  qcStatus              String?                 @default("PENDING")
+  qcStatus              String?   @default("PENDING")
   qcApprovedAt          DateTime?
   qcApprovedUserId      String?
 
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  crmOrder           CrmOrder                  @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
-  installerUser      User?                     @relation("NavOrderInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
-  points             NavigationPoint[]
-  billingPeriods     NavigationBillingPeriod[]
+  crmOrder            CrmOrder                  @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  installerUser       User?                     @relation("NavOrderInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
+  points              NavigationPoint[]
+  billingPeriods      NavigationBillingPeriod[]
   navigationContracts NavigationContract[]
-  workOrders         WorkOrder[]
+  workOrders          WorkOrder[]
 
   @@index([status])
 }
@@ -2446,54 +2478,54 @@ model NavigationBillingPeriod {
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
-  navigationOrder   NavigationOrder     @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
-  invoice           ClientInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  navigationOrder NavigationOrder @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  invoice         ClientInvoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@unique([navigationOrderId, dateFrom, dateTo])
   @@index([navigationOrderId])
 }
 
 model NavigationPriceVersion {
-  id                String          @id @default(cuid())
+  id                String    @id @default(cuid())
   navigationPointId String
   validFrom         DateTime
   validTo           DateTime?
-  unitPrice         Decimal         @db.Decimal(12, 2)
-  installationPrice Decimal         @default(0) @db.Decimal(12, 2)
-  removalPrice      Decimal         @default(0) @db.Decimal(12, 2)
-  productionPrice   Decimal         @default(0) @db.Decimal(12, 2)
-  subtotal          Decimal         @db.Decimal(12, 2)
+  unitPrice         Decimal   @db.Decimal(12, 2)
+  installationPrice Decimal   @default(0) @db.Decimal(12, 2)
+  removalPrice      Decimal   @default(0) @db.Decimal(12, 2)
+  productionPrice   Decimal   @default(0) @db.Decimal(12, 2)
+  subtotal          Decimal   @db.Decimal(12, 2)
   reason            String?
   changedByUserId   String?
-  createdAt         DateTime        @default(now())
+  createdAt         DateTime  @default(now())
 
-  navigationPoint   NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
-  changedByUser     User?           @relation("NavigationPriceChangedUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
+  navigationPoint NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
+  changedByUser   User?           @relation("NavigationPriceChangedUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
 
   @@index([navigationPointId, validFrom])
 }
 
 model NavigationPriceAuditLog {
-  id                String          @id @default(cuid())
+  id                String   @id @default(cuid())
   navigationPointId String
-  oldUnitPrice      Decimal?        @db.Decimal(12, 2)
-  newUnitPrice      Decimal         @db.Decimal(12, 2)
+  oldUnitPrice      Decimal? @db.Decimal(12, 2)
+  newUnitPrice      Decimal  @db.Decimal(12, 2)
   effectiveDate     DateTime
   reason            String
   changedByUserId   String
   changedByUserName String
-  createdAt         DateTime        @default(now())
+  createdAt         DateTime @default(now())
 
-  navigationPoint   NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
-  changedByUser     User            @relation("NavigationPriceAuditUser", fields: [changedByUserId], references: [id], onDelete: Restrict)
+  navigationPoint NavigationPoint @relation(fields: [navigationPointId], references: [id], onDelete: Cascade)
+  changedByUser   User            @relation("NavigationPriceAuditUser", fields: [changedByUserId], references: [id], onDelete: Restrict)
 
   @@index([navigationPointId])
 }
 
 model NavigationContract {
-  id                String       @id @default(cuid())
-  contractNumber    String       @unique
-  contractType      String       @default("RENTAL") // RENTAL, PRODUCTION, SERVICE, MASTER
+  id                String   @id @default(cuid())
+  contractNumber    String   @unique
+  contractType      String   @default("RENTAL") // RENTAL, PRODUCTION, SERVICE, MASTER
   clientId          String
   agencyName        String?
   responsiblePerson String?
@@ -2503,20 +2535,20 @@ model NavigationContract {
   navigationOrderId String?
   startDate         DateTime
   endDate           DateTime
-  monthlyPrice      Decimal?     @db.Decimal(12, 2)
-  totalPrice        Decimal?     @db.Decimal(12, 2)
-  status            String       @default("ACTIVE") // DRAFT, ACTIVE, EXPIRING, EXPIRED, TERMINATED
-  autoRenews        Boolean      @default(false)
-  alertDaysBefore   Int          @default(30)
+  monthlyPrice      Decimal? @db.Decimal(12, 2)
+  totalPrice        Decimal? @db.Decimal(12, 2)
+  status            String   @default("ACTIVE") // DRAFT, ACTIVE, EXPIRING, EXPIRED, TERMINATED
+  autoRenews        Boolean  @default(false)
+  alertDaysBefore   Int      @default(30)
   note              String?
   fileUrl           String?
   fileName          String?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  client          Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  offer           Offer?              @relation(fields: [offerId], references: [id], onDelete: SetNull)
-  navigationOrder NavigationOrder?    @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
+  client          Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  offer           Offer?               @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  navigationOrder NavigationOrder?     @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
   surfaces        AdvertisingSurface[]
 
   @@index([clientId])
@@ -2525,18 +2557,18 @@ model NavigationContract {
 }
 
 model NavigationContactPerson {
-  id                String   @id @default(cuid())
-  clientId          String
-  contactType       String   @default("CLIENT") // CLIENT, AGENCY, RESPONSIBLE_PERSON
-  name              String
-  agencyName        String?
-  role              String?
-  phone             String?
-  email             String?
-  isPrimary         Boolean  @default(false)
-  note              String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id          String   @id @default(cuid())
+  clientId    String
+  contactType String   @default("CLIENT") // CLIENT, AGENCY, RESPONSIBLE_PERSON
+  name        String
+  agencyName  String?
+  role        String?
+  phone       String?
+  email       String?
+  isPrimary   Boolean  @default(false)
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -2544,19 +2576,19 @@ model NavigationContactPerson {
 }
 
 model CarrierHistoryLog {
-  id           String   @id @default(cuid())
-  carrierId    String
-  surfaceId    String?
-  eventType    String   // INSTALLATION, REINSTALLATION, GRAPHICS_CHANGE, REPAIR, SERVICE, DEINSTALLATION, CLIENT_CHANGE, RENTAL_CHANGE
-  title        String
-  description  String?
-  performedBy  String?
-  performedAt  DateTime @default(now())
-  clientId     String?
-  clientName   String?
-  photoUrl     String?
-  metadata     Json?
-  createdAt    DateTime @default(now())
+  id          String   @id @default(cuid())
+  carrierId   String
+  surfaceId   String?
+  eventType   String // INSTALLATION, REINSTALLATION, GRAPHICS_CHANGE, REPAIR, SERVICE, DEINSTALLATION, CLIENT_CHANGE, RENTAL_CHANGE
+  title       String
+  description String?
+  performedBy String?
+  performedAt DateTime @default(now())
+  clientId    String?
+  clientName  String?
+  photoUrl    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
 
   carrier AdvertisingCarrier  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
@@ -2567,7 +2599,7 @@ model CarrierHistoryLog {
 
 model CompanyShoppingItem {
   id                  String    @id @default(cuid())
-  category            String    // "OFFICE" (Kancelář) or "WORKSHOP" (Dílna & Výroba)
+  category            String // "OFFICE" (Kancelář) or "WORKSHOP" (Dílna & Výroba)
   title               String
   quantity            String?
   note                String?
@@ -2585,4 +2617,3 @@ model CompanyShoppingItem {
   @@index([category])
   @@index([isPurchased])
 }
-

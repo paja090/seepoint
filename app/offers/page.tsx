@@ -7,7 +7,6 @@ import {
   Filter,
   Inbox,
   MessageSquare,
-  Plus,
   RefreshCw,
   Search,
   Send,
@@ -17,7 +16,6 @@ import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { OfferPipeline } from '@/components/offers/OfferPipeline';
 import { OffersPageClientActions } from '@/components/offers/OffersPageClientActions';
-import { StatusBadge } from '@/components/StatusBadge';
 import {
   Button,
   Card,
@@ -67,13 +65,13 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
   });
 
   let rows: OfferView[];
-  let clients: Array<{ id: string; name: string }>;
+  let clients: Array<{ id: string; name: string; pricingSegment: 'COMMERCIAL' | 'CULTURE_SPORT' | 'PUBLIC_NONPROFIT' | 'CUSTOM' }>;
   let salespeople: Array<{ id: string; name: string }>;
 
   try {
     [rows, clients, salespeople] = await Promise.all([
       listOffers(user, urlParams) as Promise<OfferView[]>,
-      prisma.client.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.client.findMany({ where: { active: true }, select: { id: true, name: true, pricingSegment: true }, orderBy: { name: 'asc' } }),
       user.role === 'SALES'
         ? []
         : prisma.user.findMany({ where: { role: { in: ['ADMIN', 'MANAGER', 'SALES'] } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),

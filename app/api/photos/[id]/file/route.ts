@@ -11,7 +11,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   try {
     const photo = await prisma.photo.findUnique({
       where: { id: (await params).id },
-      select: { driveFileId: true, content: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true },
+      select: { driveFileId: true, content: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true, carrierId: true, surfaceId: true },
     });
     if (!photo || (!photo.driveFileId && !photo.content)) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
 
@@ -33,7 +33,8 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     } else if (photo.employeeId) {
       allowed = user.employee?.id === photo.employeeId || canAccess(user.role, 'employees');
     } else {
-      allowed = canAccess(user.role, 'carriers');
+      allowed = canAccess(user.role, 'carriers')
+        || (canAccess(user.role, 'navigationProjects') && Boolean(photo.carrierId || photo.surfaceId));
     }
 
     if (!allowed) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });

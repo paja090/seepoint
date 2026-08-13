@@ -14,10 +14,8 @@ import {
   Cloud,
   ChevronRight,
   Compass,
-  TreeDeciduous,
-  RotateCw,
-  Sun,
 } from 'lucide-react';
+import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType } from '@/lib/mobile-photo-damage';
 
 type NearbyCarrier = {
   id: string;
@@ -95,7 +93,7 @@ export function MobilePhotoFieldAppView() {
   // Photo Metadata State
   const [side, setSide] = useState<'SIDE_A' | 'SIDE_B' | 'BOTH'>('SIDE_A');
   const [purpose, setPurpose] = useState<'CLIENT_REPORT' | 'DAMAGE' | 'INSPECTION' | 'MOTIF_CHANGE'>('CLIENT_REPORT');
-  const [damageType, setDamageType] = useState<string>('OVERGROWN');
+  const [damageType, setDamageType] = useState<MobilePhotoDamageType>('OVERGROWN');
 
   // Camera & Photo State
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -236,22 +234,28 @@ export function MobilePhotoFieldAppView() {
       });
 
       const responseText = await res.text();
-      let data: { error?: string; code?: string; message?: string; warnings?: string[]; clientMismatch?: ClientMismatch | null } = {};
+      let data: { error?: string; code?: string; message?: string; warnings?: string[]; clientMismatch?: ClientMismatch | null; chatSent?: boolean } = {};
       try { data = responseText ? JSON.parse(responseText) : {}; } catch { /* filtered below */ }
       if (!res.ok) {
         const messages: Record<string, string> = {
           GPS_REQUIRED: 'Před uložením fotografie je nutné získat GPS polohu.',
           DATABASE_ERROR: 'Fotografii se nepodařilo zapsat do databáze. Zkuste akci zopakovat.',
           INVALID_IMAGE: 'Formát fotografie není podporován.',
+          DAMAGE_TYPE_REQUIRED: 'Vyberte typ závady.',
         };
         throw new Error(messages[data.code || ''] || 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
       }
 
-      const warningText = data.warnings?.includes('google-drive')
-        ? ' Google Drive nebyl dostupný; použit byl bezpečný záložní zápis.'
-        : data.warnings?.includes('chat') ? ' Fotografie je uložena, ale zprávu do chatu se nepodařilo odeslat.' : '';
+      const warningParts = [
+        data.warnings?.includes('google-drive') ? 'Google Drive nebyl dostupný; použit byl bezpečný záložní zápis.' : null,
+        data.warnings?.includes('history') ? 'Zápis do historie se nepodařil.' : null,
+        data.warnings?.includes('carrier-note') ? 'Poznámku nosiče se nepodařilo aktualizovat.' : null,
+      ].filter(Boolean);
       setClientMismatch(data.clientMismatch || null);
-      setUploadSuccessMsg(data.clientMismatch ? null : (data.message || 'Fotografie byla úspěšně uložena!') + warningText);
+      setUploadSuccessMsg(data.clientMismatch ? null : [data.message || 'Fotografie byla úspěšně uložena!', ...warningParts].join(' '));
+      if (purpose === 'DAMAGE' && data.chatSent === false) {
+        setUploadErrorMsg('Fotografie závady je bezpečně uložená, ale urgentní zprávu do chatu se nepodařilo odeslat. Informujte prosím dispečink.');
+      }
       clearPreview();
       setPhotoNote('');
 
@@ -586,50 +590,21 @@ export function MobilePhotoFieldAppView() {
               </label>
 
               <div className="grid grid-cols-2 gap-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setDamageType('OVERGROWN')}
-                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
-                    damageType === 'OVERGROWN' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
-                  }`}
-                >
-                  <TreeDeciduous size={14} className="text-emerald-400 shrink-0" />
-                  <span>🌳 Zarostlá (prořez)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDamageType('TURNED')}
-                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
-                    damageType === 'TURNED' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
-                  }`}
-                >
-                  <RotateCw size={14} className="text-amber-400 shrink-0" />
-                  <span>🔄 Vytočená / hnutá</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDamageType('FADED')}
-                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
-                    damageType === 'FADED' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
-                  }`}
-                >
-                  <Sun size={14} className="text-amber-300 shrink-0" />
-                  <span>☀️ Vybledlý tisk</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setDamageType('DAMAGED_STRUCTURE')}
-                  className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
-                    damageType === 'DAMAGED_STRUCTURE' ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
-                  }`}
-                >
-                  <AlertTriangle size={14} className="text-rose-400 shrink-0" />
-                  <span>🚨 Rozbitá konstrukce</span>
-                </button>
+                {MOBILE_PHOTO_DAMAGE_TYPES.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setDamageType(item.value)}
+                    className={`rounded-xl p-2 border text-left font-bold transition flex items-center gap-1.5 ${
+                      damageType === item.value ? 'border-rose-500 bg-rose-950 text-rose-200' : 'border-slate-800 bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    <AlertTriangle size={14} className="text-rose-400 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
               </div>
+              {damageType === 'OTHER' && <p className="text-[10px] font-semibold text-amber-300">Popište jinou závadu do poznámky pod fotografií.</p>}
             </div>
           )}
 

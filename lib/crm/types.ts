@@ -1,6 +1,7 @@
 import {
   ClientStatus,
   ClientType,
+  ClientPricingSegment,
   ClientSource,
   PreferredContactMethod,
   CrmOrderStatus,
@@ -19,6 +20,7 @@ import {
 export type {
   ClientStatus,
   ClientType,
+  ClientPricingSegment,
   ClientSource,
   PreferredContactMethod,
   CrmOrderStatus,
@@ -182,6 +184,7 @@ export type ClientProfileData = {
   website?: string | null;
   status: ClientStatus;
   clientType: ClientType;
+  pricingSegment: ClientPricingSegment;
   source: ClientSource;
   assignedUserId?: string | null;
   rating?: string | null;
@@ -232,6 +235,13 @@ export const CLIENT_TYPE_LABELS: Record<ClientType, string> = {
   LOCAL_BUSINESS: 'Lokální firma',
   PUBLIC_INSTITUTION: 'Veřejná instituce',
   OTHER: 'Jiný typ',
+};
+
+export const CLIENT_PRICING_SEGMENT_LABELS: Record<ClientPricingSegment, string> = {
+  COMMERCIAL: 'Komerční',
+  CULTURE_SPORT: 'Kultura / Sport',
+  PUBLIC_NONPROFIT: 'Veřejný / neziskový',
+  CUSTOM: 'Individuální',
 };
 
 export const CLIENT_SOURCE_LABELS: Record<ClientSource, string> = {

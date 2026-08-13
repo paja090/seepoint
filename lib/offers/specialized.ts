@@ -49,7 +49,7 @@ export function parseNavigationOfferInput(raw: unknown) {
       : ('STRAIGHT' as NavigationArrowDirection));
 
     return {
-      carrierId: text(point.carrierId) || null, sortOrder: index,
+      carrierId: text(point.carrierId) || null, surfaceId: text(point.surfaceId) || null, sortOrder: index,
       latitude: coordinate(point.latitude, 'latitude'), longitude: coordinate(point.longitude, 'longitude'),
       address: nullable(text(point.address)), label: text(point.label) || `Navigační bod ${index + 1}`,
       navigationType: text(point.navigationType) || 'Směrová tabule', variant: nullable(text(point.variant)), orientation: nullable(text(point.orientation)),

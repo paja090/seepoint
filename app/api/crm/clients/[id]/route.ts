@@ -1,4 +1,4 @@
-import { ClientSource, ClientStatus, ClientType, Prisma } from '@prisma/client';
+import { ClientPricingSegment, ClientSource, ClientStatus, ClientType, Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { getClientProfile } from '@/lib/crm/client-service';
@@ -31,7 +31,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const status = body.status === undefined ? undefined : enumValue(ClientStatus, body.status);
   const clientType = body.clientType === undefined ? undefined : enumValue(ClientType, body.clientType);
   const source = body.source === undefined ? undefined : enumValue(ClientSource, body.source);
-  if ((body.status !== undefined && !status) || (body.clientType !== undefined && !clientType) || (body.source !== undefined && !source)) {
+  const pricingSegment = body.pricingSegment === undefined ? undefined : enumValue(ClientPricingSegment, body.pricingSegment);
+  if ((body.status !== undefined && !status) || (body.clientType !== undefined && !clientType) || (body.source !== undefined && !source) || (body.pricingSegment !== undefined && !pricingSegment)) {
     return NextResponse.json({ error: 'Stav, typ nebo zdroj klienta není platný.' }, { status: 400 });
   }
 
@@ -59,6 +60,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           phone: optionalText(body.phone),
           status,
           clientType,
+          pricingSegment,
           source,
           assignedUserId: body.assignedUserId === undefined ? undefined : optionalText(body.assignedUserId),
           rating: optionalText(body.rating),
@@ -73,7 +75,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           action: 'UPDATE_CLIENT',
           entityType: 'Client',
           entityId: id,
-          detailsJson: JSON.stringify({ fields: Object.keys(body) }),
+          detailsJson: JSON.stringify({ fields: Object.keys(body), pricingSegment }),
         },
       });
       return client;
