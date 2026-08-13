@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ShieldCheck, Mail, Send, UserCheck, Lock } from 'lucide-react';
 import { roles, roleLabel, type AppRole } from '@/lib/rbac';
+import { temporaryPasswordError } from '@/lib/auth-onboarding';
 
 interface AccountAdminProps {
   employeeId: string;
@@ -99,8 +100,9 @@ export function AccountAdmin({
 
   async function setTemporaryAccessPassword() {
     setMsg('');
-    if (temporaryPassword !== temporaryPasswordConfirmation) {
-      setMsg('Potvrzení dočasného hesla se neshoduje.');
+    const validationError = temporaryPasswordError(temporaryPassword, temporaryPasswordConfirmation);
+    if (validationError) {
+      setMsg(validationError);
       return;
     }
     setBusy(true);
@@ -122,6 +124,15 @@ export function AccountAdmin({
       setBusy(false);
       setMsg('Dočasné heslo se nepodařilo nastavit.');
     }
+  }
+
+  function generateTemporaryPassword() {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    const randomValues = crypto.getRandomValues(new Uint32Array(14));
+    const generated = `Sp${Array.from(randomValues, (value) => alphabet[value % alphabet.length]).join('')}`;
+    setTemporaryPassword(generated);
+    setTemporaryPasswordConfirmation(generated);
+    setMsg('Bezpečné dočasné heslo bylo vygenerováno. Předejte ho zaměstnanci bezpečným způsobem a poté ho uložte.');
   }
 
   const availableRoleOptions = roles.filter((r) => canSetAdmin || r !== 'ADMIN');
@@ -223,14 +234,25 @@ export function AccountAdmin({
                 <input className="input mt-1" type="password" value={temporaryPasswordConfirmation} onChange={(event) => setTemporaryPasswordConfirmation(event.target.value)} minLength={12} autoComplete="new-password" />
               </label>
             </div>
-            <button
-              type="button"
-              disabled={busy || !temporaryPassword || !temporaryPasswordConfirmation}
-              onClick={setTemporaryAccessPassword}
-              className="rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50"
-            >
-              Nastavit dočasné heslo a aktivovat účet
-            </button>
+            <p className="text-xs font-semibold text-amber-900">Heslo musí mít alespoň 12 znaků, jedno písmeno a jedno číslo.</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={generateTemporaryPassword}
+                disabled={busy}
+                className="rounded-xl border border-amber-700 px-4 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              >
+                Vygenerovat bezpečné heslo
+              </button>
+              <button
+                type="button"
+                disabled={busy || !temporaryPassword || !temporaryPasswordConfirmation}
+                onClick={setTemporaryAccessPassword}
+                className="rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50"
+              >
+                Nastavit dočasné heslo a aktivovat účet
+              </button>
+            </div>
           </div>
 
           {/* Multiple Roles Selection Box */}
