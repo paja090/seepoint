@@ -42,18 +42,12 @@ export async function GET(request: Request) {
 
   const messages = messagesDesc.reverse();
 
-  // Mark latest message as read by current user if fetching initial messages
+  // Opening or polling a channel makes all currently delivered messages read.
   if (!before && messages.length > 0) {
-    const lastMsg = messages[messages.length - 1];
-    await prisma.chatRead
-      .upsert({
-        where: {
-          messageId_userId: { messageId: lastMsg.id, userId: user.id },
-        },
-        update: { readAt: new Date() },
-        create: { messageId: lastMsg.id, userId: user.id },
-      })
-      .catch(() => null);
+    await prisma.chatRead.createMany({
+      data: messages.map((message) => ({ messageId: message.id, userId: user.id })),
+      skipDuplicates: true,
+    }).catch(() => null);
   }
 
   return NextResponse.json(messages);

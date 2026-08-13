@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Send,
   Camera,
@@ -29,7 +30,6 @@ import {
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 import { CompanyShoppingListModal } from './CompanyShoppingListModal';
-import { CarrierPhotoUploadModal } from '../carriers/CarrierPhotoUploadModal';
 
 interface VehicleOption {
   id: string;
@@ -50,6 +50,7 @@ interface TeamChatContainerProps {
   };
   vehicles: VehicleOption[];
   teamMembers?: TeamMemberOption[];
+  initialChannel?: string;
 }
 
 interface ChatMessageData {
@@ -86,8 +87,8 @@ const channels = [
   { id: 'urgent', label: '⚡ Urgentní Problémy & Incidenty', description: 'Havárie, poškozené nosiče a neodkladné úkoly' },
 ];
 
-export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: TeamChatContainerProps) {
-  const [activeChannel, setActiveChannel] = useState('general');
+export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], initialChannel = 'general' }: TeamChatContainerProps) {
+  const [activeChannel, setActiveChannel] = useState(() => channels.some((channel) => channel.id === initialChannel) ? initialChannel : 'general');
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
@@ -101,8 +102,9 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   const [showFuelModal, setShowFuelModal] = useState(false);
   const [showFaultModal, setShowFaultModal] = useState(false);
   const [showShoppingModal, setShowShoppingModal] = useState(false);
-  const [showCarrierPhotoModal, setShowCarrierPhotoModal] = useState(false);
   const [assigningMsgId, setAssigningMsgId] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewImageFailed, setPreviewImageFailed] = useState(false);
 
   // Fuel modal form state
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || '');
@@ -121,6 +123,25 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousMessageCount = useRef<number>(0);
+
+  useEffect(() => {
+    if (!previewImageUrl) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewImageUrl(null);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [previewImageUrl]);
+
+  function openImagePreview(url: string) {
+    setPreviewImageFailed(false);
+    setPreviewImageUrl(url);
+  }
 
   // Compress camera/gallery photo on client side to max 1600px / ~300KB to prevent HTTP 413 errors
   function compressImageForChat(file: File): Promise<string> {
@@ -540,14 +561,13 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
             <span>⛽ Palivo</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowCarrierPhotoModal(true)}
+          <Link
+            href="/mobile-photos"
             className="flex items-center gap-1.5 shrink-0 rounded-xl bg-teal-950/80 border border-teal-800/80 px-3 py-1.5 text-xs font-bold text-teal-300 active:scale-95 transition"
           >
             <Camera size={14} />
-            <span>📷 Vyfotit plochu</span>
-          </button>
+            <span>📷 Mobilní focení ploch</span>
+          </Link>
 
           <button
             type="button"
@@ -619,13 +639,13 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
 
           {/* Quick Action Buttons */}
           <div className="mt-5 space-y-2">
-            <button
-              onClick={() => setShowCarrierPhotoModal(true)}
+            <Link
+              href="/mobile-photos"
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-teal-950/60 border border-teal-800/60 px-4 py-2.5 text-xs font-bold text-teal-300 hover:bg-teal-600 hover:text-white active:scale-95 transition"
             >
               <Camera size={16} />
-              <span>📷 Vyfotit & Dokumentovat Plochu</span>
-            </button>
+              <span>📷 Otevřít mobilní focení ploch</span>
+            </Link>
 
             <button
               onClick={() => setShowShoppingModal(true)}
@@ -762,12 +782,18 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
                     {/* Image Attachment */}
                     {msg.imageUrl && (
                       <div className="mt-2.5 overflow-hidden rounded-xl border border-slate-700">
-                        <img
-                          src={msg.imageUrl}
-                          alt="Příloha fotka z terénu"
-                          className="max-h-64 w-full object-cover cursor-pointer hover:opacity-90 transition"
-                          onClick={() => window.open(msg.imageUrl!, '_blank')}
-                        />
+                        <button
+                          type="button"
+                          className="block w-full cursor-zoom-in bg-slate-950"
+                          onClick={() => openImagePreview(msg.imageUrl!)}
+                          aria-label="Zvětšit přiloženou fotografii"
+                        >
+                          <img
+                            src={msg.imageUrl}
+                            alt="Příloha fotka z terénu"
+                            className="max-h-64 w-full object-cover transition hover:opacity-90"
+                          />
+                        </button>
                       </div>
                     )}
 
@@ -1112,12 +1138,38 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [] }: T
         currentUserName={currentUser.name}
       />
 
-      {/* Carrier Photo Upload Modal */}
-      <CarrierPhotoUploadModal
-        isOpen={showCarrierPhotoModal}
-        onClose={() => setShowCarrierPhotoModal(false)}
-        onSuccess={() => fetchMessages()}
-      />
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/95 p-3 backdrop-blur-sm sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Náhled fotografie z chatu"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-slate-900/80 text-white shadow-xl transition hover:bg-slate-800"
+            onClick={() => setPreviewImageUrl(null)}
+            aria-label="Zavřít náhled fotografie"
+          >
+            <X size={22} />
+          </button>
+          <div className="flex max-h-full max-w-full items-center justify-center" onClick={(event) => event.stopPropagation()}>
+            {previewImageFailed ? (
+              <div className="rounded-2xl border border-rose-700 bg-rose-950/90 p-6 text-center text-sm font-bold text-rose-100">
+                Fotografii se nepodařilo načíst.
+              </div>
+            ) : (
+              <img
+                src={previewImageUrl}
+                alt="Zvětšená fotografie z chatu"
+                className="max-h-[calc(100dvh-3rem)] max-w-[calc(100vw-3rem)] rounded-xl object-contain shadow-2xl"
+                onError={() => setPreviewImageFailed(true)}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

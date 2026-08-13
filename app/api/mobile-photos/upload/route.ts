@@ -119,13 +119,12 @@ export async function POST(req: Request) {
       description: `${photoNote}. GPS: ${coordinates.lat}, ${coordinates.lng}.`, performedBy: workerName, photoUrl,
     });
     const chatTask = async () => {
-      if (purpose !== 'DAMAGE' && purpose !== 'CLIENT_REPORT') return;
-      const isDamage = purpose === 'DAMAGE';
+      if (purpose !== 'DAMAGE') return;
       await runWithRetry(() => prisma.chatMessage.create({ data: {
-          channel: isDamage ? 'urgent' : 'installations', userId: workerUserId, userName: workerName,
+          channel: 'urgent', userId: workerUserId, userName: workerName,
           userRole: user?.role || 'WORKER', imageUrl: photoUrl,
           content: [
-            isDamage ? '🚨 **HLÁŠENÍ ZÁVADY NA PLOŠE**' : '📸 **DOLOŽENÍ VÝLEPU PRO KLIENTA**',
+            '🚨 **HLÁŠENÍ ZÁVADY NA PLOŠE**',
             `📍 **Nosič:** ${carrier.name} (${carrier.code}) – ${carrier.city}`,
             `📐 **Strana:** ${sideText}`, damageText ? `⚠️ **Typ závady:** ${damageText}` : null,
             rawNote ? `📝 **Poznámka:** ${rawNote}` : null, `👤 **Nahlásil/a:** ${workerName}`,
