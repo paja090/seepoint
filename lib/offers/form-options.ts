@@ -83,6 +83,8 @@ export async function getOfferFormOptions() {
     ...rule,
     mediaType: rule.mediaType,
     unitPrice: rule.unitPrice.toFixed(2),
+    validFrom: rule.validFrom?.toISOString().slice(0, 10) ?? null,
+    validTo: rule.validTo?.toISOString().slice(0, 10) ?? null,
   }));
 
   const mediaPackages: MediaPackageOption[] = packages.map((pkg) => ({

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { isSurfaceDetailClientCurrent } from '@/lib/mobile-photo-nearby';
 
 function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const radius = 6371;
@@ -36,6 +37,8 @@ export async function GET(req: Request) {
         surfaces: {
           select: {
             id: true, name: true, status: true, artworkUrl: true, sidePosition: true, sourcePosition: true,
+            currentRentStart: true, currentRentEnd: true,
+            currentClient: { select: { id: true, name: true } },
             occupancies: {
               where: { dateFrom: { lte: now }, dateTo: { gte: now }, status: { in: ['RESERVED', 'OCCUPIED'] } },
               orderBy: [{ status: 'desc' }, { dateFrom: 'desc' }], take: 1,
@@ -66,13 +69,27 @@ export async function GET(req: Request) {
         const occupancy = surface.occupancies[0] || null;
         const safelyResolved = occupancy?.clientResolutionStatus !== 'UNRESOLVED';
         const clientName = occupancy?.client?.name || occupancy?.clientName || null;
+        // The carrier detail currently allows assigning a client without changing
+        // the default AVAILABLE status. Treat that explicit assignment as current
+        // when its optional rental interval includes today, but never when expired.
+        const detailClientIsCurrent = isSurfaceDetailClientCurrent({
+          hasCurrentClient: Boolean(surface.currentClient),
+          status: surface.status,
+          currentRentStart: surface.currentRentStart,
+          currentRentEnd: surface.currentRentEnd,
+        }, now);
+        const currentClient = occupancy && safelyResolved && clientName
+          ? { id: occupancy.client?.id || null, name: clientName }
+          : detailClientIsCurrent && surface.currentClient
+            ? surface.currentClient
+            : null;
         return {
           id: surface.id,
           name: surface.name,
           side: surfaceSide(surface),
           status: occupancy?.status || surface.status,
-          currentClient: occupancy && safelyResolved && clientName
-            ? { id: occupancy.client?.id || null, name: clientName } : null,
+          currentClient,
+          clientSource: occupancy ? 'OCCUPANCY' : currentClient ? 'SURFACE_DETAIL' : null,
           currentCampaign: occupancy
             ? { id: occupancy.offer?.id || occupancy.id, name: occupancy.campaignName || occupancy.offer?.campaignName || occupancy.offer?.title || 'Kampaň nezjištěna' }
             : null,

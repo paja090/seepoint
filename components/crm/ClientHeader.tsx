@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClientLogoControl } from '@/components/ClientLogoControl';
 import { Button } from '@/components/ui';
-import { CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS, CLIENT_SOURCE_LABELS, ClientProfileData, ClientStatus } from '@/lib/crm/types';
+import { CLIENT_PRICING_SEGMENT_LABELS, CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS, CLIENT_SOURCE_LABELS, ClientProfileData, ClientStatus } from '@/lib/crm/types';
 
 export function ClientHeader({ client }: { client: ClientProfileData }) {
   const router = useRouter();
@@ -26,6 +26,7 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
   const [website, setWebsite] = useState(client.website || '');
   const [status, setStatus] = useState(client.status || 'ACTIVE');
   const [clientType] = useState(client.clientType || 'DIRECT_CLIENT');
+  const [pricingSegment, setPricingSegment] = useState(client.pricingSegment || 'COMMERCIAL');
   const [source] = useState(client.source || 'WEBSITE');
   const [billingStreet, setBillingStreet] = useState(client.billingStreet || '');
   const [billingCity, setBillingCity] = useState(client.billingCity || '');
@@ -77,6 +78,7 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
           website,
           status,
           clientType,
+          pricingSegment,
           source,
           billingStreet,
           billingCity,
@@ -353,6 +355,12 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
                     <option value="BLOCKED">Blokován</option>
                     <option value="FORMER_CLIENT">Bývalý klient</option>
                   </select>
+                </label>
+                <label className="text-xs font-semibold">Cenová kategorie
+                  <select className="input text-sm mt-1" value={pricingSegment} onChange={e => setPricingSegment(e.target.value as typeof pricingSegment)}>
+                    {Object.entries(CLIENT_PRICING_SEGMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <span className="mt-1 block font-normal text-slate-500">Změna platí jen pro nové nabídky; historické ceny zůstávají ve snapshotu.</span>
                 </label>
               </div>
 

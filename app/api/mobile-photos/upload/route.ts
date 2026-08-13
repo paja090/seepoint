@@ -8,20 +8,13 @@ import {
   normalizeImageMimeType,
   parseRequiredCoordinates,
   runPostSaveTasks,
+  runWithRetry,
   stablePhotoUrl,
   storeMobilePhoto,
 } from '@/lib/mobile-photo-upload';
+import { MOBILE_PHOTO_DAMAGE_LABELS, isMobilePhotoDamageType } from '@/lib/mobile-photo-damage';
 
 export const runtime = 'nodejs';
-
-const damageTypeLabels: Record<string, string> = {
-  OVERGROWN: 'Zarostlá – nutný prořez stromů/keřů',
-  TURNED: 'Vytočená / hnutá konstrukce',
-  FADED: 'Vybledlý tisk / poničený motiv',
-  DAMAGED_STRUCTURE: 'Poškozená konstrukce / prasklé sklo',
-  LIGHTING_OFF: 'Nesvítí osvětlení',
-  OTHER: 'Jiná závada',
-};
 
 const sideLabels: Record<string, string> = {
   SIDE_A: 'Strana A', SIDE_B: 'Strana B', BOTH: 'Obě strany (A i B)',
@@ -54,6 +47,9 @@ export async function POST(req: Request) {
     if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
       return jsonError('INVALID_IMAGE', 'Vybraný soubor není podporovaná fotografie.', 415);
     }
+    if (purpose === 'DAMAGE' && (!damageType || !isMobilePhotoDamageType(damageType))) {
+      return jsonError('DAMAGE_TYPE_REQUIRED', 'Vyberte typ závady.', 400);
+    }
 
     const coordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
     if (!coordinates) return jsonError('GPS_REQUIRED', 'Před uložením fotografie je nutné získat platnou GPS polohu.', 400);
@@ -82,7 +78,7 @@ export async function POST(req: Request) {
       ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
       : user?.email || user?.name || 'Pracovník v terénu';
     const sideText = sideLabels[side] || side;
-    const damageText = damageType ? damageTypeLabels[damageType] || damageType : '';
+    const damageText = damageType && isMobilePhotoDamageType(damageType) ? MOBILE_PHOTO_DAMAGE_LABELS[damageType] : '';
     const photoNote = [
       `Účel: ${purposeLabels[purpose] || purpose}`,
       `Strana: ${sideText}`,
@@ -107,7 +103,8 @@ export async function POST(req: Request) {
           fileName, mimeType, size: stored.bytes.byteLength, type: purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
           note: photoNote, isClientVisible: purpose === 'CLIENT_REPORT', storageProvider: stored.storageProvider,
           capturedLatitude: coordinates.lat, capturedLongitude: coordinates.lng, capturedAccuracyMeters: accuracy,
-          capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName, aiStatus: 'PENDING',
+          capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName,
+          aiStatus: purpose === 'DAMAGE' ? 'SKIPPED' : 'PENDING',
         },
       });
     } catch (error) {
@@ -115,18 +112,7 @@ export async function POST(req: Request) {
       return jsonError('DATABASE_ERROR', 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.', 500);
     }
 
-    const imageDataUrl = `data:${mimeType};base64,${Buffer.from(stored.bytes).toString('base64')}`;
     const expectedClient = surface?.occupancies[0]?.client?.name || surface?.occupancies[0]?.clientName || null;
-    const analysis = await analyzeCarrierPhotoWithAI({ photoId: photo.id, imageUrl: imageDataUrl, expectedCarrierCode: carrier.code, expectedClient });
-    const detectedClient = 'detectedClient' in analysis ? analysis.detectedClient : null;
-    const confidence = 'aiConfidence' in analysis ? analysis.aiConfidence : 0;
-    const clientMismatch = Boolean(expectedClient && detectedClient && confidence >= 0.85
-      && expectedClient.localeCompare(detectedClient, 'cs', { sensitivity: 'base' }) !== 0);
-
-    if (clientMismatch) {
-      await prisma.photo.update({ where: { id: photo.id }, data: { surfaceId: null } });
-    }
-
     const historyTask = () => logCarrierHistoryEvent({
       carrierId, surfaceId: surface?.id || null, eventType: purpose === 'DAMAGE' ? 'REPAIR' : 'SERVICE',
       title: purpose === 'DAMAGE' ? `ZÁVADA: ${damageText || 'Poškozeno'}` : 'Mobilní fotodokumentace z terénu',
@@ -135,26 +121,51 @@ export async function POST(req: Request) {
     const chatTask = async () => {
       if (purpose !== 'DAMAGE' && purpose !== 'CLIENT_REPORT') return;
       const isDamage = purpose === 'DAMAGE';
-      await prisma.chatMessage.create({ data: {
-        channel: isDamage ? 'urgent' : 'installations', userId: workerUserId, userName: workerName,
-        userRole: user?.role || 'WORKER', imageUrl: photoUrl,
-        content: [
-          isDamage ? '🚨 **HLÁŠENÍ ZÁVADY NA PLOŠE**' : '📸 **DOLOŽENÍ VÝLEPU PRO KLIENTA**',
-          `📍 **Nosič:** ${carrier.name} (${carrier.code}) – ${carrier.city}`,
-          `📐 **Strana:** ${sideText}`, damageText ? `⚠️ **Typ závady:** ${damageText}` : null,
-          rawNote ? `📝 **Poznámka:** ${rawNote}` : null, `👤 **Nahlásil/a:** ${workerName}`,
-        ].filter(Boolean).join('\n'),
-      }});
-      if (isDamage) {
-        const updatedNote = `[ZÁVADA: ${damageText || 'Poškozeno'} (${sideText})] ${rawNote} | ${carrier.note || ''}`.trim();
-        await prisma.advertisingCarrier.update({ where: { id: carrier.id }, data: { note: updatedNote.slice(0, 500) } });
-      }
+      await runWithRetry(() => prisma.chatMessage.create({ data: {
+          channel: isDamage ? 'urgent' : 'installations', userId: workerUserId, userName: workerName,
+          userRole: user?.role || 'WORKER', imageUrl: photoUrl,
+          content: [
+            isDamage ? '🚨 **HLÁŠENÍ ZÁVADY NA PLOŠE**' : '📸 **DOLOŽENÍ VÝLEPU PRO KLIENTA**',
+            `📍 **Nosič:** ${carrier.name} (${carrier.code}) – ${carrier.city}`,
+            `📐 **Strana:** ${sideText}`, damageText ? `⚠️ **Typ závady:** ${damageText}` : null,
+            rawNote ? `📝 **Poznámka:** ${rawNote}` : null, `👤 **Nahlásil/a:** ${workerName}`,
+          ].filter(Boolean).join('\n'),
+        } }), 2);
+    };
+    const carrierNoteTask = async () => {
+      if (purpose !== 'DAMAGE') return;
+      const updatedNote = `[ZÁVADA: ${damageText} (${sideText})] ${rawNote} | ${carrier.note || ''}`.trim();
+      await prisma.advertisingCarrier.update({ where: { id: carrier.id }, data: { note: updatedNote.slice(0, 500) } });
     };
 
-    const warnings = clientMismatch ? [] : await runPostSaveTasks([
-      { name: 'history', run: historyTask }, { name: 'chat', run: chatTask },
-    ]);
-    if (analysis.aiStatus === 'FAILED') warnings.push('ai');
+    // A damage report is operationally urgent: persist its history and chat alert
+    // immediately after the photo. AI must never delay or suppress these steps.
+    let warnings: string[] = [];
+    let clientMismatch = false;
+    let detectedClient: string | null = null;
+    let confidence = 0;
+    if (purpose === 'DAMAGE') {
+      warnings = await runPostSaveTasks([
+        { name: 'history', run: historyTask },
+        { name: 'chat', run: chatTask },
+        { name: 'carrier-note', run: carrierNoteTask },
+      ]);
+    } else {
+      const imageDataUrl = `data:${mimeType};base64,${Buffer.from(stored.bytes).toString('base64')}`;
+      const analysis = await analyzeCarrierPhotoWithAI({ photoId: photo.id, imageUrl: imageDataUrl, expectedCarrierCode: carrier.code, expectedClient });
+      detectedClient = 'detectedClient' in analysis ? analysis.detectedClient || null : null;
+      confidence = 'aiConfidence' in analysis ? analysis.aiConfidence : 0;
+      clientMismatch = Boolean(expectedClient && detectedClient && confidence >= 0.85
+        && expectedClient.localeCompare(detectedClient, 'cs', { sensitivity: 'base' }) !== 0);
+      if (clientMismatch) await prisma.photo.update({ where: { id: photo.id }, data: { surfaceId: null } });
+      if (analysis.aiStatus === 'FAILED') warnings.push('ai');
+      if (!clientMismatch) {
+        warnings.push(...await runPostSaveTasks([
+          { name: 'history', run: historyTask },
+          { name: 'chat', run: chatTask },
+        ]));
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -162,11 +173,16 @@ export async function POST(req: Request) {
         capturedLatitude: photo.capturedLatitude, capturedLongitude: photo.capturedLongitude,
         capturedByWorkerName: photo.capturedByWorkerName, createdAt: photo.createdAt },
       warnings: [...(stored.driveWarning ? ['google-drive'] : []), ...warnings],
+      chatSent: purpose !== 'DAMAGE' || !warnings.includes('chat'),
       clientMismatch: clientMismatch ? {
         photoId: photo.id, expectedSurfaceId: surface?.id || null, expectedClient,
         detectedClient, confidence,
       } : null,
-      message: purpose === 'DAMAGE' ? 'Závada a fotografie byly bezpečně uloženy.' : 'Fotografie byla bezpečně uložena k nosiči.',
+      message: purpose === 'DAMAGE'
+        ? warnings.includes('chat')
+          ? 'Fotografie závady byla uložena, ale upozornění do chatu se nepodařilo odeslat.'
+          : 'Závada byla uložena a fotografie odeslána do urgentního chatu.'
+        : 'Fotografie byla bezpečně uložena k nosiči.',
     });
   } catch (error) {
     console.error('[mobile-photos/upload]', error);

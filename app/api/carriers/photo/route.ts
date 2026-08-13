@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-export const damageTypeLabels: Record<string, { label: string; icon: string }> = {
+const damageTypeLabels: Record<string, { label: string; icon: string }> = {
   OVERGROWN: { label: '🌳 Zarostlá – nutný prořez stromů/keřů', icon: '🌳' },
   TURNED: { label: '🔄 Vytočená / hnutá konstrukce', icon: '🔄' },
   FADED: { label: '☀️ Vybledlý tisk / poničený motiv', icon: '☀️' },
@@ -13,13 +13,13 @@ export const damageTypeLabels: Record<string, { label: string; icon: string }> =
   OTHER: { label: '⚠️ Jiná závada / poškození', icon: '⚠️' },
 };
 
-export const sideLabels: Record<string, string> = {
+const sideLabels: Record<string, string> = {
   SIDE_A: '🅰️ Strana A (Přední)',
   SIDE_B: '🅱️ Strana B (Zadní)',
   BOTH: '🔀 Obě strany (A i B)',
 };
 
-export const purposeLabels: Record<string, string> = {
+const purposeLabels: Record<string, string> = {
   CLIENT_REPORT: '📸 Doložení výlepu pro klienta',
   DAMAGE: '🚨 Poškození / Závada na ploše',
   INSPECTION: '🧹 Pravidelná kontrola / Údržba',
