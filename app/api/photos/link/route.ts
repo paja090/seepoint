@@ -19,11 +19,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Identifikátor souboru a název jsou povinné.' }, { status: 400 });
     }
 
-    const targetCarrierId = carrierId ? String(carrierId) : null;
+    let targetCarrierId = carrierId ? String(carrierId) : null;
     const targetSurfaceId = surfaceId ? String(surfaceId) : null;
 
-    if ([targetCarrierId, targetSurfaceId].filter(Boolean).length !== 1) {
-      return NextResponse.json({ error: 'Fotografie musí patřit právě jednomu nosiči nebo ploše.' }, { status: 400 });
+    if (!targetCarrierId && !targetSurfaceId) {
+      return NextResponse.json({ error: 'Fotografie musí patřit nosiči nebo ploše.' }, { status: 400 });
+    }
+
+    if (targetSurfaceId && !targetCarrierId) {
+      const surf = await prisma.advertisingSurface.findUnique({ where: { id: targetSurfaceId }, select: { carrierId: true } });
+      if (surf) targetCarrierId = surf.carrierId;
     }
 
     // Require carriers permission

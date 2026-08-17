@@ -17,11 +17,17 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) return NextResponse.json({ error: 'Fotografie je povinná.' }, { status: 400 });
     if (!ALLOWED_MIME_TYPES.has(file.type)) return NextResponse.json({ error: 'Povolené formáty jsou JPEG, PNG a WebP.' }, { status: 415 });
     if (file.size === 0 || file.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'Fotografie musí mít nejvýše 4 MB.' }, { status: 413 });
-    const carrierId = form.get('carrierId') ? String(form.get('carrierId')) : null;
+    let carrierId = form.get('carrierId') ? String(form.get('carrierId')) : null;
     const surfaceId = form.get('surfaceId') ? String(form.get('surfaceId')) : null;
     const employeeId = form.get('employeeId') ? String(form.get('employeeId')) : null;
     const navigationPointId = form.get('navigationPointId') ? String(form.get('navigationPointId')) : null;
-    if ([carrierId, surfaceId, employeeId, navigationPointId].filter(Boolean).length !== 1) return NextResponse.json({ error: 'Fotografie musí patřit právě jednomu nosiči, ploše, navigačnímu bodu nebo zaměstnanci.' }, { status: 400 });
+    if ([carrierId, surfaceId, employeeId, navigationPointId].filter(Boolean).length === 0) {
+      return NextResponse.json({ error: 'Fotografie musí patřit nosiči, ploše, navigačnímu bodu nebo zaměstnanci.' }, { status: 400 });
+    }
+    if (surfaceId && !carrierId) {
+      const surf = await prisma.advertisingSurface.findUnique({ where: { id: surfaceId }, select: { carrierId: true } });
+      if (surf) carrierId = surf.carrierId;
+    }
     const auth = await requireApiAccess(employeeId ? 'employees' : navigationPointId ? 'offers' : 'carriers'); if (isApiDenied(auth)) return auth;
     if (employeeId && auth.role !== 'ADMIN') return NextResponse.json({ error: 'Fotografii zaměstnance může měnit pouze administrátor.' }, { status: 403 });
     if (navigationPointId) {

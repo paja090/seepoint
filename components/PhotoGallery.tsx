@@ -143,8 +143,8 @@ export function PhotoGallery({
       form.append('file', file);
       form.append('type', type);
       if (note) form.append('note', note);
-      if (target === 'carrier') form.append('carrierId', carrierId);
-      else form.append('surfaceId', target.replace('surface:', ''));
+      form.append('carrierId', carrierId);
+      if (target !== 'carrier') form.append('surfaceId', target.replace('surface:', ''));
       const response = await fetch('/api/photos', { method: 'POST', body: form });
       if (!response.ok) throw new Error(await apiResponseMessage(response, 'Fotografii se nepodařilo uložit.'));
       const data = await response.json();
@@ -205,7 +205,7 @@ export function PhotoGallery({
 
     const targetLabel =
       target === 'carrier' ? 'Nosič' : surfaces.find((surface) => `surface:${surface.id}` === target)?.name ?? 'Plocha';
-    const carrierIdParam = target === 'carrier' ? carrierId : null;
+    const carrierIdParam = carrierId;
     const surfaceIdParam = target === 'carrier' ? null : target.replace('surface:', '');
 
     let successCount = 0;
