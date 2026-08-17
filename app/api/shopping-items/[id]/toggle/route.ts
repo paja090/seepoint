@@ -26,16 +26,33 @@ export async function POST(
       ? `${auth.employee.firstName} ${auth.employee.lastName}`.trim()
       : auth.name || auth.email || 'Člen týmu';
 
-    const nextIsPurchased = !existing.isPurchased;
+    const nextIsPurchased = body.isPurchased !== undefined ? Boolean(body.isPurchased) : !existing.isPurchased;
+
+    const data: any = {
+      isPurchased: nextIsPurchased,
+      purchasedByUserId: nextIsPurchased ? auth.id : null,
+      purchasedByUserName: nextIsPurchased ? userName : null,
+      purchasedAt: nextIsPurchased ? new Date() : null,
+    };
+
+    if (nextIsPurchased && body.pricePaid !== undefined) {
+      data.pricePaid = body.pricePaid !== null && body.pricePaid !== '' ? parseFloat(body.pricePaid) : null;
+    }
+    if (nextIsPurchased && body.receiptUrl !== undefined) {
+      data.receiptUrl = body.receiptUrl ? String(body.receiptUrl).trim() : null;
+    }
 
     const updated = await prisma.companyShoppingItem.update({
       where: { id },
-      data: {
-        isPurchased: nextIsPurchased,
-        purchasedByUserId: nextIsPurchased ? auth.id : null,
-        purchasedByUserName: nextIsPurchased ? userName : null,
-        purchasedAt: nextIsPurchased ? new Date() : null,
-        pricePaid: nextIsPurchased && body.pricePaid ? parseFloat(body.pricePaid) : null,
+      data,
+      include: {
+        crmOrder: {
+          select: {
+            id: true,
+            title: true,
+            orderNumber: true,
+          },
+        },
       },
     });
 

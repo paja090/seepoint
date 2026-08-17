@@ -2181,6 +2181,7 @@ model CrmOrder {
   crmTasks        CrmTask[]
   workOrders      WorkOrder[]
   navigationOrder NavigationOrder?
+  shoppingItems   CompanyShoppingItem[]
 
   @@index([clientId])
   @@index([status])
@@ -2602,23 +2603,40 @@ model CarrierHistoryLog {
   @@index([eventType])
 }
 
+enum ShoppingPriority {
+  NORMAL
+  THIS_WEEK
+  URGENT
+}
+
 model CompanyShoppingItem {
-  id                  String    @id @default(cuid())
-  category            String // "OFFICE" (Kancelář) or "WORKSHOP" (Dílna & Výroba)
-  title               String
-  quantity            String?
-  note                String?
-  imageUrl            String?
-  isPurchased         Boolean   @default(false)
-  addedByUserId       String?
-  addedByUserName     String
-  purchasedByUserId   String?
-  purchasedByUserName String?
-  purchasedAt         DateTime?
-  pricePaid           Decimal?  @db.Decimal(10, 2)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                   String           @id @default(cuid())
+  category             String // "OFFICE" (Kancelář) or "WORKSHOP" (Dílna & Výroba)
+  title                String
+  quantity             String?
+  unit                 String?
+  store                String?
+  priority             ShoppingPriority @default(NORMAL)
+  note                 String?
+  imageUrl             String?
+  receiptUrl           String?
+  isPurchased          Boolean          @default(false)
+  assignedEmployeeId   String?
+  assignedEmployeeName String?
+  crmOrderId           String?
+  crmOrder             CrmOrder?        @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  addedByUserId        String?
+  addedByUserName      String
+  purchasedByUserId    String?
+  purchasedByUserName  String?
+  purchasedAt          DateTime?
+  pricePaid            Decimal?         @db.Decimal(10, 2)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   @@index([category])
   @@index([isPurchased])
+  @@index([priority])
+  @@index([assignedEmployeeId])
+  @@index([crmOrderId])
 }
