@@ -4,6 +4,8 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+const isInlineImage = (value?: string | null) => Boolean(value?.startsWith('data:'));
+
 const damageTypeLabels: Record<string, { label: string; icon: string }> = {
   OVERGROWN: { label: '🌳 Zarostlá – nutný prořez stromů/keřů', icon: '🌳' },
   TURNED: { label: '🔄 Vytočená / hnutá konstrukce', icon: '🔄' },
@@ -28,9 +30,7 @@ const purposeLabels: Record<string, string> = {
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
 
   const body = (await request.json().catch(() => null)) as {
     carrierId: string;
@@ -42,25 +42,22 @@ export async function POST(request: Request) {
   } | null;
 
   if (!body || !body.carrierId || !body.imageUrl || !body.purpose) {
+    return NextResponse.json({ error: 'Chybí povinné údaje (nosič, fotka, účel).' }, { status: 400 });
+  }
+
+  if (isInlineImage(body.imageUrl)) {
     return NextResponse.json(
-      { error: 'Chybí povinné údaje (nosič, fotka, účel).' },
+      { error: 'Fotografii je nutné nejdříve nahrát do úložiště. Base64 obrázky nelze ukládat do databáze.' },
       { status: 400 }
     );
   }
 
-  const carrier = await prisma.advertisingCarrier.findUnique({
-    where: { id: body.carrierId },
-  });
-
-  if (!carrier) {
-    return NextResponse.json({ error: 'Nosič nebyl nalezen.' }, { status: 404 });
-  }
+  const carrier = await prisma.advertisingCarrier.findUnique({ where: { id: body.carrierId } });
+  if (!carrier) return NextResponse.json({ error: 'Nosič nebyl nalezen.' }, { status: 404 });
 
   const sideText = sideLabels[body.side] || body.side;
   const purposeText = purposeLabels[body.purpose] || body.purpose;
   const damageText = body.damageType ? damageTypeLabels[body.damageType]?.label || body.damageType : '';
-
-  // 1. Create Photo record
   const photoNoteParts = [
     `Účel: ${purposeText}`,
     `Strana: ${sideText}`,
@@ -80,7 +77,6 @@ export async function POST(request: Request) {
     },
   });
 
-  // 2. If purpose is DAMAGE, auto-post urgent message to Team Chat
   let chatMessage = null;
   if (body.purpose === 'DAMAGE') {
     const chatContent = [
@@ -90,9 +86,7 @@ export async function POST(request: Request) {
       damageText ? `⚠️ **Typ závady:** ${damageText}` : null,
       body.note ? `📝 **Poznámka z terénu:** ${body.note}` : null,
       `👤 **Nahlásil/a:** ${user.name}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ].filter(Boolean).join('\n');
 
     chatMessage = await prisma.chatMessage.create({
       data: {
@@ -105,23 +99,16 @@ export async function POST(request: Request) {
       },
     });
 
-    // Optionally update carrier note with damage warning
     const updatedNote = `[🚨 ZÁVADA: ${damageText || 'Poškozeno'} (${sideText})] ${body.note || ''} | ${carrier.note || ''}`.trim();
-    await prisma.advertisingCarrier.update({
-      where: { id: carrier.id },
-      data: { note: updatedNote.slice(0, 500) },
-    });
+    await prisma.advertisingCarrier.update({ where: { id: carrier.id }, data: { note: updatedNote.slice(0, 500) } });
   } else if (body.purpose === 'CLIENT_REPORT') {
-    // Post to installations channel for client proof
     const chatContent = [
       `📸 **DOLOŽENÍ VÝLEPU PRO KLIENTA**`,
       `📍 **Nosič:** ${carrier.name} (${carrier.code}) – ${carrier.city}`,
       `📐 **Strana:** ${sideText}`,
       body.note ? `📝 **Poznámka:** ${body.note}` : null,
       `👤 **Vyfotil/a:** ${user.name}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ].filter(Boolean).join('\n');
 
     await prisma.chatMessage.create({
       data: {
