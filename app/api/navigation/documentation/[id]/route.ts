@@ -211,7 +211,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             data: {
               navigationPointId: point.id,
               carrierId: point.carrierId,
-              selectedPhotoId: point.installedPhotoId,
+              selectedPhotoId: point.installedPhotoId ?? point.carrier?.photos?.[0]?.id ?? null,
             },
           }),
         ),
@@ -221,47 +221,49 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         items: report.items.map((item) => {
           const point = item.navigationPoint ? operationalByLabel.get(item.navigationPoint.label) : undefined;
           if (!point) return item;
+          const fallbackPhoto = point.installedPhoto || point.carrier?.photos?.[0];
           return {
             ...item,
             navigationPointId: point.id,
             carrierId: point.carrierId,
-            selectedPhotoId: point.installedPhotoId,
+            selectedPhotoId: fallbackPhoto?.id ?? null,
             navigationPoint: point,
             carrier: point.carrier,
-            selectedPhoto: point.installedPhoto,
+            selectedPhoto: fallbackPhoto ?? null,
           };
         }),
       };
     }
   }
 
-  const missingInstalledSelections = report.items.filter(
-    (item) => !item.selectedPhotoId && item.navigationPoint?.installedPhoto,
+  const missingPhotoSelections = report.items.filter(
+    (item) => !item.selectedPhotoId && (item.navigationPoint?.installedPhoto || item.carrier?.photos?.[0]),
   );
-  if (missingInstalledSelections.length > 0) {
+  if (missingPhotoSelections.length > 0) {
     await prisma.$transaction(
-      missingInstalledSelections.map((item) =>
-        prisma.navigationDocumentationItem.update({
+      missingPhotoSelections.map((item) => {
+        const photoToSelect = item.navigationPoint?.installedPhoto || item.carrier?.photos?.[0];
+        return prisma.navigationDocumentationItem.update({
           where: { id: item.id },
-          data: { selectedPhotoId: item.navigationPoint!.installedPhoto!.id },
-        }),
-      ),
+          data: { selectedPhotoId: photoToSelect!.id },
+        });
+      }),
     );
     report = {
       ...report,
       items: report.items.map((item) => {
-        const installedPhoto = item.navigationPoint?.installedPhoto;
-        if (item.selectedPhotoId || !installedPhoto) return item;
+        const photoToSelect = item.navigationPoint?.installedPhoto || item.carrier?.photos?.[0];
+        if (item.selectedPhotoId || !photoToSelect) return item;
         return {
           ...item,
-          selectedPhotoId: installedPhoto.id,
-          selectedPhoto: installedPhoto,
+          selectedPhotoId: photoToSelect.id,
+          selectedPhoto: photoToSelect,
           carrier: item.carrier
             ? {
                 ...item.carrier,
-                photos: item.carrier.photos.some((photo) => photo.id === installedPhoto.id)
+                photos: item.carrier.photos.some((photo) => photo.id === photoToSelect.id)
                   ? item.carrier.photos
-                  : [installedPhoto, ...item.carrier.photos],
+                  : [photoToSelect, ...item.carrier.photos],
               }
             : item.carrier,
         };
