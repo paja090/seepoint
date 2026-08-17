@@ -40,6 +40,7 @@ const navGroups: NavGroup[] = [
   {
     label: '🔧 Provoz & Logistika',
     items: [
+      ['/shopping', '🛍️ Nákupy', 'shoppingBag', 'team'],
       ['/work', '🗓️ Plán práce', 'briefcaseBusiness', 'work'],
       ['/tasks', '📋 Všechny úkoly', 'clipboardList', 'tasks'],
       ['/work-entries', '⏱️ Odvedená práce (všichni)', 'fileText', 'workEntries'],

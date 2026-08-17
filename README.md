@@ -1,90 +1,114 @@
-# SeePoint MVP
+# SeePoint Application
 
-MVP webové aplikace pro správu reklamních nosičů, reklamních ploch, GPS pozic, fotek a obsazenosti médií na mapě.
+Produkční webový a mobilní systém pro kompletní správu reklamních nosičů, reklamních ploch, CRM, obchodních nabídek, navigačního značení, terénních pracovních zakázek, fotodokumentace, vyúčtování pracovníků a klientské fakturace.
 
-## Stack
+---
 
-- Next.js App Router + React + TypeScript
-- Tailwind CSS
-- Prisma ORM
-- PostgreSQL
-- Google Maps API (`@react-google-maps/api`)
-- Lokální upload fotek do `public/uploads` s připravenou konfigurací pro pozdější object storage
+## 🚀 Technologie
 
-## Hlavní routes
+- **Frontend & Server Components:** Next.js (App Router), React 19, TypeScript
+- **Styling:** Tailwind CSS, PostCSS, Lucide React Icons
+- **Database & ORM:** PostgreSQL, Prisma ORM
+- **Maps & Geolocation:** Google Maps API & Leaflet Integration
+- **PDF Generation:** pdfmake
+- **Excel Import/Export:** ExcelJS
+- **Document & Photo Storage:** Google Drive API & Local fallback
 
-- `/` přesměruje na `/dashboard`, takže root aplikace nekončí na 404.
-- `/login` obsahuje jednoduché mock přihlášení.
-- `/dashboard` zobrazuje základní statistiky.
-- `/map` zobrazuje mapu nosičů, detail v pravém panelu a vytvoření bodu kliknutím do mapy.
-- `/carriers` a `/carriers/[id]` zobrazují seznam a detail nosičů.
-- `/occupancy` zobrazuje obsazenost kampaní.
-- `/settings` shrnuje provozní nastavení.
+---
 
-## Lokální spuštění
+## 🏢 Přehled Modulů
 
-1. Zkopírujte environment proměnné:
+### 1. Dashboard (`/dashboard`)
+Manažerský přehled založený pouze nad reálnými daty z databáze PostgreSQL:
+- **Obchod:** Nabídky podle stavu (`DRAFT`, `SENT`, `ACCEPTED`, `REJECTED`), CRM zakázky, hodnota pipeline.
+- **Média:** Aktivní reklamní nosiče, obsazenost ploch (`AVAILABLE`, `RESERVED`, `OCCUPIED`, `OUT_OF_SERVICE`).
+- **Navigace:** Aktivní navigační zakázky, stav schvalování grafiky, tisk, instalace, fotodokumentace, fakturace.
+- **Práce:** Plánované a rozpracované `WorkOrder` a `WorkTask`, úkoly po termínu, neschválené výkazy.
+- **Finance:** Čekající vyúčtování `Settlement`, klientské faktury `ClientInvoice` po splatnosti.
 
-   ```bash
-   cp .env.example .env
-   ```
+### 2. CRM – Klienti (`/crm/clients`)
+Klientský modul s centrální entitou `Client`. Detail klienta funguje jako centrum všech vztahů:
+- Záložky: Přehled, Kontakty, Pobočky, Nabídky, Zakázky, Realizace, Smlouvy, Fakturace, Komunikace, Úkoly, Dokumenty, Historie.
 
-2. Upravte `DATABASE_URL` v `.env` pro lokální PostgreSQL. Google Maps klíč je volitelný; bez něj aplikace použije fallback mapu.
+### 3. CRM – Nabídky (`/offers`)
+Správa obchodních nabídek (`STANDARD_MEDIA`, `NAVIGATION`, `CITY_GALLERY`):
+- Workflow: `DRAFT` → `SENT` → `ACCEPTED` / `REJECTED` / `EXPIRED`.
+- Idempotentní konverze akceptované nabídky na `CrmOrder`.
+- Veřejný klientský náhled s akceptací.
 
-3. Nainstalujte závislosti:
+### 4. CRM – Zakázky (`/crm/orders`)
+Centrální potvrzená zakázka klienta vzniklá z nabídky. Propojuje realizace, pracovní zakázky, smlouvy a klientské faktury.
 
-   ```bash
-   npm install
-   ```
+### 5. CRM – Úkoly (`/crm/tasks`)
+Obchodní a administrativní úkoly vázané na klienty, smlouvy nebo faktury (`CrmTask`).
 
-4. Vygenerujte Prisma klienta:
+### 6. Média – Nosiče & Plochy (`/carriers`, `/surfaces`)
+- `AdvertisingCarrier`: Fyzický reklamní nosič s GPS pozicí, typem konstrukce a adresou.
+- `AdvertisingSurface`: Samostatná obchodovatelná reklamní pozice.
+- `Occupancy`: Zdroj pravdy obchodní obsazenosti a kampaní.
 
-   ```bash
-   npx prisma generate
-   ```
+### 7. Média – Mapa (`/map`)
+Interaktivní mapa nosičů s filtry podle médií, klienta, obsazenosti, města a technického stavu.
 
-5. Spusťte vývojový server:
+### 8. Navigace (`/navigation`)
+Specializovaný modul pro navigační značení:
+- Návrh tras a vizualizace šipek.
+- 13krokové workflow zakázky od poptávky po dokončení.
+- Kontrola kvality (QC) a generování kvartálních fotodokumentací pro klienty.
 
-   ```bash
-   npm run dev
-   ```
+### 9. Práce & Vyúčtování (`/work-orders`, `/settlement`)
+- Fyzické pracovní zakázky (`WorkOrder`) a úkoly montérů (`WorkTask`).
+- Výkazy práce (`WorkEntry`) a výdaje (`WorkExpense`).
+- Schvalovací workflow vyúčtování pracovníků (`Settlement`: `DRAFT` → `SUBMITTED` → `APPROVED` → `LOCKED` → `PAID`).
+- Dodavatelské faktury pracovníků (`Invoice`).
 
-6. Otevřete `http://localhost:3000`. Root route `/` přesměruje na `/dashboard`.
+### 10. Klientská fakturace (`/invoices`)
+Fakturace SeePointu ke klientům (`ClientInvoice`) z CRM zakázek a navigačních období.
 
-## Build
+### 11. Mobilní fotodokumentace (`/mobile-photos`)
+Terénní rozhraní optimalizované pro mobilní telefony montérů: foto před/po instalaci s GPS a AI rozpoznáním nosičů.
 
-Produkční build spouští Prisma generate před Next buildem:
+---
 
+## 📖 Architektura
+
+Podrobný popis architektury, zdrojů pravdy a doménových vztahů naleznete v [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## 🛠️ Vývoj a Spuštění
+
+### 1. Klonování a instalace
+```bash
+git clone https://github.com/paja090/seepoint.git
+cd seepoint
+npm install
+```
+
+### 2. Konfigurace databáze
+Vytvořte `.env` soubor s připojením k PostgreSQL:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/seepoint?schema=public"
+```
+
+### 3. Generování Prisma klienta
+```bash
+npx prisma generate
+```
+
+### 4. Spuštění vývojového serveru
+```bash
+npm run dev
+```
+
+### 5. Kontrola typu a spuštění testů
+```bash
+npm run typecheck
+npx tsx --test tests/*.test.ts
+```
+
+### 6. Produkční build
 ```bash
 npm run build
-```
-
-Interně běží:
-
-```bash
-prisma generate && next build
-```
-
-Produkční server pak spustíte:
-
-```bash
 npm run start
 ```
-
-## Deploy na Vercel
-
-1. Nahrajte repozitář na GitHub/GitLab/Bitbucket.
-2. Ve Vercelu vytvořte nový projekt z repozitáře.
-3. Nastavte environment variables:
-   - `DATABASE_URL`
-   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (volitelné pro fallback mapu, doporučené pro produkci)
-   - `BLOB_READ_WRITE_TOKEN` (volitelné pro budoucí object storage)
-4. Ověřte build command: `npm run build`.
-5. Ověřte start command: `npm run start` (Vercel typicky používá vlastní runtime, ale script je připravený).
-6. Po deploy otevřete root URL projektu; route `/` přesměruje na `/dashboard`.
-
-## Poznámky k MVP
-
-- API endpointy aktuálně používají in-memory mock store, aby šlo UI vyzkoušet bez databázových migrací.
-- Prisma schéma je připravené pro PostgreSQL a následné napojení endpointů na reálnou databázi.
-- Upload fotek ukládá soubory lokálně do `public/uploads`; pro produkci na serverless hostingu je vhodné přepnout na Vercel Blob, S3 nebo Google Cloud Storage.

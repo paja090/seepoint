@@ -9,7 +9,7 @@ import { generateCityGalleryPreview } from './city-gallery-generator';
 import { inferMediaType, inferQuantity, recommendOfferType } from './intent-parser';
 import { generateNavigationPreview } from './navigation-generator';
 import { generateStandardMediaPreview } from './standard-media-generator';
-import type { AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
+import type { AiNavigationPointInput, AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
 
 const pricingSegments: ClientPricingSegment[] = ['COMMERCIAL', 'CULTURE_SPORT', 'PUBLIC_NONPROFIT', 'CUSTOM'];
 const offerTypes: OfferType[] = ['STANDARD_MEDIA', 'NAVIGATION', 'CITY_GALLERY'];
@@ -24,6 +24,27 @@ function parseRequest(raw: unknown): AiOfferRequest {
   request.selectedCandidateIds = Array.isArray(value.selectedCandidateIds) ? value.selectedCandidateIds.filter((id): id is string => typeof id === 'string' && id.length > 0) : undefined;
   request.candidateMountingTypes = value.candidateMountingTypes && typeof value.candidateMountingTypes === 'object'
     ? Object.fromEntries(Object.entries(value.candidateMountingTypes as Record<string, unknown>).filter((entry): entry is [string, 'LIGHT_POLE' | 'TRACTION' | 'COLUMN' | 'POLE' | 'OTHER' | 'UNKNOWN'] => typeof entry[1] === 'string' && ['LIGHT_POLE', 'TRACTION', 'COLUMN', 'POLE', 'OTHER', 'UNKNOWN'].includes(entry[1])))
+    : undefined;
+  request.navigationPoints = Array.isArray(value.navigationPoints)
+    ? value.navigationPoints.flatMap((rawPoint): AiNavigationPointInput[] => {
+        if (!rawPoint || typeof rawPoint !== 'object') return [];
+        const point = rawPoint as Record<string, unknown>;
+        const latitude = Number(point.latitude);
+        const longitude = Number(point.longitude);
+        if (typeof point.id !== 'string' || !point.id || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return [];
+        return [{
+          id: point.id,
+          title: typeof point.title === 'string' && point.title.trim() ? point.title.trim() : 'Navržený navigační bod',
+          latitude,
+          longitude,
+          score: Math.max(0, Math.min(100, Number(point.score) || 0)),
+          reasons: Array.isArray(point.reasons) ? point.reasons.filter((reason): reason is string => typeof reason === 'string').slice(0, 5) : [],
+          distanceMeters: Number.isFinite(Number(point.distanceMeters)) ? Number(point.distanceMeters) : undefined,
+          routeDurationSeconds: Number.isFinite(Number(point.routeDurationSeconds)) ? Number(point.routeDurationSeconds) : undefined,
+          routePolyline: typeof point.routePolyline === 'string' ? point.routePolyline : undefined,
+          arrowDirection: ['LEFT', 'RIGHT', 'STRAIGHT'].includes(String(point.arrowDirection)) ? point.arrowDirection as AiNavigationPointInput['arrowDirection'] : undefined,
+        }];
+      }).slice(0, 20)
     : undefined;
   if (request.offerType && !offerTypes.includes(request.offerType)) throw new OfferValidationError('Typ nabídky není platný.');
   if (request.pricingSegment && !pricingSegments.includes(request.pricingSegment)) throw new OfferValidationError('Cenový segment není platný.');

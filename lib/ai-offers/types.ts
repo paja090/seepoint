@@ -22,6 +22,20 @@ export type AiOfferRequest = {
   selectedSurfaceIds?: string[];
   selectedCandidateIds?: string[];
   candidateMountingTypes?: Record<string, MountingType>;
+  navigationPoints?: AiNavigationPointInput[];
+};
+
+export type AiNavigationPointInput = {
+  id: string;
+  title: string;
+  latitude: number;
+  longitude: number;
+  score: number;
+  reasons: string[];
+  distanceMeters?: number;
+  routeDurationSeconds?: number;
+  routePolyline?: string;
+  arrowDirection?: 'LEFT' | 'RIGHT' | 'STRAIGHT';
 };
 
 export type AiResolvedClient = {

@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import { carrierMapColor } from './carrier-map.ts';
 import type { Carrier, CarrierType, GpsStatus, MediaType, Occupancy, OccupancyStatus, Surface, SurfaceStatus } from './types';
+import { deriveSurfaceOccupancyState } from './occupancy';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_PRISMA_URL ?? process.env.POSTGRES_URL;
@@ -258,7 +259,74 @@ export async function archiveCarrier(id: string, input: CarrierArchiveInput = {}
 export async function restoreCarrier(id: string) { await prisma.advertisingCarrier.update({ where: { id }, data: { archivedAt: null, archivedBy: null, archiveReason: null, status: 'ACTIVE' } }); return (await getCarrier(id))!; }
 export async function deleteCarrier(id: string) { const linked = await prisma.advertisingCarrier.findUnique({ where: { id }, select: { _count: { select: { surfaces: true, photos: true, workItems: true } } } }); if (!linked) return; if (linked._count.surfaces > 0 || linked._count.photos > 0 || linked._count.workItems > 0) throw new Error('Nosic ma navazane plochy, fotky nebo praci. Pouzijte archivaci.'); await prisma.advertisingCarrier.delete({ where: { id } }); }
 export async function upsertSurface(input: Partial<Surface> & { carrierId: string }): Promise<Surface> { const existing = input.id ? await prisma.advertisingSurface.findUnique({ where: { id: input.id } }) : null; const data = { carrierId: input.carrierId, currentClientId: input.currentClientId ?? existing?.currentClientId ?? null, name: input.name ?? existing?.name ?? 'Plocha', mediaType: input.mediaType ?? existing?.mediaType ?? 'OTHER', sourcePosition: input.sourcePosition ?? existing?.sourcePosition ?? null, directionDescription: input.directionDescription ?? existing?.directionDescription ?? null, rawMediaType: input.rawMediaType ?? existing?.rawMediaType ?? null, size: input.size ?? existing?.size ?? null, orientation: input.orientation ?? existing?.orientation ?? null, status: input.status ?? existing?.status ?? 'AVAILABLE', price: input.price ?? existing?.price ?? null, note: input.note ?? existing?.note ?? null }; const saved = existing ? await prisma.advertisingSurface.update({ where: { id: existing.id }, data }) : await prisma.advertisingSurface.create({ data: { ...data, id: input.id } }); return { id: saved.id, carrierId: saved.carrierId, currentClientId: saved.currentClientId ?? undefined, name: saved.name, mediaType: saved.mediaType, sourcePosition: saved.sourcePosition ?? undefined, directionDescription: saved.directionDescription ?? undefined, rawMediaType: saved.rawMediaType ?? undefined, size: saved.size ?? undefined, orientation: saved.orientation ?? undefined, status: saved.status, price: saved.price?.toNumber(), note: saved.note ?? undefined, occupancies: [], photos: [] }; }
-export async function upsertOccupancy(input: Partial<Occupancy> & { surfaceId: string }): Promise<Occupancy> { const existing = input.id ? await prisma.occupancy.findUnique({ where: { id: input.id } }) : null; const data = { surfaceId: input.surfaceId, clientId: input.clientId ?? existing?.clientId ?? null, clientName: input.clientName ?? existing?.clientName ?? 'Klient', campaignName: input.campaignName ?? existing?.campaignName ?? 'Kampan', dateFrom: input.dateFrom ? new Date(input.dateFrom) : existing?.dateFrom ?? new Date(), dateTo: input.dateTo ? new Date(input.dateTo) : existing?.dateTo ?? new Date(), status: input.status ?? existing?.status ?? 'RESERVED', price: input.price ?? existing?.price ?? null, note: input.note ?? existing?.note ?? null, createdBy: input.createdBy ?? existing?.createdBy ?? null, updatedBy: input.updatedBy ?? existing?.updatedBy ?? null, reservedUntil: input.reservedUntil ? new Date(input.reservedUntil) : existing?.reservedUntil ?? null, offerId: input.offerId ?? existing?.offerId ?? null }; const saved = existing ? await prisma.occupancy.update({ where: { id: existing.id }, data }) : await prisma.occupancy.create({ data: { ...data, id: input.id } }); const activeSurfaceStatuses: Partial<Record<OccupancyStatus, SurfaceStatus>> = { AVAILABLE: 'AVAILABLE', NEGOTIATION: 'NEGOTIATION', RESERVED: 'RESERVED', OCCUPIED: 'OCCUPIED', OUT_OF_SERVICE: 'OUT_OF_SERVICE' }; const surfaceStatus = activeSurfaceStatuses[saved.status] ?? 'AVAILABLE'; await prisma.advertisingSurface.update({ where: { id: saved.surfaceId }, data: { status: surfaceStatus, currentClientId: ['NEGOTIATION', 'RESERVED', 'OCCUPIED'].includes(saved.status) ? saved.clientId : null } }); return serializeOccupancy(saved); }
+export async function syncSurfaceOccupancyState(surfaceId: string, client: Prisma.TransactionClient = prisma) {
+  const occupancies = await client.occupancy.findMany({
+    where: { surfaceId },
+    select: { id: true, clientId: true, status: true, dateFrom: true, dateTo: true },
+  });
+  const derived = deriveSurfaceOccupancyState(occupancies);
+  await client.advertisingSurface.update({
+    where: { id: surfaceId },
+    data: {
+      status: derived.status,
+      currentClientId: derived.currentClientId,
+      currentRentStart: derived.currentRentStart,
+      currentRentEnd: derived.currentRentEnd,
+    },
+  });
+}
+
+export async function upsertOccupancy(input: Partial<Occupancy> & { surfaceId: string }): Promise<Occupancy> {
+  const existing = input.id ? await prisma.occupancy.findUnique({ where: { id: input.id } }) : null;
+  const data = {
+    surfaceId: input.surfaceId,
+    clientId: input.clientId ?? existing?.clientId ?? null,
+    clientName: input.clientName ?? existing?.clientName ?? 'Klient',
+    campaignName: input.campaignName ?? existing?.campaignName ?? 'Kampan',
+    dateFrom: input.dateFrom ? new Date(input.dateFrom) : existing?.dateFrom ?? new Date(),
+    dateTo: input.dateTo ? new Date(input.dateTo) : existing?.dateTo ?? new Date(),
+    status: input.status ?? existing?.status ?? 'RESERVED',
+    price: input.price ?? existing?.price ?? null,
+    note: input.note ?? existing?.note ?? null,
+    createdBy: input.createdBy ?? existing?.createdBy ?? null,
+    updatedBy: input.updatedBy ?? existing?.updatedBy ?? null,
+    reservedUntil: input.reservedUntil ? new Date(input.reservedUntil) : existing?.reservedUntil ?? null,
+    offerId: input.offerId ?? existing?.offerId ?? null,
+  };
+  const saved = existing
+    ? await prisma.occupancy.update({ where: { id: existing.id }, data })
+    : await prisma.occupancy.create({ data: { ...data, id: input.id } });
+
+  await syncSurfaceOccupancyState(saved.surfaceId);
+  return serializeOccupancy(saved);
+}
+
 export type OccupancyAction = 'extend' | 'finish' | 'free';
-export async function updateOccupancyAction(id: string, action: OccupancyAction, input: { dateTo?: string; updatedBy?: string } = {}) { return prisma.$transaction(async (transaction) => { const existing = await transaction.occupancy.findUnique({ where: { id }, include: { surface: true } }); if (!existing) throw new Error('Zaznam obsazenosti nebyl nalezen.'); if (action === 'extend') { const dateTo = parseDateInput(input.dateTo); if (!dateTo) throw new Error('Zadejte platne datum prodlouzeni.'); if (dateTo < existing.dateFrom) throw new Error('Datum do musi byt po zacatku kampane.'); const conflicts = await checkOccupancyConflicts([existing.surfaceId], dateOnly(existing.dateFrom)!, dateOnly(dateTo)!, existing.id); if (hasBlockingConflict(conflicts)) { const error = new Error('Kampan nelze prodlouzit kvuli obsazene nebo rezervovane plose.'); (error as Error & { conflicts?: OccupancyConflict[] }).conflicts = conflicts; throw error; } const occupancy = await transaction.occupancy.update({ where: { id }, data: { dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy } }); return serializeOccupancy(occupancy); } const now = new Date(); const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())); const nextStatus = action === 'free' ? 'CANCELLED' : 'FINISHED'; const occupancy = await transaction.occupancy.update({ where: { id }, data: { status: nextStatus, dateTo: existing.dateTo > today ? today : existing.dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy } }); await transaction.advertisingSurface.update({ where: { id: existing.surfaceId }, data: { status: 'AVAILABLE', currentClientId: null } }); return serializeOccupancy(occupancy); }); }
+
+export async function updateOccupancyAction(id: string, action: OccupancyAction, input: { dateTo?: string; updatedBy?: string } = {}) {
+  return prisma.$transaction(async (transaction) => {
+    const existing = await transaction.occupancy.findUnique({ where: { id }, include: { surface: true } });
+    if (!existing) throw new Error('Zaznam obsazenosti nebyl nalezen.');
+    if (action === 'extend') {
+      const dateTo = parseDateInput(input.dateTo);
+      if (!dateTo) throw new Error('Zadejte platne datum prodlouzeni.');
+      if (dateTo < existing.dateFrom) throw new Error('Datum do musi byt po zacatku kampane.');
+      const conflicts = await checkOccupancyConflicts([existing.surfaceId], dateOnly(existing.dateFrom)!, dateOnly(dateTo)!, existing.id);
+      if (hasBlockingConflict(conflicts)) {
+        const error = new Error('Kampan nelze prodlouzit kvuli obsazene nebo rezervovane plose.');
+        (error as Error & { conflicts?: OccupancyConflict[] }).conflicts = conflicts;
+        throw error;
+      }
+      const occupancy = await transaction.occupancy.update({ where: { id }, data: { dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy } });
+      await syncSurfaceOccupancyState(existing.surfaceId, transaction);
+      return serializeOccupancy(occupancy);
+    }
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const nextStatus = action === 'free' ? 'CANCELLED' : 'FINISHED';
+    const occupancy = await transaction.occupancy.update({ where: { id }, data: { status: nextStatus, dateTo: existing.dateTo > today ? today : existing.dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy } });
+    await syncSurfaceOccupancyState(existing.surfaceId, transaction);
+    return serializeOccupancy(occupancy);
+  });
+}
 export { carrierMapColor };

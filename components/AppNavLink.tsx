@@ -1,6 +1,6 @@
 'use client';
 
-import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Camera, Car, ClipboardList, ClipboardCheck, FileText, FileUp, GalleryHorizontalEnd, Map, MapPinned, MessageSquare, PanelsTopLeft, PhoneCall, Route, Settings, UserRound, Users } from 'lucide-react';
+import { BadgeDollarSign, BarChart3, BriefcaseBusiness, CalendarCheck, CalendarRange, Camera, Car, ClipboardList, ClipboardCheck, FileText, FileUp, GalleryHorizontalEnd, Map, MapPinned, MessageSquare, PanelsTopLeft, PhoneCall, Route, Settings, ShoppingBag, UserRound, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -24,6 +24,7 @@ export type AppNavIcon =
   | 'phone'
   | 'route'
   | 'settings'
+  | 'shoppingBag'
   | 'userRound'
   | 'users';
 
@@ -47,6 +48,7 @@ const icons = {
   phone: PhoneCall,
   route: Route,
   settings: Settings,
+  shoppingBag: ShoppingBag,
   userRound: UserRound,
   users: Users,
 } satisfies Record<AppNavIcon, React.ComponentType<{ size?: number }>>;

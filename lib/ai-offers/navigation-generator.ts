@@ -3,7 +3,7 @@ import { geocodeAddress, computeGoogleRoute } from '@/lib/google-maps';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { resolveCatalogPrice } from './price-resolver';
 import { haversineMeters } from './scoring';
-import type { AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
+import type { AiNavigationPointInput, AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
 
 const pricedMountingTypes = ['LIGHT_POLE', 'TRACTION', 'COLUMN'] as const;
 const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
@@ -41,6 +41,12 @@ function approachOrigins(target: { latitude: number; longitude: number }, radius
       direction: ['severu', 'severovýchodu', 'východu', 'jihovýchodu', 'jihu', 'jihozápadu', 'západu', 'severozápadu'][Math.round(index * 8 / Math.min(8, count)) % 8],
     };
   });
+}
+
+type ApproachOrigin = ReturnType<typeof approachOrigins>[number];
+
+function isRefinedPoint(point: AiNavigationPointInput | ApproachOrigin): point is AiNavigationPointInput {
+  return 'title' in point && typeof point.title === 'string' && point.title.length > 0;
 }
 
 function firstPolylinePoint(encoded: string) {
@@ -85,41 +91,46 @@ export async function generateNavigationPreview(input: {
 }): Promise<AiOfferPreview> {
   const target = await resolveTarget(input.request);
   const radius = Math.max(0.5, input.request.maxRadiusKm ?? 5) * 1000;
-  const requestedIds = new Set(input.request.selectedCandidateIds ?? []);
   const origins = approachOrigins(target, radius, Math.max(input.quantity, 4));
-  const proposed = requestedIds.size ? origins.filter((origin) => requestedIds.has(origin.id)) : origins.slice(0, input.quantity);
+  const requestedIds = new Set(input.request.selectedCandidateIds ?? []);
+  const refinedPoints = input.request.navigationPoints?.slice(0, input.quantity) ?? [];
+  const proposed: Array<AiNavigationPointInput | ApproachOrigin> = refinedPoints.length
+    ? refinedPoints
+    : requestedIds.size ? origins.filter((origin) => requestedIds.has(origin.id)) : origins.slice(0, input.quantity);
   const pricingCity = input.request.city?.trim() || (/ostrava/i.test(target.address) ? 'Ostrava' : '');
   const pricingOptions = await resolvePricingOptions({ pricingSegment: input.client.pricingSegment, city: pricingCity, effectiveDate: input.dateFrom, durationMonths: input.durationMonths });
 
   const items = await Promise.all(proposed.map(async (origin, index) => {
-    const route = await computeGoogleRoute(origin, target);
-    const routeStart = firstPolylinePoint(route.polyline) ?? origin;
+    const isRefined = isRefinedPoint(origin);
+    const route = isRefined ? null : await computeGoogleRoute(origin, target);
+    const routeStart = isRefined ? origin : firstPolylinePoint(route!.polyline) ?? origin;
     const mountingType = input.request.candidateMountingTypes?.[origin.id];
     const selectedPricing = pricingOptions.find((option) => option.mountingType === mountingType);
-    const distance = route.status === 'OK' ? route.distanceMeters : haversineMeters(origin, target);
+    const distance = isRefined ? origin.distanceMeters ?? haversineMeters(origin, target) : route!.status === 'OK' ? route!.distanceMeters : haversineMeters(origin, target);
+    const direction = 'direction' in origin ? origin.direction : '';
     return {
-      selectionId: origin.id, surfaceId: null, carrierId: '', carrierCode: `AI-TRASA-${index + 1}`,
-      title: `Návrhový bod – příjezd od ${origin.direction}`, mediaType: 'NAVIGATION_SIGN' as const, city: pricingCity,
+      selectionId: origin.id, surfaceId: null, carrierId: '', carrierCode: `NAV-${index + 1}`,
+      title: isRefined ? origin.title : `Orientační směr od ${direction}`, mediaType: 'NAVIGATION_SIGN' as const, city: pricingCity,
       latitude: routeStart.latitude, longitude: routeStart.longitude,
       dateFrom: input.dateFrom.toISOString().slice(0, 10), dateTo: input.dateTo.toISOString().slice(0, 10), quantity: 1, unit: 'bod',
       catalogPrice: selectedPricing?.total ?? null, finalPrice: selectedPricing?.total ?? null, rentalTotal: selectedPricing?.rentalTotal ?? null,
       price: selectedPricing?.componentPrices.RENTAL ?? null, componentPrices: selectedPricing?.componentPrices,
       mountingType: mountingType ?? null, pricingOptions,
-      score: route.status === 'OK' ? 90 : 65, distanceMeters: distance,
-      routePolyline: route.polyline || undefined, routeDurationSeconds: route.durationSeconds || undefined, arrowDirection: 'STRAIGHT' as const,
-      reasons: [
-        `Orientační bod pokrývá příjezd od ${origin.direction}.`,
-        route.status === 'OK' ? 'Příjezdová trasa byla navržena přes Google Routes.' : 'Jde o orientační radiální návrh; trasu a přesnou polohu musí zkontrolovat obchodník.',
-        'Bod není svázaný s existujícím nosičem. V terénu je nutné najít vhodný sloup, nahrát jeho fotografii a bod případně posunout.',
+      score: isRefined ? origin.score : route!.status === 'OK' ? 82 : 35, distanceMeters: distance,
+      routePolyline: isRefined ? origin.routePolyline : route!.polyline || undefined,
+      routeDurationSeconds: isRefined ? origin.routeDurationSeconds : route!.durationSeconds || undefined,
+      arrowDirection: isRefined ? origin.arrowDirection ?? 'STRAIGHT' as const : 'STRAIGHT' as const,
+      reasons: isRefined ? origin.reasons : [
+        `Dočasný výchozí bod pro příjezd od ${direction}.`,
+        route!.status === 'OK' ? 'Trasa byla ověřena přes Google Routes.' : 'Google trasu zatím neověřil; počkejte na analýzu mapy v náhledu.',
       ],
     };
   }));
   const pricedItems = items.filter((item) => item.finalPrice !== null);
   const catalogTotal = pricedItems.length === items.length ? pricedItems.reduce((sum, item) => sum + item.finalPrice!, 0) : null;
-  const warnings = ['Všechny body jsou pouze AI návrhy. Obchodník musí ověřit reálný sloup, nahrát fotografii a potvrdit nebo upravit polohu.'];
+  const warnings = ['Před realizací obchodník ověří sloup v terénu, nahraje fotografii a případně bod posune.'];
   if (items.length < input.quantity) warnings.push(`AI připravila ${items.length} různých příjezdových směrů z požadovaných ${input.quantity} bodů. Další body doplní obchodník v mapě.`);
-  if (items.some((item) => !item.routePolyline)) warnings.push('Google Routes nebyla dostupná pro všechny příjezdy; část bodů je radiální orientační návrh.');
-  if (items.some((item) => item.mountingType === null)) warnings.push('Vyberte u každého bodu předpokládaný typ konstrukce. Finální typ se potvrdí podle fotografie z terénu.');
+  if (!refinedPoints.length && items.some((item) => !item.routePolyline)) warnings.push('Mapa ještě hledá silné body na reálných příjezdových trasách. Pokud Google trasu nenajde, body upraví obchodník v editoru.');
   if (pricingOptions.every((option) => option.total === null)) warnings.push('Pro tuto lokalitu, délku nebo segment není kompletní navigační ceník. Koncept lze vytvořit bez ceny.');
   return {
     mode: 'preview', offerType: 'NAVIGATION', recommendedOfferType: input.recommendedOfferType, client: input.client,
@@ -127,6 +138,8 @@ export async function generateNavigationPreview(input: {
     durationMonths: input.durationMonths, budget: input.request.budget ?? null, target, items, catalogTotal,
     budgetDifference: catalogTotal !== null && input.request.budget ? catalogTotal - input.request.budget : null,
     warnings, candidateCount: origins.length,
-    explanation: `Navrženo ${items.length} nových orientačních bodů z různých příjezdových směrů. Nejde o existující plochy; přesný sloup, fotografii, typ konstrukce a polohu potvrdí obchodník v terénu.`,
+    explanation: refinedPoints.length
+      ? `Vybráno ${items.length} rozhodovacích míst na reálných příjezdových trasách. AI upřednostnila odbočení, křižovatky a hlavní tahy s užitečnou vzdáleností od cíle.`
+      : `Připraveny výchozí směry. Mapa nyní hledá skutečné křižovatky, odbočení a hlavní příjezdové tahy.`,
   };
 }
