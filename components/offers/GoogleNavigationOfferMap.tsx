@@ -44,6 +44,19 @@ export type GoogleOfferMapPoint = NavigationMapPoint & {
   calculatedDistanceMeters?: number;
 };
 
+export type SuggestedNavigationPoint = {
+  id: string;
+  title: string;
+  latitude: number;
+  longitude: number;
+  score: number;
+  reasons: string[];
+  distanceMeters?: number;
+  routeDurationSeconds?: number;
+  routePolyline?: string;
+  arrowDirection?: 'LEFT' | 'RIGHT' | 'STRAIGHT';
+};
+
 type SearchResultItem = {
   placeId: string;
   title: string;
@@ -59,6 +72,11 @@ export function GoogleNavigationOfferMap({
   onTargetSelect,
   onPointMove,
   onMapClick,
+  compact = false,
+  readOnly = false,
+  suggestionCount,
+  maxRadiusKm = 5,
+  onSuggestedPoints,
 }: {
   target?: { latitude: number; longitude: number; label: string; address?: string; placeId?: string };
   points: GoogleOfferMapPoint[];
@@ -66,6 +84,11 @@ export function GoogleNavigationOfferMap({
   onTargetSelect: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }) => void;
   onPointMove: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string, address?: string) => void;
   onMapClick: (latitude: number, longitude: number, address?: string) => void;
+  compact?: boolean;
+  readOnly?: boolean;
+  suggestionCount?: number;
+  maxRadiusKm?: number;
+  onSuggestedPoints?: (points: SuggestedNavigationPoint[], error?: string) => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -81,6 +104,14 @@ export function GoogleNavigationOfferMap({
   const mapRef = useRef<unknown>(null);
   const markersRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
   const polylinesRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
+  const suggestionKeyRef = useRef('');
+
+  useEffect(() => {
+    if ((!apiKey || loadError) && target && suggestionCount && onSuggestedPoints && suggestionKeyRef.current !== 'maps-unavailable') {
+      suggestionKeyRef.current = 'maps-unavailable';
+      onSuggestedPoints([], 'Google mapa není dostupná. Body lze doplnit ručně po vytvoření konceptu.');
+    }
+  }, [apiKey, loadError, onSuggestedPoints, suggestionCount, target]);
 
   // Load Google Maps Script
   useEffect(() => {
@@ -156,6 +187,132 @@ export function GoogleNavigationOfferMap({
     };
   }, [searchQuery, sessionToken, apiKey]);
 
+  // Browser Directions API can work with a browser-restricted key even when the
+  // server Routes API cannot. Analyse real approach routes and select their most
+  // useful decision points instead of presenting geometric radial placeholders.
+  useEffect(() => {
+    if (!mapsLoaded || !target || !suggestionCount || !onSuggestedPoints) return;
+    const key = `${target.latitude.toFixed(5)}:${target.longitude.toFixed(5)}:${suggestionCount}:${maxRadiusKm}`;
+    if (suggestionKeyRef.current === key) return;
+    suggestionKeyRef.current = key;
+    let cancelled = false;
+
+    type LatLngValue = { lat: () => number; lng: () => number };
+    type DirectionStep = {
+      start_location: LatLngValue;
+      instructions?: string;
+      maneuver?: string;
+    };
+    type DirectionRoute = {
+      legs: Array<{ steps?: DirectionStep[]; distance?: { value: number }; duration?: { value: number } }>;
+      overview_polyline?: string | { points?: string };
+    };
+    type DirectionResult = { routes: DirectionRoute[] };
+    const maps = window.google?.maps as unknown as {
+      DirectionsService?: new () => { route: (request: Record<string, unknown>, callback: (result: DirectionResult | null, status: string) => void) => void };
+      TravelMode?: { DRIVING?: string };
+    };
+    if (!maps?.DirectionsService) {
+      onSuggestedPoints([], 'Google Directions není pro tento klíč dostupné. Body lze doplnit ručně po vytvoření konceptu.');
+      return;
+    }
+
+    const distanceBetween = (a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) => {
+      const earth = 6_371_000;
+      const toRad = (value: number) => value * Math.PI / 180;
+      const dLat = toRad(b.latitude - a.latitude);
+      const dLng = toRad(b.longitude - a.longitude);
+      const lat1 = toRad(a.latitude);
+      const lat2 = toRad(b.latitude);
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+      return 2 * earth * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    };
+    const requestRoute = (origin: { latitude: number; longitude: number }) => new Promise<DirectionRoute | null>((resolve) => {
+      new maps.DirectionsService!().route({
+        origin: { lat: origin.latitude, lng: origin.longitude },
+        destination: { lat: target.latitude, lng: target.longitude },
+        travelMode: maps.TravelMode?.DRIVING || 'DRIVING',
+        provideRouteAlternatives: false,
+      }, (result, status) => resolve(status === 'OK' ? result?.routes?.[0] ?? null : null));
+    });
+    const plainText = (html = '') => html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    const arrowFor = (maneuver = ''): SuggestedNavigationPoint['arrowDirection'] =>
+      /left|vlevo/i.test(maneuver) ? 'LEFT' : /right|vpravo/i.test(maneuver) ? 'RIGHT' : 'STRAIGHT';
+    const directions = ['severu', 'severovýchodu', 'východu', 'jihovýchodu', 'jihu', 'jihozápadu', 'západu', 'severozápadu'];
+    const radiusMeters = Math.max(1, maxRadiusKm) * 1000;
+    const routeCount = Math.min(8, Math.max(4, suggestionCount));
+    const latDelta = radiusMeters / 111_320;
+    const lngDelta = radiusMeters / (111_320 * Math.max(0.2, Math.cos(target.latitude * Math.PI / 180)));
+    const origins = Array.from({ length: routeCount }, (_, index) => {
+      const angle = index * 2 * Math.PI / routeCount;
+      return {
+        latitude: target.latitude + Math.cos(angle) * latDelta,
+        longitude: target.longitude + Math.sin(angle) * lngDelta,
+        direction: directions[Math.round(index * 8 / routeCount) % 8],
+      };
+    });
+
+    void Promise.all(origins.map(async (origin, routeIndex) => {
+      const route = await requestRoute(origin);
+      if (!route) return [];
+      return (route.legs[0]?.steps ?? []).flatMap((step, stepIndex) => {
+        const latitude = step.start_location.lat();
+        const longitude = step.start_location.lng();
+        const distanceMeters = distanceBetween({ latitude, longitude }, target);
+        if (distanceMeters < 250 || distanceMeters > radiusMeters * 1.15) return [];
+        const instruction = plainText(step.instructions);
+        const isTurn = /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd|držte|keep/i.test(`${instruction} ${step.maneuver ?? ''}`);
+        const isMainRoad = /silnic|dálnic|highway|route|tříd|avenue|\b[DI]\s?\d+|\b\d{2,3}\b/i.test(instruction);
+        const usefulDistance = distanceMeters >= 500 && distanceMeters <= 3_500;
+        const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isMainRoad ? 10 : 0) + (usefulDistance ? 8 : 0));
+        return [{ routeIndex, stepIndex, direction: origin.direction, latitude, longitude, distanceMeters, instruction, score, maneuver: step.maneuver }];
+      });
+    })).then(async (groups) => {
+      if (cancelled) return;
+      const candidates = groups.flat().sort((a, b) => b.score - a.score || b.distanceMeters - a.distanceMeters);
+      const selected: typeof candidates = [];
+      for (const candidate of candidates) {
+        if (selected.some((existing) => distanceBetween(existing, candidate) < 220)) continue;
+        if (selected.some((existing) => existing.routeIndex === candidate.routeIndex) && selected.length < routeCount) continue;
+        selected.push(candidate);
+        if (selected.length >= suggestionCount) break;
+      }
+      for (const candidate of candidates) {
+        if (selected.length >= suggestionCount) break;
+        if (!selected.includes(candidate) && !selected.some((existing) => distanceBetween(existing, candidate) < 220)) selected.push(candidate);
+      }
+      const suggestions = await Promise.all(selected.map(async (candidate, index) => {
+        const route = await requestRoute(candidate);
+        const rawPolyline = route?.overview_polyline;
+        const routePolyline = typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points;
+        const instruction = candidate.instruction || `rozhodovací místo při příjezdu od ${candidate.direction}`;
+        return {
+          id: `route-point-${candidate.routeIndex + 1}-${candidate.stepIndex + 1}`,
+          title: `Rozhodovací bod: ${instruction.slice(0, 90)}`,
+          latitude: candidate.latitude,
+          longitude: candidate.longitude,
+          score: candidate.score,
+          reasons: [
+            `Pokrývá příjezd od ${candidate.direction}.`,
+            /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd/i.test(`${instruction} ${candidate.maneuver ?? ''}`)
+              ? 'Řidič zde mění směr nebo volí další část trasy.'
+              : 'Bod leží na důležitém úseku příjezdové trasy.',
+            `${Math.round(candidate.distanceMeters)} m před cílem.`,
+          ],
+          distanceMeters: route?.legs[0]?.distance?.value ?? candidate.distanceMeters,
+          routeDurationSeconds: route?.legs[0]?.duration?.value,
+          routePolyline,
+          arrowDirection: arrowFor(candidate.maneuver),
+          index,
+        } satisfies SuggestedNavigationPoint & { index: number };
+      }));
+      if (!cancelled) onSuggestedPoints(suggestions.map(({ index: _index, ...point }) => point), suggestions.length ? undefined : 'Google nenašel vhodná rozhodovací místa na příjezdových trasách.');
+    }).catch(() => {
+      if (!cancelled) onSuggestedPoints([], 'Analýzu příjezdových tras se nepodařilo dokončit.');
+    });
+    return () => { cancelled = true; };
+  }, [mapsLoaded, maxRadiusKm, onSuggestedPoints, suggestionCount, target]);
+
   // Select Place Handler
   const handleSelectPlace = (item: SearchResultItem) => {
     onTargetSelect({
@@ -224,7 +381,7 @@ export function GoogleNavigationOfferMap({
         position: targetPos,
         map,
         title: `CÍL: ${target.label}`,
-        draggable: true,
+        draggable: !readOnly,
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
           fillColor: '#be123c',
@@ -276,7 +433,7 @@ export function GoogleNavigationOfferMap({
         position: pointPos,
         map,
         title: point.label,
-        draggable: true,
+        draggable: !readOnly,
         label: {
           text: `#${index + 1}`,
           color: '#ffffff',
@@ -340,7 +497,7 @@ export function GoogleNavigationOfferMap({
     if ((points.length > 0 || target) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, points, onMapClick, onPointMove, onTargetSelect]);
+  }, [mapsLoaded, target, points, onMapClick, onPointMove, onTargetSelect, readOnly]);
 
   // Graceful Leaflet Fallback if API key missing or load error
   if (loadError || !apiKey) {
@@ -365,7 +522,7 @@ export function GoogleNavigationOfferMap({
   return (
     <div className="space-y-3">
       {/* Places Autocomplete Search Box */}
-      <div className="relative">
+      {!compact && <div className="relative">
         <div className="flex items-center rounded-xl border border-slate-300 bg-white shadow-xs focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/20">
           <Search size={16} className="ml-3 text-slate-400 shrink-0" />
           <input
@@ -396,10 +553,10 @@ export function GoogleNavigationOfferMap({
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Mode Status Indicator */}
-      <div className={`rounded-xl px-3 py-2 text-xs font-bold flex items-center justify-between ${
+      {!compact && <div className={`rounded-xl px-3 py-2 text-xs font-bold flex items-center justify-between ${
         mode === 'target' ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-sky-50 text-sky-800 border border-sky-200'
       }`}>
         <span>
@@ -410,13 +567,13 @@ export function GoogleNavigationOfferMap({
         <span className="text-[11px] font-extrabold uppercase bg-white px-2 py-0.5 rounded shadow-xs">
           Google Maps API (Routes Enabled)
         </span>
-      </div>
+      </div>}
 
       {/* Interactive Google Map Container */}
       <div
         ref={containerRef}
         aria-label="Google mapa plánování navigace"
-        className="h-[520px] w-full rounded-2xl border-2 border-slate-200 bg-slate-100 shadow-inner overflow-hidden"
+        className={`${compact ? 'h-[330px] md:h-[390px]' : 'h-[520px]'} w-full rounded-2xl border-2 border-slate-200 bg-slate-100 shadow-inner overflow-hidden`}
       />
     </div>
   );

@@ -81,6 +81,26 @@ test('navigation target can be geocoded from an address', () => {
   assert.doesNotMatch(generator, /advertisingSurface\.findMany|advertisingCarrier\.findMany/);
 });
 
+test('browser route analysis replaces radial placeholders with real decision points', () => {
+  const map = readFileSync(new URL('../components/offers/GoogleNavigationOfferMap.tsx', import.meta.url), 'utf8');
+  const modal = readFileSync(new URL('../components/offers/AiOfferGeneratorModal.tsx', import.meta.url), 'utf8');
+  assert.match(map, /DirectionsService/);
+  assert.match(map, /isTurn/);
+  assert.match(map, /isMainRoad/);
+  assert.match(map, /onSuggestedPoints/);
+  assert.match(modal, /navigationPoints:/);
+  assert.match(modal, /Polohu si AI dohledá sama/);
+  assert.doesNotMatch(modal, />Latitude<|>Longitude</);
+});
+
+test('confirmed navigation keeps the route points selected in the browser', () => {
+  const generator = readFileSync(new URL('../lib/ai-offers/navigation-generator.ts', import.meta.url), 'utf8');
+  const service = readFileSync(new URL('../lib/ai-offers/service.ts', import.meta.url), 'utf8');
+  assert.match(service, /request\.navigationPoints/);
+  assert.match(generator, /refinedPoints/);
+  assert.match(generator, /isRefinedPoint/);
+});
+
 test('AI navigation points are new proposals requiring a real pole photo', () => {
   const service = readFileSync(new URL('../lib/ai-offers/service.ts', import.meta.url), 'utf8');
   const workflow = readFileSync(new URL('../lib/offers/workflow.ts', import.meta.url), 'utf8');

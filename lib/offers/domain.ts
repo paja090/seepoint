@@ -281,7 +281,7 @@ export function canManageOfferRole(role: AppRole) {
 }
 
 export function canConvertOfferRole(role: AppRole) {
-  return role === 'ADMIN' || role === 'MANAGER' || role === 'SALES';
+  return role === 'ADMIN' || role === 'MANAGER';
 }
 
 export function canAccessOffer(user: CurrentUser, createdByUserId: string | null) {
