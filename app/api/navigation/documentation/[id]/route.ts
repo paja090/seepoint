@@ -22,7 +22,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
       items: {
         include: {
-          navigationPoint: { include: { installedPhoto: true } },
+          navigationPoint: {
+            include: {
+              installedPhoto: true,
+              carrier: {
+                include: {
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                },
+              },
+            },
+          },
           carrier: {
             include: {
               photos: {
@@ -156,7 +168,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           },
           items: {
             include: {
-              navigationPoint: { include: { installedPhoto: true } },
+              navigationPoint: {
+                include: {
+                  installedPhoto: true,
+                  carrier: {
+                    include: {
+                      photos: {
+                        where: { isPrivate: false },
+                        orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                      },
+                    },
+                  },
+                },
+              },
               carrier: {
                 include: {
                   photos: {

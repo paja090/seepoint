@@ -73,7 +73,8 @@ export function NavigationReportEditor({
     setItems((current) =>
       current.map((item) => {
         if (item.id !== id) return item;
-        const foundPhoto = item.carrier?.photos.find((p) => p.id === photoId) ?? null;
+        const availablePhotos = item.carrier?.photos || (item.navigationPoint as any)?.carrier?.photos || [];
+        const foundPhoto = availablePhotos.find((p: any) => p.id === photoId) ?? null;
         return {
           ...item,
           selectedPhotoId: photoId || null,
@@ -160,6 +161,9 @@ export function NavigationReportEditor({
           const photoSrc =
             item.selectedPhoto?.url || (item.selectedPhoto?.id ? `/api/photos/${item.selectedPhoto.id}/file` : null);
 
+          const effectiveCarrier = item.carrier || (item.navigationPoint as any)?.carrier;
+          const availablePhotos = effectiveCarrier?.photos || [];
+
           return (
             <div
               key={item.id}
@@ -187,7 +191,7 @@ export function NavigationReportEditor({
                     </span>
                   </div>
 
-                  {item.carrier?.photos && item.carrier.photos.length > 0 ? (
+                  {availablePhotos.length > 0 ? (
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">Výběr fotografie</label>
                       <select
@@ -196,7 +200,7 @@ export function NavigationReportEditor({
                         onChange={(e) => updatePhoto(item.id, e.target.value)}
                       >
                         <option value="">-- Bez fotky --</option>
-                        {item.carrier.photos.map((p, pIdx) => (
+                        {availablePhotos.map((p: any, pIdx: number) => (
                           <option key={p.id} value={p.id}>
                             Fotka #{pIdx + 1} ({new Date(p.createdAt).toLocaleDateString('cs-CZ')})
                           </option>
