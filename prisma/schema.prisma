@@ -1577,6 +1577,8 @@ model WorkOrder {
   contactName      String?
   contactPhone     String?
   locationNote     String?
+  estimatedHours   Decimal?        @db.Decimal(5, 2)
+  pdfUrl           String?
   mediaLabel       String?
   quantity         Int?
   price            Decimal?        @db.Decimal(12, 2)

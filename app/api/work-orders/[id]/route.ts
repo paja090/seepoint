@@ -153,6 +153,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           contactName: text(input, 'contactName') ?? null,
           contactPhone: text(input, 'contactPhone') ?? null,
           locationNote: text(input, 'locationNote') ?? null,
+          estimatedHours: text(input, 'estimatedHours') ? Number.parseFloat(text(input, 'estimatedHours')!) : null,
+          pdfUrl: text(input, 'pdfUrl') ?? null,
           mediaLabel: text(input, 'mediaLabel') ?? null,
           quantity,
           referenceUrl: text(input, 'referenceUrl') ?? null,
