@@ -6,6 +6,7 @@ import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
 import { UserCheck, FileText, AlertTriangle, ShieldCheck, Wrench } from 'lucide-react';
+import { VehiclePhotoUploader } from '@/components/VehiclePhotoUploader';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,75 +53,92 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         </Link>
       </div>
 
-      <section className="card mb-6">
-        <h2 className="mb-4 text-lg font-black text-slate-900 border-b border-slate-200 pb-2">Provozní údaje & Dokumentace</h2>
-        <dl className="grid gap-4 text-xs md:grid-cols-4">
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Stav vozidla</dt>
-            <dd className="mt-1"><StatusPill value={vehicle.status} /></dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Zodpovědná osoba / Řidič</dt>
-            <dd className="mt-1 font-extrabold text-slate-900 flex items-center gap-1.5">
-              <UserCheck size={16} className="text-sky-600" />
-              {vehicle.responsiblePerson ?? 'Neuvedena'}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">VIN kód</dt>
-            <dd className="mt-1 font-mono font-bold text-slate-900">{vehicle.vin ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">STK platná do</dt>
-            <dd className="mt-1 font-extrabold text-slate-900">{dateOnly(vehicle.technicalInspectionUntil)}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pojištění do</dt>
-            <dd className="mt-1 font-bold text-slate-900">{dateOnly(vehicle.insuranceUntil)}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Dálniční známka do</dt>
-            <dd className="mt-1 font-bold text-emerald-800">{dateOnly(vehicle.highwayPassUntil)}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pneumatiky & Rozměr</dt>
-            <dd className="mt-1 font-bold text-slate-900">🛞 {vehicle.tiresInfo ?? 'Neuvedeno'}</dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Techničák (VTP)</dt>
-            <dd className="mt-1">
-              {vehicle.vtpUrl ? (
-                <a
-                  href={vehicle.vtpUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-black text-sky-700 hover:underline"
-                >
-                  📄 Zobrazit VTP v Google Disku ↗
-                </a>
-              ) : (
-                <span className="text-slate-400">—</span>
-              )}
-            </dd>
-          </div>
-        </dl>
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Left Column: Photo Uploader */}
+        <div className="md:col-span-1">
+          <section className="card">
+            <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-700">Fotografie vozidla / vozíku</h2>
+            <VehiclePhotoUploader
+              vehicleId={vehicle.id}
+              currentPhotoUrl={vehicle.photoUrl}
+              vehicleName={vehicle.name}
+            />
+          </section>
+        </div>
 
-        {vehicle.repairNotes && (
-          <div className="mt-4 rounded-2xl bg-rose-50 p-4 border border-rose-200 text-xs text-rose-950 font-medium">
-            <strong className="block font-black text-rose-900 text-sm mb-1 flex items-center gap-1.5">
-              <AlertTriangle size={16} className="text-rose-600" />
-              Závady a poznámky k opravám:
-            </strong>
-            <p className="font-bold">{vehicle.repairNotes}</p>
-          </div>
-        )}
+        {/* Right Column: Vehicle Info & Specs */}
+        <div className="md:col-span-2 space-y-6">
+          <section className="card">
+            <h2 className="mb-4 text-lg font-black text-slate-900 border-b border-slate-200 pb-2">Provozní údaje & Dokumentace</h2>
+            <dl className="grid gap-4 text-xs sm:grid-cols-3">
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Stav vozidla</dt>
+                <dd className="mt-1"><StatusPill value={vehicle.status} /></dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Zodpovědná osoba / Řidič</dt>
+                <dd className="mt-1 font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <UserCheck size={16} className="text-sky-600" />
+                  {vehicle.responsiblePerson ?? 'Neuvedena'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">VIN kód</dt>
+                <dd className="mt-1 font-mono font-bold text-slate-900">{vehicle.vin ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">STK platná do</dt>
+                <dd className="mt-1 font-extrabold text-slate-900">{dateOnly(vehicle.technicalInspectionUntil)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pojištění do</dt>
+                <dd className="mt-1 font-bold text-slate-900">{dateOnly(vehicle.insuranceUntil)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Dálniční známka do</dt>
+                <dd className="mt-1 font-bold text-emerald-800">{dateOnly(vehicle.highwayPassUntil)}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pneumatiky & Rozměr</dt>
+                <dd className="mt-1 font-bold text-slate-900">🛞 {vehicle.tiresInfo ?? 'Neuvedeno'}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Techničák (VTP)</dt>
+                <dd className="mt-1">
+                  {vehicle.vtpUrl ? (
+                    <a
+                      href={vehicle.vtpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-black text-sky-700 hover:underline"
+                    >
+                      📄 Zobrazit VTP v Google Disku ↗
+                    </a>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
 
-        {vehicle.note && (
-          <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs text-slate-700">
-            <strong>Poznámka:</strong> {vehicle.note}
-          </div>
-        )}
-      </section>
+            {vehicle.repairNotes && (
+              <div className="mt-4 rounded-2xl bg-rose-50 p-4 border border-rose-200 text-xs text-rose-950 font-medium">
+                <strong className="block font-black text-rose-900 text-sm mb-1 flex items-center gap-1.5">
+                  <AlertTriangle size={16} className="text-rose-600" />
+                  Závady a poznámky k opravám:
+                </strong>
+                <p className="font-bold">{vehicle.repairNotes}</p>
+              </div>
+            )}
+
+            {vehicle.note && (
+              <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs text-slate-700">
+                <strong>Poznámka:</strong> {vehicle.note}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
 
       {/* Fuel Expenses Section */}
       <section className="card mt-6 border-amber-200 bg-amber-50/40">

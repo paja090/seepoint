@@ -526,6 +526,7 @@ export async function ensureVehicleSchema() {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "owner" TEXT;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "vtpUrl" TEXT;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "repairNotes" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;`);
 
     const count = await prisma.vehicle.count();
     if (count === 0) {
