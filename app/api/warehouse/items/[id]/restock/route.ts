@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         quantity: `${neededQty}`,
         unit: item.unit,
         store: item.supplierName || 'Dodavatel dílny',
-        priority: 'HIGH' as const,
+        priority: 'THIS_WEEK',
         note: `Automaticky vygenerováno ze Skladu. Aktuální stav: ${currentStock} ${item.unit} (Minimální doporučený: ${minStock} ${item.unit}). ${item.supplierContact ? `Kontakt: ${item.supplierContact}` : ''}`,
         addedByUserId: user.id,
         addedByUserName: userName,
