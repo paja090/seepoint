@@ -1,9 +1,12 @@
 export const MOBILE_PHOTO_DAMAGE_TYPES = [
   { value: 'OVERGROWN', label: 'Zarostlá – nutný prořez' },
+  { value: 'CLIP_FRAME', label: '🪟 Klipový rám (poškozený / uvolněný)' },
+  { value: 'MISSING_CORNERS', label: '🧩 Chybějící plastové rožky' },
+  { value: 'SEATING_BOARDS', label: '🪑 Sedací desky (poškozené / chybějící)' },
   { value: 'TURNED', label: 'Vytočená / posunutá konstrukce' },
   { value: 'BENT_FRAME', label: 'Křivý / ohnutý rám' },
   { value: 'BROKEN_CONCRETE', label: 'Rozbitý beton / patka' },
-  { value: 'DAMAGED_BACKREST', label: 'Poškozené opěradlo' },
+  { value: 'DAMAGED_BACKREST', label: 'Poškozené opěradlo lavičky' },
   { value: 'GRAFFITI', label: 'Poničená sprejem / graffiti' },
   { value: 'FADED', label: 'Vybledlý nebo poničený tisk' },
   { value: 'DAMAGED_STRUCTURE', label: 'Poškozená konstrukce' },

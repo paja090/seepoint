@@ -95,6 +95,14 @@ export function CarrierFilters({ filters, options, action, resultCount }: Carrie
           </select>
         </label>
         <label>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-rose-600 font-bold">🚨 Závada</span>
+          <select className="input font-semibold" name="damage" defaultValue={value(filters.damage)}>
+            <option value="">Vše</option>
+            <option value="present">🚨 Jen se ZÁVADOU</option>
+            <option value="missing">✓ Bez závady (čisté)</option>
+          </select>
+        </label>
+        <label>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Popis</span>
           <select className="input" name="description" defaultValue={value(filters.description)}>
             <option value="">Vše</option>

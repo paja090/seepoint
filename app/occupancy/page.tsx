@@ -45,7 +45,7 @@ function buildWhere(params: SearchParams) {
   const dateTo = parseDate(clean(params.dateTo));
 
   const surfaceWhere: Prisma.AdvertisingSurfaceWhereInput = {
-    status: { not: 'OUT_OF_SERVICE' },
+    ...(status === 'OUT_OF_SERVICE' ? { status: 'OUT_OF_SERVICE' } : { status: { not: 'OUT_OF_SERVICE' } }),
     carrier: {
       archivedAt: null,
       status: 'ACTIVE',
@@ -92,7 +92,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     const in30 = new Date(today); in30.setDate(today.getDate() + 30);
 
     const surfaceFilter: Prisma.AdvertisingSurfaceWhereInput = {
-      status: { not: 'OUT_OF_SERVICE' },
+      ...(selectedStatus === 'OUT_OF_SERVICE' ? { status: 'OUT_OF_SERVICE' } : { status: { not: 'OUT_OF_SERVICE' } }),
       carrier: {
         archivedAt: null,
         status: 'ACTIVE',

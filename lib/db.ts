@@ -33,7 +33,7 @@ type OccupancyRow = Prisma.OccupancyGetPayload<Record<string, never>>;
 
 export type SurfaceTemplate = { name: string; mediaType: Surface['mediaType']; orientation?: string };
 export type CarrierArchiveInput = { archivedBy?: string; archiveReason?: string };
-export type CarrierFilters = { q?: string; carrierType?: CarrierType; mediaType?: MediaType; city?: string; locality?: string; street?: string; client?: string; surfaceStatus?: SurfaceStatus; gps?: 'missing' | 'present' | GpsStatus; photo?: 'missing' | 'present'; description?: 'missing' | 'present'; occupancy?: 'missing' | 'present'; archived?: 'active' | 'archived' | 'all'; importBatchId?: string; page?: number; pageSize?: number };
+export type CarrierFilters = { q?: string; carrierType?: CarrierType; mediaType?: MediaType; city?: string; locality?: string; street?: string; client?: string; surfaceStatus?: SurfaceStatus; gps?: 'missing' | 'present' | GpsStatus; photo?: 'missing' | 'present'; damage?: 'missing' | 'present'; description?: 'missing' | 'present'; occupancy?: 'missing' | 'present'; archived?: 'active' | 'archived' | 'all'; importBatchId?: string; page?: number; pageSize?: number };
 export type CarrierResultMeta = { total: number; returned: number; limit: number; page: number; pageSize: number; hasMore: boolean; missingGpsCount: number; archivedCount: number };
 export type CarrierFilterOptions = { cities: string[]; localities: string[]; streets: string[]; clients: string[]; importBatches: { id: string; label: string }[] };
 
@@ -177,6 +177,19 @@ export function buildCarrierWhere(filters: CarrierFilters = {}): Prisma.Advertis
   else if (filters.gps) where.gpsStatus = filters.gps;
   if (filters.photo === 'missing') where.photos = { none: {} };
   if (filters.photo === 'present') where.photos = { some: {} };
+  if (filters.damage === 'present') {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { OR: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }, { photos: { some: { type: 'DAMAGE' } } }, { surfaces: { some: { photos: { some: { type: 'DAMAGE' } } } } }] },
+    ];
+  } else if (filters.damage === 'missing') {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { NOT: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }] },
+      { photos: { none: { type: 'DAMAGE' } } },
+      { surfaces: { none: { photos: { some: { type: 'DAMAGE' } } } } },
+    ];
+  }
   if (filters.occupancy === 'missing') where.surfaces = { none: { occupancies: { some: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] } } } } };
   if (filters.occupancy === 'present') where.surfaces = { some: { occupancies: { some: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] } } } } };
   if (importBatchId) where.importBatchId = importBatchId;
