@@ -47,7 +47,12 @@ export async function POST(request: Request) {
 
     const year = Number(body.year) || new Date().getFullYear();
     const quarter = body.quarter ? Number(body.quarter) : 2;
-    const title = String(body.title || `Fotodokumentace ${quarter}. čtvrtletí ${year}`).trim();
+    const city = body.city ? String(body.city).trim() : '';
+
+    const defaultTitle = city
+      ? `Fotodokumentace ${city} – ${quarter}. čtvrtletí ${year}`
+      : `Fotodokumentace ${quarter}. čtvrtletí ${year}`;
+    const title = String(body.title || defaultTitle).trim();
     const description = body.description ? String(body.description).trim() : null;
     const offerId = body.offerId ? String(body.offerId).trim() : null;
     const navigationOfferId = body.navigationOfferId ? String(body.navigationOfferId).trim() : null;
@@ -61,6 +66,17 @@ export async function POST(request: Request) {
     }
 
     const { token, hash } = generateSecureToken();
+
+    // Helper to extract direction/orientation
+    const extractDirection = (point?: any, carrier?: any) => {
+      const direct = point?.orientation;
+      if (direct && direct.trim() !== '') return direct.trim();
+      const surf = carrier?.surfaces?.[0]?.directionDescription || carrier?.surfaces?.[0]?.orientation;
+      if (surf && surf.trim() !== '') return surf.trim();
+      const variant = point?.variant;
+      if (variant && variant.trim() !== '') return variant.trim();
+      return undefined;
+    };
 
     // Query active navigation points for this client / offer
     let points = await prisma.navigationPoint.findMany({
@@ -78,7 +94,15 @@ export async function POST(request: Request) {
           include: {
             photos: {
               where: { isPrivate: false },
-              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+              orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+            },
+            surfaces: {
+              include: {
+                photos: {
+                  where: { isPrivate: false },
+                  orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                },
+              },
             },
           },
         },
@@ -97,7 +121,15 @@ export async function POST(request: Request) {
             include: {
               photos: {
                 where: { isPrivate: false },
-                orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+                orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+              },
+              surfaces: {
+                include: {
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                },
               },
             },
           },
@@ -106,25 +138,46 @@ export async function POST(request: Request) {
       });
     }
 
+    if (city) {
+      const lowerCity = city.toLowerCase();
+      points = points.filter((p) => {
+        const text = `${p.address || ''} ${p.carrier?.city || ''} ${p.carrier?.address || ''} ${p.carrier?.name || ''} ${p.carrier?.surfaces?.map((s) => s.name).join(' ') || ''}`.toLowerCase();
+        return text.includes(lowerCity);
+      });
+    }
+
     let itemInputs: Array<{
       navigationPointId?: string;
       carrierId?: string;
       selectedPhotoId?: string;
+      customDirection?: string;
       sortOrder: number;
       isVisible: boolean;
     }> = [];
 
     if (points.length > 0) {
-      itemInputs = points.map((point, index) => ({
-        navigationPointId: point.id,
-        carrierId: point.carrierId ?? undefined,
-        selectedPhotoId: point.installedPhotoId ?? point.carrier?.photos[0]?.id ?? undefined,
-        sortOrder: index,
-        isVisible: true,
-      }));
+      itemInputs = points.map((point, index) => {
+        const availablePhotos = [
+          ...(point.carrier?.photos || []),
+          ...((point.carrier?.surfaces || []).flatMap((s: any) => s.photos || [])),
+        ].sort((a: any, b: any) => {
+          if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
+          if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+
+        return {
+          navigationPointId: point.id,
+          carrierId: point.carrierId ?? undefined,
+          selectedPhotoId: point.installedPhotoId ?? availablePhotos[0]?.id ?? undefined,
+          customDirection: extractDirection(point, point.carrier),
+          sortOrder: index,
+          isVisible: true,
+        };
+      });
     } else {
       // Fallback: Query carriers associated with this client
-      const carriers = await prisma.advertisingCarrier.findMany({
+      let carriers = await prisma.advertisingCarrier.findMany({
         where: {
           archivedAt: null,
           surfaces: {
@@ -139,19 +192,47 @@ export async function POST(request: Request) {
         include: {
           photos: {
             where: { isPrivate: false },
-            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+            orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+          },
+          surfaces: {
+            include: {
+              photos: {
+                where: { isPrivate: false },
+                orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+              },
+            },
           },
         },
         orderBy: { code: 'asc' },
         take: 100,
       });
 
-      itemInputs = carriers.map((carrier, index) => ({
-        carrierId: carrier.id,
-        selectedPhotoId: carrier.photos[0]?.id ?? undefined,
-        sortOrder: index,
-        isVisible: true,
-      }));
+      if (city) {
+        const lowerCity = city.toLowerCase();
+        carriers = carriers.filter((c) => {
+          const text = `${c.city || ''} ${c.address || ''} ${c.name || ''} ${c.surfaces?.map((s) => s.name).join(' ') || ''}`.toLowerCase();
+          return text.includes(lowerCity);
+        });
+      }
+
+      itemInputs = carriers.map((carrier, index) => {
+        const availablePhotos = [
+          ...(carrier.photos || []),
+          ...((carrier.surfaces || []).flatMap((s: any) => s.photos || [])),
+        ].sort((a: any, b: any) => {
+          if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
+          if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+
+        return {
+          carrierId: carrier.id,
+          selectedPhotoId: availablePhotos[0]?.id ?? undefined,
+          customDirection: extractDirection(null, carrier),
+          sortOrder: index,
+          isVisible: true,
+        };
+      });
     }
 
     const report = await prisma.navigationDocumentationReport.create({

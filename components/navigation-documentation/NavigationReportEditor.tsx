@@ -152,16 +152,15 @@ export function NavigationReportEditor({
           const label = item.navigationPoint?.label || item.carrier?.code || item.carrier?.name || `Navigační bod #${idx + 1}`;
           const address = item.navigationPoint?.address || item.carrier?.address || 'Adresa neuvedena';
           const city = item.carrier?.city || 'Lokalita neuvedena';
-          const currentDir = item.customDirection || item.navigationPoint?.orientation || item.snapshot?.direction || 'Obousměrný (A/B)';
-
-          const lat = item.navigationPoint?.latitude ?? item.carrier?.latitude;
-          const lng = item.navigationPoint?.longitude ?? item.carrier?.longitude;
-          const hasGps = lat !== undefined && lat !== null && lng !== undefined && lng !== null && (lat !== 0 || lng !== 0);
-
-          const photoSrc =
-            item.selectedPhoto?.url || (item.selectedPhoto?.id ? `/api/photos/${item.selectedPhoto.id}/file` : null);
-
           const effectiveCarrier = item.carrier || (item.navigationPoint as any)?.carrier;
+          const currentDir =
+            item.customDirection ||
+            item.navigationPoint?.orientation ||
+            (effectiveCarrier?.surfaces?.[0] as any)?.directionDescription ||
+            (effectiveCarrier?.surfaces?.[0] as any)?.orientation ||
+            item.snapshot?.direction ||
+            'Obousměrný (A/B)';
+
           const availablePhotos = effectiveCarrier?.photos || [];
 
           return (
