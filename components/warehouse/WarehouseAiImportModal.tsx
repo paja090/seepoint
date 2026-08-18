@@ -35,22 +35,28 @@ export function WarehouseAiImportModal() {
     setError(null);
     setSuccessMessage(null);
 
-    try {
-      const res = await fetch('/api/warehouse/ai-import-photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: file.name }),
-      });
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target?.result as string;
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'AI analýza fotky selhala.');
+      try {
+        const res = await fetch('/api/warehouse/ai-import-photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, photoBase64: base64Data }),
+        });
 
-      setProposedItems(data.proposedItems || []);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Chyba při AI zpracování fotky.');
-    } finally {
-      setLoading(false);
-    }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'AI analýza fotky selhala.');
+
+        setProposedItems(data.proposedItems || []);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Chyba při AI zpracování fotky.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   function updateItem(index: number, field: keyof ProposedItem, value: any) {

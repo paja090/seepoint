@@ -199,3 +199,59 @@ Vrať JSON objekt s přesně těmito poli:
     summary: 'Účtenka načtena v režimu rozpoznávání SeePOINT.',
   };
 }
+
+export type GeminiWarehousePhotoItem = {
+  name: string;
+  category: 'CONSUMABLE' | 'RETURNABLE';
+  quantity: number;
+  unit: string;
+  location: string;
+  note: string;
+};
+
+/**
+ * Real AI Vision model call to analyze warehouse/workshop photos
+ */
+export async function analyzeWarehouseItemsFromPhotoWithGemini(imageBase64OrUrl: string): Promise<GeminiWarehousePhotoItem[]> {
+  const prompt = `Jsi AI specialista na rozpoznávání nářadí, montážního a skladového materiálu reklamní a stavební firmy. 
+Detailně prozkoumej přiloženou fotografii regálu, dílny nebo naloženého kufru auta.
+Identifikuj VŠECHNY viditelné předměty, produkty, balení, nářadí, měřidla, žebříky, lepidla, stahovací pásky, hmoždinky atd.
+
+Pro každý nalezený předmět určete:
+- name: Přesný název předmětu v češtině (např. 'Svinovací metr 5m', 'Stahovací pásky 500mm', 'Montážní lepidlo Den Braven', 'Hliníkový žebřík 3x11', 'Aku vrtačka DeWalt')
+- category: Buď 'CONSUMABLE' (pokud jde o jednorázový/spotřební materiál jako pásky, lepidlo, pěna, hmoždinky, šrouby) nebo 'RETURNABLE' (pokud jde o vratné nářadí, měřidlo, žebřík, kufry s nářadím, aku stroje)
+- quantity: Počet viditelných kusů/balení (číslo)
+- unit: Jednotka v češtině ('ks', 'balení', 'sada', 'kbelík', 'kus')
+- location: Doporučený regál nebo sektor ('Regál A1 - Nářadí', 'Regál B2 - Spojovací materiál')
+- note: Stručná poznámka o předmětu na fotce
+
+Vrať výhradně platný JSON objekt v tomto formátu:
+{
+  "items": [
+    {
+      "name": "Svinovací metr 5m",
+      "category": "RETURNABLE",
+      "quantity": 1,
+      "unit": "ks",
+      "location": "Regál A1 - Nářadí",
+      "note": "Rozpoznán svinovací metr na fotce"
+    }
+  ]
+}`;
+
+  const res = await callGeminiVision(prompt, imageBase64OrUrl);
+
+  if (res && Array.isArray(res.items) && res.items.length > 0) {
+    return res.items.map((i: any) => ({
+      name: String(i.name || 'Předmět z fotky').trim(),
+      category: i.category === 'RETURNABLE' ? 'RETURNABLE' : 'CONSUMABLE',
+      quantity: Number(i.quantity) || 1,
+      unit: String(i.unit || 'ks').trim(),
+      location: String(i.location || 'Dílna / Regál').trim(),
+      note: String(i.note || 'Rozpoznáno AI Vision z fotky').trim(),
+    }));
+  }
+
+  return [];
+}
+
