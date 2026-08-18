@@ -41,6 +41,8 @@ export type WorkOrderData = {
   invoiced?: boolean;
   quantity?: number | null;
   mediaLabel?: string | null;
+  contactPhone?: string | null;
+  locationNote?: string | null;
   assignments: Array<{ workerName: string }>;
   workTasksCount: number;
   carrierCode?: string;
@@ -103,6 +105,22 @@ export function WorkPlanListView({
       setCleanupMessage(err instanceof Error ? err.message : 'Vyčištění selhalo');
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const handleDeleteOrder = async (e: React.MouseEvent, orderId: string, orderTitle: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`Opravdu chcete odebrat zakázku "${orderTitle}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/work-orders/${orderId}`, { method: 'DELETE' });
+      const out = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      if (!res.ok) throw new Error(out.error || 'Odebrání selhalo');
+      if (out.message) alert(out.message);
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při odebrání úkolu');
     }
   };
 
@@ -188,10 +206,9 @@ export function WorkPlanListView({
               new Date(order.scheduledAt).toDateString() === now.toDateString();
 
             return (
-              <Link
+              <div
                 key={order.id}
-                href={`/work/${order.id}`}
-                className={`card block transition hover:-translate-y-0.5 hover:shadow-md ${
+                className={`card relative block transition hover:-translate-y-0.5 hover:shadow-md ${
                   isOverdue
                     ? 'border-red-400 ring-2 ring-red-100 bg-red-50/20'
                     : isToday
@@ -200,7 +217,7 @@ export function WorkPlanListView({
                 }`}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-1.5">
+                  <Link href={`/work/${order.id}`} className="space-y-1.5 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ${workStatusStyles[order.status as keyof typeof workStatusStyles] || 'bg-slate-100 text-slate-800'}`}>
                         {workStatusLabels[order.status as keyof typeof workStatusLabels] || order.status}
@@ -223,21 +240,29 @@ export function WorkPlanListView({
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-black text-slate-950 leading-snug">
+                    <h3 className="text-lg font-black text-slate-950 leading-snug hover:text-sky-600 transition">
                       {order.title}
                     </h3>
 
-                    <p className="text-xs font-extrabold text-slate-700">
-                      👤 {order.clientName} · 📅 {formatWorkDate(new Date(order.scheduledAt))}
+                    <p className="text-xs font-extrabold text-slate-700 flex flex-wrap items-center gap-2">
+                      <span>👤 {order.clientName}</span>
+                      <span>· 📅 {formatWorkDate(new Date(order.scheduledAt))}</span>
+                      {order.contactPhone && <span className="text-emerald-700">· 📞 {order.contactPhone}</span>}
                     </p>
+
+                    {order.locationNote && (
+                      <p className="text-xs font-semibold text-slate-600">
+                        📍 Lokace: {order.locationNote}
+                      </p>
+                    )}
 
                     <p className="text-xs font-extrabold text-slate-500">
                       Zadal/a: {order.requestedBy || 'Neuvedeno'}
                       {order.carrierCode && ` · Nosič: ${order.carrierCode} (${order.carrierCity || ''})`}
                     </p>
-                  </div>
+                  </Link>
 
-                  <div className="text-xs md:text-right space-y-1">
+                  <div className="text-xs md:text-right space-y-2 shrink-0">
                     <p className="font-black text-sm text-slate-950">
                       {formatWorkPrice(order.price ?? undefined)}
                     </p>
@@ -252,9 +277,19 @@ export function WorkPlanListView({
                         {order.quantity} ks {order.mediaLabel || ''}
                       </p>
                     )}
+
+                    {canCleanup && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteOrder(e, order.id, order.title)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-red-700 hover:bg-red-100 transition"
+                      >
+                        <Trash2 size={12} /> Odebrat úkol
+                      </button>
+                    )}
                   </div>
                 </div>
-              </Link>
+              </div>
             );
           })
         )}

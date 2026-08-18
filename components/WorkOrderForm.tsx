@@ -3,7 +3,18 @@
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { workPriorityLabels, workTypeLabels } from '@/lib/work';
-import { AlertTriangle, CheckCircle2, ShieldAlert, Sparkles, FolderPlus, UserCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ShieldAlert,
+  Sparkles,
+  FolderPlus,
+  UserCheck,
+  Phone,
+  MapPin,
+  FileText,
+  HelpCircle,
+} from 'lucide-react';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -20,13 +31,25 @@ type WorkOrderFormProps = {
   initialCampaignDateTo?: string;
 };
 
-// Ceník úkolové práce (pro automatický výpočet ceny)
+// Ceník úkolové práce (pro automatický výpočet ceny dle zadaných sazeb)
 const pieceRateCatalog: Record<string, number> = {
-  'MONTÁŽ CEDULE PLÁSTEVE': 450,
-  'REINSTALACE NAVIGACE': 550,
-  'DEMONTÁŽ POPLASTOVANÉ VYKLÁPĚCÍ': 300,
-  'VÝMĚNA GRAFIKY': 250,
-  'SERVIS / OPRAVA STOJANOVÉHO SLOUPE': 600,
+  'Lavička — instalace (výměna grafiky)': 40,
+  'City poster grafika — výměna': 60,
+  'Minitower — výměna banneru': 150,
+  'Tower — výměna banneru': 200,
+  'Horizont — instalace': 30,
+  'Horizont — deinstalace': 30,
+  'CLV (City Light) — instalace': 60,
+  'Billboardy — lepení': 500,
+  'Navigace — instalace': 200,
+  'Navigace — deinstalace': 150,
+  'City poster — dovoz': 260,
+  'City poster — odvoz': 260,
+  'Minitower — instalace & dovoz (vč. plachtování)': 600,
+  'Tower — dovoz / odvoz (vč. plachtování)': 1000,
+  'Montáž cedule plástve': 450,
+  'Reinstalace navigace': 550,
+  'Servis / oprava stojanového sloupku': 600,
 };
 
 export function WorkOrderForm({
@@ -47,16 +70,24 @@ export function WorkOrderForm({
   const [workType, setWorkType] = useState('INSTALLATION');
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]);
   const [ftdUrl, setFtdUrl] = useState('');
+  const [noPhotoRequired, setNoPhotoRequired] = useState(false);
   const [quantity, setQuantity] = useState('1');
   const [pieceRateType, setPieceRateType] = useState(Object.keys(pieceRateCatalog)[0]);
   const [price, setPrice] = useState('');
   const [isCalculatedPrice, setIsCalculatedPrice] = useState(false);
 
+  const [title, setTitle] = useState(
+    initialCarrierCode
+      ? `Montáž nosiče ${initialCarrierCode}${initialClientName ? ` — ${initialClientName}` : ''}`
+      : ''
+  );
+  const [locationNote, setLocationNote] = useState('');
+
   // Auto calculate price for piece-rate work
   const handleQuantityOrRateChange = (newQty: string, newRateType: string, currentWorkType: string) => {
     if (currentWorkType === 'PIECE_RATE') {
       const qtyNum = parseInt(newQty, 10) || 1;
-      const rateVal = pieceRateCatalog[newRateType] || 450;
+      const rateVal = pieceRateCatalog[newRateType] || 40;
       setPrice(String(qtyNum * rateVal));
       setIsCalculatedPrice(true);
     }
@@ -66,7 +97,7 @@ export function WorkOrderForm({
     setWorkType(newType);
     if (newType === 'CITY_GALLERY') {
       setIsCalculatedPrice(false);
-      setPrice(''); // Must be entered manually for Galerie venku
+      setPrice('');
     } else if (newType === 'PIECE_RATE') {
       handleQuantityOrRateChange(quantity, pieceRateType, 'PIECE_RATE');
     }
@@ -80,23 +111,52 @@ export function WorkOrderForm({
     }
   };
 
+  // Preset Template Quick Fill
+  const applyTemplate = (preset: 'MEETING' | 'POSTERS' | 'TOWER' | 'REPAIR') => {
+    if (preset === 'MEETING') {
+      setTitle('Porada týmu & Plánování výjezdů');
+      setWorkType('OTHER');
+      setNoPhotoRequired(true);
+      setLocationNote('Kancelář Ostrava');
+      setPrice('0');
+      setIsCalculatedPrice(false);
+    } else if (preset === 'POSTERS') {
+      setTitle('Výměna plakátů / laviček');
+      setWorkType('PIECE_RATE');
+      setPieceRateType('Lavička — instalace (výměna grafiky)');
+      setQuantity('10');
+      setPrice(String(10 * 40));
+      setIsCalculatedPrice(true);
+      setNoPhotoRequired(false);
+    } else if (preset === 'TOWER') {
+      setTitle('Dovoz a plachtování Tower');
+      setWorkType('PIECE_RATE');
+      setPieceRateType('Tower — dovoz / odvoz (vč. plachtování)');
+      setQuantity('1');
+      setPrice('1000');
+      setIsCalculatedPrice(true);
+      setNoPhotoRequired(false);
+    } else if (preset === 'REPAIR') {
+      setTitle('Oprava a servis nosiče');
+      setWorkType('REPAIR');
+      setNoPhotoRequired(false);
+      setPrice('');
+    }
+  };
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     setSubmitting(true);
     setError('');
 
-    // Strict validation: Google Drive photo folder requirement
-    if (!ftdUrl.trim()) {
-      setError('⚠️ Musíte vložit odkaz na vytvořenou složku pro fotky na Google Disku (nepustí bez vytvořené složky).');
-      setSubmitting(false);
-      return;
-    }
-
-    if (!ftdUrl.includes('google.com') && !ftdUrl.includes('drive.google.com')) {
-      setError('⚠️ Odkaz na fotodokumentaci musí být platná adresa složky na Google Disku (drive.google.com).');
-      setSubmitting(false);
-      return;
+    // Photo folder validation only if required and provided
+    if (!noPhotoRequired && ftdUrl.trim()) {
+      if (!ftdUrl.includes('google.com') && !ftdUrl.includes('drive.google.com')) {
+        setError('⚠️ Odkaz na fotodokumentaci musí být platná adresa složky na Google Disku (drive.google.com).');
+        setSubmitting(false);
+        return;
+      }
     }
 
     if (workType === 'CITY_GALLERY' && (!price || parseFloat(price) <= 0)) {
@@ -108,8 +168,12 @@ export function WorkOrderForm({
     const form = new FormData(formElement);
     const payload = Object.fromEntries(form.entries());
 
-    // Include selected worker names
+    // Worker names
     payload.workerNames = selectedWorkers.join(', ');
+
+    if (noPhotoRequired) {
+      delete payload.ftdUrl;
+    }
 
     for (const field of ['scheduledAt', 'deadlineAt']) {
       const value = payload[field];
@@ -133,59 +197,75 @@ export function WorkOrderForm({
       formElement.reset();
       router.push(`/work/${result.id}`);
       router.refresh();
-    } catch (err) {
+    } catch {
       setError('Chyba při komunikaci se serverem.');
       setSubmitting(false);
     }
   }
 
   return (
-    <details className="card border-slate-300 shadow-md" open>
-      <summary className="cursor-pointer text-xl font-black text-slate-900 flex items-center justify-between">
-        <span>➕ Naplánovat nový pracovní úkol</span>
-        <span className="text-xs text-sky-700 font-bold">Určeno pro Manažery & Obchodníky</span>
-      </summary>
-
-      <form className="mt-6 grid gap-5 lg:grid-cols-2" onSubmit={handleSubmit}>
-        {/* Google Drive Photo Folder MUST be required */}
-        <div className="lg:col-span-2 rounded-2xl border-2 border-emerald-500/40 bg-emerald-50/60 p-4 shadow-sm">
-          <label className="block font-bold text-emerald-950 text-sm mb-1 flex items-center gap-2">
-            <FolderPlus size={18} className="text-emerald-600" />
-            Odkaz na složku pro fotodokumentaci na Google Disku <span className="text-rose-600">* Povinné</span>
-          </label>
-          <input
-            className="input w-full bg-white font-mono text-xs border-emerald-300 focus:border-emerald-600 focus:ring-emerald-500"
-            name="ftdUrl"
-            type="url"
-            required
-            value={ftdUrl}
-            onChange={(e) => setFtdUrl(e.target.value)}
-            placeholder="https://drive.google.com/drive/folders/..."
-          />
-          <span className="mt-1.5 block text-xs font-semibold text-emerald-800">
-            🔒 Zadavatel musí předem vytvořit složku na Google Disku pro ukládání fotek z terénu. Bez odkazu nelze úkol uložit.
-          </span>
+    <div className="space-y-5">
+      {/* QUICK TEMPLATES HEADER */}
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-black text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+          <Sparkles size={16} className="text-amber-500" /> Rychlé šablony úkolů:
+        </span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => applyTemplate('MEETING')}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+          >
+            💼 Porada / Schůzka
+          </button>
+          <button
+            type="button"
+            onClick={() => applyTemplate('POSTERS')}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+          >
+            🪧 Lavičky / Plakáty
+          </button>
+          <button
+            type="button"
+            onClick={() => applyTemplate('TOWER')}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+          >
+            🚚 Dovoz & Plachtování Tower
+          </button>
+          <button
+            type="button"
+            onClick={() => applyTemplate('REPAIR')}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+          >
+            🔧 Servis nosiče
+          </button>
         </div>
+      </div>
 
-        {/* Title & Dates */}
+      <form className="grid gap-5 lg:grid-cols-2" onSubmit={handleSubmit}>
+        {/* Title */}
         <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
           Název pracovní zakázky *
           <input
             className="input mt-1 w-full font-bold"
             name="title"
             required
-            defaultValue={
-              initialCarrierCode
-                ? `Montáž nosiče ${initialCarrierCode}${initialClientName ? ` — ${initialClientName}` : ''}`
-                : ''
-            }
-            placeholder="Např. Montáž navigací Koupelny Ostrava"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Např. Výměna grafiky laviček, Porada týmu Ostrava..."
           />
         </label>
 
+        {/* Dates */}
         <label className="font-bold text-slate-800 text-sm">
           Datum a čas práce *
-          <input className="input mt-1 w-full" name="scheduledAt" required type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} />
+          <input
+            className="input mt-1 w-full"
+            name="scheduledAt"
+            required
+            type="datetime-local"
+            defaultValue={new Date().toISOString().slice(0, 16)}
+          />
         </label>
 
         <label className="font-bold text-slate-800 text-sm">
@@ -221,12 +301,69 @@ export function WorkOrderForm({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-slate-500 font-normal">Urgentní úkoly se v plánu zvýrazní červeně.</span>
         </label>
+
+        {/* Location & Client Phone */}
+        <label className="font-bold text-slate-800 text-sm">
+          Místo plnění / Lokace / Adresa
+          <div className="relative mt-1">
+            <MapPin className="absolute left-3 top-3 text-slate-400" size={18} />
+            <input
+              className="input w-full pl-10"
+              name="locationNote"
+              value={locationNote}
+              onChange={(e) => setLocationNote(e.target.value)}
+              placeholder="Např. Kancelář Ostrava, Městský úřad, Sklad..."
+            />
+          </div>
+        </label>
+
+        <label className="font-bold text-slate-800 text-sm">
+          Telefon na klienta / kontakt (nepovinné)
+          <div className="relative mt-1">
+            <Phone className="absolute left-3 top-3 text-slate-400" size={18} />
+            <input className="input w-full pl-10" name="contactPhone" placeholder="+420 777 123 456" />
+          </div>
+        </label>
+
+        {/* Google Drive Photo Folder (Optional or Required via checkbox) */}
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <FolderPlus size={18} className="text-emerald-600" />
+              Odkaz na složku pro fotky na Google Disku
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-700 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-2xs hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={noPhotoRequired}
+                onChange={(e) => setNoPhotoRequired(e.target.checked)}
+                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+              />
+              <span>Fotodokumentace není vyžadována (porada, vnitřní úkol)</span>
+            </label>
+          </div>
+
+          {!noPhotoRequired && (
+            <div>
+              <input
+                className="input w-full bg-white font-mono text-xs border-slate-300 focus:border-emerald-600 focus:ring-emerald-500"
+                name="ftdUrl"
+                type="url"
+                value={ftdUrl}
+                onChange={(e) => setFtdUrl(e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/..."
+              />
+              <span className="mt-1 block text-xs font-semibold text-slate-500">
+                💡 Zadejte odkaz na složku Google Disku pro ukládání fotodokumentace z terénu.
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Auto pre-filled Requester */}
         <label className="font-bold text-slate-800 text-sm">
-          Úkol zadal/a (Přihlášený uživatel) *
+          Úkol zadal/a *
           <input
             className="input mt-1 w-full bg-slate-100 font-bold text-slate-700"
             name="requestedBy"
@@ -238,9 +375,11 @@ export function WorkOrderForm({
         {/* Price & Rate Logic */}
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5 space-y-2">
           <label className="block font-bold text-slate-900 text-sm">
-            Cena za úkol (Kč без DPH)
+            Cena za úkol (Kč bez DPH)
             <input
-              className={`input mt-1 w-full font-black text-base ${isCalculatedPrice ? 'bg-emerald-50 text-emerald-950 border-emerald-300' : ''}`}
+              className={`input mt-1 w-full font-black text-base ${
+                isCalculatedPrice ? 'bg-emerald-50 text-emerald-950 border-emerald-300' : ''
+              }`}
               name="price"
               min="0"
               step="0.01"
@@ -257,7 +396,7 @@ export function WorkOrderForm({
           {workType === 'PIECE_RATE' && (
             <div className="space-y-2 pt-1 border-t border-slate-200">
               <label className="block text-xs font-bold text-slate-700">
-                Položka ceníku úkolové práce:
+                Úkolová položka z ceníku úkonů:
                 <select
                   className="input mt-1 w-full text-xs font-semibold"
                   value={pieceRateType}
@@ -273,23 +412,17 @@ export function WorkOrderForm({
                   ))}
                 </select>
               </label>
-              <span className="text-[11px] font-semibold text-emerald-700 block">
-                ✨ Cena spočítána automaticky: {quantity} ks × {pieceRateCatalog[pieceRateType]} Kč = {price} Kč.
+              <span className="text-[11px] font-bold text-emerald-700 block">
+                ✨ Výpočet: {quantity} ks × {pieceRateCatalog[pieceRateType]} Kč = {price} Kč.
               </span>
             </div>
-          )}
-
-          {workType === 'CITY_GALLERY' && (
-            <span className="text-xs font-bold text-amber-800 block">
-              🎨 Galerie venku: Cenu je nutné napsat manuálně.
-            </span>
           )}
         </div>
 
         {/* Worker Selection Checklist */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
           <label className="block font-bold text-slate-900 text-sm flex items-center justify-between">
-            <span>👥 Přiřazení pracovníci (Seznam zaměstanatelů)</span>
+            <span>👥 Přiřazení pracovníci ze systému</span>
             <span className="text-xs text-sky-700 font-semibold">Vybráno ({selectedWorkers.length})</span>
           </label>
 
@@ -307,7 +440,9 @@ export function WorkOrderForm({
                   <label
                     key={emp.id}
                     className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 text-xs font-bold cursor-pointer transition ${
-                      checked ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      checked
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                     }`}
                   >
                     <input
@@ -322,11 +457,6 @@ export function WorkOrderForm({
               })}
             </div>
           )}
-
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <UserCheck size={16} className="text-emerald-600 shrink-0" />
-            <span>Přiřazení pracovníci dostanou upozornění a po přihlášení potvrdí převzetí úkolu.</span>
-          </div>
         </div>
 
         {/* Client & Media Details */}
@@ -364,13 +494,26 @@ export function WorkOrderForm({
 
         <label className="font-bold text-slate-800 text-sm">
           Typ média
-          <input className="input mt-1 w-full" name="mediaLabel" placeholder="Navigace, billboard, city poster…" />
+          <input className="input mt-1 w-full" name="mediaLabel" placeholder="Lavičky, billboard, city poster..." />
         </label>
 
         {/* Carrier list */}
         <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
           Propojený nosič VO
-          <input className="input mt-1 w-full font-bold text-sky-900 bg-sky-50" list="work-carriers" name="carrierCode" defaultValue={initialCarrierCode} placeholder="Začněte psát kód, město nebo název" />
+          <input
+            className="input mt-1 w-full font-bold text-sky-900 bg-sky-50"
+            list="work-carriers"
+            name="carrierCode"
+            defaultValue={initialCarrierCode}
+            onChange={(e) => {
+              const code = e.target.value;
+              const found = carriers.find((c) => c.code === code);
+              if (found && !locationNote) {
+                setLocationNote(found.label);
+              }
+            }}
+            placeholder="Začněte psát kód, město nebo název nosiče"
+          />
           <datalist id="work-carriers">
             {carriers.map((carrier) => (
               <option key={carrier.id} value={carrier.code}>
@@ -391,13 +534,13 @@ export function WorkOrderForm({
         </label>
 
         <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
-          Místo a pokyny pro montážníky
-          <input className="input mt-1 w-full" name="locationNote" placeholder="Adresa, sraz, kontakt na místě…" />
-        </label>
-
-        <label className="lg:col-span-2 font-bold text-slate-800 text-sm">
           Podrobné zadání úkolu *
-          <textarea className="input mt-1 w-full min-h-24 font-medium" name="description" required placeholder="Popis požadovaných prací..." />
+          <textarea
+            className="input mt-1 w-full min-h-24 font-medium"
+            name="description"
+            required
+            placeholder="Popis požadovaných prací, instrukce pro montážníky..."
+          />
         </label>
 
         {error && (
@@ -413,10 +556,10 @@ export function WorkOrderForm({
             disabled={submitting}
             type="submit"
           >
-            {submitting ? 'Ukládám a notifikuji pracovníky...' : ' Vytvořit pracovní úkol s Google Drive složkou'}
+            {submitting ? 'Ukládám a notifikuji pracovníky...' : '💾 Vytvořit a uložit pracovní úkol'}
           </button>
         </div>
       </form>
-    </details>
+    </div>
   );
 }
