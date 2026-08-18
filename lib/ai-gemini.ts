@@ -42,6 +42,10 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const effectiveOpenAiKey = apiKey.startsWith('sk-') ? apiKey : openAiKey;
   const effectiveGeminiKey = apiKey.startsWith('sk-') ? '' : apiKey;
 
+  if (effectiveGeminiKey.startsWith('AQ.')) {
+    throw new Error('Vložený klíč v Vercel (začínající na "AQ.") je přístupový token Google Cloud / Vertex AI. Pro funkci AI Fotky je potřeba standardní API klíč z Google AI Studio (začínající na "AIzaSy..."), který vytvoříte zdarma na aistudio.google.com/app/apikey.');
+  }
+
   if (!effectiveGeminiKey && !effectiveOpenAiKey) {
     console.warn('Neither GEMINI_API_KEY nor OPENAI_API_KEY configured in environment variables.');
     throw new Error('Chybí API klíč pro AI Vision. Vložte do Vercel Environment Variables klíč GEMINI_API_KEY (z Google AI Studio - AIzaSy...) nebo OPENAI_API_KEY (sk-...).');
