@@ -1607,6 +1607,7 @@ model WorkOrder {
   workEntries       WorkEntry[]
   rates             WorkOrderRate[]
   crmRealizations   CrmRealization[]
+  warehouseMovements WarehouseMovement[]
 
   @@index([scheduledAt, status])
   @@index([priority, scheduledAt])
@@ -2649,3 +2650,58 @@ model CompanyShoppingItem {
   @@index([assignedEmployeeId])
   @@index([crmOrderId])
 }
+
+enum WarehouseItemCategory {
+  CONSUMABLE
+  RETURNABLE
+}
+
+enum WarehouseMovementType {
+  RECEIPT
+  ISSUE
+  RETURN
+  ADJUSTMENT
+}
+
+model WarehouseItem {
+  id              String                @id @default(cuid())
+  name            String
+  code            String?
+  category        WarehouseItemCategory @default(CONSUMABLE)
+  unit            String                @default("ks")
+  quantityInStock Decimal               @default(0) @db.Decimal(10, 2)
+  minQuantity     Decimal?              @db.Decimal(10, 2)
+  unitPrice       Decimal?              @db.Decimal(10, 2)
+  location        String?
+  supplierName    String?
+  supplierContact String?
+  photoUrl        String?
+  note            String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  movements WarehouseMovement[]
+
+  @@index([category])
+  @@index([location])
+}
+
+model WarehouseMovement {
+  id                   String                @id @default(cuid())
+  itemId               String
+  item                 WarehouseItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  type                 WarehouseMovementType
+  quantity             Decimal               @db.Decimal(10, 2)
+  workOrderId          String?
+  workOrder            WorkOrder?            @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  assignedEmployeeId   String?
+  assignedEmployeeName String?
+  performedByName      String
+  note                 String?
+  createdAt            DateTime              @default(now())
+
+  @@index([itemId])
+  @@index([workOrderId])
+  @@index([assignedEmployeeId])
+}
+

@@ -538,3 +538,65 @@ export async function ensureVehicleSchema() {
     console.error('ensureVehicleSchema error:', e);
   }
 }
+
+let warehouseSchemaEnsured = false;
+export async function ensureWarehouseSchema() {
+  if (warehouseSchemaEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      DO $$ BEGIN
+        CREATE TYPE "WarehouseItemCategory" AS ENUM ('CONSUMABLE', 'RETURNABLE');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;
+    `);
+    await prisma.$executeRawUnsafe(`
+      DO $$ BEGIN
+        CREATE TYPE "WarehouseMovementType" AS ENUM ('RECEIPT', 'ISSUE', 'RETURN', 'ADJUSTMENT');
+      EXCEPTION WHEN duplicate_object THEN null; END $$;
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "WarehouseItem" (
+        "id" TEXT PRIMARY KEY,
+        "name" TEXT NOT NULL,
+        "code" TEXT,
+        "category" "WarehouseItemCategory" NOT NULL DEFAULT 'CONSUMABLE',
+        "unit" TEXT NOT NULL DEFAULT 'ks',
+        "quantityInStock" DECIMAL(10,2) NOT NULL DEFAULT 0,
+        "minQuantity" DECIMAL(10,2),
+        "unitPrice" DECIMAL(10,2),
+        "location" TEXT,
+        "supplierName" TEXT,
+        "supplierContact" TEXT,
+        "photoUrl" TEXT,
+        "note" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "WarehouseMovement" (
+        "id" TEXT PRIMARY KEY,
+        "itemId" TEXT NOT NULL,
+        "type" "WarehouseMovementType" NOT NULL,
+        "quantity" DECIMAL(10,2) NOT NULL,
+        "workOrderId" TEXT,
+        "assignedEmployeeId" TEXT,
+        "assignedEmployeeName" TEXT,
+        "performedByName" TEXT NOT NULL,
+        "note" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const count = await prisma.warehouseItem.count();
+    if (count === 0) {
+      const { seedWarehouseItems } = await import('../scripts/seed-warehouse-2026');
+      await seedWarehouseItems();
+    }
+    warehouseSchemaEnsured = true;
+  } catch (e) {
+    console.error('ensureWarehouseSchema error:', e);
+  }
+}
+
