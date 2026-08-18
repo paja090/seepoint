@@ -280,11 +280,13 @@ export function QrCarrierQuickActions({
             className="w-full rounded-xl border border-slate-700 bg-slate-950 p-2.5 text-xs font-bold text-white focus:outline-none focus:border-sky-500"
           >
             <option value="">Celý nosič / Všechny plochy</option>
-            {surfaces.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.sidePosition || 'Plocha'}) {s.currentClientName ? `• ${s.currentClientName}` : '• Volno'}
-              </option>
-            ))}
+            {surfaces
+              .filter((s) => s.name !== 'Celý nosič' && s.name !== 'Celý nosič / Všechny plochy')
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.sidePosition || 'Plocha'}) {s.currentClientName ? `• ${s.currentClientName}` : '• Volno'}
+                </option>
+              ))}
           </select>
         </div>
       )}

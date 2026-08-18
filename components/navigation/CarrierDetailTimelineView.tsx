@@ -349,9 +349,11 @@ export function CarrierDetailTimelineView({
                 <label className="block font-bold text-slate-700 mb-1">Plocha na nosiči (volitelné)</label>
                 <select className="input w-full" value={selectedSurfaceId} onChange={(e) => setSelectedSurfaceId(e.target.value)}>
                   <option value="">Celý nosič</option>
-                  {surfaces.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.sidePosition || 'Plocha'})</option>
-                  ))}
+                  {surfaces
+                    .filter((s) => s.name !== 'Celý nosič' && s.name !== 'Celý nosič / Všechny plochy')
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.sidePosition || 'Plocha'})</option>
+                    ))}
                 </select>
               </div>
 
