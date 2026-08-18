@@ -1499,16 +1499,16 @@ function ShoppingItemRow({
   return (
     <div
       onClick={() => onSelectDetail(item)}
-      className="p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:bg-slate-800/50 transition cursor-pointer group"
+      className="p-3 sm:p-4 flex items-start sm:items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-800/50 transition cursor-pointer group"
     >
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggle(item);
           }}
-          className="text-slate-500 hover:text-emerald-400 transition flex-shrink-0"
+          className="text-slate-500 hover:text-emerald-400 transition shrink-0 mt-0.5 sm:mt-0"
         >
           {item.isPurchased ? (
             <CheckCircle2 size={22} className="text-emerald-500 fill-emerald-500/20" />
@@ -1518,18 +1518,28 @@ function ShoppingItemRow({
         </button>
 
         {item.imageUrl ? (
-          <img src={item.imageUrl} alt="" className="w-10 h-10 rounded-xl object-cover border border-slate-700 flex-shrink-0" />
+          <img src={item.imageUrl} alt="" className="w-10 h-10 rounded-xl object-cover border border-slate-700 shrink-0" />
         ) : (
-          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 shrink-0">
             <Package size={18} />
           </div>
         )}
 
-        <div className="min-w-0">
-          <div className="font-bold text-sm text-slate-100 group-hover:text-orange-400 transition truncate">{item.title}</div>
-          <div className="text-xs text-slate-400 flex items-center gap-2 truncate mt-0.5">
-            <span>{item.store || 'Obchod neuveden'}</span>
-            <span>•</span>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-bold text-sm text-slate-100 group-hover:text-orange-400 transition leading-snug line-clamp-2 sm:line-clamp-1">
+              {item.title}
+            </span>
+            {item.quantity && (
+              <span className="inline-block px-1.5 py-0.5 rounded-md bg-orange-500/20 text-orange-300 text-2xs font-black sm:hidden">
+                {item.quantity}
+              </span>
+            )}
+          </div>
+
+          <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+            {item.store && <span className="font-medium text-slate-300">{item.store}</span>}
+            {item.store && <span>•</span>}
             <span>{item.assignedEmployeeName || item.addedByUserName}</span>
             {item.crmOrder && (
               <>
@@ -1541,9 +1551,19 @@ function ShoppingItemRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 text-right">
-        {renderPriorityBadge(item.priority)}
-        <div className="text-xs font-black text-slate-200 min-w-[36px]">{item.quantity || '1 ks'}</div>
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 text-right">
+        <div className="hidden sm:block">{renderPriorityBadge(item.priority)}</div>
+        {item.priority === 'URGENT' && (
+          <span className="sm:hidden text-xs font-black text-rose-400 bg-rose-500/20 px-2 py-0.5 rounded-full border border-rose-500/40">
+            🚨 Dnes
+          </span>
+        )}
+        {item.priority === 'THIS_WEEK' && (
+          <span className="sm:hidden text-xs font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/40">
+            Týden
+          </span>
+        )}
+        <div className="hidden sm:block text-xs font-black text-slate-200 min-w-[36px]">{item.quantity || '1 ks'}</div>
         <button
           type="button"
           onClick={(e) => {
