@@ -539,20 +539,22 @@ export function NavigationSurfaceManager({
 
                 {/* Direction, Destination & Distance Grid */}
                 {!isInline ? (
-                  <div className="rounded-2xl border border-sky-100 bg-slate-900 p-3.5 text-white shadow-md space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-                      <span>🧭 Parametry navigace</span>
+                  <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-4 text-white shadow-xl space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-300 border-b border-slate-800 pb-2">
+                      <span className="flex items-center gap-1.5 text-sky-400">
+                        🧭 <span className="uppercase tracking-wider font-extrabold text-[11px]">Parametry navigace</span>
+                      </span>
                       {canEdit && (
-                        <div className="flex gap-1.5">
+                        <div className="flex items-center gap-2">
                           <button
-                            className="rounded-lg bg-sky-500/20 px-2 py-0.5 text-[11px] font-bold text-sky-300 hover:bg-sky-500/40"
+                            className="rounded-xl bg-sky-500/20 hover:bg-sky-500/35 border border-sky-400/30 px-2.5 py-1 text-[11px] font-bold text-sky-200 transition shadow-2xs"
                             onClick={() => openInlineEdit(surface)}
                             type="button"
                           >
                             ✏️ Upravit
                           </button>
                           <button
-                            className="rounded-lg bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/40"
+                            className="rounded-xl bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/30 px-2.5 py-1 text-[11px] font-bold text-emerald-200 transition shadow-2xs disabled:opacity-50"
                             disabled={aiExtractingSurfaceId === surface.id}
                             onClick={() => void handleExtractPhotoData(surface.id)}
                             type="button"
@@ -563,24 +565,25 @@ export function NavigationSurfaceManager({
                       )}
                     </div>
 
-                    <div className="grid gap-2 text-xs grid-cols-1 sm:grid-cols-3 pt-1">
-                      <div className="rounded-xl bg-slate-800/80 p-2 border border-slate-700/60">
-                        <span className="block text-[10px] text-slate-400 font-semibold uppercase">Směr</span>
-                        <p className="font-bold text-sky-300 flex items-center gap-1">
-                          <span className="text-base">{arrowIcon}</span> {surface.directionDescription || 'neuvedeno'}
+                    <div className="grid gap-2.5 text-xs grid-cols-1 sm:grid-cols-3">
+                      <div className="rounded-xl bg-slate-800/90 p-2.5 border border-slate-700/70 shadow-inner flex flex-col justify-center">
+                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Směr</span>
+                        <p className="font-extrabold text-sky-300 text-sm flex items-center gap-1.5">
+                          <span className="text-xl">{arrowIcon}</span>
+                          <span className="truncate">{surface.directionDescription || 'neuvedeno'}</span>
                         </p>
                       </div>
 
-                      <div className="rounded-xl bg-slate-800/80 p-2 border border-slate-700/60">
-                        <span className="block text-[10px] text-slate-400 font-semibold uppercase">Cíl / Prodejna</span>
-                        <p className="font-bold text-emerald-300 truncate">
+                      <div className="rounded-xl bg-slate-800/90 p-2.5 border border-slate-700/70 shadow-inner flex flex-col justify-center">
+                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Cíl / Prodejna</span>
+                        <p className="font-extrabold text-emerald-300 text-sm truncate">
                           🎯 {surface.destinationName || 'neuvedeno'}
                         </p>
                       </div>
 
-                      <div className="rounded-xl bg-slate-800/80 p-2 border border-slate-700/60">
-                        <span className="block text-[10px] text-slate-400 font-semibold uppercase">Vzdálenost</span>
-                        <p className="font-bold text-amber-300">
+                      <div className="rounded-xl bg-slate-800/90 p-2.5 border border-slate-700/70 shadow-inner flex flex-col justify-center">
+                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Vzdálenost</span>
+                        <p className="font-extrabold text-amber-300 text-sm truncate">
                           📏 {surface.distanceMeters !== undefined && surface.distanceMeters !== null ? `${surface.distanceMeters} m po silnici` : 'neuvedeno'}
                         </p>
                       </div>
