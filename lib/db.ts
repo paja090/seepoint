@@ -503,3 +503,15 @@ export async function updateOccupancyAction(id: string, action: OccupancyAction,
   });
 }
 export { carrierMapColor };
+
+let schemaEnsured = false;
+export async function ensureWorkOrderSchema() {
+  if (schemaEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "WorkOrder" ADD COLUMN IF NOT EXISTS "estimatedHours" DECIMAL(5,2);`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "WorkOrder" ADD COLUMN IF NOT EXISTS "pdfUrl" TEXT;`);
+    schemaEnsured = true;
+  } catch {
+    // Ignore if SQLite or already exists
+  }
+}
