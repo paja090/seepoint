@@ -170,6 +170,17 @@ export function PublicNavigationClientView({
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img alt="SeePOINT Logo" className="h-9 w-auto bg-white/95 p-1 rounded-xl shadow-xs" src="/seepoint-logo.svg" />
+            {reportData.clientLogoUrl && (
+              <>
+                <span className="text-slate-600 text-xs font-bold">×</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt={reportData.clientName}
+                  className="h-9 max-w-[140px] w-auto object-contain bg-white/95 p-1 rounded-xl shadow-xs"
+                  src={reportData.clientLogoUrl}
+                />
+              </>
+            )}
             <div className="h-6 w-px bg-slate-800" />
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-sky-400">Fotodokumentace navigací</p>
@@ -197,14 +208,22 @@ export function PublicNavigationClientView({
         {/* Campaign Info & Summary Section */}
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
-                  <CheckCircle2 size={13} /> Oficiální klientský výstup
-                </span>
+            <div className="flex items-center gap-4">
+              {reportData.clientLogoUrl && (
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 p-2 shadow-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt={reportData.clientName} className="max-h-full max-w-full object-contain" src={reportData.clientLogoUrl} />
+                </div>
+              )}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                    <CheckCircle2 size={13} /> Oficiální klientský výstup
+                  </span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-950">{reportData.campaignTitle}</h2>
+                {reportData.description && <p className="mt-1 text-sm text-slate-600">{reportData.description}</p>}
               </div>
-              <h2 className="text-2xl font-bold text-slate-950">{reportData.campaignTitle}</h2>
-              {reportData.description && <p className="mt-1 text-sm text-slate-600">{reportData.description}</p>}
             </div>
             <div className="text-right text-xs text-slate-500 space-y-0.5">
               <p>Aktualizováno: <strong className="text-slate-800">{new Date(reportData.publishedAt).toLocaleDateString('cs-CZ')}</strong></p>

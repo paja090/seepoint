@@ -155,7 +155,7 @@ export default async function PublicNavigationDocumentationPage({
         year: report.year,
         publishedAt: (report.publishedAt || report.createdAt).toISOString(),
         clientName: report.client.name,
-        clientLogoUrl: report.client.logoFileName ? `/api/proposals/${encodeURIComponent(token)}/logo` : null,
+        clientLogoUrl: report.client.logoFileName ? `/api/client/navigation-documentation/${encodeURIComponent(token)}/logo` : null,
         campaignTitle,
         itemsCount: items.length,
         items,
