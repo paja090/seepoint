@@ -1,5 +1,4 @@
-'use client';
-
+import { useEffect } from 'react';
 import { useState } from 'react';
 import type { Carrier, Client } from '@/lib/types';
 import { mediaTypeLabel, carrierTypeLabel } from '@/lib/carrier-filters';
@@ -11,7 +10,7 @@ import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 import { QrCodeGeneratorModal } from './qr/QrCodeGeneratorModal';
 import { useOfferBasket } from '@/context/OfferBasketContext';
-import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode } from 'lucide-react';
+import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function getCarrierBadgeMeta(type: Carrier['type']) {
   switch (type) {
@@ -41,11 +40,15 @@ export function CarrierDetail({
   showLocationMap = false,
   clients = [],
   canEdit = false,
+  prevCarrier,
+  nextCarrier,
 }: {
   carrier: Carrier;
   showLocationMap?: boolean;
   clients?: Array<Pick<Client, 'id' | 'name'>>;
   canEdit?: boolean;
+  prevCarrier?: { id: string; code: string; name: string } | null;
+  nextCarrier?: { id: string; code: string; name: string } | null;
 }) {
   const isNavigation = carrier.type === 'NAVIGATION';
   const badgeMeta = getCarrierBadgeMeta(carrier.type);
@@ -84,14 +87,67 @@ export function CarrierDetail({
       ? { latitude: carrier.latitude, longitude: carrier.longitude }
       : null;
 
-  const totalPhotosCount =
-    carrier.photos.length +
-    carrier.surfaces.reduce((sum, surface) => sum + (surface.photos?.length || 0), 0);
+  const totalPhotosCount = new Set([
+    ...carrier.photos.map((p) => p.id),
+    ...carrier.surfaces.flatMap((s) => (s.photos || []).map((p) => p.id)),
+  ]).size;
 
   const [showQrModal, setShowQrModal] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const active = document.activeElement;
+      if (active && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return;
+      if (e.key === 'ArrowLeft' && prevCarrier) {
+        window.location.href = `/carriers/${prevCarrier.id}`;
+      } else if (e.key === 'ArrowRight' && nextCarrier) {
+        window.location.href = `/carriers/${nextCarrier.id}`;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [prevCarrier, nextCarrier]);
+
   return (
     <div className="space-y-6">
+      {/* 🧭 Prev / Next Carrier Bar */}
+      {(prevCarrier || nextCarrier) && (
+        <div className="flex items-center justify-between bg-slate-900 text-white p-2.5 px-3.5 sm:px-4 rounded-2xl border border-slate-800 shadow-md">
+          {prevCarrier ? (
+            <a
+              href={`/carriers/${prevCarrier.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700/80 transition"
+              title={`Předchozí nosič (Klávesa ←): ${prevCarrier.code} — ${prevCarrier.name}`}
+            >
+              <ChevronLeft size={16} className="text-amber-400" />
+              <span className="font-mono">{prevCarrier.code}</span>
+              <span className="hidden md:inline text-slate-400 font-normal text-[11px] truncate max-w-[140px]">({prevCarrier.name})</span>
+            </a>
+          ) : (
+            <span className="text-2xs text-slate-600 font-medium px-2">První nosič</span>
+          )}
+
+          <div className="text-center px-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Listování v evidenci (Klávesy ← / →)</span>
+            <span className="text-xs font-black text-amber-400 font-mono">{carrier.code}</span>
+          </div>
+
+          {nextCarrier ? (
+            <a
+              href={`/carriers/${nextCarrier.id}`}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700/80 transition"
+              title={`Další nosič (Klávesa →): ${nextCarrier.code} — ${nextCarrier.name}`}
+            >
+              <span className="hidden md:inline text-slate-400 font-normal text-[11px] truncate max-w-[140px]">({nextCarrier.name})</span>
+              <span className="font-mono">{nextCarrier.code}</span>
+              <ChevronRight size={16} className="text-amber-400" />
+            </a>
+          ) : (
+            <span className="text-2xs text-slate-600 font-medium px-2">Poslední nosič</span>
+          )}
+        </div>
+      )}
+
       {/* 🚀 Header & Category Badge */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
