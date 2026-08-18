@@ -11,7 +11,8 @@ import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 import { QrCodeGeneratorModal } from './qr/QrCodeGeneratorModal';
 import { useOfferBasket } from '@/context/OfferBasketContext';
-import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, X } from 'lucide-react';
+import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType, MOBILE_PHOTO_DAMAGE_LABELS } from '@/lib/mobile-photo-damage';
 
 function getCarrierBadgeMeta(type: Carrier['type']) {
   switch (type) {
@@ -61,7 +62,11 @@ export function CarrierDetail({
   const damagePhotos = [
     ...carrier.photos.filter((p) => p.type === 'DAMAGE'),
     ...carrier.surfaces.flatMap((s) => (s.photos || []).filter((p) => p.type === 'DAMAGE')),
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  ].sort((a, b) => {
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeB - timeA;
+  });
 
   const latestDamagePhoto = damagePhotos[0];
   const hasDamageNote = carrier.note?.includes('[ZÁVADA:') || carrier.note?.includes('ZÁVADA');
@@ -144,6 +149,53 @@ export function CarrierDetail({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [prevCarrier, nextCarrier]);
 
+  const [showReportDamageModal, setShowReportDamageModal] = useState(false);
+  const [manualDamageType, setManualDamageType] = useState<MobilePhotoDamageType>('OTHER');
+  const [manualDamageSurfaceId, setManualDamageSurfaceId] = useState('');
+  const [manualDamageNote, setManualDamageNote] = useState('');
+  const [manualDamageFile, setManualDamageFile] = useState<File | null>(null);
+  const [submittingManualDamage, setSubmittingManualDamage] = useState(false);
+
+  const handleManualDamageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingManualDamage(true);
+    try {
+      const damageLabel = MOBILE_PHOTO_DAMAGE_LABELS[manualDamageType] || manualDamageType;
+      const formattedNote = `[ZÁVADA: ${damageLabel}] ${manualDamageNote.trim()}`;
+      const updatedNote = [formattedNote, carrier.note || ''].filter(Boolean).join(' | ').slice(0, 500);
+
+      if (manualDamageFile) {
+        const fd = new FormData();
+        fd.append('file', manualDamageFile);
+        fd.append('carrierId', carrier.id);
+        if (manualDamageSurfaceId) fd.append('surfaceId', manualDamageSurfaceId);
+        fd.append('purpose', 'DAMAGE');
+        fd.append('damageType', manualDamageType);
+        fd.append('latitude', String(carrier.latitude ?? 0));
+        fd.append('longitude', String(carrier.longitude ?? 0));
+        fd.append('note', manualDamageNote.trim() || damageLabel);
+
+        await fetch('/api/mobile-photos/upload', {
+          method: 'POST',
+          body: fd,
+        });
+      } else {
+        await fetch(`/api/carriers/${carrier.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: updatedNote }),
+        });
+      }
+
+      setShowReportDamageModal(false);
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to submit damage report:', err);
+    } finally {
+      setSubmittingManualDamage(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 🧭 Prev / Next Carrier Bar */}
@@ -205,6 +257,13 @@ export function CarrierDetail({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowReportDamageModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 px-3.5 py-2 text-xs font-black text-white shadow-xs transition cursor-pointer"
+          >
+            <AlertTriangle size={15} /> Nahlásit závadu
+          </button>
           <button
             type="button"
             onClick={() => setShowQrModal(true)}
@@ -515,6 +574,115 @@ export function CarrierDetail({
           <p className="text-xs text-slate-500">Historie kampaní zatím není doplněna.</p>
         )}
       </section>
+
+      {/* 🚨 MANUAL DAMAGE REPORTING MODAL */}
+      {showReportDamageModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl p-6 text-white animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
+                  <AlertTriangle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Nahlásit poškození / Závadu</h3>
+                  <p className="text-xs text-slate-400">Nosič: {carrier.code} — {carrier.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportDamageModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleManualDamageSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-black text-rose-300 uppercase tracking-wider mb-1">
+                  Typ závady *
+                </label>
+                <select
+                  value={manualDamageType}
+                  onChange={(e) => setManualDamageType(e.target.value as MobilePhotoDamageType)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-2.5 text-xs font-bold text-white focus:outline-none focus:border-rose-500"
+                  required
+                >
+                  {MOBILE_PHOTO_DAMAGE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {carrier.surfaces.length > 0 && (
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">
+                    Dotčená reklamní plocha (volitelné)
+                  </label>
+                  <select
+                    value={manualDamageSurfaceId}
+                    onChange={(e) => setManualDamageSurfaceId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-950 p-2.5 text-xs text-white focus:outline-none focus:border-rose-500"
+                  >
+                    <option value="">Celý nosič / Všechny plochy</option>
+                    {carrier.surfaces.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block font-bold text-slate-300 mb-1">
+                  Podrobný popis závady / instrukce pro servis *
+                </label>
+                <textarea
+                  value={manualDamageNote}
+                  onChange={(e) => setManualDamageNote(e.target.value)}
+                  placeholder="Např. po větrné smršti uvolněný profil, nutný výjezd s plošinou..."
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-2.5 text-xs text-white focus:outline-none focus:border-rose-500 h-24"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-300 mb-1">
+                  Fotografie poškození (volitelné)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setManualDamageFile(e.target.files?.[0] || null)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 p-2 text-xs text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-900/60 file:text-rose-200 hover:file:bg-rose-800"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowReportDamageModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingManualDamage}
+                  className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <AlertTriangle size={15} />
+                  <span>{submittingManualDamage ? 'Odesílám...' : 'Uložit hlášení závady'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
