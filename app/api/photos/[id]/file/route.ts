@@ -105,16 +105,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       });
     }
 
-    // 3. Direct HTTP / URL link stored in url field
-    if (photo.url && (photo.url.startsWith('http://') || photo.url.startsWith('https://') || photo.url.startsWith('/'))) {
-      return NextResponse.redirect(new URL(photo.url, request.url));
-    }
-
-    // 4. Google Drive file storage
+    // 3. Google Drive file storage (primary storage for uploaded photos)
     if (photo.driveFileId) {
       const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
       if (!file.ok || !file.body) {
-        return NextResponse.json({ error: 'Fotografii se nepodařilo načíst.' }, { status: file.status === 404 ? 404 : 502 });
+        return NextResponse.json({ error: 'Fotografii se nepodařilo načíst z Google Disku.' }, { status: file.status === 404 ? 404 : 502 });
       }
       return new Response(file.body, {
         status: 200,
@@ -125,6 +120,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           'X-Content-Type-Options': 'nosniff',
         },
       });
+    }
+
+    // 4. External HTTP / URL link stored in url field (excluding self-referencing endpoint URLs)
+    if (
+      photo.url &&
+      (photo.url.startsWith('http://') || photo.url.startsWith('https://')) &&
+      !photo.url.includes(`/api/photos/${photo.id}`)
+    ) {
+      return NextResponse.redirect(photo.url);
     }
 
     return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
