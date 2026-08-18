@@ -216,11 +216,27 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                   <tr className="hover:bg-slate-50/80 transition" key={vehicle.id}>
                     {/* Name */}
                     <td className="py-3 px-4">
-                      <Link className="font-extrabold text-slate-900 hover:text-sky-700 text-sm block" href={`/vehicles/${vehicle.id}`}>
-                        {vehicle.name}
-                      </Link>
-                      <div className="mt-0.5">
-                        <StatusPill value={vehicle.status} />
+                      <div className="flex items-center gap-3">
+                        {vehicle.photoUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={vehicle.photoUrl}
+                            alt={vehicle.name}
+                            className="h-10 w-14 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400 font-bold text-xs shrink-0 border border-slate-200">
+                            📷
+                          </div>
+                        )}
+                        <div>
+                          <Link className="font-extrabold text-slate-900 hover:text-sky-700 text-sm block" href={`/vehicles/${vehicle.id}`}>
+                            {vehicle.name}
+                          </Link>
+                          <div className="mt-0.5">
+                            <StatusPill value={vehicle.status} />
+                          </div>
+                        </div>
                       </div>
                     </td>
 
