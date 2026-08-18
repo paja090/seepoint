@@ -177,3 +177,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   return NextResponse.json({ id });
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('work');
+  if (isApiDenied(auth)) return auth;
+  const { id } = await params;
+  const existing = await prisma.workOrder.findUnique({
+    where: { id },
+    include: { workEntries: { select: { id: true } } },
+  });
+  if (!existing) return NextResponse.json({ error: 'Pracovní zakázka nebyla nalezena.' }, { status: 404 });
+  if (existing.workEntries.length > 0) {
+    await prisma.workOrder.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+    return NextResponse.json({ ok: true, cancelled: true, message: 'Zakázka má již vykázanou práci a byla proto označena jako ZRUŠENÁ.' });
+  }
+  await prisma.workOrder.delete({ where: { id } });
+  return NextResponse.json({ ok: true, deleted: true });
+}
