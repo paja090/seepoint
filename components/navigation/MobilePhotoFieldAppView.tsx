@@ -14,6 +14,7 @@ import {
   Cloud,
   ChevronRight,
   Compass,
+  ExternalLink,
 } from 'lucide-react';
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType } from '@/lib/mobile-photo-damage';
 
@@ -204,13 +205,13 @@ export function MobilePhotoFieldAppView() {
 
   const handleUploadPhoto = async () => {
     if (!photoFile || !selectedCarrier) return;
-    if (!coords) {
-      setUploadErrorMsg('Před uložením fotografie je nutné získat GPS polohu.');
-      return;
-    }
     setUploading(true);
     setUploadSuccessMsg(null);
     setUploadErrorMsg(null);
+
+    const lat = coords?.lat ?? selectedCarrier.latitude ?? 0;
+    const lng = coords?.lng ?? selectedCarrier.longitude ?? 0;
+    const accuracy = coords?.accuracy ?? 50;
 
     try {
       const fd = new FormData();
@@ -222,9 +223,9 @@ export function MobilePhotoFieldAppView() {
       if (purpose === 'DAMAGE') {
         fd.append('damageType', damageType);
       }
-      fd.append('latitude', String(coords.lat));
-      fd.append('longitude', String(coords.lng));
-      fd.append('accuracyMeters', String(coords.accuracy));
+      fd.append('latitude', String(lat));
+      fd.append('longitude', String(lng));
+      fd.append('accuracyMeters', String(accuracy));
       fd.append('note', photoNote.trim() || 'Mobilní fotodokumentace v terénu');
 
       const uploadUrl = new URL('/api/mobile-photos/upload', window.location.origin);
@@ -438,12 +439,30 @@ export function MobilePhotoFieldAppView() {
                 <ChevronRight size={18} className={isSelected ? 'text-emerald-400' : 'text-slate-300 group-hover:text-slate-600'} />
               </div>
 
-              {/* Photos count & Surfaces */}
+              {/* Photos count, Surfaces & Direct Link to Carrier Card */}
               <div className={`mt-3 flex items-center justify-between border-t pt-2.5 text-[11px] font-medium ${isSelected ? 'border-emerald-800/60 text-emerald-200' : 'border-slate-100 text-slate-500'}`}>
-                <span>{c.surfaces.length} reklamních ploch</span>
-                <span className="flex items-center gap-1 font-bold">
-                  <Camera size={13} /> {c.photos.length} fotek v DB
-                </span>
+                <div className="flex items-center gap-2">
+                  <span>{c.surfaces.length} ploch</span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 font-bold">
+                    <Camera size={13} /> {c.photos.length} fotek
+                  </span>
+                </div>
+                <a
+                  href={`/carriers/${c.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                    isSelected
+                      ? 'bg-emerald-900/90 text-emerald-200 hover:bg-emerald-800 border border-emerald-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 border border-slate-200'
+                  }`}
+                  title="Otevřít novou kartu nosiče v novém okně"
+                >
+                  <span>🪧 Karta nosiče</span>
+                  <ExternalLink size={11} />
+                </a>
               </div>
             </div>
           );
@@ -460,16 +479,27 @@ export function MobilePhotoFieldAppView() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Vybraný nosič pro fotodokumentaci</span>
               <h2 className="text-base font-black text-white">{selectedCarrier.code} — {selectedCarrier.name}</h2>
             </div>
-            <button
-              onClick={() => {
-                setSelectedCarrier(null);
-                setSelectedSurfaceId(null);
-                clearPreview();
-              }}
-              className="text-xs font-bold text-slate-400 hover:text-white px-2 py-1"
-            >
-              Zavřít
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                href={`/carriers/${selectedCarrier.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+              >
+                <span>🪧 Karta nosiče</span>
+                <ExternalLink size={13} />
+              </a>
+              <button
+                onClick={() => {
+                  setSelectedCarrier(null);
+                  setSelectedSurfaceId(null);
+                  clearPreview();
+                }}
+                className="text-xs font-bold text-slate-400 hover:text-white px-2 py-1"
+              >
+                Zavřít
+              </button>
+            </div>
           </div>
 
           <div className="mb-4 rounded-2xl border border-emerald-700/60 bg-emerald-950/50 p-3">
