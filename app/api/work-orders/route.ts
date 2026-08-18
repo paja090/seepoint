@@ -46,7 +46,6 @@ export async function POST(request: Request) {
   const scheduledAt = optionalDate(input, 'scheduledAt');
   const requestedBy = text(input, 'requestedBy');
   if (!title || !description || !scheduledAt || !requestedBy) return NextResponse.json({ error: 'Vyplňte název, datum práce, zadavatele a zadání.' }, { status: 400 });
-  if (!workRequesters.includes(requestedBy as (typeof workRequesters)[number])) return NextResponse.json({ error: 'Vyberte platného zadavatele úkolu.' }, { status: 400 });
 
   const clientId = text(input, 'clientId');
   const client = clientId ? await prisma.client.findUnique({ where: { id: clientId } }) : null;

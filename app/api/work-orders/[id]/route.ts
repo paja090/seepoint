@@ -101,7 +101,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const campaignDateFrom = nullableDate(input, 'campaignDateFrom');
   const campaignDateTo = nullableDate(input, 'campaignDateTo');
   if (!title || !description || !requestedBy || scheduledAt === false) return NextResponse.json({ error: 'Vyplňte název, datum práce, zadavatele a zadání.' }, { status: 400 });
-  if (!workRequesters.includes(requestedBy as (typeof workRequesters)[number])) return NextResponse.json({ error: 'Vyberte platného zadavatele.' }, { status: 400 });
   if (deadlineAt === false || campaignDateFrom === false || campaignDateTo === false) return NextResponse.json({ error: 'Některé datum není platné.' }, { status: 400 });
   if (deadlineAt && deadlineAt < scheduledAt) return NextResponse.json({ error: 'Termín dokončení nemůže být před datem práce.' }, { status: 400 });
   if (campaignDateFrom && campaignDateTo && campaignDateTo < campaignDateFrom) return NextResponse.json({ error: 'Konec kampaně nemůže být před jejím začátkem.' }, { status: 400 });

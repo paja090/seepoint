@@ -116,18 +116,7 @@ export function WorkOrderActions({
           </select>
         </label>
 
-        <label className="block text-xs font-bold text-slate-700">
-          Cena za úkol (Kč bez DPH)
-          <input
-            className="input mt-1 font-bold text-slate-900"
-            defaultValue={price || ''}
-            min="0"
-            name="price"
-            step="0.01"
-            type="number"
-            placeholder="Neuvedena"
-          />
-        </label>
+        <input type="hidden" name="price" value={price || ''} />
 
         <label className="flex items-center gap-3 text-xs font-extrabold text-slate-800 cursor-pointer">
           <input
