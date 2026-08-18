@@ -47,6 +47,7 @@ const navGroups: NavGroup[] = [
       ['/work-entries', '⏱️ Odvedená práce (všichni)', 'fileText', 'workEntries'],
       ['/settlements', '💰 Vyúčtování firemní', 'fileText', 'settlements'],
       ['/vehicles', '🚘 Vozidla a vozíky', 'car', 'vehicles'],
+      ['/warehouse', '📦 Sklad & Materiál', 'clipboardList', 'vehicles'],
     ],
   },
   {
