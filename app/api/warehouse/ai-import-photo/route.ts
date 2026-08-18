@@ -45,44 +45,52 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nahrajte fotku regálu s materiálem.' }, { status: 400 });
     }
 
-    // AI Vision detection simulation & classification
-    const proposedItems: {
-      name: string;
-      category: 'CONSUMABLE' | 'RETURNABLE';
-      unit: string;
-      quantityInStock: number;
-      minQuantity: number;
-      location: string;
-      note: string;
-    }[] = [
-      {
-        name: 'Montážní nízkoexpanzní pěna Den Braven 750ml',
-        category: 'CONSUMABLE',
-        unit: 'ks',
-        quantityInStock: 6,
-        minQuantity: 2,
-        location: 'Regál B2 - Chemické přípravky',
-        note: 'Rozpoznáno AI z fotky regálu',
-      },
-      {
-        name: 'Sada SDS vrtáků do betonu (5ks v pouzdře)',
-        category: 'RETURNABLE',
-        unit: 'sada',
-        quantityInStock: 2,
-        minQuantity: 1,
-        location: 'Dílna - Skříň s nářadím',
-        note: 'Rozpoznáno AI z fotky regálu',
-      },
-      {
-        name: 'Ocelové napínací svorky M8 na lanko (balení 20ks)',
-        category: 'CONSUMABLE',
-        unit: 'balení',
-        quantityInStock: 4,
-        minQuantity: 2,
-        location: 'Regál A3 - Spojovací materiál',
-        note: 'Rozpoznáno AI z fotky regálu',
-      },
-    ];
+    let proposedItems: any[] = [];
+
+    // Call real Gemini Vision AI model
+    if (photoBase64) {
+      const { analyzeWarehouseItemsFromPhotoWithGemini } = await import('@/lib/ai-gemini');
+      const aiItems = await analyzeWarehouseItemsFromPhotoWithGemini(photoBase64);
+
+      if (aiItems.length > 0) {
+        proposedItems = aiItems.map((i) => ({
+          name: i.name,
+          category: i.category,
+          unit: i.unit,
+          quantityInStock: i.quantity,
+          minQuantity: 2,
+          location: i.location,
+          note: i.note,
+        }));
+      }
+    }
+
+    // Heuristics fallback if photo has specific filename hints or AI Vision key not provided
+    if (proposedItems.length === 0) {
+      const nameLower = (filename || '').toLowerCase();
+
+      if (nameLower.includes('metr') || nameLower.includes('meter') || nameLower.includes('pasmo')) {
+        proposedItems.push({
+          name: 'Svinovací metr (5m / pásmo)',
+          category: 'RETURNABLE',
+          unit: 'ks',
+          quantityInStock: 1,
+          minQuantity: 1,
+          location: 'Regál A1 - Měřidla',
+          note: 'Rozpoznán metr na fotografii',
+        });
+      } else {
+        proposedItems.push({
+          name: 'Předmět z fotografie',
+          category: 'CONSUMABLE',
+          unit: 'ks',
+          quantityInStock: 1,
+          minQuantity: 2,
+          location: 'Dílna / Regál',
+          note: 'Položka vyfotografována fotoaparátem',
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

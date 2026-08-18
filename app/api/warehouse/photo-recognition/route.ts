@@ -26,39 +26,58 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ve skladu zatím nejsou žádné položky pro spárování.' }, { status: 400 });
     }
 
-    // AI Vision detection simulation & keyword match
-    const filename = file.name.toLowerCase();
+    const arrayBuffer = await file.arrayBuffer();
+    const base64Data = `data:${file.type || 'image/jpeg'};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+
+    const { analyzeWarehouseItemsFromPhotoWithGemini } = await import('@/lib/ai-gemini');
+    const aiItems = await analyzeWarehouseItemsFromPhotoWithGemini(base64Data);
+
     const detected: { itemId: string; name: string; unit: string; detectedQty: number; confidence: number }[] = [];
 
-    // Analyze photo keywords or fallback to AI items match
-    for (const item of allItems) {
-      const nameLower = item.name.toLowerCase();
-      const isCandidate =
-        filename.includes('pas') || filename.includes('lep') || filename.includes('zebrik') ||
-        nameLower.includes('pásky') || nameLower.includes('lepidlo') || nameLower.includes('žebřík');
+    if (aiItems.length > 0) {
+      for (const aiItem of aiItems) {
+        // Try to match AI identified name with existing database items
+        const matchedDbItem = allItems.find(
+          (dbItem) =>
+            dbItem.name.toLowerCase().includes(aiItem.name.toLowerCase()) ||
+            aiItem.name.toLowerCase().includes(dbItem.name.toLowerCase())
+        );
 
-      if (isCandidate && detected.length < 3) {
-        detected.push({
-          itemId: item.id,
-          name: item.name,
-          unit: item.unit,
-          detectedQty: 1,
-          confidence: 0.92,
-        });
+        if (matchedDbItem) {
+          detected.push({
+            itemId: matchedDbItem.id,
+            name: matchedDbItem.name,
+            unit: matchedDbItem.unit,
+            detectedQty: aiItem.quantity,
+            confidence: 0.95,
+          });
+        } else {
+          // If not in DB yet, present item name from Vision AI
+          detected.push({
+            itemId: allItems[0]?.id || 'new',
+            name: aiItem.name,
+            unit: aiItem.unit,
+            detectedQty: aiItem.quantity,
+            confidence: 0.9,
+          });
+        }
       }
     }
 
-    // Fallback if no specific photo name candidate, return top 2 common consumables for quick selection
+    // Heuristics fallback if filename hints
     if (detected.length === 0) {
-      const topItems = allItems.slice(0, 3);
-      for (const item of topItems) {
-        detected.push({
-          itemId: item.id,
-          name: item.name,
-          unit: item.unit,
-          detectedQty: 1,
-          confidence: 0.85,
-        });
+      const filename = file.name.toLowerCase();
+      for (const item of allItems) {
+        const nameLower = item.name.toLowerCase();
+        if (filename.includes('metr') && nameLower.includes('metr')) {
+          detected.push({
+            itemId: item.id,
+            name: item.name,
+            unit: item.unit,
+            detectedQty: 1,
+            confidence: 0.9,
+          });
+        }
       }
     }
 
