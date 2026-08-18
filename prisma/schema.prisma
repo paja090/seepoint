@@ -752,6 +752,12 @@ model Vehicle {
   status                   VehicleStatus @default(AVAILABLE)
   technicalInspectionUntil DateTime?
   insuranceUntil           DateTime?
+  highwayPassUntil         DateTime?
+  responsiblePerson        String?
+  tiresInfo                String?
+  owner                    String?
+  vtpUrl                   String?
+  repairNotes              String?
   note                     String?
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt

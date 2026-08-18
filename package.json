@@ -15,6 +15,7 @@
     "db:seed": "prisma db seed",
     "seed:demo-settlement": "npx tsx scripts/seed-demo-settlement.ts",
     "seed:demo-settlement:clean": "npx tsx scripts/seed-demo-settlement.ts --clean",
+    "seed:vehicles": "npx tsx scripts/seed-vehicles-2026.ts",
     "offer:demo-pdf": "node --experimental-strip-types scripts/generate-demo-offer-pdf.ts",
     "import:carriers-2026": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/import-carriers-2026.ts"
   },

@@ -515,3 +515,19 @@ export async function ensureWorkOrderSchema() {
     // Ignore if SQLite or already exists
   }
 }
+
+let vehicleSchemaEnsured = false;
+export async function ensureVehicleSchema() {
+  if (vehicleSchemaEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "highwayPassUntil" TIMESTAMP;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "responsiblePerson" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "tiresInfo" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "owner" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "vtpUrl" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "repairNotes" TEXT;`);
+    vehicleSchemaEnsured = true;
+  } catch {
+    // Ignore if SQLite or already exists
+  }
+}
