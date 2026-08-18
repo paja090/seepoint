@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -12,10 +12,9 @@ import {
   AlertCircle,
   FileCheck,
   X,
-  Search,
-  Filter,
   CheckCircle2,
   Briefcase,
+  History,
 } from 'lucide-react';
 import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
@@ -54,7 +53,7 @@ export function WorkModuleClient({
   const autoOpenModal = Boolean(initialCarrierCode || initialClientName || initialCampaignDateFrom);
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'today' | 'week' | 'open' | 'urgent' | 'invoicing'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
 
   // Dates & Stats Calculation
   const now = new Date();
@@ -64,34 +63,42 @@ export function WorkModuleClient({
   const weekEnd = new Date(dayStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
-  const todayCount = orders.filter((o) => {
+  const openOrders = orders.filter((o) => !['DONE', 'CANCELLED'].includes(o.status));
+  const completedOrders = orders.filter((o) => ['DONE', 'CANCELLED'].includes(o.status));
+
+  const openCount = openOrders.length;
+  const historyCount = completedOrders.length;
+
+  const todayCount = openOrders.filter((o) => {
     const d = new Date(o.scheduledAt);
     return d >= dayStart && d < tomorrow;
   }).length;
 
-  const weekCount = orders.filter((o) => {
+  const weekCount = openOrders.filter((o) => {
     const d = new Date(o.scheduledAt);
     return d >= dayStart && d < weekEnd;
   }).length;
 
-  const openCount = orders.filter((o) => !['DONE', 'CANCELLED'].includes(o.status)).length;
-  const urgentCount = orders.filter((o) => o.priority === 'URGENT' && !['DONE', 'CANCELLED'].includes(o.status)).length;
+  const urgentCount = openOrders.filter((o) => o.priority === 'URGENT').length;
   const invoicingCount = orders.filter((o) => o.ftdSent && !o.invoiced && o.status !== 'CANCELLED').length;
 
   // Filter orders based on active stat tile selection
   const filteredOrders = orders.filter((o) => {
     const d = new Date(o.scheduledAt);
-    if (selectedFilter === 'today') return d >= dayStart && d < tomorrow;
-    if (selectedFilter === 'week') return d >= dayStart && d < weekEnd;
-    if (selectedFilter === 'open') return !['DONE', 'CANCELLED'].includes(o.status);
-    if (selectedFilter === 'urgent') return o.priority === 'URGENT' && !['DONE', 'CANCELLED'].includes(o.status);
+    const isCompleted = ['DONE', 'CANCELLED'].includes(o.status);
+
+    if (selectedFilter === 'open') return !isCompleted;
+    if (selectedFilter === 'today') return !isCompleted && d >= dayStart && d < tomorrow;
+    if (selectedFilter === 'week') return !isCompleted && d >= dayStart && d < weekEnd;
+    if (selectedFilter === 'urgent') return !isCompleted && o.priority === 'URGENT';
     if (selectedFilter === 'invoicing') return o.ftdSent && !o.invoiced && o.status !== 'CANCELLED';
+    if (selectedFilter === 'history') return isCompleted;
     return true;
   });
 
   return (
     <div className="space-y-6">
-      {/* PAGE HEADER & PRIMARY ACTION BUTTON */}
+      {/* PAGE HEADER & PRIMARY ACTION BUTTONS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div>
           <div className="flex items-center gap-2">
@@ -103,11 +110,24 @@ export function WorkModuleClient({
             Plán práce & Zakázky
           </h1>
           <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5">
-            Instalace, servis, výjezdy v terénu a správa montážních úkolů.
+            Přehled aktivních úkolů k řešení, plánování výjezdů a historie hotových zakázek.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setSelectedFilter(selectedFilter === 'history' ? 'open' : 'history')}
+            className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-extrabold shadow-sm transition ${
+              selectedFilter === 'history'
+                ? 'border-purple-600 bg-purple-600 text-white shadow-md ring-2 ring-purple-400/30'
+                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <History size={16} className={selectedFilter === 'history' ? 'text-white' : 'text-purple-600'} />
+            <span>📜 Historie ({historyCount})</span>
+          </button>
+
           <Link
             href="/work/route"
             className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 shadow-sm hover:bg-slate-50 transition"
@@ -129,10 +149,27 @@ export function WorkModuleClient({
       </div>
 
       {/* STAT TILES / QUICK FILTERS */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'today' ? 'all' : 'today')}
+          onClick={() => setSelectedFilter(selectedFilter === 'open' ? 'all' : 'open')}
+          className={`rounded-2xl border p-4 text-left transition ${
+            selectedFilter === 'open'
+              ? 'border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/30'
+              : 'border-slate-200 bg-white hover:border-slate-300 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center justify-between text-slate-500">
+            <span className="text-[11px] font-bold uppercase tracking-wider">K řešení</span>
+            <CheckCircle2 size={16} className="text-emerald-600" />
+          </div>
+          <p className="mt-1 text-2xl font-black text-slate-900">{openCount}</p>
+          <span className="text-[10px] font-semibold text-slate-400">aktivní úkoly</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSelectedFilter(selectedFilter === 'today' ? 'open' : 'today')}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'today'
               ? 'border-sky-500 bg-sky-50/90 ring-2 ring-sky-500/30'
@@ -149,7 +186,7 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'week' ? 'all' : 'week')}
+          onClick={() => setSelectedFilter(selectedFilter === 'week' ? 'open' : 'week')}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'week'
               ? 'border-sky-500 bg-sky-50/90 ring-2 ring-sky-500/30'
@@ -166,24 +203,7 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'open' ? 'all' : 'open')}
-          className={`rounded-2xl border p-4 text-left transition ${
-            selectedFilter === 'open'
-              ? 'border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/30'
-              : 'border-slate-200 bg-white hover:border-slate-300 shadow-sm'
-          }`}
-        >
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Otevřené</span>
-            <CheckCircle2 size={16} className="text-emerald-600" />
-          </div>
-          <p className="mt-1 text-2xl font-black text-slate-900">{openCount}</p>
-          <span className="text-[10px] font-semibold text-slate-400">probíhá / TODO</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'urgent' ? 'all' : 'urgent')}
+          onClick={() => setSelectedFilter(selectedFilter === 'urgent' ? 'open' : 'urgent')}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'urgent'
               ? 'border-rose-500 bg-rose-50/90 ring-2 ring-rose-500/30'
@@ -200,7 +220,7 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'invoicing' ? 'all' : 'invoicing')}
+          onClick={() => setSelectedFilter(selectedFilter === 'invoicing' ? 'open' : 'invoicing')}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'invoicing'
               ? 'border-purple-500 bg-purple-50/90 ring-2 ring-purple-500/30'
@@ -214,27 +234,45 @@ export function WorkModuleClient({
           <p className="mt-1 text-2xl font-black text-purple-950">{invoicingCount}</p>
           <span className="text-[10px] font-semibold text-purple-700">fotky hotové</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setSelectedFilter(selectedFilter === 'history' ? 'open' : 'history')}
+          className={`rounded-2xl border p-4 text-left transition ${
+            selectedFilter === 'history'
+              ? 'border-purple-600 bg-purple-50/90 ring-2 ring-purple-500/30'
+              : 'border-slate-200 bg-white hover:border-slate-300 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center justify-between text-purple-700">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Historie</span>
+            <History size={16} className="text-purple-600" />
+          </div>
+          <p className="mt-1 text-2xl font-black text-purple-950">{historyCount}</p>
+          <span className="text-[10px] font-semibold text-slate-400">hotové úkoly</span>
+        </button>
       </div>
 
       {/* FILTER CLEAR BANNER IF ACTIVE */}
-      {selectedFilter !== 'all' && (
+      {selectedFilter !== 'open' && (
         <div className="flex items-center justify-between rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700">
           <span>
-            Aktivní filtr:{' '}
+            Zobrazený filtr:{' '}
             <strong className="text-slate-900">
               {selectedFilter === 'today' && 'Dnešní zakázky'}
               {selectedFilter === 'week' && 'Zakázky v příštích 7 dnech'}
-              {selectedFilter === 'open' && 'Otevřené zakázky'}
               {selectedFilter === 'urgent' && 'Urgentní zakázky'}
               {selectedFilter === 'invoicing' && 'Zakázky čekající na fakturaci'}
+              {selectedFilter === 'history' && '📜 Historie a hotové úkoly'}
+              {selectedFilter === 'all' && 'Všechny zakázky (včetně historie)'}
             </strong>{' '}
             ({filteredOrders.length} výsledků)
           </span>
           <button
-            onClick={() => setSelectedFilter('all')}
+            onClick={() => setSelectedFilter('open')}
             className="font-bold text-sky-600 hover:underline flex items-center gap-1"
           >
-            <X size={14} /> Zrušit filtr
+            <X size={14} /> Návrat k aktivním úkolům ({openCount})
           </button>
         </div>
       )}
