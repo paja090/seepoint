@@ -184,14 +184,32 @@ export function ShoppingListModule({
     }
   };
 
-  // Helper image compressor
+  // Scroll Lock for Body when Modals or Bottom Sheets are active
+  const isAnyModalOpen = Boolean(
+    showFormModal || showFilterModal || selectedDetailItem || receiptItem || previewImage
+  );
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [isAnyModalOpen]);
+
+  // Helper image compressor (Optimized for fast mobile upload and payload size)
   function compressImage(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new window.Image();
         img.onload = () => {
-          const maxDim = 1600;
+          const maxDim = 800;
           let width = img.width;
           let height = img.height;
           if (width > maxDim || height > maxDim) {
@@ -209,7 +227,7 @@ export function ShoppingListModule({
           const ctx = canvas.getContext('2d');
           if (!ctx) return resolve(e.target?.result as string);
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.82));
+          resolve(canvas.toDataURL('image/jpeg', 0.70));
         };
         img.onerror = () => reject(new Error('Chyba obrázku'));
         img.src = e.target?.result as string;
@@ -268,8 +286,15 @@ export function ShoppingListModule({
     setEditingItem(item);
     setFormTitle(item.title);
     setFormCategory((item.category as 'OFFICE' | 'WORKSHOP') || 'WORKSHOP');
-    setFormQuantity(item.quantity || '');
-    setFormUnit(item.unit || 'ks');
+
+    let rawQty = item.quantity || '';
+    const unit = item.unit || 'ks';
+    if (rawQty && unit && rawQty.endsWith(unit)) {
+      rawQty = rawQty.slice(0, -unit.length).trim();
+    }
+    setFormQuantity(rawQty);
+    setFormUnit(unit);
+
     setFormStore(item.store || '');
     setFormPriority(item.priority || 'NORMAL');
     setFormAssignedEmployeeId(item.assignedEmployeeId || '');
@@ -291,10 +316,13 @@ export function ShoppingListModule({
     setFormSubmitting(true);
     setFormError('');
 
+    const cleanQty = formQuantity.trim();
+    const formattedQty = cleanQty ? (formUnit ? `${cleanQty} ${formUnit}` : cleanQty) : null;
+
     const payload = {
       title: formTitle.trim(),
       category: formCategory,
-      quantity: formQuantity.trim() ? (formUnit ? `${formQuantity.trim()} ${formUnit}` : formQuantity.trim()) : null,
+      quantity: formattedQty,
       unit: formUnit,
       store: formStore.trim() || null,
       priority: formPriority,
