@@ -55,20 +55,36 @@ export async function PATCH(
     }
 
     if (typeof body.assignedEmployeeId !== 'undefined') {
-      data.assignedEmployeeId = body.assignedEmployeeId || null;
-      if (body.assignedEmployeeId) {
+      const assignedEmpId = body.assignedEmployeeId ? String(body.assignedEmployeeId).trim() : null;
+      if (assignedEmpId) {
         const emp = await prisma.employee.findUnique({
-          where: { id: body.assignedEmployeeId },
+          where: { id: assignedEmpId },
           select: { firstName: true, lastName: true },
         });
-        data.assignedEmployeeName = emp ? `${emp.firstName} ${emp.lastName}`.trim() : null;
+        if (emp) {
+          data.assignedEmployeeId = assignedEmpId;
+          data.assignedEmployeeName = `${emp.firstName} ${emp.lastName}`.trim();
+        } else {
+          data.assignedEmployeeId = null;
+          data.assignedEmployeeName = null;
+        }
       } else {
+        data.assignedEmployeeId = null;
         data.assignedEmployeeName = null;
       }
     }
 
     if (typeof body.crmOrderId !== 'undefined') {
-      data.crmOrderId = body.crmOrderId || null;
+      const orderId = body.crmOrderId ? String(body.crmOrderId).trim() : null;
+      if (orderId) {
+        const orderExists = await prisma.crmOrder.findUnique({
+          where: { id: orderId },
+          select: { id: true },
+        });
+        data.crmOrderId = orderExists ? orderId : null;
+      } else {
+        data.crmOrderId = null;
+      }
     }
 
     if (typeof body.pricePaid !== 'undefined') {
@@ -90,10 +106,11 @@ export async function PATCH(
     });
 
     return NextResponse.json(updated);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to update shopping item:', error);
+    const detail = error?.message ? `: ${error.message}` : '';
     return NextResponse.json(
-      { error: 'Položku se nepodařilo upravit.' },
+      { error: `Položku se nepodařilo upravit${detail}` },
       { status: 500 }
     );
   }

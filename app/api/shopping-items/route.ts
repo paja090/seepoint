@@ -94,18 +94,35 @@ export async function POST(request: Request) {
       ? body.priority
       : 'NORMAL';
 
-    const userName = auth.employee
-      ? `${auth.employee.firstName} ${auth.employee.lastName}`.trim()
-      : auth.name || auth.email || 'Člen týmu';
+    const userName = (
+      auth.employee
+        ? `${auth.employee.firstName || ''} ${auth.employee.lastName || ''}`.trim()
+        : auth.name || auth.email || 'Člen týmu'
+    ).trim() || 'Člen týmu';
 
     let assignedEmployeeName = body.assignedEmployeeName?.trim() || null;
-    if (body.assignedEmployeeId && !assignedEmployeeName) {
+    let assignedEmployeeId = body.assignedEmployeeId ? String(body.assignedEmployeeId).trim() : null;
+    if (assignedEmployeeId) {
       const emp = await prisma.employee.findUnique({
-        where: { id: body.assignedEmployeeId },
+        where: { id: assignedEmployeeId },
         select: { firstName: true, lastName: true },
       });
       if (emp) {
         assignedEmployeeName = `${emp.firstName} ${emp.lastName}`.trim();
+      } else {
+        assignedEmployeeId = null;
+        assignedEmployeeName = null;
+      }
+    }
+
+    let crmOrderId = body.crmOrderId ? String(body.crmOrderId).trim() : null;
+    if (crmOrderId) {
+      const orderExists = await prisma.crmOrder.findUnique({
+        where: { id: crmOrderId },
+        select: { id: true },
+      });
+      if (!orderExists) {
+        crmOrderId = null;
       }
     }
 
@@ -120,10 +137,10 @@ export async function POST(request: Request) {
         note: body.note?.trim() || null,
         imageUrl: body.imageUrl?.trim() || null,
         receiptUrl: body.receiptUrl?.trim() || null,
-        assignedEmployeeId: body.assignedEmployeeId || null,
+        assignedEmployeeId,
         assignedEmployeeName,
-        crmOrderId: body.crmOrderId || null,
-        addedByUserId: auth.id,
+        crmOrderId,
+        addedByUserId: auth.id || null,
         addedByUserName: userName,
       },
       include: {
@@ -138,10 +155,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newItem);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create shopping item:', error);
+    const detail = error?.message ? `: ${error.message}` : '';
     return NextResponse.json(
-      { error: 'Položku se nepodařilo přidat do nákupního seznamu.' },
+      { error: `Položku se nepodařilo přidat do nákupního seznamu${detail}` },
       { status: 500 }
     );
   }
