@@ -107,6 +107,8 @@ export type Photo = {
   size?: number;
   taskId?: string;
   workEntryId?: string;
+  createdAt?: string;
+  capturedByWorkerName?: string;
 };
 
 export type Carrier = {

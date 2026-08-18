@@ -59,6 +59,8 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
     fileName: photo.fileName ?? undefined,
     mimeType: photo.mimeType ?? undefined,
     size: photo.size ?? undefined,
+    createdAt: photo.createdAt?.toISOString(),
+    capturedByWorkerName: photo.capturedByWorkerName ?? undefined,
   });
   const todayStr = new Date().toISOString().slice(0, 10);
   return {

@@ -11,7 +11,7 @@ import { PhotoGallery } from './PhotoGallery';
 import { StatusBadge } from './StatusBadge';
 import { QrCodeGeneratorModal } from './qr/QrCodeGeneratorModal';
 import { useOfferBasket } from '@/context/OfferBasketContext';
-import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 function getCarrierBadgeMeta(type: Carrier['type']) {
   switch (type) {
@@ -54,6 +54,41 @@ export function CarrierDetail({
   const isNavigation = carrier.type === 'NAVIGATION';
   const badgeMeta = getCarrierBadgeMeta(carrier.type);
   const { toggleSurface, isSurfaceSelected } = useOfferBasket();
+
+  const [resolvingDamage, setResolvingDamage] = useState(false);
+  const [damageResolved, setDamageResolved] = useState(false);
+
+  const damagePhotos = [
+    ...carrier.photos.filter((p) => p.type === 'DAMAGE'),
+    ...carrier.surfaces.flatMap((s) => (s.photos || []).filter((p) => p.type === 'DAMAGE')),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const latestDamagePhoto = damagePhotos[0];
+  const hasDamageNote = carrier.note?.includes('[ZÁVADA:') || carrier.note?.includes('ZÁVADA');
+  const isDamaged = (damagePhotos.length > 0 || hasDamageNote) && !damageResolved;
+
+  const handleResolveDamage = async () => {
+    setResolvingDamage(true);
+    try {
+      const cleanedNote = (carrier.note || '')
+        .replace(/\[ZÁVADA:[^\]]+\]/g, '')
+        .replace(/ZÁVADA:[^\n]+/g, '')
+        .trim();
+
+      await fetch(`/api/carriers/${carrier.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: cleanedNote }),
+      });
+
+      setDamageResolved(true);
+      window.location.reload();
+    } catch (err) {
+      console.error('Failed to resolve damage:', err);
+    } finally {
+      setResolvingDamage(false);
+    }
+  };
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const campaigns = carrier.surfaces.flatMap((surface) =>
@@ -157,6 +192,11 @@ export function CarrierDetail({
               {badgeMeta.label}
             </span>
             <StatusBadge value={carrier.archivedAt ? 'ARCHIVED' : carrier.status} />
+            {isDamaged && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-rose-600 text-white border border-rose-700 shadow-sm animate-pulse">
+                <AlertTriangle size={14} /> 🚨 ZÁVADA NA PLOŠE
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-black text-slate-950 tracking-tight">{carrier.name}</h2>
           <p className="text-xs font-semibold text-slate-500 mt-0.5">
@@ -184,6 +224,78 @@ export function CarrierDetail({
           <CarrierArchiveActions carrier={carrier} />
         </div>
       </div>
+
+      {/* 🚨 DAMAGE & REPAIR ALERT BANNER */}
+      {isDamaged && (
+        <div className="rounded-2xl border-2 border-rose-500 bg-rose-950/90 p-4 sm:p-5 text-white shadow-xl space-y-3 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-800/80 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <AlertTriangle size={22} className="animate-bounce" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-300">Aktivní poškození / Závada k opravení</span>
+                <h3 className="text-base font-black text-white">⚠️ Na tomto nosiči je nahlášena závada</h3>
+              </div>
+            </div>
+            {latestDamagePhoto?.createdAt && (
+              <span className="text-xs font-bold text-rose-200 bg-rose-900/80 px-3 py-1 rounded-xl border border-rose-700/80 self-start sm:self-auto">
+                Nahlášeno: {new Date(latestDamagePhoto.createdAt).toLocaleDateString('cs-CZ')}
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <div className="space-y-1.5 text-xs text-rose-100">
+              {latestDamagePhoto?.note && (
+                <p className="font-bold text-sm text-white bg-rose-900/60 p-3 rounded-xl border border-rose-800">
+                  {latestDamagePhoto.note}
+                </p>
+              )}
+              {!latestDamagePhoto?.note && carrier.note && (
+                <p className="font-bold text-sm text-white bg-rose-900/60 p-3 rounded-xl border border-rose-800">
+                  {carrier.note}
+                </p>
+              )}
+              {latestDamagePhoto?.capturedByWorkerName && (
+                <p className="text-xs text-rose-300 font-medium pt-1">
+                  👤 Nahlásil/a z terénu: <strong className="text-white">{latestDamagePhoto.capturedByWorkerName}</strong>
+                </p>
+              )}
+            </div>
+
+            {latestDamagePhoto?.url && (
+              <div className="relative group shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={latestDamagePhoto.url}
+                  alt="Fotografie poškození"
+                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover border-2 border-rose-400/80 shadow-md cursor-pointer hover:scale-105 transition"
+                  onClick={() => window.open(latestDamagePhoto.url, '_blank')}
+                />
+                <span className="absolute bottom-1 right-1 bg-slate-950/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-slate-700">
+                  Detail 🔍
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-rose-800/80 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-2xs text-rose-300 font-medium">
+              🛠️ Karta vyžaduje výjezd servisu nebo výměnu poškozené části.
+            </span>
+            <button
+              type="button"
+              onClick={handleResolveDamage}
+              disabled={resolvingDamage}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <CheckCircle2 size={16} />
+              <span>{resolvingDamage ? 'Ukládám...' : 'Označit závadu jako OPRAVENOU'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <QrCodeGeneratorModal
         carrier={{
