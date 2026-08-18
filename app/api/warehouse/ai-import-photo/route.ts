@@ -65,31 +65,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Heuristics fallback if photo has specific filename hints or AI Vision key not provided
     if (proposedItems.length === 0) {
-      const nameLower = (filename || '').toLowerCase();
-
-      if (nameLower.includes('metr') || nameLower.includes('meter') || nameLower.includes('pasmo')) {
-        proposedItems.push({
-          name: 'Svinovací metr (5m / pásmo)',
-          category: 'RETURNABLE',
-          unit: 'ks',
-          quantityInStock: 1,
-          minQuantity: 1,
-          location: 'Regál A1 - Měřidla',
-          note: 'Rozpoznán metr na fotografii',
-        });
-      } else {
-        proposedItems.push({
-          name: 'Předmět z fotografie',
-          category: 'CONSUMABLE',
-          unit: 'ks',
-          quantityInStock: 1,
-          minQuantity: 2,
-          location: 'Dílna / Regál',
-          note: 'Položka vyfotografována fotoaparátem',
-        });
-      }
+      return NextResponse.json({
+        error: 'AI z fotky nedokázala rozpoznat žádné položky. Zkontrolujte prosím, zda je fotka dostatečně ostrá a osvětlená.',
+      }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -99,6 +78,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('AI import photo error:', error);
-    return NextResponse.json({ error: 'AI analýza fotky selhala.' }, { status: 500 });
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'AI analýza fotky selhala.',
+    }, { status: 500 });
   }
 }

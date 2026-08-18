@@ -27,12 +27,17 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
     process.env.GOOGLE_AI_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GEMINI_KEY ||
-    process.env.GOOGLE_GEMINI_KEY;
-  const openAiKey = process.env.OPENAI_API_KEY;
+    process.env.GOOGLE_GEMINI_KEY ||
+    process.env.GOOGLE_GENAI_API_KEY ||
+    process.env.GEMINI_API_TOKEN ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_AI_KEY;
+
+  const openAiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
   if (!apiKey && !openAiKey) {
-    console.warn('Neither GEMINI_API_KEY nor OPENAI_API_KEY configured. Using AI Heuristics Mode.');
-    return null;
+    console.warn('Neither GEMINI_API_KEY nor OPENAI_API_KEY configured in environment variables.');
+    throw new Error('Chybí API klíč pro AI Vision. Vložte do Vercel Environment Variables klíč GEMINI_API_KEY nebo OPENAI_API_KEY.');
   }
 
   // Robust Base64 & MimeType extraction
@@ -84,6 +89,9 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
           const cleanText = content.replace(/```json/g, '').replace(/```/g, '').trim();
           return JSON.parse(cleanText);
         }
+      } else {
+        const errText = await res.text();
+        console.warn('OpenAI Vision returned HTTP', res.status, errText);
       }
     } catch (err) {
       console.warn('OpenAI GPT-4o vision call failed, falling back to Gemini:', err);
@@ -93,62 +101,63 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const modelsToTry = [
     'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-flash-latest',
     'gemini-1.5-pro',
+    'gemini-flash-latest',
   ];
 
-  let lastError: Error | null = null;
+  let lastErrorMsg = '';
 
   for (const model of modelsToTry) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    for (const apiVersion of ['v1beta', 'v1']) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${apiKey}`;
 
-      const payload = {
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Data,
+        const payload = {
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Data,
+                  },
                 },
-              },
-            ],
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            response_mime_type: 'application/json',
           },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          response_mime_type: 'application/json',
-        },
-      };
+        };
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.warn(`Gemini model ${model} returned ${res.status}:`, errorText.slice(0, 150));
-        lastError = new Error(`Model ${model} selhal: ${res.status}`);
-        continue;
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.warn(`Gemini model ${model} (${apiVersion}) returned ${res.status}:`, errorText.slice(0, 150));
+          lastErrorMsg = `Gemini API vrací HTTP ${res.status}: ${errorText.slice(0, 100)}`;
+          continue;
+        }
+
+        const data = await res.json();
+        let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!jsonText) continue;
+
+        jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(jsonText);
+      } catch (err: unknown) {
+        lastErrorMsg = err instanceof Error ? err.message : 'Neznámá chyba Gemini API';
       }
-
-      const data = await res.json();
-      let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!jsonText) continue;
-
-      jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonText);
-    } catch (err: unknown) {
-      lastError = err instanceof Error ? err : new Error('Neznámá chyba Gemini API');
     }
   }
 
-  console.warn('All Gemini models failed, using smart heuristics fallback:', lastError?.message);
-  return null;
+  throw new Error(`AI Vision volání selhalo. Podrobnosti: ${lastErrorMsg || 'API klíč neodpovídá nebo vypršel quota limit.'}`);
 }
 
 /**
