@@ -63,6 +63,7 @@ export function parseCarrierFilters(searchParams: Record<string, string | string
   const surfaceStatus = clean(searchParams.surfaceStatus);
   const gps = clean(searchParams.gps);
   const photo = clean(searchParams.photo);
+  const damage = clean(searchParams.damage);
   const description = clean(searchParams.description);
   const occupancy = clean(searchParams.occupancy);
   const archived = clean(searchParams.archived);
@@ -80,6 +81,7 @@ export function parseCarrierFilters(searchParams: Record<string, string | string
     surfaceStatus: surfaceStatus && surfaceStatuses.has(surfaceStatus as SurfaceStatus) ? surfaceStatus as SurfaceStatus : undefined,
     gps: gps && gpsValues.has(gps) ? gps as CarrierFilters['gps'] : undefined,
     photo: photo && simpleValues.has(photo) ? photo as CarrierFilters['photo'] : undefined,
+    damage: damage && simpleValues.has(damage) ? damage as CarrierFilters['damage'] : undefined,
     description: description && simpleValues.has(description) ? description as CarrierFilters['description'] : undefined,
     occupancy: occupancy && simpleValues.has(occupancy) ? occupancy as CarrierFilters['occupancy'] : undefined,
     archived: archived && archivedValues.has(archived) ? archived as CarrierFilters['archived'] : 'active',

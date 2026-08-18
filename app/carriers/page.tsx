@@ -65,18 +65,36 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                 const mediaTypes = [...new Set(carrier.surfaces.map((surface) => mediaTypeLabel(surface.mediaType)))];
                 const surfaceStatuses = [...new Set(carrier.surfaces.map((surface) => surface.status))];
                 const hasGps = Boolean(carrier.latitude && carrier.longitude);
+                const totalPhotos = new Set([
+                  ...carrier.photos.map((p) => p.id),
+                  ...carrier.surfaces.flatMap((s) => s.photos.map((p) => p.id)),
+                ]).size;
+                const isDamaged =
+                  carrier.photos.some((p) => p.type === 'DAMAGE') ||
+                  carrier.surfaces.some((s) => s.photos.some((p) => p.type === 'DAMAGE')) ||
+                  carrier.note?.includes('ZÁVADA');
+
                 return (
-                  <tr className={carrier.archivedAt ? 'bg-slate-50 text-slate-500' : 'hover:bg-slate-50/60'} key={carrier.id}>
+                  <tr className={carrier.archivedAt ? 'bg-slate-50 text-slate-500' : isDamaged ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50/60'} key={carrier.id}>
                     <TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${carrier.id}`}>{carrier.code}</Link></TableCell>
                     <TableCell><b>{carrier.name}</b><br /><span className="text-slate-500">{carrierTypeLabel(carrier.type)}</span></TableCell>
                     <TableCell>{mediaTypes.join(', ') || 'Bez ploch'}</TableCell>
                     <TableCell>{carrier.city || '-'}</TableCell>
                     <TableCell>{[carrier.locality ?? carrier.cadastralArea, carrier.street ?? carrier.address].filter(Boolean).join(' · ') || '-'}</TableCell>
                     <TableCell>{clients.join(', ') || <span className="text-slate-400">Klient neuveden</span>}</TableCell>
-                    <TableCell><StatusBadge value={carrier.archivedAt ? 'ARCHIVED' : carrier.status} /></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge value={carrier.archivedAt ? 'ARCHIVED' : carrier.status} />
+                        {isDamaged && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
+                            🚨 ZÁVADA
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell><div className="flex flex-wrap gap-1">{surfaceStatuses.length ? surfaceStatuses.map((status) => <StatusBadge key={status} value={status} />) : <span className="text-slate-400">Bez ploch</span>}</div></TableCell>
                     <TableCell>{hasGps ? <StatusBadge value={carrier.gpsStatus === 'VERIFIED' ? 'VERIFIED' : carrier.gpsStatus} /> : <StatusBadge value="MISSING" />}</TableCell>
-                    <TableCell>{carrier.photos.length + carrier.surfaces.reduce((sum, surface) => sum + surface.photos.length, 0)}</TableCell>
+                    <TableCell><span className="font-semibold">{totalPhotos}</span></TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-2">
                         <Link className="table-action" href={`/carriers/${carrier.id}`}>Detail</Link>
