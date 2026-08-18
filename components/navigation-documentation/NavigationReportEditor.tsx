@@ -163,6 +163,13 @@ export function NavigationReportEditor({
 
           const availablePhotos = effectiveCarrier?.photos || [];
 
+          const lat = item.navigationPoint?.latitude ?? item.carrier?.latitude;
+          const lng = item.navigationPoint?.longitude ?? item.carrier?.longitude;
+          const hasGps = lat !== undefined && lat !== null && lng !== undefined && lng !== null && (lat !== 0 || lng !== 0);
+
+          const photoSrc =
+            item.selectedPhoto?.url || (item.selectedPhoto?.id ? `/api/photos/${item.selectedPhoto.id}/file` : null);
+
           return (
             <div
               key={item.id}
