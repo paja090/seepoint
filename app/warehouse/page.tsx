@@ -7,8 +7,9 @@ import { WarehouseItemModal } from '@/components/warehouse/WarehouseItemModal';
 import { WarehouseMovementModal } from '@/components/warehouse/WarehouseMovementModal';
 import { WarehouseVoiceInputModal } from '@/components/warehouse/WarehouseVoiceInputModal';
 import { WarehousePhotoScannerModal } from '@/components/warehouse/WarehousePhotoScannerModal';
+import { WarehouseAiImportModal } from '@/components/warehouse/WarehouseAiImportModal';
 import { RestockButton } from '@/components/warehouse/RestockButton';
-import { Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, RotateCcw, Building2, MapPin, Wrench, ShoppingCart, Printer, Camera } from 'lucide-react';
+import { Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, RotateCcw, Building2, MapPin, Wrench, ShoppingCart, Printer, Camera, Sparkles } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <WarehouseAiImportModal />
           <WarehouseVoiceInputModal workOrders={workOrders} employees={employees} />
           <WarehousePhotoScannerModal workOrders={workOrders} employees={employees} />
 
