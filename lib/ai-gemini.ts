@@ -22,7 +22,12 @@ export type GeminiFuelReceipt = {
  * Helper to fetch Google Gemini API using REST endpoint with model fallback
  */
 async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_AI_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GEMINI_KEY ||
+    process.env.GOOGLE_GEMINI_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey && !openAiKey) {
@@ -30,14 +35,18 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
     return null;
   }
 
-  // Extract base64 and mime type if data URL
+  // Robust Base64 & MimeType extraction
   let mimeType = 'image/jpeg';
   let base64Data = imageBase64OrUrl;
 
-  if (imageBase64OrUrl.startsWith('data:')) {
-    const parts = imageBase64OrUrl.split(';');
-    mimeType = parts[0].replace('data:', '');
-    base64Data = parts[1].replace('base64,', '');
+  if (imageBase64OrUrl.includes(',')) {
+    const commaIndex = imageBase64OrUrl.indexOf(',');
+    const header = imageBase64OrUrl.substring(0, commaIndex);
+    base64Data = imageBase64OrUrl.substring(commaIndex + 1);
+    const matchMime = header.match(/data:(.*?);/);
+    if (matchMime && matchMime[1]) {
+      mimeType = matchMime[1];
+    }
   }
 
   // First try OpenAI GPT-4o if key available
@@ -59,7 +68,7 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
                 { type: 'text', text: prompt },
                 {
                   type: 'image_url',
-                  image_url: { url: imageBase64OrUrl.startsWith('data:') ? imageBase64OrUrl : `data:${mimeType};base64,${base64Data}` },
+                  image_url: { url: `data:${mimeType};base64,${base64Data}` },
                 },
               ],
             },
@@ -71,7 +80,10 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
       if (res.ok) {
         const data = await res.json();
         const content = data.choices?.[0]?.message?.content;
-        if (content) return JSON.parse(content);
+        if (content) {
+          const cleanText = content.replace(/```json/g, '').replace(/```/g, '').trim();
+          return JSON.parse(cleanText);
+        }
       }
     } catch (err) {
       console.warn('OpenAI GPT-4o vision call failed, falling back to Gemini:', err);
@@ -80,9 +92,9 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
 
   const modelsToTry = [
     'gemini-2.0-flash',
-    'gemini-1.5-pro',
     'gemini-1.5-flash',
     'gemini-flash-latest',
+    'gemini-1.5-pro',
   ];
 
   let lastError: Error | null = null;
@@ -125,9 +137,10 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
       }
 
       const data = await res.json();
-      const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!jsonText) continue;
 
+      jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
       return JSON.parse(jsonText);
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error('Neznámá chyba Gemini API');
