@@ -101,7 +101,6 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const modelsToTry = [
     'gemini-1.5-flash',
     'gemini-1.5-pro',
-    'gemini-2.0-flash-exp',
   ];
 
   let lastErrorMsg = '';
