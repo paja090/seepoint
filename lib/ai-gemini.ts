@@ -99,10 +99,9 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   }
 
   const modelsToTry = [
-    'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-pro',
-    'gemini-flash-latest',
+    'gemini-2.0-flash-exp',
   ];
 
   let lastErrorMsg = '';
@@ -140,7 +139,7 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.warn(`Gemini model ${model} (${apiVersion}) returned ${res.status}:`, errorText.slice(0, 150));
+          console.warn(`Gemini model ${model} (${apiVersion}) returned HTTP ${res.status}:`, errorText.slice(0, 150));
           lastErrorMsg = `Gemini API vrací HTTP ${res.status}: ${errorText.slice(0, 100)}`;
           continue;
         }
