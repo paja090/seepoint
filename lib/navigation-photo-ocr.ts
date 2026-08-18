@@ -56,11 +56,11 @@ export function extractNavigationFromPhotoText(text: string | undefined | null):
     }
   }
 
-  // 2. Detect Distance (e.g. 350m, 500 m, 1.2 km, 2,5 km)
-  const distMatch = /(\d+(?:[,.]\d+)?\s*(?:km|m))\b/i.exec(rawText);
+  // 2. Detect Distance (e.g. 350m, 500 m, 1.2 km, 2,5 km, 350 metrů, 500m po silnici)
+  const distMatch = /(\b\d+(?:[,.]\d+)?\s*(?:km|kilo|m|metrů|metru|metry|metr)?\b)/i.exec(rawText);
   if (distMatch) {
     distanceMeters = parseDistanceMeters(distMatch[1]);
-    if (distanceMeters !== undefined) {
+    if (distanceMeters !== undefined && distanceMeters > 0) {
       confidenceScore += 35;
     }
   }
@@ -105,8 +105,16 @@ export function extractNavigationFromPhotoText(text: string | undefined | null):
   };
 }
 
-export function extractFromPhotoList(photos: Array<{ url?: string; note?: string; filename?: string }>): ExtractedNavigationPhotoData | null {
-  for (const photo of photos) {
+export function extractFromPhotoList(
+  photos: Array<{ url?: string; note?: string; filename?: string }>,
+  extraTextSources: string[] = [],
+): ExtractedNavigationPhotoData | null {
+  const allPhotos = [...photos];
+  if (extraTextSources.length > 0) {
+    allPhotos.push(...extraTextSources.map((t) => ({ note: t })));
+  }
+
+  for (const photo of allPhotos) {
     const textSources = [photo.note, photo.filename, photo.url].filter(Boolean) as string[];
     for (const src of textSources) {
       const extracted = extractNavigationFromPhotoText(src);
@@ -117,7 +125,7 @@ export function extractFromPhotoList(photos: Array<{ url?: string; note?: string
   }
 
   // Secondary pass for LOW confidence
-  for (const photo of photos) {
+  for (const photo of allPhotos) {
     const textSources = [photo.note, photo.filename, photo.url].filter(Boolean) as string[];
     for (const src of textSources) {
       const extracted = extractNavigationFromPhotoText(src);

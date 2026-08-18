@@ -18,6 +18,7 @@ export async function GET(
     const surface = await prisma.advertisingSurface.findUnique({
       where: { id },
       include: {
+        photos: true,
         carrier: {
           include: {
             photos: true,
@@ -30,18 +31,31 @@ export async function GET(
       return NextResponse.json({ error: 'Navigační pozice nebyla nalezena.' }, { status: 404 });
     }
 
-    const photos = surface.carrier.photos.map((p) => ({
+    const photos = [
+      ...surface.photos,
+      ...surface.carrier.photos,
+    ].map((p) => ({
       url: p.url,
       note: p.note ?? undefined,
-      filename: p.url.split('/').pop(),
+      filename: p.fileName ?? p.url.split('/').pop(),
     }));
 
-    const result = extractFromPhotoList(photos);
+    const extraTextSources = [
+      surface.directionDescription,
+      surface.name,
+      surface.rawMediaType,
+      surface.note,
+      surface.carrier.note,
+      surface.carrier.description,
+      surface.carrier.placementDescription,
+    ].filter((t): t is string => Boolean(t?.trim()));
+
+    const result = extractFromPhotoList(photos, extraTextSources);
 
     if (!result) {
       return NextResponse.json({
         found: false,
-        message: 'Z fotek nosiče se nepodařilo automaticky rozpoznat směr ani vzdálenost.',
+        message: 'Z fotek ani popisů nosiče se nepodařilo automaticky rozpoznat směr ani vzdálenost.',
       });
     }
 
