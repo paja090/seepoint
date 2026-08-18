@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
-import { prisma } from '@/lib/db';
+import { prisma, ensureVehicleSchema } from '@/lib/db';
 import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
-import { AlertTriangle, Fuel, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Car, Truck, FileText, UserCheck, ShieldCheck, Wrench, ShieldAlert } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +18,21 @@ function clean(value: string | string[] | undefined) { return first(value)?.trim
 export default async function VehiclesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePageAccess('vehicles');
   if (!canAccess(user.role, 'vehicles')) return <AppShell><AccessDenied /></AppShell>;
+  await ensureVehicleSchema();
+
   const params = await searchParams;
   const q = clean(params.q);
   const type = clean(params.type);
   const status = clean(params.status);
   const where: Prisma.VehicleWhereInput = {};
-  if (q) where.OR = [{ name: { contains: q, mode: 'insensitive' } }, { registrationNumber: { contains: q, mode: 'insensitive' } }, { vin: { contains: q, mode: 'insensitive' } }];
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: 'insensitive' } },
+      { registrationNumber: { contains: q, mode: 'insensitive' } },
+      { vin: { contains: q, mode: 'insensitive' } },
+      { responsiblePerson: { contains: q, mode: 'insensitive' } },
+    ];
+  }
   if (type && vehicleTypes.includes(type as typeof vehicleTypes[number])) where.type = type as typeof vehicleTypes[number];
   if (status && vehicleStatuses.includes(status as typeof vehicleStatuses[number])) where.status = status as typeof vehicleStatuses[number];
 
@@ -40,7 +49,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  // Compute STK alerts
+  // Compute STK & Highway Pass alerts
   const stkAlerts = vehicles.filter((v) => {
     if (!v.technicalInspectionUntil) return false;
     const stkDate = new Date(v.technicalInspectionUntil);
@@ -48,23 +57,60 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
     return diffDays <= 30;
   });
 
+  const activeVehiclesCount = vehicles.filter((v) => v.status !== 'OUT_OF_SERVICE').length;
+  const trailersCount = vehicles.filter((v) => v.type === 'TRAILER').length;
+  const vansCount = vehicles.filter((v) => v.type === 'VAN').length;
+
   return (
     <AppShell>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+      {/* HEADER BAR */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-3xl font-bold">Vozidla, vozíky & Kniha jízd</h1>
-          <p className="mt-1 text-sm text-slate-500">Evidence vozového parku, hlídání termínů STK a přehled tankování paliva z chatu.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Auta, Vozíky & Flotila</h1>
+          <p className="mt-1 text-sm text-slate-500 font-medium">
+            Kompletní evidence vozového parku SeePOINT (auta, dodávky, billboardové vozíky, STK, rezervace a dálniční známky).
+          </p>
         </div>
-        <Link className="rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-sky-800 transition" href="/vehicle-reservations">
-          Rezervace vozidel ↗
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 to-emerald-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-sky-500 hover:to-emerald-500 transition"
+            href="/vehicle-reservations"
+          >
+            <span>📅 Kalendář & Rezervace ↗</span>
+          </Link>
+        </div>
       </div>
 
+      {/* STAT SUMMARY TILES */}
+      <div className="mb-6 grid gap-3 grid-cols-2 sm:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Aktivní vozidla</span>
+          <p className="mt-1 text-2xl font-black text-slate-900">{activeVehiclesCount}</p>
+          <span className="text-[10px] text-slate-400 font-semibold">ve vozovém parku</span>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Billboardové vozíky</span>
+          <p className="mt-1 text-2xl font-black text-sky-900">{trailersCount}</p>
+          <span className="text-[10px] text-sky-700 font-semibold">1-nápravové i 2-nápravové</span>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Dodávky & Van</span>
+          <p className="mt-1 text-2xl font-black text-emerald-900">{vansCount}</p>
+          <span className="text-[10px] text-emerald-700 font-semibold">Renault Master, Trafic, H1</span>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Upozornění STK</span>
+          <p className="mt-1 text-2xl font-black text-amber-950">{stkAlerts.length}</p>
+          <span className="text-[10px] text-amber-700 font-semibold">vyžaduje kontrolu do 30 dní</span>
+        </div>
+      </div>
+
+      {/* STK ALERT BANNER */}
       {stkAlerts.length > 0 && (
-        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50/80 p-4 shadow-sm space-y-2">
-          <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-xs space-y-2">
+          <div className="flex items-center gap-2 text-amber-950 font-black text-sm">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-            <span>⚠️ Upozornění na STK u vozidel ({stkAlerts.length})</span>
+            <span>⚠️ Upozornění na vypršení STK ({stkAlerts.length} vozidel)</span>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold">
             {stkAlerts.map((v) => {
@@ -72,8 +118,14 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
               const diffDays = Math.ceil((stkDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
               const isExpired = diffDays < 0;
               return (
-                <span key={v.id} className={`rounded-lg px-2.5 py-1 border font-bold ${isExpired ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-amber-100 text-amber-900 border-amber-300'}`}>
-                  {v.name} ({v.registrationNumber}): {isExpired ? `🚨 STK Prošlá (${Math.abs(diffDays)} dní po termínu)` : `⚠️ Vyprší za ${diffDays} dní`}
+                <span
+                  key={v.id}
+                  className={`rounded-xl px-3 py-1 border font-bold flex items-center gap-1.5 ${
+                    isExpired ? 'bg-rose-100 text-rose-950 border-rose-300' : 'bg-amber-100 text-amber-950 border-amber-300'
+                  }`}
+                >
+                  <span>{v.name} ({v.registrationNumber ?? 'Bez SPZ'}):</span>
+                  <strong>{isExpired ? `🚨 Prošlá (${Math.abs(diffDays)} dní po termínu)` : `⚠️ Za ${diffDays} dní (${stkDate.toLocaleDateString('cs-CZ')})`}</strong>
                 </span>
               );
             })}
@@ -81,35 +133,67 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
+      {/* FILTERS FORM */}
       <form className="card mb-6 grid gap-3 md:grid-cols-4">
-        <label className="text-sm font-semibold">Hledání<input className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" name="q" defaultValue={q} placeholder="Název, SPZ, VIN" /></label>
-        <label className="text-sm font-semibold">Typ<select className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" name="type" defaultValue={type ?? ''}><option value="">Všechny typy</option>{vehicleTypes.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-        <label className="text-sm font-semibold">Stav<select className="mt-1 w-full rounded-lg border px-3 py-2 font-normal" name="status" defaultValue={status ?? ''}><option value="">Všechny stavy</option>{vehicleStatuses.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-        <div className="flex items-end"><button className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Filtrovat</button></div>
+        <label className="text-xs font-bold text-slate-700">
+          Vyhledat vozidlo
+          <input
+            className="input mt-1 w-full text-xs font-normal"
+            name="q"
+            defaultValue={q}
+            placeholder="Název, SPZ, VIN nebo řidič..."
+          />
+        </label>
+        <label className="text-xs font-bold text-slate-700">
+          Typ vozidla
+          <select className="input mt-1 w-full text-xs font-normal" name="type" defaultValue={type ?? ''}>
+            <option value="">Všechny typy vozidel</option>
+            <option value="CAR">🚘 Osobní auta</option>
+            <option value="VAN">🚚 Dodávky & Užitkové</option>
+            <option value="TRAILER">🪧 Billboardové vozíky</option>
+            <option value="OTHER">🛵 Skútry & Ostatní</option>
+          </select>
+        </label>
+        <label className="text-xs font-bold text-slate-700">
+          Stav vozidla
+          <select className="input mt-1 w-full text-xs font-normal" name="status" defaultValue={status ?? ''}>
+            <option value="">Všechny stavy</option>
+            <option value="AVAILABLE">🟢 K dispozici</option>
+            <option value="RESERVED">🟡 Rezervováno</option>
+            <option value="IN_USE">🔵 V provozu</option>
+            <option value="SERVICE">🔧 V servisu</option>
+            <option value="OUT_OF_SERVICE">🔴 Vyřazeno</option>
+          </select>
+        </label>
+        <div className="flex items-end">
+          <button className="w-full rounded-xl bg-slate-950 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition">
+            Filtrovat flotilu
+          </button>
+        </div>
       </form>
 
-      <section className="card overflow-x-auto">
+      {/* FLEET TABLE */}
+      <section className="card overflow-x-auto p-0 border border-slate-200">
         {vehicles.length === 0 ? (
-          <p className="text-sm text-slate-500">Zatím není evidované žádné vozidlo ani vozík.</p>
+          <div className="p-8 text-center text-sm text-slate-500">
+            Zatím nebylo nalezeno žádné vozidlo odpovídající filtru.
+          </div>
         ) : (
-          <table className="w-full min-w-[980px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <table className="w-full min-w-[1100px] text-left text-xs">
+            <thead className="bg-slate-100/90 text-slate-700 font-extrabold uppercase tracking-wider text-[11px] border-b border-slate-200">
               <tr>
-                <th className="border-b py-2 pr-3">Vozidlo</th>
-                <th className="border-b py-2 pr-3">Typ</th>
-                <th className="border-b py-2 pr-3">SPZ / VIN</th>
-                <th className="border-b py-2 pr-3">Stav</th>
-                <th className="border-b py-2 pr-3">Kontrola STK</th>
-                <th className="border-b py-2 pr-3">Palivo (Účtenky z chatu)</th>
-                <th className="border-b py-2 pr-3">Rezervace</th>
-                <th className="border-b py-2 pr-3">Servis</th>
+                <th className="py-3 px-4">Vozidlo / Název</th>
+                <th className="py-3 px-3">Typ</th>
+                <th className="py-3 px-3">SPZ / VIN / Vlastník</th>
+                <th className="py-3 px-3">Zodpovědná osoba</th>
+                <th className="py-3 px-3">Pneu & VTP</th>
+                <th className="py-3 px-3">Dálnička & STK</th>
+                <th className="py-3 px-3">Poznámky & Závady</th>
+                <th className="py-3 px-4 text-right">Akce</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-200 font-medium">
               {vehicles.map((vehicle) => {
-                const totalFuelKcs = vehicle.fuelExpenses.reduce((sum, fe) => sum + Number(fe.amount), 0);
-                const totalLiters = vehicle.fuelExpenses.reduce((sum, fe) => sum + (fe.liters ? Number(fe.liters) : 0), 0);
-
                 let stkBadge = null;
                 if (vehicle.technicalInspectionUntil) {
                   const stkDate = new Date(vehicle.technicalInspectionUntil);
@@ -123,40 +207,114 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                   }
                 }
 
+                let typeBadge = '🚘 Auto';
+                if (vehicle.type === 'VAN') typeBadge = '🚚 Dodávka';
+                if (vehicle.type === 'TRAILER') typeBadge = '🪧 Vozík';
+                if (vehicle.type === 'OTHER') typeBadge = '🛵 Ostatní';
+
                 return (
-                  <tr className="border-b last:border-0" key={vehicle.id}>
-                    <td className="py-3 pr-3">
-                      <Link className="font-semibold hover:underline text-slate-900" href={`/vehicles/${vehicle.id}`}>
+                  <tr className="hover:bg-slate-50/80 transition" key={vehicle.id}>
+                    {/* Name */}
+                    <td className="py-3 px-4">
+                      <Link className="font-extrabold text-slate-900 hover:text-sky-700 text-sm block" href={`/vehicles/${vehicle.id}`}>
                         {vehicle.name}
                       </Link>
-                    </td>
-                    <td className="py-3 pr-3 font-semibold text-slate-600">{vehicle.type}</td>
-                    <td className="py-3 pr-3">
-                      <span className="font-bold text-slate-900">{vehicle.registrationNumber ?? '-'}</span>
-                      <br />
-                      <span className="text-[11px] text-slate-400 font-mono">{vehicle.vin ?? '-'}</span>
-                    </td>
-                    <td className="py-3 pr-3">
-                      <StatusPill value={vehicle.status} />
-                    </td>
-                    <td className="py-3 pr-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-slate-700">{dateOnly(vehicle.technicalInspectionUntil)}</span>
-                        {stkBadge}
+                      <div className="mt-0.5">
+                        <StatusPill value={vehicle.status} />
                       </div>
                     </td>
-                    <td className="py-3 pr-3">
-                      {vehicle.fuelExpenses.length > 0 ? (
-                        <div className="text-xs">
-                          <span className="font-extrabold text-slate-900">{Math.round(totalFuelKcs).toLocaleString('cs-CZ')} Kč</span>
-                          <span className="text-slate-500 block text-[11px]">{totalLiters ? `${totalLiters.toFixed(1)} l · ` : ''}{vehicle.fuelExpenses.length} účtenek</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">Bez účtenek</span>
+
+                    {/* Type */}
+                    <td className="py-3 px-3">
+                      <span className="font-bold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
+                        {typeBadge}
+                      </span>
+                    </td>
+
+                    {/* Registration Number, VIN, Owner */}
+                    <td className="py-3 px-3">
+                      <span className="font-mono font-black text-slate-900 text-xs bg-amber-100 px-2 py-0.5 rounded border border-amber-200 inline-block">
+                        {vehicle.registrationNumber ?? 'Bez SPZ'}
+                      </span>
+                      {vehicle.owner && (
+                        <span className="ml-1 text-[10px] font-bold uppercase text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded">
+                          {vehicle.owner}
+                        </span>
+                      )}
+                      {vehicle.vin && (
+                        <span className="text-[10px] text-slate-400 font-mono block mt-0.5">
+                          VIN: {vehicle.vin}
+                        </span>
                       )}
                     </td>
-                    <td className="py-3 pr-3 font-semibold text-slate-700">{vehicle._count.reservations}</td>
-                    <td className="py-3 pr-3 font-semibold text-slate-700">{vehicle._count.serviceRecords}</td>
+
+                    {/* Responsible Person */}
+                    <td className="py-3 px-3">
+                      {vehicle.responsiblePerson ? (
+                        <span className="inline-flex items-center gap-1 font-extrabold text-slate-800 text-xs bg-sky-50 text-sky-950 px-2.5 py-1 rounded-xl border border-sky-200">
+                          <UserCheck size={12} className="text-sky-600" />
+                          {vehicle.responsiblePerson}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">—</span>
+                      )}
+                    </td>
+
+                    {/* Tires & VTP */}
+                    <td className="py-3 px-3">
+                      {vehicle.tiresInfo && (
+                        <span className="text-xs font-semibold text-slate-700 block">
+                          🛞 {vehicle.tiresInfo}
+                        </span>
+                      )}
+                      {vehicle.vtpUrl && (
+                        <a
+                          href={vehicle.vtpUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-700 hover:underline mt-0.5"
+                        >
+                          📄 Otevřít VTP ↗
+                        </a>
+                      )}
+                    </td>
+
+                    {/* Highway pass & STK */}
+                    <td className="py-3 px-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-500 font-semibold">STK:</span>
+                          <span className="font-bold text-slate-900">{dateOnly(vehicle.technicalInspectionUntil)}</span>
+                          {stkBadge}
+                        </div>
+                        {vehicle.highwayPassUntil && (
+                          <div className="text-[11px] text-emerald-800 font-bold">
+                            🎫 Dálniční do: {dateOnly(vehicle.highwayPassUntil)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Repair Notes */}
+                    <td className="py-3 px-3 max-w-[220px]">
+                      {vehicle.repairNotes ? (
+                        <span className="text-xs font-bold text-rose-900 bg-rose-50 px-2 py-1 rounded-xl border border-rose-200 block truncate" title={vehicle.repairNotes}>
+                          ⚠️ {vehicle.repairNotes}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">Bez závažných závad</span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3 px-4 text-right">
+                      <Link
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-100 transition shadow-2xs"
+                        href={`/vehicles/${vehicle.id}`}
+                      >
+                        Detail ➔
+                      </Link>
+                    </td>
                   </tr>
                 );
               })}
