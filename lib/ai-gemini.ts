@@ -35,8 +35,9 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
 
   const rawOpenAiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
-  const apiKey = rawKey ? rawKey.trim() : '';
-  const openAiKey = rawOpenAiKey ? rawOpenAiKey.trim() : '';
+  // Sanitize to valid ASCII characters only (removes quotes, newlines, non-printable chars)
+  const apiKey = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
+  const openAiKey = rawOpenAiKey ? rawOpenAiKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
 
   // Smart detection: Did the user paste an OpenAI `sk-...` key into GEMINI_API_KEY?
   const effectiveOpenAiKey = apiKey.startsWith('sk-') ? apiKey : openAiKey;
@@ -143,18 +144,9 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
             },
           };
 
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': effectiveGeminiKey,
-          };
-
-          if (effectiveGeminiKey.startsWith('AQ.')) {
-            headers['Authorization'] = `Bearer ${effectiveGeminiKey}`;
-          }
-
           const res = await fetch(url, {
             method: 'POST',
-            headers,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
 
