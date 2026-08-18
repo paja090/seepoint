@@ -15,6 +15,7 @@ import {
   FileText,
   Clock,
   Paperclip,
+  Upload,
 } from 'lucide-react';
 
 type Option = { id: string; label: string };
@@ -32,7 +33,7 @@ type WorkOrderFormProps = {
   initialCampaignDateTo?: string;
 };
 
-// Aktualizovaný přesný ceník úkolových sazeb
+// Ceník úkolových sazeb
 const pieceRateCatalog: Record<string, number> = {
   'Lavička — instalace (výměna grafiky)': 40,
   'City poster grafika — výměna': 60,
@@ -74,6 +75,11 @@ export function WorkOrderForm({
   const [price, setPrice] = useState('40');
   const [isCalculatedPrice, setIsCalculatedPrice] = useState(true);
   const [estimatedHours, setEstimatedHours] = useState('1');
+  const [requestedBy, setRequestedBy] = useState(currentUserName || 'VLAĎKA');
+
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState('');
 
   const [title, setTitle] = useState(
     initialCarrierCode
@@ -81,6 +87,28 @@ export function WorkOrderForm({
       : ''
   );
   const [locationNote, setLocationNote] = useState('');
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPdfUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/work-orders/pdf-upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = (await res.json()) as { url?: string; fileName?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error || 'Nahrání selhalo');
+      setPdfUrl(data.url);
+      setPdfFileName(file.name);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Nahrání PDF selhalo.');
+    } finally {
+      setPdfUploading(false);
+    }
+  };
 
   // Auto calculate price for piece-rate work
   const handleQuantityOrRateChange = (newQty: string, newRateType: string, currentWorkType: string) => {
@@ -527,28 +555,46 @@ export function WorkOrderForm({
             />
           )}
 
-          <div className="pt-2 border-t border-slate-200">
+          <div className="pt-2 border-t border-slate-200 space-y-2">
             <label className="block font-bold text-slate-900 text-sm mb-1 flex items-center gap-2">
               <Paperclip size={18} className="text-sky-600" />
-              Odkaz na PDF podklady / přílohy ke stažení (nepovinné)
+              PDF podklady / přílohy ke stažení (URL odkaz nebo soubor z PC)
             </label>
-            <input
-              className="input w-full bg-white text-xs border-slate-300"
-              name="pdfUrl"
-              type="url"
-              placeholder="https://.../tiskovy-nahled.pdf nebo odkaz na PDF podklady"
-            />
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input
+                className="input flex-1 bg-white text-xs border-slate-300"
+                name="pdfUrl"
+                type="url"
+                value={pdfUrl}
+                onChange={(e) => setPdfUrl(e.target.value)}
+                placeholder="Vložte URL odkaz nebo vyberte soubor z počítače ➔"
+              />
+              <label className="flex items-center justify-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-black text-sky-800 hover:bg-sky-100 cursor-pointer transition shrink-0">
+                <Upload size={14} />
+                <span>{pdfUploading ? 'Nahrávám PDF…' : '📁 Vybrat a nahrát PDF'}</span>
+                <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
+              </label>
+            </div>
+
+            {pdfFileName && (
+              <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                ✓ PDF soubor "{pdfFileName}" byl úspěšně nahraný.
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Auto pre-filled Requester */}
+        {/* Editable Requester */}
         <label className="font-bold text-slate-800 text-sm">
           Úkol zadal/a *
           <input
-            className="input mt-1 w-full bg-slate-100 font-bold text-slate-700"
+            className="input mt-1 w-full font-bold text-slate-900 bg-white"
             name="requestedBy"
-            readOnly
-            value={currentUserName || 'Přihlášený zadavatel'}
+            required
+            value={requestedBy}
+            onChange={(e) => setRequestedBy(e.target.value)}
+            placeholder="Jméno zadavatele (např. VLAĎKA, Pavel...)"
           />
         </label>
 
