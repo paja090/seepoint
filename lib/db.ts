@@ -163,38 +163,196 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
 }
 
 export function buildCarrierWhere(filters: CarrierFilters = {}): Prisma.AdvertisingCarrierWhereInput {
-  const q = clean(filters.q); const city = clean(filters.city); const locality = clean(filters.locality); const street = clean(filters.street); const client = clean(filters.client); const importBatchId = clean(filters.importBatchId); const where: Prisma.AdvertisingCarrierWhereInput = {};
-  if (filters.archived === 'archived') where.archivedAt = { not: null }; else if (filters.archived !== 'all') where.archivedAt = null;
-  if (filters.carrierType) where.type = filters.carrierType;
-  if (filters.mediaType) where.surfaces = { some: { mediaType: filters.mediaType } };
-  if (city) where.city = { equals: city, mode: 'insensitive' };
-  if (locality) where.OR = [{ locality: { contains: locality, mode: 'insensitive' } }, { cadastralArea: { contains: locality, mode: 'insensitive' } }];
-  if (street) where.AND = [{ OR: [{ street: { contains: street, mode: 'insensitive' } }, { address: { contains: street, mode: 'insensitive' } }] }];
-  if (client) where.surfaces = { some: { currentClient: { name: { contains: client, mode: 'insensitive' } } } };
-  if (filters.surfaceStatus) where.surfaces = { some: { status: filters.surfaceStatus } };
-  if (filters.gps === 'missing') where.OR = [...(where.OR as Prisma.AdvertisingCarrierWhereInput[] | undefined ?? []), { gpsStatus: 'MISSING' }, { latitude: null }, { longitude: null }];
-  else if (filters.gps === 'present') where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { latitude: { not: null }, longitude: { not: null } }];
-  else if (filters.gps) where.gpsStatus = filters.gps;
-  if (filters.photo === 'missing') where.photos = { none: {} };
-  if (filters.photo === 'present') where.photos = { some: {} };
-  if (filters.damage === 'present') {
-    where.AND = [
-      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-      { OR: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }, { photos: { some: { type: 'DAMAGE' } } }, { surfaces: { some: { photos: { some: { type: 'DAMAGE' } } } } }] },
-    ];
-  } else if (filters.damage === 'missing') {
-    where.AND = [
-      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-      { NOT: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }] },
-      { photos: { none: { type: 'DAMAGE' } } },
-      { surfaces: { none: { photos: { some: { type: 'DAMAGE' } } } } },
-    ];
+  const q = clean(filters.q);
+  const city = clean(filters.city);
+  const locality = clean(filters.locality);
+  const street = clean(filters.street);
+  const client = clean(filters.client);
+  const importBatchId = clean(filters.importBatchId);
+
+  const andConditions: Prisma.AdvertisingCarrierWhereInput[] = [];
+
+  // 1. Archive filter
+  if (filters.archived === 'archived') {
+    andConditions.push({ archivedAt: { not: null } });
+  } else if (filters.archived !== 'all') {
+    andConditions.push({ archivedAt: null });
   }
-  if (filters.occupancy === 'missing') where.surfaces = { none: { occupancies: { some: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] } } } } };
-  if (filters.occupancy === 'present') where.surfaces = { some: { occupancies: { some: { status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] } } } } };
-  if (importBatchId) where.importBatchId = importBatchId;
-  if (q) where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { OR: [{ code: { contains: q, mode: 'insensitive' } }, { name: { contains: q, mode: 'insensitive' } }, { street: { contains: q, mode: 'insensitive' } }, { address: { contains: q, mode: 'insensitive' } }, { locality: { contains: q, mode: 'insensitive' } }, { city: { contains: q, mode: 'insensitive' } }, { cadastralArea: { contains: q, mode: 'insensitive' } }, { structureCode: { contains: q, mode: 'insensitive' } }, { description: { contains: q, mode: 'insensitive' } }, { placementDescription: { contains: q, mode: 'insensitive' } }, { note: { contains: q, mode: 'insensitive' } }, { surfaces: { some: { name: { contains: q, mode: 'insensitive' } } } }, { surfaces: { some: { directionDescription: { contains: q, mode: 'insensitive' } } } }, { surfaces: { some: { currentClient: { name: { contains: q, mode: 'insensitive' } } } } }] }];
-  return where;
+
+  // 2. Carrier Type
+  if (filters.carrierType) {
+    andConditions.push({ type: filters.carrierType });
+  }
+
+  // 3. City / Locality / Street
+  if (city) {
+    andConditions.push({ city: { equals: city, mode: 'insensitive' } });
+  }
+  if (locality) {
+    andConditions.push({
+      OR: [
+        { locality: { contains: locality, mode: 'insensitive' } },
+        { cadastralArea: { contains: locality, mode: 'insensitive' } },
+      ],
+    });
+  }
+  if (street) {
+    andConditions.push({
+      OR: [
+        { street: { contains: street, mode: 'insensitive' } },
+        { address: { contains: street, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  // 4. Surface criteria (mediaType, client, surfaceStatus)
+  const surfaceConditions: Prisma.AdvertisingSurfaceWhereInput[] = [];
+
+  if (filters.mediaType) {
+    surfaceConditions.push({ mediaType: filters.mediaType });
+  }
+  if (filters.surfaceStatus) {
+    surfaceConditions.push({ status: filters.surfaceStatus });
+  }
+  if (client) {
+    surfaceConditions.push({
+      OR: [
+        { currentClient: { name: { contains: client, mode: 'insensitive' } } },
+        { occupancies: { some: { clientName: { contains: client, mode: 'insensitive' } } } },
+        { occupancies: { some: { client: { name: { contains: client, mode: 'insensitive' } } } } },
+      ],
+    });
+  }
+
+  if (surfaceConditions.length > 0) {
+    andConditions.push({
+      surfaces: {
+        some: {
+          AND: surfaceConditions,
+        },
+      },
+    });
+  }
+
+  // 5. GPS Filter
+  if (filters.gps === 'missing') {
+    andConditions.push({
+      OR: [{ gpsStatus: 'MISSING' }, { latitude: null }, { longitude: null }],
+    });
+  } else if (filters.gps === 'present') {
+    andConditions.push({
+      latitude: { not: null },
+      longitude: { not: null },
+    });
+  } else if (filters.gps) {
+    andConditions.push({ gpsStatus: filters.gps as GpsStatus });
+  }
+
+  // 6. Photo Filter (Carrier AND Surface photos!)
+  if (filters.photo === 'present') {
+    andConditions.push({
+      OR: [
+        { photos: { some: {} } },
+        { surfaces: { some: { photos: { some: {} } } } },
+      ],
+    });
+  } else if (filters.photo === 'missing') {
+    andConditions.push({
+      AND: [
+        { photos: { none: {} } },
+        { surfaces: { none: { photos: { some: {} } } } },
+      ],
+    });
+  }
+
+  // 7. Damage Filter
+  if (filters.damage === 'present') {
+    andConditions.push({
+      OR: [
+        { note: { contains: 'ZÁVADA', mode: 'insensitive' } },
+        { photos: { some: { type: 'DAMAGE' } } },
+        { surfaces: { some: { photos: { some: { type: 'DAMAGE' } } } } },
+      ],
+    });
+  } else if (filters.damage === 'missing') {
+    andConditions.push({
+      NOT: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }],
+      photos: { none: { type: 'DAMAGE' } },
+      surfaces: { none: { photos: { some: { type: 'DAMAGE' } } } },
+    });
+  }
+
+  // 8. Description Filter
+  if (filters.description === 'present') {
+    andConditions.push({
+      OR: [
+        { description: { not: null } },
+        { placementDescription: { not: null } },
+      ],
+    });
+  } else if (filters.description === 'missing') {
+    andConditions.push({
+      description: null,
+      placementDescription: null,
+    });
+  }
+
+  // 9. Occupancy Filter
+  if (filters.occupancy === 'missing') {
+    andConditions.push({
+      surfaces: {
+        none: {
+          occupancies: {
+            some: {
+              status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+            },
+          },
+        },
+      },
+    });
+  } else if (filters.occupancy === 'present') {
+    andConditions.push({
+      surfaces: {
+        some: {
+          occupancies: {
+            some: {
+              status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // 10. Import Batch Filter
+  if (importBatchId) {
+    andConditions.push({ importBatchId });
+  }
+
+  // 11. Full-text / Search Query (q)
+  if (q) {
+    andConditions.push({
+      OR: [
+        { code: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+        { street: { contains: q, mode: 'insensitive' } },
+        { address: { contains: q, mode: 'insensitive' } },
+        { locality: { contains: q, mode: 'insensitive' } },
+        { city: { contains: q, mode: 'insensitive' } },
+        { cadastralArea: { contains: q, mode: 'insensitive' } },
+        { structureCode: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { placementDescription: { contains: q, mode: 'insensitive' } },
+        { note: { contains: q, mode: 'insensitive' } },
+        { surfaces: { some: { name: { contains: q, mode: 'insensitive' } } } },
+        { surfaces: { some: { directionDescription: { contains: q, mode: 'insensitive' } } } },
+        { surfaces: { some: { currentClient: { name: { contains: q, mode: 'insensitive' } } } } },
+        { surfaces: { some: { occupancies: { some: { clientName: { contains: q, mode: 'insensitive' } } } } } },
+      ],
+    });
+  }
+
+  return andConditions.length > 0 ? { AND: andConditions } : {};
 }
 
 async function getCarrierCounts(where: Prisma.AdvertisingCarrierWhereInput) {
