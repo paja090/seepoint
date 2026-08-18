@@ -37,8 +37,43 @@ export default async function PublicNavigationDocumentationPage({
       items: {
         where: { isVisible: true },
         include: {
-          navigationPoint: true,
-          carrier: true,
+          navigationPoint: {
+            include: {
+              installedPhoto: true,
+              carrier: {
+                include: {
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                  surfaces: {
+                    include: {
+                      photos: {
+                        where: { isPrivate: false },
+                        orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          carrier: {
+            include: {
+              photos: {
+                where: { isPrivate: false },
+                orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+              },
+              surfaces: {
+                include: {
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                },
+              },
+            },
+          },
           selectedPhoto: true,
         },
         orderBy: { sortOrder: 'asc' },
@@ -62,21 +97,48 @@ export default async function PublicNavigationDocumentationPage({
   }
 
   const items: SnapshotItemData[] = report.items.map((item) => {
+    const effectiveCarrier = item.carrier || (item.navigationPoint as any)?.carrier;
+    const availablePhotos = [
+      ...(effectiveCarrier?.photos || []),
+      ...((effectiveCarrier?.surfaces || []).flatMap((s: any) => s.photos || [])),
+    ].sort((a: any, b: any) => {
+      if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
+      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+
+    const photoId = item.selectedPhotoId || availablePhotos[0]?.id || (item.navigationPoint as any)?.installedPhotoId;
+
+    const direction =
+      (item as any).customDirection ||
+      item.navigationPoint?.orientation ||
+      (effectiveCarrier?.surfaces?.[0] as any)?.directionDescription ||
+      (effectiveCarrier?.surfaces?.[0] as any)?.orientation ||
+      item.navigationPoint?.variant ||
+      (item.snapshot as any)?.direction ||
+      'Obousměrný (A/B)';
+
     let baseItem: SnapshotItemData;
     if (item.snapshot && typeof item.snapshot === 'object') {
-      baseItem = { ...(item.snapshot as SnapshotItemData) };
+      baseItem = {
+        ...(item.snapshot as SnapshotItemData),
+        direction,
+      };
     } else {
       baseItem = buildSnapshotItem({
         id: item.id,
         clientNote: item.clientNote,
+        customDirection: direction,
         navigationPoint: item.navigationPoint,
-        carrier: item.carrier,
-        selectedPhoto: item.selectedPhoto,
+        carrier: effectiveCarrier,
+        selectedPhoto: item.selectedPhoto || (photoId ? { id: photoId, url: '', createdAt: new Date() } : null),
       });
     }
 
-    if (item.selectedPhotoId) {
-      baseItem.photoUrl = `/api/client/navigation-documentation/${encodeURIComponent(token)}/photos/${encodeURIComponent(item.selectedPhotoId)}`;
+    baseItem.direction = direction;
+
+    if (photoId) {
+      baseItem.photoUrl = `/api/client/navigation-documentation/${encodeURIComponent(token)}/photos/${encodeURIComponent(photoId)}`;
     }
 
     return baseItem;
