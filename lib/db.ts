@@ -526,8 +526,14 @@ export async function ensureVehicleSchema() {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "owner" TEXT;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "vtpUrl" TEXT;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "repairNotes" TEXT;`);
+
+    const count = await prisma.vehicle.count();
+    if (count === 0) {
+      const { seedVehiclesFromExcel } = await import('../scripts/seed-vehicles-2026');
+      await seedVehiclesFromExcel();
+    }
     vehicleSchemaEnsured = true;
-  } catch {
-    // Ignore if SQLite or already exists
+  } catch (e) {
+    console.error('ensureVehicleSchema error:', e);
   }
 }
