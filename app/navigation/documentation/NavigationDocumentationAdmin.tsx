@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Camera,
@@ -51,14 +51,34 @@ export function NavigationDocumentationAdmin({
   const [filterQuarter, setFilterQuarter] = useState('');
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterCity, setFilterCity] = useState('');
 
   // Create Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newClientId, setNewClientId] = useState('');
   const [newOfferId, setNewOfferId] = useState('');
+  const [newCity, setNewCity] = useState('');
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
+  const [loadingCities, setLoadingCities] = useState(false);
   const [newQuarter, setNewQuarter] = useState(2);
   const [newYear, setNewYear] = useState(new Date().getFullYear());
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (!newClientId) {
+      setAvailableCities([]);
+      setNewCity('');
+      return;
+    }
+    setLoadingCities(true);
+    fetch(`/api/navigation/documentation/cities?clientId=${newClientId}`)
+      .then((res) => res.json())
+      .then((cities) => {
+        setAvailableCities(Array.isArray(cities) ? cities : []);
+      })
+      .catch(() => setAvailableCities([]))
+      .finally(() => setLoadingCities(false));
+  }, [newClientId]);
 
   // Active Report Detail / Editing state
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
@@ -119,6 +139,7 @@ export function NavigationDocumentationAdmin({
         body: JSON.stringify({
           clientId: newClientId,
           offerId: newOfferId || undefined,
+          city: newCity || undefined,
           quarter: newQuarter,
           year: newYear,
         }),
@@ -516,6 +537,24 @@ export function NavigationDocumentationAdmin({
                       </option>
                     ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Město / Lokalita (volitelné)</label>
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm disabled:opacity-50"
+                  value={newCity}
+                  disabled={!newClientId || loadingCities}
+                  onChange={(e) => setNewCity(e.target.value)}
+                >
+                  <option value="">Všechna města / kompletní report</option>
+                  {availableCities.map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+                </select>
+                {loadingCities && <span className="text-[11px] text-slate-400 mt-0.5 block">Načítám města klienta…</span>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
