@@ -102,6 +102,10 @@ export async function POST(request: Request) {
     }
   }
 
+  const estimatedHoursText = text(input, 'estimatedHours');
+  const estimatedHours = estimatedHoursText ? Number.parseFloat(estimatedHoursText) : undefined;
+  const pdfUrl = text(input, 'pdfUrl');
+
   const order = await prisma.workOrder.create({
     data: {
       title,
@@ -120,6 +124,8 @@ export async function POST(request: Request) {
       contactName: text(input, 'contactName'),
       contactPhone: text(input, 'contactPhone'),
       locationNote: text(input, 'locationNote'),
+      estimatedHours,
+      pdfUrl,
       mediaLabel: text(input, 'mediaLabel'),
       quantity,
       referenceUrl: text(input, 'referenceUrl'),
