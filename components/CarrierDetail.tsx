@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
-import { useState } from 'react';
+'use client';
+
+import { useEffect, useState } from 'react';
 import type { Carrier, Client } from '@/lib/types';
 import { mediaTypeLabel, carrierTypeLabel } from '@/lib/carrier-filters';
 import { CarrierArchiveActions } from './CarrierArchiveActions';
