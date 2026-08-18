@@ -31,6 +31,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
                     where: { isPrivate: false },
                     orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
                   },
+                  surfaces: {
+                    include: {
+                      photos: {
+                        where: { isPrivate: false },
+                        orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -40,6 +48,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
               photos: {
                 where: { isPrivate: false },
                 orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+              },
+              surfaces: {
+                include: {
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                },
               },
             },
           },
@@ -177,6 +193,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
                         where: { isPrivate: false },
                         orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
                       },
+                      surfaces: {
+                        include: {
+                          photos: {
+                            where: { isPrivate: false },
+                            orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -186,6 +210,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
                   photos: {
                     where: { isPrivate: false },
                     orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  },
+                  surfaces: {
+                    include: {
+                      photos: {
+                        where: { isPrivate: false },
+                        orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                      },
+                    },
                   },
                 },
               },
