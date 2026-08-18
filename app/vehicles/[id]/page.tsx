@@ -5,8 +5,10 @@ import { prisma, ensureVehicleSchema } from '@/lib/db';
 import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
-import { UserCheck, FileText, AlertTriangle, ShieldCheck, Wrench } from 'lucide-react';
+import { UserCheck, FileText, AlertTriangle, ShieldCheck, Wrench, CalendarPlus } from 'lucide-react';
 import { VehiclePhotoUploader } from '@/components/VehiclePhotoUploader';
+import { VehicleEditModal } from '@/components/VehicleEditModal';
+import { VehicleServiceManager } from '@/components/VehicleServiceManager';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +22,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
     where: { id },
     include: {
       reservations: { include: { employee: true }, orderBy: { dateFrom: 'desc' }, take: 20 },
-      serviceRecords: { orderBy: { date: 'desc' }, take: 20 },
+      serviceRecords: { orderBy: { date: 'desc' }, take: 50 },
       workTasks: { include: { assignedTo: true }, orderBy: { scheduledDate: 'desc' }, take: 20 },
-      fuelExpenses: { include: { employee: true }, orderBy: { createdAt: 'desc' }, take: 20 },
+      fuelExpenses: { include: { employee: true }, orderBy: { createdAt: 'desc' }, take: 30 },
     },
   });
   if (!vehicle) notFound();
@@ -31,6 +33,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
   return (
     <AppShell>
+      {/* Top Header */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -48,14 +51,27 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             {vehicle.type === 'VAN' ? '🚚 Dodávka' : vehicle.type === 'TRAILER' ? '🪧 Billboardový vozík' : '🚘 Osobní auto'} · Detail a provozní údaje
           </p>
         </div>
-        <Link className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition" href="/vehicles">
-          ← Zpět na seznam vozidel
-        </Link>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <VehicleEditModal vehicle={vehicle} />
+
+          <Link
+            className="flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2 text-xs font-black text-sky-900 hover:bg-sky-100 transition shadow-2xs"
+            href={`/vehicle-reservations?vehicleId=${vehicle.id}`}
+          >
+            <CalendarPlus size={14} className="text-sky-700" />
+            <span>📅 Vytvořit rezervaci</span>
+          </Link>
+
+          <Link className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition" href="/vehicles">
+            ← Zpět na seznam
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Column: Photo Uploader */}
-        <div className="md:col-span-1">
+        {/* Left Column: Photo Uploader & Quick Info */}
+        <div className="md:col-span-1 space-y-6">
           <section className="card">
             <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-700">Fotografie vozidla / vozíku</h2>
             <VehiclePhotoUploader
@@ -64,12 +80,35 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               vehicleName={vehicle.name}
             />
           </section>
+
+          {/* Active Reservations */}
+          <section className="card">
+            <h2 className="mb-3 text-sm font-extrabold uppercase tracking-wider text-slate-700">Poslední rezervace vozidla</h2>
+            {vehicle.reservations.length === 0 ? (
+              <p className="text-xs text-slate-500">Zatím nebyly vytvořeny žádné rezervace.</p>
+            ) : (
+              <div className="space-y-2 text-xs">
+                {vehicle.reservations.slice(0, 5).map((r) => (
+                  <div key={r.id} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                    <span className="font-bold text-slate-900 block">{r.purpose}</span>
+                    <span className="text-[11px] text-slate-500 block">
+                      👤 {r.employee.firstName} {r.employee.lastName} · {new Date(r.dateFrom).toLocaleDateString('cs-CZ')} - {new Date(r.dateTo).toLocaleDateString('cs-CZ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
-        {/* Right Column: Vehicle Info & Specs */}
+        {/* Right Column: Vehicle Specs, Repair Notes & Service Manager */}
         <div className="md:col-span-2 space-y-6">
           <section className="card">
-            <h2 className="mb-4 text-lg font-black text-slate-900 border-b border-slate-200 pb-2">Provozní údaje & Dokumentace</h2>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-4">
+              <h2 className="text-lg font-black text-slate-900">Provozní údaje & Dokumentace</h2>
+              <VehicleEditModal vehicle={vehicle} />
+            </div>
+
             <dl className="grid gap-4 text-xs sm:grid-cols-3">
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Stav vozidla</dt>
@@ -140,7 +179,13 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Fuel Expenses Section */}
+      {/* SERVICE & OIL CHANGE MANAGER */}
+      <VehicleServiceManager
+        vehicleId={vehicle.id}
+        serviceRecords={vehicle.serviceRecords}
+      />
+
+      {/* FUEL EXPENSES SECTION */}
       <section className="card mt-6 border-amber-200 bg-amber-50/40">
         <div className="flex items-center justify-between border-b border-amber-200/60 pb-3 mb-3">
           <div>
