@@ -1,28 +1,28 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserCheck, KeyRound, Phone, User, CheckCircle2, AlertCircle } from 'lucide-react';
+import { UserCheck, KeyRound, Phone, User, CheckCircle2, AlertCircle, Camera, Upload } from 'lucide-react';
 
 export function ProfileForms({
   firstName,
   lastName,
   phone,
   email,
+  currentPhotoUrl,
 }: {
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
+  currentPhotoUrl?: string | null;
 }) {
-  const router = Router();
-  const [activeTab, setActiveTab] = useState<'contact' | 'password'>('contact');
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'contact' | 'photo' | 'password'>('contact');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  function Router() {
-    return useRouter();
-  }
+  const [photoPreview, setPhotoPreview] = useState<string | null>(currentPhotoUrl || null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   async function submitContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,10 +97,48 @@ export function ProfileForms({
     }
   }
 
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const url = URL.createObjectURL(file);
+      setPhotoPreview(url);
+    }
+  }
+
+  async function submitPhoto(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setFeedback(null);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+
+      const response = await fetch('/api/profile/photo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = (await response.json()) as { ok?: boolean; photoUrl?: string; error?: string };
+      setBusy(false);
+
+      if (!response.ok || result.error) {
+        setFeedback({ type: 'error', message: result.error || 'Nepodařilo se uložit profilovou fotku.' });
+      } else {
+        setFeedback({ type: 'success', message: 'Profilová fotografia byla úspěšně nahrána!' });
+        if (result.photoUrl) setPhotoPreview(result.photoUrl);
+        router.refresh();
+      }
+    } catch {
+      setBusy(false);
+      setFeedback({ type: 'error', message: 'Chyba při nahrávání profilové fotky.' });
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
+      <div className="flex flex-wrap border-b border-slate-200 gap-2">
         <button
           type="button"
           onClick={() => {
@@ -116,6 +154,23 @@ export function ProfileForms({
           <UserCheck size={18} />
           Kontaktní a osobní údaje
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('photo');
+            setFeedback(null);
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 font-bold text-sm border-b-2 transition ${
+            activeTab === 'photo'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Camera size={18} />
+          Profilová fotka
+        </button>
+
         <button
           type="button"
           onClick={() => {
@@ -124,7 +179,7 @@ export function ProfileForms({
           }}
           className={`flex items-center gap-2 px-4 py-2.5 font-bold text-sm border-b-2 transition ${
             activeTab === 'password'
-              ? 'border-sky-600 text-sky-600'
+              ? 'border-amber-600 text-amber-600'
               : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
@@ -217,6 +272,73 @@ export function ProfileForms({
               className="rounded-xl bg-slate-950 px-6 py-2.5 font-bold text-white shadow-md hover:bg-slate-800 disabled:opacity-50 transition"
             >
               {busy ? 'Ukládám údaje…' : '💾 Uložit kontaktní údaje'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Tab Content 2: Profile Photo Form */}
+      {activeTab === 'photo' && (
+        <form onSubmit={submitPhoto} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Camera className="text-emerald-600" size={20} />
+              Nahrání profilové fotografie
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Vaše profilová fotka se bude zobrazovat v hlavičce, v navigačním menu a u vašich záznamů v systému.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {/* Live Preview */}
+            <div className="relative group shrink-0">
+              <div className="grid h-28 w-28 place-items-center overflow-hidden rounded-full bg-slate-900 text-3xl font-black text-emerald-400 shadow-md ring-4 ring-slate-100">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Profilový náhled" className="h-full w-full object-cover" />
+                ) : (
+                  <span>{firstName[0]}{lastName[0]}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4 flex-1 w-full">
+              <label className="block text-sm font-semibold text-slate-700">
+                Vybrat obrázek z počítače / telefonu
+                <input
+                  type="file"
+                  name="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="mt-1.5 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                />
+              </label>
+
+              <div className="relative flex items-center py-1">
+                <div className="flex-grow border-t border-slate-200" />
+                <span className="flex-shrink mx-3 text-xs text-slate-400 font-semibold uppercase">Nebo zadat URL adresu</span>
+                <div className="flex-grow border-t border-slate-200" />
+              </div>
+
+              <label className="block text-sm font-semibold text-slate-700">
+                URL adresa fotografie
+                <input
+                  className="input mt-1 w-full rounded-xl border-slate-300 p-2.5 text-sm focus:ring-2 focus:ring-emerald-500"
+                  name="photoUrl"
+                  placeholder="https://example.com/moje-fotka.jpg"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              disabled={busy}
+              type="submit"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 font-bold text-white shadow-md hover:bg-emerald-700 disabled:opacity-50 transition"
+            >
+              <Upload size={18} />
+              {busy ? 'Nahrávám fotku…' : '📷 Uložit profilovou fotku'}
             </button>
           </div>
         </form>

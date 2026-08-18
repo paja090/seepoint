@@ -40,9 +40,16 @@ export default async function ProfilePage() {
             },
             orderBy: { validFrom: 'desc' },
           },
+          photos: {
+            where: { isPrimary: true },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
         },
       })
     : null;
+
+  const profilePhotoUrl = employee?.photos[0]?.url || null;
 
   const initials = employee
     ? `${employee.firstName[0]}${employee.lastName[0]}`.toUpperCase()
@@ -74,8 +81,12 @@ export default async function ProfilePage() {
 
           <div className="relative flex flex-col md:flex-row items-center md:items-start gap-6">
             {/* User Avatar Badge */}
-            <div className="grid h-24 w-24 shrink-0 place-items-center rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-3xl font-black text-slate-950 shadow-lg ring-4 ring-white/10">
-              {initials}
+            <div className="relative grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-3xl font-black text-slate-950 shadow-lg ring-4 ring-white/10">
+              {profilePhotoUrl ? (
+                <img src={profilePhotoUrl} alt={fullName} className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
 
             {/* Profile Info Summary */}
@@ -198,6 +209,7 @@ export default async function ProfilePage() {
             lastName={employee.lastName}
             phone={employee.phone ?? ''}
             email={user.email}
+            currentPhotoUrl={profilePhotoUrl}
           />
         ) : (
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
