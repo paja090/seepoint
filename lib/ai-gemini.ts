@@ -23,9 +23,10 @@ export type GeminiFuelReceipt = {
  */
 async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
+  const openAiKey = process.env.OPENAI_API_KEY;
 
-  if (!apiKey) {
-    console.warn('GEMINI_API_KEY not configured. Using AI Heuristics Mode.');
+  if (!apiKey && !openAiKey) {
+    console.warn('Neither GEMINI_API_KEY nor OPENAI_API_KEY configured. Using AI Heuristics Mode.');
     return null;
   }
 
@@ -39,11 +40,49 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
     base64Data = parts[1].replace('base64,', '');
   }
 
+  // First try OpenAI GPT-4o if key available
+  if (openAiKey) {
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openAiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageBase64OrUrl.startsWith('data:') ? imageBase64OrUrl : `data:${mimeType};base64,${base64Data}` },
+                },
+              ],
+            },
+          ],
+          max_tokens: 1000,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) return JSON.parse(content);
+      }
+    } catch (err) {
+      console.warn('OpenAI GPT-4o vision call failed, falling back to Gemini:', err);
+    }
+  }
+
   const modelsToTry = [
     'gemini-2.0-flash',
+    'gemini-1.5-pro',
     'gemini-1.5-flash',
     'gemini-flash-latest',
-    'gemini-1.5-pro',
   ];
 
   let lastError: Error | null = null;
