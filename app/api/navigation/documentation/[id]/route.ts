@@ -197,6 +197,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       });
       if (updatedReport) {
         report = updatedReport;
+      }
+    }
+  }
   // Helper to get merged carrier photos from carrier direct photos + surface photos
   function getMergedCarrierPhotos(carrier: any) {
     if (!carrier) return [];
