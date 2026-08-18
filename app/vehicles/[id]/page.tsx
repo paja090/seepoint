@@ -182,7 +182,10 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
       {/* SERVICE & OIL CHANGE MANAGER */}
       <VehicleServiceManager
         vehicleId={vehicle.id}
-        serviceRecords={vehicle.serviceRecords}
+        serviceRecords={vehicle.serviceRecords.map((r) => ({
+          ...r,
+          cost: r.cost ? Number(r.cost) : null,
+        }))}
       />
 
       {/* FUEL EXPENSES SECTION */}
