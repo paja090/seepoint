@@ -1,5 +1,6 @@
 import { canAccess, type AppSection } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import { ResponsiveAppShell, type NavGroup } from './ResponsiveAppShell';
 
@@ -87,6 +88,16 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
     : user.email || 'Uživatel';
 
+  const employeePhoto = user.employee?.id
+    ? await prisma.photo.findFirst({
+        where: { employeeId: user.employee.id, isPrimary: true },
+        select: { url: true },
+        orderBy: { createdAt: 'desc' },
+      })
+    : null;
+
+  const avatarUrl = employeePhoto?.url || null;
+
   return (
     <ResponsiveAppShell
       user={{
@@ -95,6 +106,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         email: user.email || '',
         role: user.role,
         allowedRoles: user.allowedRoles || [user.role],
+        avatarUrl,
       }}
       visibleGroups={visibleGroups}
     >

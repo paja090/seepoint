@@ -57,7 +57,7 @@ export function ResponsiveAppShell({
   visibleGroups,
 }: {
   children: React.ReactNode;
-  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[] };
+  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; avatarUrl?: string | null };
   visibleGroups: NavGroup[];
 }) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -129,10 +129,14 @@ export function ResponsiveAppShell({
             </Link>
             <Link
               href="/profile"
-              className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-xs font-black text-slate-950 ring-2 ring-emerald-500/30"
+              className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-emerald-500 text-xs font-black text-slate-950 ring-2 ring-emerald-500/30 shrink-0"
               title="Můj profil"
             >
-              {initials}
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
             </Link>
           </div>
         </header>
@@ -168,8 +172,12 @@ export function ResponsiveAppShell({
           <div className="mb-4 rounded-2xl bg-slate-900/90 border border-slate-800 p-3 space-y-2">
             <div className="flex items-center justify-between">
               <Link href="/profile" className="flex items-center gap-2.5 min-w-0 group">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500 text-xs font-black text-slate-950 group-hover:scale-105 transition-transform">
-                  {initials}
+                <div className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-500 text-xs font-black text-slate-950 group-hover:scale-105 transition-transform">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+                  ) : (
+                    initials
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-bold text-slate-200 group-hover:text-emerald-400 transition">{user.name}</p>
