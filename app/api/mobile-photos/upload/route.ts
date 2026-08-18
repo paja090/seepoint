@@ -51,16 +51,20 @@ export async function POST(req: Request) {
       return jsonError('DAMAGE_TYPE_REQUIRED', 'Vyberte typ závady.', 400);
     }
 
-    const coordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
-    if (!coordinates) return jsonError('GPS_REQUIRED', 'Před uložením fotografie je nutné získat platnou GPS polohu.', 400);
-    const accuracyValue = Number(formData.get('accuracyMeters'));
-    const accuracy = Number.isFinite(accuracyValue) && accuracyValue >= 0 ? accuracyValue : null;
-
     const carrier = await prisma.advertisingCarrier.findUnique({
       where: { id: carrierId },
-      select: { id: true, code: true, name: true, city: true, note: true },
+      select: { id: true, code: true, name: true, city: true, note: true, latitude: true, longitude: true },
     });
     if (!carrier) return jsonError('CARRIER_NOT_FOUND', 'Nosič nebyl nalezen.', 404);
+
+    const clientCoordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
+    const coordinates = clientCoordinates || {
+      lat: carrier.latitude ?? 0,
+      lng: carrier.longitude ?? 0,
+    };
+
+    const accuracyValue = Number(formData.get('accuracyMeters'));
+    const accuracy = Number.isFinite(accuracyValue) && accuracyValue >= 0 ? accuracyValue : null;
 
     const requestedSurfaceId = typeof surfaceId === 'string' && surfaceId ? surfaceId : null;
     const now = new Date();
