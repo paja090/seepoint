@@ -38,9 +38,13 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const apiKey = rawKey ? rawKey.trim() : '';
   const openAiKey = rawOpenAiKey ? rawOpenAiKey.trim() : '';
 
-  if (!apiKey && !openAiKey) {
+  // Smart detection: Did the user paste an OpenAI `sk-...` key into GEMINI_API_KEY?
+  const effectiveOpenAiKey = apiKey.startsWith('sk-') ? apiKey : openAiKey;
+  const effectiveGeminiKey = apiKey.startsWith('sk-') ? '' : apiKey;
+
+  if (!effectiveGeminiKey && !effectiveOpenAiKey) {
     console.warn('Neither GEMINI_API_KEY nor OPENAI_API_KEY configured in environment variables.');
-    throw new Error('Chybí API klíč pro AI Vision. Vložte do Vercel Environment Variables klíč GEMINI_API_KEY nebo OPENAI_API_KEY.');
+    throw new Error('Chybí API klíč pro AI Vision. Vložte do Vercel Environment Variables klíč GEMINI_API_KEY (z Google AI Studio - AIzaSy...) nebo OPENAI_API_KEY (sk-...).');
   }
 
   // Robust Base64 & MimeType extraction
@@ -57,14 +61,16 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
     }
   }
 
-  // First try OpenAI GPT-4o if key available
-  if (openAiKey) {
+  const errorLogs: string[] = [];
+
+  // Try OpenAI GPT-4o if OpenAI key is detected
+  if (effectiveOpenAiKey) {
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${openAiKey}`,
+          Authorization: `Bearer ${effectiveOpenAiKey}`,
         },
         body: JSON.stringify({
           model: 'gpt-4o',
@@ -95,77 +101,81 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
       } else {
         const errText = await res.text();
         console.warn('OpenAI Vision returned HTTP', res.status, errText);
+        errorLogs.push(`OpenAI GPT-4o HTTP ${res.status}: ${errText.slice(0, 100)}`);
       }
     } catch (err) {
-      console.warn('OpenAI GPT-4o vision call failed, falling back to Gemini:', err);
+      const msg = err instanceof Error ? err.message : 'Chyba OpenAI';
+      console.warn('OpenAI GPT-4o vision call failed:', msg);
+      errorLogs.push(`OpenAI: ${msg}`);
     }
   }
 
-  const modelsToTry = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash',
-    'gemini-2.0-flash-exp',
-  ];
+  // Try Google Gemini Vision models
+  if (effectiveGeminiKey) {
+    const modelsToTry = [
+      'gemini-1.5-flash',
+      'gemini-1.5-pro',
+      'gemini-flash-latest',
+    ];
 
-  let lastErrorMsg = '';
+    for (const model of modelsToTry) {
+      for (const apiVersion of ['v1beta', 'v1']) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${effectiveGeminiKey}`;
 
-  for (const model of modelsToTry) {
-    for (const apiVersion of ['v1beta', 'v1']) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/${apiVersion}/models/${model}:generateContent?key=${apiKey}`;
-
-        const payload = {
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Data,
+          const payload = {
+            contents: [
+              {
+                parts: [
+                  { text: prompt },
+                  {
+                    inline_data: {
+                      mime_type: mimeType,
+                      data: base64Data,
+                    },
                   },
-                },
-              ],
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              response_mime_type: 'application/json',
             },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            response_mime_type: 'application/json',
-          },
-        };
+          };
 
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          let errDetail = errorText;
-          try {
-            const errJson = JSON.parse(errorText);
-            errDetail = errJson.error?.message || errorText;
-          } catch {}
-          console.warn(`Gemini model ${model} (${apiVersion}) returned HTTP ${res.status}:`, errDetail.slice(0, 150));
-          lastErrorMsg = `Google Gemini (${model} ${apiVersion}) vrací HTTP ${res.status}: ${errDetail}`;
-          continue;
+          if (!res.ok) {
+            const errorText = await res.text();
+            let errDetail = errorText;
+            try {
+              const errJson = JSON.parse(errorText);
+              errDetail = errJson.error?.message || errorText;
+            } catch {}
+            console.warn(`Gemini model ${model} (${apiVersion}) returned HTTP ${res.status}:`, errDetail.slice(0, 150));
+            errorLogs.push(`${model} (${apiVersion}): HTTP ${res.status} - ${errDetail}`);
+            continue;
+          }
+
+          const data = await res.json();
+          let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!jsonText) continue;
+
+          jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
+          return JSON.parse(jsonText);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Neznámá chyba Gemini API';
+          errorLogs.push(`${model} (${apiVersion}): ${msg}`);
         }
-
-        const data = await res.json();
-        let jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!jsonText) continue;
-
-        jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(jsonText);
-      } catch (err: unknown) {
-        lastErrorMsg = err instanceof Error ? err.message : 'Neznámá chyba Gemini API';
       }
     }
   }
 
-  throw new Error(`AI Vision volání selhalo. Podrobnosti: ${lastErrorMsg || 'API klíč neodpovídá nebo vypršel quota limit.'}`);
+  throw new Error(`AI Vision volání selhalo. Podrobnosti:\n${errorLogs.join('\n')}`);
 }
 
 /**
