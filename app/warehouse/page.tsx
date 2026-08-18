@@ -6,8 +6,9 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { WarehouseItemModal } from '@/components/warehouse/WarehouseItemModal';
 import { WarehouseMovementModal } from '@/components/warehouse/WarehouseMovementModal';
 import { WarehouseVoiceInputModal } from '@/components/warehouse/WarehouseVoiceInputModal';
+import { WarehousePhotoScannerModal } from '@/components/warehouse/WarehousePhotoScannerModal';
 import { RestockButton } from '@/components/warehouse/RestockButton';
-import { Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, RotateCcw, Building2, MapPin, Wrench, ShoppingCart, Printer } from 'lucide-react';
+import { Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, RotateCcw, Building2, MapPin, Wrench, ShoppingCart, Printer, Camera } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
 
         <div className="flex flex-wrap items-center gap-2">
           <WarehouseVoiceInputModal workOrders={workOrders} employees={employees} />
+          <WarehousePhotoScannerModal workOrders={workOrders} employees={employees} />
 
           <Link
             className="flex items-center gap-1.5 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition"
