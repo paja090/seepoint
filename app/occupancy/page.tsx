@@ -41,6 +41,8 @@ function buildWhere(params: SearchParams) {
   const city = clean(params.city);
   const status = clean(params.status);
   const mediaType = clean(params.mediaType);
+  const photo = clean(params.photo);
+  const damage = clean(params.damage);
   const dateFrom = parseDate(clean(params.dateFrom));
   const dateTo = parseDate(clean(params.dateTo));
 
@@ -51,6 +53,33 @@ function buildWhere(params: SearchParams) {
       status: 'ACTIVE',
     },
   };
+
+  if (photo === 'present') {
+    surfaceWhere.OR = [
+      { photos: { some: {} } },
+      { carrier: { photos: { some: {} } } },
+    ];
+  } else if (photo === 'missing') {
+    surfaceWhere.AND = [
+      { photos: { none: {} } },
+      { carrier: { photos: { none: {} } } },
+    ];
+  }
+
+  if (damage === 'present') {
+    surfaceWhere.OR = [
+      { photos: { some: { type: 'DAMAGE' } } },
+      { carrier: { photos: { some: { type: 'DAMAGE' } } } },
+      { carrier: { note: { contains: 'ZÁVADA', mode: 'insensitive' } } },
+    ];
+  } else if (damage === 'missing') {
+    surfaceWhere.AND = [
+      { photos: { none: { type: 'DAMAGE' } } },
+      { carrier: { photos: { none: { type: 'DAMAGE' } } } },
+      { carrier: { NOT: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }] } },
+    ];
+  }
+
   const where: Prisma.OccupancyWhereInput = {};
 
   if (q) where.OR = [
@@ -82,6 +111,8 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
   const selectedMediaType = clean(params.mediaType);
   const selectedCity = clean(params.city);
   const searchQuery = clean(params.q);
+  const selectedPhoto = clean(params.photo);
+  const selectedDamage = clean(params.damage);
 
   try {
     const where = buildWhere(params);
@@ -109,10 +140,30 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       } : {}),
     };
 
+    if (selectedPhoto === 'present') {
+      surfaceFilter.OR = [{ photos: { some: {} } }, { carrier: { photos: { some: {} } } }];
+    } else if (selectedPhoto === 'missing') {
+      surfaceFilter.AND = [{ photos: { none: {} } }, { carrier: { photos: { none: {} } } }];
+    }
+
+    if (selectedDamage === 'present') {
+      surfaceFilter.OR = [
+        { photos: { some: { type: 'DAMAGE' } } },
+        { carrier: { photos: { some: { type: 'DAMAGE' } } } },
+        { carrier: { note: { contains: 'ZÁVADA', mode: 'insensitive' } } },
+      ];
+    } else if (selectedDamage === 'missing') {
+      surfaceFilter.AND = [
+        { photos: { none: { type: 'DAMAGE' } } },
+        { carrier: { photos: { none: { type: 'DAMAGE' } } } },
+        { carrier: { NOT: [{ note: { contains: 'ZÁVADA', mode: 'insensitive' } }] } },
+      ];
+    }
+
     const [dbRows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, filteredSurfaces] = await Promise.all([
       prisma.occupancy.findMany({
         where,
-        include: { client: true, surface: { include: { carrier: true } } },
+        include: { client: true, surface: { include: { photos: true, carrier: { include: { photos: true } } } } },
         orderBy: [{ dateTo: 'asc' }, { dateFrom: 'asc' }],
         take: 500,
       }),
@@ -128,7 +179,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       }),
       prisma.advertisingSurface.findMany({
         where: surfaceFilter,
-        include: { carrier: true },
+        include: { photos: true, carrier: { include: { photos: true } } },
         orderBy: [{ carrier: { city: 'asc' } }, { name: 'asc' }],
         take: 500,
       }),
@@ -146,55 +197,75 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       ? dbRows.filter((r) => new Date(r.dateTo) < today || r.status === 'FINISHED')
       : dbRows.filter((r) => new Date(r.dateTo) >= today && r.status !== 'FINISHED');
 
-    let tableRows = activeDbRows.map((row) => ({
-      id: row.id,
-      surfaceId: row.surfaceId,
-      clientId: row.clientId,
-      clientName: row.clientName,
-      campaignName: row.campaignName,
-      dateFrom: row.dateFrom.toISOString(),
-      dateTo: row.dateTo.toISOString(),
-      status: row.status as string,
-      price: row.price?.toString() ?? null,
-      client: row.client ? { name: row.client.name } : null,
-      surface: {
-        id: row.surface.id,
-        name: row.surface.name,
-        mediaType: row.surface.mediaType,
-        carrier: {
-          id: row.surface.carrier.id,
-          code: row.surface.carrier.code,
-          city: row.surface.carrier.city,
-          name: row.surface.carrier.name,
+    let tableRows = activeDbRows.map((row) => {
+      const surfacePhotos = row.surface.photos || [];
+      const carrierPhotos = row.surface.carrier.photos || [];
+      const isDamaged =
+        surfacePhotos.some((p) => p.type === 'DAMAGE') ||
+        carrierPhotos.some((p) => p.type === 'DAMAGE') ||
+        Boolean(row.surface.carrier.note?.includes('ZÁVADA'));
+
+      return {
+        id: row.id,
+        surfaceId: row.surfaceId,
+        clientId: row.clientId,
+        clientName: row.clientName,
+        campaignName: row.campaignName,
+        dateFrom: row.dateFrom.toISOString(),
+        dateTo: row.dateTo.toISOString(),
+        status: row.status as string,
+        price: row.price?.toString() ?? null,
+        client: row.client ? { name: row.client.name } : null,
+        surface: {
+          id: row.surface.id,
+          name: row.surface.name,
+          mediaType: row.surface.mediaType,
+          isDamaged,
+          carrier: {
+            id: row.surface.carrier.id,
+            code: row.surface.carrier.code,
+            city: row.surface.carrier.city,
+            name: row.surface.carrier.name,
+          },
         },
-      },
-    }));
+      };
+    });
 
     if (selectedStatus === 'AVAILABLE' || (!selectedStatus && tableRows.length === 0)) {
       const freeSurfaces = filteredSurfaces.filter((s) => !activeOccupiedSurfaceIds.has(s.id));
-      tableRows = freeSurfaces.map((s) => ({
-        id: `avail-${s.id}`,
-        surfaceId: s.id,
-        clientId: null,
-        clientName: '🟢 Volná plocha k pronájmu',
-        campaignName: 'VOLNÁ PLOCHA K PRONÁJMU',
-        dateFrom: today.toISOString(),
-        dateTo: in30.toISOString(),
-        status: 'AVAILABLE',
-        price: null,
-        client: null,
-        surface: {
-          id: s.id,
-          name: s.name,
-          mediaType: s.mediaType,
-          carrier: {
-            id: s.carrier.id,
-            code: s.carrier.code,
-            city: s.carrier.city,
-            name: s.carrier.name,
+      tableRows = freeSurfaces.map((s) => {
+        const surfacePhotos = s.photos || [];
+        const carrierPhotos = s.carrier.photos || [];
+        const isDamaged =
+          surfacePhotos.some((p) => p.type === 'DAMAGE') ||
+          carrierPhotos.some((p) => p.type === 'DAMAGE') ||
+          Boolean(s.carrier.note?.includes('ZÁVADA'));
+
+        return {
+          id: `avail-${s.id}`,
+          surfaceId: s.id,
+          clientId: null,
+          clientName: '🟢 Volná plocha k pronájmu',
+          campaignName: 'VOLNÁ PLOCHA K PRONÁJMU',
+          dateFrom: today.toISOString(),
+          dateTo: in30.toISOString(),
+          status: 'AVAILABLE',
+          price: null,
+          client: null,
+          surface: {
+            id: s.id,
+            name: s.name,
+            mediaType: s.mediaType,
+            isDamaged,
+            carrier: {
+              id: s.carrier.id,
+              code: s.carrier.code,
+              city: s.carrier.city,
+              name: s.carrier.name,
+            },
           },
-        },
-      }));
+        };
+      });
     }
 
     const surfaceOptions = filteredSurfaces.map((s) => ({
@@ -234,15 +305,17 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         </div>
 
         <FilterBar>
-          <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-6" method="get">
+          <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-8" method="get">
             <label className="text-sm font-medium">Hledání<input className="input mt-1" name="q" defaultValue={clean(params.q) ?? ''} placeholder="Kampaň, klient, kód..." /></label>
             <label className="text-sm font-medium">Klient<input className="input mt-1" name="client" defaultValue={clean(params.client) ?? ''} placeholder="Jméno klienta" /></label>
             <label className="text-sm font-medium">Přiřazení klienta<select className="input mt-1 font-semibold" name="clientResolution" defaultValue={clientResolutionFilter(clean(params.clientResolution))}><option value="all">Všechny záznamy</option><option value="resolved">Klient přiřazen</option><option value="unresolved">Klient neurčen</option></select></label>
             <label className="text-sm font-medium">Město / Lokalita<input className="input mt-1" name="city" defaultValue={clean(params.city) ?? ''} placeholder="Ostrava, Praha..." /></label>
             <label className="text-sm font-medium">Typ média<select className="input mt-1 font-semibold" name="mediaType" defaultValue={clean(params.mediaType) ?? ''}><option value="">Všechna média</option>{mediaTypes.map((type) => <option key={type} value={type}>{mediaTypeLabel(type)}</option>)}</select></label>
             <label className="text-sm font-medium">Stav obsazenosti<select className="input mt-1 font-semibold" name="status" defaultValue={clean(params.status) ?? ''}><option value="">Všechny stavy</option>{occupancyStatuses.map((item) => <option key={item} value={item}>{CzechOccupancyStatusLabels[item] || item}</option>)}</select></label>
-            <div className="grid grid-cols-2 gap-2"><label className="text-sm font-medium">Od<input className="input mt-1" name="dateFrom" type="date" defaultValue={clean(params.dateFrom) ?? ''} /></label><label className="text-sm font-medium">Do<input className="input mt-1" name="dateTo" type="date" defaultValue={clean(params.dateTo) ?? ''} /></label></div>
-            <div className="flex flex-wrap items-center gap-2 md:col-span-3 xl:col-span-6"><Button type="submit">Filtrovat výsledky</Button><Button href="/occupancy" variant="secondary">Vymazat filtry</Button></div>
+            <label className="text-sm font-medium">Fotky<select className="input mt-1 font-semibold" name="photo" defaultValue={clean(params.photo) ?? ''}><option value="">Všechny</option><option value="present">S fotkou</option><option value="missing">Bez fotky</option></select></label>
+            <label className="text-sm font-medium text-rose-600 font-bold">🚨 Závada<select className="input mt-1 font-semibold" name="damage" defaultValue={clean(params.damage) ?? ''}><option value="">Všechny</option><option value="present">🚨 Jen se ZÁVADOU</option><option value="missing">✓ Bez závady</option></select></label>
+            <div className="grid grid-cols-2 gap-2 md:col-span-2"><label className="text-sm font-medium">Od<input className="input mt-1" name="dateFrom" type="date" defaultValue={clean(params.dateFrom) ?? ''} /></label><label className="text-sm font-medium">Do<input className="input mt-1" name="dateTo" type="date" defaultValue={clean(params.dateTo) ?? ''} /></label></div>
+            <div className="flex flex-wrap items-center gap-2 md:col-span-3 xl:col-span-8"><Button type="submit">Filtrovat výsledky</Button><Button href="/occupancy" variant="secondary">Vymazat filtry</Button></div>
           </form>
         </FilterBar>
 

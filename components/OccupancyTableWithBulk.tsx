@@ -14,6 +14,7 @@ type SurfaceItem = {
   id: string;
   name: string;
   mediaType: string;
+  isDamaged?: boolean;
   carrier: {
     id: string;
     code: string;
@@ -145,10 +146,16 @@ export function OccupancyTableWithBulk({
                   </button>
                 </TableCell>
                 <TableCell>
-                  <Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${row.surface.carrier.id}`}>
-                    {row.surface.carrier.code}
-                  </Link>
-                  <br />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Link className="font-semibold text-slate-950 hover:underline font-mono" href={`/carriers/${row.surface.carrier.id}`}>
+                      {row.surface.carrier.code}
+                    </Link>
+                    {row.surface.isDamaged && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white shadow-2xs animate-pulse">
+                        🚨 ZÁVADA
+                      </span>
+                    )}
+                  </div>
                   <span className="text-slate-500">{row.surface.carrier.city}</span>
                 </TableCell>
                 <TableCell>
