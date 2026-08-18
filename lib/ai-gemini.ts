@@ -22,7 +22,7 @@ export type GeminiFuelReceipt = {
  * Helper to fetch Google Gemini API using REST endpoint with model fallback
  */
 async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
-  const apiKey =
+  const rawKey =
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_AI_KEY ||
     process.env.GOOGLE_API_KEY ||
@@ -33,7 +33,10 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
     process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
     process.env.NEXT_PUBLIC_GOOGLE_AI_KEY;
 
-  const openAiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+  const rawOpenAiKey = process.env.OPENAI_API_KEY || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+
+  const apiKey = rawKey ? rawKey.trim() : '';
+  const openAiKey = rawOpenAiKey ? rawOpenAiKey.trim() : '';
 
   if (!apiKey && !openAiKey) {
     console.warn('Neither GEMINI_API_KEY nor OPENAI_API_KEY configured in environment variables.');
@@ -101,6 +104,8 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const modelsToTry = [
     'gemini-1.5-flash',
     'gemini-1.5-pro',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-exp',
   ];
 
   let lastErrorMsg = '';
@@ -138,8 +143,13 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
 
         if (!res.ok) {
           const errorText = await res.text();
-          console.warn(`Gemini model ${model} (${apiVersion}) returned HTTP ${res.status}:`, errorText.slice(0, 150));
-          lastErrorMsg = `Gemini API vrací HTTP ${res.status}: ${errorText.slice(0, 100)}`;
+          let errDetail = errorText;
+          try {
+            const errJson = JSON.parse(errorText);
+            errDetail = errJson.error?.message || errorText;
+          } catch {}
+          console.warn(`Gemini model ${model} (${apiVersion}) returned HTTP ${res.status}:`, errDetail.slice(0, 150));
+          lastErrorMsg = `Google Gemini (${model} ${apiVersion}) vrací HTTP ${res.status}: ${errDetail}`;
           continue;
         }
 
