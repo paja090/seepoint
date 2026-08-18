@@ -23,10 +23,36 @@ const PHOTO_TYPES: Array<{ value: PhotoType; label: string }> = [
   { value: 'ARCHIVE', label: 'Archiv' },
 ];
 
+function buildUniqueGalleryPhotos(carrierPhotos: Photo[] = [], surfaces: Surface[] = []): GalleryPhoto[] {
+  const photoMap = new Map<string, GalleryPhoto>();
+
+  (surfaces || []).forEach((surface) => {
+    (surface.photos || []).forEach((photo) => {
+      if (photo && photo.id && !photoMap.has(photo.id)) {
+        photoMap.set(photo.id, {
+          ...photo,
+          targetLabel: surface.name || 'Plocha',
+        });
+      }
+    });
+  });
+
+  (carrierPhotos || []).forEach((photo) => {
+    if (photo && photo.id && !photoMap.has(photo.id)) {
+      photoMap.set(photo.id, {
+        ...photo,
+        targetLabel: 'Celý nosič',
+      });
+    }
+  });
+
+  return Array.from(photoMap.values()).sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+}
+
 export function PhotoGallery({
   carrierId,
-  carrierPhotos,
-  surfaces,
+  carrierPhotos = [],
+  surfaces = [],
   canEdit = false,
 }: {
   carrierId: string;
@@ -34,12 +60,7 @@ export function PhotoGallery({
   surfaces: Surface[];
   canEdit?: boolean;
 }) {
-  const initialPhotos: GalleryPhoto[] = [
-    ...carrierPhotos.map((photo) => ({ ...photo, targetLabel: 'Nosič' })),
-    ...surfaces.flatMap((surface) =>
-      surface.photos.map((photo) => ({ ...photo, targetLabel: surface.name })),
-    ),
-  ].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
+  const initialPhotos = buildUniqueGalleryPhotos(carrierPhotos, surfaces);
 
   const [photos, setPhotos] = useState<GalleryPhoto[]>(initialPhotos);
   const [target, setTarget] = useState('carrier');
@@ -66,13 +87,7 @@ export function PhotoGallery({
 
   // Synchronize photos state when props change
   useEffect(() => {
-    const updated = [
-      ...carrierPhotos.map((photo) => ({ ...photo, targetLabel: 'Nosič' })),
-      ...surfaces.flatMap((surface) =>
-        surface.photos.map((photo) => ({ ...photo, targetLabel: surface.name })),
-      ),
-    ].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
-    setPhotos(updated);
+    setPhotos(buildUniqueGalleryPhotos(carrierPhotos, surfaces));
   }, [carrierPhotos, surfaces]);
 
   // Lightbox handlers
@@ -320,9 +335,11 @@ export function PhotoGallery({
               Cíl
               <select className="input mt-1 font-normal" value={target} onChange={(event) => setTarget(event.target.value)}>
                 <option value="carrier">Celý nosič</option>
-                {surfaces.map((surface) => (
-                  <option key={surface.id} value={`surface:${surface.id}`}>{surface.name}</option>
-                ))}
+                {surfaces
+                  .filter((surface) => surface.name !== 'Celý nosič' && surface.name !== 'Celý nosič / Všechny plochy')
+                  .map((surface) => (
+                    <option key={surface.id} value={`surface:${surface.id}`}>{surface.name}</option>
+                  ))}
               </select>
             </label>
             <label className="text-sm font-semibold text-slate-700">
