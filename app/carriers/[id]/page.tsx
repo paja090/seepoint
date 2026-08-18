@@ -35,13 +35,23 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
 
   if (!carrier) notFound();
 
-  const [history, surfaces, clients] = await Promise.all([
+  const [history, surfaces, clients, prevCarrier, nextCarrier] = await Promise.all([
     getCarrierHistoryTimeline(carrierId),
     listCarrierSurfaces(carrierId),
     prisma.client.findMany({
       where: { active: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
+    }),
+    prisma.advertisingCarrier.findFirst({
+      where: { code: { lt: carrier.code }, archivedAt: null },
+      orderBy: { code: 'desc' },
+      select: { id: true, code: true, name: true },
+    }),
+    prisma.advertisingCarrier.findFirst({
+      where: { code: { gt: carrier.code }, archivedAt: null },
+      orderBy: { code: 'asc' },
+      select: { id: true, code: true, name: true },
     }),
   ]);
 
@@ -50,7 +60,14 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
           <div className="card">
-            <CarrierDetail carrier={carrier} clients={clients} showLocationMap canEdit={canEdit} />
+            <CarrierDetail
+              carrier={carrier}
+              clients={clients}
+              showLocationMap
+              canEdit={canEdit}
+              prevCarrier={prevCarrier}
+              nextCarrier={nextCarrier}
+            />
           </div>
           <div id="carrier-form" className="card scroll-mt-6">
             <h2 className="mb-4 font-bold">Upravit nosič</h2>
