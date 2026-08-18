@@ -5,7 +5,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { WorkOrderAcknowledgeButton } from '@/components/WorkOrderAcknowledgeButton';
-import { prisma } from '@/lib/db';
+import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import {
   formatWorkDate,
   formatWorkPrice,
@@ -60,6 +60,7 @@ function dateInput(value?: Date | null) {
 export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePageAccess('work');
   const { id } = await params;
+  await ensureWorkOrderSchema();
 
   const [order, clients, carriers] = await Promise.all([
     prisma.workOrder.findUnique({

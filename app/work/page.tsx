@@ -1,7 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { WorkModuleClient } from '@/components/WorkModuleClient';
-import { prisma } from '@/lib/db';
+import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +13,7 @@ function cleanParam(v: string | string[] | undefined) {
 export default async function WorkPlanPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const user = await requirePageAccess('work');
   const params = await searchParams;
+  await ensureWorkOrderSchema();
 
   const initialCarrierCode = cleanParam(params.carrierCode) || '';
   const initialClientName = cleanParam(params.clientName) || '';
