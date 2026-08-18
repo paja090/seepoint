@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         mimeType: file.type || 'application/pdf',
         content: new Uint8Array(buffer),
         url: `/api/photos/${photoId}/file`,
-        type: 'INSTALLATION_BEFORE',
+        type: 'BEFORE_INSTALLATION',
       },
     });
 
