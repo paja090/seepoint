@@ -281,7 +281,18 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       formattedAiNote = parts.join('\n');
     }
 
-    // Save CORRECT official legal name, verified data & COMPLETE AI Note directly into DB
+    // Preserve manual notes while replacing old AI Profile blocks
+    let updatedNote = formattedAiNote;
+    if (client.note) {
+      const manualParts = client.note
+        .split('\n\n')
+        .filter((part) => !part.includes('🤖 AI PROFIL & STRATEGIE') && !part.includes('💡 TIPY PRO OBCHODNÍKA') && !part.includes('🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE'));
+      if (manualParts.length > 0) {
+        updatedNote = `${manualParts.join('\n\n')}\n\n${formattedAiNote}`;
+      }
+    }
+
+    // Save CORRECT official legal name, verified data & REPLACED/CLEANED AI Note directly into DB
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
@@ -296,9 +307,7 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
         billingStreet: finalStreet,
         billingCity: finalCity,
         billingZip: finalZip,
-        note: formattedAiNote
-          ? `${client.note ? `${client.note}\n\n` : ''}${formattedAiNote}`
-          : client.note,
+        note: updatedNote,
       },
     });
 
@@ -331,16 +340,28 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       }
     }
 
-    // Step 5: Automatically insert ALL MS Region branches into client.branches (`ClientBranch` table)
+    // Step 5: Update & Upsert MS Region branches in `ClientBranch` table (overwriting outdated addresses)
     let createdBranchesCount = 0;
     if (aiEnrichmentResult?.msRegionBranches && Array.isArray(aiEnrichmentResult.msRegionBranches)) {
       for (const b of aiEnrichmentResult.msRegionBranches) {
         if (!b.name) continue;
-        const exists = client.branches.some(
+        const existingBranch = client.branches.find(
           (existing) => existing.name.toLowerCase() === b.name.toLowerCase()
         );
 
-        if (!exists) {
+        if (existingBranch) {
+          // Update address with 100% verified live Google Search Grounding address
+          await prisma.clientBranch.update({
+            where: { id: existingBranch.id },
+            data: {
+              street: b.street || existingBranch.street,
+              city: b.city || existingBranch.city,
+              zip: b.zip || existingBranch.zip,
+              note: b.note || existingBranch.note,
+            },
+          });
+        } else {
+          // Create new verified branch
           await prisma.clientBranch.create({
             data: {
               clientId: id,
