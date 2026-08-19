@@ -247,16 +247,6 @@ Odpověz v JSON formátu s klíči:
   }
 }
 
-export type GeminiFuelReceipt = {
-  vendor: string;
-  amountCzk: number;
-  liters: number;
-  fuelType: 'Diesel' | 'Natural 95' | 'AdBlue' | 'Jiné';
-  date?: string | null;
-  odometer?: number | null;
-  summary: string;
-};
-
 /**
  * 2. AI Fuel Receipt OCR & Parser
  */
