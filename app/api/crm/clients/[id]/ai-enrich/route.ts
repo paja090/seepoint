@@ -76,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
       .join('\n');
 
-    // Step 2: Use Gemini 3.6 AI to analyze company, find ALL MS Region branches with STRICT ANTI-HALLUCINATION rules
+    // Step 2: Use Gemini 3.6 AI with Live Google Search Grounding to ensure 100% accurate data
     const apiKey = process.env.GEMINI_API_KEY;
     let aiEnrichmentResult: {
       selectedIndex?: number;
@@ -118,10 +118,12 @@ DŮLEŽITÝ KONTEXT AGENTURY SEEPOINT:
 Agentura SeePoint působí a vlastní reklamní plochy VÝHRADNĚ V OSTRAVĚ a Moravskoslezském kraji (MS kraj – Ostrava, Opava, Frýdek-Místek, Karviná, Havířov, Třinec, Nový Jičín, Bohumín, Orlová, Krnov, Bruntál, Kopřivnice, Frenštát p.R.).
 Praha ani jiné kraje nás NEZAJÍMAJÍ. Všechny reklamní návrhy, pobočky a kontaktní osoby ZACILUJ PRIORITNĚ NA OSTRAVU A MORAVSKOSLEZSKÝ KRAJ!
 
-PŘÍSNÁ PRAVIDLA PRO ADRESY POBOČEK (ANTI-HALUCINACE):
-1. NIKDY si NEVYMÝŠLEJ fiktivní nebo neodpovídající ulice ani čísla popisná!
-2. Uváděj POUZE Skutečné a reálně ověřené adresa prodejen/poboček klienta z oficiálního webu nebo ARES rejstříku.
-3. Pokud u pobočky znáš město (např. Ostrava), ale neznáš na 100 % přesnou ulici s číslem popisným, raději pole \`street\` nechej prázdné nebo uveď městskou část (např. "Ostrava - Poruba"), než abys vygeneroval vymyšlenou ulici!
+PŘÍSNÁ PRAVIDLA PRO PRAVDIVOST A ADRESY (LIVE GOOGLE SEARCH):
+1. VYUŽIJ ŽIVÉ GOOGLE VYHLEDÁVÁNÍ PRO OVĚŘENÍ SKUTEČNÝCH A REÁLNÝCH PRODEJEN A POBOČEK KLIENTA.
+2. NIKDY si NEVYMÝŠLEJ fiktivní nebo neodpovídající ulice, čísla popisná, jména ani kontakty!
+3. Uváděj POUZE Skutečné a 100% ověřené adresa prodejen/poboček klienta z oficiálního webu klienta nebo ARES rejstříku.
+4. Pokud u pobočky znáš město (např. Ostrava), ale neznáš na 100 % přesnou ulici s číslem popisným, raději pole \`street\` nechej prázdné nebo uveď městskou část (např. "Ostrava - Poruba"), než abys vygeneroval vymyšlenou ulici!
+5. Raději uveď méně poboček, které jsou na 100 % reálné a ověřené, než více nepřesných!
 
 Zadání hledaného klienta:
 - Zadání/Hledaný pojem: "${searchKeyword}"
@@ -140,8 +142,8 @@ TVÉ ÚKOLY:
 5. Urči hlavní obor činnosti v češtině (businessField).
 6. Napiš 2-3 stručné věty představující profil a zaměření firmy (companySummary).
 7. Uveď jména jednatelů / vedení (executives).
-8. Uveď kontaktní osoby a manažery (contactPersons) pro Ostrava / MS kraj nebo centrálu.
-9. KLÍČOVÝ ÚKOL - POBOČKY (OSTRAVA & MS KRAJ): Dohledei reálné FYZICKÉ PRODEJNY A POBOČKY klienta v Moravskoslezském kraji s PŘESNÝMI A REÁLNÝMI ADRESAMI. Neuváděj vymyšlené ulice! Vyjmenuj nalezené prodejny v poli \`msRegionBranches\`!
+8. Uveď reálné kontaktní osoby a manažery (contactPersons) pro Ostrava / MS kraj nebo centrálu.
+9. POBOČKY (OSTRAVA & MS KRAJ): Dohledei reálné FYZICKÉ PRODEJNY A POBOČKY klienta v Moravskoslezském kraji s PŘESNÝMI A REÁLNÝMI ADRESAMI. Neuváděj vymyšlené ulice! Vyjmenuj pouze ověřené prodejny v poli \`msRegionBranches\`!
 10. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint V OSTRAVĚ A MS KRAJI s konkrétními důvody zacílení.
 11. Napiš 2 prodejní argumenty zaměřené na podporu ostravských a krajských poboček.
 
@@ -203,7 +205,10 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              tools: [{ googleSearch: {} }],
+            }),
           }
         );
 

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       )
       .join('\n');
 
-    // Step 2: Use Gemini 3.6 AI to select best candidate & fill form values
+    // Step 2: Use Gemini 3.6 AI with Live Google Search Grounding to select best candidate & fill form values
     const apiKey = process.env.GEMINI_API_KEY;
     let aiResult: {
       name?: string;
@@ -91,6 +91,7 @@ ${candidatesSummaryStr || 'Žádní kandidáti v ARES nenalezeni'}
 ÚKOLY:
 1. Vyber správnou firmu (např. pro zadání "Canis" vybereš "CANIS SAFETY a.s.", NIKOLIV nesouvisející firmy).
 2. Připrav zjištěné kontaktní a fakturační údaje pro formulář.
+3. Použij živé Google vyhledávání pro zjištění aktuálního webu, e-mailu a telefonu firmy.
 
 Vrať POUZE platný JSON bez markdownu ve tvaru:
 {
@@ -112,7 +113,10 @@ Vrať POUZE platný JSON bez markdownu ve tvaru:
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              tools: [{ googleSearch: {} }],
+            }),
           }
         );
 
