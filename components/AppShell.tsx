@@ -99,6 +99,12 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
 
   const avatarUrl = employeePhoto?.url || null;
 
+  const employees = await prisma.employee.findMany({
+    where: { isActive: true },
+    select: { id: true, firstName: true, lastName: true, position: true },
+    orderBy: { firstName: 'asc' },
+  });
+
   return (
     <ResponsiveAppShell
       user={{
@@ -109,6 +115,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         allowedRoles: user.allowedRoles || [user.role],
         avatarUrl,
       }}
+      employees={employees}
       visibleGroups={visibleGroups}
     >
       {children}

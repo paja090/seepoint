@@ -15,7 +15,9 @@ import {
   UserRound,
   PhoneCall,
   Package,
+  Sparkles,
 } from 'lucide-react';
+import { AiQuickTaskModal } from './tasks/AiQuickTaskModal';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
 import { RoleSwitcherButton } from './RoleSwitcherButton';
@@ -55,13 +57,16 @@ const pageTitles: Array<[string, string]> = [
 export function ResponsiveAppShell({
   children,
   user,
+  employees = [],
   visibleGroups,
 }: {
   children: React.ReactNode;
   user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; avatarUrl?: string | null };
+  employees?: Array<{ id: string; firstName: string; lastName: string; position: string | null }>;
   visibleGroups: NavGroup[];
 }) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [isAiTaskModalOpen, setIsAiTaskModalOpen] = useState(false);
   const pathname = usePathname();
 
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
@@ -113,6 +118,15 @@ export function ResponsiveAppShell({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsAiTaskModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-fuchsia-600 to-pink-600 px-3 py-1.5 text-xs font-black text-white shadow-md hover:from-fuchsia-500 hover:to-pink-500 transition active:scale-95"
+              title="🎙️ Zadání AI provozního úkolu"
+            >
+              <Sparkles size={14} />
+              <span className="hidden sm:inline">AI Úkol</span>
+            </button>
             <Link
               href="/chat"
               className="grid h-9 w-9 place-items-center rounded-full bg-slate-800 text-emerald-400 hover:text-white border border-slate-700 transition shadow-2xs"
@@ -286,6 +300,12 @@ export function ResponsiveAppShell({
             <span>Menu</span>
           </button>
         </nav>
+
+        <AiQuickTaskModal
+          isOpen={isAiTaskModalOpen}
+          onClose={() => setIsAiTaskModalOpen(false)}
+          employees={employees}
+        />
       </div>
     </OfferBasketProvider>
   );
