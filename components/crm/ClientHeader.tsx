@@ -14,6 +14,7 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
   const [showCommModal, setShowCommModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Edit form state
@@ -231,6 +232,29 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
     }
   };
 
+  const handleDeleteClient = async (permanent: boolean) => {
+    const actionName = permanent ? 'TRVALE SMAZAT' : 'DEAKTIVOVAT';
+    if (!confirm(`Opravdu chcete klienta ${client.name} ${actionName}?`)) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/crm/clients/${client.id}${permanent ? '?permanent=true' : ''}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        alert(`Klient byl úspěšně ${permanent ? 'trvale smazán' : 'deaktivován'}.`);
+        router.push('/clients');
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Chyba při odstraňování klienta.');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Chyba spojení.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const statusObj = CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS] || CLIENT_STATUS_LABELS.ACTIVE;
 
   return (
@@ -293,7 +317,10 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
             ✏️ Upravit profil
           </Button>
           <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs flex-1 sm:flex-none">
-            🔗 Sloučit duplicity
+            🔗 Sloučit
+          </Button>
+          <Button onClick={() => setShowDeleteModal(true)} variant="secondary" className="!bg-rose-950 !text-rose-200 border-rose-800 hover:!bg-rose-900 text-xs flex-1 sm:flex-none">
+            🗑️ Smazat
           </Button>
         </div>
       </div>
@@ -505,6 +532,58 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
                 <Button type="submit" variant="secondary" className="!bg-purple-900 !text-white hover:!bg-purple-800" disabled={saving}>{saving ? 'Provádím...' : 'Sloučit klienty'}</Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete / Deactivate Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
+          <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
+            <h2 className="text-lg font-bold border-b pb-2 text-rose-950 flex items-center gap-2">
+              <span>🗑️</span> Odstranit klienta {client.name}
+            </h2>
+            <p className="text-xs text-slate-600">
+              Vyberte požadovaný způsob odstranění klienta <strong>{client.name}</strong> ze systému SeePoint.
+            </p>
+
+            <div className="space-y-3 pt-1">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-2">
+                <h4 className="font-bold text-xs text-amber-950">🛑 Deaktivovat / Archivovat (Doporučeno)</h4>
+                <p className="text-[11px] text-amber-800">
+                  Klient bude skryt z běžného vyhledávání, ale veškeré historické zakázky, nabídky a faktury zůstanou v účetnictví zachovány.
+                </p>
+                <Button
+                  onClick={() => handleDeleteClient(false)}
+                  disabled={saving}
+                  variant="secondary"
+                  className="w-full !bg-amber-600 !text-white hover:!bg-amber-700 text-xs"
+                >
+                  {saving ? 'Provádím...' : 'Deaktivovat klienta'}
+                </Button>
+              </div>
+
+              <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3 space-y-2">
+                <h4 className="font-bold text-xs text-rose-950">🔥 Trvale smazat z databáze</h4>
+                <p className="text-[11px] text-rose-800">
+                  Nenávratně smaže záznam klienta i s jeho profilovými daty z databáze.
+                </p>
+                <Button
+                  onClick={() => handleDeleteClient(true)}
+                  disabled={saving}
+                  variant="secondary"
+                  className="w-full !bg-rose-700 !text-white hover:!bg-rose-800 text-xs"
+                >
+                  {saving ? 'Smazávám...' : 'Trvale smazat klienta'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t pt-3">
+              <Button type="button" variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                Zrušit
+              </Button>
+            </div>
           </div>
         </div>
       )}
