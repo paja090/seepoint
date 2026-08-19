@@ -9,7 +9,9 @@ export type SystemNotificationItem = {
     | 'PENDING_INVOICE'
     | 'EXPIRING_CONTRACT'
     | 'MY_TASK_TODAY'
-    | 'VEHICLE_FAULT';
+    | 'VEHICLE_FAULT'
+    | 'LOW_STOCK'
+    | 'UNRETURNED_TOOL';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -156,6 +158,58 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
       });
     });
   }
+
+  // 4. WAREHOUSE: Low Stock Items Alert (< minQuantity)
+  const lowStockWarehouseItems = await prisma.warehouseItem.findMany({
+    where: {
+      minQuantity: { not: null },
+    },
+    select: { id: true, name: true, unit: true, quantityInStock: true, minQuantity: true, location: true },
+    take: 25,
+  });
+
+  const criticalItems = lowStockWarehouseItems.filter(
+    (item) => item.minQuantity !== null && Number(item.quantityInStock) < Number(item.minQuantity)
+  );
+
+  criticalItems.forEach((item) => {
+    notifications.push({
+      id: `warehouse-low-stock-${item.id}`,
+      type: 'LOW_STOCK',
+      title: `📦 Dochází materiál ve skladu: ${item.name}`,
+      message: `Skladový stav je pouze ${Number(item.quantityInStock)} ${item.unit} (minimální limit je ${Number(item.minQuantity)} ${item.unit})${item.location ? ` na pozici ${item.location}` : ''}. Nutno dokoupit nebo doobjednat!`,
+      severity: 'HIGH',
+      link: `/warehouse?lowStock=true`,
+      createdAt: now.toISOString(),
+    });
+  });
+
+  // 5. WAREHOUSE: Long-standing Unreturned Borrowed Tools (> 48h)
+  const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  const unreturnedMovements = await prisma.warehouseMovement.findMany({
+    where: {
+      type: 'ISSUE',
+      createdAt: { lte: twoDaysAgo },
+      item: { category: 'RETURNABLE' },
+    },
+    include: { item: true },
+    orderBy: { createdAt: 'asc' },
+    take: 15,
+  });
+
+  unreturnedMovements.forEach((m) => {
+    if (m.item) {
+      notifications.push({
+        id: `unreturned-tool-${m.id}`,
+        type: 'UNRETURNED_TOOL',
+        title: `🛠️ Dlouho nevrácené nářadí: ${m.item.name}`,
+        message: `${m.performedByName || m.assignedEmployeeName || 'Pracovník'} má vybrané nářadí ${m.item.name} (${Number(m.quantity)} ${m.item.unit}) již od ${new Date(m.createdAt).toLocaleDateString('cs-CZ')}. Nezapomeňte vrátit do skladu!`,
+        severity: 'MEDIUM',
+        link: `/warehouse`,
+        createdAt: now.toISOString(),
+      });
+    }
+  });
 
   const highCount = notifications.filter((n) => n.severity === 'HIGH').length;
 
