@@ -108,7 +108,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
         </div>
         <Button onClick={openCreateModal} className="flex items-center gap-1.5 text-xs font-bold">
           <Plus size={14} />
-          <span>➕ Přidat pobočku</span>
+          <span>➕ Přidat novou pobočku</span>
         </Button>
       </div>
 
@@ -119,7 +119,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
           <TableHead>
             <tr>
               <TableHeaderCell>Kód / Název pobočky</TableHeaderCell>
-              <TableHeaderCell>Adresa</TableHeaderCell>
+              <TableHeaderCell>Ulice a číslo</TableHeaderCell>
               <TableHeaderCell>Město / PSČ</TableHeaderCell>
               <TableHeaderCell>Poznámka</TableHeaderCell>
               <TableHeaderCell>Akce</TableHeaderCell>
@@ -135,11 +135,13 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                   </div>
                   {b.code && <span className="text-xs text-slate-500 font-mono pl-5">{b.code}</span>}
                 </TableCell>
-                <TableCell>{b.street || '-'}</TableCell>
+                <TableCell>
+                  <span className="font-medium text-slate-900">{b.street || <span className="text-slate-400 font-normal">Neuvedeno</span>}</span>
+                </TableCell>
                 <TableCell>
                   {b.city ? (
-                    <span className="flex items-center gap-1">
-                      <MapPin size={12} className="text-slate-400" />
+                    <span className="flex items-center gap-1 font-medium text-slate-900">
+                      <MapPin size={12} className="text-amber-600 shrink-0" />
                       <span>{b.city} {b.zip || ''}</span>
                     </span>
                   ) : '-'}
@@ -149,17 +151,19 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openEditModal(b)}
-                      className="p-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 transition"
-                      title="Upravit pobočku"
+                      className="px-3 py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-extrabold transition flex items-center gap-1.5 shadow-2xs"
+                      title="Upravit adresu a údaje pobočky"
                     >
-                      <Edit3 size={14} />
+                      <Edit3 size={13} className="text-sky-700" />
+                      <span>✏️ Upravit</span>
                     </button>
                     <button
                       onClick={() => handleDelete(b.id, b.name)}
-                      className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition flex items-center gap-1"
                       title="Odstranit pobočku"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} className="text-rose-600" />
+                      <span>Smazat</span>
                     </button>
                   </div>
                 </TableCell>
@@ -172,10 +176,22 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
       {/* Edit / Create Branch Modal */}
       {(editingBranch || isCreating) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
-          <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h3 className="font-bold text-base border-b pb-2">
-              {editingBranch ? '✏️ Upravit pobočku' : '➕ Přidat novou pobočku'}
-            </h3>
+          <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">
+                {editingBranch ? '✏️ Upravit adresu & údaje pobočky' : '➕ Přidat novou pobočku klienta'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingBranch(null);
+                  setIsCreating(false);
+                }}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleSave} className="space-y-3">
               <label className="text-xs font-semibold">Název pobočky / prodejny *
@@ -185,26 +201,26 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="input text-xs mt-1 font-bold"
+                  className="input text-xs mt-1 font-bold text-slate-900"
                 />
               </label>
 
               <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs font-semibold">Ulice a číslo popisné *
+                  <input
+                    type="text"
+                    placeholder="Např. Místecká 329/258"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    className="input text-xs mt-1 font-bold text-slate-900"
+                  />
+                </label>
                 <label className="text-xs font-semibold">Kód pobočky
                   <input
                     type="text"
                     placeholder="Např. OST-01"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    className="input text-xs mt-1"
-                  />
-                </label>
-                <label className="text-xs font-semibold">Ulice a č.p.
-                  <input
-                    type="text"
-                    placeholder="Např. Místecká 329/258"
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
                     className="input text-xs mt-1"
                   />
                 </label>
@@ -218,7 +234,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     required
-                    className="input text-xs mt-1"
+                    className="input text-xs mt-1 font-bold text-slate-900"
                   />
                 </label>
                 <label className="text-xs font-semibold">PSČ
@@ -227,7 +243,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                     placeholder="Např. 70030"
                     value={zip}
                     onChange={(e) => setZip(e.target.value)}
-                    className="input text-xs mt-1"
+                    className="input text-xs mt-1 font-mono"
                   />
                 </label>
               </div>
@@ -253,8 +269,8 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                 >
                   Zrušit
                 </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Ukládám...' : 'Uložit pobočku'}
+                <Button type="submit" disabled={loading} className="font-bold">
+                  {loading ? 'Ukládám...' : '💾 Uložit adresu pobočky'}
                 </Button>
               </div>
             </form>
