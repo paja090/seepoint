@@ -8,41 +8,59 @@ export const dynamic = 'force-dynamic';
 export default async function CityGalleryProjectsPage() {
   await requirePageAccess('cityGallery');
 
-  const [projectsRaw, fleetConfig, offerCount] = await Promise.all([
-    prisma.cityGalleryProject.findMany({
-      include: { _count: { select: { offers: true } } },
-      orderBy: { updatedAt: 'desc' },
-      take: 100,
-    }),
-    prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }),
-    prisma.offer.count({ where: { offerType: 'CITY_GALLERY', archivedAt: null } }),
-  ]);
+  let projectsRaw: any[] = [];
+  let fleetConfig: any = null;
+
+  try {
+    const results = await Promise.all([
+      prisma.cityGalleryProject
+        .findMany({
+          include: { _count: { select: { offers: true } } },
+          orderBy: { updatedAt: 'desc' },
+          take: 100,
+        })
+        .catch((err) => {
+          console.error('Error fetching CityGalleryProject:', err);
+          return [];
+        }),
+      prisma.cityGalleryFleetConfig
+        .findUnique({ where: { id: 'default' } })
+        .catch((err) => {
+          console.error('Error fetching CityGalleryFleetConfig:', err);
+          return null;
+        }),
+    ]);
+    projectsRaw = results[0] || [];
+    fleetConfig = results[1] || null;
+  } catch (err) {
+    console.error('Error in CityGalleryPage queries:', err);
+  }
 
   const totalFleet = fleetConfig?.totalFrames ?? 24;
   const maintenanceCount = fleetConfig?.maintenanceCount ?? 0;
 
   const projects = projectsRaw.map((p) => ({
     id: p.id,
-    title: p.title,
-    status: p.status,
-    city: p.city,
-    locality: p.locality,
-    address: p.address,
-    description: p.description,
-    frameCount: p.frameCount,
-    permitStatus: p.permitStatus,
-    permitNumber: p.permitNumber,
-    permitValidFrom: p.permitValidFrom ? p.permitValidFrom.toISOString() : null,
-    permitValidTo: p.permitValidTo ? p.permitValidTo.toISOString() : null,
-    permitNote: p.permitNote,
-    cityOfficialContact: p.cityOfficialContact,
-    organizerName: p.organizerName,
-    artistName: p.artistName,
-    dateFrom: p.dateFrom ? p.dateFrom.toISOString() : null,
-    dateTo: p.dateTo ? p.dateTo.toISOString() : null,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-    _count: p._count,
+    title: p.title || 'Výstava Galerie VENKU',
+    status: p.status || 'DRAFT',
+    city: p.city || 'Ostrava',
+    locality: p.locality || null,
+    address: p.address || null,
+    description: p.description || null,
+    frameCount: typeof p.frameCount === 'number' ? p.frameCount : 6,
+    permitStatus: p.permitStatus || 'SUBMITTED',
+    permitNumber: p.permitNumber || null,
+    permitValidFrom: p.permitValidFrom ? new Date(p.permitValidFrom).toISOString() : null,
+    permitValidTo: p.permitValidTo ? new Date(p.permitValidTo).toISOString() : null,
+    permitNote: p.permitNote || null,
+    cityOfficialContact: p.cityOfficialContact || null,
+    organizerName: p.organizerName || null,
+    artistName: p.artistName || null,
+    dateFrom: p.dateFrom ? new Date(p.dateFrom).toISOString() : null,
+    dateTo: p.dateTo ? new Date(p.dateTo).toISOString() : null,
+    createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString(),
+    _count: p._count || { offers: 0 },
   }));
 
   const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
