@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ClientLogoControl } from '@/components/ClientLogoControl';
 import { Button } from '@/components/ui';
 import { CLIENT_PRICING_SEGMENT_LABELS, CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS, CLIENT_SOURCE_LABELS, ClientProfileData, ClientStatus } from '@/lib/crm/types';
+import { Building2, ShieldCheck, Mail, Phone, Globe, MapPin, Plus, Edit3, Trash2, Link2, CheckSquare, MessageSquare, FilePlus, Store, AlertTriangle, TrendingUp, DollarSign, Layers } from 'lucide-react';
 
 export function ClientHeader({ client }: { client: ClientProfileData }) {
   const router = useRouter();
@@ -258,10 +259,12 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
   const statusObj = CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS] || CLIENT_STATUS_LABELS.ACTIVE;
 
   return (
-    <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 space-y-4 w-full max-w-full overflow-hidden">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full max-w-full overflow-hidden">
-          <div className="p-1 bg-white rounded-xl shadow-md shrink-0">
+    <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-slate-800 space-y-6 w-full max-w-full overflow-hidden">
+      {/* Top Header Row: Logo, Company Name, Status Badges & Action Buttons */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0 flex-1">
+          {/* Logo Container */}
+          <div className="p-1.5 bg-white rounded-2xl shadow-xl border border-slate-700/60 shrink-0">
             <ClientLogoControl
               clientId={client.id}
               clientName={client.name}
@@ -274,148 +277,201 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
               }
             />
           </div>
-          <div className="space-y-1 min-w-0 flex-1 max-w-full">
-            <div className="flex items-center gap-2 flex-wrap max-w-full">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white break-words max-w-full">{client.name}</h1>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusObj.badge} shrink-0`}>
+
+          <div className="space-y-1.5 min-w-0 flex-1">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white break-words">{client.name}</h1>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${statusObj.badge} shrink-0`}>
                 {statusObj.label}
               </span>
-              <span className="bg-slate-700/80 text-slate-300 text-xs px-2.5 py-0.5 rounded-full border border-slate-600 shrink-0">
-                {CLIENT_TYPE_LABELS[client.clientType as keyof typeof CLIENT_TYPE_LABELS] || client.clientType}
-              </span>
+              {client.companyId && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider shrink-0">
+                  <ShieldCheck size={12} className="text-emerald-400" />
+                  OVĚŘENO ARES
+                </span>
+              )}
             </div>
 
-            {client.tradingName && <p className="text-slate-300 text-xs sm:text-sm italic truncate max-w-full">{client.tradingName}</p>}
+            {client.tradingName && (
+              <p className="text-sky-300 text-xs sm:text-sm font-semibold italic">{client.tradingName}</p>
+            )}
 
-            <div className="flex items-center gap-x-3 gap-y-1 text-xs text-slate-300 mt-2 flex-wrap max-w-full">
-              {client.companyId && <span className="shrink-0">IČO: <strong className="text-white">{client.companyId}</strong></span>}
-              {client.dic && <span className="shrink-0">DIČ: <strong className="text-white">{client.dic}</strong></span>}
+            {/* Information Meta Strip */}
+            <div className="flex items-center gap-x-4 gap-y-1.5 text-xs text-slate-300 pt-1 flex-wrap font-medium">
+              {client.companyId && (
+                <span className="shrink-0">
+                  IČO: <strong className="text-white font-mono">{client.companyId}</strong>
+                </span>
+              )}
+              {client.dic && (
+                <span className="shrink-0">
+                  DIČ: <strong className="text-white font-mono">{client.dic}</strong>
+                </span>
+              )}
+              {client.billingCity && (
+                <span className="flex items-center gap-1 shrink-0">
+                  <MapPin size={12} className="text-amber-400" />
+                  <span>Sídlo: <strong className="text-white">{client.billingCity}</strong></span>
+                </span>
+              )}
               {client.email && (
-                <span className="truncate max-w-[200px] sm:max-w-xs">
-                  E-mail: <a href={`mailto:${client.email}`} className="text-sky-300 hover:underline truncate inline-block align-bottom">{client.email}</a>
+                <span className="flex items-center gap-1 shrink-0">
+                  <Mail size={12} className="text-sky-400" />
+                  <a href={`mailto:${client.email}`} className="text-sky-300 hover:underline">{client.email}</a>
                 </span>
               )}
-              {client.phone && <span className="shrink-0">Tel: <a href={`tel:${client.phone}`} className="text-sky-300 hover:underline">{client.phone}</a></span>}
+              {client.phone && (
+                <span className="flex items-center gap-1 shrink-0">
+                  <Phone size={12} className="text-emerald-400" />
+                  <a href={`tel:${client.phone}`} className="text-emerald-300 hover:underline font-mono">{client.phone}</a>
+                </span>
+              )}
               {client.website && (
-                <span className="truncate max-w-[200px] sm:max-w-xs">
-                  Web: <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="text-sky-300 hover:underline truncate inline-block align-bottom">{client.website}</a>
+                <span className="flex items-center gap-1 shrink-0">
+                  <Globe size={12} className="text-indigo-400" />
+                  <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="text-indigo-300 hover:underline font-bold">
+                    {client.website.replace(/^https?:\/\//i, '').split('/')[0]}
+                  </a>
                 </span>
               )}
             </div>
-
-            <div className="flex items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-1 flex-wrap">
-              <span>Obchodník: <strong className="text-slate-200">{client.assignedUser?.name || 'Nepřiřazen'}</strong></span>
-              <span className="hidden sm:inline">•</span>
-              <span>Zdroj: <strong className="text-slate-200">{CLIENT_SOURCE_LABELS[client.source as keyof typeof CLIENT_SOURCE_LABELS] || client.source}</strong></span>
-            </div>
           </div>
         </div>
 
-        {/* Action Header Buttons */}
-        <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center w-full lg:w-auto shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-800">
-          <Button onClick={() => setShowEditModal(true)} variant="secondary" className="!bg-slate-700 !text-white hover:!bg-slate-600 border-slate-600 text-xs flex-1 sm:flex-none">
-            ✏️ Upravit profil
+        {/* Primary Header Action Buttons */}
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800">
+          <Button onClick={() => setShowEditModal(true)} variant="secondary" className="!bg-slate-800 !text-white hover:!bg-slate-700 border-slate-700 text-xs font-bold shadow-md cursor-pointer">
+            <Edit3 size={13} className="mr-1 text-sky-400" />
+            <span>Upravit profil</span>
           </Button>
-          <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs flex-1 sm:flex-none">
-            🔗 Sloučit
+          <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs font-bold cursor-pointer">
+            <Link2 size={13} className="mr-1 text-purple-400" />
+            <span>Sloučit</span>
           </Button>
-          <Button onClick={() => setShowDeleteModal(true)} variant="secondary" className="!bg-rose-950 !text-rose-200 border-rose-800 hover:!bg-rose-900 text-xs flex-1 sm:flex-none">
-            🗑️ Smazat
+          <Button onClick={() => setShowDeleteModal(true)} variant="secondary" className="!bg-rose-950 !text-rose-200 border-rose-800 hover:!bg-rose-900 text-xs font-bold cursor-pointer">
+            <Trash2 size={13} className="mr-1 text-rose-400" />
+            <span>Smazat</span>
           </Button>
         </div>
       </div>
 
-      {/* Quick Action Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 border-t border-slate-700/80 text-xs scrollbar-thin">
-        <button onClick={() => setShowContactModal(true)} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-          <span>➕</span> Kontakt
+      {/* Quick Action Bar Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-t border-slate-800/80 pt-3 scrollbar-thin">
+        <button onClick={() => setShowContactModal(true)} className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-100 px-3 py-1.5 rounded-xl border border-slate-700 transition font-bold cursor-pointer shrink-0">
+          <Plus size={13} className="text-emerald-400" />
+          <span>Kontakt</span>
         </button>
-        <button onClick={() => setShowBranchModal(true)} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-          <span>➕</span> Pobočka
+        <button onClick={() => setShowBranchModal(true)} className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-100 px-3 py-1.5 rounded-xl border border-slate-700 transition font-bold cursor-pointer shrink-0">
+          <Store size={13} className="text-amber-400" />
+          <span>Pobočka MS Kraj</span>
         </button>
-        <a href={`/offers/new?clientId=${client.id}`} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-          <span>📄</span> Nová Nabídka
+        <a href={`/offers/new?clientId=${client.id}`} className="flex items-center gap-1.5 bg-sky-950 hover:bg-sky-900 text-sky-200 px-3 py-1.5 rounded-xl border border-sky-800 transition font-bold shrink-0">
+          <FilePlus size={13} className="text-sky-400" />
+          <span>Nová Nabídka</span>
         </a>
-        <button onClick={() => setShowCommModal(true)} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-          <span>📞</span> Záznam komunikace
+        <button onClick={() => setShowCommModal(true)} className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-100 px-3 py-1.5 rounded-xl border border-slate-700 transition font-bold cursor-pointer shrink-0">
+          <MessageSquare size={13} className="text-indigo-400" />
+          <span>Záznam Hovoru</span>
         </button>
-        <button onClick={() => setShowTaskModal(true)} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-          <span>✅</span> Nový Úkol
+        <button onClick={() => setShowTaskModal(true)} className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-100 px-3 py-1.5 rounded-xl border border-slate-700 transition font-bold cursor-pointer shrink-0">
+          <CheckSquare size={13} className="text-teal-400" />
+          <span>Nový Úkol</span>
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-2">
-        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 text-center">
-          <div className="text-xs text-slate-400 font-medium">Aktivní kampaně</div>
-          <div className="text-xl font-bold text-emerald-400 mt-1">{client.metrics.activeOccupanciesCount}</div>
-        </div>
-        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 text-center">
-          <div className="text-xs text-slate-400 font-medium">Zakázky v přípravě</div>
-          <div className="text-xl font-bold text-amber-400 mt-1">{client.metrics.inPreparationOrdersCount}</div>
-        </div>
-        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 text-center">
-          <div className="text-xs text-slate-400 font-medium">Celkem vyfakturováno</div>
-          <div className="text-base font-bold text-sky-300 mt-1">{client.metrics.totalBilled.toLocaleString('cs-CZ')} Kč</div>
-        </div>
-        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 text-center">
-          <div className="text-xs text-slate-400 font-medium">Neuhrazené faktury</div>
-          <div className={`text-base font-bold mt-1 ${client.metrics.totalOverdue > 0 ? 'text-rose-400' : 'text-slate-200'}`}>
-            {client.metrics.totalUnpaid.toLocaleString('cs-CZ')} Kč
+      {/* KPI Cards Grid (4 High-Impact Metrics) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+        <div className="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 shadow-inner flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Celkem vyfakturováno</span>
+            <DollarSign size={15} className="text-sky-400" />
+          </div>
+          <div className="text-xl font-black text-white mt-1">
+            {client.metrics.totalBilled ? `${client.metrics.totalBilled.toLocaleString('cs-CZ')} Kč` : '0 Kč'}
           </div>
         </div>
-        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 text-center">
-          <div className="text-xs text-slate-400 font-medium">Úkoly k řešení</div>
-          <div className="text-xl font-bold text-indigo-300 mt-1">{client.metrics.pendingTasksCount}</div>
+
+        <div className="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 shadow-inner flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Aktivní kampaně</span>
+            <Layers size={15} className="text-emerald-400" />
+          </div>
+          <div className="text-xl font-black text-emerald-400 mt-1">
+            {client.metrics.activeOccupanciesCount || 0}
+          </div>
         </div>
-        <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/70 text-center">
-          <div className="text-xs text-slate-400 font-medium">Smlouvy před koncem</div>
-          <div className="text-xl font-bold text-purple-300 mt-1">{client.metrics.expiringContractsCount}</div>
+
+        <div className="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 shadow-inner flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Zakázky v realizaci</span>
+            <TrendingUp size={15} className="text-amber-400" />
+          </div>
+          <div className="text-xl font-black text-amber-400 mt-1">
+            {client.metrics.inPreparationOrdersCount || 0}
+          </div>
+        </div>
+
+        <div className="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 shadow-inner flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>Pobočky v MS kraji</span>
+            <Store size={15} className="text-indigo-400" />
+          </div>
+          <div className="text-xl font-black text-indigo-300 mt-1">
+            {client.branches?.length || 0}
+          </div>
         </div>
       </div>
 
-      {/* Edit Client Modal */}
+      {/* Edit Client Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
-          <div className="card max-w-2xl w-full bg-white max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl">
-            <h2 className="text-xl font-bold border-b pb-2">✏️ Úprava CRM Profilu Klienta</h2>
-            <form onSubmit={handleSaveClient} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="text-xs font-semibold">Název společnosti *<input className="input text-sm mt-1" value={name} onChange={e => setName(e.target.value)} required /></label>
-                <label className="text-xs font-semibold">Obchodní název (značka)<input className="input text-sm mt-1" value={tradingName} onChange={e => setTradingName(e.target.value)} /></label>
-                <label className="text-xs font-semibold">IČO<input className="input text-sm mt-1" value={companyId} onChange={e => setCompanyId(e.target.value)} /></label>
-                <label className="text-xs font-semibold">DIČ<input className="input text-sm mt-1" value={dic} onChange={e => setDic(e.target.value)} /></label>
-                <label className="text-xs font-semibold">E-mail<input className="input text-sm mt-1" type="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
-                <label className="text-xs font-semibold">Telefon<input className="input text-sm mt-1" value={phone} onChange={e => setPhone(e.target.value)} /></label>
-                <label className="text-xs font-semibold">Webová stránka<input className="input text-sm mt-1" value={website} onChange={e => setWebsite(e.target.value)} /></label>
-                <label className="text-xs font-semibold">Stav klienta
-                  <select className="input text-sm mt-1" value={status} onChange={e => setStatus(e.target.value as ClientStatus)}>
-                    <option value="ACTIVE">Aktivní klient</option>
-                    <option value="LEAD">Lead / Poptávající</option>
-                    <option value="INACTIVE">Neaktivní</option>
-                    <option value="BLOCKED">Blokován</option>
-                    <option value="FORMER_CLIENT">Bývalý klient</option>
-                  </select>
+          <div className="card max-w-lg w-full bg-white space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-extrabold text-base text-slate-900">✏️ Upravit profil klienta</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1">✕</button>
+            </div>
+            <form onSubmit={handleSaveClient} className="space-y-3">
+              <label className="text-xs font-bold text-slate-700">Název firmy *
+                <input type="text" value={name} onChange={e => setName(e.target.value)} required className="input text-xs mt-1 font-bold" />
+              </label>
+              <label className="text-xs font-bold text-slate-700">Obchodní název značky
+                <input type="text" value={tradingName} onChange={e => setTradingName(e.target.value)} className="input text-xs mt-1" />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs font-bold text-slate-700">IČO
+                  <input type="text" value={companyId} onChange={e => setCompanyId(e.target.value)} className="input text-xs mt-1 font-mono" />
                 </label>
-                <label className="text-xs font-semibold">Cenová kategorie
-                  <select className="input text-sm mt-1" value={pricingSegment} onChange={e => setPricingSegment(e.target.value as typeof pricingSegment)}>
-                    {Object.entries(CLIENT_PRICING_SEGMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                  </select>
-                  <span className="mt-1 block font-normal text-slate-500">Změna platí jen pro nové nabídky; historické ceny zůstávají ve snapshotu.</span>
+                <label className="text-xs font-bold text-slate-700">DIČ
+                  <input type="text" value={dic} onChange={e => setDic(e.target.value)} className="input text-xs mt-1 font-mono" />
                 </label>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <label className="text-xs font-semibold">Fakturační Ulice<input className="input text-sm mt-1" value={billingStreet} onChange={e => setBillingStreet(e.target.value)} /></label>
-                <label className="text-xs font-semibold">Fakturační Město<input className="input text-sm mt-1" value={billingCity} onChange={e => setBillingCity(e.target.value)} /></label>
-                <label className="text-xs font-semibold">Fakturační PSČ<input className="input text-sm mt-1" value={billingZip} onChange={e => setBillingZip(e.target.value)} /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs font-bold text-slate-700">E-mail
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input text-xs mt-1" />
+                </label>
+                <label className="text-xs font-bold text-slate-700">Telefon
+                  <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="input text-xs mt-1 font-mono" />
+                </label>
               </div>
-
-              <label className="text-xs font-semibold">Interní poznámka<textarea className="input text-sm mt-1 h-20" value={note} onChange={e => setNote(e.target.value)} /></label>
-
+              <label className="text-xs font-bold text-slate-700">Webové stránky
+                <input type="text" value={website} onChange={e => setWebsite(e.target.value)} className="input text-xs mt-1" />
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="text-xs font-bold text-slate-700">Ulice sídla
+                  <input type="text" value={billingStreet} onChange={e => setBillingStreet(e.target.value)} className="input text-xs mt-1" />
+                </label>
+                <label className="text-xs font-bold text-slate-700">Město sídla
+                  <input type="text" value={billingCity} onChange={e => setBillingCity(e.target.value)} className="input text-xs mt-1 font-bold" />
+                </label>
+                <label className="text-xs font-bold text-slate-700">PSČ sídla
+                  <input type="text" value={billingZip} onChange={e => setBillingZip(e.target.value)} className="input text-xs mt-1 font-mono" />
+                </label>
+              </div>
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowEditModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Ukládám...' : 'Uložit zmeny'}</Button>
+                <Button type="submit" disabled={saving} className="font-bold bg-sky-600 hover:bg-sky-700 text-white">
+                  {saving ? 'Ukládám...' : '💾 Uložit profil'}
+                </Button>
               </div>
             </form>
           </div>
@@ -426,23 +482,23 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
       {showContactModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold border-b pb-2">➕ Přidat Kontaktní Osobu</h2>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">➕ Přidat novou kontaktní osobu</h3>
+              <button onClick={() => setShowContactModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+            </div>
             <form onSubmit={handleAddContact} className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs font-semibold">Jméno *<input className="input text-sm mt-1" value={cFirstName} onChange={e => setCFirstName(e.target.value)} required /></label>
-                <label className="text-xs font-semibold">Příjmení *<input className="input text-sm mt-1" value={cLastName} onChange={e => setCLastName(e.target.value)} required /></label>
+                <label className="text-xs font-semibold">Jméno *<input type="text" value={cFirstName} onChange={e => setCFirstName(e.target.value)} required className="input text-xs mt-1" /></label>
+                <label className="text-xs font-semibold">Příjmení *<input type="text" value={cLastName} onChange={e => setCLastName(e.target.value)} required className="input text-xs mt-1" /></label>
               </div>
-              <label className="text-xs font-semibold">Pozice / Funkce<input className="input text-sm mt-1" placeholder="Např. Obchodní ředitel" value={cTitle} onChange={e => CSetTitle(e.target.value)} /></label>
-              <label className="text-xs font-semibold">E-mail<input className="input text-sm mt-1" type="email" value={cEmail} onChange={e => setCEmail(e.target.value)} /></label>
-              <label className="text-xs font-semibold">Telefon<input className="input text-sm mt-1" value={cPhone} onChange={e => setCPhone(e.target.value)} /></label>
-              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-                <input type="checkbox" checked={cIsPrimary} onChange={e => setCIsPrimary(e.target.checked)} />
-                <span>Nastavit jako Hlavní kontakt klienta</span>
-              </label>
-
+              <label className="text-xs font-semibold">Pozice / Funkce<input type="text" value={cTitle} onChange={e => CSetTitle(e.target.value)} placeholder="Např. Manažer nákupu" className="input text-xs mt-1" /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs font-semibold">E-mail<input type="email" value={cEmail} onChange={e => setCEmail(e.target.value)} className="input text-xs mt-1" /></label>
+                <label className="text-xs font-semibold">Telefon<input type="text" value={cPhone} onChange={e => setCPhone(e.target.value)} className="input text-xs mt-1 font-mono" /></label>
+              </div>
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowContactModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Ukládám...' : 'Přidat kontakt'}</Button>
+                <Button type="submit" disabled={saving} className="font-bold">Uložit kontakt</Button>
               </div>
             </form>
           </div>
@@ -453,47 +509,47 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
       {showBranchModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold border-b pb-2">➕ Přidat Pobočku / Provozovnu</h2>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">🏬 Přidat novou pobočku klienta</h3>
+              <button onClick={() => setShowBranchModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+            </div>
             <form onSubmit={handleAddBranch} className="space-y-3">
-              <label className="text-xs font-semibold">Název pobočky *<input className="input text-sm mt-1" placeholder="Např. Prodejna Brno Vankovka" value={bName} onChange={e => setBName(e.target.value)} required /></label>
-              <label className="text-xs font-semibold">Kód pobočky<input className="input text-sm mt-1" placeholder="Např. BRN-01" value={bCode} onChange={e => setBCode(e.target.value)} /></label>
-              <label className="text-xs font-semibold">Ulice<input className="input text-sm mt-1" value={bStreet} onChange={e => setBStreet(e.target.value)} /></label>
+              <label className="text-xs font-semibold">Název pobočky *<input type="text" value={bName} onChange={e => setBName(e.target.value)} required placeholder="Např. Prodejna Ostrava Svinov" className="input text-xs mt-1" /></label>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs font-semibold">Město<input className="input text-sm mt-1" value={bCity} onChange={e => setBCity(e.target.value)} /></label>
-                <label className="text-xs font-semibold">PSČ<input className="input text-sm mt-1" value={bZip} onChange={e => setBZip(e.target.value)} /></label>
+                <label className="text-xs font-semibold">Ulice a číslo<input type="text" value={bStreet} onChange={e => setBStreet(e.target.value)} className="input text-xs mt-1" /></label>
+                <label className="text-xs font-semibold">Město *<input type="text" value={bCity} onChange={e => setBCity(e.target.value)} required placeholder="Ostrava" className="input text-xs mt-1" /></label>
               </div>
-
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowBranchModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Ukládám...' : 'Přidat pobočku'}</Button>
+                <Button type="submit" disabled={saving} className="font-bold">Uložit pobočku</Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Add Communication Modal */}
+      {/* Log Communication Modal */}
       {showCommModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold border-b pb-2">📞 Zaznamenat Komunikaci</h2>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">📞 Zaznamenat komunikaci</h3>
+              <button onClick={() => setShowCommModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+            </div>
             <form onSubmit={handleAddComm} className="space-y-3">
               <label className="text-xs font-semibold">Typ komunikace
-                <select className="input text-sm mt-1" value={commType} onChange={e => setCommType(e.target.value)}>
-                  <option value="PHONE_CALL">📞 Telefonát</option>
-                  <option value="EMAIL">✉️ E-mail</option>
-                  <option value="IN_PERSON_MEETING">🤝 Osobní schůzka</option>
-                  <option value="ONLINE_MEETING">💻 Online schůzka</option>
-                  <option value="NOTE">📝 Poznámka</option>
-                  <option value="INTERNAL_NOTE">🔒 Interní poznámka (neveřejná)</option>
+                <select value={commType} onChange={e => setCommType(e.target.value)} className="input text-xs mt-1">
+                  <option value="PHONE_CALL">Telefonní hovor</option>
+                  <option value="EMAIL">E-mailová zpráva</option>
+
+                  <option value="MEETING">Osobní schůzka</option>
                 </select>
               </label>
-              <label className="text-xs font-semibold">Předmět *<input className="input text-sm mt-1" placeholder="Např. Projednání prodloužení navigace" value={commSubject} onChange={e => setCommSubject(e.target.value)} required /></label>
-              <label className="text-xs font-semibold">Obsah jednání *<textarea className="input text-sm mt-1 h-24" placeholder="Detailní zápis komunikace..." value={commContent} onChange={e => setCommContent(e.target.value)} required /></label>
-
+              <label className="text-xs font-semibold">Předmět / Téma *<input type="text" value={commSubject} onChange={e => setCommSubject(e.target.value)} required placeholder="Např. Projednání nabídky na zábor VO" className="input text-xs mt-1" /></label>
+              <label className="text-xs font-semibold">Obsah / Poznámka z jednání<textarea value={commContent} onChange={e => setCommContent(e.target.value)} rows={3} className="input text-xs mt-1" /></label>
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowCommModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Ukládám...' : 'Uložit zápis'}</Button>
+                <Button type="submit" disabled={saving} className="font-bold">Uložit hovor</Button>
               </div>
             </form>
           </div>
@@ -504,85 +560,67 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
       {showTaskModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold border-b pb-2">✅ Nový Úkol pro Klienta</h2>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">✅ Vytvořit nový úkol pro klienta</h3>
+              <button onClick={() => setShowTaskModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+            </div>
             <form onSubmit={handleAddTask} className="space-y-3">
-              <label className="text-xs font-semibold">Název úkolu *<input className="input text-sm mt-1" placeholder="Např. Zavolat ohledně podkladů do tiskárny" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} required /></label>
-              <label className="text-xs font-semibold">Termín splnění *<input className="input text-sm mt-1" type="date" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)} required /></label>
-
+              <label className="text-xs font-semibold">Název úkolu *<input type="text" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} required placeholder="Např. Zavolat ohledně prodloužení smlouvy" className="input text-xs mt-1" /></label>
+              <label className="text-xs font-semibold">Termín splnění *<input type="date" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)} required className="input text-xs mt-1 font-mono" /></label>
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowTaskModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Ukládám...' : 'Vytvořit úkol'}</Button>
+                <Button type="submit" disabled={saving} className="font-bold">Vytvořit úkol</Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Merge Modal */}
+      {/* Merge Client Modal */}
       {showMergeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold border-b pb-2 text-purple-950">🔗 Sloučit Duplicitního Klienta</h2>
-            <p className="text-xs text-slate-600">Zadejte ID zdrojového klienta, který má být sloučen do cílového klienta <strong>{client.name}</strong>. Všechny zakázky, kontakty, nabídky a historii převedeme automaticky.</p>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">🔗 Sloučit jiného klienta do tohoto profilu</h3>
+              <button onClick={() => setShowMergeModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+            </div>
             <form onSubmit={handleMergeClient} className="space-y-3">
-              <label className="text-xs font-semibold">ID Zdrojového Klienta *<input className="input text-sm mt-1 font-mono" placeholder="Zadejte ID duplicitního klienta..." value={sourceClientId} onChange={e => setSourceClientId(e.target.value)} required /></label>
-
+              <p className="text-xs text-slate-600">Všechny nabídky, zakázky, pobočky i kontakty zdrojového klienta budou sloučeny do profilu <strong>{client.name}</strong>.</p>
+              <label className="text-xs font-semibold">ID zdrojového klienta ke sloučení *
+                <input type="text" value={sourceClientId} onChange={e => setSourceClientId(e.target.value)} required placeholder="Vložte ID klienta (C-xxx nebo CUID)" className="input text-xs mt-1 font-mono" />
+              </label>
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowMergeModal(false)}>Zrušit</Button>
-                <Button type="submit" variant="secondary" className="!bg-purple-900 !text-white hover:!bg-purple-800" disabled={saving}>{saving ? 'Provádím...' : 'Sloučit klienty'}</Button>
+                <Button type="submit" disabled={saving} className="font-bold bg-purple-600 text-white">Sloučit klienta</Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Delete / Deactivate Modal */}
+      {/* Delete / Deactivate Client Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-lg font-bold border-b pb-2 text-rose-950 flex items-center gap-2">
-              <span>🗑️</span> Odstranit klienta {client.name}
-            </h2>
-            <p className="text-xs text-slate-600">
-              Vyberte požadovaný způsob odstranění klienta <strong>{client.name}</strong> ze systému SeePoint.
-            </p>
-
-            <div className="space-y-3 pt-1">
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3 space-y-2">
-                <h4 className="font-bold text-xs text-amber-950">🛑 Deaktivovat / Archivovat (Doporučeno)</h4>
-                <p className="text-[11px] text-amber-800">
-                  Klient bude skryt z běžného vyhledávání, ale veškeré historické zakázky, nabídky a faktury zůstanou v účetnictví zachovány.
-                </p>
-                <Button
-                  onClick={() => handleDeleteClient(false)}
-                  disabled={saving}
-                  variant="secondary"
-                  className="w-full !bg-amber-600 !text-white hover:!bg-amber-700 text-xs"
-                >
-                  {saving ? 'Provádím...' : 'Deaktivovat klienta'}
-                </Button>
-              </div>
-
-              <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3 space-y-2">
-                <h4 className="font-bold text-xs text-rose-950">🔥 Trvale smazat z databáze</h4>
-                <p className="text-[11px] text-rose-800">
-                  Nenávratně smaže záznam klienta i s jeho profilovými daty z databáze.
-                </p>
-                <Button
-                  onClick={() => handleDeleteClient(true)}
-                  disabled={saving}
-                  variant="secondary"
-                  className="w-full !bg-rose-700 !text-white hover:!bg-rose-800 text-xs"
-                >
-                  {saving ? 'Smazávám...' : 'Trvale smazat klienta'}
-                </Button>
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="font-bold text-base text-slate-900">🗑️ Odstranění / Deaktivace Klienta</h3>
+              <button onClick={() => setShowDeleteModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+            </div>
+            <div className="space-y-3 text-xs text-slate-700">
+              <p>Zvolte, jaký druh odstranění chcete provést pro klienta <strong>{client.name}</strong>:</p>
+              <div className="space-y-2 pt-1">
+                <button type="button" onClick={() => handleDeleteClient(false)} className="w-full p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-left transition">
+                  <strong className="text-amber-950 block font-bold">1. Archivovat / Deaktivovat (Doporučeno)</strong>
+                  <span className="text-amber-800 text-[11px]">Klient bude označen jako neaktivní. Všechna jeho data zůstanou bezpečně v systému.</span>
+                </button>
+                <button type="button" onClick={() => handleDeleteClient(true)} className="w-full p-3 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-left transition">
+                  <strong className="text-rose-950 block font-bold">2. Trvale smazat z databáze</strong>
+                  <span className="text-rose-800 text-[11px]">Klient i všechny jeho navázané kontakty a pobočky budou trvale smazány z databáze.</span>
+                </button>
               </div>
             </div>
-
             <div className="flex justify-end border-t pt-3">
-              <Button type="button" variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                Zrušit
-              </Button>
+              <Button type="button" variant="secondary" onClick={() => setShowDeleteModal(false)}>Zrušit</Button>
             </div>
           </div>
         </div>
