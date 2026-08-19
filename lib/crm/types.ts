@@ -60,6 +60,7 @@ export type ClientBranchItem = {
   zip?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  note?: string | null;
   contactPerson?: { firstName: string; lastName: string } | null;
 };
 
