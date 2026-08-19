@@ -76,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
       .join('\n');
 
-    // Step 2: Use Gemini 3.6 AI to analyze company, find ALL MS Region branches, local contacts & OSTRAVA ad strategy
+    // Step 2: Use Gemini 3.6 AI to analyze company, find ALL MS Region branches with STRICT ANTI-HALLUCINATION rules
     const apiKey = process.env.GEMINI_API_KEY;
     let aiEnrichmentResult: {
       selectedIndex?: number;
@@ -118,6 +118,11 @@ DŮLEŽITÝ KONTEXT AGENTURY SEEPOINT:
 Agentura SeePoint působí a vlastní reklamní plochy VÝHRADNĚ V OSTRAVĚ a Moravskoslezském kraji (MS kraj – Ostrava, Opava, Frýdek-Místek, Karviná, Havířov, Třinec, Nový Jičín, Bohumín, Orlová, Krnov, Bruntál, Kopřivnice, Frenštát p.R.).
 Praha ani jiné kraje nás NEZAJÍMAJÍ. Všechny reklamní návrhy, pobočky a kontaktní osoby ZACILUJ PRIORITNĚ NA OSTRAVU A MORAVSKOSLEZSKÝ KRAJ!
 
+PŘÍSNÁ PRAVIDLA PRO ADRESY POBOČEK (ANTI-HALUCINACE):
+1. NIKDY si NEVYMÝŠLEJ fiktivní nebo neodpovídající ulice ani čísla popisná!
+2. Uváděj POUZE Skutečné a reálně ověřené adresa prodejen/poboček klienta z oficiálního webu nebo ARES rejstříku.
+3. Pokud u pobočky znáš město (např. Ostrava), ale neznáš na 100 % přesnou ulici s číslem popisným, raději pole \`street\` nechej prázdné nebo uveď městskou část (např. "Ostrava - Poruba"), než abys vygeneroval vymyšlenou ulici!
+
 Zadání hledaného klienta:
 - Zadání/Hledaný pojem: "${searchKeyword}"
 - Současný název v CRM: "${client.name}"
@@ -136,7 +141,7 @@ TVÉ ÚKOLY:
 6. Napiš 2-3 stručné věty představující profil a zaměření firmy (companySummary).
 7. Uveď jména jednatelů / vedení (executives).
 8. Uveď kontaktní osoby a manažery (contactPersons) pro Ostrava / MS kraj nebo centrálu.
-9. KLÍČOVÝ ÚKOL - POBOČKY: Dohledei VŠECHNY FYZICKÉ PRODEJNY, SKLADY, PROVOZOVNY A POBOČKY klienta v Moravskoslezském kraji (Ostrava, Opava, Frýdek-Místek, Karviná, Havířov, Třinec, Nový Jičín, Krnov, Bruntál, Bohumín, Orlová atd.). Neomezuj se na 1-2 pobočky! Vyjmenuj VŠECHNY nalezené prodejny/pobočky v MS kraji v poli \`msRegionBranches\`!
+9. KLÍČOVÝ ÚKOL - POBOČKY (OSTRAVA & MS KRAJ): Dohledei reálné FYZICKÉ PRODEJNY A POBOČKY klienta v Moravskoslezském kraji s PŘESNÝMI A REÁLNÝMI ADRESAMI. Neuváděj vymyšlené ulice! Vyjmenuj nalezené prodejny v poli \`msRegionBranches\`!
 10. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint V OSTRAVĚ A MS KRAJI s konkrétními důvody zacílení.
 11. Napiš 2 prodejní argumenty zaměřené na podporu ostravských a krajských poboček.
 
@@ -179,20 +184,6 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       "city": "Opava",
       "zip": "74601",
       "note": "Prodejna Opava"
-    },
-    {
-      "name": "CANIS SAFETY - Prodejna Frýdek-Místek",
-      "street": "Příborská 2294",
-      "city": "Frýdek-Místek",
-      "zip": "73801",
-      "note": "Prodejna Frýdek-Místek"
-    },
-    {
-      "name": "CANIS SAFETY - Prodejna Karviná",
-      "street": "Nádražní 195",
-      "city": "Karviná",
-      "zip": "73301",
-      "note": "Prodejna Karviná"
     }
   ],
   "recommendedCarriers": [
@@ -202,7 +193,7 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
   ],
   "salesAdvice": [
     "Nabídnout navigaci od sjezdu Místecká k ostravské prodejně CANIS.",
-    "Zacílit na podporu návštěvnosti ostravské, opavské a frýdecké prodejny u stavebních firem z MS kraje."
+    "Zacílit na podporu návštěvnosti ostravské a opavské prodejny u stavebních firem z MS kraje."
   ]
 }`;
 
@@ -268,7 +259,7 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       }
 
       if (aiEnrichmentResult.msRegionBranches && aiEnrichmentResult.msRegionBranches.length > 0) {
-        parts.push(`\n🏬 VŠECHNY POBOČKY A PRODEJNY V OSTRAVĚ & MS KRAJI (${aiEnrichmentResult.msRegionBranches.length}):`);
+        parts.push(`\n🏬 POBOČKY A PRODEJNY V OSTRAVĚ & MS KRAJI (${aiEnrichmentResult.msRegionBranches.length}):`);
         aiEnrichmentResult.msRegionBranches.forEach((b) => parts.push(`  - ${b.name}: ${b.street || ''}, ${b.city || ''}`));
       }
 

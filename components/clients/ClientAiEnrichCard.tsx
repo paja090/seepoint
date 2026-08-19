@@ -254,13 +254,24 @@ export function ClientAiEnrichCard({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {enrichData.msRegionBranches.map((b, i) => (
-                  <div key={i} className="rounded-xl border border-amber-200/80 bg-white p-3 space-y-1 text-xs">
-                    <div className="font-extrabold text-slate-900">{b.name}</div>
-                    <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
-                      <MapPin size={12} className="text-amber-600 shrink-0" />
-                      <span>{b.street ? `${b.street}, ` : ''}{b.city}</span>
+                  <div key={i} className="rounded-xl border border-amber-200/80 bg-white p-3 space-y-1.5 text-xs flex flex-col justify-between">
+                    <div>
+                      <div className="font-extrabold text-slate-900">{b.name}</div>
+                      <div className="flex items-center gap-1.5 text-slate-600 text-[11px] mt-0.5">
+                        <MapPin size={12} className="text-amber-600 shrink-0" />
+                        <span>{b.street ? `${b.street}, ` : ''}{b.city}</span>
+                      </div>
+                      {b.note && <p className="text-[10px] text-slate-500 italic mt-0.5">{b.note}</p>}
                     </div>
-                    {b.note && <p className="text-[10px] text-slate-500 italic mt-0.5">{b.note}</p>}
+                    <div className="pt-1.5 border-t border-amber-100/80 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400">Dohledáno AI</span>
+                      <a
+                        href={`/clients/${clientId}?tab=branches`}
+                        className="text-[10px] font-bold text-sky-600 hover:text-sky-800 hover:underline flex items-center gap-1"
+                      >
+                        <span>✏️ Upravit adresu</span>
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
