@@ -17,3 +17,30 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
   catch(error){if(error instanceof Error&&error.message==='LAST_ADMIN')return NextResponse.json({error:'Posledního aktivního administrátora nelze deaktivovat.'},{status:409});throw error}
   return NextResponse.json({ok:true});
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const actor = await getCurrentUser();
+  if (!actor || !['ADMIN', 'MANAGER'].includes(actor.role)) {
+    return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const employee = await prisma.employee.findUnique({ where: { id }, include: { user: true } });
+  if (!employee) return NextResponse.json({ error: 'Zaměstnanec nebyl nalezen.' }, { status: 404 });
+
+  if (actor.role === 'MANAGER' && employee.user?.role === 'ADMIN') {
+    return NextResponse.json({ error: 'Manažer nemůže mazat administrátora.' }, { status: 403 });
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (employee.userId) {
+        await tx.user.delete({ where: { id: employee.userId } }).catch(() => null);
+      }
+      await tx.employee.delete({ where: { id } });
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Chyba při mazání zaměstnance.' }, { status: 500 });
+  }
+}
