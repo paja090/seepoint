@@ -8,6 +8,7 @@ import { WarehouseMovementModal } from '@/components/warehouse/WarehouseMovement
 import { WarehouseVoiceInputModal } from '@/components/warehouse/WarehouseVoiceInputModal';
 import { WarehousePhotoScannerModal } from '@/components/warehouse/WarehousePhotoScannerModal';
 import { WarehouseAiImportModal } from '@/components/warehouse/WarehouseAiImportModal';
+import { MobileWarehouseAppClient } from '@/components/warehouse/MobileWarehouseAppClient';
 import { RestockButton } from '@/components/warehouse/RestockButton';
 import { Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, RotateCcw, Building2, MapPin, Wrench, ShoppingCart, Printer, Camera, Sparkles } from 'lucide-react';
 
@@ -73,6 +74,47 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
 
   return (
     <AppShell>
+      {/* Mobile-first Warehouse Quick App (< lg) */}
+      <div className="block lg:hidden mb-6">
+        <MobileWarehouseAppClient
+          items={itemsRaw.map((item) => ({
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            category: item.category,
+            unit: item.unit,
+            quantityInStock: Number(item.quantityInStock),
+            minQuantity: item.minQuantity ? Number(item.minQuantity) : null,
+            location: item.location,
+            supplierName: item.supplierName,
+          }))}
+          workOrders={workOrders}
+          employees={employees}
+          recentMovements={recentMovementsRaw.map((m) => ({
+            id: m.id,
+            type: m.type,
+            quantity: Number(m.quantity),
+            performedByName: m.performedByName,
+            assignedEmployeeName: m.assignedEmployeeName,
+            createdAt: m.createdAt,
+            item: {
+              id: m.item.id,
+              name: m.item.name,
+              category: m.item.category,
+              unit: m.item.unit,
+            },
+            workOrder: m.workOrder
+              ? {
+                  id: m.workOrder.id,
+                  title: m.workOrder.title,
+                  clientName: m.workOrder.clientName,
+                }
+              : null,
+          }))}
+          currentUserName={user.name || undefined}
+        />
+      </div>
+
       {/* Header Bar */}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
