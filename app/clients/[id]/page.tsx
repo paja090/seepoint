@@ -43,19 +43,19 @@ export default async function ClientProfilePage({
   const client = rawClient as unknown as ClientProfileData;
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊', name: 'Přehled' },
-    { id: 'contacts', label: 'Contacts', icon: '👥', name: `Kontakty (${client.contacts?.length || 0})` },
-    { id: 'branches', label: 'Branches', icon: '🏬', name: `Pobočky (${client.branches?.length || 0})` },
-    { id: 'offers', label: 'Offers', icon: '📄', name: `Nabídky (${client.offers?.length || 0})` },
-    { id: 'orders', label: 'Orders', icon: '🛒', name: `Zakázky (${client.crmOrders?.length || 0})` },
-    { id: 'realizations', label: 'Realizations', icon: '🛠️', name: 'Realizace' },
-    { id: 'surfaces', label: 'Surfaces', icon: '🪧', name: `Reklamní plochy (${client.occupancies?.length || 0})` },
-    { id: 'contracts', label: 'Contracts', icon: '📜', name: `Smlouvy (${client.contracts?.length || 0})` },
-    { id: 'invoices', label: 'Invoices', icon: '💶', name: `Fakturace (${client.invoices?.length || 0})` },
-    { id: 'communications', label: 'Communications', icon: '📞', name: `Komunikace (${client.communications?.length || 0})` },
-    { id: 'tasks', label: 'Tasks', icon: '✅', name: `Úkoly (${client.crmTasks?.length || 0})` },
-    { id: 'documents', label: 'Documents', icon: '📁', name: `Dokumenty (${client.documents?.length || 0})` },
-    { id: 'audit', label: 'Audit', icon: '🛡️', name: 'Historie' },
+    { id: 'overview', icon: '📊', name: 'Přehled' },
+    { id: 'contacts', icon: '👥', name: 'Kontakty', count: client.contacts?.length || 0 },
+    { id: 'branches', icon: '🏬', name: 'Pobočky MS Kraj', count: client.branches?.length || 0 },
+    { id: 'offers', icon: '📄', name: 'Nabídky', count: client.offers?.length || 0 },
+    { id: 'orders', icon: '🛒', name: 'Zakázky', count: client.crmOrders?.length || 0 },
+    { id: 'realizations', icon: '🛠️', name: 'Realizace' },
+    { id: 'surfaces', icon: '🪧', name: 'Reklamní Plochy', count: client.occupancies?.length || 0 },
+    { id: 'contracts', icon: '📜', name: 'Smlouvy', count: client.contracts?.length || 0 },
+    { id: 'invoices', icon: '💶', name: 'Fakturace', count: client.invoices?.length || 0 },
+    { id: 'communications', icon: '📞', name: 'Komunikace', count: client.communications?.length || 0 },
+    { id: 'tasks', icon: '✅', name: 'Úkoly', count: client.crmTasks?.length || 0 },
+    { id: 'documents', icon: '📁', name: 'Dokumenty', count: client.documents?.length || 0 },
+    { id: 'audit', icon: '🛡️', name: 'Historie' },
   ];
 
   return (
@@ -73,25 +73,38 @@ export default async function ClientProfilePage({
           website={client.website}
         />
 
-        {/* 13 CRM Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto pb-0 text-sm font-medium scrollbar-thin">
-          {tabs.map(t => {
-            const isActive = tab === t.id;
-            return (
-              <a
-                key={t.id}
-                href={`/clients/${client.id}?tab=${t.id}`}
-                className={`flex items-center gap-1.5 px-4 py-2.5 border-b-2 font-semibold whitespace-nowrap transition ${
-                  isActive
-                    ? 'border-sky-600 text-sky-700 bg-sky-50/50 rounded-t-lg'
-                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                }`}
-              >
-                <span>{t.icon}</span>
-                <span>{t.name}</span>
-              </a>
-            );
-          })}
+        {/* Enterprise Tab Bar */}
+        <div className="bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs overflow-x-auto scrollbar-thin">
+          <div className="flex items-center gap-1 min-w-max">
+            {tabs.map((t) => {
+              const isActive = tab === t.id;
+              return (
+                <a
+                  key={t.id}
+                  href={`/clients/${client.id}?tab=${t.id}`}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+                    isActive
+                      ? 'bg-white text-sky-950 shadow-sm border border-slate-200/80'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <span className="text-sm">{t.icon}</span>
+                  <span>{t.name}</span>
+                  {typeof t.count === 'number' && (
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        isActive
+                          ? 'bg-sky-100 text-sky-800'
+                          : 'bg-slate-200/80 text-slate-700'
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </a>
+              );
+            })}
+          </div>
         </div>
 
         {/* Tab Content Display */}
