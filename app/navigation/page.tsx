@@ -25,7 +25,16 @@ import {
 } from '@/lib/navigation/types';
 import { NavigationKanbanView } from '@/components/navigation/NavigationKanbanView';
 
+import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
+
 export const dynamic = 'force-dynamic';
+
+const navSubNavItems = [
+  { href: '/navigation', label: '📋 Projekty Navigace' },
+  { href: '/navigation/contracts', label: '📋 Evidence smluv VO' },
+  { href: '/navigation/contacts', label: '🏛️ Kontaktní osoby měst' },
+  { href: '/navigation/documentation', label: '📷 Fotodokumentace & Reporty' },
+];
 
 export default async function NavigationDashboardPage({
   searchParams,
@@ -49,9 +58,12 @@ export default async function NavigationDashboardPage({
 
   return (
     <AppShell>
+      {/* Shared SubNav Tabs */}
+      <ProjectSubNav items={navSubNavItems} />
+
       {/* Top Header & Operational Actions */}
       <PageHeader
-        title="Modul NAVIGACE"
+        title="🧭 Městská Navigace"
         description="Kompletní provozní rozhraní pro navigaci: od nabídky přes výrobu, plánování montáží v terénu až po fakturaci."
         actions={
           <div className="flex flex-wrap gap-2">

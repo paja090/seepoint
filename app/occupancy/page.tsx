@@ -10,6 +10,14 @@ import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/l
 import { clientResolutionFilter } from '@/lib/occupancy-client';
 import { OccupancyTableWithBulk } from '@/components/OccupancyTableWithBulk';
 import { QuickOccupancyBookingForm } from '@/components/QuickOccupancyBookingForm';
+import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
+
+const inventoryNavItems = [
+  { href: '/projects/city-inventory', label: '📊 Přehled & Nástěnka' },
+  { href: '/carriers', label: '🪧 Evidence nosičů' },
+  { href: '/occupancy', label: '📅 Obsazenost ploch' },
+  { href: '/map', label: '🗺️ Mapa nosičů' },
+];
 
 export const dynamic = 'force-dynamic';
 
@@ -283,6 +291,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
 
     return (
       <AppShell>
+        <ProjectSubNav items={inventoryNavItems} />
         <PageHeader
           title="Obsazenost & Volné Plochy k Kampaním"
           description="Přehled, filtrování volných reklamních ploch a hromadné rezervace kampaní pro obchodníky. Prošlé kampaně automaticky mizí z tabulky a plochy se ihned stávají volnými."

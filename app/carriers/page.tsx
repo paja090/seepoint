@@ -8,7 +8,16 @@ import { Button, EmptyState, PageHeader, Table, TableCell, TableHead, TableHeade
 import { carrierTypeLabel, mediaTypeLabel, parseCarrierFilters } from '@/lib/carrier-filters';
 import { getCarrierFilterOptions, getCarriersPage } from '@/lib/db';
 
+import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
+
 export const dynamic = 'force-dynamic';
+
+const inventoryNavItems = [
+  { href: '/projects/city-inventory', label: '📊 Přehled & Nástěnka' },
+  { href: '/carriers', label: '🪧 Evidence nosičů' },
+  { href: '/occupancy', label: '📅 Obsazenost ploch' },
+  { href: '/map', label: '🗺️ Mapa nosičů' },
+];
 
 export default async function Carriers({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePageAccess('carriers');
@@ -22,6 +31,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
 
   return (
     <AppShell>
+      <ProjectSubNav items={inventoryNavItems} />
       <PageHeader
         title="Reklamní nosiče"
         description="Databázově filtrovaný seznam nosičů. Tabulka je stránkovaná, ale celkový počet se počítá nad celou databází."

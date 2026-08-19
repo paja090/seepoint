@@ -28,14 +28,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '🗺️ Nosiče & Navigace',
+    label: '🗺️ Městské projekty & Inventář',
     items: [
-      ['/carriers', '🪧 Evidence nosičů', 'panelsTopLeft', 'carriers'],
-      ['/navigation', '🧭 Projekty Navigace', 'mapPinned', 'navigationProjects'],
-      ['/navigation/contracts', '📋 Evidence smluv VO', 'fileText', 'navigationContracts'],
-      ['/navigation/contacts', '🏛️ Kontaktní osoby měst', 'users', 'navigationContacts'],
-      ['/navigation/documentation', '📷 Fotodokumentace & Reporty', 'camera', 'navigationDocumentation'],
+      ['/navigation', '🧭 Městská Navigace', 'mapPinned', 'navigationProjects'],
       ['/projects/city-gallery', '🖼️ Galerie VENKU', 'galleryHorizontalEnd', 'cityGallery'],
+      ['/projects/city-inventory', '🪧 Městský Inventář (Postery/Lavičky)', 'panelsTopLeft', 'carriers'],
     ],
   },
   {
