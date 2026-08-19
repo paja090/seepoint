@@ -114,8 +114,12 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   // Try Google Gemini Vision models
   if (effectiveGeminiKey) {
     const modelsToTry = [
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite',
       'gemini-1.5-flash',
       'gemini-1.5-pro',
+      'gemini-2.5-flash',
+      'gemini-3.0-flash',
       'gemini-flash-latest',
     ];
 
@@ -158,7 +162,10 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
               errDetail = errJson.error?.message || errorText;
             } catch {}
             console.warn(`Gemini model ${model} (${apiVersion}) returned HTTP ${res.status}:`, errDetail.slice(0, 150));
-            errorLogs.push(`${model} (${apiVersion}): HTTP ${res.status} - ${errDetail}`);
+            // Save non-404 error details or last error
+            if (res.status !== 404 || errorLogs.length === 0) {
+              errorLogs.push(`${model} (${apiVersion}): HTTP ${res.status} - ${errDetail}`);
+            }
             continue;
           }
 
