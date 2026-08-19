@@ -6,7 +6,16 @@ import { listNavigationContracts } from '@/lib/navigation/contract-service';
 import { prisma } from '@/lib/db';
 import { ContractManagementView } from '@/components/navigation/ContractManagementView';
 
+import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
+
 export const dynamic = 'force-dynamic';
+
+const navSubNavItems = [
+  { href: '/navigation', label: '📋 Projekty Navigace' },
+  { href: '/navigation/contracts', label: '📋 Evidence smluv VO' },
+  { href: '/navigation/contacts', label: '🏛️ Kontaktní osoby měst' },
+  { href: '/navigation/documentation', label: '📷 Fotodokumentace & Reporty' },
+];
 
 export default async function NavigationContractsPage({
   searchParams,
@@ -31,6 +40,7 @@ export default async function NavigationContractsPage({
 
   return (
     <AppShell>
+      <ProjectSubNav items={navSubNavItems} />
       <PageHeader
         title="📄 Evidence smluv navigační reklamy"
         description="Správa smluv pronájmu, výroby a servisu navigačních cedulí s automatickými hlídači vypršení platnosti."
