@@ -16,6 +16,7 @@ import { ClientCommunicationsTab } from '@/components/crm/ClientCommunicationsTa
 import { ClientTasksTab } from '@/components/crm/ClientTasksTab';
 import { ClientDocumentsTab } from '@/components/crm/ClientDocumentsTab';
 import { ClientAuditTab } from '@/components/crm/ClientAuditTab';
+import { ClientAiEnrichCard } from '@/components/clients/ClientAiEnrichCard';
 import { ClientProfileData } from '@/lib/crm/types';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,15 @@ export default async function ClientProfilePage({
       <div className="space-y-6 pb-12">
         {/* Main Client Profile Header & Metrics */}
         <ClientHeader client={client} />
+
+        {/* AI Client Enrichment & ARES Lookup Card */}
+        <ClientAiEnrichCard
+          clientId={client.id}
+          clientName={client.name}
+          companyId={client.companyId}
+          dic={client.dic}
+          website={client.website}
+        />
 
         {/* 13 CRM Navigation Tabs */}
         <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto pb-0 text-sm font-medium scrollbar-thin">
