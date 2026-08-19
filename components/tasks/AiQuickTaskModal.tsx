@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Mic, MicOff, Check, X, User, AlertCircle, Loader2 } from 'lucide-react';
+import { Sparkles, Mic, MicOff, Check, X, User, AlertCircle, Loader2, ListChecks } from 'lucide-react';
 
 export type EmployeeOption = {
   id: string;
@@ -22,6 +22,7 @@ export function AiQuickTaskModal({
   onTasksCreated?: () => void;
 }) {
   const [prompt, setPrompt] = useState('');
+  const [targetAssigneeId, setTargetAssigneeId] = useState<string>('AUTO');
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +69,10 @@ export function AiQuickTaskModal({
       const res = await fetch('/api/ai/parse-quick-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          prompt,
+          defaultAssigneeId: targetAssigneeId !== 'AUTO' ? targetAssigneeId : undefined,
+        }),
       });
 
       const data = await res.json();
@@ -93,7 +97,7 @@ export function AiQuickTaskModal({
             </div>
             <div>
               <h3 className="text-lg font-black text-slate-900">AI Rychlý Úkolníček</h3>
-              <p className="text-xs text-slate-500">Zadejte hlasem nebo textem rychlý pokyn pro dílnu</p>
+              <p className="text-xs text-slate-500">Zadejte hlasem nebo textem rychlý Check-list pro dílnu</p>
             </div>
           </div>
           <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
@@ -113,20 +117,25 @@ export function AiQuickTaskModal({
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 space-y-3">
               <div className="flex items-center gap-2 font-bold text-sm text-emerald-800">
                 <Check size={18} className="text-emerald-600" />
-                <span>Úspěšně vytvořeno {createdTasks.length} úkolů!</span>
+                <span>Vytvořen Check-list o {createdTasks.length} položkách!</span>
               </div>
               <div className="space-y-2">
-                {createdTasks.map((t) => (
-                  <div key={t.id} className="rounded-xl bg-white p-3 border border-emerald-100 text-xs text-slate-800 space-y-1 shadow-2xs">
-                    <strong className="block font-bold text-slate-900">{t.title}</strong>
-                    {t.description && <p className="text-slate-500">{t.description}</p>}
-                    <div className="flex items-center justify-between text-[11px] pt-1 text-slate-500">
-                      <span className="font-semibold text-slate-700">
-                        👤 {t.assignedToEmployee?.firstName} {t.assignedToEmployee?.lastName}
-                      </span>
-                      <span className="font-bold uppercase text-[10px] text-fuchsia-700 bg-fuchsia-50 px-2 py-0.5 rounded-md">
-                        {t.priority}
-                      </span>
+                {createdTasks.map((t, idx) => (
+                  <div key={t.id} className="rounded-xl bg-white p-3 border border-emerald-100 text-xs text-slate-800 space-y-1 shadow-2xs flex items-start gap-2.5">
+                    <div className="h-5 w-5 rounded-md border-2 border-emerald-500 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5 font-bold">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <strong className="block font-bold text-slate-900 leading-snug">{t.title}</strong>
+                      {t.description && <p className="text-slate-500 text-[11px]">{t.description}</p>}
+                      <div className="flex items-center justify-between text-[11px] pt-1 text-slate-500">
+                        <span className="font-semibold text-slate-700">
+                          👤 {t.assignedToEmployee?.firstName} {t.assignedToEmployee?.lastName}
+                        </span>
+                        <span className="font-bold uppercase text-[10px] text-fuchsia-700 bg-fuchsia-50 px-2 py-0.5 rounded-md">
+                          {t.priority}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -142,7 +151,7 @@ export function AiQuickTaskModal({
                 }}
                 className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700"
               >
-                Zadat další úkol
+                Zadat další Check-list
               </button>
 
               <button
@@ -157,8 +166,27 @@ export function AiQuickTaskModal({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="font-bold text-xs text-slate-700 block mb-1.5">
-                Namluvte nebo napište pokyn vedoucího:
+              <label className="font-bold text-xs text-slate-700 block mb-1">
+                Přiřadit úkoly:
+              </label>
+              <select
+                value={targetAssigneeId}
+                onChange={(e) => setTargetAssigneeId(e.target.value)}
+                className="input w-full p-2.5 text-xs border-slate-300 rounded-xl mb-3 font-semibold text-slate-800"
+              >
+                <option value="AUTO">🤖 AI Automaticky (podle jména v pokynu nebo "sám sobě")</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    👤 {e.firstName} {e.lastName} ({e.position || 'Pracovník'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-xs text-slate-700 block mb-1.5 flex items-center justify-between">
+                <span>Namluvte nebo napište pokyn (AI vytvoří Check-list):</span>
+                <span className="text-[11px] text-fuchsia-700 font-bold">🎙️ Hlasové zadávání</span>
               </label>
               <div className="relative">
                 <textarea
@@ -166,7 +194,7 @@ export function AiQuickTaskModal({
                   required
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="např. Pavel zítra ráno než odjede zamete halu u vrat a odpoledne skočí do Hornbachu pro barvu..."
+                  placeholder="např. Zamést halu u vrat, uklidit ponk u pily a zajet do Hornbachu pro barvu..."
                   className="input w-full p-3 text-xs border-slate-300 rounded-2xl resize-none"
                 />
 
@@ -184,7 +212,7 @@ export function AiQuickTaskModal({
                 </button>
               </div>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                💡 Tip: Můžete zmínit jméno zaměstnance (např. *Pavel*, *Petr*) a AI úkol automaticky spáruje s jeho profilem.
+                💡 Tip: Můžete říct <i>"Sám sobě"</i> nebo napsat seznam úkolů oddělený čárkami.
               </span>
             </div>
 
@@ -205,12 +233,12 @@ export function AiQuickTaskModal({
                 {loading ? (
                   <>
                     <Loader2 size={16} className="animate-spin" />
-                    <span>AI Zpracovává úkoly...</span>
+                    <span>AI Vytváří Check-list...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={16} />
-                    <span>Zpracovat & Vytvořit úkoly</span>
+                    <ListChecks size={16} />
+                    <span>Vytvořit Check-list</span>
                   </>
                 )}
               </button>

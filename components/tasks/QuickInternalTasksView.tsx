@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle, Clock, User, AlertCircle, Sparkles, MessageSquare, Trash2, X } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, User, AlertCircle, Sparkles, MessageSquare, Trash2, X, CheckSquare, Square } from 'lucide-react';
 
 export type QuickTaskItem = {
   id: string;
@@ -104,7 +104,7 @@ export function QuickInternalTasksView({
               statusFilter === 'ALL' ? 'bg-slate-900 text-white font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Všechny ({tasks.length})
+            Všechny položky ({tasks.length})
           </button>
           <button
             type="button"
@@ -113,7 +113,7 @@ export function QuickInternalTasksView({
               statusFilter === 'PENDING' ? 'bg-amber-500 text-white font-black' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
             }`}
           >
-            Čekající ({tasks.filter((t) => t.status === 'PENDING').length})
+            K vyřízení ({tasks.filter((t) => t.status === 'PENDING').length})
           </button>
           <button
             type="button"
@@ -136,11 +136,11 @@ export function QuickInternalTasksView({
         </div>
       </div>
 
-      {/* Task Cards Grid */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Task Checklist Items */}
+      <div className="space-y-2">
         {filteredTasks.length === 0 ? (
-          <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 text-xs">
-            Žádné úkoly k zobrazení.
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 text-xs">
+            Žádné úkoly v tomto seznamu.
           </div>
         ) : (
           filteredTasks.map((t) => {
@@ -151,106 +151,138 @@ export function QuickInternalTasksView({
             return (
               <div
                 key={t.id}
-                className={`flex flex-col justify-between rounded-2xl border p-4 shadow-2xs transition space-y-3 ${
+                className={`flex flex-col sm:flex-row sm:items-center justify-between rounded-2xl border p-3.5 shadow-2xs transition gap-3 ${
                   isCompleted
-                    ? 'bg-emerald-50/40 border-emerald-200'
+                    ? 'bg-emerald-50/50 border-emerald-200'
                     : isUnresolved
-                    ? 'bg-rose-50/40 border-rose-200'
-                    : 'bg-white border-slate-200 hover:shadow-md'
+                    ? 'bg-rose-50/50 border-rose-200'
+                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-xs'
                 }`}
               >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-black uppercase ${
-                        isCompleted
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : isUnresolved
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {isCompleted ? '✓ Splněno' : isUnresolved ? '✕ Nevyřízeno' : '⏳ K vyřízení'}
-                    </span>
+                {/* Checkbox & Task details */}
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isCompleted) {
+                        updateTaskStatus(t.id, 'PENDING');
+                      } else {
+                        setCompletionTaskId(t.id);
+                        setCompletionNoteInput('');
+                      }
+                    }}
+                    title={isCompleted ? 'Označit jako nedokončené' : 'Zaškrtnout jako splněné'}
+                    className={`mt-0.5 shrink-0 rounded-lg transition p-0.5 ${
+                      isCompleted
+                        ? 'text-emerald-600 hover:text-emerald-700'
+                        : isUnresolved
+                        ? 'text-rose-500 hover:text-rose-600'
+                        : 'text-slate-400 hover:text-emerald-600'
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <CheckSquare size={22} className="fill-emerald-100" />
+                    ) : isUnresolved ? (
+                      <XCircle size={22} />
+                    ) : (
+                      <Square size={22} />
+                    )}
+                  </button>
 
-                    <div className="flex items-center gap-1">
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                        {t.priority}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4
+                        className={`font-bold text-sm leading-snug ${
+                          isCompleted ? 'line-through text-slate-500 font-semibold' : 'text-slate-900'
+                        }`}
+                      >
+                        {t.title}
+                      </h4>
+
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                          isCompleted
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : isUnresolved
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {isCompleted ? '✓ Splněno' : isUnresolved ? '✕ Nevyřízeno' : '⏳ K vyřízení'}
                       </span>
-                      {(userRole === 'ADMIN' || userRole === 'MANAGER') && (
-                        <button
-                          type="button"
-                          onClick={() => deleteTask(t.id)}
-                          className="rounded-full p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                    </div>
+
+                    {t.description && <p className="text-xs text-slate-500">{t.description}</p>}
+
+                    {/* Reason if unresolved */}
+                    {isUnresolved && t.unresolvedReason && (
+                      <div className="mt-1.5 rounded-xl bg-rose-100/80 border border-rose-200 p-2 text-xs text-rose-900">
+                        <b className="text-[10px] uppercase tracking-wider text-rose-700 block font-bold">
+                          Důvod nevyřízení pro vedoucího:
+                        </b>
+                        <p className="font-semibold text-rose-950 mt-0.5">{t.unresolvedReason}</p>
+                      </div>
+                    )}
+
+                    {/* Completion note */}
+                    {isCompleted && t.completionNote && (
+                      <div className="mt-1.5 rounded-xl bg-emerald-100/80 border border-emerald-200 p-2 text-xs text-emerald-900">
+                        <b className="text-[10px] uppercase tracking-wider text-emerald-700 block font-bold">
+                          Poznámka ke splnění:
+                        </b>
+                        <p className="font-semibold text-emerald-950 mt-0.5">{t.completionNote}</p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 pt-1">
+                      <span className="font-semibold text-slate-700">
+                        👤 {t.assignedToEmployee?.firstName} {t.assignedToEmployee?.lastName}
+                      </span>
+                      {t.dueDate && (
+                        <span className="text-slate-400">Termín: {new Date(t.dueDate).toLocaleDateString('cs-CZ')}</span>
                       )}
                     </div>
                   </div>
-
-                  <h4 className="font-bold text-slate-900 text-sm mt-2 leading-snug">{t.title}</h4>
-                  {t.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{t.description}</p>}
-
-                  {/* Reason if unresolved */}
-                  {isUnresolved && t.unresolvedReason && (
-                    <div className="mt-2.5 rounded-xl bg-rose-100/70 border border-rose-200 p-2.5 text-xs text-rose-900">
-                      <b className="block text-[11px] uppercase tracking-wider text-rose-700">Důvod nevyřízení:</b>
-                      <p className="mt-0.5 font-semibold">{t.unresolvedReason}</p>
-                    </div>
-                  )}
-
-                  {/* Completion note */}
-                  {isCompleted && t.completionNote && (
-                    <div className="mt-2.5 rounded-xl bg-emerald-100/70 border border-emerald-200 p-2.5 text-xs text-emerald-900">
-                      <b className="block text-[11px] uppercase tracking-wider text-emerald-700">Poznámka ke splnění:</b>
-                      <p className="mt-0.5 font-semibold">{t.completionNote}</p>
-                    </div>
-                  )}
-
-                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                    <span className="font-bold text-slate-800">
-                      👤 {t.assignedToEmployee?.firstName} {t.assignedToEmployee?.lastName}
-                    </span>
-                    {t.dueDate && (
-                      <span className="text-slate-400">Termín: {new Date(t.dueDate).toLocaleDateString('cs-CZ')}</span>
-                    )}
-                  </div>
                 </div>
 
-                {/* Status Action Buttons */}
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCompletionTaskId(t.id);
-                      setCompletionNoteInput('');
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-bold transition ${
-                      isCompleted
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                    }`}
-                  >
-                    <CheckCircle2 size={14} />
-                    <span>Splněno</span>
-                  </button>
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                  {!isCompleted && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCompletionTaskId(t.id);
+                        setCompletionNoteInput('');
+                      }}
+                      className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                    >
+                      Splněno
+                    </button>
+                  )}
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUnresolvedTaskId(t.id);
-                      setReasonInput('');
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-bold transition ${
-                      isUnresolved
-                        ? 'bg-rose-600 text-white shadow-xs'
-                        : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
-                    }`}
-                  >
-                    <XCircle size={14} />
-                    <span>Nevyřízeno</span>
-                  </button>
+                  {!isUnresolved && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnresolvedTaskId(t.id);
+                        setReasonInput('');
+                      }}
+                      className="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-800 hover:bg-rose-100 transition"
+                    >
+                      Nevyřízeno
+                    </button>
+                  )}
+
+                  {(userRole === 'ADMIN' || userRole === 'MANAGER') && (
+                    <button
+                      type="button"
+                      onClick={() => deleteTask(t.id)}
+                      className="rounded-full p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                      title="Smazat položku"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
             );
