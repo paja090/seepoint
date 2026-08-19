@@ -1,19 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, Check } from 'lucide-react';
+import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, UserCheck, Mail, Phone, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+
+type ContactPersonFound = {
+  firstName: string;
+  lastName: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+};
 
 type AiEnrichmentData = {
   foundIco?: string;
   foundDic?: string;
   foundWebsite?: string;
+  foundEmail?: string;
+  foundPhone?: string;
   foundStreet?: string;
   foundCity?: string;
   foundZip?: string;
   businessField?: string;
   companySummary?: string;
   executives?: string;
+  contactPersons?: ContactPersonFound[];
   recommendedCarriers?: Array<{ type: string; reason: string }>;
   salesAdvice?: string[];
 };
@@ -42,6 +53,7 @@ export function ClientAiEnrichCard({
   const [loading, setLoading] = useState(false);
   const [enrichData, setEnrichData] = useState<AiEnrichmentData | null>(null);
   const [ares, setAres] = useState<AresData | null>(null);
+  const [createdContactsCount, setCreatedContactsCount] = useState(0);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,8 +69,9 @@ export function ClientAiEnrichCard({
       } else {
         setEnrichData(data.aiEnrichment || null);
         setAres(data.aresData || null);
+        setCreatedContactsCount(data.createdContactsCount || 0);
         setSavedSuccess(true);
-        // Refresh server components & client header with updated IČO/DIČ/Address
+        // Refresh server components & client header with updated IČO/DIČ/Address/Contacts
         router.refresh();
       }
     } catch (e: any) {
@@ -77,8 +90,8 @@ export function ClientAiEnrichCard({
             <Sparkles size={18} />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta & ARES Rejstřík</h3>
-            <p className="text-xs text-slate-500">Automatické dohledání IČO/DIČ, sídla, jednatelů a reklamní strategie</p>
+            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Kontakty & ARES Rejstřík</h3>
+            <p className="text-xs text-slate-500">Automatické dohledání IČO/DIČ, sídla, kontaktních osob, e-mailů a reklamní strategie</p>
           </div>
         </div>
 
@@ -88,7 +101,7 @@ export function ClientAiEnrichCard({
           className="flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-700 active:scale-95 transition shadow-md disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? 'AI Dohledává v rejstříku...' : '✨ AI Dohledat & Doplnit profil'}</span>
+          <span>{loading ? 'AI Dohledává kontakty & rejstřík...' : '✨ AI Dohledat kontakty & profil'}</span>
         </button>
       </div>
 
@@ -99,9 +112,16 @@ export function ClientAiEnrichCard({
       )}
 
       {savedSuccess && (
-        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 font-bold animate-in fade-in duration-200">
-          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-          <span>Údaje (IČO, DIČ, Sídlo, Obor) byly úspěšně zapsány do databáze a profilu klienta!</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 font-bold animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span>Údaje (IČO, DIČ, Sídlo, Obor) byly zapsány do databáze klienta!</span>
+          </div>
+          {createdContactsCount > 0 && (
+            <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
+              +{createdContactsCount} NOVÁ KONTAKTNÍ OSOBA V ZÁLOŽCE KONTAKTY
+            </span>
+          )}
         </div>
       )}
 
@@ -110,7 +130,7 @@ export function ClientAiEnrichCard({
         <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3.5 border border-sky-100 text-xs text-slate-600">
           <Building2 size={20} className="text-sky-500 shrink-0" />
           <p>
-            Klikněte na tlačítko výše. AI ověří firmu <strong>{clientName}</strong> v rejstříku ARES (IČO/DIČ, sídlo), okamžitě zapíše zjištěná data do databáze klienta a vygeneruje <strong>doporučenou strategii nosičů SeePoint</strong>.
+            Klikněte na tlačítko výše. AI ověří firmu <strong>{clientName}</strong> v rejstříku ARES, **dohledá kontaktní osoby, e-maily a telefony** (automaticky je vnitřně uloží do záložky Kontakty) a vygeneruje **doporučenou strategii nosičů SeePoint**.
           </p>
         </div>
       )}
@@ -149,6 +169,54 @@ export function ClientAiEnrichCard({
             </span>
           </div>
 
+          {/* Contact Persons Found */}
+          {enrichData?.contactPersons && enrichData.contactPersons.length > 0 && (
+            <div className="rounded-2xl bg-white p-4 border border-slate-200 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users size={16} className="text-sky-600" />
+                  <h4 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
+                    Nalezené kontaktní osoby (uloženy v záložce Kontakty)
+                  </h4>
+                </div>
+                <a
+                  href={`/clients/${clientId}?tab=contacts`}
+                  className="text-[11px] font-bold text-sky-600 hover:underline flex items-center gap-1"
+                >
+                  <span>Zobrazit v Kontaktech</span>
+                  <ArrowRight size={12} />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {enrichData.contactPersons.map((cp, i) => (
+                  <div key={i} className="rounded-xl border border-sky-100 bg-sky-50/60 p-3 space-y-1 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-slate-900">{cp.firstName} {cp.lastName}</span>
+                      {cp.title && (
+                        <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">
+                          {cp.title}
+                        </span>
+                      )}
+                    </div>
+                    {cp.email && (
+                      <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                        <Mail size={12} className="text-sky-600 shrink-0" />
+                        <a href={`mailto:${cp.email}`} className="hover:underline">{cp.email}</a>
+                      </div>
+                    )}
+                    {cp.phone && (
+                      <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                        <Phone size={12} className="text-sky-600 shrink-0" />
+                        <a href={`tel:${cp.phone}`} className="hover:underline">{cp.phone}</a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* AI Company Summary & Business Field */}
           {enrichData && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,7 +233,7 @@ export function ClientAiEnrichCard({
                 <p className="text-xs text-slate-700 leading-relaxed">{enrichData.companySummary}</p>
                 {enrichData.executives && (
                   <div className="pt-1 text-[11px] text-slate-500 border-t border-slate-100 mt-2">
-                    <strong>Statutární orgány / Jednatelé:</strong> {enrichData.executives}
+                    <strong>Statutární orgány / Vedení:</strong> {enrichData.executives}
                   </div>
                 )}
               </div>
