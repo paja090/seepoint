@@ -217,7 +217,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   const expiringPermitProjects = await prisma.cityGalleryProject.findMany({
     where: {
       permitValidTo: { lte: thirtyDaysInFuture, gte: now },
-      status: { in: ['ACTIVE', 'SCHEDULED'] },
+      status: { in: ['ACTIVE', 'PREPARATION', 'DRAFT'] },
     },
     select: { id: true, title: true, city: true, locality: true, permitValidTo: true, frameCount: true },
     take: 15,
