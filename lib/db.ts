@@ -4,7 +4,18 @@ import type { Carrier, CarrierType, GpsStatus, MediaType, Occupancy, OccupancySt
 import { deriveSurfaceOccupancyState } from './occupancy';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_PRISMA_URL ?? process.env.POSTGRES_URL;
+const getDbUrl = () => {
+  const url =
+    (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) ||
+    (process.env.POSTGRES_PRISMA_URL && process.env.POSTGRES_PRISMA_URL.trim()) ||
+    (process.env.POSTGRES_URL_NON_POOLING && process.env.POSTGRES_URL_NON_POOLING.trim()) ||
+    (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim());
+  return url && url.length > 0 ? url : undefined;
+};
+const databaseUrl = getDbUrl();
+if (databaseUrl) {
+  process.env.DATABASE_URL = databaseUrl;
+}
 export const prisma = globalForPrisma.prisma ?? new PrismaClient(databaseUrl ? { datasourceUrl: databaseUrl } : undefined);
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
