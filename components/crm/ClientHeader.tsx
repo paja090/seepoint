@@ -234,10 +234,10 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
   const statusObj = CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS] || CLIENT_STATUS_LABELS.ACTIVE;
 
   return (
-    <div className="card space-y-5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 shadow-xl border-slate-700">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="p-1 bg-white rounded-xl shadow-md">
+    <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 space-y-4 w-full max-w-full overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full max-w-full overflow-hidden">
+          <div className="p-1 bg-white rounded-xl shadow-md shrink-0">
             <ClientLogoControl
               clientId={client.id}
               clientName={client.name}
@@ -250,41 +250,49 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
               }
             />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight text-white">{client.name}</h1>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusObj.badge}`}>
+          <div className="space-y-1 min-w-0 flex-1 max-w-full">
+            <div className="flex items-center gap-2 flex-wrap max-w-full">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white break-words max-w-full">{client.name}</h1>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusObj.badge} shrink-0`}>
                 {statusObj.label}
               </span>
-              <span className="bg-slate-700/80 text-slate-300 text-xs px-2.5 py-0.5 rounded-full border border-slate-600">
+              <span className="bg-slate-700/80 text-slate-300 text-xs px-2.5 py-0.5 rounded-full border border-slate-600 shrink-0">
                 {CLIENT_TYPE_LABELS[client.clientType as keyof typeof CLIENT_TYPE_LABELS] || client.clientType}
               </span>
             </div>
 
-            {client.tradingName && <p className="text-slate-300 text-sm italic mt-0.5">{client.tradingName}</p>}
+            {client.tradingName && <p className="text-slate-300 text-xs sm:text-sm italic truncate max-w-full">{client.tradingName}</p>}
 
-            <div className="flex items-center gap-4 text-xs text-slate-300 mt-2 flex-wrap">
-              {client.companyId && <span>IČO: <strong className="text-white">{client.companyId}</strong></span>}
-              {client.dic && <span>DIČ: <strong className="text-white">{client.dic}</strong></span>}
-              {client.email && <span>E-mail: <a href={`mailto:${client.email}`} className="text-sky-300 hover:underline">{client.email}</a></span>}
-              {client.phone && <span>Tel: <a href={`tel:${client.phone}`} className="text-sky-300 hover:underline">{client.phone}</a></span>}
-              {client.website && <span>Web: <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="text-sky-300 hover:underline">{client.website}</a></span>}
+            <div className="flex items-center gap-x-3 gap-y-1 text-xs text-slate-300 mt-2 flex-wrap max-w-full">
+              {client.companyId && <span className="shrink-0">IČO: <strong className="text-white">{client.companyId}</strong></span>}
+              {client.dic && <span className="shrink-0">DIČ: <strong className="text-white">{client.dic}</strong></span>}
+              {client.email && (
+                <span className="truncate max-w-[200px] sm:max-w-xs">
+                  E-mail: <a href={`mailto:${client.email}`} className="text-sky-300 hover:underline truncate inline-block align-bottom">{client.email}</a>
+                </span>
+              )}
+              {client.phone && <span className="shrink-0">Tel: <a href={`tel:${client.phone}`} className="text-sky-300 hover:underline">{client.phone}</a></span>}
+              {client.website && (
+                <span className="truncate max-w-[200px] sm:max-w-xs">
+                  Web: <a href={client.website.startsWith('http') ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="text-sky-300 hover:underline truncate inline-block align-bottom">{client.website}</a>
+                </span>
+              )}
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+            <div className="flex items-center gap-2 sm:gap-3 text-xs text-slate-400 mt-1 flex-wrap">
               <span>Obchodník: <strong className="text-slate-200">{client.assignedUser?.name || 'Nepřiřazen'}</strong></span>
-              <span>•</span>
+              <span className="hidden sm:inline">•</span>
               <span>Zdroj: <strong className="text-slate-200">{CLIENT_SOURCE_LABELS[client.source as keyof typeof CLIENT_SOURCE_LABELS] || client.source}</strong></span>
             </div>
           </div>
         </div>
 
         {/* Action Header Buttons */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <Button onClick={() => setShowEditModal(true)} variant="secondary" className="!bg-slate-700 !text-white hover:!bg-slate-600 border-slate-600 text-xs">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center w-full lg:w-auto shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-800">
+          <Button onClick={() => setShowEditModal(true)} variant="secondary" className="!bg-slate-700 !text-white hover:!bg-slate-600 border-slate-600 text-xs flex-1 sm:flex-none">
             ✏️ Upravit profil
           </Button>
-          <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs">
+          <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs flex-1 sm:flex-none">
             🔗 Sloučit duplicity
           </Button>
         </div>
