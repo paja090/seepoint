@@ -90,27 +90,29 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
           }))}
           workOrders={workOrders}
           employees={employees}
-          recentMovements={recentMovementsRaw.map((m) => ({
-            id: m.id,
-            type: m.type,
-            quantity: Number(m.quantity),
-            performedByName: m.performedByName,
-            assignedEmployeeName: m.assignedEmployeeName,
-            createdAt: m.createdAt,
-            item: {
-              id: m.item.id,
-              name: m.item.name,
-              category: m.item.category,
-              unit: m.item.unit,
-            },
-            workOrder: m.workOrder
-              ? {
-                  id: m.workOrder.id,
-                  title: m.workOrder.title,
-                  clientName: m.workOrder.clientName,
-                }
-              : null,
-          }))}
+          recentMovements={recentMovementsRaw
+            .filter((m) => m.item != null)
+            .map((m) => ({
+              id: m.id,
+              type: m.type,
+              quantity: Number(m.quantity),
+              performedByName: m.performedByName,
+              assignedEmployeeName: m.assignedEmployeeName,
+              createdAt: m.createdAt,
+              item: {
+                id: m.item!.id,
+                name: m.item!.name,
+                category: m.item!.category,
+                unit: m.item!.unit,
+              },
+              workOrder: m.workOrder
+                ? {
+                    id: m.workOrder.id,
+                    title: m.workOrder.title,
+                    clientName: m.workOrder.clientName,
+                  }
+                : null,
+            }))}
           currentUserName={user.name || undefined}
         />
       </div>
