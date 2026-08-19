@@ -16,6 +16,7 @@ import {
   PhoneCall,
   Package,
   Sparkles,
+  ClipboardCheck,
 } from 'lucide-react';
 import { AiQuickTaskModal } from './tasks/AiQuickTaskModal';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
@@ -273,13 +274,13 @@ export function ResponsiveAppShell({
           </Link>
 
           <Link
-            href="/chat"
+            href="/my-tasks"
             className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
-              pathname === '/chat' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+              pathname === '/my-tasks' ? 'text-emerald-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <MessageSquare size={20} />
-            <span>Chat</span>
+            <ClipboardCheck size={20} />
+            <span>Moje úkoly</span>
           </Link>
 
           <Link

@@ -11,18 +11,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
     }
 
-    const { prompt } = (await request.json().catch(() => ({}))) as { prompt?: string };
+    const { prompt, defaultAssigneeId } = (await request.json().catch(() => ({}))) as {
+      prompt?: string;
+      defaultAssigneeId?: string;
+    };
+
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
       return NextResponse.json({ error: 'Zadejte nebo namluvte zadání úkolů.' }, { status: 400 });
     }
 
     const employees = await prisma.employee.findMany({
       where: { isActive: true },
-      select: { id: true, firstName: true, lastName: true, position: true },
+      select: { id: true, firstName: true, lastName: true, position: true, userId: true },
     });
 
+    // Find current user's employee profile
+    const actorEmployee = employees.find((e) => e.userId === actor.id || e.id === actor.employee?.id) || employees[0];
+
     const employeeListStr = employees
-      .map((e) => `- ID: "${e.id}", Jméno: "${e.firstName} ${e.lastName}" (${e.position || 'Pracovník'})`)
+      .map((e) => `- ID: "${e.id}", Jméno: "${e.firstName} ${e.lastName}" (${e.position || 'Pracovník'})${e.id === actorEmployee?.id ? ' [PŘIHLÁŠENÝ UŽIVATEL / SÁM SOBĚ]' : ''}`)
       .join('\n');
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -30,31 +37,35 @@ export async function POST(request: Request) {
       title: string;
       description?: string;
       assignedToEmployeeId?: string;
-      assignedToEmployeeName?: string;
       priority: 'LOW' | 'MEDIUM' | 'HIGH';
       dueDate?: string;
     }> = [];
 
     if (apiKey) {
       const systemPrompt = `Jsi inteligentní asistent pro rozdělování interních provozních úkolů na dílně a ve firmě.
-Tvým úkolem je vzít volný text/záznam hlasu od vedoucího a rozpadnout ho na jednotlivé konkrétní úkoly.
+Tvým úkolem je vzít volný text/záznam hlasu od vedoucího a rozpadnout ho na jednotlivé konkrétní samostatně zaškrtávací položky (Check-list úkolů).
 
 Seznam aktivních zaměstnanců ve firmě:
 ${employeeListStr}
+
+PRAVIDLA PRO ROZPOZNÁNÍ ZAMĚSTNANCE:
+1. Pokud text obsahuje slovíčka jako "já", "pro mě", "sebe", "sám sobě", "naplánovat sobě", přiřaď úkol přihlášenému uživateli ID "${actorEmployee?.id}".
+2. Pokud v textu zazní jméno (např. Petr, Pavel, Milan), přiřaď úkol danému zaměstnanci.
+3. Pokud zaměstnanec z textu nevyplývá a nebylo specifikováno jméno, použij jako výchozího zaměstnance ID "${defaultAssigneeId || actorEmployee?.id}".
 
 Vracíš POUZE platný JSON objekt ve tvaru:
 {
   "tasks": [
     {
-      "title": "Stručný název úkolu (např. Zamést halu u vrat)",
+      "title": "Stručný konkrétní úkol (např. Zamést halu u vrat)",
       "description": "Podrobnější instrukce nebo poznámka (volitelné)",
-      "assignedToEmployeeId": "ID zaměstnance ze seznamu výše (pokud je v textu zmíněn nebo odpovídá křestním jménem/příjmením)",
+      "assignedToEmployeeId": "ID zaměstnance ze seznamu",
       "priority": "HIGH" | "MEDIUM" | "LOW",
       "dueDate": "YYYY-MM-DD nebo null"
     }
   ]
 }
-Pokud z textu nevyplývá zaměstnanec, přiřaď prvního nejvhodnějšího nebo toho, jehož jméno v textu zaznělo. Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
+Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -88,8 +99,10 @@ Pokud z textu nevyplývá zaměstnanec, přiřaď prvního nejvhodnějšího neb
 
     // Fallback if AI or API failed or gave no tasks
     if (parsedTasks.length === 0) {
-      // Find matching employee directly from prompt text
-      let matchedEmp = employees[0];
+      let matchedEmp = defaultAssigneeId
+        ? employees.find((e) => e.id === defaultAssigneeId)
+        : actorEmployee || employees[0];
+
       for (const emp of employees) {
         const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
         if (prompt.toLowerCase().includes(emp.firstName.toLowerCase()) || prompt.toLowerCase().includes(fullName)) {
@@ -109,7 +122,7 @@ Pokud z textu nevyplývá zaměstnanec, přiřaď prvního nejvhodnějšího neb
     // Save tasks to DB
     const createdTasks = [];
     for (const taskData of parsedTasks) {
-      const empId = taskData.assignedToEmployeeId || employees[0]?.id;
+      const empId = taskData.assignedToEmployeeId || defaultAssigneeId || actorEmployee?.id || employees[0]?.id;
       if (!empId) continue;
 
       const created = await prisma.quickInternalTask.create({
