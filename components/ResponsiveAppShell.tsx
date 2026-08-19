@@ -14,6 +14,7 @@ import {
   MessageSquare,
   UserRound,
   PhoneCall,
+  Package,
 } from 'lucide-react';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
 import { AppTopbar } from './AppTopbar';
@@ -240,13 +241,13 @@ export function ResponsiveAppShell({
           </Link>
 
           <Link
-            href="/map"
+            href="/warehouse"
             className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
-              pathname === '/map' ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-200'
+              pathname.startsWith('/warehouse') ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Map size={20} />
-            <span>Mapa</span>
+            <Package size={20} />
+            <span>Sklad</span>
           </Link>
 
           <Link
