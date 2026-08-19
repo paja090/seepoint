@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Package,
@@ -16,6 +16,7 @@ import {
   Wrench,
   Layers,
   UserCheck,
+  Star,
 } from 'lucide-react';
 import { WarehouseVoiceInputModal } from './WarehouseVoiceInputModal';
 import { WarehousePhotoScannerModal } from './WarehousePhotoScannerModal';
@@ -70,9 +71,33 @@ export function MobileWarehouseAppClient({
   const [isPending, startTransition] = useTransition();
   const [activeTab, setActiveTab] = useState<'quick' | 'borrowed' | 'catalog' | 'history'>('quick');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'CONSUMABLE' | 'RETURNABLE'>('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'FAVORITES' | 'CONSUMABLE' | 'RETURNABLE'>('ALL');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [processingItemIds, setProcessingItemIds] = useState<Record<string, boolean>>({});
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('seepoint_warehouse_favorites');
+      if (saved) {
+        setFavoriteIds(JSON.parse(saved));
+      } else {
+        // Default top 3 items if not set yet
+        setFavoriteIds(items.slice(0, 3).map((i) => i.id));
+      }
+    } catch (e) {}
+  }, []);
+
+  const toggleFavorite = (itemId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setFavoriteIds((prev) => {
+      const next = prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId];
+      try {
+        localStorage.setItem('seepoint_warehouse_favorites', JSON.stringify(next));
+      } catch (err) {}
+      return next;
+    });
+  };
 
   // Compute active borrowings (net quantity issued minus quantity returned per item)
   const activeBorrowingsMap = new Map<string, { itemId: string; name: string; unit: string; qty: number }>();
@@ -148,8 +173,12 @@ export function MobileWarehouseAppClient({
     }
   };
 
+  const favoriteItems = items.filter((item) => favoriteIds.includes(item.id));
+
   const filteredItems = items.filter((item) => {
-    const matchesCategory = selectedCategory === 'ALL' || item.category === selectedCategory;
+    const matchesCategory =
+      selectedCategory === 'ALL' ||
+      (selectedCategory === 'FAVORITES' ? favoriteIds.includes(item.id) : item.category === selectedCategory);
     const q = searchQuery.trim().toLowerCase();
     const matchesQuery =
       !q ||
@@ -293,6 +322,7 @@ export function MobileWarehouseAppClient({
             {(
               [
                 ['ALL', 'Všechny položky'],
+                ['FAVORITES', `⭐ Oblíbené (${favoriteItems.length})`],
                 ['CONSUMABLE', 'Spotřební (pásky, lepidla)'],
                 ['RETURNABLE', 'Vratné (nářadí, žebříky)'],
               ] as const
@@ -312,20 +342,86 @@ export function MobileWarehouseAppClient({
             ))}
           </div>
 
+          {/* Favorites Dedicated Section (when viewing ALL and has favorites) */}
+          {selectedCategory === 'ALL' && favoriteItems.length > 0 && !searchQuery && (
+            <div className="rounded-2xl border border-amber-300/80 bg-amber-50/60 p-3.5 space-y-2.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-amber-950 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Star size={15} className="text-amber-500 fill-amber-400" />
+                  ⭐ Moje oblíbené & často berané položky
+                </span>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-full">1-Klik Výdej</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {favoriteItems.map((item) => {
+                  const inStock = Number(item.quantityInStock);
+                  const isBusy = Boolean(processingItemIds[item.id]) || isPending;
+                  return (
+                    <div
+                      key={`fav-${item.id}`}
+                      className="rounded-xl border border-amber-200 bg-white p-2.5 flex flex-col justify-between shadow-2xs hover:shadow-md transition"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-1">
+                          <strong className="text-xs font-black text-slate-900 leading-tight line-clamp-1">{item.name}</strong>
+                          <button
+                            type="button"
+                            onClick={(e) => toggleFavorite(item.id, e)}
+                            className="text-amber-400 hover:text-amber-600 transition shrink-0 p-0.5"
+                            title="Odebrat z oblíbených"
+                          >
+                            <Star size={14} className="fill-amber-400" />
+                          </button>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          Skladem: <b className="text-slate-900 font-bold">{inStock} {item.unit}</b>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isBusy || inStock <= 0}
+                        onClick={() => handleQuickMovement(item.id, 'ISSUE', 1)}
+                        className="mt-2.5 flex items-center justify-center gap-1 rounded-lg bg-amber-500 py-1.5 px-2 text-[11px] font-black text-slate-950 shadow-2xs hover:bg-amber-400 active:scale-95 transition disabled:opacity-50"
+                      >
+                        <ArrowUpRight size={13} />
+                        <span>{isBusy ? '...' : `VZÍT 1 ${item.unit.toUpperCase()}`}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             {filteredItems.slice(0, 30).map((item) => {
               const inStock = Number(item.quantityInStock);
               const isLow = item.minQuantity !== null && inStock < Number(item.minQuantity);
               const isBusy = Boolean(processingItemIds[item.id]) || isPending;
+              const isFav = favoriteIds.includes(item.id);
 
               return (
                 <div
                   key={item.id}
-                  className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+                  className={`flex flex-col justify-between rounded-2xl border p-4 shadow-sm hover:shadow-md transition bg-white ${
+                    isFav ? 'border-amber-400/80 ring-1 ring-amber-300/50' : 'border-slate-200'
+                  }`}
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-bold text-slate-900 text-base leading-snug">{item.name}</h4>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <button
+                          type="button"
+                          onClick={(e) => toggleFavorite(item.id, e)}
+                          className="shrink-0 text-slate-300 hover:text-amber-400 transition"
+                          title={isFav ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
+                        >
+                          <Star size={18} className={isFav ? 'text-amber-400 fill-amber-400' : ''} />
+                        </button>
+                        <h4 className="font-bold text-slate-900 text-base leading-snug">{item.name}</h4>
+                      </div>
                       <span
                         className={`shrink-0 rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${
                           item.category === 'RETURNABLE'
