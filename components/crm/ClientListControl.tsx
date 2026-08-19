@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
+import { Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export type ClientSimpleItem = {
   id: string;
@@ -18,6 +19,11 @@ export function AddClientModalButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // AI & ARES Lookup state
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
+
   // Form inputs
   const [name, setName] = useState('');
   const [companyId, setCompanyId] = useState('');
@@ -30,6 +36,37 @@ export function AddClientModalButton() {
   const [duplicates, setDuplicates] = useState<ClientSimpleItem[]>([]);
   const [ignoreDuplicates, setIgnoreDuplicates] = useState(false);
   const [canForceCreate, setCanForceCreate] = useState(false);
+
+  const handleAiLookup = async () => {
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    setAiSuccessMsg(null);
+    try {
+      const res = await fetch('/api/crm/clients/ai-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: aiQuery.trim() }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        alert(resData.error || 'Chyba při vyhledávání v ARES / AI.');
+      } else if (resData.data) {
+        const d = resData.data;
+        if (d.name) setName(d.name);
+        if (d.companyId) setCompanyId(d.companyId);
+        if (d.billingCity) setBillingCity(d.billingCity);
+        if (d.email) setEmail(d.email);
+        if (d.phone) setPhone(d.phone);
+        if (d.contactPerson) setContactPerson(d.contactPerson);
+
+        setAiSuccessMsg(`Údaje pro "${d.name}" byly předvyplněny z ARES & AI!`);
+      }
+    } catch {
+      alert('Chyba komunikace se serverem.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const submitClient = async (forceCreate = false) => {
     setSaving(true);
@@ -77,7 +114,47 @@ export function AddClientModalButton() {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-lg w-full bg-white space-y-4 shadow-2xl">
-            <h2 className="text-xl font-bold border-b pb-2">➕ Založit Nového Klienta do CRM</h2>
+            <h2 className="text-xl font-bold border-b pb-2 flex items-center gap-2">
+              <span>➕</span> Založit Nového Klienta do CRM
+            </h2>
+
+            {/* Fast AI & ARES Pre-fill Box */}
+            <div className="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-indigo-50/50 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-black text-sky-950">
+                <Sparkles size={16} className="text-sky-600 shrink-0" />
+                <span>✨ AI & ARES Rychlé Předvyplnění (Podle IČO nebo názvu)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Zadejte IČO (např. 25877698) nebo název (např. Canis)"
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleAiLookup();
+                    }
+                  }}
+                  className="input text-xs flex-1 bg-white font-medium focus:ring-2 focus:ring-sky-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleAiLookup}
+                  disabled={aiLoading || !aiQuery.trim()}
+                  className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 disabled:opacity-50 shadow-xs"
+                >
+                  {aiLoading ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                  <span>Načíst AI</span>
+                </button>
+              </div>
+              {aiSuccessMsg && (
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                  <span>{aiSuccessMsg}</span>
+                </div>
+              )}
+            </div>
 
             {duplicates.length > 0 && !ignoreDuplicates ? (
               <div className="space-y-4">
@@ -104,7 +181,8 @@ export function AddClientModalButton() {
 
                 <div className="flex justify-end gap-2 border-t pt-3">
                   <Button type="button" variant="secondary" onClick={() => setDuplicates([])}>Zpět k formuláři</Button>
-                  {canForceCreate ? <Button
+                  {canForceCreate ? (
+                    <Button
                       type="button"
                       variant="secondary"
                       className="!bg-amber-600 !text-white hover:!bg-amber-700"
@@ -114,13 +192,16 @@ export function AddClientModalButton() {
                       }}
                     >
                       I přesto vytvořit nového
-                    </Button> : <p className="max-w-64 text-xs text-amber-800">Klienta se stejným názvem nelze založit podruhé. Otevřete existující profil.</p>}
+                    </Button>
+                  ) : (
+                    <p className="max-w-64 text-xs text-amber-800">Klienta se stejným názvem nelze založit podruhé. Otevřete existující profil.</p>
+                  )}
                 </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-3">
                 <label className="text-xs font-semibold">Název společnosti *
-                  <input className="input text-sm mt-1" placeholder="Např. Kofola ČeskoSlovensko a.s." value={name} onChange={e => setName(e.target.value)} required />
+                  <input className="input text-sm mt-1 font-bold" placeholder="Např. Kofola ČeskoSlovensko a.s." value={name} onChange={e => setName(e.target.value)} required />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="text-xs font-semibold">IČO<input className="input text-sm mt-1" placeholder="Např. 24261980" value={companyId} onChange={e => setCompanyId(e.target.value)} /></label>
