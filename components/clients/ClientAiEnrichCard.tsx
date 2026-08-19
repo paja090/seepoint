@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, UserCheck, Mail, Phone, Users } from 'lucide-react';
+import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, UserCheck, Mail, Phone, Users, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 type ContactPersonFound = {
@@ -13,6 +13,8 @@ type ContactPersonFound = {
 };
 
 type AiEnrichmentData = {
+  selectedOfficialName?: string;
+  tradingName?: string;
   foundIco?: string;
   foundDic?: string;
   foundWebsite?: string;
@@ -51,18 +53,30 @@ export function ClientAiEnrichCard({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [enrichData, setEnrichData] = useState<AiEnrichmentData | null>(null);
   const [ares, setAres] = useState<AresData | null>(null);
   const [createdContactsCount, setCreatedContactsCount] = useState(0);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleEnrich = async () => {
+  const handleEnrich = async (overrideQuery?: string) => {
     setLoading(true);
     setError(null);
     setSavedSuccess(false);
     try {
-      const res = await fetch(`/api/crm/clients/${clientId}/ai-enrich`, { method: 'POST' });
+      const q = overrideQuery || searchQuery || clientName;
+      const isIco = /^\d{8}$/.test(q.replace(/\s+/g, ''));
+
+      const res = await fetch(`/api/crm/clients/${clientId}/ai-enrich`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          searchQuery: q,
+          overrideIco: isIco ? q.replace(/\s+/g, '') : undefined,
+        }),
+      });
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Chyba při dohledávání klienta.');
@@ -71,7 +85,7 @@ export function ClientAiEnrichCard({
         setAres(data.aresData || null);
         setCreatedContactsCount(data.createdContactsCount || 0);
         setSavedSuccess(true);
-        // Refresh server components & client header with updated IČO/DIČ/Address/Contacts
+        // Refresh server components & client header with updated Name/IČO/DIČ/Address/Contacts
         router.refresh();
       }
     } catch (e: any) {
@@ -83,25 +97,47 @@ export function ClientAiEnrichCard({
 
   return (
     <div className="rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50/80 via-indigo-50/40 to-white p-5 shadow-sm space-y-4">
-      {/* Header */}
+      {/* Header & Refined Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-sky-600 text-white shadow-md">
             <Sparkles size={18} />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Logo, Kontakty & ARES Rejstřík</h3>
-            <p className="text-xs text-slate-500">Automatické dohledání IČO/DIČ, loga firmy, sídla, kontaktních osob a reklamní strategie</p>
+            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Presný Název & ARES Rejstřík</h3>
+            <p className="text-xs text-slate-500">Automatická korekce názvu, dohledání IČO/DIČ, sídla, kontaktních osob a strategie</p>
           </div>
         </div>
 
         <button
-          onClick={handleEnrich}
+          onClick={() => handleEnrich()}
           disabled={loading}
           className="flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-700 active:scale-95 transition shadow-md disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? 'AI Dohledává logo, kontakty & rejstřík...' : '✨ AI Dohledat logo, kontakty & profil'}</span>
+          <span>{loading ? 'AI Výběr presné firmy v ARES...' : '✨ AI Dohledat & Opravit název'}</span>
+        </button>
+      </div>
+
+      {/* Manual Search Query Refinement */}
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 rounded-2xl bg-white p-2 border border-sky-100 shadow-2xs">
+        <div className="flex items-center gap-2 px-2 text-slate-400 shrink-0">
+          <Search size={15} />
+          <span className="text-xs font-bold text-slate-600">Upřesnit hledaný název nebo IČO:</span>
+        </div>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={`Např. "${clientName} Safety" nebo "25877698"`}
+          className="flex-1 rounded-xl bg-slate-50 px-3 py-1.5 text-xs text-slate-900 border border-slate-200 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-sky-500 font-medium"
+        />
+        <button
+          onClick={() => handleEnrich(searchQuery)}
+          disabled={loading || !searchQuery.trim()}
+          className="rounded-xl bg-slate-800 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-900 transition disabled:opacity-40 shrink-0"
+        >
+          Vyhledat
         </button>
       </div>
 
@@ -115,11 +151,13 @@ export function ClientAiEnrichCard({
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 font-bold animate-in fade-in duration-200">
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-            <span>Údaje (IČO, DIČ, Sídlo, Web, Obor) i logo klienta byly úspěšně zapsány do databáze klienta!</span>
+            <span>
+              Oficiální název ({ares?.name || enrichData?.selectedOfficialName || clientName}), IČO, DIČ, Sídlo a Obor byly zapsány do profilu!
+            </span>
           </div>
           {createdContactsCount > 0 && (
             <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
-              +{createdContactsCount} NOVÁ KONTAKTNÍ OSOBA V ZÁLOŽCE KONTAKTY
+              +{createdContactsCount} KONTAKT V ZÁLOŽCE KONTAKTY
             </span>
           )}
         </div>
@@ -130,7 +168,7 @@ export function ClientAiEnrichCard({
         <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3.5 border border-sky-100 text-xs text-slate-600">
           <Building2 size={20} className="text-sky-500 shrink-0" />
           <p>
-            Klikněte na tlačítko výše. AI ověří firmu <strong>{clientName}</strong> v rejstříku ARES, **dohledá kontaktní osoby, e-maily a telefony** (automaticky je vnitřně uloží do záložky Kontakty) a vygeneruje **doporučenou strategii nosičů SeePoint**.
+            Klikněte na tlačítko výše. AI vyhledá firmu <strong>{clientName}</strong> v rejstříku ARES, vybere přesnou shodu (např. <em>CANIS SAFETY a.s.</em>), **opraví oficiální název klienta, doplní IČO/DIČ, kontakty** a vygeneruje reklamní strategii.
           </p>
         </div>
       )}
@@ -147,10 +185,13 @@ export function ClientAiEnrichCard({
       {/* Results Display */}
       {(enrichData || ares) && (
         <div className="space-y-4 pt-1">
-          {/* Verified IČO & Address Pill */}
+          {/* Verified Legal Name & IČO Pill */}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950">
             <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
             <div className="flex-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span>
+                <strong>Právní název:</strong> {ares?.name || enrichData?.selectedOfficialName || clientName}
+              </span>
               <span>
                 <strong>IČO:</strong> {ares?.ico || enrichData?.foundIco || companyId || 'Nenalezeno'}
               </span>
@@ -165,7 +206,7 @@ export function ClientAiEnrichCard({
               )}
             </div>
             <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white uppercase">
-              ULOŽENO DO DATABÁZE
+              OVRĚNO V ARES
             </span>
           </div>
 
