@@ -15,6 +15,7 @@ export type GeminiFuelReceipt = {
   liters: number;
   fuelType: 'Diesel' | 'Natural 95' | 'AdBlue' | 'Jiné';
   date?: string | null;
+  odometer?: number | null;
   summary: string;
 };
 
@@ -250,7 +251,7 @@ Odpověz v JSON formátu s klíči:
  * 2. AI Fuel Receipt OCR & Parser
  */
 export async function parseFuelReceiptWithGemini(imageUrlBase64: string): Promise<GeminiFuelReceipt> {
-  const prompt = `Jsi AI účetní asistent SeePOINT. Analyzuj přiloženou účtenku za pohonné hmoty (benzínka Orlen, Shell, MOL, OMV, EuroOil atd.).
+  const prompt = `Jsi AI účetní asistent SeePOINT. Analyzuj přiloženou účtenku za pohonné hmoty (benzínka Orlen, Shell, MOL, OMV, EuroOil atd.) nebo snímek účtenky s dopsanými km.
 
 Vrať JSON objekt s přesně těmito poli:
 {
@@ -259,6 +260,7 @@ Vrať JSON objekt s přesně těmito poli:
   "liters": přesné číslo načerpaných litrů paliva (např. 38.5),
   "fuelType": "Diesel" nebo "Natural 95" nebo "AdBlue" nebo "Jiné",
   "date": "YYYY-MM-DD" nebo null,
+  "odometer": stav tachometru / dopsané kilometry (číslo v km, např. 185240 nebo 245000), jinak null,
   "summary": "Stručný popis účtenky česky"
 }`;
 
@@ -271,6 +273,7 @@ Vrať JSON objekt s přesně těmito poli:
       liters: geminiResult.liters || 0,
       fuelType: geminiResult.fuelType || 'Diesel',
       date: geminiResult.date || null,
+      odometer: typeof geminiResult.odometer === 'number' ? geminiResult.odometer : null,
       summary: geminiResult.summary || 'Účtenka úspěšně přečtena pomocí AI.',
     };
   }
