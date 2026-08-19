@@ -120,6 +120,6 @@ export async function generateStandardMediaPreview(input: {
     budget: input.request.budget ?? null, items, catalogTotal,
     budgetDifference: catalogTotal !== null && input.request.budget ? catalogTotal - input.request.budget : null,
     warnings, candidateCount: available.length,
-    explanation: `Vybráno ${items.length} konkrétních dostupných reklamních ploch podle lokality, typu média, ceny a mapové použitelnosti. Každá strana nosiče byla posouzena samostatně.`,
+    explanation: `Na základě Vašeho zadání jsme připravili návrh reklamní kampaně pro ${input.client.name}${city ? ` (${city})` : ''}. Vybrali jsme ${items.length} dostupných nosičů s vysokou viditelností. Každá reklamní plocha byla ověřena samostatně.`,
   };
 }

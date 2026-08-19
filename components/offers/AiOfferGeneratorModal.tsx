@@ -56,6 +56,7 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
   const [preview, setPreview] = useState<Preview | null>(null);
   const [routeAnalysis, setRouteAnalysis] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [routeAnalysisMessage, setRouteAnalysisMessage] = useState('');
+  const [clientMessage, setClientMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -83,6 +84,7 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
     pricingSegment,
     city: offerType === 'NAVIGATION' ? undefined : city.trim() || undefined,
     mediaType: mediaType || undefined,
+    clientMessage: clientMessage.trim() || undefined,
     budget: budget ? Number(budget) : undefined,
     durationMonths,
     quantity,
@@ -105,19 +107,31 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
     }]) : undefined,
   });
 
-  function updateMountingType(selectionId: string, mountingType: MountingType | '') {
+  const updateMountingType = (selectionId: string, mountingType: MountingType | '') => {
     setPreview((current) => {
       if (!current) return current;
       const items = current.items.map((item) => {
         if (item.selectionId !== selectionId) return item;
-        const pricing = item.pricingOptions?.find((option) => option.mountingType === mountingType);
-        return { ...item, mountingType: mountingType || null, rentalTotal: pricing?.rentalTotal ?? null, catalogPrice: pricing?.total ?? null, finalPrice: pricing?.total ?? null, componentPrices: pricing?.componentPrices };
+        const selectedOption = item.pricingOptions?.find((option) => option.mountingType === mountingType);
+        return {
+          ...item,
+          mountingType: mountingType || null,
+          rentalTotal: selectedOption ? selectedOption.rentalTotal : item.rentalTotal,
+          finalPrice: selectedOption ? selectedOption.total : item.finalPrice,
+          componentPrices: selectedOption ? selectedOption.componentPrices : item.componentPrices,
+        };
       });
-      const complete = items.every((item) => item.finalPrice !== null);
-      const catalogTotal = complete ? items.reduce((sum, item) => sum + (item.finalPrice ?? 0), 0) : null;
-      return { ...current, items, catalogTotal, budgetDifference: catalogTotal !== null && current.budget ? catalogTotal - current.budget : null };
+      const catalogTotal = items.some((item) => item.finalPrice === null)
+        ? null
+        : items.reduce((sum, item) => sum + (item.finalPrice ?? 0), 0);
+      return {
+        ...current,
+        items,
+        catalogTotal,
+        budgetDifference: catalogTotal !== null && current.budget ? catalogTotal - current.budget : null,
+      };
     });
-  }
+  };
 
   const handleSuggestedPoints = useCallback((suggestions: SuggestedNavigationPoint[], analysisError?: string) => {
     if (!suggestions.length) {
@@ -167,8 +181,11 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
       const response = await fetch('/api/offers/ai-generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody(action)) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'AI návrh se nepodařilo připravit.');
-      if (action === 'preview') setPreview(data as Preview);
-      else { onClose(); router.push(data.redirectUrl); router.refresh(); }
+      if (action === 'preview') {
+        const p = data as Preview;
+        setPreview(p);
+        setClientMessage(p.explanation || '');
+      } else { onClose(); router.push(data.redirectUrl); router.refresh(); }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'AI návrh se nepodařilo připravit.');
       if (action === 'preview') setRouteAnalysis('idle');
@@ -208,15 +225,6 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
               <label className="block text-xs font-bold">Co je pro trasu důležité? <span className="font-normal text-slate-500">(nepovinné)</span><textarea className="input mt-1 min-h-16" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Např. zachytit příjezd od centra a z dálnice" /></label>
               <div><span className="text-xs font-bold">Kolik bodů navrhnout?</span><div className="mt-2 flex gap-2">{[4, 6, 8].map((count) => <button key={count} type="button" onClick={() => setQuantity(count)} className={`min-w-14 rounded-lg border px-3 py-2 text-sm font-black ${quantity === count ? 'border-sky-400 bg-sky-500/20 text-sky-200' : 'border-slate-700 bg-slate-900'}`}>{count}</button>)}</div></div>
             </section>
-            <details className="group rounded-xl border border-slate-800 bg-slate-950/50 p-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold text-slate-300">Cena a pokročilé nastavení <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></summary>
-              <div className="mt-3 grid gap-3 sm:grid-cols-4">
-                <label className="text-xs font-bold">Cenová kategorie<select className="input mt-1" disabled={Boolean(selectedClient)} value={pricingSegment} onChange={(event) => setPricingSegment(event.target.value as PricingSegment)}>{Object.entries(segmentLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-                <label className="text-xs font-bold">Délka (měsíce)<input className="input mt-1" min="1" type="number" value={durationMonths} onChange={(event) => setDurationMonths(Number(event.target.value))} /></label>
-                <label className="text-xs font-bold">Max. rozpočet Kč<input className="input mt-1" min="0" type="number" value={budget} onChange={(event) => setBudget(event.target.value)} /></label>
-                <label className="text-xs font-bold">Oblast hledání (km)<input className="input mt-1" min="1" max="15" step="1" type="number" value={maxRadiusKm} onChange={(event) => setMaxRadiusKm(Number(event.target.value))} /></label>
-              </div>
-            </details>
           </> : <>
             <section><label className="text-sm font-black uppercase tracking-wide text-amber-400">Co klient potřebuje?<textarea className="input mt-2 min-h-24 normal-case tracking-normal text-white" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Popište kampaň, lokalitu a očekávání klienta." /></label></section>
             <section className="grid gap-3 sm:grid-cols-5">
@@ -234,10 +242,18 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
                 </select>
               </label>
               <label className="text-xs font-bold">Počet ploch<input className="input mt-1" min="1" type="number" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
-              <label className="text-xs font-bold">Délka (měsíce)<input className="input mt-1" min="1" type="number" value={durationMonths} onChange={(event) => setDurationMonths(Number(event.target.value))} /></label>
-              <label className="text-xs font-bold">Max. rozpočet Kč<input className="input mt-1" min="0" type="number" value={budget} onChange={(event) => setBudget(event.target.value)} placeholder="Bez omezení" /></label>
             </section>
           </>}
+
+          <details className="group rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold text-slate-300">Cenová kategorie a rozpočet <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-4">
+              <label className="text-xs font-bold">Cenová kategorie<select className="input mt-1" disabled={Boolean(selectedClient)} value={pricingSegment} onChange={(event) => setPricingSegment(event.target.value as PricingSegment)}>{Object.entries(segmentLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+              <label className="text-xs font-bold">Délka (měsíce)<input className="input mt-1" min="1" type="number" value={durationMonths} onChange={(event) => setDurationMonths(Number(event.target.value))} /></label>
+              <label className="text-xs font-bold">Max. rozpočet Kč<input className="input mt-1" min="0" type="number" value={budget} onChange={(event) => setBudget(event.target.value)} placeholder="Bez omezení" /></label>
+              {offerType === 'NAVIGATION' && <label className="text-xs font-bold">Oblast hledání (km)<input className="input mt-1" min="1" max="15" step="1" type="number" value={maxRadiusKm} onChange={(event) => setMaxRadiusKm(Number(event.target.value))} /></label>}
+            </div>
+          </details>
 
           <button className="btn-primary w-full" disabled={loading || !canPreview} onClick={() => void call('preview')} type="button">{loading ? 'Připravuji návrh…' : offerType === 'NAVIGATION' ? 'Najít nejlepší navigační body' : 'Připravit AI návrh'}</button>
         </>}
@@ -271,7 +287,18 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
             <button className="mt-2 text-xs font-bold text-rose-300" onClick={() => setPreview((current) => current ? { ...current, items: current.items.filter((candidate) => candidate.selectionId !== item.selectionId) } : current)} type="button">Odebrat bod</button>
           </article>)}</div>
 
-          <div className="rounded-xl bg-sky-950 p-3 text-xs text-sky-100">{preview.explanation}</div>
+          <div className="rounded-xl border border-sky-800 bg-sky-950/60 p-3">
+            <label className="block text-xs font-bold text-sky-200">
+              📝 Průvodní text v hlavičce nabídky (můžete upravit před vytvořením)
+              <textarea
+                className="input mt-1.5 min-h-20 w-full bg-slate-900 text-xs text-slate-100"
+                value={clientMessage}
+                onChange={(e) => setClientMessage(e.target.value)}
+                placeholder="Text, který uvidí klient v úvodu nabídky..."
+              />
+            </label>
+          </div>
+
           <div className="flex flex-col-reverse gap-2 sm:flex-row"><button className="rounded-xl border border-slate-600 px-4 py-2 text-sm" onClick={() => { setPreview(null); setRouteAnalysis('idle'); }} type="button">Upravit zadání</button><button className="btn-primary flex-1" disabled={loading || preview.items.length === 0 && preview.offerType !== 'CITY_GALLERY' || preview.offerType === 'NAVIGATION' && routeAnalysis === 'running'} onClick={() => void call('confirm')} type="button">{loading ? 'Vytvářím koncept…' : 'Vytvořit koncept nabídky'}</button></div>
         </section>}
       </div>

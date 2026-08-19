@@ -12,6 +12,7 @@ export type AiOfferRequest = {
   durationMonths?: number;
   quantity?: number;
   mediaType?: MediaType;
+  clientMessage?: string;
   dateFrom?: string;
   dateTo?: string;
   targetName?: string;

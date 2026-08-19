@@ -99,7 +99,8 @@ async function confirmStandard(user: CurrentUser, request: AiOfferRequest, clien
   const result = await createOffer(user, {
     clientId: client.id, title: `AI návrh – ${request.city || client.name}`, campaignName: request.prompt,
     pricingTier: client.pricingSegment, budget: request.budget ? String(request.budget) : '', taxRate: '21', confirmNegotiation: false, chargeSelections: [],
-    internalNote: `AI Copilot: ${request.prompt}`, clientMessage: 'Na základě zadání jsme připravili transparentní návrh dostupných reklamních ploch.',
+    internalNote: `AI Copilot: ${request.prompt}`,
+    clientMessage: request.clientMessage?.trim() || preview.explanation || 'Na základě zadání jsme připravili transparentní návrh dostupných reklamních ploch.',
     items: preview.items.map((item) => ({ surfaceId: item.surfaceId!, dateFrom: item.dateFrom, dateTo: item.dateTo, quantity: String(item.quantity), unit: item.unit, unitPrice: String(item.price?.unitPrice ?? 0), discountPercent: '0', discountAmount: '0', customTitle: item.title, clientDescription: item.reasons.join(' ') })),
   });
   const offerId = result.offer.id!;
