@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const client = await prisma.client.findUnique({
       where: { id },
-      include: { contacts: true },
+      include: { contacts: true, branches: true },
     });
 
     if (!client) {
@@ -76,7 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
       .join('\n');
 
-    // Step 2: Use Gemini 3.6 AI to pick the BEST matching company candidate & enrich profile
+    // Step 2: Use Gemini 3.6 AI to analyze company, find MS Region branches, local contacts & OSTRAVA ad strategy
     const apiKey = process.env.GEMINI_API_KEY;
     let aiEnrichmentResult: {
       selectedIndex?: number;
@@ -100,12 +100,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         email?: string;
         phone?: string;
       }>;
+      msRegionBranches?: Array<{
+        name: string;
+        street?: string;
+        city?: string;
+        zip?: string;
+        note?: string;
+      }>;
       recommendedCarriers?: Array<{ type: string; reason: string }>;
       salesAdvice?: string[];
     } | null = null;
 
     if (apiKey) {
       const prompt = `Jsi seniorní CRM analytik a obchodní asistent české reklamní agentury SeePoint.
+
+DŮLEŽITÝ KONTEXT AGENATURY SEEPOINT:
+Agentura SeePoint působí a vlastní reklamní plochy VÝHRADNĚ V OSTRAVĚ a Moravskoslezském kraji (MS kraj – Ostrava, Opava, Frýdek-Místek, Karviná, Havířov, Třinec, Nový Jičín).
+Praha ani jiné kraje nás NEZAJÍMAJÍ. Všechny reklamní návrhy, pobočky a kontaktní osoby ZACILUJ PRIORITNĚ NA OSTRAVU A MORAVSKOSLEZSKÝ KRAJ!
 
 Zadání hledaného klienta:
 - Zadání/Hledaný pojem: "${searchKeyword}"
@@ -117,16 +128,17 @@ Nalezené kandidátní subjekty z českého státního rejstříku ARES:
 ${candidatesSummaryStr || 'Žádné subjekty nenalezeny'}
 
 TVÉ ÚKOLY:
-1. Z kandidátů z ARES vyber ten JEDINÝ SPRÁVNÝ hlavně odpovídající hledané značce/firmě (např. pro zadání "Canis" vybereš "CANIS SAFETY a.s." - pracovní oděvy, NIKOLIV "AuraCanis s.r.o." nebo nesouvisející firmy).
-2. Pokud v ARES kandidátech správná firma je, určete její přesný oficiální právní název (selectedOfficialName), IČO (selectedIco) a DIČ (selectedDic).
-3. Vytvoř přirozený obchodní název značky (tradingName, např. "CANIS SAFETY - Pracovní oděvy a ochranné pomůcky").
+1. Z kandidátů z ARES vyber ten JEDINÝ SPRÁVNÝ hlavně odpovídající hledané značce/firmě (např. pro zadání "Canis" vybereš "CANIS SAFETY a.s." - pracovní oděvy, NIKOLIV nesouvisející firmy).
+2. Urči přesný oficiální právní název (selectedOfficialName), IČO (selectedIco) a DIČ (selectedDic).
+3. Vytvoř přirozený obchodní název značky (tradingName).
 4. Uveď webové stránky firmy (foundWebsite), hlavního e-mail (foundEmail) a telefon (foundPhone).
-5. Určete hlavní obor činnosti v češtině (businessField).
+5. Urči hlavní obor činnosti v češtině (businessField).
 6. Napiš 2-3 stručné věty představující profil a zaměření firmy (companySummary).
 7. Uveď jména jednatelů / vedení (executives).
-8. Uveď kontaktní osoby (contactPersons) s e-mailem a telefonem.
-9. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint pro tohoto klienta s důvody.
-10. Napiš 2 konkrétní prodejní argumenty pro obchodníka SeePoint.
+8. Dohledei kontaktní osoby a manažery (contactPersons) PRIORITNĚ pro Ostrava / MS kraj nebo centrálu.
+9. Dohledei konkrétní PROVOZOVNY, PRODEJNY A POBOČKY klienta v OSTRAVĚ a Moravskoslezském kraji (msRegionBranches)!
+10. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint V OSTRAVĚ A MS KRAJI (např. 'Městská navigace VO Ostrava - průmyslové zóny/Rudná', 'City Postery & Lavičky Ostrava Poruba/Centrum', 'Solitéry & Billboardy přivaděč Ostrava Mošnov/D1') s konkrétními důvody zacílení.
+11. Napiš 2 prodejní argumenty zaměřené na podporu poboček v MS kraji.
 
 Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
 {
@@ -142,25 +154,41 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
   "foundCity": "Praha 9",
   "foundZip": "19800",
   "businessField": "Pracovní oděvy, obuv a ochranné pracovní pomůcky",
-  "companySummary": "CANIS SAFETY a.s. je přední český výrobce a dovozce pracovních oděvů, obuvi a ochranných pomůcek pro průmysl, stavebnictví a řemesla.",
+  "companySummary": "CANIS SAFETY a.s. je přední český dodavatel pracovních oděvů a ochranných pomůcek s prodejnami v OSTRAVĚ a MS kraji.",
   "executives": "Ing. Jaromír Páral, David Páral",
   "contactPersons": [
     {
-      "firstName": "Jaromír",
-      "lastName": "Páral",
-      "title": "Předseda představenstva",
-      "email": "info@canis.cz",
-      "phone": "+420 800 156 500"
+      "firstName": "Místní",
+      "lastName": "Vedoucí",
+      "title": "Vedoucí prodejny Ostrava",
+      "email": "ostrava@canis.cz",
+      "phone": "+420 596 111 222"
+    }
+  ],
+  "msRegionBranches": [
+    {
+      "name": "CANIS SAFETY - Prodejna Ostrava Hrabůvka",
+      "street": "Místecká 329/258",
+      "city": "Ostrava - Hrabůvka",
+      "zip": "70030",
+      "note": "Prodejna a sklad pro Ostrava Jih"
+    },
+    {
+      "name": "CANIS SAFETY - Prodejna Opava",
+      "street": "Těšínská 2913/86",
+      "city": "Opava",
+      "zip": "74601",
+      "note": "Pobočka Opava"
     }
   ],
   "recommendedCarriers": [
-    { "type": "Městská navigace VO u průmyslových zón", "reason": "Navedení firemních zákazníků a řemeslníků přímo k prodejnám CANIS." },
-    { "type": "City Postery & Lavičky u zastávek", "reason": "Zásah pracujících a řemeslníků při cestě do práce." },
-    { "type": "Solitéry & Billboardy na přivaděčích měst", "reason": "Vysoká viditelnost pro B2B nákupčí stavebních a montážních firem." }
+    { "type": "Městská navigace VO na ulici Místecká a Rudná v Ostravě", "reason": "Přímá velkoplošná navigace řemeslníků a nákupčích stavebních firem ke skladu a prodejně v Ostravě Hrabůvce." },
+    { "type": "City Postery a Lavičky na uzlech MHD Ostrava Svinov a ÚAN", "reason": "Oslovení pracovníků a řemeslníků směřujících do průmyslových zón Hrabová a Poruba." },
+    { "type": "Solitéry na přivaděči D1 Ostrava – Přívoz / Mošnov", "reason": "Dominantní viditelnost pro B2B firemní zákazníky a montážní firmy z celého MS kraje." }
   ],
   "salesAdvice": [
-    "Zdůraznit velkoplošnou navigaci pro pobočkovou síť po ČR.",
-    "Nabídnout dlouhodobou prezentaci u velkých průmyslových parků."
+    "Nabídnout navigaci od sjezdu Místecká k ostravské prodejně CANIS.",
+    "Zacílit na podporu návštěvnosti ostravské a opavské prodejny u stavebních firem z MS kraje."
   ]
 }`;
 
@@ -210,11 +238,11 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
     const finalCity = matchedAres?.sidlo?.nazevObce || aiEnrichmentResult?.foundCity || client.billingCity || null;
     const finalZip = matchedAres?.sidlo?.psc ? String(matchedAres.sidlo.psc) : aiEnrichmentResult?.foundZip || client.billingZip || null;
 
-    // Build complete formatted AI Note (including Sales Tips & Recommended Ad Carriers!)
+    // Build complete formatted AI Note focused on Ostrava & MS Region
     let formattedAiNote = '';
     if (aiEnrichmentResult) {
       const parts: string[] = [];
-      parts.push(`🤖 AI PROFIL & STRATEGIE SEEPOINT (${new Date().toLocaleDateString('cs-CZ')}):`);
+      parts.push(`🤖 AI PROFIL & STRATEGIE SEEPOINT - OSTRAVA A MS KRAJ (${new Date().toLocaleDateString('cs-CZ')}):`);
       if (aiEnrichmentResult.businessField) {
         parts.push(`• Obor činnosti: ${aiEnrichmentResult.businessField}`);
       }
@@ -225,13 +253,18 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
         parts.push(`• Vedení / Jednatelé: ${aiEnrichmentResult.executives}`);
       }
 
+      if (aiEnrichmentResult.msRegionBranches && aiEnrichmentResult.msRegionBranches.length > 0) {
+        parts.push(`\n🏬 POBOČKY A PRODEJNY V OSTRAVĚ & MS KRAJI:`);
+        aiEnrichmentResult.msRegionBranches.forEach((b) => parts.push(`  - ${b.name}: ${b.street || ''}, ${b.city || ''}`));
+      }
+
       if (aiEnrichmentResult.salesAdvice && aiEnrichmentResult.salesAdvice.length > 0) {
-        parts.push(`\n💡 TIPY PRO OBCHODNÍKA:`);
+        parts.push(`\n💡 TIPY PRO OBCHODNÍKA (ZACÍLENÍ MS KRAJ):`);
         aiEnrichmentResult.salesAdvice.forEach((tip) => parts.push(`  - ${tip}`));
       }
 
       if (aiEnrichmentResult.recommendedCarriers && aiEnrichmentResult.recommendedCarriers.length > 0) {
-        parts.push(`\n🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE SEEPOINT:`);
+        parts.push(`\n🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE SEEPOINT (OSTRAVA & MS KRAJ):`);
         aiEnrichmentResult.recommendedCarriers.forEach((rec) => parts.push(`  - [${rec.type}]: ${rec.reason}`));
       }
 
@@ -288,10 +321,36 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       }
     }
 
+    // Step 5: Automatically insert MS Region branches into client.branches (`ClientBranch` table)
+    let createdBranchesCount = 0;
+    if (aiEnrichmentResult?.msRegionBranches && Array.isArray(aiEnrichmentResult.msRegionBranches)) {
+      for (const b of aiEnrichmentResult.msRegionBranches) {
+        if (!b.name) continue;
+        const exists = client.branches.some(
+          (existing) => existing.name.toLowerCase() === b.name.toLowerCase()
+        );
+
+        if (!exists) {
+          await prisma.clientBranch.create({
+            data: {
+              clientId: id,
+              name: b.name,
+              street: b.street || null,
+              city: b.city || 'Ostrava',
+              zip: b.zip || null,
+              note: b.note || 'Dohledáno AI pro Moravskoslezský kraj',
+            },
+          });
+          createdBranchesCount++;
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       client: updatedClient,
       createdContactsCount,
+      createdBranchesCount,
       aresData: matchedAres
         ? {
             ico: matchedAres.ico,
