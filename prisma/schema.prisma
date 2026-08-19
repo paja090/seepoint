@@ -380,6 +380,7 @@ model User {
   communicationAuthorLogs        ClientCommunication[]           @relation("CommunicationAuthor")
   assignedCrmTasks               CrmTask[]                       @relation("CrmTaskAssignedUser")
   createdCrmTasks                CrmTask[]                       @relation("CrmTaskCreatedUser")
+  createdQuickInternalTasks      QuickInternalTask[]             @relation("CreatedQuickTasks")
   uploadedClientDocuments        ClientDocument[]                @relation("ClientDocumentUploader")
   crmAuditLogs                   CrmAuditLog[]
   performedClientMerges          ClientMergeLog[]
@@ -467,9 +468,10 @@ model Employee {
   updatedAt      DateTime       @updatedAt
 
   user                 User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  assignedTasks        WorkTask[]              @relation("AssignedWorkTasks")
-  createdTasks         WorkTask[]              @relation("CreatedWorkTasks")
-  settlements          Settlement[]
+  assignedTasks              WorkTask[]              @relation("AssignedWorkTasks")
+  createdTasks               WorkTask[]              @relation("CreatedWorkTasks")
+  assignedQuickInternalTasks QuickInternalTask[]     @relation("AssignedQuickTasks")
+  settlements                Settlement[]
   vehicleReservations  VehicleReservation[]
   fuelExpenses         VehicleFuelExpense[]
   absences             EmployeeAbsence[]
@@ -2719,5 +2721,33 @@ model WarehouseMovement {
   @@index([itemId])
   @@index([workOrderId])
   @@index([assignedEmployeeId])
+}
+
+enum QuickInternalTaskStatus {
+  PENDING
+  COMPLETED
+  UNRESOLVED
+}
+
+model QuickInternalTask {
+  id                   String                  @id @default(cuid())
+  title                String
+  description          String?
+  assignedToEmployeeId String
+  createdByUserId      String
+  dueDate              DateTime?
+  priority             String                  @default("MEDIUM")
+  status               QuickInternalTaskStatus @default(PENDING)
+  unresolvedReason     String?
+  completedAt          DateTime?
+  completionNote       String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  assignedToEmployee Employee @relation("AssignedQuickTasks", fields: [assignedToEmployeeId], references: [id], onDelete: Cascade)
+  createdByUser      User     @relation("CreatedQuickTasks", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([assignedToEmployeeId, status])
+  @@index([createdByUserId])
 }
 
