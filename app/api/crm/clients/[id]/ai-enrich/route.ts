@@ -126,7 +126,7 @@ TVÉ ÚKOLY:
 7. Uveď jména jednatelů / vedení (executives).
 8. Uveď kontaktní osoby (contactPersons) s e-mailem a telefonem.
 9. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint pro tohoto klienta s důvody.
-10. Napiš 2 prodejní argumenty pro obchodníka SeePoint.
+10. Napiš 2 konkrétní prodejní argumenty pro obchodníka SeePoint.
 
 Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
 {
@@ -210,7 +210,35 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
     const finalCity = matchedAres?.sidlo?.nazevObce || aiEnrichmentResult?.foundCity || client.billingCity || null;
     const finalZip = matchedAres?.sidlo?.psc ? String(matchedAres.sidlo.psc) : aiEnrichmentResult?.foundZip || client.billingZip || null;
 
-    // Save CORRECT official legal name & verified data directly into DB
+    // Build complete formatted AI Note (including Sales Tips & Recommended Ad Carriers!)
+    let formattedAiNote = '';
+    if (aiEnrichmentResult) {
+      const parts: string[] = [];
+      parts.push(`🤖 AI PROFIL & STRATEGIE SEEPOINT (${new Date().toLocaleDateString('cs-CZ')}):`);
+      if (aiEnrichmentResult.businessField) {
+        parts.push(`• Obor činnosti: ${aiEnrichmentResult.businessField}`);
+      }
+      if (aiEnrichmentResult.companySummary) {
+        parts.push(`• Profil firmy: ${aiEnrichmentResult.companySummary}`);
+      }
+      if (aiEnrichmentResult.executives) {
+        parts.push(`• Vedení / Jednatelé: ${aiEnrichmentResult.executives}`);
+      }
+
+      if (aiEnrichmentResult.salesAdvice && aiEnrichmentResult.salesAdvice.length > 0) {
+        parts.push(`\n💡 TIPY PRO OBCHODNÍKA:`);
+        aiEnrichmentResult.salesAdvice.forEach((tip) => parts.push(`  - ${tip}`));
+      }
+
+      if (aiEnrichmentResult.recommendedCarriers && aiEnrichmentResult.recommendedCarriers.length > 0) {
+        parts.push(`\n🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE SEEPOINT:`);
+        aiEnrichmentResult.recommendedCarriers.forEach((rec) => parts.push(`  - [${rec.type}]: ${rec.reason}`));
+      }
+
+      formattedAiNote = parts.join('\n');
+    }
+
+    // Save CORRECT official legal name, verified data & COMPLETE AI Note directly into DB
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
@@ -225,8 +253,8 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
         billingStreet: finalStreet,
         billingCity: finalCity,
         billingZip: finalZip,
-        note: aiEnrichmentResult?.companySummary
-          ? `${client.note ? `${client.note}\n\n` : ''}🤖 AI Profil (${new Date().toLocaleDateString('cs-CZ')}): Obor: ${aiEnrichmentResult.businessField}. ${aiEnrichmentResult.companySummary}`
+        note: formattedAiNote
+          ? `${client.note ? `${client.note}\n\n` : ''}${formattedAiNote}`
           : client.note,
       },
     });
