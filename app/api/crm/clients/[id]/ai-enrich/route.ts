@@ -4,6 +4,31 @@ import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+function cleanOldAiNotes(rawNote: string | null): string {
+  if (!rawNote) return '';
+
+  const paragraphs = rawNote.split('\n\n');
+  const pureManualParagraphs = paragraphs.filter((p) => {
+    const lower = p.toLowerCase();
+    const hasAiMarker =
+      p.includes('🤖') ||
+      p.includes('💡') ||
+      p.includes('🎯') ||
+      p.includes('🏬') ||
+      lower.includes('ai profil') ||
+      lower.includes('obor činnosti:') ||
+      lower.includes('profil firmy:') ||
+      lower.includes('vedení / jednatelé:') ||
+      lower.includes('pobočky a prodejny') ||
+      lower.includes('tipy pro obchodníka') ||
+      lower.includes('doporučená reklamní strategie') ||
+      lower.includes('seepoint (ostrava');
+    return !hasAiMarker;
+  });
+
+  return pureManualParagraphs.join('\n\n').trim();
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const actor = await getCurrentUser();
@@ -281,16 +306,11 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       formattedAiNote = parts.join('\n');
     }
 
-    // Preserve manual notes while replacing old AI Profile blocks
-    let updatedNote = formattedAiNote;
-    if (client.note) {
-      const manualParts = client.note
-        .split('\n\n')
-        .filter((part) => !part.includes('🤖 AI PROFIL & STRATEGIE') && !part.includes('💡 TIPY PRO OBCHODNÍKA') && !part.includes('🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE'));
-      if (manualParts.length > 0) {
-        updatedNote = `${manualParts.join('\n\n')}\n\n${formattedAiNote}`;
-      }
-    }
+    // Completely purge any old AI notes, duplicate attempts or stale profile text
+    const manualNotesOnly = cleanOldAiNotes(client.note);
+    const updatedNote = manualNotesOnly
+      ? `${manualNotesOnly}\n\n${formattedAiNote}`
+      : formattedAiNote;
 
     // Save CORRECT official legal name, verified data & REPLACED/CLEANED AI Note directly into DB
     const updatedClient = await prisma.client.update({
