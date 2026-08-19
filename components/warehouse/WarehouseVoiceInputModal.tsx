@@ -4,9 +4,10 @@ import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mic, MicOff, Loader2, X, CheckCircle2, Sparkles, Volume2 } from 'lucide-react';
 
-export function WarehouseVoiceInputModal({ workOrders = [], employees = [] }: {
+export function WarehouseVoiceInputModal({ workOrders = [], employees = [], triggerClassName }: {
   workOrders?: { id: string; title: string; clientName: string }[];
   employees?: { id: string; firstName: string; lastName: string }[];
+  triggerClassName?: string;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -104,10 +105,13 @@ export function WarehouseVoiceInputModal({ workOrders = [], employees = [] }: {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-purple-500 hover:to-indigo-500 transition"
+        className={
+          triggerClassName ||
+          'flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-purple-500 hover:to-indigo-500 transition'
+        }
       >
-        <Sparkles size={16} />
-        <span>🎙️ AI Hlasový výdej (Bleskový)</span>
+        <Sparkles size={16} className="shrink-0" />
+        <span className="truncate">AI Hlasový výdej</span>
       </button>
 
       {isOpen && (
