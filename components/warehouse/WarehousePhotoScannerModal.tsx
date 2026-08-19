@@ -14,9 +14,11 @@ interface DetectedItem {
 export function WarehousePhotoScannerModal({
   workOrders = [],
   employees = [],
+  triggerClassName,
 }: {
   workOrders?: { id: string; title: string; clientName: string }[];
   employees?: { id: string; firstName: string; lastName: string }[];
+  triggerClassName?: string;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -110,10 +112,13 @@ export function WarehousePhotoScannerModal({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-emerald-500 hover:to-teal-500 transition"
+        className={
+          triggerClassName ||
+          'flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-emerald-500 hover:to-teal-500 transition'
+        }
       >
-        <Camera size={16} />
-        <span>📷 AI Fotka regálu / materiálu</span>
+        <Camera size={16} className="shrink-0" />
+        <span className="truncate">AI Fotka materiálu</span>
       </button>
 
       {isOpen && (

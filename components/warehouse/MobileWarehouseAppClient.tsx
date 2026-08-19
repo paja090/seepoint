@@ -162,29 +162,40 @@ export function MobileWarehouseAppClient({
   return (
     <div className="space-y-4 pb-20">
       {/* Hero Header Banner */}
-      <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/40 p-4 sm:p-6 text-slate-100 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="rounded-3xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/40 p-3.5 sm:p-6 text-slate-100 shadow-xl overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-              <Package size={26} />
+            <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+              <Package size={22} className="sm:h-6 sm:w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+              <h2 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
                 Mobilní Sklad <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">Live ⚡</span>
               </h2>
-              <p className="text-xs text-slate-400">Příchod do skladu, rychlé vyzvednutí a vracení nářadí</p>
+              <p className="text-[11px] sm:text-xs text-slate-400">Příchod do skladu, rychlé vyzvednutí a vracení nářadí</p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <WarehouseVoiceInputModal workOrders={workOrders} employees={employees} />
-            <WarehousePhotoScannerModal workOrders={workOrders} employees={employees} />
-            <WarehouseAiImportModal />
           </div>
         </div>
 
+        {/* 3 Action Boxes - Grid 3 cols fitting 100% on mobile */}
+        <div className="mt-3.5 grid grid-cols-3 gap-1.5 w-full">
+          <WarehouseVoiceInputModal
+            workOrders={workOrders}
+            employees={employees}
+            triggerClassName="flex flex-col sm:flex-row items-center justify-center gap-1 rounded-xl sm:rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-1.5 sm:px-3 py-2 text-[10px] sm:text-xs font-black text-white shadow-md hover:from-purple-500 hover:to-indigo-500 transition text-center w-full min-w-0"
+          />
+          <WarehousePhotoScannerModal
+            workOrders={workOrders}
+            employees={employees}
+            triggerClassName="flex flex-col sm:flex-row items-center justify-center gap-1 rounded-xl sm:rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-1.5 sm:px-3 py-2 text-[10px] sm:text-xs font-black text-white shadow-md hover:from-emerald-500 hover:to-teal-500 transition text-center w-full min-w-0"
+          />
+          <WarehouseAiImportModal
+            triggerClassName="flex flex-col sm:flex-row items-center justify-center gap-1 rounded-xl sm:rounded-2xl bg-gradient-to-r from-purple-700 to-indigo-700 px-1.5 sm:px-3 py-2 text-[10px] sm:text-xs font-black text-white shadow-md hover:from-purple-600 hover:to-indigo-600 transition text-center w-full min-w-0"
+          />
+        </div>
+
         {/* Quick Action Navigation Tabs */}
-        <div className="mt-5 grid grid-cols-4 gap-1.5 rounded-2xl bg-slate-950/70 p-1.5 border border-slate-800">
+        <div className="mt-3 grid grid-cols-4 gap-1 rounded-2xl bg-slate-950/70 p-1 border border-slate-800 w-full overflow-hidden">
           <button
             type="button"
             onClick={() => setActiveTab('quick')}
