@@ -28,6 +28,12 @@ import {
   Briefcase,
   AlertCircle,
   CheckCircle2,
+  Car,
+  Truck,
+  Mail,
+  User,
+  Calendar,
+  PlusCircle,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -80,6 +86,38 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   ]);
 
   if (!order) notFound();
+
+  const scheduledDate = order.scheduledAt || order.createdAt;
+  const startOfDay = new Date(scheduledDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(scheduledDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const vehicleReservations = await prisma.vehicleReservation.findMany({
+    where: {
+      status: { in: ['RESERVED', 'ACTIVE'] },
+      dateFrom: { lte: endOfDay },
+      dateTo: { gte: startOfDay },
+    },
+    include: {
+      vehicle: true,
+      employee: true,
+    },
+  });
+
+  const carReservations = vehicleReservations.filter(
+    (r) =>
+      r.vehicle.type !== 'TRAILER' &&
+      !r.vehicle.name.toLowerCase().includes('vozík') &&
+      !r.vehicle.name.toLowerCase().includes('přívěs')
+  );
+
+  const trailerReservations = vehicleReservations.filter(
+    (r) =>
+      r.vehicle.type === 'TRAILER' ||
+      r.vehicle.name.toLowerCase().includes('vozík') ||
+      r.vehicle.name.toLowerCase().includes('přívěs')
+  );
 
   const isOverdue = Boolean(
     order.deadlineAt && order.deadlineAt < new Date() && !['DONE', 'CANCELLED'].includes(order.status)
@@ -335,21 +373,139 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               />
             </section>
 
-            {/* Client Phone Contact (Clickable in mobile app) */}
-            <section className="card space-y-2">
-              <h2 className="text-base font-black text-slate-900">Kontakt na zákazníka / místě</h2>
-              <p className="text-xs font-bold text-slate-800">{order.contactName || 'Jméno neuvedeno'}</p>
-              {order.contactPhone ? (
-                <a
-                  href={`tel:${order.contactPhone}`}
-                  className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-300 p-3 text-xs font-black text-emerald-900 hover:bg-emerald-100 transition shadow-2xs"
+            {/* Vehicle & Trailer Reservation Info Card */}
+            <section className="card space-y-3 border-amber-200 bg-amber-50/40">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <Car size={18} className="text-amber-600" />
+                  Vozidlo & Vozík v rezervaci
+                </h2>
+                <Link
+                  href="/vehicle-reservations"
+                  className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline"
+                  title="Otevřít rezervační kalendář vozidel"
                 >
-                  <Phone size={16} className="text-emerald-600 shrink-0" />
-                  <span>{order.contactPhone} (Zavolat na mobil)</span>
-                </a>
-              ) : (
-                <p className="text-xs text-slate-500">Telefon neuveden.</p>
-              )}
+                  Kalendář ↗
+                </Link>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {/* Auto / Dodávka */}
+                <div className="rounded-xl border border-amber-200/80 bg-white p-3 space-y-1">
+                  <span className="font-extrabold text-amber-950 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                    <Car size={14} className="text-amber-600" />
+                    Auto pro výjezd:
+                  </span>
+                  {carReservations.length > 0 ? (
+                    carReservations.map((res) => (
+                      <div key={res.id} className="pt-0.5">
+                        <strong className="text-slate-900 text-sm font-black">{res.vehicle.name}</strong>
+                        {res.vehicle.registrationNumber && (
+                          <span className="ml-1.5 rounded-md bg-slate-900 px-1.5 py-0.5 text-[10px] font-black text-amber-300">
+                            {res.vehicle.registrationNumber}
+                          </span>
+                        )}
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          Rezervoval/a: {res.employee.firstName} {res.employee.lastName}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-500 font-medium">Pro tento termín není v rezervaci přihlášeno žádné auto.</p>
+                  )}
+                </div>
+
+                {/* Vozík / Přívěs */}
+                <div className="rounded-xl border border-amber-200/80 bg-white p-3 space-y-1">
+                  <span className="font-extrabold text-amber-950 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                    <Truck size={14} className="text-amber-600" />
+                    Vozík / Přívěs z rezervace:
+                  </span>
+                  {trailerReservations.length > 0 ? (
+                    trailerReservations.map((res) => (
+                      <div key={res.id} className="pt-0.5">
+                        <strong className="text-slate-900 text-sm font-black">{res.vehicle.name}</strong>
+                        {res.vehicle.registrationNumber && (
+                          <span className="ml-1.5 rounded-md bg-slate-900 px-1.5 py-0.5 text-[10px] font-black text-amber-300">
+                            {res.vehicle.registrationNumber}
+                          </span>
+                        )}
+                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          Rezervoval/a: {res.employee.firstName} {res.employee.lastName}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[11px] text-slate-500 font-medium">Pro tento termín není rezervován žádný přívěsný vozík.</p>
+                  )}
+                </div>
+              </div>
+
+              <Link
+                href="/vehicle-reservations"
+                className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-amber-300 bg-amber-100/70 py-2 px-3 text-xs font-bold text-amber-950 hover:bg-amber-200 transition"
+              >
+                <PlusCircle size={14} />
+                <span>Rezervovat auto / vozík na výjezd ↗</span>
+              </Link>
+            </section>
+
+            {/* Client & Field Contact Details */}
+            <section className="card space-y-3">
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Phone size={18} className="text-sky-600" />
+                Kontakt na klienta & místě
+              </h2>
+
+              <div className="space-y-2 text-xs">
+                {/* Client Company Name */}
+                <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-200">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Firma / Klient</span>
+                  <strong className="text-sm font-black text-slate-900">
+                    {order.client?.name || order.clientName}
+                  </strong>
+                </div>
+
+                {/* Contact Person Name */}
+                {(order.contactName || order.client?.contactPerson) && (
+                  <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-200">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Kontaktní osoba na místě</span>
+                    <strong className="text-xs font-black text-slate-900">
+                      {order.contactName || order.client?.contactPerson}
+                    </strong>
+                  </div>
+                )}
+
+                {/* Phone Call Action Button */}
+                {(order.contactPhone || order.client?.phone) ? (
+                  <a
+                    href={`tel:${order.contactPhone || order.client?.phone}`}
+                    className="flex items-center justify-between rounded-xl bg-emerald-600 p-3 text-xs font-black text-white hover:bg-emerald-500 transition shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Phone size={16} className="shrink-0" />
+                      <span>{order.contactPhone || order.client?.phone}</span>
+                    </div>
+                    <span className="bg-emerald-700 px-2 py-0.5 rounded-md text-[10px] font-bold">Zavolat 📞</span>
+                  </a>
+                ) : (
+                  <p className="text-xs text-slate-500 italic p-1">Telefon na klienta neuveden.</p>
+                )}
+
+                {/* Email Action Button */}
+                {order.client?.email && (
+                  <a
+                    href={`mailto:${order.client.email}`}
+                    className="flex items-center justify-between rounded-xl bg-sky-50 border border-sky-200 p-2.5 text-xs font-bold text-sky-900 hover:bg-sky-100 transition"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail size={14} className="text-sky-600 shrink-0" />
+                      <span className="truncate">{order.client.email}</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold text-sky-700 shrink-0">E-mail ✉️</span>
+                  </a>
+                )}
+              </div>
             </section>
           </aside>
         </div>
