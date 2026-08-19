@@ -1233,23 +1233,39 @@ model NavigationReportAuditLog {
 }
 
 model CityGalleryProject {
-  id          String                   @id @default(cuid())
-  title       String
-  status      CityGalleryProjectStatus @default(DRAFT)
-  city        String?
-  locality    String?
-  address     String?
-  latitude    Float?
-  longitude   Float?
-  description String?
-  dateFrom    DateTime?
-  dateTo      DateTime?
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
+  id                  String                   @id @default(cuid())
+  title               String
+  status              CityGalleryProjectStatus @default(DRAFT)
+  city                String?
+  locality            String?
+  address             String?
+  latitude            Float?
+  longitude           Float?
+  description         String?
+  frameCount          Int                      @default(6)
+  permitStatus        String?                  @default("SUBMITTED")
+  permitNumber        String?
+  permitValidFrom     DateTime?
+  permitValidTo       DateTime?
+  permitNote          String?
+  cityOfficialContact String?
+  organizerName       String?
+  artistName          String?
+  dateFrom            DateTime?
+  dateTo              DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   offers CityGalleryOffer[]
 
   @@index([status, city])
+}
+
+model CityGalleryFleetConfig {
+  id               String   @id @default("default")
+  totalFrames      Int      @default(24)
+  maintenanceCount Int      @default(0)
+  updatedAt        DateTime @updatedAt
 }
 
 model CityGalleryOffer {
