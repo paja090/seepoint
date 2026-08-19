@@ -264,7 +264,7 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 w-full">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0 flex-1">
           {/* Logo Container */}
-          <div className="p-1.5 bg-white rounded-2xl shadow-xl border border-slate-700/60 shrink-0">
+          <div className="p-1.5 bg-slate-900/90 rounded-2xl shadow-md border border-slate-800 shrink-0">
             <ClientLogoControl
               clientId={client.id}
               clientName={client.name}
