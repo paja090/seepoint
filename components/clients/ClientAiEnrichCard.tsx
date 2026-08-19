@@ -90,8 +90,8 @@ export function ClientAiEnrichCard({
             <Sparkles size={18} />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Kontakty & ARES Rejstřík</h3>
-            <p className="text-xs text-slate-500">Automatické dohledání IČO/DIČ, sídla, kontaktních osob, e-mailů a reklamní strategie</p>
+            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Logo, Kontakty & ARES Rejstřík</h3>
+            <p className="text-xs text-slate-500">Automatické dohledání IČO/DIČ, loga firmy, sídla, kontaktních osob a reklamní strategie</p>
           </div>
         </div>
 
@@ -101,7 +101,7 @@ export function ClientAiEnrichCard({
           className="flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-700 active:scale-95 transition shadow-md disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? 'AI Dohledává kontakty & rejstřík...' : '✨ AI Dohledat kontakty & profil'}</span>
+          <span>{loading ? 'AI Dohledává logo, kontakty & rejstřík...' : '✨ AI Dohledat logo, kontakty & profil'}</span>
         </button>
       </div>
 
@@ -115,7 +115,7 @@ export function ClientAiEnrichCard({
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 font-bold animate-in fade-in duration-200">
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-            <span>Údaje (IČO, DIČ, Sídlo, Obor) byly zapsány do databáze klienta!</span>
+            <span>Údaje (IČO, DIČ, Sídlo, Web, Obor) i logo klienta byly úspěšně zapsány do databáze klienta!</span>
           </div>
           {createdContactsCount > 0 && (
             <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
