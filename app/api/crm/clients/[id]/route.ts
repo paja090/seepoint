@@ -1,115 +1,126 @@
-import { ClientPricingSegment, ClientSource, ClientStatus, ClientType, Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
-import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
-import { getClientProfile } from '@/lib/crm/client-service';
-import { normalizeClientName } from '@/lib/crm/domain';
+import { Prisma } from '@prisma/client';
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 
-const enumValue = <T extends Record<string, string>>(values: T, value: unknown): T[keyof T] | undefined =>
-  typeof value === 'string' && Object.values(values).includes(value) ? value as T[keyof T] : undefined;
-const optionalText = (value: unknown) => typeof value === 'string' ? value.trim() || null : undefined;
+export const dynamic = 'force-dynamic';
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('clients');
   if (isApiDenied(auth)) return auth;
+  const { id } = await params;
 
-  const profile = await getClientProfile((await params).id);
-  return profile
-    ? NextResponse.json({ client: profile })
-    : NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
+  try {
+    const client = await prisma.client.findUnique({
+      where: { id },
+      include: {
+        assignedUser: { select: { id: true, name: true, email: true } },
+        contacts: { orderBy: { createdAt: 'desc' } },
+        branches: { orderBy: { createdAt: 'desc' } },
+        offers: { orderBy: { createdAt: 'desc' } },
+        crmOrders: { orderBy: { createdAt: 'desc' } },
+        contracts: { orderBy: { createdAt: 'desc' } },
+        invoices: { orderBy: { createdAt: 'desc' } },
+        communications: { orderBy: { createdAt: 'desc' } },
+        crmTasks: { orderBy: { createdAt: 'desc' } },
+        documents: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!client) {
+      return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
+    }
+
+    return NextResponse.json(client);
+  } catch (error) {
+    console.error('CRM client fetch failed', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ error: 'Klienta se nepodařilo načíst.' }, { status: 500 });
+  }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('clients');
   if (isApiDenied(auth)) return auth;
   const { id } = await params;
-  const body = await req.json().catch(() => null) as Record<string, unknown> | null;
-  if (!body) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
-
-  const name = body.name === undefined ? undefined : optionalText(body.name);
-  if (body.name !== undefined && !name) return NextResponse.json({ error: 'Název společnosti je povinný.' }, { status: 400 });
-  const status = body.status === undefined ? undefined : enumValue(ClientStatus, body.status);
-  const clientType = body.clientType === undefined ? undefined : enumValue(ClientType, body.clientType);
-  const source = body.source === undefined ? undefined : enumValue(ClientSource, body.source);
-  const pricingSegment = body.pricingSegment === undefined ? undefined : enumValue(ClientPricingSegment, body.pricingSegment);
-  if ((body.status !== undefined && !status) || (body.clientType !== undefined && !clientType) || (body.source !== undefined && !source) || (body.pricingSegment !== undefined && !pricingSegment)) {
-    return NextResponse.json({ error: 'Stav, typ nebo zdroj klienta není platný.' }, { status: 400 });
-  }
 
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      const client = await tx.client.update({
-        where: { id },
-        data: {
-          name: name ?? undefined,
-          normalizedName: name ? normalizeClientName(name) : undefined,
-          tradingName: optionalText(body.tradingName),
-          companyId: optionalText(body.companyId),
-          dic: optionalText(body.dic),
-          billingStreet: optionalText(body.billingStreet),
-          billingCity: optionalText(body.billingCity),
-          billingZip: optionalText(body.billingZip),
-          billingCountry: body.billingCountry === undefined ? undefined : optionalText(body.billingCountry) || 'CZ',
-          shippingStreet: optionalText(body.shippingStreet),
-          shippingCity: optionalText(body.shippingCity),
-          shippingZip: optionalText(body.shippingZip),
-          shippingCountry: body.shippingCountry === undefined ? undefined : optionalText(body.shippingCountry) || 'CZ',
-          website: optionalText(body.website),
-          contactPerson: optionalText(body.contactPerson),
-          email: optionalText(body.email),
-          phone: optionalText(body.phone),
-          status,
-          clientType,
-          pricingSegment,
-          source,
-          assignedUserId: body.assignedUserId === undefined ? undefined : optionalText(body.assignedUserId),
-          rating: optionalText(body.rating),
-          note: optionalText(body.note),
-          lastActivityAt: new Date(),
-        },
-      });
-      await tx.crmAuditLog.create({
-        data: {
-          userId: auth.id,
-          userEmail: auth.email,
-          action: 'UPDATE_CLIENT',
-          entityType: 'Client',
-          entityId: id,
-          detailsJson: JSON.stringify({ fields: Object.keys(body), pricingSegment }),
-        },
-      });
-      return client;
+    const body = await request.json();
+    const updated = await prisma.client.update({
+      where: { id },
+      data: {
+        name: body.name,
+        companyId: body.companyId,
+        tradingName: body.tradingName,
+        dic: body.dic,
+        billingStreet: body.billingStreet,
+        billingCity: body.billingCity,
+        billingZip: body.billingZip,
+        billingCountry: body.billingCountry,
+        website: body.website,
+        contactPerson: body.contactPerson,
+        email: body.email,
+        phone: body.phone,
+        status: body.status,
+        clientType: body.clientType,
+        pricingSegment: body.pricingSegment,
+        source: body.source,
+        assignedUserId: body.assignedUserId,
+        note: body.note,
+      },
     });
-    return NextResponse.json({ success: true, client: updated });
+
+    return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
-    }
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return NextResponse.json({ error: 'Klient se stejným názvem už existuje.' }, { status: 409 });
     }
     console.error('CRM client update failed', error instanceof Error ? error.message : 'unknown error');
     return NextResponse.json({ error: 'Klienta se nepodařilo upravit.' }, { status: 500 });
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('clients');
   if (isApiDenied(auth)) return auth;
-  if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Deaktivovat klienta může pouze administrátor.' }, { status: 403 });
   const { id } = await params;
+  const url = new URL(request.url);
+  const isPermanent = url.searchParams.get('permanent') === 'true';
 
   try {
-    await prisma.$transaction([
-      prisma.client.update({ where: { id }, data: { active: false, status: 'INACTIVE' } }),
-      prisma.crmAuditLog.create({ data: { userId: auth.id, userEmail: auth.email, action: 'DEACTIVATE_CLIENT', entityType: 'Client', entityId: id } }),
-    ]);
-    return NextResponse.json({ success: true });
+    if (isPermanent) {
+      // Hard delete from database
+      await prisma.client.delete({ where: { id } });
+      await prisma.crmAuditLog.create({
+        data: {
+          userId: auth.id,
+          userEmail: auth.email,
+          action: 'PERMANENT_DELETE_CLIENT',
+          entityType: 'Client',
+          entityId: id,
+        },
+      });
+      return NextResponse.json({ success: true, permanent: true });
+    } else {
+      // Soft delete / deactivation
+      await prisma.$transaction([
+        prisma.client.update({ where: { id }, data: { active: false, status: 'INACTIVE' } }),
+        prisma.crmAuditLog.create({
+          data: {
+            userId: auth.id,
+            userEmail: auth.email,
+            action: 'DEACTIVATE_CLIENT',
+            entityType: 'Client',
+            entityId: id,
+          },
+        }),
+      ]);
+      return NextResponse.json({ success: true, permanent: false });
+    }
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
     }
-    console.error('CRM client deactivation failed', error instanceof Error ? error.message : 'unknown error');
-    return NextResponse.json({ error: 'Klienta se nepodařilo deaktivovat.' }, { status: 500 });
+    console.error('CRM client deactivation/deletion failed', error instanceof Error ? error.message : 'unknown error');
+    return NextResponse.json({ error: 'Klienta se nepodařilo odstranit.' }, { status: 500 });
   }
 }
