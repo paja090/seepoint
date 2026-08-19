@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, UserCheck, Mail, Phone, Users, Search } from 'lucide-react';
+import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, UserCheck, Mail, Phone, Users, Search, Store } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 type ContactPersonFound = {
@@ -10,6 +10,14 @@ type ContactPersonFound = {
   title?: string;
   email?: string;
   phone?: string;
+};
+
+type BranchFound = {
+  name: string;
+  street?: string;
+  city?: string;
+  zip?: string;
+  note?: string;
 };
 
 type AiEnrichmentData = {
@@ -27,6 +35,7 @@ type AiEnrichmentData = {
   companySummary?: string;
   executives?: string;
   contactPersons?: ContactPersonFound[];
+  msRegionBranches?: BranchFound[];
   recommendedCarriers?: Array<{ type: string; reason: string }>;
   salesAdvice?: string[];
 };
@@ -57,6 +66,7 @@ export function ClientAiEnrichCard({
   const [enrichData, setEnrichData] = useState<AiEnrichmentData | null>(null);
   const [ares, setAres] = useState<AresData | null>(null);
   const [createdContactsCount, setCreatedContactsCount] = useState(0);
+  const [createdBranchesCount, setCreatedBranchesCount] = useState(0);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,8 +94,9 @@ export function ClientAiEnrichCard({
         setEnrichData(data.aiEnrichment || null);
         setAres(data.aresData || null);
         setCreatedContactsCount(data.createdContactsCount || 0);
+        setCreatedBranchesCount(data.createdBranchesCount || 0);
         setSavedSuccess(true);
-        // Refresh server components & client header with updated Name/IČO/DIČ/Address/Contacts
+        // Refresh server components & client header with updated Name/IČO/DIČ/Address/Contacts/Branches
         router.refresh();
       }
     } catch (e: any) {
@@ -104,8 +115,13 @@ export function ClientAiEnrichCard({
             <Sparkles size={18} />
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Presný Název & ARES Rejstřík</h3>
-            <p className="text-xs text-slate-500">Automatická korekce názvu, dohledání IČO/DIČ, sídla, kontaktních osob a strategie</p>
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-slate-900 text-base">AI Profil Klienta, Pobočky & Nosiče Ostrava / MS kraj</h3>
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 uppercase">
+                ZACÍLENO NA OSTRAVU & MS KRAJ
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">Dohledání poboček v MS kraji, místních kontaktů a strategie na nosičích SeePoint v Ostravě</p>
           </div>
         </div>
 
@@ -115,7 +131,7 @@ export function ClientAiEnrichCard({
           className="flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-700 active:scale-95 transition shadow-md disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? 'AI Výběr presné firmy v ARES...' : '✨ AI Dohledat & Opravit název'}</span>
+          <span>{loading ? 'AI Analýza MS Kraje & ARES...' : '✨ AI Dohledat pobočky MS kraj & profil'}</span>
         </button>
       </div>
 
@@ -129,7 +145,7 @@ export function ClientAiEnrichCard({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={`Např. "${clientName} Safety" nebo "25877698"`}
+          placeholder={`Např. "${clientName} Ostrava" nebo "25877698"`}
           className="flex-1 rounded-xl bg-slate-50 px-3 py-1.5 text-xs text-slate-900 border border-slate-200 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-sky-500 font-medium"
         />
         <button
@@ -152,14 +168,21 @@ export function ClientAiEnrichCard({
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
             <span>
-              Oficiální název ({ares?.name || enrichData?.selectedOfficialName || clientName}), IČO, DIČ, Sídlo a Obor byly zapsány do profilu!
+              Profil klienta ({ares?.name || enrichData?.selectedOfficialName || clientName}), IČO, sídlo a MS strategie uloženy!
             </span>
           </div>
-          {createdContactsCount > 0 && (
-            <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
-              +{createdContactsCount} KONTAKT V ZÁLOŽCE KONTAKTY
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {createdBranchesCount > 0 && (
+              <span className="rounded-full bg-amber-600 px-2.5 py-0.5 text-[10px] font-black text-white">
+                +{createdBranchesCount} POBOČEK V ZÁLOŽCE POBOČKY
+              </span>
+            )}
+            {createdContactsCount > 0 && (
+              <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-black text-white">
+                +{createdContactsCount} KONTAKT V KONTAKTECH
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -168,7 +191,7 @@ export function ClientAiEnrichCard({
         <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3.5 border border-sky-100 text-xs text-slate-600">
           <Building2 size={20} className="text-sky-500 shrink-0" />
           <p>
-            Klikněte na tlačítko výše. AI vyhledá firmu <strong>{clientName}</strong> v rejstříku ARES, vybere přesnou shodu (např. <em>CANIS SAFETY a.s.</em>), **opraví oficiální název klienta, doplní IČO/DIČ, kontakty** a vygeneruje reklamní strategii.
+            Klikněte na tlačítko výše. AI vyhledá firmu <strong>{clientName}</strong> v rejstříku ARES, **dohledá pobočky v Moravskoslezském kraji a Ostravě** (automaticky je uloží do záložky Pobočky), **místní kontakty** a vygeneruje **reklamní strategii na nosičích SeePoint v Ostravě**.
           </p>
         </div>
       )}
@@ -206,9 +229,43 @@ export function ClientAiEnrichCard({
               )}
             </div>
             <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white uppercase">
-              OVRĚNO V ARES
+              OVIĚŘENO V ARES
             </span>
           </div>
+
+          {/* MS Region Branches Found */}
+          {enrichData?.msRegionBranches && enrichData.msRegionBranches.length > 0 && (
+            <div className="rounded-2xl bg-amber-50/90 p-4 border border-amber-200 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Store size={18} className="text-amber-700" />
+                  <h4 className="font-bold text-xs text-amber-950 uppercase tracking-wider">
+                    Pobočky a prodejny v Moravskoslezském kraji & Ostravě (uloženy v záložce Pobočky)
+                  </h4>
+                </div>
+                <a
+                  href={`/clients/${clientId}?tab=branches`}
+                  className="text-[11px] font-bold text-amber-800 hover:underline flex items-center gap-1"
+                >
+                  <span>Zobrazit v Pobočkách</span>
+                  <ArrowRight size={12} />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {enrichData.msRegionBranches.map((b, i) => (
+                  <div key={i} className="rounded-xl border border-amber-200/80 bg-white p-3 space-y-1 text-xs">
+                    <div className="font-extrabold text-slate-900">{b.name}</div>
+                    <div className="flex items-center gap-1.5 text-slate-600 text-[11px]">
+                      <MapPin size={12} className="text-amber-600 shrink-0" />
+                      <span>{b.street ? `${b.street}, ` : ''}{b.city}</span>
+                    </div>
+                    {b.note && <p className="text-[10px] text-slate-500 italic mt-0.5">{b.note}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Contact Persons Found */}
           {enrichData?.contactPersons && enrichData.contactPersons.length > 0 && (
@@ -217,7 +274,7 @@ export function ClientAiEnrichCard({
                 <div className="flex items-center gap-2">
                   <Users size={16} className="text-sky-600" />
                   <h4 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
-                    Nalezené kontaktní osoby (uloženy v záložce Kontakty)
+                    Místní kontaktní osoby & vedení (uloženy v záložce Kontakty)
                   </h4>
                 </div>
                 <a
@@ -283,7 +340,7 @@ export function ClientAiEnrichCard({
               <div className="rounded-2xl bg-amber-50/80 p-4 border border-amber-200 shadow-2xs space-y-2">
                 <div className="flex items-center gap-1.5 text-[11px] font-black text-amber-900 uppercase tracking-wider">
                   <Lightbulb size={14} className="text-amber-600" />
-                  <span>Tipy pro obchodníka</span>
+                  <span>Tipy pro obchodníka (MS kraj)</span>
                 </div>
                 <ul className="space-y-1.5 text-xs text-amber-950">
                   {enrichData.salesAdvice?.map((tip, i) => (
@@ -297,19 +354,19 @@ export function ClientAiEnrichCard({
             </div>
           )}
 
-          {/* Recommended Ad Strategy */}
+          {/* Recommended Ad Strategy for Ostrava & MS Region */}
           {enrichData?.recommendedCarriers && enrichData.recommendedCarriers.length > 0 && (
-            <div className="rounded-2xl bg-white p-4 border border-slate-200 shadow-2xs space-y-3">
+            <div className="rounded-2xl bg-sky-900 text-white p-4.5 border border-sky-800 shadow-md space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Target size={16} className="text-sky-600" />
-                  <h4 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
-                    Doporučená reklamní strategie SeePoint
+                  <Target size={18} className="text-sky-300" />
+                  <h4 className="font-extrabold text-xs text-white uppercase tracking-wider">
+                    Doporučená reklamní strategie SeePoint (Ostrava & MS Kraj)
                   </h4>
                 </div>
                 <a
                   href={`/offers/new?clientId=${clientId}`}
-                  className="flex items-center gap-1 text-xs font-bold text-sky-600 hover:text-sky-800 hover:underline"
+                  className="flex items-center gap-1 text-xs font-bold text-sky-200 hover:text-white hover:underline bg-sky-800/60 px-3 py-1 rounded-xl border border-sky-700"
                 >
                   <FileText size={13} />
                   <span>Vytvořit AI Nabídku na míru</span>
@@ -318,9 +375,9 @@ export function ClientAiEnrichCard({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {enrichData.recommendedCarriers.map((rec, i) => (
-                  <div key={i} className="rounded-xl border border-sky-100 bg-sky-50/50 p-3 space-y-1">
-                    <span className="font-extrabold text-xs text-sky-950 block">{rec.type}</span>
-                    <p className="text-[11px] text-slate-600 leading-snug">{rec.reason}</p>
+                  <div key={i} className="rounded-xl border border-sky-800 bg-sky-950/70 p-3 space-y-1">
+                    <span className="font-extrabold text-xs text-sky-300 block">{rec.type}</span>
+                    <p className="text-[11px] text-slate-300 leading-snug">{rec.reason}</p>
                   </div>
                 ))}
               </div>
