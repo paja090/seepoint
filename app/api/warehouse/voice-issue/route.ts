@@ -59,6 +59,9 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const isReturn = /vrátil|vracím|vracim|dávám zpět|davam zpet|vráceno|vraceno|zpět do skladu|zpet do skladu/i.test(text);
+    const movementType = isReturn ? 'RETURN' : 'ISSUE';
+
     const performedByName = user.employee
       ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
       : user.name || user.email;
@@ -73,11 +76,11 @@ export async function POST(request: Request) {
 
     for (const issue of matchedIssues) {
       const currentStock = Number(issue.item.quantityInStock);
-      const isConsumable = issue.item.category === 'CONSUMABLE';
-      const movementType = isConsumable ? 'ISSUE' : 'ISSUE';
 
       let newStock = currentStock;
-      if (isConsumable) {
+      if (movementType === 'RETURN') {
+        newStock = currentStock + issue.quantity;
+      } else {
         newStock = Math.max(0, currentStock - issue.quantity);
       }
 
@@ -91,7 +94,7 @@ export async function POST(request: Request) {
             assignedEmployeeId: assignedEmployeeId || null,
             assignedEmployeeName: assignedEmployeeName || null,
             performedByName,
-            note: `Hlasový výdej: "${speechText}"`,
+            note: `Hlasový pohyb (${isReturn ? 'Vracení' : 'Výdej'}): "${speechText}"`,
           },
         }),
         prisma.warehouseItem.update({
@@ -108,11 +111,12 @@ export async function POST(request: Request) {
       });
     }
 
+    const actionTitle = isReturn ? 'Úspěšně vráceno do skladu' : 'Úspěšně vydáno ze skladu';
     return NextResponse.json({
       success: true,
       speechText,
       issuedItems: results,
-      message: `Úspěšně vydáno: ${results.map((r) => `${r.quantity} ${r.unit} ${r.name}`).join(', ')}`,
+      message: `${actionTitle}: ${results.map((r) => `${r.quantity} ${r.unit} ${r.name}`).join(', ')}`,
     });
   } catch (error) {
     console.error('Voice issue error:', error);

@@ -72,19 +72,44 @@ export function MobileWarehouseAppClient({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'CONSUMABLE' | 'RETURNABLE'>('ALL');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [processingItemIds, setProcessingItemIds] = useState<Record<string, boolean>>({});
 
-  // Filter items assigned/checked-out by recent movements (active borrowings)
-  const myMovements = recentMovements.filter(
-    (m) =>
-      m.type === 'ISSUE' &&
-      m.item?.category === 'RETURNABLE' &&
-      (currentUserName ? m.performedByName?.includes(currentUserName) || m.assignedEmployeeName?.includes(currentUserName) : true)
-  );
+  // Compute active borrowings (net quantity issued minus quantity returned per item)
+  const activeBorrowingsMap = new Map<string, { itemId: string; name: string; unit: string; qty: number }>();
 
-  // Fast movement handler (take or return)
+  recentMovements.forEach((m) => {
+    if (!m.item || m.item.category !== 'RETURNABLE') return;
+
+    const matchesUser = currentUserName
+      ? m.performedByName?.includes(currentUserName) || m.assignedEmployeeName?.includes(currentUserName)
+      : true;
+
+    if (!matchesUser) return;
+
+    const current = activeBorrowingsMap.get(m.item.id) || {
+      itemId: m.item.id,
+      name: m.item.name,
+      unit: m.item.unit,
+      qty: 0,
+    };
+
+    const qty = Number(m.quantity) || 1;
+    if (m.type === 'ISSUE') {
+      current.qty += qty;
+    } else if (m.type === 'RETURN') {
+      current.qty = Math.max(0, current.qty - qty);
+    }
+
+    activeBorrowingsMap.set(m.item.id, current);
+  });
+
+  const activeBorrowings = Array.from(activeBorrowingsMap.values()).filter((b) => b.qty > 0);
+
+  // Fast movement handler (take or return) with instant double-click protection
   const handleQuickMovement = async (itemId: string, type: 'ISSUE' | 'RETURN', quantity = 1, note = '') => {
-    setBusyItemId(itemId);
+    if (processingItemIds[itemId]) return;
+
+    setProcessingItemIds((prev) => ({ ...prev, [itemId]: true }));
     setStatusMessage(null);
 
     try {
@@ -106,7 +131,7 @@ export function MobileWarehouseAppClient({
 
       setStatusMessage({
         type: 'success',
-        text: type === 'ISSUE' ? `✅ Vzato: ${quantity}x z položky.` : `🟢 Vráceno: ${quantity}x do skladu.`,
+        text: type === 'ISSUE' ? `✅ Vzato: ${quantity}x ze skladu.` : `🟢 Vráceno: ${quantity}x do skladu.`,
       });
 
       startTransition(() => {
@@ -115,7 +140,11 @@ export function MobileWarehouseAppClient({
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: `⚠️ ${err.message}` });
     } finally {
-      setBusyItemId(null);
+      setProcessingItemIds((prev) => {
+        const next = { ...prev };
+        delete next[itemId];
+        return next;
+      });
     }
   };
 
@@ -257,7 +286,7 @@ export function MobileWarehouseAppClient({
             {filteredItems.slice(0, 30).map((item) => {
               const inStock = Number(item.quantityInStock);
               const isLow = item.minQuantity !== null && inStock < Number(item.minQuantity);
-              const isBusy = busyItemId === item.id;
+              const isBusy = Boolean(processingItemIds[item.id]) || isPending;
 
               return (
                 <div
@@ -298,7 +327,7 @@ export function MobileWarehouseAppClient({
                       className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 py-2.5 px-3 text-xs font-black text-slate-950 shadow-sm active:scale-95 transition disabled:opacity-50"
                     >
                       <ArrowUpRight size={14} />
-                      <span>VZÍT 1 {item.unit.toUpperCase()}</span>
+                      <span>{isBusy ? 'Ukládám...' : `VZÍT 1 ${item.unit.toUpperCase()}`}</span>
                     </button>
 
                     {item.category === 'CONSUMABLE' && (
@@ -332,7 +361,7 @@ export function MobileWarehouseAppClient({
             </p>
           </div>
 
-          {myMovements.length === 0 ? (
+          {activeBorrowings.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
               <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
               <h4 className="font-bold text-slate-800">Nemáte žádné aktivní výpůjčky</h4>
@@ -340,26 +369,29 @@ export function MobileWarehouseAppClient({
             </div>
           ) : (
             <div className="space-y-3">
-              {myMovements.map((movement) => (
-                <div key={movement.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div>
-                    <strong className="text-slate-900 text-sm font-black">{movement.item.name}</strong>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      Vzato: {Number(movement.quantity)} {movement.item.unit} · {new Date(movement.createdAt).toLocaleDateString('cs-CZ')}
+              {activeBorrowings.map((borrowing) => {
+                const isProcessing = Boolean(processingItemIds[borrowing.itemId]) || isPending;
+                return (
+                  <div key={borrowing.itemId} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div>
+                      <strong className="text-slate-900 text-sm font-black">{borrowing.name}</strong>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        Aktivně u sebe: <b className="text-purple-700 font-bold">{borrowing.qty} {borrowing.unit}</b>
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    type="button"
-                    disabled={busyItemId === movement.item.id}
-                    onClick={() => handleQuickMovement(movement.item.id, 'RETURN', Number(movement.quantity))}
-                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 py-2 px-3.5 text-xs font-black text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition"
-                  >
-                    <RotateCcw size={14} />
-                    <span>VRÁTIT DO SKLADU</span>
-                  </button>
-                </div>
-              ))}
+                    <button
+                      type="button"
+                      disabled={isProcessing}
+                      onClick={() => handleQuickMovement(borrowing.itemId, 'RETURN', borrowing.qty)}
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 px-4 text-xs font-black text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition disabled:opacity-50"
+                    >
+                      <RotateCcw size={14} />
+                      <span>{isProcessing ? 'Ukládám...' : 'VRÁTIT DO SKLADU'}</span>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
