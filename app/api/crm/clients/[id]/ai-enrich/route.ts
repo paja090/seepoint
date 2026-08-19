@@ -59,42 +59,58 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Extracted ARES details
-    const verifiedIco = aresData?.ico || client.companyId || '';
-    const verifiedDic = aresData?.dic || client.dic || '';
+    const aresIco = aresData?.ico || '';
+    const aresDic = aresData?.dic || '';
     const officialName = aresData?.obchodniJmeno || client.name;
     const addressText = aresData?.sidlo?.textovaAdresa || '';
 
     // Step 2: Use Gemini 3.6 AI to analyze company & recommend SeePoint ad strategy
     const apiKey = process.env.GEMINI_API_KEY;
-    let aiEnrichmentResult = null;
+    let aiEnrichmentResult: {
+      foundIco?: string;
+      foundDic?: string;
+      foundWebsite?: string;
+      foundStreet?: string;
+      foundCity?: string;
+      foundZip?: string;
+      businessField?: string;
+      companySummary?: string;
+      executives?: string;
+      recommendedCarriers?: Array<{ type: string; reason: string }>;
+      salesAdvice?: string[];
+    } | null = null;
 
     if (apiKey) {
-      const prompt = `Jsi seniorní CRM analytik a marketingový poradce české reklamní agentury SeePoint (specializace na OOH venkovní reklamu, městskou navigaci na sloupech VO, lavičky, Galerie VENKU a billboardy).
+      const prompt = `Jsi seniorní CRM analytik a marketingový poradce české reklamní agentury SeePoint.
 
 Analýza klienta:
 - Název firmy: "${officialName}"
-- IČO: "${verifiedIco}"
-- Sídlo/Adresa: "${addressText || `${client.billingStreet}, ${client.billingCity}`}"
+- IČO v databázi/ARES: "${aresIco || client.companyId || 'Chybí'}"
+- DIČ v databázi/ARES: "${aresDic || client.dic || 'Chybí'}"
+- Sídlo/Adresa: "${addressText || `${client.billingStreet || ''}, ${client.billingCity || ''}`}"
 - Web klienta: "${client.website || 'Neuveden'}"
 - Stávající poznámky: "${client.note || ''}"
 
 Tvé úkoly:
-1. Identifikuj přesný hlavní obor činnosti firmy (v češtině).
-2. Napiš 2-3 stručné věty představující firmu, její rozsah a cílovou skupinu.
-3. Doplň jména statutárních orgánů / jednatelů, pokud jsou známá nebo pravděpodobná.
-4. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint pro tohoto klienta:
-   - Městská navigace (směrové tabule na sloupech VO u sjezdů a křižovatek)
-   - City Postery & Lavičky (reklama na městském inventáři pro zásah chodců)
-   - Galerie VENKU (venkovní výstavy na frekventovaných náměstích)
-   - Solitéry & Billboardy na hlavních přivaděčích
-   U každého nosiče uveď konkrétní důvod, proč je pro tohoto klienta ideální.
-5. Napiš 2 konkrétní prodejní argumenty / tipy pro obchodníka SeePoint při sjednávání zakázky.
+1. Pokud chybí IČO nebo DIČ, zkus podle názvu firmy dohledat oficiální 8místné IČO a DIČ v ČR (např. CZ12345678).
+2. Pokud chybí web klienta, uveď pravděpodobnou URL adresu webu klienta.
+3. Identifikuj přesný hlavní obor činnosti firmy v češtině.
+4. Napiš 2-3 stručné věty představující firmu, její rozsah a cílovou skupinu.
+5. Doplň jména statutárních orgánů / jednatelů, pokud jsou známá nebo pravděpodobná.
+6. Navrhni 3 DOPORUČENÉ REKLAMNÍ NOSIČE ze sítě SeePoint pro tohoto klienta (Městská navigace VO, City Postery & Lavičky, Galerie VENKU, Billboardy) s konkrétními důvody.
+7. Napiš 2 konkrétní prodejní argumenty pro obchodníka SeePoint.
 
 Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
 {
+  "foundIco": "8místné IČO nebo null",
+  "foundDic": "DIČ nebo null",
+  "foundWebsite": "https://... nebo null",
+  "foundStreet": "Ulice a č.p. nebo null",
+  "foundCity": "Město nebo null",
+  "foundZip": "PSČ nebo null",
   "businessField": "Hlavní obor činnosti",
   "companySummary": "2-3 věty o zaměření a profilu firmy...",
-  "executives": "Jména jednatelů nebo 'Neuvedeno v rejstříku'",
+  "executives": "Jména jednatelů",
   "recommendedCarriers": [
     { "type": "Městská navigace VO", "reason": "Proč je vhodná..." },
     { "type": "City Postery & Lavičky", "reason": "Proč je vhodná..." },
@@ -127,17 +143,28 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
       }
     }
 
-    // Step 3: Update client record in DB with verified details
+    // Step 3: Combine best verified values from ARES + Gemini AI + Existing DB
+    const finalIco = aresIco || aiEnrichmentResult?.foundIco || client.companyId || null;
+    const finalDic = aresDic || aiEnrichmentResult?.foundDic || client.dic || null;
+    const finalWebsite = client.website || aiEnrichmentResult?.foundWebsite || null;
+
+    const finalStreet = aresData?.sidlo?.ulice
+      ? `${aresData.sidlo.ulice} ${aresData.sidlo.cisloDomovni || ''}`.trim()
+      : aiEnrichmentResult?.foundStreet || client.billingStreet || null;
+
+    const finalCity = aresData?.sidlo?.nazevObce || aiEnrichmentResult?.foundCity || client.billingCity || null;
+    const finalZip = aresData?.sidlo?.psc ? String(aresData.sidlo.psc) : aiEnrichmentResult?.foundZip || client.billingZip || null;
+
+    // Save directly into client in database!
     const updatedClient = await prisma.client.update({
       where: { id },
       data: {
-        companyId: verifiedIco || client.companyId,
-        dic: verifiedDic || client.dic,
-        billingStreet: aresData?.sidlo?.ulice
-          ? `${aresData.sidlo.ulice} ${aresData.sidlo.cisloDomovni || ''}`.trim()
-          : client.billingStreet,
-        billingCity: aresData?.sidlo?.nazevObce || client.billingCity,
-        billingZip: aresData?.sidlo?.psc ? String(aresData.sidlo.psc) : client.billingZip,
+        companyId: finalIco,
+        dic: finalDic,
+        website: finalWebsite,
+        billingStreet: finalStreet,
+        billingCity: finalCity,
+        billingZip: finalZip,
         note: aiEnrichmentResult?.companySummary
           ? `${client.note ? `${client.note}\n\n` : ''}🤖 AI Profil (${new Date().toLocaleDateString('cs-CZ')}): Obor: ${aiEnrichmentResult.businessField}. ${aiEnrichmentResult.companySummary}`
           : client.note,

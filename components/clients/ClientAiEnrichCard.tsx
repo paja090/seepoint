@@ -1,10 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText } from 'lucide-react';
+import { Sparkles, Building2, ShieldCheck, MapPin, Target, Lightbulb, RefreshCw, CheckCircle2, ArrowRight, FileText, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 type AiEnrichmentData = {
+  foundIco?: string;
+  foundDic?: string;
+  foundWebsite?: string;
+  foundStreet?: string;
+  foundCity?: string;
+  foundZip?: string;
   businessField?: string;
   companySummary?: string;
   executives?: string;
@@ -36,11 +42,13 @@ export function ClientAiEnrichCard({
   const [loading, setLoading] = useState(false);
   const [enrichData, setEnrichData] = useState<AiEnrichmentData | null>(null);
   const [ares, setAres] = useState<AresData | null>(null);
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleEnrich = async () => {
     setLoading(true);
     setError(null);
+    setSavedSuccess(false);
     try {
       const res = await fetch(`/api/crm/clients/${clientId}/ai-enrich`, { method: 'POST' });
       const data = await res.json();
@@ -49,6 +57,8 @@ export function ClientAiEnrichCard({
       } else {
         setEnrichData(data.aiEnrichment || null);
         setAres(data.aresData || null);
+        setSavedSuccess(true);
+        // Refresh server components & client header with updated IČO/DIČ/Address
         router.refresh();
       }
     } catch (e: any) {
@@ -68,7 +78,7 @@ export function ClientAiEnrichCard({
           </div>
           <div>
             <h3 className="font-black text-slate-900 text-base">AI Profil Klienta & ARES Rejstřík</h3>
-            <p className="text-xs text-slate-500">Automatické dohledání firemních dat, jednatelů a reklamní strategie</p>
+            <p className="text-xs text-slate-500">Automatické dohledání IČO/DIČ, sídla, jednatelů a reklamní strategie</p>
           </div>
         </div>
 
@@ -88,12 +98,19 @@ export function ClientAiEnrichCard({
         </div>
       )}
 
+      {savedSuccess && (
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 font-bold animate-in fade-in duration-200">
+          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+          <span>Údaje (IČO, DIČ, Sídlo, Obor) byly úspěšně zapsány do databáze a profilu klienta!</span>
+        </div>
+      )}
+
       {/* Initial State Hint */}
       {!enrichData && !ares && !loading && (
         <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3.5 border border-sky-100 text-xs text-slate-600">
           <Building2 size={20} className="text-sky-500 shrink-0" />
           <p>
-            Klikněte na tlačítko výše. AI ověří firmu <strong>{clientName}</strong> v rejstříku ARES (IČO/DIČ, sídlo) a vygeneruje <strong>doporučenou strategii nosičů SeePoint</strong> na míru oboru podnikání.
+            Klikněte na tlačítko výše. AI ověří firmu <strong>{clientName}</strong> v rejstříku ARES (IČO/DIČ, sídlo), okamžitě zapíše zjištěná data do databáze klienta a vygeneruje <strong>doporučenou strategii nosičů SeePoint</strong>.
           </p>
         </div>
       )}
@@ -110,29 +127,27 @@ export function ClientAiEnrichCard({
       {/* Results Display */}
       {(enrichData || ares) && (
         <div className="space-y-4 pt-1">
-          {/* ARES Verified Pill */}
-          {ares && (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950">
-              <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
-              <div className="flex-1 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span>
-                  <strong>IČO:</strong> {ares.ico || companyId || 'Nenalezeno'}
-                </span>
-                <span>
-                  <strong>DIČ:</strong> {ares.dic || dic || 'Neuvedeno'}
-                </span>
-                {ares.address && (
-                  <span className="flex items-center gap-1">
-                    <MapPin size={12} className="text-emerald-700" />
-                    {ares.address}
-                  </span>
-                )}
-              </div>
-              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white">
-                VERIFIKOVÁNO ARES
+          {/* Verified IČO & Address Pill */}
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950">
+            <ShieldCheck size={18} className="text-emerald-600 shrink-0" />
+            <div className="flex-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span>
+                <strong>IČO:</strong> {ares?.ico || enrichData?.foundIco || companyId || 'Nenalezeno'}
               </span>
+              <span>
+                <strong>DIČ:</strong> {ares?.dic || enrichData?.foundDic || dic || 'Neuvedeno'}
+              </span>
+              {(ares?.address || enrichData?.foundCity) && (
+                <span className="flex items-center gap-1">
+                  <MapPin size={12} className="text-emerald-700" />
+                  {ares?.address || `${enrichData?.foundStreet || ''}, ${enrichData?.foundCity || ''}`}
+                </span>
+              )}
             </div>
-          )}
+            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white uppercase">
+              ULOŽENO DO DATABÁZE
+            </span>
+          </div>
 
           {/* AI Company Summary & Business Field */}
           {enrichData && (
