@@ -63,11 +63,37 @@ export async function generateStandardMediaPreview(input: {
   }).sort((a, b) => b.score - a.score || (a.totalPrice ?? Number.MAX_SAFE_INTEGER) - (b.totalPrice ?? Number.MAX_SAFE_INTEGER));
 
   const requestedIds = new Set(input.request.selectedSurfaceIds ?? []);
-  let selected = requestedIds.size ? ranked.filter((row) => requestedIds.has(row.surface.id)) : ranked.slice(0, input.quantity);
+  let selected: typeof ranked = [];
+
+  if (requestedIds.size) {
+    selected = ranked.filter((row) => requestedIds.has(row.surface.id));
+  } else if (!input.mediaType) {
+    // Interleave media types to build a balanced mix (lavičky/babičky, city postery, citylighty, billboardy...)
+    const byType = new Map<MediaType, typeof ranked>();
+    for (const row of ranked) {
+      const list = byType.get(row.surface.mediaType) ?? [];
+      list.push(row);
+      byType.set(row.surface.mediaType, list);
+    }
+    const typeLists = Array.from(byType.values());
+    const maxLen = Math.max(...typeLists.map((l) => l.length), 0);
+    for (let i = 0; i < maxLen; i++) {
+      for (const list of typeLists) {
+        if (list[i]) {
+          selected.push(list[i]);
+          if (selected.length === input.quantity) break;
+        }
+      }
+      if (selected.length === input.quantity) break;
+    }
+  } else {
+    selected = ranked.slice(0, input.quantity);
+  }
+
   if (!requestedIds.size && input.request.budget && selected.some((row) => row.totalPrice !== null)) {
     const affordable: typeof selected = [];
     let running = 0;
-    for (const row of ranked) {
+    for (const row of (input.mediaType ? ranked : selected)) {
       if (row.totalPrice === null || running + row.totalPrice > input.request.budget) continue;
       affordable.push(row); running += row.totalPrice;
       if (affordable.length === input.quantity) break;
