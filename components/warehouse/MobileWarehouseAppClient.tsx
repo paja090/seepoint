@@ -78,7 +78,7 @@ export function MobileWarehouseAppClient({
   const myMovements = recentMovements.filter(
     (m) =>
       m.type === 'ISSUE' &&
-      m.item.category === 'RETURNABLE' &&
+      m.item?.category === 'RETURNABLE' &&
       (currentUserName ? m.performedByName?.includes(currentUserName) || m.assignedEmployeeName?.includes(currentUserName) : true)
   );
 
