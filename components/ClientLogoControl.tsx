@@ -69,7 +69,7 @@ export function ClientLogoControl({
 
   return (
     <div className="flex min-w-48 items-center gap-3">
-      <span className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-500">
+      <span className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-800 bg-slate-900/80 text-xs font-bold text-slate-300">
         {logoUrl ? (
           <Image alt={`Logo ${clientName}`} className="object-contain p-1" fill sizes="48px" src={logoUrl} unoptimized />
         ) : (
