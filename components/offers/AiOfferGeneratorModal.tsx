@@ -46,6 +46,7 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
   const [pricingSegment, setPricingSegment] = useState<PricingSegment>('COMMERCIAL');
   const [prompt, setPrompt] = useState('');
   const [city, setCity] = useState('');
+  const [mediaType, setMediaType] = useState('');
   const [budget, setBudget] = useState('');
   const [durationMonths, setDurationMonths] = useState(12);
   const [quantity, setQuantity] = useState(6);
@@ -81,6 +82,7 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
     clientName: clientName.trim() || undefined,
     pricingSegment,
     city: offerType === 'NAVIGATION' ? undefined : city.trim() || undefined,
+    mediaType: mediaType || undefined,
     budget: budget ? Number(budget) : undefined,
     durationMonths,
     quantity,
@@ -217,7 +219,24 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
             </details>
           </> : <>
             <section><label className="text-sm font-black uppercase tracking-wide text-amber-400">Co klient potřebuje?<textarea className="input mt-2 min-h-24 normal-case tracking-normal text-white" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Popište kampaň, lokalitu a očekávání klienta." /></label></section>
-            <section className="grid gap-3 sm:grid-cols-4"><label className="text-xs font-bold">Město / lokalita<input className="input mt-1" value={city} onChange={(event) => setCity(event.target.value)} /></label><label className="text-xs font-bold">Počet ploch<input className="input mt-1" min="1" type="number" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label><label className="text-xs font-bold">Délka (měsíce)<input className="input mt-1" min="1" type="number" value={durationMonths} onChange={(event) => setDurationMonths(Number(event.target.value))} /></label><label className="text-xs font-bold">Max. rozpočet Kč<input className="input mt-1" min="0" type="number" value={budget} onChange={(event) => setBudget(event.target.value)} /></label></section>
+            <section className="grid gap-3 sm:grid-cols-5">
+              <label className="text-xs font-bold">Město / lokalita<input className="input mt-1" value={city} onChange={(event) => setCity(event.target.value)} placeholder="Všechna města" /></label>
+              <label className="text-xs font-bold">Typ média / Mix
+                <select className="input mt-1" value={mediaType} onChange={(event) => setMediaType(event.target.value)}>
+                  <option value="">✨ Automatický mix (Lavičky, City postery, Billboardy...)</option>
+                  <option value="PROMO_BENCH">Lavičky / Babičky (PROMO_BENCH)</option>
+                  <option value="CITY_POSTER">City postery (CITY_POSTER)</option>
+                  <option value="CITYLIGHT">Citylight / CLV (CITYLIGHT)</option>
+                  <option value="BILLBOARD">Billboardy (BILLBOARD)</option>
+                  <option value="BIGBOARD">Bigboardy (BIGBOARD)</option>
+                  <option value="LED_SCREEN">LED obrazovky (LED_SCREEN)</option>
+                  <option value="BANNER">Bannery / Plachty (BANNER)</option>
+                </select>
+              </label>
+              <label className="text-xs font-bold">Počet ploch<input className="input mt-1" min="1" type="number" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
+              <label className="text-xs font-bold">Délka (měsíce)<input className="input mt-1" min="1" type="number" value={durationMonths} onChange={(event) => setDurationMonths(Number(event.target.value))} /></label>
+              <label className="text-xs font-bold">Max. rozpočet Kč<input className="input mt-1" min="0" type="number" value={budget} onChange={(event) => setBudget(event.target.value)} placeholder="Bez omezení" /></label>
+            </section>
           </>}
 
           <button className="btn-primary w-full" disabled={loading || !canPreview} onClick={() => void call('preview')} type="button">{loading ? 'Připravuji návrh…' : offerType === 'NAVIGATION' ? 'Najít nejlepší navigační body' : 'Připravit AI návrh'}</button>
