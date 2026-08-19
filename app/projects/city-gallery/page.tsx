@@ -1,13 +1,64 @@
-import { GalleryHorizontalEnd, Plus } from 'lucide-react';
-import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
+import { CityGalleryModuleClient } from '@/components/city-gallery/CityGalleryModuleClient';
 
 export const dynamic = 'force-dynamic';
 
 export default async function CityGalleryProjectsPage() {
   await requirePageAccess('cityGallery');
-  const [projects, offerCount] = await Promise.all([prisma.cityGalleryProject.findMany({ include: { _count: { select: { offers: true } } }, orderBy: { updatedAt: 'desc' }, take: 100 }), prisma.offer.count({ where: { offerType: 'CITY_GALLERY', archivedAt: null } })]);
-  return <AppShell><div className="space-y-6"><header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-fuchsia-700">Projekty</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Galerie venku</h1><p className="mt-2 text-sm text-slate-500">Rozšiřitelný základ pro lokality, instalace a realizace City Gallery.</p></div><Link className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white" href="/offers/new/city-gallery"><Plus size={17} /> Nová nabídka</Link></header><div className="grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-xs text-slate-500">Projekty</p><strong className="mt-2 block text-2xl">{projects.length}</strong></div><div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-xs text-slate-500">Nabídky</p><strong className="mt-2 block text-2xl">{offerCount}</strong></div><div className="rounded-2xl border border-slate-200 bg-white p-5"><p className="text-xs text-slate-500">Aktivní realizace</p><strong className="mt-2 block text-2xl">{projects.filter((project) => project.status === 'ACTIVE').length}</strong></div></div><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">Evidence projektů</h2>{projects.length ? <ul className="mt-4 divide-y divide-slate-100">{projects.map((project) => <li className="flex items-center gap-4 py-4" key={project.id}><span className="rounded-xl bg-fuchsia-50 p-2 text-fuchsia-700"><GalleryHorizontalEnd size={19} /></span><span className="min-w-0 flex-1"><strong className="block text-sm">{project.title}</strong><span className="text-xs text-slate-500">{project.city || 'Lokalita neuvedena'} · {project._count.offers} nabídek</span></span><span className="text-xs font-semibold text-slate-500">{project.status}</span></li>)}</ul> : <div className="py-10 text-center text-sm text-slate-500">Zatím není založen žádný projekt. Nabídku lze vytvořit i bez projektu a propojit ji později.</div>}</section></div></AppShell>;
+
+  const [projectsRaw, fleetConfig, offerCount] = await Promise.all([
+    prisma.cityGalleryProject.findMany({
+      include: { _count: { select: { offers: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    }),
+    prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }),
+    prisma.offer.count({ where: { offerType: 'CITY_GALLERY', archivedAt: null } }),
+  ]);
+
+  const totalFleet = fleetConfig?.totalFrames ?? 24;
+  const maintenanceCount = fleetConfig?.maintenanceCount ?? 0;
+
+  const projects = projectsRaw.map((p) => ({
+    id: p.id,
+    title: p.title,
+    status: p.status,
+    city: p.city,
+    locality: p.locality,
+    address: p.address,
+    description: p.description,
+    frameCount: p.frameCount,
+    permitStatus: p.permitStatus,
+    permitNumber: p.permitNumber,
+    permitValidFrom: p.permitValidFrom ? p.permitValidFrom.toISOString() : null,
+    permitValidTo: p.permitValidTo ? p.permitValidTo.toISOString() : null,
+    permitNote: p.permitNote,
+    cityOfficialContact: p.cityOfficialContact,
+    organizerName: p.organizerName,
+    artistName: p.artistName,
+    dateFrom: p.dateFrom ? p.dateFrom.toISOString() : null,
+    dateTo: p.dateTo ? p.dateTo.toISOString() : null,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+    _count: p._count,
+  }));
+
+  const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
+  const occupiedFrames = activeProjects.reduce((acc, p) => acc + (p.frameCount || 6), 0);
+  const availableFrames = Math.max(0, totalFleet - occupiedFrames - maintenanceCount);
+
+  const fleet = {
+    totalFleet,
+    occupiedFrames,
+    availableFrames,
+    maintenanceCount,
+  };
+
+  return (
+    <AppShell>
+      <CityGalleryModuleClient initialProjects={projects} initialFleet={fleet} />
+    </AppShell>
+  );
 }

@@ -11,7 +11,8 @@ export type SystemNotificationItem = {
     | 'MY_TASK_TODAY'
     | 'VEHICLE_FAULT'
     | 'LOW_STOCK'
-    | 'UNRETURNED_TOOL';
+    | 'UNRETURNED_TOOL'
+    | 'CITY_GALLERY_PERMIT_EXPIRING';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -206,6 +207,32 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
         message: `${m.performedByName || m.assignedEmployeeName || 'Pracovník'} má vybrané nářadí ${m.item.name} (${Number(m.quantity)} ${m.item.unit}) již od ${new Date(m.createdAt).toLocaleDateString('cs-CZ')}. Nezapomeňte vrátit do skladu!`,
         severity: 'MEDIUM',
         link: `/warehouse`,
+        createdAt: now.toISOString(),
+      });
+    }
+  });
+
+  // 6. CITY GALLERY: Permit Expiration Alerts (within 30 days)
+  const thirtyDaysInFuture = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const expiringPermitProjects = await prisma.cityGalleryProject.findMany({
+    where: {
+      permitValidTo: { lte: thirtyDaysInFuture, gte: now },
+      status: { in: ['ACTIVE', 'SCHEDULED'] },
+    },
+    select: { id: true, title: true, city: true, locality: true, permitValidTo: true, frameCount: true },
+    take: 15,
+  });
+
+  expiringPermitProjects.forEach((p) => {
+    if (p.permitValidTo) {
+      const diffDays = Math.ceil((new Date(p.permitValidTo).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      notifications.push({
+        id: `city-gallery-permit-${p.id}`,
+        type: 'CITY_GALLERY_PERMIT_EXPIRING',
+        title: `📜 Končí zábor města: ${p.title}`,
+        message: `Povolení záboru veřejného prostranství (${p.city || 'Město'}${p.locality ? ` – ${p.locality}` : ''}) pro ${p.frameCount} nosičů vyprší za ${diffDays} dní (${new Date(p.permitValidTo).toLocaleDateString('cs-CZ')}). Podajte žádost o prodloužení nebo naplánujte odvoz!`,
+        severity: diffDays <= 7 ? 'HIGH' : 'MEDIUM',
+        link: `/projects/city-gallery`,
         createdAt: now.toISOString(),
       });
     }
