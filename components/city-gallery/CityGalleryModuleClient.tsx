@@ -29,7 +29,7 @@ import Link from 'next/link';
 export type CityGalleryProjectData = {
   id: string;
   title: string;
-  status: 'DRAFT' | 'PREPARATION' | 'SCHEDULED' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+  status: 'DRAFT' | 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
   city: string | null;
   locality: string | null;
   address: string | null;
@@ -84,7 +84,7 @@ export function CityGalleryModuleClient({
   const [formLocality, setFormLocality] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formFrameCount, setFormFrameCount] = useState(6);
-  const [formStatus, setFormStatus] = useState<'DRAFT' | 'SCHEDULED' | 'ACTIVE'>('ACTIVE');
+  const [formStatus, setFormStatus] = useState<'DRAFT' | 'PLANNED' | 'ACTIVE'>('ACTIVE');
   const [formPermitStatus, setFormPermitStatus] = useState('APPROVED');
   const [formPermitNumber, setFormPermitNumber] = useState('');
   const [formPermitValidFrom, setFormPermitValidFrom] = useState('');
@@ -117,7 +117,7 @@ export function CityGalleryModuleClient({
   // Calculate expiring permits (< 30 days)
   const now = new Date();
   const expiringProjects = projects.filter((p) => {
-    if (!p.permitValidTo || (p.status !== 'ACTIVE' && p.status !== 'SCHEDULED')) return false;
+    if (!p.permitValidTo || (p.status !== 'ACTIVE' && p.status !== 'PLANNED')) return false;
     const diffDays = Math.ceil((new Date(p.permitValidTo).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 30;
   });
@@ -437,12 +437,12 @@ export function CityGalleryModuleClient({
                         className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-black uppercase ${
                           p.status === 'ACTIVE'
                             ? 'bg-emerald-100 text-emerald-800'
-                            : p.status === 'SCHEDULED'
+                            : p.status === 'PLANNED'
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {p.status === 'ACTIVE' ? 'Aktivní v ulicích' : p.status === 'SCHEDULED' ? 'Plánováno' : 'Koncept'}
+                        {p.status === 'ACTIVE' ? 'Aktivní v ulicích' : p.status === 'PLANNED' ? 'Plánováno' : 'Koncept'}
                       </span>
                     </div>
 
@@ -736,7 +736,7 @@ export function CityGalleryModuleClient({
                     className="input h-10 text-xs w-full"
                   >
                     <option value="ACTIVE">Aktivní v ulicích</option>
-                    <option value="SCHEDULED">Plánováno</option>
+                    <option value="PLANNED">Plánováno</option>
                     <option value="DRAFT">Koncept</option>
                   </select>
                 </div>
