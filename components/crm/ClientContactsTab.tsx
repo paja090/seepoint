@@ -179,17 +179,19 @@ export function ClientContactsTab({ client }: { client: ClientProfileData }) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openEditModal(contact)}
-                      className="p-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 transition"
-                      title="Upravit kontakt"
+                      className="px-3 py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-extrabold transition flex items-center gap-1.5 shadow-2xs"
+                      title="Upravit kontaktní osobu"
                     >
-                      <Edit3 size={14} />
+                      <Edit3 size={13} className="text-sky-700" />
+                      <span>✏️ Upravit</span>
                     </button>
                     <button
                       onClick={() => handleDelete(contact.id, `${contact.firstName} ${contact.lastName}`)}
-                      className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
+                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition flex items-center gap-1"
                       title="Odstranit kontakt"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} className="text-rose-600" />
+                      <span>Smazat</span>
                     </button>
                   </div>
                 </TableCell>
