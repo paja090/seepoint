@@ -242,6 +242,25 @@ export function MobileWarehouseAppClient({
         </div>
       </div>
 
+      {/* Low Stock Warehouse Alert Banner */}
+      {items.filter((item) => item.minQuantity !== null && Number(item.quantityInStock) < Number(item.minQuantity)).length > 0 && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-rose-500/40 bg-rose-950/80 p-3.5 text-rose-200 text-xs font-bold shadow-md">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle size={18} className="text-rose-400 shrink-0" />
+            <span className="truncate">
+              <strong>Pozor: {items.filter((item) => item.minQuantity !== null && Number(item.quantityInStock) < Number(item.minQuantity)).length} položek</strong> má kriticky nízký stav zásoby!
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setSelectedCategory('ALL'); setSearchQuery(''); setActiveTab('catalog'); }}
+            className="shrink-0 rounded-xl bg-rose-800 px-2.5 py-1 text-[11px] font-black text-white hover:bg-rose-700 transition"
+          >
+            Přehled ↗
+          </button>
+        </div>
+      )}
+
       {/* Notification status banner */}
       {statusMessage && (
         <div
