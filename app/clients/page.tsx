@@ -76,7 +76,20 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                 const statusObj = CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS] || CLIENT_STATUS_LABELS.ACTIVE;
                 return (
                   <tr className="hover:bg-slate-50/70 cursor-pointer" key={client.id}>
-                    <TableCell><ClientLogoControl clientId={client.id} clientName={client.name} logoUrl={client.logoDriveFileId ? `/api/clients/${client.id}/logo/file` : undefined} /></TableCell>
+                    <TableCell>
+                      <ClientLogoControl
+                        clientId={client.id}
+                        clientName={client.name}
+                        compact={true}
+                        logoUrl={
+                          client.logoDriveFileId
+                            ? `/api/clients/${client.id}/logo/file`
+                            : client.website
+                            ? `https://www.google.com/s2/favicons?domain=${client.website.replace(/^https?:\/\//i, '').split('/')[0]}&sz=256`
+                            : undefined
+                        }
+                      />
+                    </TableCell>
                     <TableCell>
                       <a href={`/clients/${client.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline">{client.name}</a>
                       {client.companyId && <div className="text-xs text-slate-500 font-mono">IČO: {client.companyId}</div>}
