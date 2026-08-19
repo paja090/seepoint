@@ -36,6 +36,23 @@ export function ClientOverviewTab({ client }: { client: ClientProfileData }) {
         </div>
       )}
 
+      {/* Client Note & AI Profile Card */}
+      {client.note && (
+        <div className="card space-y-2 border-l-4 border-sky-500 bg-sky-50/30">
+          <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+              <span>📝</span> Poznámky klienta & AI Profil pro obchodníka
+            </h3>
+            <span className="text-[10px] font-bold text-sky-800 bg-sky-100 px-2 py-0.5 rounded-full">
+              ULOŽENO V DATABÁZI
+            </span>
+          </div>
+          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-medium">
+            {client.note}
+          </p>
+        </div>
+      )}
+
       {/* Grid Overview Sections */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Open Offers & Deals */}
