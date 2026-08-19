@@ -35,7 +35,7 @@ const navGroups: NavGroup[] = [
       ['/navigation/contracts', '📋 Evidence smluv VO', 'fileText', 'navigationContracts'],
       ['/navigation/contacts', '🏛️ Kontaktní osoby měst', 'users', 'navigationContacts'],
       ['/navigation/documentation', '📷 Fotodokumentace & Reporty', 'camera', 'navigationDocumentation'],
-      ['/projects/city-gallery', '🖼️ Městská galerie', 'galleryHorizontalEnd', 'cityGallery'],
+      ['/projects/city-gallery', '🖼️ Galerie VENKU', 'galleryHorizontalEnd', 'cityGallery'],
     ],
   },
   {

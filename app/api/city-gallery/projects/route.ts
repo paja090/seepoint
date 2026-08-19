@@ -7,18 +7,24 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const [projects, fleetConfig] = await Promise.all([
-      prisma.cityGalleryProject.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
-      prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }),
+    const [projectsRaw, fleetConfig] = await Promise.all([
+      prisma.cityGalleryProject
+        .findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        })
+        .catch(() => []),
+      prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }).catch(() => null),
     ]);
 
     const totalFleet = fleetConfig?.totalFrames ?? 24;
     const maintenanceCount = fleetConfig?.maintenanceCount ?? 0;
 
-    // Calculate active and scheduled frame allocations
+    const projects = projectsRaw.map((p) => ({
+      ...p,
+      frameCount: typeof p.frameCount === 'number' ? p.frameCount : 6,
+    }));
+
     const activeProjects = projects.filter((p) => p.status === 'ACTIVE');
     const occupiedFrames = activeProjects.reduce((acc, p) => acc + (p.frameCount || 6), 0);
     const availableFrames = Math.max(0, totalFleet - occupiedFrames - maintenanceCount);
@@ -49,15 +55,14 @@ export async function POST(request: Request) {
 
     const frameCount = Number(input.frameCount) || 6;
 
-    // Check frame capacity
-    const [fleetConfig, activeProjects] = await Promise.all([
-      prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }),
-      prisma.cityGalleryProject.findMany({ where: { status: 'ACTIVE' } }),
+    const [fleetConfig, activeProjectsRaw] = await Promise.all([
+      prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }).catch(() => null),
+      prisma.cityGalleryProject.findMany({ where: { status: 'ACTIVE' } }).catch(() => []),
     ]);
 
     const totalFleet = fleetConfig?.totalFrames ?? 24;
     const maintenanceCount = fleetConfig?.maintenanceCount ?? 0;
-    const occupiedFrames = activeProjects.reduce((acc, p) => acc + (p.frameCount || 6), 0);
+    const occupiedFrames = activeProjectsRaw.reduce((acc, p: any) => acc + (p.frameCount || 6), 0);
     const availableFrames = Math.max(0, totalFleet - occupiedFrames - maintenanceCount);
 
     const isStatusActive = input.status === 'ACTIVE';
