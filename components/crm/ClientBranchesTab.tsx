@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Table, TableHead, TableHeaderCell, TableCell, EmptyState, Button } from '@/components/ui';
 import { ClientBranchItem, ClientProfileData } from '@/lib/crm/types';
-import { Edit3, Trash2, Plus, MapPin, Store } from 'lucide-react';
+import { Edit3, Trash2, Plus, MapPin, Store, Sparkles } from 'lucide-react';
 
 export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
   const router = useRouter();
@@ -101,68 +101,86 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
 
   return (
     <div className="card space-y-4">
-      <div className="flex items-center justify-between border-b pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
         <div>
-          <h3 className="font-bold text-slate-900 text-lg">Pobočky a Provozovny ({branches.length})</h3>
-          <p className="text-xs text-slate-500">Adresy a cílové prodejny klienta pro projekt Navigace a lokální reklamu.</p>
+          <div className="flex items-center gap-2">
+            <h3 className="font-extrabold text-slate-900 text-lg">Pobočky a Provozovny klienta ({branches.length})</h3>
+            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-900 uppercase">
+              OSTRAVA & MS KRAJ
+            </span>
+          </div>
+          <p className="text-xs text-slate-500">Evidence adres a prodejen klienta pro navigaci a lokální outdoor reklamu.</p>
         </div>
-        <Button onClick={openCreateModal} className="flex items-center gap-1.5 text-xs font-bold">
-          <Plus size={14} />
-          <span>➕ Přidat novou pobočku</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={openCreateModal} className="flex items-center gap-1.5 text-xs font-bold">
+            <Plus size={14} />
+            <span>➕ Přidat novou pobočku</span>
+          </Button>
+        </div>
       </div>
 
       {branches.length === 0 ? (
-        <EmptyState title="Žádné pobočky" description="Klient zatím nemá evidované žádné pobočky. Přidejte první tlačítkem výše." />
+        <div className="p-6 text-center space-y-3 bg-amber-50/40 rounded-2xl border border-amber-200">
+          <Store size={32} className="mx-auto text-amber-600" />
+          <div>
+            <h4 className="font-bold text-slate-900 text-sm">Zatím nejsou uloženy žádné pobočky</h4>
+            <p className="text-xs text-slate-600 mt-1 max-w-md mx-auto">
+              Můžete přidat pobočku ručně tlačítkem níže nebo spustit AI dohledání v horním modrém boxu AI Profilu.
+            </p>
+          </div>
+          <Button onClick={openCreateModal} className="text-xs font-bold">
+            ➕ Přidat první pobočku ručně
+          </Button>
+        </div>
       ) : (
         <Table minWidth="min-w-[700px]">
           <TableHead>
             <tr>
               <TableHeaderCell>Kód / Název pobočky</TableHeaderCell>
-              <TableHeaderCell>Ulice a číslo</TableHeaderCell>
+              <TableHeaderCell>Ulice a číslo popisné</TableHeaderCell>
               <TableHeaderCell>Město / PSČ</TableHeaderCell>
               <TableHeaderCell>Poznámka</TableHeaderCell>
-              <TableHeaderCell>Akce</TableHeaderCell>
+              <TableHeaderCell>Akce (Úprava / Smazání)</TableHeaderCell>
             </tr>
           </TableHead>
           <tbody>
             {branches.map((b: ClientBranchItem) => (
-              <tr key={b.id} className="hover:bg-slate-50/70">
+              <tr key={b.id} className="hover:bg-amber-50/30 transition">
                 <TableCell>
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <Store size={15} className="text-amber-600 shrink-0" />
+                  <div className="font-extrabold text-slate-900 flex items-center gap-1.5">
+                    <Store size={16} className="text-amber-600 shrink-0" />
                     <span>{b.name}</span>
                   </div>
                   {b.code && <span className="text-xs text-slate-500 font-mono pl-5">{b.code}</span>}
                 </TableCell>
                 <TableCell>
-                  <span className="font-medium text-slate-900">{b.street || <span className="text-slate-400 font-normal">Neuvedeno</span>}</span>
+                  <span className="font-bold text-slate-900">{b.street || <span className="text-slate-400 font-normal italic">Neuvedeno</span>}</span>
                 </TableCell>
                 <TableCell>
                   {b.city ? (
-                    <span className="flex items-center gap-1 font-medium text-slate-900">
-                      <MapPin size={12} className="text-amber-600 shrink-0" />
+                    <span className="flex items-center gap-1 font-bold text-slate-900">
+                      <MapPin size={13} className="text-amber-600 shrink-0" />
                       <span>{b.city} {b.zip || ''}</span>
                     </span>
                   ) : '-'}
                 </TableCell>
-                <TableCell><span className="text-xs text-slate-500">{b.note || '-'}</span></TableCell>
+                <TableCell><span className="text-xs text-slate-600">{b.note || '-'}</span></TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => openEditModal(b)}
-                      className="px-3 py-1.5 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-900 text-xs font-extrabold transition flex items-center gap-1.5 shadow-2xs"
+                      className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer"
                       title="Upravit adresu a údaje pobočky"
                     >
-                      <Edit3 size={13} className="text-sky-700" />
-                      <span>✏️ Upravit</span>
+                      <Edit3 size={14} />
+                      <span>✏️ Upravit adresu</span>
                     </button>
                     <button
                       onClick={() => handleDelete(b.id, b.name)}
-                      className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition flex items-center gap-1"
+                      className="px-2.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-900 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                       title="Odstranit pobočku"
                     >
-                      <Trash2 size={13} className="text-rose-600" />
+                      <Trash2 size={13} className="text-rose-700" />
                       <span>Smazat</span>
                     </button>
                   </div>
@@ -178,7 +196,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-bold text-base text-slate-900">
+              <h3 className="font-extrabold text-base text-slate-900">
                 {editingBranch ? '✏️ Upravit adresu & údaje pobočky' : '➕ Přidat novou pobočku klienta'}
               </h3>
               <button
@@ -187,14 +205,14 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                   setEditingBranch(null);
                   setIsCreating(false);
                 }}
-                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleSave} className="space-y-3">
-              <label className="text-xs font-semibold">Název pobočky / prodejny *
+              <label className="text-xs font-bold text-slate-700">Název pobočky / prodejny *
                 <input
                   type="text"
                   placeholder="Např. CANIS SAFETY - Prodejna Ostrava Hrabůvka"
@@ -206,16 +224,16 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
               </label>
 
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs font-semibold">Ulice a číslo popisné *
+                <label className="text-xs font-bold text-slate-700">Ulice a číslo popisné *
                   <input
                     type="text"
                     placeholder="Např. Místecká 329/258"
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    className="input text-xs mt-1 font-bold text-slate-900"
+                    className="input text-xs mt-1 font-bold text-slate-900 border-sky-300 focus:ring-2 focus:ring-sky-500"
                   />
                 </label>
-                <label className="text-xs font-semibold">Kód pobočky
+                <label className="text-xs font-bold text-slate-700">Kód pobočky
                   <input
                     type="text"
                     placeholder="Např. OST-01"
@@ -227,7 +245,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs font-semibold">Město *
+                <label className="text-xs font-bold text-slate-700">Město *
                   <input
                     type="text"
                     placeholder="Např. Ostrava"
@@ -237,7 +255,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                     className="input text-xs mt-1 font-bold text-slate-900"
                   />
                 </label>
-                <label className="text-xs font-semibold">PSČ
+                <label className="text-xs font-bold text-slate-700">PSČ
                   <input
                     type="text"
                     placeholder="Např. 70030"
@@ -248,7 +266,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                 </label>
               </div>
 
-              <label className="text-xs font-semibold">Poznámka / Popis pobočky
+              <label className="text-xs font-bold text-slate-700">Poznámka / Popis pobočky
                 <input
                   type="text"
                   placeholder="Např. Hlavní velkosklad a prodejna pro Ostrava-Jih"
@@ -269,7 +287,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                 >
                   Zrušit
                 </Button>
-                <Button type="submit" disabled={loading} className="font-bold">
+                <Button type="submit" disabled={loading} className="font-extrabold bg-sky-600 hover:bg-sky-700 text-white">
                   {loading ? 'Ukládám...' : '💾 Uložit adresu pobočky'}
                 </Button>
               </div>
