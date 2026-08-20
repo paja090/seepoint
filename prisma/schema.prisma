@@ -252,6 +252,41 @@ enum PhotoType {
   ARCHIVE
   EMPLOYEE_PROFILE
   EXPENSE_RECEIPT
+  SURVEY
+}
+
+enum CandidateSurveyStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum CandidateSupervisionStatus {
+  PENDING_REVIEW
+  APPROVED
+  NEEDS_RECHECK
+  REJECTED
+}
+
+enum CandidateVisibilityQuality {
+  GOOD
+  NEEDS_CHECK
+  POOR
+}
+
+enum CandidateOwnershipType {
+  CITY_MUNICIPALITY
+  PRIVATE_OWNER
+  SEEPOINT
+  OTHER
+  UNKNOWN
+}
+
+enum CandidatePermitStatus {
+  UNKNOWN
+  NEEDS_VERIFICATION
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
 }
 
 enum ImportStatus {
@@ -388,6 +423,9 @@ model User {
   navigationPriceVersions        NavigationPriceVersion[]        @relation("NavigationPriceChangedUser")
   assignedNavigationOrders       NavigationOrder[]               @relation("NavOrderInstaller")
   assignedNavigationPoints       NavigationPoint[]               @relation("NavPointInstaller")
+  createdCandidatePoints         NavigationCandidatePoint[]      @relation("CandidateCreatedBy")
+  assignedCandidatePoints        NavigationCandidatePoint[]      @relation("CandidateAssignedTo")
+  supervisionCandidatePoints     NavigationCandidatePoint[]      @relation("CandidateSupervisionBy")
 }
 
 model UserSession {
@@ -638,6 +676,7 @@ model AdvertisingCarrier {
   navigationPoints             NavigationPoint[]
   navigationDocumentationItems NavigationDocumentationItem[]
   historyLogs                  CarrierHistoryLog[]
+  candidatePoints              NavigationCandidatePoint[]
 
   @@index([importBatchId])
   @@index([archivedAt])
@@ -936,6 +975,7 @@ model AdvertisingSurface {
   crmRealizations  CrmRealization[]
   navigationPoints NavigationPoint[]
   historyLogs      CarrierHistoryLog[]
+  candidatePoints  NavigationCandidatePoint[]
 
   @@index([carrierId])
   @@index([currentClientId])
@@ -1144,6 +1184,7 @@ model NavigationPoint {
   priceVersions                NavigationPriceVersion[]
   priceAuditLogs               NavigationPriceAuditLog[]
   navigationDocumentationItems NavigationDocumentationItem[]
+  convertedCandidatePoint      NavigationCandidatePoint?    @relation("CandidateConvertedPoint")
 
   @@index([navigationOfferId, sortOrder])
   @@index([navigationOrderId])
@@ -1467,6 +1508,7 @@ model Photo {
   taskId                 String?
   workEntryId            String?
   crmRealizationId       String?
+  surveyCandidatePointId String?
   url                    String
   driveFileId            String?
   fileName               String?
@@ -1500,6 +1542,7 @@ model Photo {
   navigationDocumentationItems NavigationDocumentationItem[]
   installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
   siteNavigationPoint          NavigationPoint?               @relation("PointSitePhoto")
+  surveyCandidatePoint         NavigationCandidatePoint?     @relation("CandidatePhotos", fields: [surveyCandidatePointId], references: [id], onDelete: SetNull)
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
@@ -2496,8 +2539,82 @@ model NavigationOrder {
   billingPeriods      NavigationBillingPeriod[]
   navigationContracts NavigationContract[]
   workOrders          WorkOrder[]
+  surveyRoutes        SurveyRoute[]
+  candidatePoints     NavigationCandidatePoint[]
 
   @@index([status])
+}
+
+model SurveyRoute {
+  id                String          @id @default(cuid())
+  navigationOrderId String
+  name              String
+  description       String?
+  originName        String?
+  originLatitude    Float?
+  originLongitude   Float?
+  targetLatitude    Float?
+  targetLongitude   Float?
+  routeOrder        Int             @default(0)
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  navigationOrder NavigationOrder          @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  candidatePoints NavigationCandidatePoint[]
+
+  @@index([navigationOrderId, active, routeOrder])
+}
+
+model NavigationCandidatePoint {
+  id                         String                     @id @default(cuid())
+  navigationOrderId          String
+  surveyRouteId              String?
+  label                      String
+  latitude                   Float
+  longitude                  Float
+  address                    String?
+  campaignType               String?                    @default("Dlouhodobá navigace")
+  placementType              CarrierType                @default(NAVIGATION)
+  approachDirection          String?
+  arrowDirection             NavigationArrowDirection?  @default(STRAIGHT)
+  distanceValue              Decimal?                   @db.Decimal(10, 2)
+  distanceUnit               DistanceUnit               @default(KILOMETERS)
+  distanceSource             NavigationDistanceSource   @default(CALCULATED)
+  ownershipType              CandidateOwnershipType     @default(UNKNOWN)
+  ownerName                  String?
+  visibilityTowardTarget    CandidateVisibilityQuality @default(GOOD)
+  permitStatus               CandidatePermitStatus      @default(UNKNOWN)
+  internalNote               String?
+  createdByUserId            String
+  assignedToUserId           String?
+  surveyStatus               CandidateSurveyStatus      @default(COMPLETED)
+  supervisionStatus          CandidateSupervisionStatus @default(PENDING_REVIEW)
+  supervisionNote            String?
+  supervisionByUserId        String?
+  supervisionAt              DateTime?
+  selectedForOffer           Boolean                    @default(false)
+  rejectionReason            String?
+  carrierId                  String?
+  surfaceId                  String?
+  convertedNavigationPointId String?                    @unique
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+
+  navigationOrder          NavigationOrder          @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  surveyRoute              SurveyRoute?             @relation(fields: [surveyRouteId], references: [id], onDelete: SetNull)
+  createdByUser            User                     @relation("CandidateCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignedToUser           User?                    @relation("CandidateAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  supervisionByUser        User?                    @relation("CandidateSupervisionBy", fields: [supervisionByUserId], references: [id], onDelete: SetNull)
+  carrier                  AdvertisingCarrier?      @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  surface                  AdvertisingSurface?      @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
+  convertedNavigationPoint NavigationPoint?         @relation("CandidateConvertedPoint", fields: [convertedNavigationPointId], references: [id], onDelete: SetNull)
+  photos                   Photo[]                  @relation("CandidatePhotos")
+
+  @@index([navigationOrderId, supervisionStatus])
+  @@index([surveyRouteId])
+  @@index([createdByUserId])
+  @@index([latitude, longitude])
 }
 
 model NavigationBillingPeriod {
