@@ -288,7 +288,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         for (const p of offer.navigation.points) {
           const q = number(p.quantity) || 1;
           rentalSum += q * number(p.unitPrice);
-          frameSum += q * number((p as unknown as Record<string, unknown>).framePrice);
+          frameSum += q * number((p as unknown as Record<string, unknown>).framePrice as string | number | null | undefined);
           productionSum += q * number(p.productionPrice);
           installationSum += q * number(p.installationPrice);
           removalSum += q * number(p.removalPrice);
