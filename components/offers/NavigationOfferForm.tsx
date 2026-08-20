@@ -591,6 +591,31 @@ export function NavigationOfferForm({
     router.refresh();
   }
 
+  async function uploadDataUrl(dataUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], `VISUALIZATION_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'SURVEY');
+
+      const uploadRes = await fetch('/api/mobile-photos/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (uploadRes.ok) {
+        const data = await uploadRes.json();
+        return data.photo?.url || null;
+      }
+    } catch (err) {
+      console.error('Upload visualization error:', err);
+    }
+    return null;
+  }
+
   const activePointForVisualizer = points.find((p) => p.id === activeVisualizerPointId);
 
   return (
@@ -1291,9 +1316,18 @@ export function NavigationOfferForm({
           pointLabel={activePointForVisualizer.label}
           initialPhotoUrl={activePointForVisualizer.sitePhotoUrl}
           onClose={() => setActiveVisualizerPointId(null)}
-          onSaveVisualization={(dataUrl) => {
-            updatePoint(activePointForVisualizer.id, { visualizedPhotoUrl: dataUrl });
+          onSaveVisualization={async (dataUrl) => {
+            const pointId = activePointForVisualizer.id;
             setActiveVisualizerPointId(null);
+            setMessage('⏳ Ukládám vytvořenou vizualizaci cedule...');
+            const uploadedUrl = await uploadDataUrl(dataUrl);
+            if (uploadedUrl) {
+              updatePoint(pointId, { visualizedPhotoUrl: uploadedUrl });
+              setMessage('✓ Vizualizace cedule byla úspěšně nahrána a připojena k bodu.');
+            } else {
+              updatePoint(pointId, { visualizedPhotoUrl: dataUrl });
+              setMessage('✓ Vizualizace byla připojena k bodu.');
+            }
           }}
         />
       )}
