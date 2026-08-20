@@ -145,7 +145,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
   if (!navigation) return null;
 
-  const priceRows = navigation.points.map((point) => {
+  // Filter price rows dynamically for selected points (or all if none filtered)
+  const activePoints = navigation.points.filter((p) =>
+    selectedPointIds.length > 0 ? selectedPointIds.includes(p.id) : true
+  );
+
+  const priceRows = activePoints.map((point) => {
     const quantity = Number(point.quantity || 0);
     const rental = quantity * Number(point.unitPrice || 0);
     const frame = quantity * Number((point as Record<string, unknown>).framePrice || 0);
@@ -154,6 +159,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     const removal = quantity * Number(point.removalPrice || 0);
     return { point, quantity, rental, frame, production, installation, removal, subtotal: rental + frame + production + installation + removal };
   });
+
   const priceTotals = priceRows.reduce((sum, row) => ({
     rental: sum.rental + row.rental,
     frame: sum.frame + row.frame,
@@ -162,9 +168,10 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     removal: sum.removal + row.removal,
     subtotal: sum.subtotal + row.subtotal,
   }), { rental: 0, frame: 0, production: 0, installation: 0, removal: 0, subtotal: 0 });
+
   const taxRate = Number(offer.taxRate || 21);
-  const taxAmount = Number(offer.taxAmount ?? priceTotals.subtotal * taxRate / 100);
-  const totalWithTax = Number(offer.totalWithTax ?? priceTotals.subtotal + taxAmount);
+  const taxAmount = Math.round(priceTotals.subtotal * taxRate) / 100;
+  const totalWithTax = priceTotals.subtotal + taxAmount;
 
   const target = {
     latitude: navigation.targetLatitude,
@@ -356,23 +363,21 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </div>
                     </div>
 
-                    {isLocationSelectionPhase ? (
-                      <button
-                        type="button"
-                        disabled={selectionSubmitted}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          togglePointSelection(point.id);
-                        }}
-                        className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-70 ${
-                          isSelected
-                            ? 'bg-emerald-600 text-white shadow-xs'
-                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
-                        }`}
-                      >
-                        {isSelected ? '✓ Vybráno' : '+ Vybrat'}
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      disabled={selectionSubmitted}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePointSelection(point.id);
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
+                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      }`}
+                    >
+                      {isSelected ? '✓ Vybráno v nabídce' : '+ Vybrat do nabídky'}
+                    </button>
                   </div>
 
                   {/* Metadata Row: Arrow + Distance + Pillar */}
@@ -418,7 +423,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         alt={`Fotografie a vizualizace nosiče – ${point.label}`}
                         className="h-48 w-full object-cover group-hover:scale-105 transition duration-300"
                       />
-                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-black">
+                      <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-xs">
                         🔍 Kliknutím zvětšíte snímek
                       </div>
                     </div>
@@ -437,10 +442,16 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
       {!isLocationSelectionPhase ? (
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" aria-labelledby="navigation-pricing-heading">
-          <div className="border-b border-slate-200 bg-slate-950 px-6 py-5 text-white">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-400">Položkový rozpočet</p>
-            <h2 className="mt-1 text-xl font-black" id="navigation-pricing-heading">Kompletní cenová nabídka</h2>
-            <p className="mt-1 text-sm text-slate-300">Přehled ceny každého navigačního bodu včetně výroby, montáže a následné demontáže.</p>
+          <div className="border-b border-slate-200 bg-slate-950 px-6 py-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-400">Položkový rozpočet</p>
+              <h2 className="mt-1 text-xl font-black" id="navigation-pricing-heading">Kompletní cenová nabídka</h2>
+              <p className="mt-1 text-sm text-slate-300">Přehled ceny vybraných navigačních bodů ({activePoints.length} z {navigation.points.length}).</p>
+            </div>
+            <div className="rounded-2xl bg-slate-900 border border-slate-800 px-4 py-2.5 sm:text-right shrink-0">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">Živý přepočet: {activePoints.length} z {navigation.points.length} bodů</p>
+              <p className="text-xl font-black text-emerald-400">{money(totalWithTax)} <span className="text-xs text-slate-300 font-normal">s DPH</span></p>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
