@@ -513,12 +513,12 @@ export function GoogleNavigationOfferMap({
           fontSize: '11px',
         },
         icon: {
-          path: googleMaps.SymbolPath.CIRCLE,
+          path: 'M 0,0 m -7,0 a 7,7 0 1,0 14,0 a 7,7 0 1,0 -14,0',
           fillColor: '#3b82f6',
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 3,
-          scale: 9,
+          scale: 1.5,
         },
       });
 
