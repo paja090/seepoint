@@ -1,10 +1,11 @@
 import { Prisma } from '@prisma/client';
 
-export type NavigationPointPriceParts = { quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; installationPrice: Prisma.Decimal; removalPrice: Prisma.Decimal; productionPrice: Prisma.Decimal };
+export type NavigationPointPriceParts = { quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; installationPrice: Prisma.Decimal; removalPrice: Prisma.Decimal; productionPrice: Prisma.Decimal; framePrice?: Prisma.Decimal };
 
 export function calculateNavigationPointSubtotal(parts: NavigationPointPriceParts) {
+  const frame = parts.framePrice || new Prisma.Decimal(0);
   return parts.quantity
-    .mul(parts.unitPrice.add(parts.installationPrice).add(parts.removalPrice).add(parts.productionPrice))
+    .mul(parts.unitPrice.add(parts.installationPrice).add(parts.removalPrice).add(parts.productionPrice).add(frame))
     .toDecimalPlaces(2);
 }
 

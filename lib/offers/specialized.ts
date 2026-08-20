@@ -35,7 +35,8 @@ export function parseNavigationOfferInput(raw: unknown) {
     const installationPrice = decimal(point.installationPrice, `Montáž bodu ${index + 1}`);
     const removalPrice = decimal(point.removalPrice, `Demontáž bodu ${index + 1}`);
     const productionPrice = decimal(point.productionPrice, `Výroba bodu ${index + 1}`);
-    const subtotal = calculateNavigationPointSubtotal({ quantity, unitPrice, installationPrice, removalPrice, productionPrice });
+    const framePrice = decimal(point.framePrice, `Výroba rámu bodu ${index + 1}`);
+    const subtotal = calculateNavigationPointSubtotal({ quantity, unitPrice, installationPrice, removalPrice, productionPrice, framePrice });
     
     // Parse new Google Maps structured fields
     const manualDistanceVal = point.manualDistanceValue !== undefined && point.manualDistanceValue !== null && point.manualDistanceValue !== '' 
@@ -53,7 +54,7 @@ export function parseNavigationOfferInput(raw: unknown) {
       latitude: coordinate(point.latitude, 'latitude'), longitude: coordinate(point.longitude, 'longitude'),
       address: nullable(text(point.address)), label: text(point.label) || `Navigační bod ${index + 1}`,
       navigationType: text(point.navigationType) || 'Směrová tabule', variant: nullable(text(point.variant)), orientation: nullable(text(point.orientation)),
-      quantity, unitPrice, subtotal, installationPrice, removalPrice, productionPrice,
+      quantity, unitPrice, subtotal, installationPrice, removalPrice, productionPrice, framePrice,
       internalNote: nullable(text(point.internalNote)), clientNote: nullable(text(point.clientNote)),
       
       // New structured fields

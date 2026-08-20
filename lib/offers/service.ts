@@ -197,9 +197,9 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       clientArtworkFileName: row.navigationOffer.clientArtworkFileName,
       points: row.navigationOffer.points.map((point) => ({
         id: point.id, label: point.label, latitude: point.latitude, longitude: point.longitude, address: point.address,
-        navigationType: point.navigationType, variant: point.variant, orientation: point.orientation,
         quantity: point.quantity.toFixed(2), unitPrice: point.unitPrice.toFixed(2), subtotal: point.subtotal.toFixed(2),
         installationPrice: point.installationPrice.toFixed(2), removalPrice: point.removalPrice.toFixed(2), productionPrice: point.productionPrice.toFixed(2),
+        framePrice: (point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice ? (point as unknown as { framePrice: Prisma.Decimal }).framePrice.toFixed(2) : '0.00',
         internalNote: publicView ? undefined : point.internalNote, clientNote: point.clientNote, status: point.status,
         
         // Structured Navigation fields

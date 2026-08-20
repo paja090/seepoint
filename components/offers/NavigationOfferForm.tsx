@@ -28,6 +28,7 @@ type DraftPoint = {
   orientation: string;
   quantity: string;
   unitPrice: string;
+  framePrice: string;
   installationPrice: string;
   removalPrice: string;
   productionPrice: string;
@@ -145,10 +146,11 @@ export function NavigationOfferForm({
         variant: String(point.variant ?? '120x80 cm'),
         orientation: String(point.orientation ?? ''),
         quantity: String(point.quantity ?? 1),
-        unitPrice: String(point.unitPrice ?? 1500),
-        productionPrice: String(point.productionPrice ?? 1200),
+        unitPrice: String(point.unitPrice ?? 12000),
+        framePrice: String(point.framePrice ?? 1960),
+        productionPrice: String(point.productionPrice ?? 600),
         installationPrice: String(point.installationPrice ?? 800),
-        removalPrice: String(point.removalPrice ?? 400),
+        removalPrice: String(point.removalPrice ?? 600),
         internalNote: String(point.internalNote ?? ''),
         clientNote: String(point.clientNote ?? ''),
         arrowDirectionEnum: (point.arrowDirectionEnum as DraftPoint['arrowDirectionEnum']) || 'STRAIGHT',
@@ -192,30 +194,34 @@ export function NavigationOfferForm({
 
   // Default price list items fetched from Settings
   const [catalogDefaults, setCatalogDefaults] = useState({
-    rentalPrice: '9500',
-    productionPrice: '1800',
-    installationPrice: '1500',
-    removalPrice: '800',
+    rentalPrice: '12000',
+    framePrice: '1960',
+    productionPrice: '600',
+    installationPrice: '800',
+    removalPrice: '600',
   });
 
   useEffect(() => {
     async function loadPriceCatalog() {
       try {
-        let rental = '9500';
-        let production = '1800';
-        let installation = '1500';
-        let removal = '800';
+        let rental = '12000';
+        let frame = '1960';
+        let production = '600';
+        let installation = '800';
+        let removal = '600';
 
         // 1. Check Offer Price Rules catalog first
         const resRules = await fetch('/api/offer-price-rules');
         if (resRules.ok) {
-          const rules = (await resRules.json()) as Array<{ category: string; mediaType?: string; unitPrice?: number }>;
+          const rules = (await resRules.json()) as Array<{ code?: string; category: string; mediaType?: string; unitPrice?: number }>;
           const rRental = rules.find((r) => r.category === 'RENTAL' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
+          const rFrame = rules.find((r) => r.code?.includes('FRAME') || (r.category === 'PRODUCTION' && r.mediaType === 'NAVIGATION_FRAME'))?.unitPrice;
           const rProd = rules.find((r) => (r.category === 'PRODUCTION' || r.category === 'PRINT') && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
           const rInst = rules.find((r) => r.category === 'INSTALLATION' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
           const rRem = rules.find((r) => r.category === 'REMOVAL' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
 
           if (rRental !== undefined) rental = String(rRental);
+          if (rFrame !== undefined) frame = String(rFrame);
           if (rProd !== undefined) production = String(rProd);
           if (rInst !== undefined) installation = String(rInst);
           if (rRem !== undefined) removal = String(rRem);
@@ -232,7 +238,7 @@ export function NavigationOfferForm({
           }
         }
 
-        setCatalogDefaults({ rentalPrice: rental, productionPrice: production, installationPrice: installation, removalPrice: removal });
+        setCatalogDefaults({ rentalPrice: rental, framePrice: frame, productionPrice: production, installationPrice: installation, removalPrice: removal });
       } catch {
         /* fallback to defaults */
       }
@@ -245,6 +251,7 @@ export function NavigationOfferForm({
   // Financial summary breakdown
   const totals = useMemo(() => {
     let rental = 0;
+    let frame = 0;
     let production = 0;
     let installation = 0;
     let removal = 0;
@@ -252,16 +259,17 @@ export function NavigationOfferForm({
     for (const p of points) {
       const q = Number(p.quantity || 0);
       rental += q * Number(p.unitPrice || 0);
+      frame += q * Number(p.framePrice || 0);
       production += q * Number(p.productionPrice || 0);
       installation += q * Number(p.installationPrice || 0);
       removal += q * Number(p.removalPrice || 0);
     }
 
-    const subtotal = rental + production + installation + removal;
+    const subtotal = rental + frame + production + installation + removal;
     const tax = subtotal * 0.21;
     const totalWithTax = subtotal + tax;
 
-    return { rental, production, installation, removal, subtotal, tax, totalWithTax };
+    return { rental, frame, production, installation, removal, subtotal, tax, totalWithTax };
   }, [points]);
 
   async function computeClientDirections(
@@ -476,6 +484,7 @@ export function NavigationOfferForm({
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
+        framePrice: catalogDefaults.framePrice,
         productionPrice: catalogDefaults.productionPrice,
         installationPrice: catalogDefaults.installationPrice,
         removalPrice: catalogDefaults.removalPrice,
@@ -513,6 +522,7 @@ export function NavigationOfferForm({
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
+        framePrice: catalogDefaults.framePrice,
         productionPrice: catalogDefaults.productionPrice,
         installationPrice: catalogDefaults.installationPrice,
         removalPrice: catalogDefaults.removalPrice,
@@ -536,6 +546,7 @@ export function NavigationOfferForm({
   function applyCatalogRatesToPoint(pointId: string) {
     updatePoint(pointId, {
       unitPrice: catalogDefaults.rentalPrice,
+      framePrice: catalogDefaults.framePrice,
       productionPrice: catalogDefaults.productionPrice,
       installationPrice: catalogDefaults.installationPrice,
       removalPrice: catalogDefaults.removalPrice,
@@ -548,6 +559,7 @@ export function NavigationOfferForm({
       current.map((p) => ({
         ...p,
         unitPrice: catalogDefaults.rentalPrice,
+        framePrice: catalogDefaults.framePrice,
         productionPrice: catalogDefaults.productionPrice,
         installationPrice: catalogDefaults.installationPrice,
         removalPrice: catalogDefaults.removalPrice,
@@ -923,15 +935,19 @@ export function NavigationOfferForm({
               </strong>
             </div>
             <div className="flex justify-between text-slate-300">
-              <span>Tisk a výroba:</span>
+              <span>Výroba rámu D-FLEX:</span>
+              <strong className="text-white">{totals.frame.toLocaleString('cs-CZ')} Kč</strong>
+            </div>
+            <div className="flex justify-between text-slate-300">
+              <span>UV tisk na Dibond:</span>
               <strong className="text-white">{totals.production.toLocaleString('cs-CZ')} Kč</strong>
             </div>
             <div className="flex justify-between text-slate-300">
-              <span>Instalace:</span>
+              <span>Montáž / Instalace:</span>
               <strong className="text-white">{totals.installation.toLocaleString('cs-CZ')} Kč</strong>
             </div>
             <div className="flex justify-between text-slate-300">
-              <span>Demontáž:</span>
+              <span>Demontáž / Deinstalace:</span>
               <strong className="text-white">{totals.removal.toLocaleString('cs-CZ')} Kč</strong>
             </div>
 
@@ -1301,9 +1317,9 @@ export function NavigationOfferForm({
                     <input className="input" min="0.01" step="0.01" type="number" value={point.quantity} onChange={(e) => updatePoint(point.id, { quantity: e.target.value })} />
                   </Field>
 
-                  <Field label="Pronájem (Cena/ks/rok)">
+                  <Field label="Pronájem nosiče (Cena/ks/rok)">
                     <div className="space-y-1">
-                      <input className="input font-bold" min="0" step="0.01" type="number" value={point.unitPrice} onChange={(e) => updatePoint(point.id, { unitPrice: e.target.value })} />
+                      <input className="input font-bold text-sky-900" min="0" step="0.01" type="number" value={point.unitPrice} onChange={(e) => updatePoint(point.id, { unitPrice: e.target.value })} />
                       {Number(point.unitPrice) > 0 && (
                         <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
                           <span>📅 {Number(point.unitPrice).toLocaleString('cs-CZ')} Kč / rok</span>
@@ -1313,15 +1329,19 @@ export function NavigationOfferForm({
                     </div>
                   </Field>
 
-                  <Field label="Tisk & Výroba – UV tisk na Dibond (Cena/ks)">
+                  <Field label="Výroba rámu – Rám D-FLEX (Cena/ks)">
+                    <input className="input font-bold" min="0" step="0.01" type="number" value={point.framePrice} onChange={(e) => updatePoint(point.id, { framePrice: e.target.value })} />
+                  </Field>
+
+                  <Field label="UV tisk na Dibond (Cena/ks)">
                     <input className="input font-bold" min="0" step="0.01" type="number" value={point.productionPrice} onChange={(e) => updatePoint(point.id, { productionPrice: e.target.value })} />
                   </Field>
 
-                  <Field label="Montáž (Cena/ks)">
+                  <Field label="Montáž / Instalace (Cena/ks)">
                     <input className="input" min="0" step="0.01" type="number" value={point.installationPrice} onChange={(e) => updatePoint(point.id, { installationPrice: e.target.value })} />
                   </Field>
 
-                  <Field label="Demontáž (Cena/ks)">
+                  <Field label="Demontáž / Deinstalace (Cena/ks)">
                     <input className="input" min="0" step="0.01" type="number" value={point.removalPrice} onChange={(e) => updatePoint(point.id, { removalPrice: e.target.value })} />
                   </Field>
 

@@ -148,18 +148,20 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
   const priceRows = navigation.points.map((point) => {
     const quantity = Number(point.quantity || 0);
     const rental = quantity * Number(point.unitPrice || 0);
+    const frame = quantity * Number((point as Record<string, unknown>).framePrice || 0);
     const production = quantity * Number(point.productionPrice || 0);
     const installation = quantity * Number(point.installationPrice || 0);
     const removal = quantity * Number(point.removalPrice || 0);
-    return { point, quantity, rental, production, installation, removal, subtotal: rental + production + installation + removal };
+    return { point, quantity, rental, frame, production, installation, removal, subtotal: rental + frame + production + installation + removal };
   });
   const priceTotals = priceRows.reduce((sum, row) => ({
     rental: sum.rental + row.rental,
+    frame: sum.frame + row.frame,
     production: sum.production + row.production,
     installation: sum.installation + row.installation,
     removal: sum.removal + row.removal,
     subtotal: sum.subtotal + row.subtotal,
-  }), { rental: 0, production: 0, installation: 0, removal: 0, subtotal: 0 });
+  }), { rental: 0, frame: 0, production: 0, installation: 0, removal: 0, subtotal: 0 });
   const taxRate = Number(offer.taxRate || 21);
   const taxAmount = Number(offer.taxAmount ?? priceTotals.subtotal * taxRate / 100);
   const totalWithTax = Number(offer.totalWithTax ?? priceTotals.subtotal + taxAmount);
@@ -442,30 +444,35 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[900px] w-full text-left text-sm">
+            <table className="min-w-[950px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-5 py-3">Navigační bod</th>
-                  <th className="px-4 py-3 text-right">Počet</th>
-                  <th className="px-4 py-3 text-right">Pronájem</th>
-                  <th className="px-4 py-3 text-right">Výroba a tisk</th>
-                  <th className="px-4 py-3 text-right">Montáž</th>
-                  <th className="px-4 py-3 text-right">Demontáž</th>
+                  <th className="px-3 py-3 text-right">Počet</th>
+                  <th className="px-3 py-3 text-right">Pronájem (rok / měs)</th>
+                  <th className="px-3 py-3 text-right">Výroba rámu</th>
+                  <th className="px-3 py-3 text-right">UV tisk na Dibond</th>
+                  <th className="px-3 py-3 text-right">Montáž</th>
+                  <th className="px-3 py-3 text-right">Demontáž</th>
                   <th className="px-5 py-3 text-right">Celkem bez DPH</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {priceRows.map(({ point, quantity, rental, production, installation, removal, subtotal }) => (
+                {priceRows.map(({ point, quantity, rental, frame, production, installation, removal, subtotal }) => (
                   <tr key={point.id}>
                     <td className="px-5 py-4">
                       <p className="font-bold text-slate-900">{point.label}</p>
                       <p className="mt-1 text-xs text-slate-500">{point.navigationType}{point.variant ? ` · ${point.variant}` : ''}</p>
                     </td>
-                    <td className="px-4 py-4 text-right font-semibold text-slate-700">{quantity.toLocaleString('cs-CZ')} ks</td>
-                    <td className="px-4 py-4 text-right text-slate-700">{money(rental)}</td>
-                    <td className="px-4 py-4 text-right text-slate-700">{money(production)}</td>
-                    <td className="px-4 py-4 text-right text-slate-700">{money(installation)}</td>
-                    <td className="px-4 py-4 text-right text-slate-700">{money(removal)}</td>
+                    <td className="px-3 py-4 text-right font-semibold text-slate-700">{quantity.toLocaleString('cs-CZ')} ks</td>
+                    <td className="px-3 py-4 text-right text-slate-700">
+                      <div className="font-bold">{money(rental)}</div>
+                      <div className="text-[10px] text-sky-700 font-semibold">{money(Math.round(rental / 12))}/měs</div>
+                    </td>
+                    <td className="px-3 py-4 text-right text-slate-700">{money(frame)}</td>
+                    <td className="px-3 py-4 text-right text-slate-700">{money(production)}</td>
+                    <td className="px-3 py-4 text-right text-slate-700">{money(installation)}</td>
+                    <td className="px-3 py-4 text-right text-slate-700">{money(removal)}</td>
                     <td className="px-5 py-4 text-right font-black text-slate-950">{money(subtotal)}</td>
                   </tr>
                 ))}
@@ -473,12 +480,13 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             </table>
           </div>
 
-          <div className="grid gap-5 border-t border-slate-200 bg-slate-50 p-6 lg:grid-cols-[1fr_360px]">
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Pronájem bodů</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.rental)}</dd></div>
-              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Výroba a tisk</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.production)}</dd></div>
-              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Montáž</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.installation)}</dd></div>
-              <div className="rounded-xl bg-white p-3"><dt className="text-slate-500">Demontáž</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.removal)}</dd></div>
+          <div className="grid gap-5 border-t border-slate-200 bg-slate-50 p-6 lg:grid-cols-[1fr_340px]">
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Pronájem nosičů</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.rental)} <span className="text-[10px] text-sky-700 font-normal">({money(Math.round(priceTotals.rental / 12))}/měs)</span></dd></div>
+              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Výroba rámů (D-FLEX)</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.frame)}</dd></div>
+              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">UV tisk na Dibond</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.production)}</dd></div>
+              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Montáž / Instalace</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.installation)}</dd></div>
+              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Demontáž / Deinstalace</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.removal)}</dd></div>
             </dl>
             <dl className="space-y-3 rounded-2xl bg-slate-950 p-5 text-white">
               <div className="flex justify-between gap-4 text-sm"><dt className="text-slate-300">Cena bez DPH</dt><dd className="font-bold">{money(priceTotals.subtotal)}</dd></div>

@@ -1133,6 +1133,7 @@ model NavigationPoint {
   installationPrice Decimal               @default(0) @db.Decimal(12, 2)
   removalPrice      Decimal               @default(0) @db.Decimal(12, 2)
   productionPrice   Decimal               @default(0) @db.Decimal(12, 2)
+  framePrice        Decimal               @default(0) @db.Decimal(12, 2)
   priceSnapshot     Json?
   internalNote      String?
   clientNote        String?
