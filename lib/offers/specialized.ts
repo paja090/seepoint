@@ -111,13 +111,26 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       subtotal: totals.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: totals.taxAmount, totalPrice: totals.subtotal, totalWithTax: totals.totalWithTax,
       updatedByUserId: user.id,
     };
-    if (offerId) {
-      const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { id: true, offerType: true, status: true, createdByUserId: true } });
-      if (!existing || existing.offerType !== 'NAVIGATION') throw new OfferValidationError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
-      if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
-      await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
-      return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
-    }
+      if (offerId) {
+        const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { id: true, offerType: true, status: true, createdByUserId: true } });
+        if (!existing || existing.offerType !== 'NAVIGATION') throw new OfferValidationError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
+        if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
+
+        const existingPoints = await tx.navigationPoint.findMany({
+          where: { navigationOffer: { offerId } },
+          select: { id: true },
+        });
+        const pointIds = existingPoints.map((p) => p.id);
+        if (pointIds.length > 0) {
+          await tx.navigationPoint.updateMany({
+            where: { id: { in: pointIds } },
+            data: { sitePhotoId: null },
+          });
+        }
+
+        await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
+        return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+      }
     return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
