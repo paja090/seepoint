@@ -41,8 +41,8 @@ export async function POST(req: Request) {
     const damageType = formData.get('damageType') ? String(formData.get('damageType')) : null;
     const rawNote = String(formData.get('note') || '').trim();
 
-    if (!(file instanceof File) || typeof carrierId !== 'string' || !carrierId) {
-      return jsonError('INVALID_UPLOAD', 'Chybí fotografie nebo vybraný nosič.', 400);
+    if (!(file instanceof File)) {
+      return jsonError('INVALID_UPLOAD', 'Chybí soubor fotografie.', 400);
     }
     if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
       return jsonError('INVALID_IMAGE', 'Vybraný soubor není podporovaná fotografie.', 415);
@@ -51,16 +51,19 @@ export async function POST(req: Request) {
       return jsonError('DAMAGE_TYPE_REQUIRED', 'Vyberte typ závady.', 400);
     }
 
-    const carrier = await prisma.advertisingCarrier.findUnique({
-      where: { id: carrierId },
-      select: { id: true, code: true, name: true, city: true, note: true, latitude: true, longitude: true },
-    });
-    if (!carrier) return jsonError('CARRIER_NOT_FOUND', 'Nosič nebyl nalezen.', 404);
+    const validCarrierId = typeof carrierId === 'string' && carrierId.trim() ? carrierId.trim() : null;
+
+    const carrier = validCarrierId
+      ? await prisma.advertisingCarrier.findUnique({
+          where: { id: validCarrierId },
+          select: { id: true, code: true, name: true, city: true, note: true, latitude: true, longitude: true },
+        })
+      : null;
 
     const clientCoordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
     const coordinates = clientCoordinates || {
-      lat: carrier.latitude ?? 0,
-      lng: carrier.longitude ?? 0,
+      lat: carrier?.latitude ?? 0,
+      lng: carrier?.longitude ?? 0,
     };
 
     const accuracyValue = Number(formData.get('accuracyMeters'));
@@ -68,14 +71,13 @@ export async function POST(req: Request) {
 
     const requestedSurfaceId = typeof surfaceId === 'string' && surfaceId ? surfaceId : null;
     const now = new Date();
-    const surface = requestedSurfaceId
-      ? await prisma.advertisingSurface.findFirst({ where: { id: requestedSurfaceId, carrierId }, select: {
+    const surface = (requestedSurfaceId && validCarrierId)
+      ? await prisma.advertisingSurface.findFirst({ where: { id: requestedSurfaceId, carrierId: validCarrierId }, select: {
           id: true,
           occupancies: { where: { dateFrom: { lte: now }, dateTo: { gte: now }, status: { in: ['RESERVED', 'OCCUPIED'] } },
             orderBy: { dateFrom: 'desc' }, take: 1, select: { clientName: true, client: { select: { name: true } } } },
         } })
       : null;
-    if (requestedSurfaceId && !surface) return jsonError('SURFACE_NOT_FOUND', 'Vybraná plocha nepatří k tomuto nosiči.', 400);
 
     const workerUserId = user?.id || 'MOBILE_WORKER';
     const workerName = user?.employee
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
     const photoId = `photo-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const mimeType = normalizeImageMimeType(file);
     const extension = mimeType === 'image/heic' ? 'heic' : mimeType === 'image/heif' ? 'heif' : mimeType.split('/')[1] || 'jpg';
-    const safeCode = carrier.code.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeCode = carrier ? carrier.code.replace(/[^a-zA-Z0-9_-]/g, '_') : 'SURVEY';
     const fileName = `PHOTO_${safeCode}_${new Date().toISOString().slice(0, 10)}_${photoId.slice(-8)}.${extension}`;
     const stored = await storeMobilePhoto(file, fileName, photoId, uploadPhotoToGoogleDrive);
     const photoUrl = stablePhotoUrl(photoId);
@@ -102,13 +104,17 @@ export async function POST(req: Request) {
     try {
       photo = await prisma.photo.create({
         data: {
-          id: photoId, carrierId, surfaceId: surface?.id, url: photoUrl,
-          driveFileId: stored.driveFileId, content: stored.storageProvider === 'LOCAL' ? Buffer.from(stored.bytes) : undefined,
+          id: photoId,
+          carrierId: carrier?.id || null,
+          surfaceId: surface?.id || null,
+          url: photoUrl,
+          driveFileId: stored.driveFileId,
+          content: stored.storageProvider === 'LOCAL' ? Buffer.from(stored.bytes) : undefined,
           fileName, mimeType, size: stored.bytes.byteLength, type: purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
           note: photoNote, isClientVisible: purpose === 'CLIENT_REPORT', storageProvider: stored.storageProvider,
           capturedLatitude: coordinates.lat, capturedLongitude: coordinates.lng, capturedAccuracyMeters: accuracy,
           capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName,
-          aiStatus: purpose === 'DAMAGE' ? 'SKIPPED' : 'PENDING',
+          aiStatus: (purpose === 'DAMAGE' || !carrier) ? 'SKIPPED' : 'PENDING',
         },
       });
     } catch (error) {
