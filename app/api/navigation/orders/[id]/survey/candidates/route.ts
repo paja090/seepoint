@@ -49,7 +49,50 @@ export async function POST(
     });
 
     if (!order) {
-      return NextResponse.json({ error: 'Zakázka nebyla nalezena.' }, { status: 404 });
+      const offer = await prisma.offer.findUnique({
+        where: { id: navigationOrderId },
+        include: { navigationOffer: { include: { points: true } } },
+      });
+
+      if (offer && offer.navigationOffer) {
+        const nav = offer.navigationOffer;
+        const nextSortOrder = (nav.points?.length || 0) + 1;
+        const newPoint = await prisma.navigationPoint.create({
+          data: {
+            navigationOfferId: nav.id,
+            label: label?.trim() || `Navigační bod ${nextSortOrder}`,
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
+            address: address?.trim() || null,
+            navigationType: placementType || 'Směrová tabule',
+            variant: '120x80 cm',
+            orientation: 'Obousměrný (A/B)',
+            arrowDirectionEnum: arrowDirection || 'STRAIGHT',
+            quantity: 1,
+            unitPrice: 1500,
+            productionPrice: 1200,
+            installationPrice: 800,
+            removalPrice: 400,
+            sortOrder: nextSortOrder,
+            internalNote: internalNote?.trim() || null,
+          },
+        });
+
+        return NextResponse.json({
+          candidate: {
+            id: newPoint.id,
+            label: newPoint.label,
+            latitude: newPoint.latitude,
+            longitude: newPoint.longitude,
+            address: newPoint.address,
+            placementType: newPoint.navigationType,
+            supervisionStatus: 'APPROVED',
+            createdAt: newPoint.createdAt,
+          },
+        });
+      }
+
+      return NextResponse.json({ error: 'Zakázka ani nabídka nebyla nalezena.' }, { status: 404 });
     }
 
     let calculatedDistance = distanceValue ? parseFloat(distanceValue) : null;
