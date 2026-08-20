@@ -40,7 +40,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     return new Response(new Uint8Array(pdf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename(offer.title))}`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
   } catch (error) {
     if (error instanceof OfferValidationError && error.code === 'NOT_FOUND') return NextResponse.json({ error: 'Nabídka nebyla nalezena.' }, { status: 404 });
-    console.error('Offer PDF generation failed', error);
-    return NextResponse.json({ error: 'PDF nabídky se nepodařilo vytvořit.' }, { status: 500 });
+    console.error('Offer PDF generation failed:', error);
+    return NextResponse.json({ error: 'PDF nabídky se nepodařilo vytvořit.', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
