@@ -200,19 +200,38 @@ export function NavigationOfferForm({
   useEffect(() => {
     async function loadPriceCatalog() {
       try {
-        const res = await fetch('/api/price-list-items');
-        if (res.ok) {
-          const items = (await res.json()) as Array<{ carrierType?: string; mediaType?: string; rentalPrice?: number; productionPrice?: number }>;
+        let rental = '1500';
+        let production = '1200';
+        let installation = '800';
+        let removal = '400';
+
+        // 1. Check Offer Price Rules catalog first
+        const resRules = await fetch('/api/offer-price-rules');
+        if (resRules.ok) {
+          const rules = (await resRules.json()) as Array<{ category: string; mediaType?: string; unitPrice?: number }>;
+          const rRental = rules.find((r) => r.category === 'RENTAL' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
+          const rProd = rules.find((r) => (r.category === 'PRODUCTION' || r.category === 'PRINT') && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
+          const rInst = rules.find((r) => r.category === 'INSTALLATION' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
+          const rRem = rules.find((r) => r.category === 'REMOVAL' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
+
+          if (rRental !== undefined) rental = String(rRental);
+          if (rProd !== undefined) production = String(rProd);
+          if (rInst !== undefined) installation = String(rInst);
+          if (rRem !== undefined) removal = String(rRem);
+        }
+
+        // 2. Fallback to Price List Items
+        const resItems = await fetch('/api/price-list-items');
+        if (resItems.ok) {
+          const items = (await resItems.json()) as Array<{ carrierType?: string; mediaType?: string; rentalPrice?: number; productionPrice?: number }>;
           const navItem = items.find((i) => i.carrierType === 'NAVIGATION' || i.mediaType === 'NAVIGATION_SIGN');
           if (navItem) {
-            setCatalogDefaults({
-              rentalPrice: String(navItem.rentalPrice || 1500),
-              productionPrice: String(navItem.productionPrice || 1200),
-              installationPrice: '800',
-              removalPrice: '400',
-            });
+            if (navItem.rentalPrice) rental = String(navItem.rentalPrice);
+            if (navItem.productionPrice) production = String(navItem.productionPrice);
           }
         }
+
+        setCatalogDefaults({ rentalPrice: rental, productionPrice: production, installationPrice: installation, removalPrice: removal });
       } catch {
         /* fallback to defaults */
       }
