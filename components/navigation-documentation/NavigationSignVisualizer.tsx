@@ -65,11 +65,16 @@ export function NavigationSignVisualizer({
   // Load photo or default background placeholder image on mount
   useEffect(() => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (initialPhotoUrl && (initialPhotoUrl.startsWith('http://') || initialPhotoUrl.startsWith('https://'))) {
+      img.crossOrigin = 'anonymous';
+    }
     img.onload = () => {
       setBgImage(img);
       setSignX(img.width ? img.width / 2 : 400);
       setSignY(img.height ? img.height / 2 : 300);
+    };
+    img.onerror = (err) => {
+      console.error('Visualizer photo load error:', err);
     };
     if (initialPhotoUrl) {
       img.src = initialPhotoUrl;

@@ -66,11 +66,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } else {
       allowed =
         canAccess(user.role, 'carriers') ||
-        (canAccess(user.role, 'navigationProjects') &&
-          Boolean(photo.carrierId || photo.surfaceId || photo.siteNavigationPoint)) ||
-        (canAccess(user.role, 'offers') &&
-          Boolean(photo.siteNavigationPoint) &&
-          canAccessOffer(user, photo.siteNavigationPoint?.navigationOffer?.offer.createdByUserId ?? null));
+        canAccess(user.role, 'offers') ||
+        canAccess(user.role, 'navigationProjects') ||
+        photo.type === 'SURVEY' ||
+        photo.type === 'CARRIER' ||
+        photo.type === 'LOCATION' ||
+        Boolean(photo.carrierId || photo.surfaceId || photo.siteNavigationPoint);
     }
 
     if (!allowed) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
