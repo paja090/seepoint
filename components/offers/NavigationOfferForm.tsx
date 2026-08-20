@@ -135,37 +135,54 @@ export function NavigationOfferForm({
 
   const [points, setPoints] = useState<DraftPoint[]>(
     () =>
-      navigation?.points.map((point: Record<string, unknown>) => ({
-        id: String(point.id),
-        label: String(point.label),
-        latitude: Number(point.latitude),
-        longitude: Number(point.longitude),
-        carrierId: (point.carrierId as string) ?? null,
-        address: String(point.address ?? ''),
-        navigationType: String(point.navigationType ?? 'Směrová tabule'),
-        variant: String(point.variant ?? '120x80 cm'),
-        orientation: String(point.orientation ?? ''),
-        quantity: String(point.quantity ?? 1),
-        unitPrice: String(point.unitPrice ?? 12000),
-        framePrice: String(point.framePrice ?? 1960),
-        productionPrice: String(point.productionPrice ?? 600),
-        installationPrice: String(point.installationPrice ?? 800),
-        removalPrice: String(point.removalPrice ?? 600),
-        internalNote: String(point.internalNote ?? ''),
-        clientNote: String(point.clientNote ?? ''),
-        arrowDirectionEnum: (point.arrowDirectionEnum as DraftPoint['arrowDirectionEnum']) || 'STRAIGHT',
-        pillarNumber: String(point.pillarNumber ?? ''),
-        pillarType: String(point.pillarType ?? ''),
-        manualDistanceValue: point.manualDistanceValue ? String(point.manualDistanceValue) : '',
-        manualDistanceUnit: (point.manualDistanceUnit as DraftPoint['manualDistanceUnit']) || 'METERS',
-        distanceSource: (point.distanceSource as DraftPoint['distanceSource']) || 'CALCULATED',
-        routePolyline: (point.routePolyline as string) ?? undefined,
-        calculatedDistanceMeters: (point.calculatedDistanceMeters as number) ?? undefined,
-        visualizedPhotoUrl: typeof point.visualizedPhotoUrl === 'string' ? point.visualizedPhotoUrl : undefined,
-        sitePhotoId: typeof point.sitePhotoId === 'string' ? point.sitePhotoId : undefined,
-        sitePhotoUrl: typeof point.sitePhotoUrl === 'string' ? point.sitePhotoUrl : undefined,
-        isSelectedByClient: point.isSelectedByClient !== false,
-      })) ?? [],
+      navigation?.points.map((point: Record<string, unknown>) => {
+        const rawFrame = Number(point.framePrice || 0);
+        const rawProd = Number(point.productionPrice || 0);
+
+        let framePrice = rawFrame > 0 ? String(rawFrame) : '1960';
+        let productionPrice = '600';
+
+        if (rawProd > 0) {
+          if (rawProd === rawFrame || (rawProd >= 1800 && rawFrame === 0)) {
+            framePrice = '1960';
+            productionPrice = '600';
+          } else {
+            productionPrice = String(rawProd);
+          }
+        }
+
+        return {
+          id: String(point.id),
+          label: String(point.label),
+          latitude: Number(point.latitude),
+          longitude: Number(point.longitude),
+          carrierId: (point.carrierId as string) ?? null,
+          address: String(point.address ?? ''),
+          navigationType: String(point.navigationType ?? 'Směrová tabule'),
+          variant: String(point.variant ?? '120x80 cm'),
+          orientation: String(point.orientation ?? ''),
+          quantity: String(point.quantity ?? 1),
+          unitPrice: String(point.unitPrice ?? 12000),
+          framePrice,
+          productionPrice,
+          installationPrice: String(point.installationPrice ?? 800),
+          removalPrice: String(point.removalPrice ?? 600),
+          internalNote: String(point.internalNote ?? ''),
+          clientNote: String(point.clientNote ?? ''),
+          arrowDirectionEnum: (point.arrowDirectionEnum as DraftPoint['arrowDirectionEnum']) || 'STRAIGHT',
+          pillarNumber: String(point.pillarNumber ?? ''),
+          pillarType: String(point.pillarType ?? ''),
+          manualDistanceValue: point.manualDistanceValue ? String(point.manualDistanceValue) : '',
+          manualDistanceUnit: (point.manualDistanceUnit as DraftPoint['manualDistanceUnit']) || 'METERS',
+          distanceSource: (point.distanceSource as DraftPoint['distanceSource']) || 'CALCULATED',
+          routePolyline: (point.routePolyline as string) ?? undefined,
+          calculatedDistanceMeters: (point.calculatedDistanceMeters as number) ?? undefined,
+          visualizedPhotoUrl: typeof point.visualizedPhotoUrl === 'string' ? point.visualizedPhotoUrl : undefined,
+          sitePhotoId: typeof point.sitePhotoId === 'string' ? point.sitePhotoId : undefined,
+          sitePhotoUrl: typeof point.sitePhotoUrl === 'string' ? point.sitePhotoUrl : undefined,
+          isSelectedByClient: point.isSelectedByClient !== false,
+        };
+      }) ?? [],
   );
 
   const [mode, setMode] = useState<'target' | 'point'>(target ? 'point' : 'target');
@@ -222,7 +239,7 @@ export function NavigationOfferForm({
 
           if (rRental !== undefined) rental = String(rRental);
           if (rFrame !== undefined) frame = String(rFrame);
-          if (rProd !== undefined) production = String(rProd);
+          if (rProd !== undefined && rProd < 1800) production = String(rProd);
           if (rInst !== undefined) installation = String(rInst);
           if (rRem !== undefined) removal = String(rRem);
         }
@@ -234,7 +251,9 @@ export function NavigationOfferForm({
           const navItem = items.find((i) => i.carrierType === 'NAVIGATION' || i.mediaType === 'NAVIGATION_SIGN');
           if (navItem) {
             if (navItem.rentalPrice) rental = String(navItem.rentalPrice);
-            if (navItem.productionPrice) production = String(navItem.productionPrice);
+            if (navItem.productionPrice && navItem.productionPrice < 1800 && String(navItem.productionPrice) !== frame) {
+              production = String(navItem.productionPrice);
+            }
           }
         }
 
