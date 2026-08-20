@@ -559,47 +559,27 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-6">
-          {/* Isolated Graphic Sign Plate Rendering */}
-          <div className="relative w-48 h-64 shrink-0 rounded-2xl border-4 border-slate-800 bg-gradient-to-b from-slate-900 to-slate-950 text-white p-4 shadow-xl flex flex-col justify-between overflow-hidden">
-            {/* Right side brackets */}
-            <div className="absolute right-0 top-6 w-2.5 h-4 bg-slate-500 rounded-l" />
-            <div className="absolute right-0 bottom-12 w-2.5 h-4 bg-slate-500 rounded-l" />
-
-            {/* Inner dashed bounds */}
-            <div className="absolute inset-3 border border-dashed border-white/30 rounded-xl pointer-events-none" />
-
-            {/* Content or Artwork */}
+          {/* Graphic Artwork Proof Image / Template */}
+          <div className="relative w-full md:w-1/2 shrink-0 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm overflow-hidden flex flex-col items-center justify-center">
             {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl ? (
               <img
                 src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
                 alt="Grafický motiv cedule"
-                className="w-full h-36 object-contain rounded-lg"
+                className="w-full h-auto max-h-80 object-contain rounded-xl"
               />
             ) : (
-              <div className="flex min-h-32 items-center justify-center px-2 pt-4 text-center">
-                {offer.client.logoUrl ? (
-                  <img
-                    src={offer.client.logoUrl}
-                    alt={`Logo ${offer.client.name} na navigační ceduli`}
-                    className="max-h-24 w-full object-contain"
-                  />
-                ) : (
-                  <div className="text-sm font-black uppercase leading-tight text-white">{navigation.targetName}</div>
-                )}
-              </div>
+              <img
+                src="/offer/navigation-proof-template.jpg"
+                alt="Šablona navigačního panelu 670 × 900 mm"
+                className="w-full h-auto max-h-80 object-contain rounded-xl"
+              />
             )}
-
-            {/* Bottom Badge */}
-            <div className="rounded-xl border border-white/20 bg-slate-950/80 p-2.5 text-center flex items-center justify-between text-xs font-black">
-              <span>⬅</span>
-              <span>1,3 km</span>
-            </div>
           </div>
 
-          <div className="space-y-3 text-xs text-slate-600">
+          <div className="space-y-3 text-xs text-slate-600 w-full md:w-1/2">
             <h4 className="font-bold text-slate-900 text-sm">Specifikace navigačního prvku:</h4>
             <ul className="space-y-1.5 list-disc list-inside font-medium text-slate-700">
-              <li>Rozměr: <strong>Ostrava 900 × 670 mm</strong>; Havířov používá odlišný tvar s horním půlkruhem, jeho přesný rozměr bude doplněn po ověření.</li>
+              <li>Rozměr: <strong>Ostrava 670 × 900 mm</strong>; Havířov používá odlišný tvar s horním půlkruhem, jeho přesný rozměr bude doplněn po ověření.</li>
               <li>Materiál: odolný panel <strong>DIBOND</strong>, standardně jednostranný; podle umístění může být proveden oboustranně.</li>
               <li>Grafika: černý podklad bez reflexních prvků, logo klienta, směrová šipka a vzdálenost k cíli.</li>
               <li>Uchycení: nerezovými páskami na sloup veřejného osvětlení nebo určený sloupek.</li>
