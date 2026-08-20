@@ -191,19 +191,19 @@ export function NavigationOfferForm({
 
   // Default price list items fetched from Settings
   const [catalogDefaults, setCatalogDefaults] = useState({
-    rentalPrice: '1500',
-    productionPrice: '1200',
-    installationPrice: '800',
-    removalPrice: '400',
+    rentalPrice: '9500',
+    productionPrice: '1800',
+    installationPrice: '1500',
+    removalPrice: '800',
   });
 
   useEffect(() => {
     async function loadPriceCatalog() {
       try {
-        let rental = '1500';
-        let production = '1200';
-        let installation = '800';
-        let removal = '400';
+        let rental = '9500';
+        let production = '1800';
+        let installation = '1500';
+        let removal = '800';
 
         // 1. Check Offer Price Rules catalog first
         const resRules = await fetch('/api/offer-price-rules');
@@ -1311,8 +1311,8 @@ export function NavigationOfferForm({
                     </div>
                   </Field>
 
-                  <Field label="Tisk & Výroba (Cena/ks)">
-                    <input className="input" min="0" step="0.01" type="number" value={point.productionPrice} onChange={(e) => updatePoint(point.id, { productionPrice: e.target.value })} />
+                  <Field label="Tisk & Výroba – UV tisk na Dibond (Cena/ks)">
+                    <input className="input font-bold" min="0" step="0.01" type="number" value={point.productionPrice} onChange={(e) => updatePoint(point.id, { productionPrice: e.target.value })} />
                   </Field>
 
                   <Field label="Montáž (Cena/ks)">
