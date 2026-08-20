@@ -111,19 +111,23 @@ export async function GET(
         }));
 
         return NextResponse.json({
-          id: offer.id,
-          targetName: nav.targetName || offer.title,
-          targetAddress: nav.targetAddress || null,
-          targetLatitude: nav.targetLatitude,
-          targetLongitude: nav.targetLongitude,
-          targetNote: nav.targetNote || null,
-          status: offer.status,
-          crmOrder: {
+          survey: {
+            id: offer.id,
+            crmOrderId: offer.id,
             client: offer.client,
+            targetName: nav.targetName || offer.title,
+            targetAddress: nav.targetAddress || null,
+            targetLatitude: nav.targetLatitude,
+            targetLongitude: nav.targetLongitude,
+            targetNote: nav.targetNote || null,
+            status: offer.status,
+            crmOrder: {
+              client: offer.client,
+            },
+            surveyRoutes: [],
+            candidatePoints,
+            nearbyCarriers: [],
           },
-          surveyRoutes: [],
-          candidatePoints,
-          nearbyCarriers: [],
         });
       }
 

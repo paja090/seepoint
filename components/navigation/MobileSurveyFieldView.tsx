@@ -147,7 +147,7 @@ export function MobileSurveyFieldView({
       const res = await fetch(`/api/navigation/orders/${orderId}/survey`);
       if (res.ok) {
         const json = await res.json();
-        setData(json.survey);
+        setData(json.survey || json);
       }
     } catch (e) {
       console.error('Error loading survey:', e);
