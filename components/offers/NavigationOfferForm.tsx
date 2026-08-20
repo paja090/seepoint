@@ -7,6 +7,7 @@ import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
+import { compressImageFile } from '@/lib/image-compress';
 
 type ClientOption = {
   id: string;
@@ -327,10 +328,11 @@ export function NavigationOfferForm({
       setMessage('Fotografie sloupu musí být ve formátu JPG, PNG nebo WebP.');
       return;
     }
-    setMessage('⏳ Nahrávám fotografii sloupu...');
+    setMessage('⏳ Zpracovávám a nahrávám fotografii sloupu...');
     try {
+      const compressedFile = await compressImageFile(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', compressedFile);
       formData.append('type', 'SURVEY');
       const res = await fetch('/api/mobile-photos/upload', {
         method: 'POST',

@@ -26,6 +26,7 @@ import {
   Check,
   Send,
 } from 'lucide-react';
+import { compressImageFile } from '@/lib/image-compress';
 import { GoogleNavigationOfferMap } from '@/components/offers/GoogleNavigationOfferMap';
 
 export type CandidatePointItem = {
@@ -270,8 +271,9 @@ export function MobileSurveyFieldView({
       // 1. Upload photos if any
       const uploadedPhotoIds: string[] = [];
       for (const p of photosToUpload) {
+        const compressed = await compressImageFile(p.file);
         const formData = new FormData();
-        formData.append('file', p.file);
+        formData.append('file', compressed);
         formData.append('type', 'SURVEY');
         if (formLat && formLng) {
           formData.append('latitude', formLat.toString());
