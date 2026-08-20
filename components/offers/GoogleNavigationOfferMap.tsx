@@ -68,10 +68,10 @@ type SearchResultItem = {
 export function GoogleNavigationOfferMap({
   target,
   points,
-  mode,
-  onTargetSelect,
-  onPointMove,
-  onMapClick,
+  mode = 'point',
+  onTargetSelect = () => {},
+  onPointMove = () => {},
+  onMapClick = () => {},
   compact = false,
   readOnly = false,
   suggestionCount,
@@ -80,10 +80,10 @@ export function GoogleNavigationOfferMap({
 }: {
   target?: { latitude: number; longitude: number; label: string; address?: string; placeId?: string };
   points: GoogleOfferMapPoint[];
-  mode: 'target' | 'point';
-  onTargetSelect: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }) => void;
-  onPointMove: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string, address?: string) => void;
-  onMapClick: (latitude: number, longitude: number, address?: string) => void;
+  mode?: 'target' | 'point';
+  onTargetSelect?: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }) => void;
+  onPointMove?: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string, address?: string) => void;
+  onMapClick?: (latitude: number, longitude: number, address?: string) => void;
   compact?: boolean;
   readOnly?: boolean;
   suggestionCount?: number;
