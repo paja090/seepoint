@@ -249,7 +249,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
         const notifText = notifications.map((n) => `- [${n.severity}] ${n.title}: ${n.message}`).join('\n');
         const systemPrompt = `Jsi AI Asistent vedení firmy SeePoint. Zde je seznam aktuálních notifikací a varování:\n${notifText}\n\nVytvoř 1 STRUČNÝ, PŘEHLEDNÝ A EFEKTIVNÍ SOUHRN v češtině (max 200 znaků) jako "AI Souhrn pro vedoucího", který vypíchne nejakutnější problémy (např. končící zábory měst, vypršení smluv, nevyřízené úkoly s důvody). Vrať ČISTÝ TEXT bez jakýchkoliv markdown značek.`;
 
-        for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest']) {
+        for (const model of ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest']) {
           try {
             const res = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,

@@ -107,7 +107,7 @@ Vrať POUZE platný JSON bez markdownu ve tvaru:
   "website": "https://www.canis.cz"
 }`;
 
-      const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
       for (const model of modelsToTry) {
         try {
           const aiRes = await fetch(
