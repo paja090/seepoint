@@ -63,6 +63,23 @@ export async function PUT(
           },
         });
 
+        if (Array.isArray(photoIds) && photoIds.length > 0) {
+          await prisma.photo.updateMany({
+            where: { id: { in: photoIds } },
+            data: {
+              surveyCandidatePointId: updatedPoint.id,
+              type: 'SURVEY',
+            },
+          });
+          const firstPhoto = await prisma.photo.findFirst({ where: { id: { in: photoIds } } });
+          if (firstPhoto) {
+            await prisma.navigationPoint.update({
+              where: { id: updatedPoint.id },
+              data: { sitePhotoId: firstPhoto.id },
+            });
+          }
+        }
+
         return NextResponse.json({
           candidate: {
             id: updatedPoint.id,

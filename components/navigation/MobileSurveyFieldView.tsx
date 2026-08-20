@@ -219,11 +219,17 @@ export function MobileSurveyFieldView({
       setFormNote(existing.internalNote || '');
       setSelectedCarrierId(existing.carrierId || null);
       setSelectedSurfaceId(existing.surfaceId || null);
+      setPhotosToUpload([]);
     } else {
+      const nextIndex = (data?.candidatePoints?.length || 0) + 1;
       setEditingCandidate(null);
-      setFormRouteId(data?.surveyRoutes[0]?.id || '');
-      setFormLabel('');
+      setFormRouteId('');
+      setFormLabel(`Navigační bod #${nextIndex}`);
+      setFormLat(coords?.lat || data?.targetLatitude || 49.82);
+      setFormLng(coords?.lng || data?.targetLongitude || 18.29);
       setFormAddress('');
+      setFormCampaignType('Dlouhodobá navigace');
+      setFormPlacementType('NAVIGATION');
       setFormApproachDirection('');
       setFormArrowDirection('STRAIGHT');
       setFormVisibility('GOOD');
@@ -233,7 +239,6 @@ export function MobileSurveyFieldView({
       setSelectedCarrierId(null);
       setSelectedSurfaceId(null);
       setPhotosToUpload([]);
-      handleGetLocation();
     }
     setShowAddModal(true);
   };

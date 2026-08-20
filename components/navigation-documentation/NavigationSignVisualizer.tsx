@@ -25,6 +25,7 @@ export function NavigationSignVisualizer({
   distanceText: initialDistanceText,
   arrowDirectionEnum,
   orientation,
+  initialPhotoUrl,
   onClose,
   onSaveVisualization,
 }: {
@@ -34,6 +35,7 @@ export function NavigationSignVisualizer({
   distanceText?: string;
   arrowDirectionEnum?: string;
   orientation?: string;
+  initialPhotoUrl?: string | null;
   onClose: () => void;
   onSaveVisualization: (dataUrl: string) => void;
 }) {
@@ -59,15 +61,18 @@ export function NavigationSignVisualizer({
   // Custom AI Graphic Artwork overlay state
   const [graphicImage, setGraphicImage] = useState<HTMLImageElement | null>(null);
 
-  // Load a default background placeholder image on mount
+  // Load photo or default background placeholder image on mount
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => setBgImage(img);
-    // Standard street/pole background fallback canvas
-    img.src =
-      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%2394a3b8"/><path d="M 0 450 Q 400 380 800 450 L 800 600 L 0 600 Z" fill="%23475569"/><rect x="520" y="40" width="22" height="560" fill="%23334155"/><rect x="526" y="40" width="10" height="560" fill="%2364748b"/><text x="360" y="240" font-family="sans-serif" font-size="20" font-weight="bold" fill="%231e293b" text-anchor="middle">Nahrajte fotku ulice/sloupu pro vizualizaci</text></svg>';
-  }, []);
+    if (initialPhotoUrl) {
+      img.src = initialPhotoUrl;
+    } else {
+      img.src =
+        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%2394a3b8"/><path d="M 0 450 Q 400 380 800 450 L 800 600 L 0 600 Z" fill="%23475569"/><rect x="520" y="40" width="22" height="560" fill="%23334155"/><rect x="526" y="40" width="10" height="560" fill="%2364748b"/><text x="360" y="240" font-family="sans-serif" font-size="20" font-weight="bold" fill="%231e293b" text-anchor="middle">Nahrajte fotku ulice/sloupu pro vizualizaci</text></svg>';
+    }
+  }, [initialPhotoUrl]);
 
   // Handle custom photo upload
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {

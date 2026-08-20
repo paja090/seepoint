@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Calculator, Camera, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -301,6 +301,28 @@ export function NavigationOfferForm({
         resolve({});
       }
     });
+  }
+
+  async function handleUploadDesktopPhoto(pointId: string, file: File) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'CARRIER');
+      const res = await fetch('/api/mobile-photos/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.photo?.url) {
+          updatePoint(pointId, { sitePhotoUrl: data.photo.url, sitePhotoId: data.photo.id });
+        }
+      } else {
+        alert('Chyba při nahrávání fotografie.');
+      }
+    } catch {
+      alert('Chyba při nahrávání fotografie.');
+    }
   }
 
   async function fetchRouteInfo(
@@ -1203,6 +1225,63 @@ export function NavigationOfferForm({
                   <Field label="Interní poznámka (skrytá)">
                     <input className="input" value={point.internalNote} onChange={(e) => updatePoint(point.id, { internalNote: e.target.value })} />
                   </Field>
+
+                  {/* Desktop Photo & Visualizer Action Card */}
+                  <div className="col-span-full border-t border-slate-200 pt-3 mt-1">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                      <div className="flex items-center gap-3">
+                        {point.sitePhotoUrl ? (
+                          <div className="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-300 bg-slate-200 shrink-0">
+                            <img src={point.sitePhotoUrl} alt="Fotka sloupu" className="w-full h-full object-cover" />
+                            <label className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition">
+                              Změnit
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files?.[0]) handleUploadDesktopPhoto(point.id, e.target.files[0]);
+                                }}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="w-20 h-20 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50/50 hover:bg-sky-100/50 flex flex-col items-center justify-center text-sky-700 cursor-pointer shrink-0 transition text-center p-1">
+                            <Upload size={18} />
+                            <span className="text-[10px] font-bold mt-1">Nahrát fotku sloupu</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files?.[0]) handleUploadDesktopPhoto(point.id, e.target.files[0]);
+                              }}
+                            />
+                          </label>
+                        )}
+
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <Camera size={14} className="text-sky-600" /> Reálná fotka sloupu / křižovatky
+                          </h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {point.sitePhotoUrl
+                              ? '✓ Fotka je nahraná. Kliknutím na Foto-vizualizátor se fotka sloupu ihned načte jako pozadí plátna.'
+                              : 'Nahrajte fotku z počítače nebo z terénního průzkumu pro tvorbu vizualizace navigační tabule.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveVisualizerPointId(point.id)}
+                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold text-xs shadow hover:from-sky-500 hover:to-blue-500 transition shrink-0 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <ImageIcon size={15} />
+                        <span>{point.sitePhotoUrl ? '✨ Otevřít ve Foto-vizualizátoru' : 'Vytvořit vizualizaci cedule'}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))
@@ -1219,6 +1298,7 @@ export function NavigationOfferForm({
           arrowDirectionEnum={activePointForVisualizer.arrowDirectionEnum}
           orientation={activePointForVisualizer.orientation}
           pointLabel={activePointForVisualizer.label}
+          initialPhotoUrl={activePointForVisualizer.sitePhotoUrl}
           onClose={() => setActiveVisualizerPointId(null)}
           onSaveVisualization={(dataUrl) => {
             updatePoint(activePointForVisualizer.id, { visualizedPhotoUrl: dataUrl });

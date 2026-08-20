@@ -94,21 +94,50 @@ export async function GET(
 
       if (offer && offer.navigationOffer) {
         const nav = offer.navigationOffer;
-        const candidatePoints = (nav.points || []).map((p) => ({
-          id: p.id,
-          label: p.label,
-          latitude: p.latitude,
-          longitude: p.longitude,
-          address: p.address,
-          placementType: p.navigationType || 'Směrová tabule',
-          ownershipType: 'SEEPOINT',
-          visibilityTowardTarget: 'GOOD',
-          permitStatus: 'GRANTED',
-          surveyStatus: 'COMPLETED',
-          supervisionStatus: 'APPROVED',
-          photos: [],
-          createdAt: p.createdAt,
-        }));
+        const offerPoints = await prisma.navigationPoint.findMany({
+          where: { navigationOfferId: nav.id },
+          include: { sitePhoto: true },
+        });
+
+        const pointIds = offerPoints.map((p) => p.id);
+        const photosInDb = pointIds.length > 0
+          ? await prisma.photo.findMany({
+              where: { surveyCandidatePointId: { in: pointIds } },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true, url: true, surveyCandidatePointId: true, createdAt: true },
+            })
+          : [];
+
+        const candidatePoints = offerPoints.map((p) => {
+          const matchedPhotos: Array<{ id: string; url: string; createdAt: string | Date }> = photosInDb
+            .filter((ph) => ph.surveyCandidatePointId === p.id)
+            .map((ph) => ({ id: ph.id, url: ph.url, createdAt: ph.createdAt }));
+
+          if (p.sitePhoto?.url && !matchedPhotos.some((ph) => ph.url === p.sitePhoto!.url)) {
+            matchedPhotos.unshift({
+              id: p.sitePhoto.id,
+              url: p.sitePhoto.url,
+              createdAt: p.createdAt,
+            });
+          }
+
+          return {
+            id: p.id,
+            label: p.label,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            address: p.address,
+            placementType: p.navigationType || 'Směrová tabule',
+            ownershipType: 'SEEPOINT',
+            visibilityTowardTarget: 'GOOD',
+            permitStatus: 'GRANTED',
+            surveyStatus: 'COMPLETED',
+            supervisionStatus: 'APPROVED',
+            photos: matchedPhotos,
+            sitePhotoUrl: p.sitePhoto?.url || matchedPhotos[0]?.url || null,
+            createdAt: p.createdAt,
+          };
+        });
 
         return NextResponse.json({
           survey: {

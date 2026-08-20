@@ -78,6 +78,23 @@ export async function POST(
           },
         });
 
+        if (Array.isArray(photoIds) && photoIds.length > 0) {
+          await prisma.photo.updateMany({
+            where: { id: { in: photoIds } },
+            data: {
+              surveyCandidatePointId: newPoint.id,
+              type: 'SURVEY',
+            },
+          });
+          const firstPhoto = await prisma.photo.findFirst({ where: { id: { in: photoIds } } });
+          if (firstPhoto) {
+            await prisma.navigationPoint.update({
+              where: { id: newPoint.id },
+              data: { sitePhotoId: firstPhoto.id },
+            });
+          }
+        }
+
         return NextResponse.json({
           candidate: {
             id: newPoint.id,
