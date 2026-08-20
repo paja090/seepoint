@@ -436,9 +436,9 @@ export function GoogleNavigationOfferMap({
         draggable: !readOnly,
         label: {
           text: `#${index + 1}`,
-          color: '#ffffff',
+          color: '#000000',
           fontWeight: '900',
-          fontSize: '12px',
+          fontSize: '13px',
         },
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',

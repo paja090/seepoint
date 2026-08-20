@@ -162,7 +162,7 @@ export function NavigationPointMap({
             <svg width="36" height="48" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 6px 10px rgba(2, 132, 199, 0.45));">
               <path d="M18 0C8.059 0 0 8.059 0 18C0 29.25 15.3 45.225 17.235 47.19C17.658 47.613 18.342 47.613 18.765 47.19C20.7 45.225 36 29.25 36 18C36 8.059 27.941 0 18 0Z" fill="url(#pointGrad_${index})"/>
               <circle cx="18" cy="18" r="12" fill="#FFFFFF" stroke="#0284c7" stroke-width="2.5"/>
-              <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="12" fill="#0284c7">#${pointNumber}</text>
+              <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="13" fill="#000000">#${pointNumber}</text>
               <defs>
                 <linearGradient id="pointGrad_${index}" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
                   <stop stop-color="#0284c7"/>

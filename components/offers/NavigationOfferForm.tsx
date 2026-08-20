@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload } from 'lucide-react';
+import { Calculator, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -481,6 +481,21 @@ export function NavigationOfferForm({
     setPoints((current) => current.map((point) => (point.id === id ? { ...point, ...changes } : point)));
   }
 
+  function movePoint(fromIndex: number, toIndex: number) {
+    if (fromIndex < 0 || fromIndex >= points.length || toIndex < 0 || toIndex >= points.length || fromIndex === toIndex) {
+      return;
+    }
+    setPoints((current) => {
+      const updated = [...current];
+      const [movedItem] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, movedItem);
+      return updated.map((p, idx) => ({
+        ...p,
+        label: p.label.startsWith('Navigační bod ') ? `Navigační bod ${idx + 1}` : p.label,
+      }));
+    });
+  }
+
   async function uploadSitePhoto(point: DraftPoint, file: File) {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 4 * 1024 * 1024) {
       setMessage('Fotografie sloupu musí být JPG, PNG nebo WebP do 4 MB.');
@@ -954,12 +969,51 @@ export function NavigationOfferForm({
           ) : (
             points.map((point, index) => (
               <div className="card space-y-4 border border-slate-200 bg-white p-5 shadow-sm" key={point.id}>
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-100 font-mono text-xs font-bold text-sky-800">
-                      #{index + 1}
-                    </span>
-                    <h3 className="font-bold text-slate-900">{point.label}</h3>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Reordering Controls (Up / Down & Selector) */}
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-2xs">
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        onClick={() => movePoint(index, index - 1)}
+                        className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent text-slate-700 transition cursor-pointer"
+                        title="Posunout bod výše v pořadí"
+                      >
+                        <ArrowUp size={14} />
+                      </button>
+
+                      <span className="flex h-6 px-2.5 items-center justify-center rounded-md bg-sky-100 font-mono text-xs font-black text-sky-900">
+                        #{index + 1}
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={index === points.length - 1}
+                        onClick={() => movePoint(index, index + 1)}
+                        className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent text-slate-700 transition cursor-pointer"
+                        title="Posunout bod níže v pořadí"
+                      >
+                        <ArrowDown size={14} />
+                      </button>
+                    </div>
+
+                    {points.length > 1 && (
+                      <select
+                        value={index}
+                        onChange={(e) => movePoint(index, Number(e.target.value))}
+                        className="text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 cursor-pointer hover:border-slate-300 transition"
+                        title="Změnit pořadí bodu v trase"
+                      >
+                        {points.map((_, posIdx) => (
+                          <option key={posIdx} value={posIdx}>
+                            Pořadí #{posIdx + 1}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    <h3 className="font-extrabold text-slate-900 text-sm ml-1">{point.label}</h3>
 
                     {point.realDistanceText && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
