@@ -205,11 +205,13 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       },
       ...(!isNavigation && offer.carriers.length > 18 ? [{ text: `Dalších ${offer.carriers.length - 18} ploch je uvedeno v interaktivní nabídce.`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 12] }] : []),
 
-      // Embedded Visualizations in PDF
-      ...(isNavigation && navigationData && navigationData.points.some((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl)) ? [
-        { text: 'Grafické vizualizace umístění cedulí na trase', style: 'heading', margin: [0, 14, 0, 8] },
+      // Visualized photos of navigation points
+      ...(isNavigation && navigationData ? [
         ...navigationData.points
-          .filter((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl))
+          .filter((p) => {
+            const img = (p as unknown as Record<string, unknown>).visualizedPhotoUrl;
+            return typeof img === 'string' && img.startsWith('data:image/');
+          })
           .map((p, idx) => {
             const pAny = p as unknown as Record<string, unknown>;
             const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
@@ -217,6 +219,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
               : typeof pAny.calculatedDistanceMeters === 'number'
                 ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
                 : '—';
+
             return {
               stack: [
                 { text: `Bod #${idx + 1}: ${p.label} (${distStr} do cíle)`, bold: true, fontSize: 9.5, color: NAVY, margin: [0, 6, 0, 4] },
@@ -227,7 +230,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       ] : []),
 
       // Graphic Artwork Proof Section in PDF (670 x 900 mm)
-      ...(isNavigation && navigationData && (navigationData as unknown as Record<string, unknown>).includeGraphicProof !== false && (navigationData as unknown as Record<string, unknown>).graphicArtworkUrl ? [
+      ...(isNavigation && navigationData && (navigationData as unknown as Record<string, unknown>).includeGraphicProof !== false && typeof (navigationData as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl).startsWith('data:image/') ? [
         { text: 'Grafický motiv a provedení cedule (670 × 900 mm)', style: 'heading', margin: [0, 14, 0, 8] },
         { text: 'Tiskový motiv oboustranné plástve SeePOINT pro montáž na sloupy veřejného osvětlení:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 8] },
         { image: String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl), width: 240, alignment: 'center', margin: [0, 4, 0, 16] },

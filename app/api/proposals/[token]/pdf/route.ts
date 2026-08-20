@@ -37,7 +37,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     }
     const offer = toProposalOffer(offerView);
     const pdf = await createOfferPdf(offer, await loadClientLogo(token));
-    return new Response(new Uint8Array(pdf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename(offer.title))}`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
+    return new Response(new Uint8Array(pdf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename(offer.title))}`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
   } catch (error) {
     if (error instanceof OfferValidationError && error.code === 'NOT_FOUND') return NextResponse.json({ error: 'Nabídka nebyla nalezena.' }, { status: 404 });
     console.error('Offer PDF generation failed', error);
