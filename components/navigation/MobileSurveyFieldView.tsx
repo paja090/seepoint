@@ -252,6 +252,7 @@ export function MobileSurveyFieldView({
       preview: URL.createObjectURL(file),
     }));
     setPhotosToUpload((prev) => [...prev, ...newPhotos]);
+    e.target.value = '';
   };
 
   const handleRemovePhoto = (index: number) => {
@@ -273,8 +274,13 @@ export function MobileSurveyFieldView({
         formData.append('file', p.file);
         formData.append('type', 'SURVEY');
         if (formLat && formLng) {
+          formData.append('latitude', formLat.toString());
+          formData.append('longitude', formLng.toString());
           formData.append('capturedLatitude', formLat.toString());
           formData.append('capturedLongitude', formLng.toString());
+        }
+        if (selectedCarrierId) {
+          formData.append('carrierId', selectedCarrierId);
         }
         const uploadRes = await fetch('/api/mobile-photos/upload', {
           method: 'POST',

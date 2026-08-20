@@ -127,6 +127,7 @@ export async function PUT(
         where: { id: { in: photoIds } },
         data: {
           surveyCandidatePointId: updated.id,
+          ...(updated.carrierId ? { carrierId: updated.carrierId } : {}),
           type: 'SURVEY',
         },
       });

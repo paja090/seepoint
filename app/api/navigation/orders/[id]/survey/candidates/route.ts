@@ -155,6 +155,7 @@ export async function POST(
         where: { id: { in: photoIds } },
         data: {
           surveyCandidatePointId: candidate.id,
+          ...(candidate.carrierId ? { carrierId: candidate.carrierId } : {}),
           type: 'SURVEY',
         },
       });
