@@ -60,7 +60,7 @@ export default async function MobileSurveysPage({
 
     const navOffers = await prisma.offer.findMany({
       where: {
-        offerType: 'NAVIGATION_MEDIA',
+        offerType: 'NAVIGATION',
         ...(search.trim()
           ? {
               OR: [
@@ -83,7 +83,7 @@ export default async function MobileSurveysPage({
       take: 50,
     });
 
-    const mappedOffers = navOffers.map((o) => ({
+    const mappedOffers = navOffers.map((o: any) => ({
       id: o.id,
       isOffer: true,
       targetName: o.navigationOffer?.targetName || o.title || 'Navigační nabídka',
@@ -94,7 +94,7 @@ export default async function MobileSurveysPage({
           name: o.client?.name || o.client?.tradingName || 'Klient',
         },
       },
-      candidatePoints: (o.navigationOffer?.points || []).map((p) => ({
+      candidatePoints: (o.navigationOffer?.points || []).map((p: any) => ({
         id: p.id,
         supervisionStatus: 'APPROVED',
         createdAt: p.createdAt,
