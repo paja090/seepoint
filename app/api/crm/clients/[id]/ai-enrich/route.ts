@@ -258,6 +258,52 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
     const selectedCandIdx = (aiEnrichmentResult?.selectedIndex || 1) - 1;
     const matchedAres = aresCandidates[selectedCandIdx] || aresCandidates[0] || null;
 
+    // Fallback AI Enrichment Result if Gemini API is temporarily unavailable or out of quota (HTTP 429)
+    if (!aiEnrichmentResult && (matchedAres || client.name)) {
+      const compName = matchedAres?.obchodniJmeno || client.name;
+      const compCity = matchedAres?.sidlo?.nazevObce || client.billingCity || 'Ostrava / MS kraj';
+      const compStreet = matchedAres?.sidlo?.ulice
+        ? `${matchedAres.sidlo.ulice} ${matchedAres.sidlo.cisloDomovni || ''}`.trim()
+        : client.billingStreet || undefined;
+
+      aiEnrichmentResult = {
+        selectedOfficialName: compName,
+        tradingName: client.tradingName || compName,
+        selectedIco: matchedAres?.ico || client.companyId || undefined,
+        selectedDic: matchedAres?.dic || client.dic || undefined,
+        foundWebsite: client.website || undefined,
+        businessField: 'Podnikatelský subjekt a obchodní činnost',
+        companySummary: `${compName} je společnost působící se sídlem v ${compCity}. V státním rejstříku ARES evidována pod IČO ${matchedAres?.ico || client.companyId || 'Neuvedeno'}.`,
+        executives: client.contactPerson || 'Vedení / Jednatelé společnosti',
+        msRegionBranches: [
+          {
+            name: `${compName} - Sídlo / Prodejna ${compCity}`,
+            street: compStreet,
+            city: compCity,
+            zip: matchedAres?.sidlo?.psc ? String(matchedAres.sidlo.psc) : client.billingZip || undefined,
+          },
+        ],
+        salesAdvice: [
+          `Zacílit obchodní nabídku na podporu navštěvnosti a viditelnosti v ${compCity} a Moravskoslezském kraji.`,
+          `Navrhnout outdoorovou reklamní kampaň a městskou navigaci SeePoint na klíčových tepnách v Ostravě.`,
+        ],
+        recommendedCarriers: [
+          {
+            type: `Městská navigace a směrové tabule SeePoint (${compCity})`,
+            reason: 'Přímé navedení B2B i B2C zákazníků ke klientské provozovně a sídlu.',
+          },
+          {
+            type: 'Bigboardy a Billboardové plochy Ostrava (Rudná / Místecká / Opavská)',
+            reason: 'Vysokofrekvenční oslovení řidičů a firemní klientely v celém MS kraji.',
+          },
+          {
+            type: 'City Light Postery na uzlech MHD Ostrava (Poruba / Svinov / ÚAN)',
+            reason: 'Dominantní zásah zákazníků a veřejnosti v nákupních zónách.',
+          },
+        ],
+      };
+    }
+
     const finalOfficialName =
       aiEnrichmentResult?.selectedOfficialName || matchedAres?.obchodniJmeno || client.name;
     const finalTradingName = aiEnrichmentResult?.tradingName || client.tradingName || client.name;

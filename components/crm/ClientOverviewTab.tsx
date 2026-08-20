@@ -7,7 +7,7 @@ function FormattedClientNote({ note }: { note: string }) {
   if (!note) return null;
 
   // Check if note contains AI structured section markers
-  const isAiStructured = note.includes('🤖 AI PROFIL & STRATEGIE') || note.includes('💡 TIPY PRO OBCHODNÍKA') || note.includes('🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE');
+  const isAiStructured = note.includes('AI PROFIL') || note.includes('PROFIL & ZAMĚŘENÍ') || note.includes('TIPY PRO OBCHODNÍKA') || note.includes('DOPORUČENÁ REKLAMNÍ STRATEGIE');
 
   if (!isAiStructured) {
     return (
@@ -33,19 +33,19 @@ function FormattedClientNote({ note }: { note: string }) {
   let currentSection: 'profile' | 'branches' | 'tips' | 'strategy' | 'manual' = 'manual';
 
   for (const line of lines) {
-    if (line.includes('🤖 AI PROFIL & STRATEGIE')) {
+    if (line.includes('AI PROFIL') || line.includes('PROFIL & ZAMĚŘENÍ')) {
       currentSection = 'profile';
       continue;
     }
-    if (line.includes('🏬 POBOČKY A PRODEJNY')) {
+    if (line.includes('POBOČKY A PRODEJNY') || line.includes('POBOČKY & PRODEJNY') || line.includes('POBOČKY V')) {
       currentSection = 'branches';
       continue;
     }
-    if (line.includes('💡 TIPY PRO OBCHODNÍKA')) {
+    if (line.includes('TIPY PRO OBCHODNÍKA')) {
       currentSection = 'tips';
       continue;
     }
-    if (line.includes('🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE')) {
+    if (line.includes('DOPORUČENÁ REKLAMNÍ STRATEGIE')) {
       currentSection = 'strategy';
       continue;
     }
