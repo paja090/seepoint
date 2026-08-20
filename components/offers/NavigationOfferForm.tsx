@@ -872,6 +872,15 @@ export function NavigationOfferForm({
           </a>
         )}
 
+        {initialOffer?.id && (
+          <a
+            href={`/mobile-surveys/${initialOffer.id}`}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-bold text-emerald-950 hover:bg-emerald-100 transition shadow-xs cursor-pointer"
+          >
+            📍 Otevřít v Mobilním Průzkumu lokalit
+          </a>
+        )}
+
         {message && <p className="rounded-xl bg-amber-50 p-3 text-xs font-semibold text-amber-800 border border-amber-200" role="alert">{message}</p>}
       </aside>
 

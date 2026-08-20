@@ -80,7 +80,54 @@ export async function GET(
     });
 
     if (!order) {
-      return NextResponse.json({ error: 'Zakázka nebyla nalezena.' }, { status: 404 });
+      const offer = await prisma.offer.findUnique({
+        where: { id },
+        include: {
+          client: true,
+          navigationOffer: {
+            include: {
+              points: true,
+            },
+          },
+        },
+      });
+
+      if (offer && offer.navigationOffer) {
+        const nav = offer.navigationOffer;
+        const candidatePoints = (nav.points || []).map((p) => ({
+          id: p.id,
+          label: p.label,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          address: p.address,
+          placementType: p.navigationType || 'Směrová tabule',
+          ownershipType: 'SEEPOINT',
+          visibilityTowardTarget: 'GOOD',
+          permitStatus: 'GRANTED',
+          surveyStatus: 'COMPLETED',
+          supervisionStatus: 'APPROVED',
+          photos: [],
+          createdAt: p.createdAt,
+        }));
+
+        return NextResponse.json({
+          id: offer.id,
+          targetName: nav.targetName || offer.title,
+          targetAddress: nav.targetAddress || null,
+          targetLatitude: nav.targetLatitude,
+          targetLongitude: nav.targetLongitude,
+          targetNote: nav.targetNote || null,
+          status: offer.status,
+          crmOrder: {
+            client: offer.client,
+          },
+          surveyRoutes: [],
+          candidatePoints,
+          nearbyCarriers: [],
+        });
+      }
+
+      return NextResponse.json({ error: 'Projekt průzkumu nebo nabídka nebyla nalezena.' }, { status: 404 });
     }
 
     let nearbyCarriers: Array<any> = [];

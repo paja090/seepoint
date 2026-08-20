@@ -41,7 +41,7 @@ export default async function MobileSurveysPage({
       };
     }
 
-    orders = await prisma.navigationOrder.findMany({
+    const navOrders = await prisma.navigationOrder.findMany({
       where: whereCondition,
       include: {
         crmOrder: {
@@ -57,6 +57,53 @@ export default async function MobileSurveysPage({
       orderBy: { updatedAt: 'desc' },
       take: 50,
     });
+
+    const navOffers = await prisma.offer.findMany({
+      where: {
+        offerType: 'NAVIGATION_MEDIA',
+        ...(search.trim()
+          ? {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { client: { name: { contains: search, mode: 'insensitive' } } },
+                { navigationOffer: { targetName: { contains: search, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        client: { select: { name: true, tradingName: true } },
+        navigationOffer: {
+          include: {
+            points: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 50,
+    });
+
+    const mappedOffers = navOffers.map((o) => ({
+      id: o.id,
+      isOffer: true,
+      targetName: o.navigationOffer?.targetName || o.title || 'Navigační nabídka',
+      targetAddress: o.navigationOffer?.targetAddress || null,
+      crmOrderId: o.id,
+      crmOrder: {
+        client: {
+          name: o.client?.name || o.client?.tradingName || 'Klient',
+        },
+      },
+      candidatePoints: (o.navigationOffer?.points || []).map((p) => ({
+        id: p.id,
+        supervisionStatus: 'APPROVED',
+        createdAt: p.createdAt,
+      })),
+      surveyRoutes: [],
+      updatedAt: o.updatedAt,
+    }));
+
+    orders = [...navOrders, ...mappedOffers].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   } catch (err: any) {
     console.error('Error loading mobile surveys:', err);
     fetchError = err instanceof Error ? err.message : 'Nepodařilo se načíst průzkumy z databáze.';
@@ -157,8 +204,8 @@ export default async function MobileSurveysPage({
                         <h3 className="font-black text-base text-slate-900 group-hover:text-emerald-700 transition truncate">
                           {o.targetName}
                         </h3>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-700">
-                          Z-{(o.crmOrderId || '').slice(-4).toUpperCase()}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${o.isOffer ? 'bg-indigo-100 text-indigo-900 border border-indigo-200' : 'bg-slate-100 text-slate-700'}`}>
+                          {o.isOffer ? '📄 NABÍDKA' : `Z-${(o.crmOrderId || '').slice(-4).toUpperCase()}`}
                         </span>
                       </div>
                       <p className="text-xs text-sky-700 font-bold">{o.crmOrder?.client?.name || 'Klient nezjištěn'}</p>
