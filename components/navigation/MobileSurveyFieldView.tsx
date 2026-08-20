@@ -160,6 +160,7 @@ export function MobileSurveyFieldView({
     if (!initialData) {
       fetchSurvey();
     }
+    handleGetLocation();
   }, [orderId]);
 
   // Handle Geolocation capture
@@ -385,28 +386,43 @@ export function MobileSurveyFieldView({
 
         {/* View Mode Toggle & Primary Action */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
-          <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setViewMode('MAP')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                  viewMode === 'MAP' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🗺️ Mapa
+              </button>
+              <button
+                onClick={() => setViewMode('LIST')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
+                  viewMode === 'LIST' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                📋 Seznam ({data.candidatePoints.length})
+              </button>
+            </div>
+
             <button
-              onClick={() => setViewMode('MAP')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
-                viewMode === 'MAP' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+              onClick={() => handleGetLocation()}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                coords
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 hover:bg-blue-500/30'
+                  : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
               }`}
+              title="Zobrazit a vycentrovat moji GPS polohu na mapě"
             >
-              🗺️ Mapa
-            </button>
-            <button
-              onClick={() => setViewMode('LIST')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition ${
-                viewMode === 'LIST' ? 'bg-emerald-500 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              📋 Seznam ({data.candidatePoints.length})
+              <Compass size={13} className={locating ? 'animate-spin text-blue-400' : 'text-blue-400'} />
+              <span>{locating ? 'Zjišťuji GPS…' : coords ? '📍 Moje GPS aktivní' : '🎯 Moje poloha'}</span>
             </button>
           </div>
 
           <button
             onClick={() => handleOpenAddModal()}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs shadow-lg shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
           >
             <Plus size={16} />
             <span>+ PŘIDAT MÍSTO</span>
@@ -426,6 +442,7 @@ export function MobileSurveyFieldView({
                 onPointMove={() => {}}
                 onMapClick={() => {}}
                 points={mapPoints}
+                userLocation={coords ? { latitude: coords.lat, longitude: coords.lng } : undefined}
                 target={{
                   latitude: data.targetLatitude,
                   longitude: data.targetLongitude,

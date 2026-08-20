@@ -23,6 +23,7 @@ export function NavigationPointMap({
   mode: 'target' | 'point';
   onMapClick: (latitude: number, longitude: number) => void;
   onPointMove: (id: string, latitude: number, longitude: number) => void;
+  userLocation?: { latitude: number; longitude: number };
 }) {
   const element = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);

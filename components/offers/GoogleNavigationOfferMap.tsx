@@ -74,6 +74,7 @@ export function GoogleNavigationOfferMap({
   onMapClick,
   compact = false,
   readOnly = false,
+  userLocation,
   suggestionCount,
   maxRadiusKm = 5,
   onSuggestedPoints,
@@ -86,6 +87,7 @@ export function GoogleNavigationOfferMap({
   onMapClick: (latitude: number, longitude: number, address?: string) => void;
   compact?: boolean;
   readOnly?: boolean;
+  userLocation?: { latitude: number; longitude: number };
   suggestionCount?: number;
   maxRadiusKm?: number;
   onSuggestedPoints?: (points: SuggestedNavigationPoint[], error?: string) => void;
@@ -494,10 +496,39 @@ export function GoogleNavigationOfferMap({
       }
     });
 
-    if ((points.length > 0 || target) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
+    // 3. User Current GPS Location Marker
+    if (userLocation) {
+      const userPos = { lat: userLocation.latitude, lng: userLocation.longitude };
+      bounds.extend(userPos);
+
+      const userMarker = new googleMaps.Marker({
+        position: userPos,
+        map,
+        title: 'Moje aktuální poloha (GPS)',
+        zIndex: 99999,
+        label: {
+          text: '📍 Jste zde',
+          color: '#2563eb',
+          fontWeight: '900',
+          fontSize: '11px',
+        },
+        icon: {
+          path: googleMaps.SymbolPath.CIRCLE,
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 3,
+          scale: 9,
+        },
+      });
+
+      markersRef.current.push(userMarker);
+    }
+
+    if ((points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, points, onMapClick, onPointMove, onTargetSelect, readOnly]);
+  }, [mapsLoaded, target, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly]);
 
   // Graceful Leaflet Fallback if API key missing or load error
   if (loadError || !apiKey) {
@@ -514,6 +545,7 @@ export function GoogleNavigationOfferMap({
           mode={mode}
           onMapClick={onMapClick}
           onPointMove={(id, lat, lng) => onPointMove(id, lat, lng)}
+          userLocation={userLocation}
         />
       </div>
     );
