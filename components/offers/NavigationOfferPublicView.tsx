@@ -536,62 +536,140 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         </div>
       ) : null}
 
-      {/* Graphic artwork and technical specification */}
-      {!isLocationSelectionPhase && (
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
+      {/* 🎨 Executive Proofing & Graphic Specification Studio Section */}
+      <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 md:p-8 text-white shadow-2xl ring-1 ring-white/10 space-y-6">
+        {/* Subtle Ambient Glow */}
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
+
+        {/* Section Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-5">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 font-extrabold text-lg">
-              🎨
-            </span>
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/20">
+              <span className="text-xl">🎨</span>
+            </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-lg font-black text-white tracking-tight">
                 Grafický návrh a technické provedení navigační cedule
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs font-medium text-slate-400">
                 Přesný formát a tvar panelu se řídí pravidly města a konkrétním místem instalace.
               </p>
             </div>
           </div>
-          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl">
-            Rozměr dle lokality
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3.5 py-1.5 text-xs font-black text-sky-400 backdrop-blur-sm">
+              <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
+              Rozměr: 670 × 900 mm
+            </span>
+          </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center gap-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-6">
-          {/* Graphic Artwork Proof Image / Template */}
-          <div className="relative w-full md:w-1/2 shrink-0 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm overflow-hidden flex flex-col items-center justify-center">
-            {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl ? (
-              <img
-                src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
-                alt="Grafický motiv cedule"
-                className="w-full h-auto max-h-80 object-contain rounded-xl"
-              />
-            ) : (
-              <img
-                src="/offer/navigation-proof-template.jpg"
-                alt="Šablona navigačního panelu 670 × 900 mm"
-                className="w-full h-auto max-h-80 object-contain rounded-xl"
-              />
-            )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          {/* Left Column: Premium Interactive Graphic Artwork Frame (7 Cols) */}
+          <div className="lg:col-span-7 flex flex-col items-center">
+            <div
+              className="group relative w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3 shadow-2xl transition duration-300 hover:border-sky-500/50 cursor-pointer"
+              onClick={() =>
+                setActiveLightboxImage(
+                  typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
+                    ? String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)
+                    : '/offer/navigation-proof-template.jpg'
+                )
+              }
+            >
+              {/* Studio Window Header Bar */}
+              <div className="mb-2.5 flex items-center justify-between border-b border-slate-800/80 pb-2 px-1 text-[11px] font-bold text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+                  <span className="ml-2 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+                    {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
+                      ? 'NÁHLED GRAFICKÉHO MOTIVU'
+                      : 'OFICIÁLNÍ ŠABLONA PANELU (670 × 900 MM)'}
+                  </span>
+                </div>
+                <span className="text-sky-400 group-hover:underline flex items-center gap-1">
+                  🔍 Zvětšit náhled
+                </span>
+              </div>
+
+              {/* Artwork Image Container */}
+              <div className="relative flex min-h-[300px] w-full items-center justify-center rounded-xl bg-slate-900 p-2 shadow-inner overflow-hidden">
+                {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl ? (
+                  <img
+                    src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
+                    alt="Grafický motiv cedule"
+                    className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
+                  />
+                ) : (
+                  <img
+                    src="/offer/navigation-proof-template.jpg"
+                    alt="Šablona navigačního panelu 670 × 900 mm"
+                    className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
+                  />
+                )}
+
+                {/* Hover overlay hint */}
+                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                  <span className="rounded-xl border border-white/30 bg-slate-900/90 px-4 py-2 text-xs font-bold text-white shadow-xl flex items-center gap-2">
+                    🔍 Kliknutím otevřete detail v plné velikosti
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-3 text-xs text-slate-600 w-full md:w-1/2">
-            <h4 className="font-bold text-slate-900 text-sm">Specifikace navigačního prvku:</h4>
-            <ul className="space-y-1.5 list-disc list-inside font-medium text-slate-700">
-              <li>Rozměr: <strong>Ostrava 670 × 900 mm</strong>; Havířov používá odlišný tvar s horním půlkruhem, jeho přesný rozměr bude doplněn po ověření.</li>
-              <li>Materiál: odolný panel <strong>DIBOND</strong>, standardně jednostranný; podle umístění může být proveden oboustranně.</li>
-              <li>Grafika: černý podklad bez reflexních prvků, logo klienta, směrová šipka a vzdálenost k cíli.</li>
-              <li>Uchycení: nerezovými páskami na sloup veřejného osvětlení nebo určený sloupek.</li>
-            </ul>
-            <p className="text-[11px] text-slate-500 pt-1">
-              💡 Přesný rozměr pro danou lokalitu a finální grafický návrh budou před výrobou zaslány klientovi ke korektuře a odsouhlasení.
-            </p>
+          {/* Right Column: Specification Details & Feature Cards (5 Cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-wider text-sky-400 flex items-center gap-2">
+              <span>📋</span> Technické parametry prvku:
+            </h4>
 
-            {/* Client graphic upload becomes available after accepting the priced quote. */}
-            <div className="pt-3 space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                {artworkUploadEnabled ? <label className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-bold text-sky-900 hover:bg-sky-100 transition cursor-pointer">
+            <div className="space-y-2.5 text-xs text-slate-300 font-medium">
+              <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 shadow-xs">
+                <span className="text-base leading-none">📐</span>
+                <div>
+                  <span className="font-bold text-white block">Rozměry panelu:</span>
+                  <span className="text-slate-400"><strong>Ostrava 670 × 900 mm</strong>; Havířov používá odlišný tvar s horním půlkruhem (přesný rozměr bude doplněn po ověření).</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 shadow-xs">
+                <span className="text-base leading-none">🛡️</span>
+                <div>
+                  <span className="font-bold text-white block">Materiálové provedení:</span>
+                  <span className="text-slate-400">Odolná sendvičová deska <strong>DIBOND (3 mm)</strong>, standardně jednostranná; dle lokality oboustranná.</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 shadow-xs">
+                <span className="text-base leading-none">🎨</span>
+                <div>
+                  <span className="font-bold text-white block">Tisková grafika:</span>
+                  <span className="text-slate-400">Matný černý podklad bez reflexních prvků, logo klienta, směrová šipka a vzdálenost k cíli.</span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 shadow-xs">
+                <span className="text-base leading-none">🔩</span>
+                <div>
+                  <span className="font-bold text-white block">Instalace a uchycení:</span>
+                  <span className="text-slate-400">Nerezové ocelové pásky (Bandimex) na sloupy veřejného osvětlení nebo určené sloupky.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200 flex items-start gap-2.5">
+              <span className="text-base leading-none shrink-0">💡</span>
+              <span>Přesný rozměr pro danou lokalitu a finální grafický návrh budou před výrobou zaslány klientovi ke korektuře a odsouhlasení.</span>
+            </div>
+
+            {/* Client artwork upload option */}
+            <div className="pt-2">
+              {artworkUploadEnabled ? (
+                <label className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-300 hover:bg-sky-500/20 hover:text-white transition cursor-pointer shadow-lg shadow-sky-500/10">
                   <span>📤 Nahrát vlastní logo / grafické podklady</span>
                   <input
                     type="file"
@@ -625,14 +703,6 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       reader.readAsDataURL(file);
                     }}
                   />
-                </label> : (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
-                    Grafické podklady nahrajete zde po schválení cenové nabídky. SeePOINT následně připraví finální návrh k samostatné korektuře před výrobou.
-                  </div>
-                )}
-              </div>
-
-              {uploadedArtworkName ? (
                 <div className="text-[11px] font-bold text-slate-600 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
                   📁 Nahrané podklady od klienta: {uploadedArtworkName}
                 </div>
