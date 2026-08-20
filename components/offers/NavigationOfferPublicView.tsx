@@ -669,50 +669,58 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             {/* Client artwork upload option */}
             <div className="pt-2">
               {artworkUploadEnabled ? (
-                <label className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-300 hover:bg-sky-500/20 hover:text-white transition cursor-pointer shadow-lg shadow-sky-500/10">
-                  <span>📤 Nahrát vlastní logo / grafické podklady</span>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf,.ai,.eps,.svg"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 3 * 1024 * 1024) {
-                        setArtworkMessage('Soubor může mít maximálně 3 MB.');
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = async (ev) => {
-                        const dataUrl = ev.target?.result as string;
-                        try {
-                          if (!effectiveProposalKey) throw new Error('Chybí identifikátor nabídky.');
-                          const response = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/artwork`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ clientArtworkUrl: dataUrl, clientArtworkFileName: file.name }),
-                          });
-                          const result = await response.json().catch(() => null) as { error?: string } | null;
-                          if (!response.ok) throw new Error(result?.error || 'Nahrání podkladů selhalo.');
-                          setUploadedArtworkName(file.name);
-                          setArtworkMessage('Podklady byly úspěšně předány obchodníkovi SeePOINT.');
-                        } catch {
-                          setArtworkMessage('Podklady se nepodařilo nahrát.');
+                <div className="space-y-2">
+                  <label className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-300 hover:bg-sky-500/20 hover:text-white transition cursor-pointer shadow-lg shadow-sky-500/10">
+                    <span>📤 Nahrát vlastní logo / grafické podklady</span>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,.ai,.eps,.svg"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 3 * 1024 * 1024) {
+                          setArtworkMessage('Soubor může mít maximálně 3 MB.');
+                          return;
                         }
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                  />
-                <div className="text-[11px] font-bold text-slate-600 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
-                  📁 Nahrané podklady od klienta: {uploadedArtworkName}
+                        const reader = new FileReader();
+                        reader.onload = async (ev) => {
+                          const dataUrl = ev.target?.result as string;
+                          try {
+                            if (!effectiveProposalKey) throw new Error('Chybí identifikátor nabídky.');
+                            const response = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/artwork`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ clientArtworkUrl: dataUrl, clientArtworkFileName: file.name }),
+                            });
+                            const result = await response.json().catch(() => null) as { error?: string } | null;
+                            if (!response.ok) throw new Error(result?.error || 'Nahrání podkladů selhalo.');
+                            setUploadedArtworkName(file.name);
+                            setArtworkMessage('Podklady byly úspěšně předány obchodníkovi SeePOINT.');
+                          } catch {
+                            setArtworkMessage('Podklady se nepodařilo nahrát.');
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                  {uploadedArtworkName ? (
+                    <div className="text-[11px] font-bold text-sky-400 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                      📁 Nahrané podklady od klienta: {uploadedArtworkName}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              {artworkMessage ? <p className="text-xs font-semibold text-slate-700" role="status">{artworkMessage}</p> : null}
+              ) : (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs font-medium text-slate-400 text-center">
+                  Grafické podklady nahrajete zde po schválení cenové nabídky. SeePOINT následně připraví finální návrh k samostatné korektuře před výrobou.
+                </div>
+              )}
+              {artworkMessage ? <p className="text-xs font-semibold text-sky-400 pt-2" role="status">{artworkMessage}</p> : null}
             </div>
           </div>
         </div>
-      </div>
-      )}
+      </section>
 
       {/* Photo Lightbox Modal */}
       {activeLightboxImage && (
