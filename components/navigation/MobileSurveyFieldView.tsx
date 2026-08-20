@@ -423,7 +423,7 @@ export function MobileSurveyFieldView({
               target={{
                 latitude: data.targetLatitude,
                 longitude: data.targetLongitude,
-                title: data.targetName,
+                label: data.targetName,
                 address: data.targetAddress || undefined,
               }}
             />
