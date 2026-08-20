@@ -914,8 +914,11 @@ export function NavigationOfferForm({
 
           <div className="space-y-1.5 text-xs">
             <div className="flex justify-between text-slate-300">
-              <span>Pronájem bodů:</span>
-              <strong className="text-white">{totals.rental.toLocaleString('cs-CZ')} Kč</strong>
+              <span>Pronájem bodů (rok):</span>
+              <strong className="text-white">
+                {totals.rental.toLocaleString('cs-CZ')} Kč
+                <span className="text-[10px] text-sky-400 font-normal ml-1">({Math.round(totals.rental / 12).toLocaleString('cs-CZ')} Kč/měs)</span>
+              </strong>
             </div>
             <div className="flex justify-between text-slate-300">
               <span>Tisk a výroba:</span>
@@ -1296,8 +1299,16 @@ export function NavigationOfferForm({
                     <input className="input" min="0.01" step="0.01" type="number" value={point.quantity} onChange={(e) => updatePoint(point.id, { quantity: e.target.value })} />
                   </Field>
 
-                  <Field label="Pronájem (Cena/ks/měsíc)">
-                    <input className="input" min="0" step="0.01" type="number" value={point.unitPrice} onChange={(e) => updatePoint(point.id, { unitPrice: e.target.value })} />
+                  <Field label="Pronájem (Cena/ks/rok)">
+                    <div className="space-y-1">
+                      <input className="input font-bold" min="0" step="0.01" type="number" value={point.unitPrice} onChange={(e) => updatePoint(point.id, { unitPrice: e.target.value })} />
+                      {Number(point.unitPrice) > 0 && (
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shadow-2xs">
+                          <span>📅 {Number(point.unitPrice).toLocaleString('cs-CZ')} Kč / rok</span>
+                          <span className="text-sky-700 font-bold">🗓️ {Math.round(Number(point.unitPrice) / 12).toLocaleString('cs-CZ')} Kč / měs</span>
+                        </div>
+                      )}
+                    </div>
                   </Field>
 
                   <Field label="Tisk & Výroba (Cena/ks)">
