@@ -54,6 +54,7 @@ export function NavigationSignVisualizer({
   const [signY, setSignY] = useState(180);
   const [signScale, setSignScale] = useState(1.0);
   const [signRotation, setSignRotation] = useState(0);
+  const [mountType, setMountType] = useState<'pole' | 'ground_pole'>('pole');
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ offsetX: 0, offsetY: 0 });
@@ -185,9 +186,29 @@ export function NavigationSignVisualizer({
     const radius = 16;
 
     // Metallic pole & mounting brackets behind sign
-    ctx.fillStyle = '#64748B';
-    ctx.fillRect(width / 2, -height / 2 + 35, 14, 14);
-    ctx.fillRect(width / 2, height / 2 - 45, 14, 14);
+    if (mountType === 'ground_pole') {
+      // Standalone ground pole extending downwards
+      const poleWidth = 16;
+      const poleHeight = 450;
+      const poleGrad = ctx.createLinearGradient(-poleWidth / 2, 0, poleWidth / 2, 0);
+      poleGrad.addColorStop(0, '#334155');
+      poleGrad.addColorStop(0.3, '#94A3B8');
+      poleGrad.addColorStop(0.7, '#E2E8F0');
+      poleGrad.addColorStop(1, '#1E293B');
+
+      ctx.save();
+      ctx.fillStyle = poleGrad;
+      ctx.fillRect(-poleWidth / 2, -height / 2 + 15, poleWidth, poleHeight);
+
+      // Pole metal top cap
+      ctx.fillStyle = '#0F172A';
+      ctx.fillRect(-poleWidth / 2 - 2, -height / 2 + 10, poleWidth + 4, 6);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#64748B';
+      ctx.fillRect(width / 2, -height / 2 + 35, 14, 14);
+      ctx.fillRect(width / 2, height / 2 - 45, 14, 14);
+    }
 
     // Outer Drop Shadow
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
@@ -259,28 +280,28 @@ export function NavigationSignVisualizer({
       }
     }
 
-    // Bottom Section: Integrated Dark Distance & Direction Badge
-    const badgeHeight = 44;
-    const badgeY = height / 2 - badgeHeight - 12;
-    const badgeWidth = width - 24;
+    // Bottom Section: Integrated Dark Distance & Direction Badge (Enlarged & Bold!)
+    const badgeHeight = 48;
+    const badgeY = height / 2 - badgeHeight - 10;
+    const badgeWidth = width - 20;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.beginPath();
     ctx.roundRect(-badgeWidth / 2, badgeY, badgeWidth, badgeHeight, 10);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 1.4;
     ctx.stroke();
 
-    // Text in Badge: Distance + Arrow
+    // Text in Badge: Distance + Arrow (Enlarged bold 22px!)
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '800 15px system-ui, -apple-system, sans-serif';
+    ctx.font = '900 22px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${distanceText}    ${arrow}`, 0, badgeY + badgeHeight / 2);
+    ctx.fillText(`${distanceText}   ${arrow}`, 0, badgeY + badgeHeight / 2 + 1);
 
     ctx.restore();
-  }, [bgImage, graphicImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme]);
+  }, [bgImage, graphicImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme, mountType]);
 
   function handleSave() {
     const canvas = canvasRef.current;
@@ -414,7 +435,38 @@ export function NavigationSignVisualizer({
             </section>
 
             <section className="space-y-4 border-t border-slate-800 pt-4">
-              <h3 className="text-sm font-bold text-sky-400">3. Velikost a umístění na sloup</h3>
+              <h3 className="text-sm font-bold text-sky-400">3. Velikost, sloup a umístění</h3>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1.5">Typ uchycení / Sloupek</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMountType('pole')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
+                      mountType === 'pole'
+                        ? 'bg-sky-600 border-sky-400 text-white shadow-md'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>📌 Na sloup VO</span>
+                    <span className="text-[10px] font-normal opacity-80">(Příchytka na sloup)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setMountType('ground_pole')}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-1 cursor-pointer ${
+                      mountType === 'ground_pole'
+                        ? 'bg-sky-600 border-sky-400 text-white shadow-md'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>🏗️ Samostatný słoupek</span>
+                    <span className="text-[10px] font-normal opacity-80">(Do trávníku / země)</span>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <div className="flex justify-between text-xs font-bold text-slate-400 mb-1">
                   <span>Velikost cedule:</span>

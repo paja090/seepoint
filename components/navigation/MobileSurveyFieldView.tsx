@@ -136,7 +136,8 @@ export function MobileSurveyFieldView({
 
   // Photo Capture State
   const [photosToUpload, setPhotosToUpload] = useState<Array<{ file: File; preview: string }>>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Proximity Alert State
   const [nearbyAlertCarrier, setNearbyAlertCarrier] = useState<SurveyDetailData['nearbyCarriers'][0] | null>(null);
@@ -634,10 +635,17 @@ export function MobileSurveyFieldView({
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-800 block">📷 Fotografie z terénu</label>
               <input
-                ref={fileInputRef}
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
+                className="hidden"
+                onChange={handlePhotoSelect}
+              />
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
                 multiple
                 className="hidden"
                 onChange={handlePhotoSelect}
@@ -645,11 +653,19 @@ export function MobileSurveyFieldView({
               <div className="flex flex-wrap gap-2 items-center">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-md hover:bg-slate-800 active:scale-95 transition"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex items-center gap-1.5 bg-slate-900 text-white px-3.5 py-2.5 rounded-2xl text-xs font-bold shadow-md hover:bg-slate-800 active:scale-95 transition cursor-pointer"
                 >
-                  <Camera size={16} className="text-emerald-400" />
+                  <Camera size={15} className="text-emerald-400" />
                   <span>Vyfotit fotoaparátem</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex items-center gap-1.5 bg-slate-100 text-slate-800 border border-slate-300 px-3.5 py-2.5 rounded-2xl text-xs font-bold shadow-sm hover:bg-slate-200 active:scale-95 transition cursor-pointer"
+                >
+                  <span>🖼️ Vybrat z galerie</span>
                 </button>
 
                 {photosToUpload.map((p, idx) => (
@@ -658,7 +674,7 @@ export function MobileSurveyFieldView({
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(idx)}
-                      className="absolute top-0.5 right-0.5 bg-red-600 text-white size-5 rounded-full text-[10px] font-black flex items-center justify-center shadow-md"
+                      className="absolute top-0.5 right-0.5 bg-red-600 text-white size-5 rounded-full text-[10px] font-black flex items-center justify-center shadow-md cursor-pointer"
                     >
                       ✕
                     </button>
