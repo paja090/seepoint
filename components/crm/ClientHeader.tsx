@@ -271,8 +271,10 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
               logoUrl={
                 client.logoDriveFileId
                   ? `/api/clients/${client.id}/logo/file`
-                  : client.website
-                  ? `https://www.google.com/s2/favicons?domain=${client.website.replace(/^https?:\/\//i, '').split('/')[0]}&sz=256`
+                  : client.website && client.website.trim()
+                  ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+                      client.website.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0]
+                    )}&sz=256`
                   : undefined
               }
             />
