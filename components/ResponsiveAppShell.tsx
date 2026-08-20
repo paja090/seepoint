@@ -17,6 +17,7 @@ import {
   Package,
   Sparkles,
   ClipboardCheck,
+  Compass,
 } from 'lucide-react';
 import { AiQuickTaskModal } from './tasks/AiQuickTaskModal';
 import { AppNavLink, type AppNavIcon } from './AppNavLink';
@@ -256,13 +257,13 @@ export function ResponsiveAppShell({
           </Link>
 
           <Link
-            href="/warehouse"
+            href="/mobile-surveys"
             className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
-              pathname.startsWith('/warehouse') ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+              pathname.startsWith('/mobile-surveys') ? 'text-emerald-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Package size={20} />
-            <span>Sklad</span>
+            <Compass size={20} />
+            <span>Průzkum</span>
           </Link>
 
           <Link
@@ -280,17 +281,7 @@ export function ResponsiveAppShell({
             }`}
           >
             <ClipboardCheck size={20} />
-            <span>Moje úkoly</span>
-          </Link>
-
-          <Link
-            href="/work/route"
-            className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
-              pathname === '/work/route' ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Route size={20} />
-            <span>Výjezd</span>
+            <span>Úkoly</span>
           </Link>
 
           <button
