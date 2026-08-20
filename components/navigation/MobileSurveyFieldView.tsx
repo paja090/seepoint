@@ -416,23 +416,33 @@ export function MobileSurveyFieldView({
 
       {/* Main View Area */}
       {viewMode === 'MAP' ? (
-        <div className="bg-white rounded-3xl shadow-md border border-slate-200 overflow-hidden">
-          <div className="h-[55vh] min-h-[380px] w-full relative">
-            <GoogleNavigationOfferMap
-              mode="point"
-              readOnly={true}
-              onTargetSelect={() => {}}
-              onPointMove={() => {}}
-              onMapClick={() => {}}
-              points={mapPoints}
-              target={{
-                latitude: data.targetLatitude,
-                longitude: data.targetLongitude,
-                label: data.targetName,
-                address: data.targetAddress || undefined,
-              }}
-            />
+        <div className="space-y-3">
+          <div className="bg-white rounded-3xl shadow-md border border-slate-200 overflow-hidden">
+            <div className="h-[50vh] min-h-[350px] w-full relative">
+              <GoogleNavigationOfferMap
+                mode="point"
+                readOnly={true}
+                onTargetSelect={() => {}}
+                onPointMove={() => {}}
+                onMapClick={() => {}}
+                points={mapPoints}
+                target={{
+                  latitude: data.targetLatitude,
+                  longitude: data.targetLongitude,
+                  label: data.targetName,
+                  address: data.targetAddress || undefined,
+                }}
+              />
+            </div>
           </div>
+
+          <button
+            onClick={() => handleOpenAddModal()}
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 text-slate-950 font-black p-4 rounded-2xl shadow-lg border border-emerald-300 active:scale-95 transition text-sm tracking-wide"
+          >
+            <Plus size={20} />
+            <span>+ PŘIDAT NOVÉ MÍSTO V TERÉNU</span>
+          </button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -507,9 +517,12 @@ export function MobileSurveyFieldView({
         </div>
       )}
 
-      {/* Sticky Bottom Action Button on Mobile */}
-      <div className="fixed bottom-4 left-4 right-4 z-40 sm:hidden">
-        <div className="p-1.5 rounded-3xl bg-slate-950/90 backdrop-blur-md border border-slate-800 shadow-2xl">
+      {/* Sticky Bottom Action Button on Mobile - Elevated above mobile browser bars */}
+      <div
+        className="fixed left-4 right-4 z-50 sm:hidden"
+        style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="p-1.5 rounded-3xl bg-slate-950/95 backdrop-blur-xl border border-emerald-500/40 shadow-2xl">
           <button
             onClick={() => handleOpenAddModal()}
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 text-slate-950 font-black py-3.5 px-4 rounded-2xl shadow-lg active:scale-95 transition text-xs tracking-wider"
