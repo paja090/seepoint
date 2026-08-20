@@ -1266,20 +1266,11 @@ export function NavigationOfferForm({
                           </h4>
                           <p className="text-[11px] text-slate-500 mt-0.5">
                             {point.sitePhotoUrl
-                              ? '✓ Fotka je nahraná. Kliknutím na Foto-vizualizátor se fotka sloupu ihned načte jako pozadí plátna.'
-                              : 'Nahrajte fotku z počítače nebo z terénního průzkumu pro tvorbu vizualizace navigační tabule.'}
+                              ? '✓ Fotka sloupu je nahraná. Nahoře kliknutím na tlačítko "Foto-vizualizátor cedule" se ihned načte jako pozadí.'
+                              : 'Nahrajte fotku sloupu z počítače nebo z terénního průzkumu pro tvorbu vizualizace navigační tabule.'}
                           </p>
                         </div>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveVisualizerPointId(point.id)}
-                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold text-xs shadow hover:from-sky-500 hover:to-blue-500 transition shrink-0 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <ImageIcon size={15} />
-                        <span>{point.sitePhotoUrl ? '✨ Otevřít ve Foto-vizualizátoru' : 'Vytvořit vizualizaci cedule'}</span>
-                      </button>
                     </div>
                   </div>
                 </div>
