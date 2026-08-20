@@ -56,7 +56,7 @@ export function NavigationSignVisualizer({
   const [signRotation, setSignRotation] = useState(0);
 
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ offsetX: 0, offsetY: 0 });
 
   // Custom AI Graphic Artwork overlay state
   const [graphicImage, setGraphicImage] = useState<HTMLImageElement | null>(null);
@@ -65,7 +65,11 @@ export function NavigationSignVisualizer({
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => setBgImage(img);
+    img.onload = () => {
+      setBgImage(img);
+      setSignX(img.width ? img.width / 2 : 400);
+      setSignY(img.height ? img.height / 2 : 300);
+    };
     if (initialPhotoUrl) {
       img.src = initialPhotoUrl;
     } else {
@@ -73,6 +77,57 @@ export function NavigationSignVisualizer({
         'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%2394a3b8"/><path d="M 0 450 Q 400 380 800 450 L 800 600 L 0 600 Z" fill="%23475569"/><rect x="520" y="40" width="22" height="560" fill="%23334155"/><rect x="526" y="40" width="10" height="560" fill="%2364748b"/><text x="360" y="240" font-family="sans-serif" font-size="20" font-weight="bold" fill="%231e293b" text-anchor="middle">Nahrajte fotku ulice/sloupu pro vizualizaci</text></svg>';
     }
   }, [initialPhotoUrl]);
+
+  function getCanvasCoords(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement> | MouseEvent | TouchEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+
+    if ('touches' in e && (e as TouchEvent).touches && (e as TouchEvent).touches.length > 0) {
+      clientX = (e as TouchEvent).touches[0].clientX;
+      clientY = (e as TouchEvent).touches[0].clientY;
+    } else if ('clientX' in e) {
+      clientX = (e as MouseEvent).clientX;
+      clientY = (e as MouseEvent).clientY;
+    }
+
+    const scaleX = canvas.width / (rect.width || 1);
+    const scaleY = canvas.height / (rect.height || 1);
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
+
+  // Handle global mouse/touch dragging window events
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleWindowMove = (e: MouseEvent | TouchEvent) => {
+      const coords = getCanvasCoords(e);
+      setSignX(coords.x - dragStart.offsetX);
+      setSignY(coords.y - dragStart.offsetY);
+    };
+
+    const handleWindowEnd = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowEnd);
+    window.addEventListener('touchmove', handleWindowMove, { passive: false });
+    window.addEventListener('touchend', handleWindowEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMove);
+      window.removeEventListener('mouseup', handleWindowEnd);
+      window.removeEventListener('touchmove', handleWindowMove);
+      window.removeEventListener('touchend', handleWindowEnd);
+    };
+  }, [isDragging, dragStart]);
 
   // Handle custom photo upload
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -83,8 +138,8 @@ export function NavigationSignVisualizer({
       const img = new Image();
       img.onload = () => {
         setBgImage(img);
-        setSignX(img.width / 2 - 50);
-        setSignY(img.height / 2 - 80);
+        setSignX(img.width / 2);
+        setSignY(img.height / 2);
       };
       img.src = event.target?.result as string;
     };
@@ -257,24 +312,26 @@ export function NavigationSignVisualizer({
         {/* Modal Main Area */}
         <div className="grid flex-1 overflow-hidden lg:grid-cols-[1fr_360px]">
           {/* Canvas Interactive Viewport */}
-          <div className="relative flex items-center justify-center bg-slate-950 p-4 overflow-auto">
+          <div className="relative flex items-center justify-center bg-slate-950 p-4 overflow-auto select-none">
             <canvas
               ref={canvasRef}
-              className="max-h-full max-w-full rounded-2xl border border-slate-800 shadow-lg cursor-grab active:cursor-grabbing"
+              className="max-h-full max-w-full rounded-2xl border border-slate-800 shadow-lg cursor-grab active:cursor-grabbing touch-none"
               onMouseDown={(e) => {
+                e.preventDefault();
+                const coords = getCanvasCoords(e);
                 setIsDragging(true);
-                setDragStart({ x: e.clientX - signX, y: e.clientY - signY });
+                setDragStart({ offsetX: coords.x - signX, offsetY: coords.y - signY });
               }}
-              onMouseMove={(e) => {
-                if (!isDragging) return;
-                setSignX(e.clientX - dragStart.x);
-                setSignY(e.clientY - dragStart.y);
+              onTouchStart={(e) => {
+                e.preventDefault();
+                const coords = getCanvasCoords(e);
+                setIsDragging(true);
+                setDragStart({ offsetX: coords.x - signX, offsetY: coords.y - signY });
               }}
-              onMouseUp={() => setIsDragging(false)}
             />
 
-            <div className="absolute bottom-6 left-6 rounded-xl bg-slate-900/90 border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300">
-              💡 Tip: Táhnutím myší po obrázku posunete ceduli na požadovaný sloup nebo budovu.
+            <div className="absolute bottom-6 left-6 rounded-xl bg-slate-900/90 border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 pointer-events-none">
+              💡 Tip: Uchopte ceduli myší/prstem a přesuňte ji na sloup, nebo použijte tlačítka posunu vpravo.
             </div>
           </div>
 
@@ -356,8 +413,8 @@ export function NavigationSignVisualizer({
               </div>
             </section>
 
-            <section className="space-y-3 border-t border-slate-800 pt-4">
-              <h3 className="text-sm font-bold text-sky-400">3. Velikost a natočení</h3>
+            <section className="space-y-4 border-t border-slate-800 pt-4">
+              <h3 className="text-sm font-bold text-sky-400">3. Velikost a umístění na sloup</h3>
               <div>
                 <div className="flex justify-between text-xs font-bold text-slate-400 mb-1">
                   <span>Velikost cedule:</span>
@@ -365,12 +422,12 @@ export function NavigationSignVisualizer({
                 </div>
                 <input
                   type="range"
-                  min="0.4"
-                  max="2.5"
+                  min="0.3"
+                  max="2.8"
                   step="0.05"
                   value={signScale}
                   onChange={(e) => setSignScale(parseFloat(e.target.value))}
-                  className="w-full accent-sky-500"
+                  className="w-full accent-sky-500 cursor-pointer"
                 />
               </div>
 
@@ -386,8 +443,61 @@ export function NavigationSignVisualizer({
                   step="1"
                   value={signRotation}
                   onChange={(e) => setSignRotation(parseInt(e.target.value))}
-                  className="w-full accent-sky-500"
+                  className="w-full accent-sky-500 cursor-pointer"
                 />
+              </div>
+
+              {/* Precise Position Nudge D-Pad */}
+              <div className="pt-3 border-t border-slate-800">
+                <div className="flex justify-between text-xs font-bold text-slate-400 mb-2">
+                  <span>Přesný posun na sloup:</span>
+                  <span className="font-mono text-sky-400">X: {Math.round(signX)} | Y: {Math.round(signY)}</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setSignY((y) => y - 15)}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+                  >
+                    ▲ Nahoru
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSignX((x) => x - 15)}
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+                    >
+                      ◀ Vlevo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (canvasRef.current) {
+                          setSignX(canvasRef.current.width / 2);
+                          setSignY(canvasRef.current.height / 2);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-sky-950 border border-sky-700/60 text-sky-300 hover:bg-sky-900 rounded-xl text-[11px] font-bold transition active:scale-95 cursor-pointer"
+                      title="Vycentrovat na střed obrázku"
+                    >
+                      🎯 Střed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSignX((x) => x + 15)}
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+                    >
+                      Vpravo ▶
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSignY((y) => y + 15)}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+                  >
+                    ▼ Dolů
+                  </button>
+                </div>
               </div>
             </section>
           </div>
