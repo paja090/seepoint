@@ -17,7 +17,8 @@
     "seed:demo-settlement:clean": "npx tsx scripts/seed-demo-settlement.ts --clean",
     "seed:vehicles": "npx tsx scripts/seed-vehicles-2026.ts",
     "offer:demo-pdf": "node --experimental-strip-types scripts/generate-demo-offer-pdf.ts",
-    "import:carriers-2026": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/import-carriers-2026.ts"
+    "import:carriers-2026": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/import-carriers-2026.ts",
+    "purge:offers": "node --env-file-if-exists=.env.preview scripts/purge-test-offers.js"
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",
