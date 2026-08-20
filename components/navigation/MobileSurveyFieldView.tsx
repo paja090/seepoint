@@ -438,7 +438,7 @@ export function MobileSurveyFieldView({
 
           <button
             onClick={() => handleOpenAddModal()}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 text-slate-950 font-black p-4 rounded-2xl shadow-lg border border-emerald-300 active:scale-95 transition text-sm tracking-wide"
+            className="hidden sm:flex w-full items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 text-slate-950 font-black p-4 rounded-2xl shadow-lg border border-emerald-300 active:scale-95 transition text-sm tracking-wide"
           >
             <Plus size={20} />
             <span>+ PŘIDAT NOVÉ MÍSTO V TERÉNU</span>
