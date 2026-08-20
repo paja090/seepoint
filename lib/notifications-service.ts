@@ -249,18 +249,25 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
         const notifText = notifications.map((n) => `- [${n.severity}] ${n.title}: ${n.message}`).join('\n');
         const systemPrompt = `Jsi AI Asistent vedení firmy SeePoint. Zde je seznam aktuálních notifikací a varování:\n${notifText}\n\nVytvoř 1 STRUČNÝ, PŘEHLEDNÝ A EFEKTIVNÍ SOUHRN v češtině (max 200 znaků) jako "AI Souhrn pro vedoucího", který vypíchne nejakutnější problémy (např. končící zábory měst, vypršení smluv, nevyřízené úkoly s důvody). Vrať ČISTÝ TEXT bez jakýchkoliv markdown značek.`;
 
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }),
-          }
-        );
+        for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest']) {
+          try {
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }),
+              }
+            );
 
-        if (res.ok) {
-          const data = await res.json();
-          aiSummary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+            if (res.ok) {
+              const data = await res.json();
+              aiSummary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+              if (aiSummary) break;
+            }
+          } catch (e) {
+            console.error(`Error in notifications AI summary with ${model}:`, e);
+          }
         }
       }
     } catch (err) {

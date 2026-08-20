@@ -224,27 +224,33 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
   ]
 }`;
 
-      try {
-        const aiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              tools: [{ googleSearch: {} }],
-            }),
-          }
-        );
+      const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      for (const model of modelsToTry) {
+        try {
+          const aiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                tools: [{ googleSearch: {} }],
+              }),
+            }
+          );
 
-        if (aiRes.ok) {
-          const aiJson = await aiRes.json();
-          const rawText = aiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-          aiEnrichmentResult = JSON.parse(cleanJson);
+          if (aiRes.ok) {
+            const aiJson = await aiRes.json();
+            const rawText = aiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+            aiEnrichmentResult = JSON.parse(cleanJson);
+            if (aiEnrichmentResult) break;
+          } else {
+            console.warn(`Gemini model ${model} HTTP ${aiRes.status}`);
+          }
+        } catch (e) {
+          console.error(`Gemini AI enrichment error with model ${model}:`, e);
         }
-      } catch (e) {
-        console.error('Gemini AI enrichment error:', e);
       }
     }
 
