@@ -122,9 +122,21 @@ export async function POST(req: Request) {
       return jsonError('DATABASE_ERROR', 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.', 500);
     }
 
+    if (!carrier) {
+      return NextResponse.json({
+        success: true,
+        photo: {
+          id: photo.id,
+          url: photo.url,
+          fileName: photo.fileName,
+          storageProvider: photo.storageProvider,
+        },
+      });
+    }
+
     const expectedClient = surface?.occupancies[0]?.client?.name || surface?.occupancies[0]?.clientName || null;
     const historyTask = () => logCarrierHistoryEvent({
-      carrierId, surfaceId: surface?.id || null, eventType: purpose === 'DAMAGE' ? 'REPAIR' : 'SERVICE',
+      carrierId: carrier.id, surfaceId: surface?.id || null, eventType: purpose === 'DAMAGE' ? 'REPAIR' : 'SERVICE',
       title: purpose === 'DAMAGE' ? `ZÁVADA: ${damageText || 'Poškozeno'}` : 'Mobilní fotodokumentace z terénu',
       description: `${photoNote}. GPS: ${coordinates.lat}, ${coordinates.lng}.`, performedBy: workerName, photoUrl,
     });
