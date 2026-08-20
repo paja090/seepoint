@@ -134,7 +134,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
     margin: [0, 0, 0, 10],
   }));
 
-  const clientMark = clientLogoDataUrl
+  const clientMark = clientLogoDataUrl && clientLogoDataUrl.startsWith('data:image/')
     ? { image: clientLogoDataUrl, fit: [110, 48], alignment: 'right', margin: [0, 2, 0, 0] }
     : { text: offer.client.logoLabel || offer.client.name, fontSize: 18, bold: true, color: BLUE, alignment: 'right', margin: [0, 6, 0, 0] };
 
@@ -187,7 +187,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       ...(isNavigation && navigationData ? [
         { text: `CÍLOVÁ PROVOZOVNA: ${navigationData.targetName}`, style: 'heading' },
         ...(navigationData.targetAddress ? [{ text: `Adresa: ${navigationData.targetAddress}`, color: MUTED, fontSize: 8.5, margin: [0, 0, 0, 8] }] : []),
-        ...(staticMapDataUrl ? [{ image: staticMapDataUrl, width: 518, margin: [0, 4, 0, 16] }] : []),
+        ...(staticMapDataUrl && staticMapDataUrl.startsWith('data:image/') ? [{ image: staticMapDataUrl, width: 518, margin: [0, 4, 0, 16] }] : []),
       ] : []),
 
       { text: isNavigation ? 'Vytipované navigační body na trase' : 'Vybrané reklamní plochy', style: 'heading' },
@@ -242,17 +242,15 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         layout: { fillColor: (rowIndex: number, node: { table: { body: unknown[] } }) => rowIndex === node.table.body.length - 1 ? BLUE : rowIndex % 2 === 0 ? '#F8FAFC' : null, hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0', paddingTop: () => 8, paddingBottom: () => 8 },
         margin: [0, 0, 0, 22],
       },
-      { text: 'Co bude následovat po schválení', style: 'heading' },
+      { text: 'Další krok a realizace kampaně', style: 'heading', margin: [0, 0, 0, 10] },
       ...nextSteps,
-      { text: 'Obchodní podmínky', style: 'heading', margin: [0, 14, 0, 8] },
-      { ul: offer.conditions.map((condition) => condition.text), color: MUTED, fontSize: 8.5, margin: [4, 0, 0, 18] },
       {
-        table: { widths: ['*'], body: [[{ stack: [
-          { text: 'Váš kontakt v SeePOINT', style: 'eyebrow' },
-          { text: offer.salesperson.name, bold: true, fontSize: 12, margin: [0, 4, 0, 2] },
-          { text: [safe(offer.salesperson.email), safe(offer.salesperson.phone)].filter((value) => value !== '—').join('  •  ') || 'Kontakt je dostupný v interaktivní nabídce.', color: MUTED },
-        ], margin: [14, 12, 14, 12] }]] },
+        table: { body: [[{ stack: [
+          { text: 'Potřebujete poradit nebo vybrat jiné pozice?', bold: true, fontSize: 10 },
+          { text: [safe(offer.salesperson.name), safe(offer.salesperson.email), safe(offer.salesperson.phone)].filter((value) => value !== '—').join('  •  ') || 'Kontakt je dostupný v interaktivní nabídce.', color: MUTED, margin: [0, 2, 0, 0] },
+        ], margin: [12, 10, 12, 10] }]] },
         layout: { fillColor: '#F8FAFC', hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0' },
+        margin: [0, 10, 0, 0],
       },
     ],
     styles: {
@@ -280,63 +278,70 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
         label: String(idx + 1),
       })),
     ];
-    staticMapDataUrl = await fetchStaticMapDataUrl({ markers, size: '600x260' });
+
+    staticMapDataUrl = await fetchStaticMapDataUrl({
+      size: '600x320',
+      markers,
+      polyline: (navigationData.points.find((p) => (p as unknown as Record<string, unknown>).routePolyline) as unknown as Record<string, unknown> | undefined)?.routePolyline as string | undefined,
+    });
   }
 
-  const dateStr = new Date().toLocaleDateString('cs-CZ');
-
-  const pointRows = navigationData?.points.map((p, idx) => {
-    const pAny = p as unknown as Record<string, unknown>;
+  const pointRows = navigationData ? navigationData.points.map((point, index) => {
+    const pAny = point as unknown as Record<string, unknown>;
     const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
       ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
       : typeof pAny.calculatedDistanceMeters === 'number'
         ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
         : '—';
 
+    const pillarStr = pAny.pillarNumber ? `Sloup ${pAny.pillarNumber}` : '—';
+
     return [
-      { text: `#${idx + 1}`, bold: true, alignment: 'center' },
-      { text: `${p.label}\n${safe(p.address)}`, fontSize: 8 },
-      { text: safe(String(pAny.pillarNumber || '—')), alignment: 'center', bold: true },
-      { text: `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`, fontSize: 7.5, color: MUTED },
-      { text: formatArrowDirectionPdf(String(pAny.arrowDirectionEnum || 'STRAIGHT')), fontSize: 8 },
-      { text: distStr, fontSize: 8, alignment: 'center' },
-      { text: '[   ] Splněno', fontSize: 8, bold: true, alignment: 'center' },
+      { text: String(index + 1), alignment: 'center', bold: true },
+      { stack: [{ text: point.label, bold: true }, { text: safe(point.address), fontSize: 8, color: MUTED }] },
+      { text: pillarStr, alignment: 'center', bold: true, color: BLUE },
+      { text: `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`, fontSize: 8 },
+      { text: formatArrowDirectionPdf(typeof pAny.arrowDirectionEnum === 'string' ? pAny.arrowDirectionEnum : null), fontSize: 8.5, bold: true },
+      { text: distStr, alignment: 'center', fontSize: 8.5 },
+      { text: '[  ] Osazeno', alignment: 'center', fontSize: 8, color: MUTED },
     ];
-  }) || [];
+  }) : [];
 
   const definition = {
-    info: { title: `Montážní list - ${offer.title}`, author: 'SeePOINT', subject: 'Montážní protokol a instrukce pro techniky' },
+    info: { title: `Montážní list – ${offer.title}`, author: 'SeePOINT', subject: 'Protokol instalace navigačních cedulí' },
     pageSize: 'A4',
     pageMargins: [38, 38, 38, 38],
-    defaultStyle: { font: 'Roboto', fontSize: 9, color: NAVY, lineHeight: 1.15 },
+    defaultStyle: { font: 'Roboto', fontSize: 8.5, color: NAVY, lineHeight: 1.15 },
     header: () => ({
       columns: [
-        { text: 'SeePOINT  •  MONTÁŽNÍ PROTOKOL & TISKOVÉ DATA', bold: true, color: BLUE, fontSize: 9 },
-        { text: `MONT-LIST  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
+        { text: 'SeePOINT  •  MONTÁŽNÍ & INSTALAČNÍ PROTOKOL', bold: true, color: BLUE, fontSize: 9 },
+        { text: `DOKUMENT  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
       ],
       margin: [38, 16, 38, 0],
     }),
     footer: (currentPage: number, pageCount: number) => ({
       columns: [
-        { text: 'SeePOINT s.r.o.  •  Technické oddělení a montáže', color: MUTED, fontSize: 7.5 },
-        { text: `Strana ${currentPage} z ${pageCount}`, alignment: 'right', color: MUTED, fontSize: 7.5 },
+        { text: 'SeePOINT  •  montážní dokumentace pro techniky VO', color: MUTED, fontSize: 7.5 },
+        { text: `${currentPage} / ${pageCount}`, alignment: 'right', color: MUTED, fontSize: 7.5 },
       ],
       margin: [38, 0, 38, 14],
     }),
     content: [
       {
         table: {
-          widths: ['*', 140],
+          widths: ['*', 160],
           body: [[
             { stack: [
-              { text: 'MONTÁŽNÍ LIST A PROTOKOL UMÍSTĚNÍ', color: BLUE, bold: true, fontSize: 9 },
-              { text: offer.title, fontSize: 18, bold: true, color: NAVY, margin: [0, 4, 0, 2] },
-              { text: `Klient: ${offer.client.name}  •  Vygenerováno: ${dateStr}`, fontSize: 9, color: MUTED },
+              { text: 'MONTÁŽNÍ LIST NAVIGAČNÍ SÍTĚ', color: BLUE, bold: true, fontSize: 9 },
+              { text: offer.title, fontSize: 20, bold: true, color: NAVY, margin: [0, 4, 0, 2] },
+              { text: `Cíl: ${navigationData?.targetName || offer.client.name}`, fontSize: 10, bold: true, color: MUTED },
+              ...(navigationData?.targetAddress ? [{ text: `📍 ${navigationData.targetAddress}`, fontSize: 8.5, color: MUTED }] : []),
             ], margin: [12, 10, 8, 10] },
             { stack: [
-              { text: 'CÍLOVÁ PROVOZOVNA', fontSize: 7.5, color: MUTED },
-              { text: safe(navigationData?.targetName), bold: true, fontSize: 10, margin: [0, 2, 0, 0] },
-              { text: safe(navigationData?.targetAddress), fontSize: 8, color: MUTED },
+              { text: 'KLIENT / ZÁKAZNÍK', fontSize: 7.5, color: MUTED },
+              { text: offer.client.name, bold: true, fontSize: 10, margin: [0, 2, 0, 4] },
+              { text: `Počet cedulí k montáži: ${navigationData?.points.length || 0} ks`, bold: true, color: BLUE },
+              { text: `Termín instalace: dle dohody`, fontSize: 8, color: MUTED },
             ], margin: [8, 10, 12, 10] },
           ]],
         },
@@ -344,7 +349,7 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
         margin: [0, 0, 0, 14],
       },
 
-      ...(staticMapDataUrl ? [{ image: staticMapDataUrl, width: 518, margin: [0, 0, 0, 14] }] : []),
+      ...(staticMapDataUrl && staticMapDataUrl.startsWith('data:image/') ? [{ image: staticMapDataUrl, width: 518, margin: [0, 0, 0, 14] }] : []),
 
       { text: 'Seznam navigačních bodů pro montáž na sloupy VO', style: 'heading' },
       {
@@ -369,10 +374,16 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
       },
 
       // Visualized photos of points for installers
-      ...(navigationData && navigationData.points.some((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl)) ? [
+      ...(navigationData && navigationData.points.some((p) => {
+        const img = (p as unknown as Record<string, unknown>).visualizedPhotoUrl;
+        return typeof img === 'string' && img.startsWith('data:image/');
+      }) ? [
         { text: 'Fotodokumentace a přesný zákres umístění cedulí', style: 'heading', pageBreak: 'before' },
         ...navigationData.points
-          .filter((p) => Boolean((p as unknown as Record<string, unknown>).visualizedPhotoUrl))
+          .filter((p) => {
+            const img = (p as unknown as Record<string, unknown>).visualizedPhotoUrl;
+            return typeof img === 'string' && img.startsWith('data:image/');
+          })
           .map((p, idx) => {
             const pAny = p as unknown as Record<string, unknown>;
             return {

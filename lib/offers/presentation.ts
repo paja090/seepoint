@@ -280,6 +280,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     pricing: (() => {
       if (offer.offerType === 'NAVIGATION' && offer.navigation) {
         let rentalSum = 0;
+        let frameSum = 0;
         let productionSum = 0;
         let installationSum = 0;
         let removalSum = 0;
@@ -287,6 +288,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         for (const p of offer.navigation.points) {
           const q = number(p.quantity) || 1;
           rentalSum += q * number(p.unitPrice);
+          frameSum += q * number((p as unknown as Record<string, unknown>).framePrice);
           productionSum += q * number(p.productionPrice);
           installationSum += q * number(p.installationPrice);
           removalSum += q * number(p.removalPrice);
@@ -300,11 +302,19 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
           },
         ];
 
+        if (frameSum > 0) {
+          rows.push({
+            label: 'Výroba rámu D-FLEX',
+            amount: frameSum,
+            note: 'Výroba nosných nerez/pozinkovaných rámů',
+          });
+        }
+
         if (productionSum > 0) {
           rows.push({
-            label: 'Tisk a výroba navigačních tabulí',
+            label: 'UV tisk na Dibond',
             amount: productionSum,
-            note: 'Výroba fólií a panelů',
+            note: 'Potisk hliníkových Dibond desek 3mm',
           });
         }
 
@@ -312,7 +322,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
           rows.push({
             label: 'Montáž a instalace',
             amount: installationSum,
-            note: 'Instalace na vybraná místa',
+            note: 'Ukotvení na vybrané sloupy VO',
           });
         }
 
@@ -320,9 +330,14 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
           rows.push({
             label: 'Demontáž nosičů',
             amount: removalSum,
-            note: 'Demontáž po ukončení kampaně',
+            note: 'Demontáž po ukončení nájmu',
           });
         }
+
+        const subtotal = rentalSum + frameSum + productionSum + installationSum + removalSum;
+        const taxRate = number(offer.taxRate) || 21;
+        const taxAmount = Math.round(subtotal * taxRate) / 100;
+        const totalWithTax = subtotal + taxAmount;
 
         if (number(offer.discountAmount) > 0) {
           rows.push({
@@ -333,9 +348,9 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         }
 
         rows.push(
-          { label: 'Cena bez DPH', amount: number(offer.subtotal), emphasis: 'subtotal' as const },
-          { label: `DPH ${offer.taxRate ?? 21} %`, amount: number(offer.taxAmount) },
-          { label: 'Celkem včetně DPH', amount: number(offer.totalWithTax), emphasis: 'total' as const },
+          { label: 'Cena bez DPH', amount: subtotal, emphasis: 'subtotal' as const },
+          { label: `DPH ${taxRate} %`, amount: taxAmount },
+          { label: 'Celkem včetně DPH', amount: totalWithTax, emphasis: 'total' as const },
         );
 
         return rows;
