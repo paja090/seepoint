@@ -339,6 +339,47 @@ export function NavigationOfferForm({
     return clientResult;
   }
 
+  async function reverseGeocodeLocation(lat: number, lng: number): Promise<string | undefined> {
+    try {
+      const googleMaps = window.google?.maps;
+      if (googleMaps?.Geocoder) {
+        const geocoder = new googleMaps.Geocoder();
+        const res = await new Promise<{ results: Array<{ formatted_address: string }> | null; status: string }>((resolve) => {
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            resolve({ results: results as Array<{ formatted_address: string }> | null, status });
+          });
+        });
+        if (res.status === 'OK' && res.results?.[0]?.formatted_address) {
+          return res.results[0].formatted_address;
+        }
+      }
+    } catch {
+      /* fallback */
+    }
+
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+        headers: { 'Accept-Language': 'cs,en' },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { display_name?: string; address?: { road?: string; house_number?: string; city?: string; town?: string; village?: string; suburb?: string } };
+        if (data.address) {
+          const road = data.address.road || '';
+          const houseNum = data.address.house_number || '';
+          const city = data.address.city || data.address.town || data.address.village || data.address.suburb || '';
+          const streetPart = [road, houseNum].filter(Boolean).join(' ');
+          const full = [streetPart, city].filter(Boolean).join(', ');
+          if (full) return full;
+        }
+        if (data.display_name) return data.display_name;
+      }
+    } catch {
+      /* fallback */
+    }
+
+    return undefined;
+  }
+
   const [recalculatingRoutes, setRecalculatingRoutes] = useState(false);
 
   async function recalculateAllRoutes(targetPos?: { latitude: number; longitude: number }) {
@@ -870,9 +911,18 @@ export function NavigationOfferForm({
             void recalculateAllRoutes(newTarget);
           }}
           onMapClick={mapClick}
-          onPointMove={async (id: string, latitude: number, longitude: number, _dist?: number, _poly?: string, address?: string) => {
-            const addrObj = typeof address === 'string' && address ? { address } : {};
+          onPointMove={async (id: string, latitude: number, longitude: number, _dist?: number, _poly?: string, passedAddress?: string) => {
+            updatePoint(id, { latitude, longitude });
+
+            let freshAddress = passedAddress;
+            const currentPoint = points.find((p) => p.id === id);
+            if (!freshAddress || freshAddress === currentPoint?.address) {
+              freshAddress = await reverseGeocodeLocation(latitude, longitude);
+            }
+
+            const addrObj = freshAddress ? { address: freshAddress } : {};
             updatePoint(id, { latitude, longitude, ...addrObj });
+
             if (target) {
               const routeInfo = await fetchRouteInfo(latitude, longitude, target.latitude, target.longitude);
               updatePoint(id, { latitude, longitude, ...addrObj, ...routeInfo });

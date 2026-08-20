@@ -458,7 +458,7 @@ export function GoogleNavigationOfferMap({
           if (window.google?.maps?.Geocoder) {
             const geocoder = new window.google.maps.Geocoder();
             geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-              const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : ((point as unknown as Record<string, unknown>).address as string | undefined);
+              const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : undefined;
               onPointMove(point.id, lat, lng, undefined, undefined, street);
             });
           } else {
