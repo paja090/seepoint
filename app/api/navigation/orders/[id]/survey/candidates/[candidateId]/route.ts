@@ -45,7 +45,39 @@ export async function PUT(
     });
 
     if (!existingCandidate) {
-      return NextResponse.json({ error: 'Kandidátní místo nebylo nalezeno.' }, { status: 404 });
+      const existingOfferPoint = await prisma.navigationPoint.findUnique({
+        where: { id: candidateId },
+      });
+
+      if (existingOfferPoint) {
+        const updatedPoint = await prisma.navigationPoint.update({
+          where: { id: candidateId },
+          data: {
+            ...(label && { label: label.trim() }),
+            ...(latitude && { latitude: parseFloat(latitude) }),
+            ...(longitude && { longitude: parseFloat(longitude) }),
+            ...(address !== undefined && { address: address?.trim() || null }),
+            ...(placementType && { navigationType: placementType }),
+            ...(arrowDirection && { arrowDirectionEnum: arrowDirection }),
+            ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
+          },
+        });
+
+        return NextResponse.json({
+          candidate: {
+            id: updatedPoint.id,
+            label: updatedPoint.label,
+            latitude: updatedPoint.latitude,
+            longitude: updatedPoint.longitude,
+            address: updatedPoint.address,
+            placementType: updatedPoint.navigationType,
+            supervisionStatus: 'APPROVED',
+            createdAt: updatedPoint.createdAt,
+          },
+        });
+      }
+
+      return NextResponse.json({ error: 'Kandidátní místo ani navigační bod nebyly nalezeny.' }, { status: 404 });
     }
 
     const updated = await prisma.navigationCandidatePoint.update({
