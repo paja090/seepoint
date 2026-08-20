@@ -81,8 +81,13 @@ export async function sendOfferEmail(input: {
     ? '<p style="margin:0 0 20px;padding:12px 16px;border-radius:10px;background:#fff7ed;color:#9a3412"><strong>Nezávazná fáze bez cen:</strong> nejprve si vyberete vhodné navigační body. Přesnou cenovou nabídku obdržíte až po jejich odsouhlasení.</p>'
     : '';
 
+  const bccEmails = Array.from(
+    new Set([input.salespersonEmail, process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean))
+  );
+
   await sendEmail({
     to: input.to,
+    bcc: bccEmails,
     subject,
     html: `<div style="margin:0;background:#f1f5f9;padding:32px 16px;font-family:Arial,sans-serif;color:#0f172a">
       <div style="max-width:640px;margin:0 auto;border-radius:16px;background:#ffffff;padding:32px;box-shadow:0 1px 3px rgba(15,23,42,.12)">
@@ -115,19 +120,36 @@ export async function sendOfferEmail(input: {
   });
 }
 
-async function sendEmail(input: { to: string; subject: string; html: string; webhookBody: Record<string, string> }) {
+async function sendEmail(input: {
+  to: string;
+  bcc?: string | string[];
+  subject: string;
+  html: string;
+  webhookBody: Record<string, string>;
+}) {
   ensureEmailConfigured();
+  const defaultFrom = 'SeePOINT <info@seepoint.cz>';
+  const from = process.env.EMAIL_FROM || defaultFrom;
+  const bccList = Array.isArray(input.bcc)
+    ? input.bcc.filter(Boolean)
+    : input.bcc
+    ? [input.bcc]
+    : [process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean);
 
   if (process.env.RESEND_API_KEY) {
-    const from = process.env.EMAIL_FROM;
-    if (!from) throw new Error('Chybí odesílací adresa EMAIL_FROM.');
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ from, to: [input.to], subject: input.subject, html: input.html }),
+      body: JSON.stringify({
+        from,
+        to: [input.to],
+        ...(bccList.length > 0 ? { bcc: bccList } : {}),
+        subject: input.subject,
+        html: input.html,
+      }),
     });
     if (!response.ok) {
       const result = await response.json().catch(() => null) as { message?: string } | null;
@@ -143,7 +165,7 @@ async function sendEmail(input: { to: string; subject: string; html: string; web
         'content-type': 'application/json',
         authorization: `Bearer ${process.env.EMAIL_WEBHOOK_SECRET ?? ''}`,
       },
-      body: JSON.stringify({ to: input.to, ...input.webhookBody }),
+      body: JSON.stringify({ to: input.to, bcc: bccList, ...input.webhookBody }),
     });
     if (!response.ok) throw new Error('E-mail se nepodařilo odeslat přes webhook.');
     return;
@@ -164,16 +186,17 @@ async function sendEmail(input: { to: string; subject: string; html: string; web
     throw new Error(`Google OAuth pro e-mail selhal: ${tokenData.error_description || tokenResponse.statusText}`);
   }
 
-  const from = process.env.EMAIL_FROM || 'SeePOINT';
-  const mime = [
+  const mimeLines = [
     `From: ${from}`,
     `To: ${input.to}`,
+    ...(bccList.length > 0 ? [`Bcc: ${bccList.join(', ')}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(input.subject).toString('base64')}?=`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=UTF-8',
     '',
     input.html,
-  ].join('\r\n');
+  ];
+  const mime = mimeLines.join('\r\n');
   const raw = Buffer.from(mime).toString('base64url');
   const gmailResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
