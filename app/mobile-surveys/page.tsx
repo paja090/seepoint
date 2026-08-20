@@ -16,43 +16,51 @@ export default async function MobileSurveysPage({
   const user = await getCurrentUser();
   const { search = '', filter = 'all' } = await searchParams;
 
-  const whereCondition: any = {};
+  let orders: any[] = [];
+  let fetchError: string | null = null;
 
-  if (search.trim()) {
-    whereCondition.OR = [
-      { targetName: { contains: search, mode: 'insensitive' } },
-      { targetAddress: { contains: search, mode: 'insensitive' } },
-      { crmOrder: { client: { name: { contains: search, mode: 'insensitive' } } } },
-    ];
-  }
+  try {
+    const whereCondition: any = {};
 
-  if (filter === 'my' && user) {
-    whereCondition.OR = [
-      { installerUserId: user.id },
-      { candidatePoints: { some: { createdByUserId: user.id } } },
-    ];
-  } else if (filter === 'pendingReview') {
-    whereCondition.candidatePoints = {
-      some: { supervisionStatus: 'PENDING_REVIEW' },
-    };
-  }
+    if (search.trim()) {
+      whereCondition.OR = [
+        { targetName: { contains: search, mode: 'insensitive' } },
+        { targetAddress: { contains: search, mode: 'insensitive' } },
+        { crmOrder: { client: { name: { contains: search, mode: 'insensitive' } } } },
+      ];
+    }
 
-  const orders = await prisma.navigationOrder.findMany({
-    where: whereCondition,
-    include: {
-      crmOrder: {
-        include: {
-          client: { select: { name: true, tradingName: true } },
+    if (filter === 'my' && user) {
+      whereCondition.OR = [
+        { installerUserId: user.id },
+        { candidatePoints: { some: { createdByUserId: user.id } } },
+      ];
+    } else if (filter === 'pendingReview') {
+      whereCondition.candidatePoints = {
+        some: { supervisionStatus: 'PENDING_REVIEW' },
+      };
+    }
+
+    orders = await prisma.navigationOrder.findMany({
+      where: whereCondition,
+      include: {
+        crmOrder: {
+          include: {
+            client: { select: { name: true, tradingName: true } },
+          },
+        },
+        surveyRoutes: { where: { active: true } },
+        candidatePoints: {
+          select: { id: true, supervisionStatus: true, createdAt: true },
         },
       },
-      surveyRoutes: { where: { active: true } },
-      candidatePoints: {
-        select: { id: true, supervisionStatus: true, createdAt: true },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-    take: 50,
-  });
+      orderBy: { updatedAt: 'desc' },
+      take: 50,
+    });
+  } catch (err: any) {
+    console.error('Error loading mobile surveys:', err);
+    fetchError = err instanceof Error ? err.message : 'Nepodařilo se načíst průzkumy z databáze.';
+  }
 
   return (
     <AppShell>
@@ -113,9 +121,17 @@ export default async function MobileSurveysPage({
           </div>
         </div>
 
+        {/* Error Alert */}
+        {fetchError && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl text-xs font-semibold flex items-center gap-2">
+            <AlertCircle size={18} className="shrink-0 text-rose-600" />
+            <span>Chyba při komunikaci s databází: {fetchError}</span>
+          </div>
+        )}
+
         {/* Survey Project Cards */}
         <div className="space-y-3">
-          {orders.length === 0 ? (
+          {orders.length === 0 && !fetchError ? (
             <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-2">
               <Compass size={32} className="mx-auto text-slate-400" />
               <h3 className="font-extrabold text-slate-800 text-sm">Žádné zakázky pro průzkum nenalezeny</h3>
@@ -123,9 +139,11 @@ export default async function MobileSurveysPage({
             </div>
           ) : (
             orders.map((o: any) => {
-              const totalCandidates = o.candidatePoints.length;
-              const pendingReviewCount = o.candidatePoints.filter((c: any) => c.supervisionStatus === 'PENDING_REVIEW').length;
-              const approvedCount = o.candidatePoints.filter((c: any) => c.supervisionStatus === 'APPROVED').length;
+              const candidates = o.candidatePoints || [];
+              const routes = o.surveyRoutes || [];
+              const totalCandidates = candidates.length;
+              const pendingReviewCount = candidates.filter((c: any) => c.supervisionStatus === 'PENDING_REVIEW').length;
+              const approvedCount = candidates.filter((c: any) => c.supervisionStatus === 'APPROVED').length;
 
               return (
                 <Link
@@ -140,7 +158,7 @@ export default async function MobileSurveysPage({
                           {o.targetName}
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-700">
-                          Z-{o.crmOrderId.slice(-4).toUpperCase()}
+                          Z-{(o.crmOrderId || '').slice(-4).toUpperCase()}
                         </span>
                       </div>
                       <p className="text-xs text-sky-700 font-bold">{o.crmOrder?.client?.name || 'Klient nezjištěn'}</p>
@@ -173,7 +191,7 @@ export default async function MobileSurveysPage({
                       </span>
                     )}
                     <span className="text-slate-500 ml-auto font-normal text-[11px]">
-                      Trasy: {o.surveyRoutes.length}
+                      Trasy: {routes.length}
                     </span>
                   </div>
                 </Link>
