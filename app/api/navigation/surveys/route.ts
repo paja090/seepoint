@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
-    const filter = searchParams.get('filter') || 'all'; // all, my, active, pendingReview, completed
+    const filter = searchParams.get('filter') || 'all';
 
     const whereCondition: any = {};
 
@@ -68,22 +68,22 @@ export async function GET(request: Request) {
       take: 100,
     });
 
-    const formattedSurveys = orders.map((order) => {
+    const formattedSurveys = orders.map((order: any) => {
       const totalCandidates = order.candidatePoints.length;
       const pendingReviewCount = order.candidatePoints.filter(
-        (c) => c.supervisionStatus === 'PENDING_REVIEW'
+        (c: any) => c.supervisionStatus === 'PENDING_REVIEW'
       ).length;
       const approvedCount = order.candidatePoints.filter(
-        (c) => c.supervisionStatus === 'APPROVED'
+        (c: any) => c.supervisionStatus === 'APPROVED'
       ).length;
       const recheckCount = order.candidatePoints.filter(
-        (c) => c.supervisionStatus === 'NEEDS_RECHECK'
+        (c: any) => c.supervisionStatus === 'NEEDS_RECHECK'
       ).length;
       const rejectedCount = order.candidatePoints.filter(
-        (c) => c.supervisionStatus === 'REJECTED'
+        (c: any) => c.supervisionStatus === 'REJECTED'
       ).length;
 
-      const lastSurveyAt = order.candidatePoints.reduce((latest, c) => {
+      const lastSurveyAt = order.candidatePoints.reduce((latest: Date, c: any) => {
         return c.createdAt > latest ? c.createdAt : latest;
       }, order.createdAt);
 

@@ -420,7 +420,7 @@ export function MobileSurveyFieldView({
           <div className="h-[55vh] min-h-[380px] w-full relative">
             <GoogleNavigationOfferMap
               points={mapPoints}
-              targetLocation={{
+              target={{
                 latitude: data.targetLatitude,
                 longitude: data.targetLongitude,
                 title: data.targetName,

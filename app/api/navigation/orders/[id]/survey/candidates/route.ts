@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,7 @@ export async function POST(
       internalNote,
       carrierId,
       surfaceId,
-      photoIds, // optional array of newly uploaded photo IDs to link
+      photoIds,
       surveyStatus = 'COMPLETED',
     } = body;
 
@@ -52,7 +52,6 @@ export async function POST(
       return NextResponse.json({ error: 'Zakázka nebyla nalezena.' }, { status: 404 });
     }
 
-    // Auto-calculate direct distance in km to target if distance not provided
     let calculatedDistance = distanceValue ? parseFloat(distanceValue) : null;
     if (!calculatedDistance && order.targetLatitude && order.targetLongitude) {
       const latDiff = (parseFloat(latitude) - order.targetLatitude) * 111.32;
@@ -91,7 +90,6 @@ export async function POST(
       },
     });
 
-    // Link uploaded photos if photoIds provided
     if (Array.isArray(photoIds) && photoIds.length > 0) {
       await prisma.photo.updateMany({
         where: { id: { in: photoIds } },

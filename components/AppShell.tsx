@@ -10,7 +10,7 @@ const navGroups: NavGroup[] = [
     items: [
       ['/dashboard', '📊 Nástěnka / Přehled', 'barChart3', 'dashboard'],
       ['/map', '🗺️ Mapa nosičů', 'map', 'map'],
-      ['/mobile-surveys', '📍 Průzkum lokalit', 'compass', 'navigationProjects'],
+      ['/mobile-surveys', '📍 Průzkum lokalit', 'mapPinned', 'navigationProjects'],
       ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
       ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
       ['/my-work-entries', '⏱️ Moje odvedená práce', 'clipboardCheck', 'myWorkEntries'],

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -45,9 +45,7 @@ export async function POST(
       );
     }
 
-    // Transactional conversion
-    const result = await prisma.$transaction(async (tx) => {
-      // Pick first photo as sitePhoto if available
+    const result = await prisma.$transaction(async (tx: any) => {
       const sitePhoto = candidate.photos[0];
 
       const navPoint = await tx.navigationPoint.create({

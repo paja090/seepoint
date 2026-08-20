@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -83,7 +83,6 @@ export async function GET(
       return NextResponse.json({ error: 'Zakázka nebyla nalezena.' }, { status: 404 });
     }
 
-    // Proximity search for nearby carriers if target coordinates exist
     let nearbyCarriers: Array<any> = [];
     if (order.targetLatitude && order.targetLongitude) {
       const allCarriers = await prisma.advertisingCarrier.findMany({
@@ -106,9 +105,8 @@ export async function GET(
         take: 300,
       });
 
-      // Calculate distance from target for context
       nearbyCarriers = allCarriers
-        .map((c) => {
+        .map((c: any) => {
           const latDiff = (c.latitude! - order.targetLatitude) * 111.32;
           const lngDiff =
             (c.longitude! - order.targetLongitude) *
@@ -120,8 +118,8 @@ export async function GET(
             distanceKm: Math.round(distanceKm * 100) / 100,
           };
         })
-        .filter((c) => c.distanceKm <= 10.0) // Within 10km radius
-        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .filter((c: any) => c.distanceKm <= 10.0)
+        .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
         .slice(0, 50);
     }
 

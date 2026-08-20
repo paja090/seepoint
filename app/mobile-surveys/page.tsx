@@ -1,6 +1,6 @@
 import { requirePageAccess } from '@/lib/page-auth';
 import { AppShell } from '@/components/AppShell';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { Compass, MapPin, Search, Plus, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -122,10 +122,10 @@ export default async function MobileSurveysPage({
               <p className="text-xs text-slate-500">Pro zadaný filtr nebyly v databázi nalezeny žádné navigační zakázky.</p>
             </div>
           ) : (
-            orders.map((o) => {
+            orders.map((o: any) => {
               const totalCandidates = o.candidatePoints.length;
-              const pendingReviewCount = o.candidatePoints.filter((c) => c.supervisionStatus === 'PENDING_REVIEW').length;
-              const approvedCount = o.candidatePoints.filter((c) => c.supervisionStatus === 'APPROVED').length;
+              const pendingReviewCount = o.candidatePoints.filter((c: any) => c.supervisionStatus === 'PENDING_REVIEW').length;
+              const approvedCount = o.candidatePoints.filter((c: any) => c.supervisionStatus === 'APPROVED').length;
 
               return (
                 <Link
