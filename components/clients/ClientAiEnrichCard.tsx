@@ -293,6 +293,42 @@ export function ClientAiEnrichCard({
                   <p className="text-xs text-slate-500 italic">Žádné krajské pobočky nedohledány.</p>
                 )}
               </div>
+
+              {/* Sales Advice & Tips for Salesperson */}
+              {enrichData.salesAdvice && enrichData.salesAdvice.length > 0 && (
+                <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2 col-span-1 md:col-span-2">
+                  <div className="flex items-center gap-2 text-indigo-950 border-b border-indigo-200/80 pb-2">
+                    <Lightbulb size={16} className="text-indigo-600" />
+                    <h4 className="font-bold text-xs uppercase">💡 Tipy pro obchodníka (Zacílení MS kraj)</h4>
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-slate-800 font-medium">
+                    {enrichData.salesAdvice.map((tip, idx) => (
+                      <li key={idx} className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-indigo-100">
+                        <span className="text-indigo-600 font-bold shrink-0">•</span>
+                        <span>{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Recommended SeePoint Advertising Strategy */}
+              {enrichData.recommendedCarriers && enrichData.recommendedCarriers.length > 0 && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2 col-span-1 md:col-span-2">
+                  <div className="flex items-center gap-2 text-emerald-950 border-b border-emerald-200/80 pb-2">
+                    <Target size={16} className="text-emerald-600" />
+                    <h4 className="font-bold text-xs uppercase">🎯 Doporučená reklamní strategie SeePoint (Ostrava & MS kraj)</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    {enrichData.recommendedCarriers.map((rec, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-white border border-emerald-200/70 space-y-1 flex flex-col justify-between">
+                        <div className="font-extrabold text-xs text-emerald-950">{rec.type}</div>
+                        <p className="text-[11px] text-slate-600 leading-snug">{rec.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
