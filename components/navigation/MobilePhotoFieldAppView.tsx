@@ -336,6 +336,23 @@ export function MobilePhotoFieldAppView() {
           )}
         </div>
         {gpsError && <p className="mt-2 text-xs text-amber-400 font-medium flex items-center gap-1"><AlertTriangle size={14} /> {gpsError}</p>}
+
+        {/* Quick Switcher Banner to Location Survey */}
+        <a
+          href="/mobile-surveys"
+          className="mt-3 flex items-center justify-between rounded-2xl bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 p-3 text-xs font-bold text-white border border-sky-700/50 shadow-md hover:border-sky-400 active:scale-[0.99] transition group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-sky-500/20 text-sky-300 rounded-xl border border-sky-500/30">
+              <Compass size={18} />
+            </div>
+            <div>
+              <span className="block font-black text-sky-200">📍 Hledáte nové navigační místo?</span>
+              <span className="text-[11px] text-sky-300/80 font-medium">Otevřít Mobilní Průzkum Lokalit pro zakázky</span>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-sky-300 group-hover:translate-x-1 transition" />
+        </a>
       </div>
 
       {/* Filter Radius & Search */}

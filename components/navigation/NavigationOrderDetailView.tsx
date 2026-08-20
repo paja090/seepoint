@@ -25,8 +25,9 @@ import {
   NAVIGATION_PHASES,
 } from '@/lib/navigation/types';
 import Link from 'next/link';
+import { NavigationSurveyTab } from './NavigationSurveyTab';
 
-export type NavigationTabKey = 'overview' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
+export type NavigationTabKey = 'overview' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
 
 export function NavigationOrderDetailView({ order }: { order: NavigationOrderDetail }) {
   const [currentOrder, setCurrentOrder] = useState<NavigationOrderDetail>(order);
@@ -351,6 +352,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
           <div className="flex overflow-x-auto border-b border-slate-200 gap-4 pb-1">
             {[
               { id: 'overview', label: '📌 Přehled' },
+              { id: 'survey', label: '📍 Průzkum lokalit' },
               { id: 'points', label: `📍 Navigační body (${currentOrder.points.length})` },
               { id: 'graphics', label: '🎨 Grafika & Výroba' },
               { id: 'installation', label: '🛠️ Montáž' },
@@ -425,6 +427,9 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
               </div>
             </div>
           )}
+
+          {/* Tab: Survey */}
+          {activeTab === 'survey' && <NavigationSurveyTab navigationOrderId={currentOrder.id} />}
 
           {/* Tab: Points & Prices */}
           {activeTab === 'points' && (
