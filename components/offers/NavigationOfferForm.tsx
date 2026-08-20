@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Camera, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Calculator, Camera, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical, Zap } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -323,10 +323,15 @@ export function NavigationOfferForm({
   }
 
   async function handleUploadDesktopPhoto(pointId: string, file: File) {
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type.toLowerCase()) && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
+      setMessage('Fotografie sloupu musí být ve formátu JPG, PNG nebo WebP.');
+      return;
+    }
+    setMessage('⏳ Nahrávám fotografii sloupu...');
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('type', 'CARRIER');
+      formData.append('type', 'SURVEY');
       const res = await fetch('/api/mobile-photos/upload', {
         method: 'POST',
         body: formData,
@@ -335,12 +340,16 @@ export function NavigationOfferForm({
         const data = await res.json();
         if (data.photo?.url) {
           updatePoint(pointId, { sitePhotoUrl: data.photo.url, sitePhotoId: data.photo.id });
+          setMessage('✓ Fotografie sloupu byla úspěšně nahrána a připojena k bodu.');
+        } else {
+          setMessage('Fotografii se nepodařilo uložit.');
         }
       } else {
-        alert('Chyba při nahrávání fotografie.');
+        const errJson = await res.json().catch(() => ({}));
+        setMessage(errJson.error || 'Chyba při nahrávání fotografie.');
       }
     } catch {
-      alert('Chyba při nahrávání fotografie.');
+      setMessage('Chyba při nahrávání fotografie.');
     }
   }
 
@@ -520,6 +529,29 @@ export function NavigationOfferForm({
 
   function updatePoint(id: string, changes: Partial<DraftPoint>) {
     setPoints((current) => current.map((point) => (point.id === id ? { ...point, ...changes } : point)));
+  }
+
+  function applyCatalogRatesToPoint(pointId: string) {
+    updatePoint(pointId, {
+      unitPrice: catalogDefaults.rentalPrice,
+      productionPrice: catalogDefaults.productionPrice,
+      installationPrice: catalogDefaults.installationPrice,
+      removalPrice: catalogDefaults.removalPrice,
+    });
+    setMessage('✓ Aktuální ceníkové sazby byly načteny k navigačnímu bodu.');
+  }
+
+  function applyCatalogRatesToAllPoints() {
+    setPoints((current) =>
+      current.map((p) => ({
+        ...p,
+        unitPrice: catalogDefaults.rentalPrice,
+        productionPrice: catalogDefaults.productionPrice,
+        installationPrice: catalogDefaults.installationPrice,
+        removalPrice: catalogDefaults.removalPrice,
+      }))
+    );
+    setMessage('✓ Aktuální ceníkové sazby byly načteny pro všechny navigační body.');
   }
 
   function movePoint(fromIndex: number, toIndex: number) {
@@ -1024,15 +1056,28 @@ export function NavigationOfferForm({
 
         {/* Itemized Points Editor & Photo Visualizer Trigger */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
             <h2 className="text-xl font-bold text-slate-900">Vytipované navigační body na trase ({points.length})</h2>
-            <button
-              type="button"
-              className="text-xs font-bold text-sky-700 hover:text-sky-900 flex items-center gap-1"
-              onClick={handleAddPoint}
-            >
-              <Plus size={14} /> Přidat dalekosáhlý bod
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {points.length > 0 && (
+                <button
+                  type="button"
+                  onClick={applyCatalogRatesToAllPoints}
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Aplikovat výchozí ceníkové ceny na všechny body"
+                >
+                  <Zap size={14} className="text-amber-600 fill-amber-500" />
+                  <span>⚡ Načíst ceníkové sazby pro všechny body</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 cursor-pointer font-bold"
+                onClick={handleAddPoint}
+              >
+                <Plus size={14} /> Přidat navigační bod
+              </button>
+            </div>
           </div>
 
           {points.length === 0 ? (
@@ -1099,6 +1144,15 @@ export function NavigationOfferForm({
 
                   <div className="flex items-center gap-2">
                     <button
+                      type="button"
+                      onClick={() => applyCatalogRatesToPoint(point.id)}
+                      className="inline-flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                      title="Načíst aktuální ceníkové sazby z Nastavení"
+                    >
+                      <Zap size={13} className="text-amber-600 fill-amber-500" /> Načíst ceník
+                    </button>
+
+                    <button
                       className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition"
                       onClick={() => setActiveVisualizerPointId(point.id)}
                       type="button"
@@ -1122,7 +1176,7 @@ export function NavigationOfferForm({
                   <div className="flex flex-wrap items-center gap-3">
                     {point.sitePhotoUrl ? <img alt={`Reálný sloup pro ${point.label}`} className="h-20 w-28 rounded-lg border object-cover" src={point.sitePhotoUrl} /> : <div className="grid h-20 w-28 place-items-center rounded-lg border border-dashed border-amber-300 text-amber-700"><ImageIcon size={22} /></div>}
                     <div className="min-w-0 flex-1"><p className="text-xs font-bold text-slate-900">Reálná fotografie sloupu – povinné terénní ověření</p><p className="mt-1 text-[11px] text-slate-600">AI bod je pouze návrh. Vyfoťte vhodný sloup a podle skutečnosti upravte bod i typ konstrukce.</p></div>
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50"><Upload size={14} />{point.sitePhotoUrl ? 'Nahradit fotografii sloupu' : 'Nahrát fotografii sloupu'}<input accept="image/jpeg,image/png,image/webp" className="hidden" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadSitePhoto(point, file); event.target.value = ''; }} /></label>
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50"><Upload size={14} />{point.sitePhotoUrl ? 'Nahradit fotografii sloupu' : 'Nahrát fotografii sloupu'}<input accept="image/jpeg,image/png,image/webp,image/heic" className="hidden" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleUploadDesktopPhoto(point.id, file); event.target.value = ''; }} /></label>
                   </div>
                 </div>
 
