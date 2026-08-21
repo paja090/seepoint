@@ -822,56 +822,89 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
         {/* Realization Photo Gallery Showcase */}
         <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-950 p-5 text-white space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
               <span className="text-base">📸</span>
-              <h4 className="font-bold text-sm text-white">Fotogalerie realizovaných navigačních nosičů na sloupech VO</h4>
+              <h4 className="font-bold text-sm text-white">Ukázka vybraných realizací navigačních nosičů v terénu</h4>
             </div>
             <span className="text-xs font-medium text-slate-400">
-              Více než 400+ aktivních navigačních nosičů v kraji
+              Ilustrační přehled různorodých klientů a typů instalací (400+ nosičů v síti)
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 1. Penny Fryčovice */}
             <div
-              className="group relative h-44 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between p-4"
-              onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
+              className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+              onClick={() => setActiveLightboxImage('/offer/real-penny-frycovice.jpg')}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-red-400 bg-red-950/80 px-2.5 py-1 rounded-lg border border-red-800/50">KFC Drive-Thru</span>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">✓ VO Schváleno</span>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-white">📍 KFC Ostrava – Přívozská</p>
-                <p className="text-[11px] text-slate-400">Navigační deska Dibond (670 × 900 mm) na sloupu VO s nerezovými pásky Bandimex.</p>
+              <img
+                src="/offer/real-penny-frycovice.jpg"
+                alt="Ukázka realizace – Penny Market Fryčovice"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-xs text-red-300 bg-red-950/90 px-2.5 py-1 rounded-lg border border-red-800/60 backdrop-blur-xs">PENNY Fryčovice</span>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
+                </div>
+                <div className="space-y-0.5 text-white">
+                  <p className="text-xs font-bold flex items-center justify-between">
+                    <span>📍 PENNY Market – Fryčovice (2,5 km)</span>
+                    <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                  </p>
+                  <p className="text-[11px] text-slate-300 font-medium">Červená směrová cedule s odrazovou šipkou na betonovém sloupu VO.</p>
+                </div>
               </div>
             </div>
 
+            {/* 2. McDonald's */}
             <div
-              className="group relative h-44 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between p-4"
-              onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
+              className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+              onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-blue-400 bg-blue-950/80 px-2.5 py-1 rounded-lg border border-blue-800/50">LIDL Navigace</span>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">✓ VO Schváleno</span>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-white">📍 LIDL Havířov – Hlavní třída</p>
-                <p className="text-[11px] text-slate-400">Směrový panel s vyznačenou vzdáleností a logem klienta na frekventovaném průtahu.</p>
+              <img
+                src="/offer/navigation-proof-template.jpg"
+                alt="Ukázka realizace – McDonald's"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">McDonald's</span>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
+                </div>
+                <div className="space-y-0.5 text-white">
+                  <p className="text-xs font-bold flex items-center justify-between">
+                    <span>📍 McDonald's – Navigace k provozovně</span>
+                    <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                  </p>
+                  <p className="text-[11px] text-slate-300 font-medium">Černá matná deska Dibond se světelným logem a vzdáleností na ocelovém sloupu.</p>
+                </div>
               </div>
             </div>
 
+            {/* 3. LIDL */}
             <div
-              className="group relative h-44 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between p-4"
-              onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
+              className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+              onClick={() => setActiveLightboxImage('/offer/real-lidl.jpg')}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-800/50">Penny Market</span>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">✓ VO Schváleno</span>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-white">📍 Penny Market Karviná</p>
-                <p className="text-[11px] text-slate-400">Oboustranná navigační cedule na sloupu veřejného osvětlení před klíčovou křižovatkou.</p>
+              <img
+                src="/offer/real-lidl.jpg"
+                alt="Ukázka realizace – LIDL"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-xs text-blue-300 bg-blue-950/90 px-2.5 py-1 rounded-lg border border-blue-800/60 backdrop-blur-xs">LIDL Navigace</span>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
+                </div>
+                <div className="space-y-0.5 text-white">
+                  <p className="text-xs font-bold flex items-center justify-between">
+                    <span>📍 LIDL Česká republika (1,1 km)</span>
+                    <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                  </p>
+                  <p className="text-[11px] text-slate-300 font-medium">Prestižní městské navádění prodejen na vysokých sloupech veřejného osvětlení.</p>
+                </div>
               </div>
             </div>
           </div>
