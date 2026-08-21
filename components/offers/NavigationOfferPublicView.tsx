@@ -903,10 +903,44 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     <span>📍 LIDL Česká republika (1,1 km)</span>
                     <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
                   </p>
-                  <p className="text-[11px] text-slate-300 font-medium">Prestižní městské navádění prodejny na samostatném ocelovém sloupku.</p>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust & Performance Divider Strip (Breaks up heavy graphics flow) */}
+      <section className="rounded-3xl border border-slate-800/80 bg-slate-900/60 p-6 md:p-8 backdrop-blur-md shadow-xl text-center space-y-5">
+        <div className="max-w-3xl mx-auto space-y-2">
+          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400 bg-purple-950/80 px-3 py-1 rounded-full border border-purple-800/60 inline-block">
+            🤝 Garance spolehlivého partnerství
+          </span>
+          <h4 className="text-lg sm:text-xl font-black text-white tracking-tight">
+            Kompletní outdoorový servis od A do Z pod jednou střechou
+          </h4>
+          <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            Postaráme se o kompletní realizaci bez vaší starosti – od vyřízení městských a policejních povolení (PČR), přes vlastní velkoformátový tisk a montáž plošinami, až po záruční servis a čištění do 48 hodin.
+          </p>
+        </div>
+
+        {/* 4 Key Trust Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-4xl mx-auto pt-3 border-t border-slate-800/80">
+          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
+            <span className="text-2xl font-black text-purple-400 block tracking-tight">400+</span>
+            <span className="text-[11px] font-bold text-slate-300">Ploch v MS kraji</span>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
+            <span className="text-2xl font-black text-purple-400 block tracking-tight">15+ let</span>
+            <span className="text-[11px] font-bold text-slate-300">Zkušeností v oboru</span>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
+            <span className="text-2xl font-black text-purple-400 block tracking-tight">100%</span>
+            <span className="text-[11px] font-bold text-slate-300">Vyřízení povolení</span>
+          </div>
+          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
+            <span className="text-2xl font-black text-purple-400 block tracking-tight">48 hod</span>
+            <span className="text-[11px] font-bold text-slate-300">Garance servisu</span>
           </div>
         </div>
       </section>
