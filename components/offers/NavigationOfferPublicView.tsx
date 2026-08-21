@@ -861,10 +861,10 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             {/* 2. McDonald's */}
             <div
               className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
-              onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+              onClick={() => setActiveLightboxImage('/offer/real-mcdonalds.jpg')}
             >
               <img
-                src="/offer/navigation-proof-template.jpg"
+                src="/offer/real-mcdonalds.jpg"
                 alt="Ukázka realizace – McDonald's"
                 className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
               />
