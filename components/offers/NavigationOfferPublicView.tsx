@@ -989,7 +989,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             </div>
             <div className="p-4 pt-0 space-y-1">
               <h4 className="text-sm font-extrabold text-white">Promo věže & věžní konstrukce</h4>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">Nepřehlédnutelné velkoplošné trojboké věže a horizontální nosiče situované u nákupních zón, kruhových objezdů a vstupů do měst. Zásah tisíců řidičů denně.</p>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">Nepřehlédnutelné velkoplošné čtyřstranné věže a horizontální nosiče situované u nákupních zón, kruhových objezdů a vstupů do měst. Zásah tisíců řidičů denně.</p>
             </div>
           </div>
 
