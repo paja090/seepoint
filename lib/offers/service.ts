@@ -211,9 +211,19 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         manualDistanceUnit: point.manualDistanceUnit,
         distanceSource: point.distanceSource,
         routePolyline: point.routePolyline,
-        visualizedPhotoUrl: point.visualizedPhotoUrl,
-        sitePhotoId: publicView ? undefined : point.sitePhotoId,
-        sitePhotoUrl: publicView ? undefined : point.sitePhoto?.url,
+        visualizedPhotoUrl: point.visualizedPhotoUrl
+          ? (publicView && token && point.visualizedPhotoUrl.includes('/api/photos/')
+              ? point.visualizedPhotoUrl.replace(/\/api\/photos\/([^/]+).*/, `/api/proposals/${encodeURIComponent(token)}/photos/$1`)
+              : point.visualizedPhotoUrl)
+          : (point.sitePhotoId && publicView && token
+              ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhotoId}`
+              : undefined),
+        sitePhotoId: point.sitePhotoId ?? undefined,
+        sitePhotoUrl: point.sitePhoto
+          ? (publicView && token
+              ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhoto.id}`
+              : `/api/photos/${point.sitePhoto.id}/thumbnail`)
+          : undefined,
         isSelectedByClient: point.isSelectedByClient !== false,
       })),
     } : null,
@@ -826,9 +836,10 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
 export async function getPublicPhoto(token: string, photoId: string) {
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(photoId)) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
   const offer = await getPublicRow(token);
-  const allowed = offer.items.some((item) => item.surface.photos.some((photo) => photo.id === photoId) || item.surface.carrier.photos.some((photo) => photo.id === photoId));
+  const allowed = offer.items.some((item) => item.surface.photos.some((photo) => photo.id === photoId) || item.surface.carrier.photos.some((photo) => photo.id === photoId))
+    || (offer.navigationOffer?.points.some((point) => point.sitePhotoId === photoId) ?? false);
   if (!allowed) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
-  const photo = await prisma.photo.findFirst({ where: { id: photoId, isClientVisible: true }, select: { driveFileId: true, fileName: true, mimeType: true, url: true } });
+  const photo = await prisma.photo.findFirst({ where: { id: photoId }, select: { driveFileId: true, fileName: true, mimeType: true, url: true } });
   if (!photo) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
   return photo;
 }

@@ -409,30 +409,39 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     </p>
                   )}
 
-                  {/* Visualizer Photo Preview if available */}
-                  {typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl && (
-                    <div
-                      className="mt-3 overflow-hidden rounded-xl border border-slate-200 cursor-zoom-in relative group"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveLightboxImage(String(pObj.visualizedPhotoUrl));
-                      }}
-                    >
-                      <img
-                        src={String(pObj.visualizedPhotoUrl)}
-                        alt={`Fotografie a vizualizace nosiče – ${point.label}`}
-                        className="h-48 w-full object-cover group-hover:scale-105 transition duration-300"
-                      />
-                      <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-xs">
-                        🔍 Kliknutím zvětšíte snímek
+                  {/* Visualizer / Site Photo Preview if available */}
+                  {(() => {
+                    const activePhoto = (typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl)
+                      ? pObj.visualizedPhotoUrl
+                      : (typeof pObj.sitePhotoUrl === 'string' && pObj.sitePhotoUrl ? pObj.sitePhotoUrl : null);
+
+                    if (!activePhoto) {
+                      return isLocationSelectionPhase ? (
+                        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                          Fotografie umístění a vizualizace nosiče zatím nebyla přiložena.
+                        </div>
+                      ) : null;
+                    }
+
+                    return (
+                      <div
+                        className="mt-3 overflow-hidden rounded-xl border border-slate-200 cursor-zoom-in relative group"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveLightboxImage(String(activePhoto));
+                        }}
+                      >
+                        <img
+                          src={String(activePhoto)}
+                          alt={`Fotografie a vizualizace nosiče – ${point.label}`}
+                          className="h-48 w-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-xs">
+                          🔍 Kliknutím zvětšíte snímek
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {isLocationSelectionPhase && !pObj.visualizedPhotoUrl ? (
-                    <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
-                      Fotografie umístění a vizualizace nosiče zatím nebyla přiložena.
-                    </div>
-                  ) : null}
+                    );
+                  })()}
                 </article>
               );
             })}
