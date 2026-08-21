@@ -875,10 +875,10 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 </div>
                 <div className="space-y-0.5 text-white">
                   <p className="text-xs font-bold flex items-center justify-between">
-                    <span>📍 McDonald's – Navigace k provozovně</span>
+                    <span>📍 McDonald's – Navigace k provozovně (1,4 km)</span>
                     <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
                   </p>
-                  <p className="text-[11px] text-slate-300 font-medium">Černá matná deska Dibond se světelným logem a vzdáleností na ocelovém sloupu.</p>
+                  <p className="text-[11px] text-slate-300 font-medium">Černá matná deska Dibond s logem a vzdáleností na sloupu veřejného osvětlení (VO).</p>
                 </div>
               </div>
             </div>
@@ -896,14 +896,14 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-xs text-blue-300 bg-blue-950/90 px-2.5 py-1 rounded-lg border border-blue-800/60 backdrop-blur-xs">LIDL Navigace</span>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
+                  <span className="text-[10px] font-bold text-sky-300 bg-sky-950/90 px-2 py-0.5 rounded border border-sky-800/60 backdrop-blur-xs">✓ Samostatný sloupek</span>
                 </div>
                 <div className="space-y-0.5 text-white">
                   <p className="text-xs font-bold flex items-center justify-between">
                     <span>📍 LIDL Česká republika (1,1 km)</span>
                     <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
                   </p>
-                  <p className="text-[11px] text-slate-300 font-medium">Prestižní městské navádění prodejen na vysokých sloupech veřejného osvětlení.</p>
+                  <p className="text-[11px] text-slate-300 font-medium">Prestižní městské navádění prodejny na samostatném ocelovém sloupku.</p>
                 </div>
               </div>
             </div>
