@@ -731,6 +731,141 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         </div>
       </section>
 
+      {/* 🏆 References & Realization Photo Gallery Section */}
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 font-black text-xl shadow-xs border border-emerald-100">
+              🏆
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                Ukázky realizací a zkušenosti našich klientů
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Více než 150+ úspěšně realizovaných navigačních sítí v Moravskoslezském kraji.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800">
+            ✓ 100% Schváleno úřady & VO
+          </span>
+        </div>
+
+        {/* Realization Stats Badges */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+            <div className="text-xl md:text-2xl font-black text-slate-900">150+</div>
+            <div className="text-[11px] font-semibold text-slate-500">Realizovaných navigačních sítí</div>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+            <div className="text-xl md:text-2xl font-black text-slate-900">3 500+</div>
+            <div className="text-[11px] font-semibold text-slate-500">Osazených cedulí na sloupech VO</div>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+            <div className="text-xl md:text-2xl font-black text-slate-900">99,2 %</div>
+            <div className="text-[11px] font-semibold text-slate-500">Garantovaná obslužnost & servis</div>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+            <div className="text-xl md:text-2xl font-black text-emerald-700">14 dní</div>
+            <div className="text-[11px] font-semibold text-slate-500">Průměrná doba od schválení po montáž</div>
+          </div>
+        </div>
+
+        {/* Client Testimonials Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-sky-900 bg-sky-100 px-2.5 py-1 rounded-lg">Globus ČR</span>
+                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+              </div>
+              <p className="text-xs text-slate-600 italic leading-relaxed">
+                „Dlouhodobá spolupráce na navigační reklamě pro náš hypermarket funguje bezchybně. Klienti nás díky přehledným šipkám na křižovatkách najdou bez bloudění.“
+              </p>
+            </div>
+            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+              Dlouhodobá navigační kampaň • 14 lokalit
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-rose-900 bg-rose-100 px-2.5 py-1 rounded-lg">Kaufland CZ</span>
+                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+              </div>
+              <p className="text-xs text-slate-600 italic leading-relaxed">
+                „Oceňujeme rychlé vyřízení záborů a povolení na sloupech VO a perfektní kvartální fotodokumentaci. Vše proběhlo přesně podle plánu.“
+              </p>
+            </div>
+            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+              Navigační cedule Dibond • 22 lokalit
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-emerald-900 bg-emerald-100 px-2.5 py-1 rounded-lg">Decathlon CZ</span>
+                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+              </div>
+              <p className="text-xs text-slate-600 italic leading-relaxed">
+                „Přehledná interaktivní mapa trasy s přesnými vzdálenostmi nám pomohla efektivně navést řidiče přímo k naší prodejně z hlavních průtahů.“
+              </p>
+            </div>
+            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+              Městské navádění prodejen • 8 lokalit
+            </div>
+          </div>
+        </div>
+
+        {/* Realization Photo Gallery Showcase */}
+        <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-950 p-5 text-white space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📸</span>
+              <h4 className="font-bold text-sm text-white">Fotogalerie reálné montáže a provedení v terénu</h4>
+            </div>
+            <span className="text-xs font-medium text-slate-400">
+              Všechny cedule jsou schváleny techniky VO a městem
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              className="group relative h-48 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer"
+              onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+            >
+              <img
+                src="/offer/navigation-proof-template.jpg"
+                alt="Ukázka reálné instalace na sloupu VO v terénu"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-3 flex items-center justify-between text-xs font-bold text-white">
+                <span>📍 Realizace navigačního panelu na sloupu VO (ukázka v terénu)</span>
+                <span className="text-sky-400 text-[11px] group-hover:underline">🔍 Zvětšit</span>
+              </div>
+            </div>
+
+            <div
+              className="group relative h-48 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer"
+              onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
+            >
+              <img
+                src="/offer/media-navigation.png"
+                alt="Provedení cedule Dibond 670x900 mm"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-3 flex items-center justify-between text-xs font-bold text-white">
+                <span>🛡️ Odolná hliníková sendvičová deska DIBOND (670 × 900 mm)</span>
+                <span className="text-sky-400 text-[11px] group-hover:underline">🔍 Zvětšit</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Photo Lightbox Modal */}
       {activeLightboxImage && (
         <div
