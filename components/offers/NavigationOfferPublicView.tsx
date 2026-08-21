@@ -937,36 +937,97 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
         </div>
 
-        {/* 5 Core Pillars Grid */}
+        {/* 5 Core Pillars Grid with Real Media Type Photos */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-            <div className="text-lg">🧭</div>
-            <h4 className="text-sm font-extrabold text-white">Navigační systémy VO</h4>
-            <p className="text-xs text-slate-400 font-medium">Exkluzivní síť 400+ směrníků na sloupech veřejného osvětlení u hlavních křižovatek v MS kraji.</p>
+          {/* 1. Navigation */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-600/60 transition shadow-md">
+            <div className="relative h-32 w-full overflow-hidden bg-slate-900">
+              <img
+                src="/images/media-types/navigation.jpg"
+                alt="Navigační systémy na sloupech VO"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Navigační desky VO</span>
+              </div>
+            </div>
+            <div className="p-4 pt-0 space-y-1">
+              <h4 className="text-sm font-extrabold text-white">Navigační systémy VO</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">Exkluzivní síť 400+ směrníků na sloupech veřejného osvětlení u hlavních křižovatek v MS kraji.</p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-            <div className="text-lg">🏛️</div>
-            <h4 className="text-sm font-extrabold text-white">Městské reklamní nosiče</h4>
-            <p className="text-xs text-slate-400 font-medium">City Light (CLV), City Gallery, City Poster, A0 bannery, minivěže i promo lavičky na atraktivních místech.</p>
+          {/* 2. Citylight */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-600/60 transition shadow-md">
+            <div className="relative h-32 w-full overflow-hidden bg-slate-900">
+              <img
+                src="/images/media-types/citylight.jpg"
+                alt="Prosvětlené Citylight CLV"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">💡 Citylight (CLV) nosiče</span>
+              </div>
+            </div>
+            <div className="p-4 pt-0 space-y-1">
+              <h4 className="text-sm font-extrabold text-white">Prosvětlené Citylighty</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">Prestižní svítící vitríny u frekventovaných zón, zastávek MHD a pěších zón pro maximální viditelnost i v noci.</p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-            <div className="text-lg">🗼</div>
-            <h4 className="text-sm font-extrabold text-white">Promo věže & horizonty</h4>
-            <p className="text-xs text-slate-400 font-medium">Dominantní velkoplošné nosiče a promo věže u nákupních zón, kruhových objezdů a terminálů.</p>
+          {/* 3. Promo Tower */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-600/60 transition shadow-md">
+            <div className="relative h-32 w-full overflow-hidden bg-slate-900">
+              <img
+                src="/images/media-types/promo-tower.jpg"
+                alt="Promo věže a velkoplošné nosiče"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🗼 Promo věže & horizonty</span>
+              </div>
+            </div>
+            <div className="p-4 pt-0 space-y-1">
+              <h4 className="text-sm font-extrabold text-white">Promo věže & věžní konstrukce</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">Dominantní velkoplošné nosiče a trojboké věže u nákupních zón, terminálů a kruhových objezdů.</p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-            <div className="text-lg">🖨️</div>
-            <h4 className="text-sm font-extrabold text-white">Velkoformátový tisk & výroba</h4>
-            <p className="text-xs text-slate-400 font-medium">Vlastní tisková technologie, tisk bannerů, polepů, Dibond desek a zakázková výroba nosičů na míru.</p>
+          {/* 4. City Poster */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-600/60 transition shadow-md">
+            <div className="relative h-32 w-full overflow-hidden bg-slate-900">
+              <img
+                src="/images/media-types/city-poster.jpg"
+                alt="City Poster CLP vitríny"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                <span className="font-extrabold text-xs text-purple-300 bg-purple-950/90 px-2.5 py-1 rounded-lg border border-purple-800/60 backdrop-blur-xs">🖼️ City Poster (CLP)</span>
+              </div>
+            </div>
+            <div className="p-4 pt-0 space-y-1">
+              <h4 className="text-sm font-extrabold text-white">City Poster & A0 bannery</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">Moderní plakátové vitríny a reklamní plochy u úřadů, pošt, zdravotnických zařízení a škol.</p>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition lg:col-span-2">
-            <div className="text-lg">⚙️</div>
-            <h4 className="text-sm font-extrabold text-white">100% Kompletní servis na klíč</h4>
-            <p className="text-xs text-slate-400 font-medium">Vyřízení všech městských i policejních povolení (PČR), odborná montáž plošinami a garance opravy či čištění do 48 hodin.</p>
+          {/* 5. Promo Bench & Service */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-600/60 transition shadow-md lg:col-span-2">
+            <div className="relative h-32 w-full overflow-hidden bg-slate-900">
+              <img
+                src="/images/media-types/promo-bench.jpg"
+                alt="Reklamní lavičky a kompletní servis"
+                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end justify-between">
+                <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">🪑 Mobiliář & 100% Servis na klíč</span>
+                <span className="font-bold text-[10px] text-purple-300 bg-purple-950/90 px-2 py-0.5 rounded border border-purple-800/60">⚡ Servis do 48 hod</span>
+              </div>
+            </div>
+            <div className="p-4 pt-0 space-y-1">
+              <h4 className="text-sm font-extrabold text-white">Vlastní výroba, tiskárna & servis na klíč</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">Provozujeme vlastní velkoformátový tisk, výrobu Dibond nosičů i montážní plošiny. Vyřídíme všechna městská i policejní povolení (PČR) a garantujeme rychlou opravu či čištění do 48 hodin.</p>
+            </div>
           </div>
         </div>
 
