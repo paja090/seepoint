@@ -743,7 +743,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 Ukázky realizací a zkušenosti našich klientů
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Více než 150+ úspěšně realizovaných navigačních sítí v Moravskoslezském kraji.
+                Desítky úspěšně zřízených navigačních sítí a zkoordinovaných tras v Moravskoslezském kraji.
               </p>
             </div>
           </div>
@@ -755,20 +755,20 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         {/* Realization Stats Badges */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">150+</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">35+</div>
             <div className="text-[11px] font-semibold text-slate-500">Realizovaných navigačních sítí</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">3 500+</div>
-            <div className="text-[11px] font-semibold text-slate-500">Osazených cedulí na sloupech VO</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">110+</div>
+            <div className="text-[11px] font-semibold text-slate-500">Zřízených bodů na sloupech VO</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">99,2 %</div>
-            <div className="text-[11px] font-semibold text-slate-500">Garantovaná obslužnost & servis</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">100 %</div>
+            <div className="text-[11px] font-semibold text-slate-500">Zajištění vyřízení záborů & VO</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
             <div className="text-xl md:text-2xl font-black text-emerald-700">14 dní</div>
-            <div className="text-[11px] font-semibold text-slate-500">Průměrná doba od schválení po montáž</div>
+            <div className="text-[11px] font-semibold text-slate-500">Průměrná doba od schválení po instalaci</div>
           </div>
         </div>
 
@@ -777,15 +777,30 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg">Maloobchodní síť Hruška</span>
+                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+              </div>
+              <p className="text-xs text-slate-600 italic leading-relaxed">
+                „Dlouhodobá spolupráce na městské navigaci k našim prodejnám v Ostravě a okolí. Klienti nás díky přehledným šipkám na křižovatkách snadno najdou.“
+              </p>
+            </div>
+            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+              Městská navigační síť • Prodejny MS kraj
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
                 <span className="font-black text-xs text-sky-900 bg-sky-100 px-2.5 py-1 rounded-lg">Globus ČR</span>
                 <span className="text-amber-500 text-xs font-bold">★★★★★</span>
               </div>
               <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Dlouhodobá spolupráce na navigační reklamě pro náš hypermarket funguje bezchybně. Klienti nás díky přehledným šipkám na křižovatkách najdou bez bloudění.“
+                „Přehledné vyřízení záborů a instalace naváděcích tabulí na hlavních příjezdových trasách k hypermarketu bez starostí.“
               </p>
             </div>
             <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Dlouhodobá navigační kampaň • 14 lokalit
+              Příjezdová navigace • 14 lokalit
             </div>
           </div>
 
@@ -796,26 +811,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 <span className="text-amber-500 text-xs font-bold">★★★★★</span>
               </div>
               <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Oceňujeme rychlé vyřízení záborů a povolení na sloupech VO a perfektní kvartální fotodokumentaci. Vše proběhlo přesně podle plánu.“
+                „Super domluva, rychlé vyřízení povolení na sloupech VO a dokládání kvartální fotodokumentace. Vše proběhlo podle plánu.“
               </p>
             </div>
             <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
               Navigační cedule Dibond • 22 lokalit
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-emerald-900 bg-emerald-100 px-2.5 py-1 rounded-lg">Decathlon CZ</span>
-                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
-              </div>
-              <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Přehledná interaktivní mapa trasy s přesnými vzdálenostmi nám pomohla efektivně navést řidiče přímo k naší prodejně z hlavních průtahů.“
-              </p>
-            </div>
-            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Městské navádění prodejen • 8 lokalit
             </div>
           </div>
         </div>
