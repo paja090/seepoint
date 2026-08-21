@@ -912,75 +912,73 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       </section>
 
       {/* About SeePOINT s.r.o. - Full Service Advertising & Manufacturing Section */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-indigo-950/60 p-6 sm:p-8 text-white shadow-2xl space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-950/80 text-purple-300 border border-purple-800/60 mb-2">
-                <span>🏢 Realizátor nabídky</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-                <span>O společnosti SEEPOINT s.r.o.</span>
-              </h3>
-              <p className="text-xs text-slate-300 mt-1 font-medium max-w-2xl">
-                Přední dodavatel outdoorové reklamy a výrobce originálních nosičů v Moravskoslezském kraji. Kromě navigačních systémů zajišťujeme kompletní reklamní servis pro malé i velké značky.
-              </p>
+      <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-indigo-950/60 p-6 md:p-8 text-white shadow-2xl space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-950/80 text-purple-300 border border-purple-800/60 mb-2">
+              <span>🏢 Realizátor nabídky</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <a
-                href="https://seepoint.cz"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
-              >
-                <span>🌐 Navštívit seepoint.cz</span>
-              </a>
-            </div>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+              <span>O společnosti SEEPOINT s.r.o.</span>
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 font-medium max-w-2xl">
+              Přední dodavatel outdoorové reklamy a výrobce originálních nosičů v Moravskoslezském kraji. Kromě navigačních systémů zajišťujeme kompletní reklamní servis pro malé i velké značky.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <a
+              href="https://seepoint.cz"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
+            >
+              <span>🌐 Navštívit seepoint.cz</span>
+            </a>
+          </div>
+        </div>
+
+        {/* 5 Core Pillars Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
+            <div className="text-lg">🧭</div>
+            <h4 className="text-sm font-extrabold text-white">Navigační systémy VO</h4>
+            <p className="text-xs text-slate-400 font-medium">Exkluzivní síť 400+ směrníků na sloupech veřejného osvětlení u hlavních křižovatek v MS kraji.</p>
           </div>
 
-          {/* 5 Core Pillars Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-              <div className="text-lg">🧭</div>
-              <h4 className="text-sm font-extrabold text-white">Navigační systémy VO</h4>
-              <p className="text-xs text-slate-400 font-medium">Exkluzivní síť 400+ směrníků na sloupech veřejného osvětlení u hlavních křižovatek v MS kraji.</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-              <div className="text-lg">🏛️</div>
-              <h4 className="text-sm font-extrabold text-white">Městské reklamní nosiče</h4>
-              <p className="text-xs text-slate-400 font-medium">City Light (CLV), City Gallery, City Poster, A0 bannery, minivěže i promo lavičky na atraktivních místech.</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-              <div className="text-lg">🗼</div>
-              <h4 className="text-sm font-extrabold text-white">Promo věže & horizonty</h4>
-              <p className="text-xs text-slate-400 font-medium">Dominantní velkoplošné nosiče a promo věže u nákupních zón, kruhových objezdů a terminálů.</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
-              <div className="text-lg">🖨️</div>
-              <h4 className="text-sm font-extrabold text-white">Velkoformátový tisk & výroba</h4>
-              <p className="text-xs text-slate-400 font-medium">Vlastní tisková technologie, tisk bannerů, polepů, Dibond desek a zakázková výroba nosičů na míru.</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition lg:col-span-2">
-              <div className="text-lg">⚙️</div>
-              <h4 className="text-sm font-extrabold text-white">100% Kompletní servis na klíč</h4>
-              <p className="text-xs text-slate-400 font-medium">Vyřízení všech městských i policejních povolení (PČR), odborná montáž plošinami a garance opravy či čištění do 48 hodin.</p>
-            </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
+            <div className="text-lg">🏛️</div>
+            <h4 className="text-sm font-extrabold text-white">Městské reklamní nosiče</h4>
+            <p className="text-xs text-slate-400 font-medium">City Light (CLV), City Gallery, City Poster, A0 bannery, minivěže i promo lavičky na atraktivních místech.</p>
           </div>
 
-          {/* Contact Strip */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80 text-xs font-semibold text-slate-300">
-            <div className="flex items-center gap-1.5">
-              <span>📍 Fráni Šrámka 1209/5, 709 00 Ostrava-Mariánské Hory</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <span>📞 +420 778 089 099</span>
-              <span>✉️ info@seepoint.cz</span>
-              <span className="text-purple-400 font-bold">seepoint.cz</span>
-            </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
+            <div className="text-lg">🗼</div>
+            <h4 className="text-sm font-extrabold text-white">Promo věže & horizonty</h4>
+            <p className="text-xs text-slate-400 font-medium">Dominantní velkoplošné nosiče a promo věže u nákupních zón, kruhových objezdů a terminálů.</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition">
+            <div className="text-lg">🖨️</div>
+            <h4 className="text-sm font-extrabold text-white">Velkoformátový tisk & výroba</h4>
+            <p className="text-xs text-slate-400 font-medium">Vlastní tisková technologie, tisk bannerů, polepů, Dibond desek a zakázková výroba nosičů na míru.</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-1.5 hover:border-purple-800/60 transition lg:col-span-2">
+            <div className="text-lg">⚙️</div>
+            <h4 className="text-sm font-extrabold text-white">100% Kompletní servis na klíč</h4>
+            <p className="text-xs text-slate-400 font-medium">Vyřízení všech městských i policejních povolení (PČR), odborná montáž plošinami a garance opravy či čištění do 48 hodin.</p>
+          </div>
+        </div>
+
+        {/* Contact Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80 text-xs font-semibold text-slate-300">
+          <div className="flex items-center gap-1.5">
+            <span>📍 Fráni Šrámka 1209/5, 709 00 Ostrava-Mariánské Hory</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span>📞 +420 778 089 099</span>
+            <span>✉️ info@seepoint.cz</span>
+            <span className="text-purple-400 font-bold">seepoint.cz</span>
           </div>
         </div>
       </section>
