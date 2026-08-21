@@ -743,7 +743,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 Ukázky realizací a zkušenosti našich klientů
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Desítky úspěšně zřízených navigačních sítí a zkoordinovaných tras v Moravskoslezském kraji.
+                Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO v Moravskoslezském kraji.
               </p>
             </div>
           </div>
@@ -755,16 +755,16 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         {/* Realization Stats Badges */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">35+</div>
-            <div className="text-[11px] font-semibold text-slate-500">Realizovaných navigačních sítí</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">400+</div>
+            <div className="text-[11px] font-semibold text-slate-500">Navigačních ploch na sloupech VO</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">110+</div>
-            <div className="text-[11px] font-semibold text-slate-500">Zřízených bodů na sloupech VO</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">150+</div>
+            <div className="text-[11px] font-semibold text-slate-500">Realizovaných sítí a tras v MS kraji</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
             <div className="text-xl md:text-2xl font-black text-slate-900">100 %</div>
-            <div className="text-[11px] font-semibold text-slate-500">Zajištění vyřízení záborů & VO</div>
+            <div className="text-[11px] font-semibold text-slate-500">Zajištění záborů & správců VO</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
             <div className="text-xl md:text-2xl font-black text-emerald-700">14 dní</div>
@@ -777,45 +777,45 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg">Maloobchodní síť Hruška</span>
+                <span className="font-black text-xs text-red-900 bg-red-100 px-2.5 py-1 rounded-lg">KFC ČR</span>
                 <span className="text-amber-500 text-xs font-bold">★★★★★</span>
               </div>
               <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Dlouhodobá spolupráce na městské navigaci k našim prodejnám v Ostravě a okolí. Klienti nás díky přehledným šipkám na křižovatkách snadno najdou.“
+                „Perfektní řešení příjezdové navigace k našim restauracím a Drive-Thru z hlavních městských průtahů. Řidiči odbočí přesně tam, kde mají.“
               </p>
             </div>
             <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Městská navigační síť • Prodejny MS kraj
+              Navigační síť Drive-Thru • Ostrava & okrajové sídliště
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-sky-900 bg-sky-100 px-2.5 py-1 rounded-lg">Globus ČR</span>
+                <span className="font-black text-xs text-blue-900 bg-blue-100 px-2.5 py-1 rounded-lg">LIDL Česká republika</span>
                 <span className="text-amber-500 text-xs font-bold">★★★★★</span>
               </div>
               <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Přehledné vyřízení záborů a instalace naváděcích tabulí na hlavních příjezdových trasách k hypermarketu bez starostí.“
+                „Rychlé vyřízení všech potřebných záborů a povolení na sloupech VO a bezchybná pravidelná fotodokumentaci. Vše proběhlo přesně podle plánu.“
               </p>
             </div>
             <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Příjezdová navigace • 14 lokalit
+              Městské navádění prodejen • Havířov & Karviná
             </div>
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-rose-900 bg-rose-100 px-2.5 py-1 rounded-lg">Kaufland CZ</span>
+                <span className="font-black text-xs text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg">Penny Market</span>
                 <span className="text-amber-500 text-xs font-bold">★★★★★</span>
               </div>
               <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Super domluva, rychlé vyřízení povolení na sloupech VO a dokládání kvartální fotodokumentace. Vše proběhlo podle plánu.“
+                „Přehledná navigační kampaň na klíčových křižovatkách efektivně navádí řidiče z hlavních tahů přímo k našim prodejnám.“
               </p>
             </div>
             <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Navigační cedule Dibond • 22 lokalit
+              Navigační cedule Dibond • Frýdek-Místek & Karviná
             </div>
           </div>
         </div>
@@ -825,41 +825,53 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-base">📸</span>
-              <h4 className="font-bold text-sm text-white">Fotogalerie reálné montáže a provedení v terénu</h4>
+              <h4 className="font-bold text-sm text-white">Fotogalerie realizovaných navigačních nosičů na sloupech VO</h4>
             </div>
             <span className="text-xs font-medium text-slate-400">
-              Všechny cedule jsou schváleny techniky VO a městem
+              Více než 400+ aktivních navigačních nosičů v kraji
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div
-              className="group relative h-48 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer"
-              onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+              className="group relative h-44 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between p-4"
+              onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
             >
-              <img
-                src="/offer/navigation-proof-template.jpg"
-                alt="Ukázka reálné instalace na sloupu VO v terénu"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-3 flex items-center justify-between text-xs font-bold text-white">
-                <span>📍 Realizace navigačního panelu na sloupu VO (ukázka v terénu)</span>
-                <span className="text-sky-400 text-[11px] group-hover:underline">🔍 Zvětšit</span>
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-red-400 bg-red-950/80 px-2.5 py-1 rounded-lg border border-red-800/50">KFC Drive-Thru</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">✓ VO Schváleno</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-white">📍 KFC Ostrava – Přívozská</p>
+                <p className="text-[11px] text-slate-400">Navigační deska Dibond (670 × 900 mm) na sloupu VO s nerezovými pásky Bandimex.</p>
               </div>
             </div>
 
             <div
-              className="group relative h-48 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer"
+              className="group relative h-44 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between p-4"
               onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
             >
-              <img
-                src="/offer/media-navigation.png"
-                alt="Provedení cedule Dibond 670x900 mm"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent p-3 flex items-center justify-between text-xs font-bold text-white">
-                <span>🛡️ Odolná hliníková sendvičová deska DIBOND (670 × 900 mm)</span>
-                <span className="text-sky-400 text-[11px] group-hover:underline">🔍 Zvětšit</span>
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-blue-400 bg-blue-950/80 px-2.5 py-1 rounded-lg border border-blue-800/50">LIDL Navigace</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">✓ VO Schváleno</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-white">📍 LIDL Havířov – Hlavní třída</p>
+                <p className="text-[11px] text-slate-400">Směrový panel s vyznačenou vzdáleností a logem klienta na frekventovaném průtahu.</p>
+              </div>
+            </div>
+
+            <div
+              className="group relative h-44 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between p-4"
+              onClick={() => setActiveLightboxImage('/offer/media-navigation.png')}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-black text-xs text-amber-400 bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-800/50">Penny Market</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/40">✓ VO Schváleno</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-white">📍 Penny Market Karviná</p>
+                <p className="text-[11px] text-slate-400">Oboustranná navigační cedule na sloupu veřejného osvětlení před klíčovou křižovatkou.</p>
               </div>
             </div>
           </div>
