@@ -836,10 +836,34 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
 export async function getPublicPhoto(token: string, photoId: string) {
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(photoId)) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
   const offer = await getPublicRow(token);
-  const allowed = offer.items.some((item) => item.surface.photos.some((photo) => photo.id === photoId) || item.surface.carrier.photos.some((photo) => photo.id === photoId))
-    || (offer.navigationOffer?.points.some((point) => point.sitePhotoId === photoId) ?? false);
+  const allowed =
+    offer.items.some(
+      (item) =>
+        item.surface.photos.some((photo) => photo.id === photoId) ||
+        item.surface.carrier.photos.some((photo) => photo.id === photoId)
+    ) ||
+    (offer.navigationOffer?.points.some(
+      (point) =>
+        point.sitePhotoId === photoId ||
+        (point.visualizedPhotoUrl && point.visualizedPhotoUrl.includes(photoId))
+    ) ?? false) ||
+    Boolean(
+      await prisma.photo.findFirst({
+        where: {
+          id: photoId,
+          siteNavigationPoint: {
+            navigationOffer: { offer: { publicTokenHash: hashPublicToken(token) } },
+          },
+        },
+        select: { id: true },
+      })
+    );
+
   if (!allowed) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
-  const photo = await prisma.photo.findFirst({ where: { id: photoId }, select: { driveFileId: true, fileName: true, mimeType: true, url: true } });
+  const photo = await prisma.photo.findFirst({
+    where: { id: photoId },
+    select: { driveFileId: true, fileName: true, mimeType: true, url: true, content: true },
+  });
   if (!photo) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
   return photo;
 }
