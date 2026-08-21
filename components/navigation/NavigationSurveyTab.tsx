@@ -377,11 +377,14 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
                     <p className="text-slate-400 italic">Bez fotografií</p>
                   ) : (
                     <div className="flex items-center gap-2 overflow-x-auto">
-                      {c.photos.map((p: any) => (
-                        <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="relative size-14 rounded-xl overflow-hidden border border-slate-300 shrink-0 block">
-                          <Image src={p.url} alt={c.label} fill className="object-cover" />
-                        </a>
-                      ))}
+                      {c.photos.map((p: any) => {
+                        const photoSrc = p.url || `/api/photos/${p.id}/file`;
+                        return (
+                          <a key={p.id} href={photoSrc} target="_blank" rel="noreferrer" className="relative size-14 rounded-xl overflow-hidden border border-slate-300 shrink-0 block bg-slate-100">
+                            <Image src={photoSrc} alt={c.label} fill unoptimized className="object-cover" />
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

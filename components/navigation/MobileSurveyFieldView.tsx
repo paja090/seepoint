@@ -535,11 +535,14 @@ export function MobileSurveyFieldView({
                 {/* Photos Strip */}
                 {c.photos.length > 0 && (
                   <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                    {c.photos.map((p) => (
-                      <div key={p.id} className="relative size-16 rounded-xl overflow-hidden border border-slate-200 shrink-0">
-                        <Image src={p.url} alt={c.label} fill className="object-cover" />
-                      </div>
-                    ))}
+                    {c.photos.map((p) => {
+                      const photoSrc = p.url || `/api/photos/${p.id}/file`;
+                      return (
+                        <div key={p.id} className="relative size-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                          <Image src={photoSrc} alt={c.label} fill unoptimized className="object-cover" />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

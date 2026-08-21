@@ -111,12 +111,16 @@ export async function GET(
         const candidatePoints = offerPoints.map((p) => {
           const matchedPhotos: Array<{ id: string; url: string; createdAt: string | Date }> = photosInDb
             .filter((ph) => ph.surveyCandidatePointId === p.id)
-            .map((ph) => ({ id: ph.id, url: ph.url, createdAt: ph.createdAt }));
+            .map((ph) => ({
+              id: ph.id,
+              url: ph.url || `/api/photos/${ph.id}/file`,
+              createdAt: ph.createdAt,
+            }));
 
-          if (p.sitePhoto?.url && !matchedPhotos.some((ph) => ph.url === p.sitePhoto!.url)) {
+          if (p.sitePhoto?.id && !matchedPhotos.some((ph) => ph.id === p.sitePhoto!.id)) {
             matchedPhotos.unshift({
               id: p.sitePhoto.id,
-              url: p.sitePhoto.url,
+              url: p.sitePhoto.url || `/api/photos/${p.sitePhoto.id}/file`,
               createdAt: p.createdAt,
             });
           }
