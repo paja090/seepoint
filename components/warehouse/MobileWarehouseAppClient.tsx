@@ -100,14 +100,23 @@ export function MobileWarehouseAppClient({
   };
 
   // Compute active borrowings (net quantity issued minus quantity returned per item)
+  // Sort movements in ascending chronological order so ISSUE (+qty) happens before RETURN (-qty)
   const activeBorrowingsMap = new Map<string, { itemId: string; name: string; unit: string; qty: number }>();
+  const sortedMovements = [...recentMovements].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
 
-  recentMovements.forEach((m) => {
+  sortedMovements.forEach((m) => {
     if (!m.item || m.item.category !== 'RETURNABLE') return;
 
-    const matchesUser = currentUserName
-      ? m.performedByName?.includes(currentUserName) || m.assignedEmployeeName?.includes(currentUserName)
-      : true;
+    // Flexible user matching checking if currentUserName shares words with performedByName/assignedEmployeeName
+    const matchesUser = (() => {
+      if (!currentUserName) return true;
+      const userTokens = currentUserName.toLowerCase().split(/\s+/).filter(Boolean);
+      const perfText = (m.performedByName || '').toLowerCase();
+      const assText = (m.assignedEmployeeName || '').toLowerCase();
+      return userTokens.some((tok) => perfText.includes(tok) || assText.includes(tok));
+    })();
 
     if (!matchesUser) return;
 

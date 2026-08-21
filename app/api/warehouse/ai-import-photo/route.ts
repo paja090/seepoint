@@ -16,26 +16,72 @@ export async function POST(request: Request) {
 
     // If saving confirmed items directly to DB:
     if (body.itemsToSave && Array.isArray(body.itemsToSave)) {
-      const createdCount = await prisma.$transaction(
-        body.itemsToSave.map((item: any) =>
-          prisma.warehouseItem.create({
+      const performedByName = user.employee
+        ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
+        : user.name || user.email;
+
+      let savedCount = 0;
+
+      for (const item of body.itemsToSave) {
+        const nameClean = String(item.name || '').trim();
+        if (!nameClean) continue;
+
+        const qtyToAdd = Number(item.quantityInStock) || 1;
+        const category = item.category === 'RETURNABLE' ? 'RETURNABLE' : 'CONSUMABLE';
+
+        const existing = await prisma.warehouseItem.findFirst({
+          where: { name: { equals: nameClean, mode: 'insensitive' } },
+        });
+
+        if (existing) {
+          // Restock existing item instead of creating a duplicate row
+          const newQty = Number(existing.quantityInStock) + qtyToAdd;
+          await prisma.$transaction([
+            prisma.warehouseItem.update({
+              where: { id: existing.id },
+              data: { quantityInStock: newQty },
+            }),
+            prisma.warehouseMovement.create({
+              data: {
+                itemId: existing.id,
+                type: 'RECEIPT',
+                quantity: qtyToAdd,
+                performedByName,
+                note: 'AI naskladnění regálu (aktualizace stávající položky)',
+              },
+            }),
+          ]);
+        } else {
+          // Create new item and log initial RECEIPT movement
+          const newItem = await prisma.warehouseItem.create({
             data: {
-              name: item.name.trim(),
-              category: item.category === 'RETURNABLE' ? 'RETURNABLE' : 'CONSUMABLE',
+              name: nameClean,
+              category,
               unit: item.unit || 'ks',
-              quantityInStock: Number(item.quantityInStock) || 1,
+              quantityInStock: qtyToAdd,
               minQuantity: item.minQuantity ? Number(item.minQuantity) : 2,
               location: item.location ? String(item.location).trim() : 'Dílna / Regál',
               note: item.note || 'Automaticky naskladněno pomocí AI Fotky regálu',
             },
-          })
-        )
-      );
+          });
+
+          await prisma.warehouseMovement.create({
+            data: {
+              itemId: newItem.id,
+              type: 'RECEIPT',
+              quantity: qtyToAdd,
+              performedByName,
+              note: 'AI naskladnění regálu (nová položka)',
+            },
+          });
+        }
+        savedCount++;
+      }
 
       return NextResponse.json({
         success: true,
-        count: createdCount.length,
-        message: `Úspěšně uloženo ${createdCount.length} nových položek do databáze skladu!`,
+        count: savedCount,
+        message: `Úspěšně zpracováno a uloženo ${savedCount} položek v databázi skladu!`,
       });
     }
 

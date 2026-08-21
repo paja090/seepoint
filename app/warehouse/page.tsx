@@ -57,7 +57,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
       select: { id: true, firstName: true, lastName: true },
     }),
     prisma.warehouseMovement.findMany({
-      take: 20,
+      take: 100,
       orderBy: { createdAt: 'desc' },
       include: { item: true, workOrder: true },
     }),
