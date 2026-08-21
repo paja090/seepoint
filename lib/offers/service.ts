@@ -852,7 +852,7 @@ export async function getPublicPhoto(token: string, photoId: string) {
         where: {
           id: photoId,
           siteNavigationPoint: {
-            navigationOffer: { offer: { publicTokenHash: hashPublicToken(token) } },
+            navigationOffer: { offer: { publicTokenHash: hashPublicOfferToken(token) } },
           },
         },
         select: { id: true },

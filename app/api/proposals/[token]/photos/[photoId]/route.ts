@@ -18,7 +18,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
 
     // 1. Binary content stored directly in DB (Buffer)
     if (photo.content) {
-      return new Response(photo.content, {
+      return new Response(Buffer.from(photo.content), {
         status: 200,
         headers: {
           'Content-Type': photo.mimeType ?? 'image/jpeg',
