@@ -8,16 +8,6 @@ import {
   ExternalLink,
   FilePenLine,
   Link2,
-'use client';
-
-import {
-  CalendarCheck,
-  Check,
-  Copy,
-  Eye,
-  ExternalLink,
-  FilePenLine,
-  Link2,
   LoaderCircle,
   X,
 } from 'lucide-react';
@@ -159,48 +149,16 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
         )}
 
         <div className="border-t border-slate-100 pt-3 space-y-2">
-          <button className={secondaryButton} disabled={disabled} onClick={() => void action('publish')} type="button">
-            <Link2 aria-hidden="true" size={17} />
-            Vytvořit / získat veřejný odkaz pro klienta
+          <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
+            <Copy aria-hidden="true" size={17} />
+            Duplikovat nabídku
           </button>
         </div>
 
-        <button className={secondaryButton} disabled={disabled} onClick={() => void action('duplicate')} type="button">
-          <Copy aria-hidden="true" size={17} />
-          Duplikovat nabídku
-        </button>
-
-        {(status === 'DRAFT' || status === 'SENT') && (
-          <button className="w-full px-3 py-2 text-sm font-semibold text-slate-500 transition hover:text-red-700 disabled:opacity-50" disabled={disabled} onClick={() => void action('expire')} type="button">
-            Označit jako expirovanou
-          </button>
-        )}
-
-        {busy && (
-          <p className="flex items-center justify-center gap-2 text-sm text-slate-500" role="status">
-            <LoaderCircle aria-hidden="true" className="animate-spin" size={16} />
-            Provádím akci…
-          </p>
+        {message && (
+          <p className="text-center text-xs font-semibold text-slate-600">{message}</p>
         )}
       </div>
-
-      {publicUrl && (
-        <div className="border-t border-emerald-100 bg-emerald-50 p-5">
-          <p className="text-sm font-semibold text-emerald-950">Nový veřejný odkaz</p>
-          <p className="mt-1 text-xs leading-5 text-emerald-700">Z bezpečnostních důvodů se zobrazí pouze nyní.</p>
-          <div className="mt-3 flex gap-2">
-            <input aria-label="Veřejný odkaz nabídky" className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-700" readOnly value={publicUrl} />
-            <button aria-label="Kopírovat veřejný odkaz" className="rounded-lg bg-emerald-700 px-3 text-white" onClick={() => void navigator.clipboard.writeText(publicUrl)} type="button">
-              <Copy aria-hidden="true" size={16} />
-            </button>
-            <a aria-label="Otevřít veřejnou nabídku" className="flex items-center rounded-lg border border-emerald-200 bg-white px-3 text-emerald-800" href={publicUrl} rel="noreferrer" target="_blank">
-              <ExternalLink aria-hidden="true" size={16} />
-            </a>
-          </div>
-        </div>
-      )}
-
-      {message && <p className="border-t border-slate-100 px-5 py-3 text-sm text-slate-600" aria-live="polite">{message}</p>}
     </section>
   );
 }
