@@ -131,6 +131,10 @@ export function SalesOpportunitiesClientView({
 
   const handlePrepareProposal = (item: OpportunityItem) => {
     const suggestedMedia = Array.isArray(item.suggestedMediaTypes) ? item.suggestedMediaTypes[0] : '';
+    const fullTargetAddress = item.address
+      ? (item.address.toLowerCase().includes(item.city.toLowerCase()) ? item.address : `${item.address}, ${item.city}`)
+      : item.city;
+
     setCopilotPreFill({
       clientId: item.clientId || undefined,
       clientName: item.companyName,
@@ -138,7 +142,7 @@ export function SalesOpportunitiesClientView({
       prompt: `Nezávazný koncept kampaně k události: ${item.title}. ${item.summary}`,
       mediaType: suggestedMedia || 'CITY_POSTER',
       targetName: item.companyName,
-      targetAddress: item.address ? `${item.address}, ${item.city}` : item.city,
+      targetAddress: fullTargetAddress,
       opportunityId: item.id,
       isNoPriceConcept: true,
     });

@@ -268,21 +268,22 @@ export function AiOfferGeneratorModal({
             </section>
           </> : <>
             <section><label className="text-sm font-black uppercase tracking-wide text-amber-400">Co klient potřebuje?<textarea className="input mt-2 min-h-24 normal-case tracking-normal text-white" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Popište kampaň, lokalitu a očekávání klienta." /></label></section>
-            <section className="grid gap-3 sm:grid-cols-5">
-              <label className="text-xs font-bold">Město / lokalita<input className="input mt-1" value={city} onChange={(event) => setCity(event.target.value)} placeholder="Všechna města" /></label>
-              <label className="text-xs font-bold">Typ média / Mix
-                <select className="input mt-1" value={mediaType} onChange={(event) => setMediaType(event.target.value)}>
-                  <option value="">✨ Automatický mix (Lavičky, City postery, Billboardy...)</option>
-                  <option value="PROMO_BENCH">Lavičky / Babičky (PROMO_BENCH)</option>
-                  <option value="CITY_POSTER">City postery (CITY_POSTER)</option>
-                  <option value="CITYLIGHT">Citylight / CLV (CITYLIGHT)</option>
-                  <option value="BILLBOARD">Billboardy (BILLBOARD)</option>
-                  <option value="BIGBOARD">Bigboardy (BIGBOARD)</option>
-                  <option value="LED_SCREEN">LED obrazovky (LED_SCREEN)</option>
-                  <option value="BANNER">Bannery / Plachty (BANNER)</option>
+            <section className="grid gap-3 sm:grid-cols-6">
+              <label className="text-xs font-bold sm:col-span-2">Město / lokalita<input className="input mt-1 text-white" value={city} onChange={(event) => setCity(event.target.value)} placeholder="Např. Ostrava" /></label>
+              <label className="text-xs font-bold sm:col-span-2">Přesná adresa prodejny / cíle<input className="input mt-1 text-white" value={targetAddress} onChange={(event) => setTargetAddress(event.target.value)} placeholder="Ulice a číslo (např. Jantarová 3344/4)" /></label>
+              <label className="text-xs font-bold sm:col-span-1">Typ média
+                <select className="input mt-1 text-white" value={mediaType} onChange={(event) => setMediaType(event.target.value)}>
+                  <option value="">✨ Automatický mix</option>
+                  <option value="PROMO_BENCH">Lavičky / Babičky</option>
+                  <option value="CITY_POSTER">City postery</option>
+                  <option value="CITYLIGHT">Citylight (CLV)</option>
+                  <option value="BILLBOARD">Billboardy</option>
+                  <option value="BIGBOARD">Bigboardy</option>
+                  <option value="LED_SCREEN">LED obrazovky</option>
+                  <option value="BANNER">Bannery / Plachty</option>
                 </select>
               </label>
-              <label className="text-xs font-bold">Počet ploch<input className="input mt-1" min="1" type="number" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
+              <label className="text-xs font-bold sm:col-span-1">Počet ploch<input className="input mt-1 text-white" min="1" type="number" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
             </section>
           </>}
 
