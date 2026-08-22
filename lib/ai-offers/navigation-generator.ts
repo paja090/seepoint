@@ -58,6 +58,39 @@ export function isRestrictedHighwayOr1stClassRoad(text: string): boolean {
   });
 }
 
+/**
+ * Checks if coordinates/address fall inside Ostrava's restricted Municipal Heritage Zones (Nařízení č. 2/2020)
+ * where outdoor advertising & light pole navigation signs are prohibited.
+ */
+export function isOstravaRestrictedZone(lat: number, lng: number, addressText = ''): boolean {
+  // 1. Moravská Ostrava Center Heritage Zone (Nařízení č. 2/2020)
+  if (lat >= 49.8310 && lat <= 49.8420 && lng >= 18.2810 && lng <= 18.2980) {
+    return true;
+  }
+  // 2. Poruba Hlavní třída Heritage Zone
+  if (lat >= 49.8235 && lat <= 49.8355 && lng >= 18.1600 && lng <= 18.1760) {
+    return true;
+  }
+  // 3. Vítkovice Mírové náměstí Heritage Zone
+  if (lat >= 49.8105 && lat <= 49.8185 && lng >= 18.2640 && lng <= 18.2760) {
+    return true;
+  }
+
+  if (addressText) {
+    const norm = addressText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const heritageKeywords = [
+      'masarykovo namesti',
+      'jiraskovo namesti',
+      'pamatkova zona',
+      'hlavni trida poruba',
+      'mirove namesti vitkovice',
+    ];
+    if (heritageKeywords.some((k) => norm.includes(k))) return true;
+  }
+
+  return false;
+}
+
 function rentalQuantity(unit: string, durationMonths: number) {
   if (/rok|year|annual/i.test(unit)) return durationMonths / 12;
   if (/měs|mes|month/i.test(unit)) return durationMonths;
@@ -188,20 +221,21 @@ export async function generateNavigationPreview(input: {
         return dist >= 300 && dist <= 3500;
       });
 
-      // Find candidate point along polyline that is NOT on a restricted highway, prioritizing major intersections
+      // Find candidate point along polyline that is NOT on a restricted highway or Heritage Zone (Nařízení č. 2/2020)
       let foundValidPoint = false;
       for (const candidate of decisionZoneCandidates) {
         const revGeo = await reverseGeocode(candidate.latitude, candidate.longitude);
         const addressText = revGeo?.formattedAddress || '';
+        const isHighway = isRestrictedHighwayOr1stClassRoad(addressText);
+        const isHeritageZone = isOstravaRestrictedZone(candidate.latitude, candidate.longitude, addressText);
 
-        if (addressText && !isRestrictedHighwayOr1stClassRoad(addressText)) {
+        if (addressText && !isHighway && !isHeritageZone) {
           selectedPoint = candidate;
           foundValidPoint = true;
           const distMeters = haversineMeters(candidate, target);
           const distKm = (distMeters / 1000).toFixed(1);
           const streetPart = addressText.split(',')[0]?.trim() || '';
 
-          const isIntersectionOrSquare = /křižovatk|náměst|tříd|nárož|kruh|rondel|objezd/i.test(addressText);
           const isFarIntersection = distMeters > 1000;
 
           if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
@@ -212,7 +246,7 @@ export async function generateNavigationPreview(input: {
             pointReasons = [
               isFarIntersection
                 ? `🚦 Frekventovaná křižovatka: Bod zachycuje vysoký průjezd aut na městské třídě ${streetPart} ve vzdálenosti cca ${distKm} km od cíle.`
-                : `Navigační bod na městské třídě ${streetPart} mimo dálnice a I. třídy.`,
+                : `Navigační bod na městské třídě ${streetPart} mimo dálnice, I. třídy a památkovou zónu.`,
               `Strategický bod pro včasné nasměrování řidičů přijíždějících od ${direction}.`,
             ];
           }

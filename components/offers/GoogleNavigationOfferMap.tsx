@@ -263,10 +263,18 @@ export function GoogleNavigationOfferMap({
         const distanceMeters = distanceBetween({ latitude, longitude }, target);
         if (distanceMeters < 250 || distanceMeters > radiusMeters * 1.15) return [];
         const instruction = plainText(step.instructions);
+        const normInstr = instruction.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+        // Exclude restricted highways & Ostrava Historic Heritage Zone (Nařízení č. 2/2020)
+        const isHighwayOrHeritage = /rudna|mistecka|bohuminska|marianskohorska|dalnic|d1|d56|i\/11|i\/56|masarykovo namesti|jiraskovo namesti|pamatkova/i.test(normInstr)
+          || (latitude >= 49.8310 && latitude <= 49.8420 && longitude >= 18.2810 && longitude <= 18.2980);
+
+        if (isHighwayOrHeritage) return [];
+
         const isTurn = /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd|držte|keep/i.test(`${instruction} ${step.maneuver ?? ''}`);
-        const isMainRoad = /silnic|dálnic|highway|route|tříd|avenue|\b[DI]\s?\d+|\b\d{2,3}\b/i.test(instruction);
-        const usefulDistance = distanceMeters >= 500 && distanceMeters <= 3_500;
-        const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isMainRoad ? 10 : 0) + (usefulDistance ? 8 : 0));
+        const isAvenue = /tříd|avenue|ulice|náměstí|nároží/i.test(instruction);
+        const usefulDistance = distanceMeters >= 300 && distanceMeters <= 3_500;
+        const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isAvenue ? 10 : 0) + (usefulDistance ? 8 : 0));
         return [{ routeIndex, stepIndex, direction: origin.direction, latitude, longitude, distanceMeters, instruction, score, maneuver: step.maneuver }];
       });
     })).then(async (groups) => {
