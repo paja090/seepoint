@@ -110,7 +110,33 @@ export async function generateStandardMediaPreview(input: {
     }
     if (affordable.length) selected = affordable;
   }
-  const items = selected.map(({ surface, price, totalPrice, score, reasons }) => ({
+  // For PROMO_TOWER (Promo Věže), automatically select all available sides (4 sides) on that carrier together
+  const expandedSelected: typeof selected = [];
+  const addedTowerCarrierIds = new Set<string>();
+
+  for (const item of selected) {
+    if (expandedSelected.some((x) => x.surface.id === item.surface.id)) continue;
+
+    expandedSelected.push(item);
+
+    const isPromoTower = item.surface.mediaType === 'PROMO_TOWER' ||
+      item.surface.carrier.name.toLowerCase().includes('věž') ||
+      item.surface.carrier.name.toLowerCase().includes('tower');
+
+    if (isPromoTower && !addedTowerCarrierIds.has(item.surface.carrierId)) {
+      addedTowerCarrierIds.add(item.surface.carrierId);
+      const siblingSurfaces = available.filter(
+        (candidate) => candidate.surface.carrierId === item.surface.carrierId && candidate.surface.id !== item.surface.id
+      );
+      for (const sibling of siblingSurfaces) {
+        if (!expandedSelected.some((x) => x.surface.id === sibling.surface.id)) {
+          expandedSelected.push(sibling);
+        }
+      }
+    }
+  }
+
+  const items = expandedSelected.map(({ surface, price, totalPrice, score, reasons }) => ({
     selectionId: surface.id, surfaceId: surface.id, carrierId: surface.carrierId, carrierCode: surface.carrier.code,
     title: `${surface.carrier.name} – ${surface.name}`, mediaType: surface.mediaType, city: surface.carrier.city,
     latitude: surface.carrier.latitude, longitude: surface.carrier.longitude,
