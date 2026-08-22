@@ -24,6 +24,8 @@ export type AiOfferRequest = {
   selectedCandidateIds?: string[];
   candidateMountingTypes?: Record<string, MountingType>;
   navigationPoints?: AiNavigationPointInput[];
+  isNoPriceConcept?: boolean;
+  opportunityId?: string;
 };
 
 export type AiNavigationPointInput = {

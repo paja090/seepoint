@@ -36,7 +36,29 @@ const typeCards: Array<{ value: OfferType; icon: typeof Compass; text: string }>
   { value: 'CITY_GALLERY', icon: Sparkles, text: 'Projektové nabídky Galerie venku.' },
 ];
 
-export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpen: boolean; onClose: () => void; clients?: ClientOption[] }) {
+export type PreFillData = {
+  clientId?: string;
+  clientName?: string;
+  city?: string;
+  prompt?: string;
+  mediaType?: string;
+  targetName?: string;
+  targetAddress?: string;
+  opportunityId?: string;
+  isNoPriceConcept?: boolean;
+};
+
+export function AiOfferGeneratorModal({
+  isOpen,
+  onClose,
+  clients = [],
+  preFill,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  clients?: ClientOption[];
+  preFill?: PreFillData | null;
+}) {
   const router = useRouter();
   const [clientList, setClientList] = useState(clients);
   const [offerType, setOfferType] = useState<OfferType>('STANDARD_MEDIA');
@@ -53,12 +75,29 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
   const [targetName, setTargetName] = useState('');
   const [targetAddress, setTargetAddress] = useState('');
   const [maxRadiusKm, setMaxRadiusKm] = useState(5);
+  const [isNoPriceConcept, setIsNoPriceConcept] = useState(false);
+  const [opportunityId, setOpportunityId] = useState<string | undefined>(undefined);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [routeAnalysis, setRouteAnalysis] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [routeAnalysisMessage, setRouteAnalysisMessage] = useState('');
   const [clientMessage, setClientMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Handle Pre-Fill data
+  useEffect(() => {
+    if (preFill && isOpen) {
+      if (preFill.clientId) setClientId(preFill.clientId);
+      if (preFill.clientName) setClientName(preFill.clientName);
+      if (preFill.city) setCity(preFill.city);
+      if (preFill.prompt) setPrompt(preFill.prompt);
+      if (preFill.mediaType) setMediaType(preFill.mediaType);
+      if (preFill.targetName) setTargetName(preFill.targetName);
+      if (preFill.targetAddress) setTargetAddress(preFill.targetAddress);
+      if (preFill.opportunityId) setOpportunityId(preFill.opportunityId);
+      if (preFill.isNoPriceConcept !== undefined) setIsNoPriceConcept(preFill.isNoPriceConcept);
+    }
+  }, [preFill, isOpen]);
 
   const selectedClient = useMemo(() => clientList.find((client) => client.id === clientId), [clientId, clientList]);
   const recommended = useMemo<OfferType>(() => /naviga|cedul|směrov|smerov|pobočk|pobock/i.test(prompt) ? 'NAVIGATION' : /galerie venku|city gallery|výstav|vystav/i.test(prompt) ? 'CITY_GALLERY' : 'STANDARD_MEDIA', [prompt]);
@@ -83,6 +122,8 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
     clientName: clientName.trim() || undefined,
     pricingSegment,
     city: offerType === 'NAVIGATION' ? undefined : city.trim() || undefined,
+    isNoPriceConcept,
+    opportunityId,
     mediaType: mediaType || undefined,
     clientMessage: clientMessage.trim() || undefined,
     budget: budget ? Number(budget) : undefined,
@@ -244,6 +285,26 @@ export function AiOfferGeneratorModal({ isOpen, onClose, clients = [] }: { isOpe
               <label className="text-xs font-bold">Počet ploch<input className="input mt-1" min="1" type="number" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
             </section>
           </>}
+
+          {/* Mode Option: No Price Concept */}
+          <section className="rounded-xl border border-purple-800/60 bg-purple-950/30 p-3">
+            <label className="flex items-start gap-2.5 cursor-pointer text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-slate-700 bg-slate-900 text-purple-600 focus:ring-purple-500"
+                checked={isNoPriceConcept}
+                onChange={(e) => setIsNoPriceConcept(e.target.checked)}
+              />
+              <div>
+                <span className="font-extrabold text-purple-200">
+                  🔒 Nezávazný koncept kampaně bez cen (pro první oslovení klienta)
+                </span>
+                <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                  Veřejný odkaz klientovi ukáže strategii, reálné fotky nosičů a mapu, ale kompletně skryje ceníkové i celkové ceny.
+                </p>
+              </div>
+            </label>
+          </section>
 
           <details className="group rounded-xl border border-slate-800 bg-slate-950/50 p-3">
             <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-bold text-slate-300">Cenová kategorie a rozpočet <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></summary>

@@ -146,6 +146,35 @@ enum OfferType {
   CITY_GALLERY
 }
 
+enum OpportunityEventType {
+  NEW_BRANCH
+  NEW_ESTABLISHMENT
+  STORE_OPENING
+  RESTAURANT_OPENING
+  CAR_DEALERSHIP
+  RETAIL_PARK
+  RETAIL_PARK_TENANT
+  EXPANSION
+  RELOCATION
+  REOPENING
+  MARKETING_EVENT
+  SEASONAL_CAMPAIGN
+  NEW_PRODUCT_SERVICE
+  EVENT_EXHIBITION
+  MASS_RECRUITMENT
+  OTHER
+}
+
+enum OpportunityStatus {
+  NEW
+  REVIEWED
+  CONTACT_PLANNED
+  CONTACTED
+  PROPOSAL_CREATED
+  CONVERTED
+  DISMISSED
+}
+
 enum NavigationPointStatus {
   PLANNED
   APPROVAL_REQUIRED
@@ -426,6 +455,7 @@ model User {
   createdCandidatePoints         NavigationCandidatePoint[]      @relation("CandidateCreatedBy")
   assignedCandidatePoints        NavigationCandidatePoint[]      @relation("CandidateAssignedTo")
   supervisionCandidatePoints     NavigationCandidatePoint[]      @relation("CandidateSupervisionBy")
+  assignedOpportunities          SalesOpportunity[]              @relation("OpportunityAssignedUser")
 }
 
 model UserSession {
@@ -634,6 +664,7 @@ model Client {
   mergedTargetLogs               ClientMergeLog[]
   navigationContracts            NavigationContract[]
   navigationContactPersons       NavigationContactPerson[]
+  salesOpportunities             SalesOpportunity[]
 }
 
 model AdvertisingCarrier {
@@ -1059,6 +1090,9 @@ model Offer {
   expiredAt             DateTime?
   archivedAt            DateTime?
   negotiationApprovedAt DateTime?
+  isNoPriceConcept      Boolean              @default(false)
+  campaignStrategy      Json?
+  campaignPhases        Json?
   createdBy             String?
   createdByUserId       String?
   updatedByUserId       String?
@@ -1078,11 +1112,54 @@ model Offer {
   navigationDocumentationReports NavigationDocumentationReport[]
   crmOrder                       CrmOrder?
   navigationContracts            NavigationContract[]
+  salesOpportunities             SalesOpportunity[]
 
   @@index([clientId])
   @@index([status, validUntil])
   @@index([createdByUserId, createdAt])
   @@index([archivedAt])
+}
+
+model SalesOpportunity {
+  id                      String               @id @default(cuid())
+  companyName             String
+  companyId               String?
+  website                 String?
+  eventType               OpportunityEventType @default(NEW_BRANCH)
+  title                   String
+  summary                 String
+  city                    String
+  region                  String?
+  address                 String?
+  latitude                Float?
+  longitude               Float?
+  eventDate               DateTime?
+  detectedAt              DateTime             @default(now())
+  sourceUrl               String
+  sourceTitle             String
+  sourcePublishedAt       DateTime?
+  opportunityScore        Int                  @default(50)
+  scoreReasons            Json?
+  suggestedMediaTypes     Json?
+  suggestedCampaignPhases Json?
+  status                  OpportunityStatus    @default(NEW)
+  clientId                String?
+  createdOfferId          String?
+  assignedToUserId        String?
+  dismissedReason         String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdOffer Offer?    @relation(fields: [createdOfferId], references: [id], onDelete: SetNull)
+  assignedTo   User?     @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, opportunityScore])
+  @@index([city, region])
+  @@index([clientId])
+  @@index([createdOfferId])
+  @@index([assignedToUserId])
+  @@index([companyName, eventType])
 }
 
 model NavigationOffer {

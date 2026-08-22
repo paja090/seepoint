@@ -105,13 +105,59 @@ async function confirmStandard(user: CurrentUser, request: AiOfferRequest, clien
   });
   const offerId = result.offer.id!;
   await prisma.$transaction([
-    prisma.offer.update({ where: { id: offerId }, data: { pricingSegment: client.pricingSegment } }),
+    prisma.offer.update({
+      where: { id: offerId },
+      data: {
+        pricingSegment: client.pricingSegment,
+        isNoPriceConcept: Boolean(request.isNoPriceConcept),
+        campaignStrategy: {
+          summary: preview.explanation,
+          city: request.city || client.name,
+          recommendedMediaTypes: [request.mediaType || 'CITY_POSTER'],
+        },
+        campaignPhases: [
+          {
+            phase: 'TEASER',
+            name: 'Před-otvírací fáze (Teaser)',
+            timeframe: '2–3 týdny před otevřením',
+            recommendedMediaTypes: ['CITY_POSTER', 'PROMO_BENCH'],
+            description: 'Budování povědomí o příchodu značky a vyvolání prvotního zájmu obyvatel v širším okolí.',
+          },
+          {
+            phase: 'OPENING',
+            name: 'Fáze slavnostního otevření',
+            timeframe: 'Týden otevření',
+            recommendedMediaTypes: ['CITY_POSTER', 'NAVIGATION_SIGN', 'PROMO_BENCH'],
+            description: 'Intenzivní lokální kampaň s přímou navigací zákazníků z hlavních příjezdových křižovatek k novému objektu.',
+          },
+          {
+            phase: 'FOLLOW_UP',
+            name: 'Stabilizační fáze (Follow-up)',
+            timeframe: '1–2 týdny po otevření',
+            recommendedMediaTypes: ['PROMO_BENCH', 'CITY_POSTER'],
+            description: 'Upevnění návyku zákazníků navštěvovat novou pobočku v rezidenčních a spádových čtvrtích.',
+          },
+        ],
+      },
+    }),
     ...preview.items.map((item) => prisma.offerItem.updateMany({ where: { offerId, surfaceId: item.surfaceId! }, data: {
       priceRuleId: item.price?.ruleId ?? null, pricingSegment: client.pricingSegment,
       catalogPrice: item.price?.unitPrice ?? null, finalPrice: item.price?.unitPrice ?? null, priceSource: item.price ? 'OFFER_PRICE_RULE' : 'MISSING',
       priceValidFrom: item.price?.validFrom ? new Date(item.price.validFrom) : null, priceValidTo: item.price?.validTo ? new Date(item.price.validTo) : null,
     } })),
   ]);
+
+  if (request.opportunityId) {
+    await prisma.salesOpportunity.update({
+      where: { id: request.opportunityId },
+      data: {
+        createdOfferId: offerId,
+        clientId: client.id,
+        status: 'PROPOSAL_CREATED',
+      },
+    }).catch(() => undefined);
+  }
+
   return offerId;
 }
 
