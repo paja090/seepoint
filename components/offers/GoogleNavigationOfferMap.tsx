@@ -16,6 +16,9 @@ declare global {
         Polyline: new (options: Record<string, unknown>) => {
           setMap: (map: unknown) => void;
         };
+        Polygon?: new (options: Record<string, unknown>) => {
+          setMap: (map: unknown) => void;
+        };
         LatLngBounds: new () => {
           extend: (point: { lat: number; lng: number }) => void;
         };
@@ -432,6 +435,47 @@ export function GoogleNavigationOfferMap({
       });
 
       markersRef.current.push(targetMarker);
+    }
+
+    // Render Ostrava Municipal Heritage Restricted Zones (Nařízení č. 2/2020)
+    if (googleMaps.Polygon) {
+      const heritageZones = [
+        // 1. Moravská Ostrava Památková Zóna (Centrum)
+        [
+          { lat: 49.8418, lng: 18.2835 },
+          { lat: 49.8398, lng: 18.2978 },
+          { lat: 49.8318, lng: 18.2945 },
+          { lat: 49.8312, lng: 18.2840 },
+          { lat: 49.8362, lng: 18.2810 },
+        ],
+        // 2. Poruba Památková Zóna (Hlavní třída)
+        [
+          { lat: 49.8355, lng: 18.1610 },
+          { lat: 49.8355, lng: 18.1750 },
+          { lat: 49.8235, lng: 18.1760 },
+          { lat: 49.8235, lng: 18.1600 },
+        ],
+        // 3. Vítkovice Památková Zóna (Mírové náměstí)
+        [
+          { lat: 49.8185, lng: 18.2640 },
+          { lat: 49.8185, lng: 18.2760 },
+          { lat: 49.8105, lng: 18.2760 },
+          { lat: 49.8105, lng: 18.2640 },
+        ],
+      ];
+
+      heritageZones.forEach((path) => {
+        const poly = new googleMaps.Polygon!({
+          paths: path,
+          strokeColor: '#ef4444',
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: '#f87171',
+          fillOpacity: 0.15,
+          map,
+        });
+        polylinesRef.current.push(poly as unknown as { setMap: (map: unknown) => void });
+      });
     }
 
     // 2. Navigation Points Markers & Route Polylines
