@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Sparkles, MapPin, Target, Layers, Calendar, CheckCircle2, ChevronRight, MessageSquare, PhoneCall, Mail, ExternalLink } from 'lucide-react';
-import type { OfferView } from '@/lib/offers/domain';
+import type { OfferView } from '@/lib/offers/view-model';
 import type { CampaignPhase } from '@/lib/opportunities/types';
 
 const GoogleNavigationOfferMap = dynamic(() => import('./GoogleNavigationOfferMap').then((m) => m.GoogleNavigationOfferMap), { ssr: false });
@@ -16,6 +16,8 @@ const mediaLabels: Record<string, { label: string; icon: string; desc: string }>
   BILLBOARD: { label: 'Billboardy (5.1 × 2.4 m)', icon: '📐', desc: 'Velkoplošná kampaňová síť u hlavních silničních tahů a vjezdů do města.' },
   BIGBOARD: { label: 'Bigboardy (9.6 × 3.6 m)', icon: '🏢', desc: 'Dominantní velkoplošné nosiče pro maximální zásah řidičů na obchvatech.' },
 };
+
+type ItemType = OfferView['items'][number];
 
 export function CampaignConceptPublicView({
   offer,
@@ -55,7 +57,7 @@ export function CampaignConceptPublicView({
       ];
 
   // Group items by media type
-  const mediaGroups = offer.items.reduce<Record<string, typeof offer.items>>((acc, item) => {
+  const mediaGroups = offer.items.reduce<Record<string, ItemType[]>>((acc: Record<string, ItemType[]>, item: ItemType) => {
     const key = item.surface.mediaType || 'OTHER';
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
@@ -315,7 +317,11 @@ export function CampaignConceptPublicView({
               <div className="rounded-2xl overflow-hidden border border-slate-800 min-h-[450px]">
                 <GoogleNavigationOfferMap
                   readOnly
-                  points={offer.items.flatMap((item, idx) => (
+                  mode="LOCATION_SELECTION"
+                  onTargetSelect={() => {}}
+                  onPointMove={() => {}}
+                  onMapClick={() => {}}
+                  points={offer.items.flatMap((item: ItemType, idx: number) => (
                     item.surface.carrier.latitude != null && item.surface.carrier.longitude != null
                       ? [{
                           id: item.surfaceId || `surface-${idx}`,
