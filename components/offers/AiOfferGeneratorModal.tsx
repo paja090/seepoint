@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ChevronDown, Compass, Image, MapPin, Sparkles, X } from 'lucide-react';
 import type { SuggestedNavigationPoint } from './GoogleNavigationOfferMap';
+import { reverseGeocode } from '@/lib/google-maps';
+import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-generator';
+import { haversineMeters } from '@/lib/ai-offers/scoring';
 
 const GoogleNavigationOfferMap = dynamic(() => import('./GoogleNavigationOfferMap').then((module) => module.GoogleNavigationOfferMap), { ssr: false });
 
