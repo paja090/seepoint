@@ -10,6 +10,40 @@ const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
   LIGHT_POLE: 'VO / veřejné osvětlení', TRACTION: 'Trakce', COLUMN: 'Sloupek',
 };
 
+/**
+ * Checks if a road/street is a restricted highway or 1st class trunk road in Ostrava
+ * (e.g. Rudná, Místecká, Bohumínská, Dálnice D1, D56, I/11).
+ * Municipal navigation signs on light poles are NOT allowed on these main highways.
+ */
+export function isRestrictedHighwayOr1stClassRoad(text: string): boolean {
+  if (!text) return false;
+  const norm = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const forbiddenKeywords = [
+    'rudna',
+    'mistecka',
+    'bohuminska',
+    'opavska',
+    'slovenska',
+    'dalnice',
+    'dalnici',
+    'd1',
+    'd56',
+    'i/11',
+    'i/56',
+    'i/59',
+    'silnice 1',
+    'silnici 1',
+  ];
+
+  return forbiddenKeywords.some((keyword) => {
+    if (keyword.length <= 3) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+      return regex.test(norm);
+    }
+    return norm.includes(keyword);
+  });
+}
+
 function rentalQuantity(unit: string, durationMonths: number) {
   if (/rok|year|annual/i.test(unit)) return durationMonths / 12;
   if (/měs|mes|month/i.test(unit)) return durationMonths;
@@ -103,11 +137,34 @@ export async function generateNavigationPreview(input: {
   const items = await Promise.all(proposed.map(async (origin, index) => {
     const isRefined = isRefinedPoint(origin);
     const route = isRefined ? null : await computeGoogleRoute(origin, target);
-    const routeStart = isRefined ? origin : firstPolylinePoint(route!.polyline) ?? origin;
+    let routeStart = isRefined ? origin : firstPolylinePoint(route!.polyline) ?? origin;
+    const pointTitle = isRefined ? origin.title : '';
+    const isHighway = isRestrictedHighwayOr1stClassRoad(pointTitle) || isRestrictedHighwayOr1stClassRoad(target.address);
+
+    // If point is detected on restricted highway/1st class road (Rudná, Místecká, D1), shift 150m towards target onto municipal street
+    if (isHighway && !isRefined) {
+      const shiftLat = (target.latitude - routeStart.latitude) * 0.15;
+      const shiftLon = (target.longitude - routeStart.longitude) * 0.15;
+      routeStart = {
+        latitude: routeStart.latitude + shiftLat,
+        longitude: routeStart.longitude + shiftLon,
+      };
+    }
+
     const mountingType = input.request.candidateMountingTypes?.[origin.id];
     const selectedPricing = pricingOptions.find((option) => option.mountingType === mountingType);
     const distance = isRefined ? origin.distanceMeters ?? haversineMeters(origin, target) : route!.status === 'OK' ? route!.distanceMeters : haversineMeters(origin, target);
     const direction = 'direction' in origin ? origin.direction : '';
+
+    const reasons = isRefined ? origin.reasons : [
+      `Dočasný výchozí bod pro příjezd od ${direction}.`,
+      route!.status === 'OK' ? 'Trasa byla ověřena přes Google Routes.' : 'Google trasu zatím neověřil; počkejte na analýzu mapy v náhledu.',
+    ];
+
+    if (isHighway) {
+      reasons.push('🛡️ Omezení sítě: Desky VO se neumísťují na dálnicích a I. třídě (Rudná, Místecká). Bod byl AI posunut na odbočovací křižovatku/městskou třídu.');
+    }
+
     return {
       selectionId: origin.id, surfaceId: null, carrierId: '', carrierCode: `NAV-${index + 1}`,
       title: isRefined ? origin.title : `Orientační směr od ${direction}`, mediaType: 'NAVIGATION_SIGN' as const, city: pricingCity,
@@ -120,15 +177,17 @@ export async function generateNavigationPreview(input: {
       routePolyline: isRefined ? origin.routePolyline : route!.polyline || undefined,
       routeDurationSeconds: isRefined ? origin.routeDurationSeconds : route!.durationSeconds || undefined,
       arrowDirection: isRefined ? origin.arrowDirection ?? 'STRAIGHT' as const : 'STRAIGHT' as const,
-      reasons: isRefined ? origin.reasons : [
-        `Dočasný výchozí bod pro příjezd od ${direction}.`,
-        route!.status === 'OK' ? 'Trasa byla ověřena přes Google Routes.' : 'Google trasu zatím neověřil; počkejte na analýzu mapy v náhledu.',
-      ],
+      reasons,
     };
   }));
+
   const pricedItems = items.filter((item) => item.finalPrice !== null);
   const catalogTotal = pricedItems.length === items.length ? pricedItems.reduce((sum, item) => sum + item.finalPrice!, 0) : null;
-  const warnings = ['Před realizací obchodník ověří sloup v terénu, nahraje fotografii a případně bod posune.'];
+  const warnings = [
+    'Před realizací obchodník ověří sloup v terénu, nahraje fotografii a případně bod posune.',
+    '🛡️ Omezení sítě: Navigační desky na sloupech VO nelze z legislativních a bezpečnostních důvodů umísťovat přímo na dálnicích a silnicích I. třídy (Rudná, Místecká, D1, D56). AI navrhuje body výhradně na odbočovacích křižovatkách a městských třídách.',
+  ];
+
   if (items.length < input.quantity) warnings.push(`AI připravila ${items.length} různých příjezdových směrů z požadovaných ${input.quantity} bodů. Další body doplní obchodník v mapě.`);
   if (!refinedPoints.length && items.some((item) => !item.routePolyline)) warnings.push('Mapa ještě hledá silné body na reálných příjezdových trasách. Pokud Google trasu nenajde, body upraví obchodník v editoru.');
   if (pricingOptions.every((option) => option.total === null)) warnings.push('Pro tuto lokalitu, délku nebo segment není kompletní navigační ceník. Koncept lze vytvořit bez ceny.');
@@ -139,7 +198,7 @@ export async function generateNavigationPreview(input: {
     budgetDifference: catalogTotal !== null && input.request.budget ? catalogTotal - input.request.budget : null,
     warnings, candidateCount: origins.length,
     explanation: refinedPoints.length
-      ? `Vybráno ${items.length} rozhodovacích míst na reálných příjezdových trasách. AI upřednostnila odbočení, křižovatky a hlavní tahy s užitečnou vzdáleností od cíle.`
-      : `Připraveny výchozí směry. Mapa nyní hledá skutečné křižovatky, odbočení a hlavní příjezdové tahy.`,
+      ? `Vybráno ${items.length} rozhodovacích míst na reálných příjezdových trasách mimo dálnice a I. třídy.`
+      : `Připraveny výchozí směry na městských třídách a odbočkách (mimo dálnice a I. třídy).`,
   };
 }
