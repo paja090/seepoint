@@ -60,6 +60,47 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   } catch { return null; }
 }
 
+export async function reverseGeocode(latitude: number, longitude: number): Promise<GeocodeResult | null> {
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  if (apiKey) try {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.set('latlng', `${latitude},${longitude}`);
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('language', 'cs');
+    url.searchParams.set('region', 'cz');
+    const response = await fetch(url, {
+      headers: { Referer: process.env.APP_URL || 'https://seepoint.vercel.app/' },
+      cache: 'no-store',
+    });
+    if (response.ok) {
+      const data = await response.json() as {
+        status?: string;
+        results?: Array<{ formatted_address?: string }>;
+      };
+      const first = data.status === 'OK' ? data.results?.[0] : undefined;
+      if (first?.formatted_address) {
+        return { latitude, longitude, formattedAddress: first.formatted_address };
+      }
+    }
+  } catch { /* Fallback */ }
+
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse');
+    url.searchParams.set('format', 'jsonv2');
+    url.searchParams.set('lat', String(latitude));
+    url.searchParams.set('lon', String(longitude));
+    const response = await fetch(url, { headers: { 'User-Agent': 'SeePOINT-internal/1.0' }, cache: 'no-store' });
+    if (!response.ok) return null;
+    const data = await response.json() as { display_name?: string };
+    if (data.display_name) {
+      return { latitude, longitude, formattedAddress: data.display_name };
+    }
+  } catch { return null; }
+
+  return null;
+}
+
 /**
  * Computes route driving distance and polyline using Google Routes API (New).
  * Only called on point creation, drag end, or explicit recalculation request.

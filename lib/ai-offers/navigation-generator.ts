@@ -139,16 +139,38 @@ export async function generateNavigationPreview(input: {
     const route = isRefined ? null : await computeGoogleRoute(origin, target);
     let routeStart = isRefined ? origin : firstPolylinePoint(route!.polyline) ?? origin;
     const pointTitle = isRefined ? origin.title : '';
-    const isHighway = isRestrictedHighwayOr1stClassRoad(pointTitle) || isRestrictedHighwayOr1stClassRoad(target.address);
 
-    // If point is detected on restricted highway/1st class road (Rudná, Místecká, D1), shift 150m towards target onto municipal street
+    // Check street name via reverseGeocode to verify if GPS coordinates fall on a restricted 1st class road/highway
+    let resolvedAddress = pointTitle;
+    if (!isRefined) {
+      const revGeo = await reverseGeocode(routeStart.latitude, routeStart.longitude);
+      if (revGeo?.formattedAddress) {
+        resolvedAddress = `${pointTitle} ${revGeo.formattedAddress}`;
+      }
+    }
+
+    let isHighway = isRestrictedHighwayOr1stClassRoad(resolvedAddress);
+    let wasShiftedOffHighway = false;
+
+    // If point lands on a restricted highway (Rudná, Místecká, D1, D56, I/11), shift towards target onto municipal street
     if (isHighway && !isRefined) {
-      const shiftLat = (target.latitude - routeStart.latitude) * 0.15;
-      const shiftLon = (target.longitude - routeStart.longitude) * 0.15;
-      routeStart = {
-        latitude: routeStart.latitude + shiftLat,
-        longitude: routeStart.longitude + shiftLon,
-      };
+      for (let step = 1; step <= 3; step++) {
+        const shiftLat = (target.latitude - routeStart.latitude) * (0.25 * step);
+        const shiftLon = (target.longitude - routeStart.longitude) * (0.25 * step);
+        const candidatePoint = {
+          latitude: routeStart.latitude + shiftLat,
+          longitude: routeStart.longitude + shiftLon,
+        };
+        const revGeo = await reverseGeocode(candidatePoint.latitude, candidatePoint.longitude);
+        const candidateAddress = revGeo?.formattedAddress || '';
+        if (!isRestrictedHighwayOr1stClassRoad(candidateAddress)) {
+          routeStart = candidatePoint;
+          resolvedAddress = candidateAddress;
+          isHighway = false;
+          wasShiftedOffHighway = true;
+          break;
+        }
+      }
     }
 
     const mountingType = input.request.candidateMountingTypes?.[origin.id];
@@ -161,8 +183,8 @@ export async function generateNavigationPreview(input: {
       route!.status === 'OK' ? 'Trasa byla ověřena přes Google Routes.' : 'Google trasu zatím neověřil; počkejte na analýzu mapy v náhledu.',
     ];
 
-    if (isHighway) {
-      reasons.push('🛡️ Omezení sítě: Desky VO se neumísťují na dálnicích a I. třídě (Rudná, Místecká). Bod byl AI posunut na odbočovací křižovatku/městskou třídu.');
+    if (wasShiftedOffHighway || isHighway) {
+      reasons.push('🛡️ Omezení sítě: Desky VO se neumísťují na dálnicích a I. třídě (Rudná, Místecká). Bod byl AI automaticky posunut na městskou odbočovací trusu.');
     }
 
     return {
