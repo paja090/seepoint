@@ -339,6 +339,53 @@ export function CampaignConceptPublicView({
           </section>
         )}
 
+        {/* NEXT STEPS & ROADMAP SECTION */}
+        <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 space-y-6 shadow-xl">
+          <div className="space-y-1">
+            <span className="text-[11px] font-black uppercase tracking-wider text-purple-400">Průvodce realizací</span>
+            <h2 className="text-xl sm:text-2xl font-black text-white">Jak probíhá daleký postup a realizace?</h2>
+            <p className="text-xs sm:text-sm text-slate-400 font-medium">Od schválení nezávazného konceptu k aktivním reklamním plochám v terénu.</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-3 relative overflow-hidden">
+              <span className="text-2xl font-black text-purple-500/40 absolute top-3 right-4">01</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-950 text-purple-300 flex items-center justify-center font-black text-sm border border-purple-800">
+                1
+              </div>
+              <h3 className="font-bold text-white text-sm">Schválení konceptu & lokací</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Projdete navržené plochy, vyberete preferované lokality a potvrdíte rozsah kampaně.</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-3 relative overflow-hidden">
+              <span className="text-2xl font-black text-purple-500/40 absolute top-3 right-4">02</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-950 text-purple-300 flex items-center justify-center font-black text-sm border border-purple-800">
+                2
+              </div>
+              <h3 className="font-bold text-white text-sm">Příprava cenové kalkulace</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Obchodník pro vybrané plochy připraví ceníkovou kalkulaci se započtením slev a rozpočtu.</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-3 relative overflow-hidden">
+              <span className="text-2xl font-black text-purple-500/40 absolute top-3 right-4">03</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-950 text-purple-300 flex items-center justify-center font-black text-sm border border-purple-800">
+                3
+              </div>
+              <h3 className="font-bold text-white text-sm">Povolení & Výroba grafiky</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Zajistíme úřední zábor a stavební souhlasy (např. u VO) a vytiskneme kampaňové materiály.</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-3 relative overflow-hidden">
+              <span className="text-2xl font-black text-purple-500/40 absolute top-3 right-4">04</span>
+              <div className="w-10 h-10 rounded-xl bg-purple-950 text-purple-300 flex items-center justify-center font-black text-sm border border-purple-800">
+                4
+              </div>
+              <h3 className="font-bold text-white text-sm">Instalace & Fotodokumentace</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Tým montážníků osadí plochy v terénu a zašleme vám kompletní klientský fotoreport.</p>
+            </div>
+          </div>
+        </section>
+
         {/* CALL TO ACTION STRIP */}
         <section className="rounded-3xl border border-purple-800/80 bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 p-8 text-center space-y-4 shadow-2xl">
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
