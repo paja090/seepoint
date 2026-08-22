@@ -20,6 +20,9 @@ export async function POST() {
     const rssUrls = [
       'https://news.google.com/rss/search?q=ostrava+otev%C5%99en%C3%AD+prodejny+pobo%C4%8Dky+provozovny&hl=cs&gl=CZ&ceid=CZ:cs',
       'https://news.google.com/rss/search?q=moravskoslezsky+kraj+nova+pobocka+retail+park&hl=cs&gl=CZ&ceid=CZ:cs',
+      'https://news.google.com/rss/search?q=opava+havirov+karvina+frydek+mistek+otevreni+prodejna&hl=cs&gl=CZ&ceid=CZ:cs',
+      'https://news.google.com/rss/search?q=ostrava+opava+koncert+festival+sportovni+akce&hl=cs&gl=CZ&ceid=CZ:cs',
+      'https://news.google.com/rss/search?q=ostrava+novy+restaurace+autosalon+prodejna&hl=cs&gl=CZ&ceid=CZ:cs',
     ];
 
     const rawArticles: Array<{ title: string; link: string; pubDate?: string }> = [];
@@ -34,7 +37,7 @@ export async function POST() {
           const itemRegex = /<item>[\s\S]*?<\/item>/gi;
           const items = xmlText.match(itemRegex) || [];
 
-          for (const itemXml of items.slice(0, 10)) {
+          for (const itemXml of items.slice(0, 15)) {
             const titleMatch = itemXml.match(/<title>(.*?)<\/title>/i);
             const linkMatch = itemXml.match(/<link>(.*?)<\/link>/i);
             const pubDateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/i);
@@ -58,10 +61,10 @@ export async function POST() {
     let addedCount = 0;
     let duplicateCount = 0;
 
-    // Process top 5 unique articles with AI
+    // Process top 15 unique articles with AI
     const uniqueArticles = rawArticles.filter(
       (art, idx, all) => all.findIndex((candidate) => candidate.title === art.title) === idx
-    ).slice(0, 5);
+    ).slice(0, 15);
 
     for (const article of uniqueArticles) {
       try {
