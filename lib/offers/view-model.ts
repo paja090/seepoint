@@ -73,6 +73,7 @@ export type OfferView = {
   taxAmount: string | null;
   totalWithTax: string | null;
   hasPublicLink?: boolean;
+  isNoPriceConcept?: boolean;
   publicToken?: string | null;
   publishedAt?: string | null;
   sentAt?: string | null;
