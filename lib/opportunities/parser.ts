@@ -47,7 +47,7 @@ export async function parseOpportunityFromAiInput(
   const promptText = `Jsi AI Obchodní radar pro českou outdoorovou reklamní společnost SeePOINT (seepoint.cz).
 Tvým úkolem je z textu novinové zprávy, tiskové zprávy nebo inzerátu extrahovat strukturovaná data o nové obchodní příležitosti (otevření pobočky, prodejny, restaurace, stěhování, expanze firmy).
 
-Vrať VÝHRADNĚ platný JSON bez jakýchkoliv markdown značek (```json) s těmito poli:
+Vrať VÝHRADNĚ platný JSON bez jakýchkoliv markdown značek (JSON format) s těmito poli:
 {
   "companyName": "Přesný název firmy/značky",
   "companyId": "IČO pokud je v textu výslovně uvedeno, jinak null",

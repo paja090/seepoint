@@ -46,6 +46,7 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
     const navigationMode = (offer.navigation as unknown as { proposalMode?: string } | undefined)?.proposalMode;
     const isLocationSelection = offer.offerType === 'NAVIGATION' && navigationMode !== 'PRICED_QUOTE';
     return (
+      <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-7xl space-y-6">
           <header className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
