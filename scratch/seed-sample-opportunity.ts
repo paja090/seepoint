@@ -1,5 +1,7 @@
-import { prisma } from '../lib/db';
+import { PrismaClient } from '@prisma/client';
 import { createOpportunity } from '../lib/opportunities/service';
+
+const prisma = new PrismaClient();
 
 async function main() {
   const result = await createOpportunity({
