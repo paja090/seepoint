@@ -317,7 +317,7 @@ export function CampaignConceptPublicView({
               <div className="rounded-2xl overflow-hidden border border-slate-800 min-h-[450px]">
                 <GoogleNavigationOfferMap
                   readOnly
-                  mode="LOCATION_SELECTION"
+                  mode="point"
                   onTargetSelect={() => {}}
                   onPointMove={() => {}}
                   onMapClick={() => {}}
