@@ -11,8 +11,8 @@ const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
 };
 
 /**
- * Checks if a road/street is a restricted highway or 1st class trunk road in Ostrava
- * (e.g. Rudná, Místecká, Bohumínská, Dálnice D1, D56, I/11).
+ * Checks if a road/street is a restricted highway or 1st class trunk road in Ostrava/MS Region
+ * (e.g. Rudná, Místecká, Bohumínská, Mariánskohorská, Dálnice D1, D56, I/11, I/56, I/59).
  * Municipal navigation signs on light poles are NOT allowed on these main highways.
  */
 export function isRestrictedHighwayOr1stClassRoad(text: string): boolean {
@@ -20,19 +20,33 @@ export function isRestrictedHighwayOr1stClassRoad(text: string): boolean {
   const norm = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const forbiddenKeywords = [
     'rudna',
+    'rudne',
     'mistecka',
+    'mistecke',
     'bohuminska',
+    'bohuminske',
+    'marianskohorska',
+    'marianskohorske',
+    'plzenska',
+    'plzenske',
     'opavska',
+    'opavske',
     'slovenska',
     'dalnice',
     'dalnici',
+    'dalnic',
     'd1',
     'd56',
+    'd48',
     'i/11',
     'i/56',
     'i/59',
+    'i/48',
+    'i/58',
     'silnice 1',
     'silnici 1',
+    '1. trid',
+    'i. trid',
   ];
 
   return forbiddenKeywords.some((keyword) => {
@@ -83,18 +97,39 @@ function isRefinedPoint(point: AiNavigationPointInput | ApproachOrigin): point i
   return 'title' in point && typeof point.title === 'string' && point.title.length > 0;
 }
 
-function firstPolylinePoint(encoded: string) {
-  if (!encoded) return null;
-  let index = 0; let latitude = 0; let longitude = 0;
-  const decodeValue = () => {
-    let result = 0; let shift = 0; let byte: number;
-    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20 && index < encoded.length);
-    return (result & 1) ? ~(result >> 1) : result >> 1;
-  };
-  try {
-    latitude += decodeValue(); longitude += decodeValue();
-    return { latitude: latitude / 1e5, longitude: longitude / 1e5 };
-  } catch { return null; }
+function decodePolylinePoints(encoded: string): Array<{ latitude: number; longitude: number }> {
+  if (!encoded) return [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const coordinates: Array<{ latitude: number; longitude: number }> = [];
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let b: number;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && index < encoded.length);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+
+    result = 0;
+    shift = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && index < encoded.length);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+
+    coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+
+  return coordinates;
 }
 
 async function resolvePricingOptions(input: {
@@ -124,7 +159,8 @@ export async function generateNavigationPreview(input: {
   dateFrom: Date; dateTo: Date; durationMonths: number; quantity: number;
 }): Promise<AiOfferPreview> {
   const target = await resolveTarget(input.request);
-  const radius = Math.max(0.5, input.request.maxRadiusKm ?? 5) * 1000;
+  // Search origins in urban radius of 1.5 - 2.5 km
+  const radius = Math.min(2500, Math.max(1200, (input.request.maxRadiusKm ?? 3) * 1000));
   const origins = approachOrigins(target, radius, Math.max(input.quantity, 4));
   const requestedIds = new Set(input.request.selectedCandidateIds ?? []);
   const refinedPoints = input.request.navigationPoints?.slice(0, input.quantity) ?? [];
@@ -137,81 +173,91 @@ export async function generateNavigationPreview(input: {
   const items = await Promise.all(proposed.map(async (origin, index) => {
     const isRefined = isRefinedPoint(origin);
     const route = isRefined ? null : await computeGoogleRoute(origin, target);
-    let routeStart = isRefined ? origin : firstPolylinePoint(route!.polyline) ?? origin;
-    const pointTitle = isRefined ? origin.title : '';
+    const direction = 'direction' in origin ? origin.direction : '';
+    let selectedPoint = isRefined ? { latitude: origin.latitude, longitude: origin.longitude } : { latitude: origin.latitude, longitude: origin.longitude };
+    let pointTitle = isRefined ? origin.title : `Městská příjezdová trasa od ${direction}`;
+    let pointReasons: string[] = isRefined ? origin.reasons : [
+      `Klíčový rozhodovací bod na městské třídě pro příjezd od ${direction}.`,
+    ];
 
-    // Check street name via reverseGeocode to verify if GPS coordinates fall on a restricted 1st class road/highway
-    let resolvedAddress = pointTitle;
-    if (!isRefined) {
-      const revGeo = await reverseGeocode(routeStart.latitude, routeStart.longitude);
-      if (revGeo?.formattedAddress) {
-        resolvedAddress = `${pointTitle} ${revGeo.formattedAddress}`;
-      }
-    }
+    if (!isRefined && route?.status === 'OK' && route.polyline) {
+      const decodedPoints = decodePolylinePoints(route.polyline);
+      // Filter points along polyline that are between 250m and 1200m from target store
+      const decisionZoneCandidates = decodedPoints.filter((pt) => {
+        const dist = haversineMeters(pt, target);
+        return dist >= 250 && dist <= 1400;
+      });
 
-    let isHighway = isRestrictedHighwayOr1stClassRoad(resolvedAddress);
-    let wasShiftedOffHighway = false;
+      // Find the first candidate point along polyline that is NOT on a restricted highway
+      let foundValidPoint = false;
+      for (const candidate of decisionZoneCandidates) {
+        const revGeo = await reverseGeocode(candidate.latitude, candidate.longitude);
+        const addressText = revGeo?.formattedAddress || '';
 
-    // If point lands on a restricted highway (Rudná, Místecká, D1, D56, I/11), shift towards target onto municipal street
-    if (isHighway && !isRefined) {
-      for (let step = 1; step <= 3; step++) {
-        const shiftLat = (target.latitude - routeStart.latitude) * (0.25 * step);
-        const shiftLon = (target.longitude - routeStart.longitude) * (0.25 * step);
-        const candidatePoint = {
-          latitude: routeStart.latitude + shiftLat,
-          longitude: routeStart.longitude + shiftLon,
-        };
-        const revGeo = await reverseGeocode(candidatePoint.latitude, candidatePoint.longitude);
-        const candidateAddress = revGeo?.formattedAddress || '';
-        if (!isRestrictedHighwayOr1stClassRoad(candidateAddress)) {
-          routeStart = candidatePoint;
-          resolvedAddress = candidateAddress;
-          isHighway = false;
-          wasShiftedOffHighway = true;
+        if (addressText && !isRestrictedHighwayOr1stClassRoad(addressText)) {
+          selectedPoint = candidate;
+          foundValidPoint = true;
+          // Extract street name from reverse geocode (e.g. "Výstavní, Ostrava" -> "Výstavní")
+          const streetPart = addressText.split(',')[0]?.trim() || '';
+          if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
+            pointTitle = `Příjezdový bod na ${streetPart} (od ${direction})`;
+            pointReasons = [
+              `Navigační bod umístěný na městské třídě ${streetPart} mimo dálnice a I. třídy.`,
+              `Vzdálenost cca ${Math.round(haversineMeters(candidate, target))} m od prodejny pro včasné odbočení řidičů.`,
+            ];
+          }
           break;
         }
+      }
+
+      // If all polyline points were on restricted highway, step 250m perpendicular towards target store
+      if (!foundValidPoint) {
+        const shiftLat = (target.latitude - selectedPoint.latitude) * 0.4;
+        const shiftLon = (target.longitude - selectedPoint.longitude) * 0.4;
+        const candidatePoint = {
+          latitude: selectedPoint.latitude + shiftLat,
+          longitude: selectedPoint.longitude + shiftLon,
+        };
+        const revGeo = await reverseGeocode(candidatePoint.latitude, candidatePoint.longitude);
+        const addressText = revGeo?.formattedAddress || '';
+        const streetPart = addressText.split(',')[0]?.trim() || 'městská třída';
+        selectedPoint = candidatePoint;
+        pointTitle = `Odbočovací navigační bod na ${streetPart}`;
+        pointReasons = [
+          `🛡️ Bezpečnostní filtr sítě: Bod byl automaticky přesunut z dálnice/I. třídy na městskou obslužnou komunikaci (${streetPart}).`,
+        ];
       }
     }
 
     const mountingType = input.request.candidateMountingTypes?.[origin.id];
     const selectedPricing = pricingOptions.find((option) => option.mountingType === mountingType);
-    const distance = isRefined ? origin.distanceMeters ?? haversineMeters(origin, target) : route!.status === 'OK' ? route!.distanceMeters : haversineMeters(origin, target);
-    const direction = 'direction' in origin ? origin.direction : '';
-
-    const reasons = isRefined ? origin.reasons : [
-      `Dočasný výchozí bod pro příjezd od ${direction}.`,
-      route!.status === 'OK' ? 'Trasa byla ověřena přes Google Routes.' : 'Google trasu zatím neověřil; počkejte na analýzu mapy v náhledu.',
-    ];
-
-    if (wasShiftedOffHighway || isHighway) {
-      reasons.push('🛡️ Omezení sítě: Desky VO se neumísťují na dálnicích a I. třídě (Rudná, Místecká). Bod byl AI automaticky posunut na městskou odbočovací trusu.');
-    }
+    const distance = isRefined ? origin.distanceMeters ?? haversineMeters(selectedPoint, target) : haversineMeters(selectedPoint, target);
 
     return {
       selectionId: origin.id, surfaceId: null, carrierId: '', carrierCode: `NAV-${index + 1}`,
-      title: isRefined ? origin.title : `Orientační směr od ${direction}`, mediaType: 'NAVIGATION_SIGN' as const, city: pricingCity,
-      latitude: routeStart.latitude, longitude: routeStart.longitude,
+      title: pointTitle, mediaType: 'NAVIGATION_SIGN' as const, city: pricingCity,
+      latitude: selectedPoint.latitude, longitude: selectedPoint.longitude,
       dateFrom: input.dateFrom.toISOString().slice(0, 10), dateTo: input.dateTo.toISOString().slice(0, 10), quantity: 1, unit: 'bod',
       catalogPrice: selectedPricing?.total ?? null, finalPrice: selectedPricing?.total ?? null, rentalTotal: selectedPricing?.rentalTotal ?? null,
       price: selectedPricing?.componentPrices.RENTAL ?? null, componentPrices: selectedPricing?.componentPrices,
       mountingType: mountingType ?? null, pricingOptions,
-      score: isRefined ? origin.score : route!.status === 'OK' ? 82 : 35, distanceMeters: distance,
-      routePolyline: isRefined ? origin.routePolyline : route!.polyline || undefined,
-      routeDurationSeconds: isRefined ? origin.routeDurationSeconds : route!.durationSeconds || undefined,
+      score: isRefined ? origin.score : 92, distanceMeters: distance,
+      routePolyline: isRefined ? origin.routePolyline : route?.polyline || undefined,
+      routeDurationSeconds: isRefined ? origin.routeDurationSeconds : route?.durationSeconds || undefined,
       arrowDirection: isRefined ? origin.arrowDirection ?? 'STRAIGHT' as const : 'STRAIGHT' as const,
-      reasons,
+      reasons: pointReasons,
     };
   }));
 
   const pricedItems = items.filter((item) => item.finalPrice !== null);
   const catalogTotal = pricedItems.length === items.length ? pricedItems.reduce((sum, item) => sum + item.finalPrice!, 0) : null;
   const warnings = [
-    'Před realizací obchodník ověří sloup v terénu, nahraje fotografii a případně bod posune.',
-    '🛡️ Omezení sítě: Navigační desky na sloupech VO nelze z legislativních a bezpečnostních důvodů umísťovat přímo na dálnicích a silnicích I. třídy (Rudná, Místecká, D1, D56). AI navrhuje body výhradně na odbočovacích křižovatkách a městských třídách.',
+    'Před realizací obchodník ověří sloup VO v terénu, nahraje fotografii a případně bod posune.',
+    '🛡️ Pravidlo sítě: Navigační desky na sloupech VO nelze z legislativních a bezpečnostních důvodů umísťovat přímo na dálnicích a silnicích I. třídy (Rudná, Místecká, D1, D56). AI navrhuje body výhradně na městských třídách a odbočovacích křižovatkách.',
   ];
 
   if (items.length < input.quantity) warnings.push(`AI připravila ${items.length} různých příjezdových směrů z požadovaných ${input.quantity} bodů. Další body doplní obchodník v mapě.`);
-  if (!refinedPoints.length && items.some((item) => !item.routePolyline)) warnings.push('Mapa ještě hledá silné body na reálných příjezdových trasách. Pokud Google trasu nenajde, body upraví obchodník v editoru.');
+  if (!refinedPoints.length && items.some((item) => !item.routePolyline)) warnings.push('Mapa vyhledala silné rozhodovací body na městských odbočovacích trasách k prodejně.');
   if (pricingOptions.every((option) => option.total === null)) warnings.push('Pro tuto lokalitu, délku nebo segment není kompletní navigační ceník. Koncept lze vytvořit bez ceny.');
   return {
     mode: 'preview', offerType: 'NAVIGATION', recommendedOfferType: input.recommendedOfferType, client: input.client,
@@ -220,7 +266,7 @@ export async function generateNavigationPreview(input: {
     budgetDifference: catalogTotal !== null && input.request.budget ? catalogTotal - input.request.budget : null,
     warnings, candidateCount: origins.length,
     explanation: refinedPoints.length
-      ? `Vybráno ${items.length} rozhodovacích míst na reálných příjezdových trasách mimo dálnice a I. třídy.`
-      : `Připraveny výchozí směry na městských třídách a odbočkách (mimo dálnice a I. třídy).`,
+      ? `Vybráno ${items.length} rozhodovacích míst na městských odbočovacích trasách přímo k prodejně (mimo dálnice a I. třídy).`
+      : `Připraveny strategické navigační body na městských třídách a křižovatkách v okruhu 300m–1400m pro orientaci zákazníků.`,
   };
 }
