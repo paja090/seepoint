@@ -49,16 +49,23 @@ export async function parseOpportunityFromAiInput(
   }
 
   const promptText = `Jsi AI Obchodní radar pro českou outdoorovou reklamní společnost SeePOINT (seepoint.cz).
-Tvým úkolem je posoudit, zda text zprávy představuje REÁLNOU obchodní příležitost pro OOH reklamu (např. otevření konkrétní nové prodejny, pobočky, restaurace, autosalonu, stěhování firmy, kulturní/sportovní akce).
+Tvým úkolem je z textu novinové zprávy, tiskové zprávy nebo inzerátu identifikovat jakoukoliv OBCHODNÍ NEBO KULTURNÍ PŘÍLEŽITOST pro venkovní reklamu (OOH).
 
-POZOR: Pokud jde o obecné novinové články (např. "Otevírací doba o svátcích", "Počasí v Ostravě", "Nehoda na dálnici"), zadej "isRelevant": false.
+VÍTANÉ PŘÍLEŽITOSTI (isRelevant = true):
+- Otevření nové prodejny, pobočky, restaurace, kavárny, autosalonu, provozovny
+- Koncert, festival, divadelní představení, veletrh, výstava, sportovní turnaj
+- Stěhování firmy, přístavba, expanze, nábor zaměstnanců
+- Významná marketingová akce nebo sezónní kampaň
+
+VYŘAZOVANÉ ČLÁNKY (isRelevant = false):
+- Pouze obecné články bez konkrétní značky či akce (např. "Předpověď počasí", "Dopravní nehoda na D1", "Přehled otevíracích dob o svátcích")
 
 Vrať VÝHRADNĚ platný JSON (JSON format) s těmito poli:
 {
   "isRelevant": true nebo false,
-  "relevanceReason": "Stručný důvod relevance či nerelevance",
-  "companyName": "Přesný konkrétní název firmy/značky nebo akce (NIDKY nepoužívej obecné fráze jako 'Nový potenciální klient')",
-  "companyId": "IČO pokud je uvedeno, jinak null",
+  "relevanceReason": "Stručné odůvodnění",
+  "companyName": "Přesný konkrétní název firmy, značky, pořadatele nebo akce (např. Primark, KFC, Colors of Ostrava, McDonald's)",
+  "companyId": "IČO pokud je v textu uvedeno, jinak null",
   "website": "webová stránka firmy pokud je známa, jinak null",
   "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | CAR_DEALERSHIP | RETAIL_PARK | EXPANSION | RELOCATION | REOPENING | MARKETING_EVENT | SEASONAL_CAMPAIGN | OTHER",
   "title": "Stručný atraktivní titulek příležitosti (max 8 slov)",
