@@ -8,6 +8,16 @@ import {
   ExternalLink,
   FilePenLine,
   Link2,
+'use client';
+
+import {
+  CalendarCheck,
+  Check,
+  Copy,
+  Eye,
+  ExternalLink,
+  FilePenLine,
+  Link2,
   LoaderCircle,
   X,
 } from 'lucide-react';
@@ -22,12 +32,13 @@ type OfferActionsProps = {
   offerType: 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY';
   navigationProposalMode?: string;
   navigationSelectionSubmitted?: boolean;
+  isNoPriceConcept?: boolean;
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50';
 
-export function OfferActions({ offerId, status, converted, canConvert, offerType, navigationProposalMode, navigationSelectionSubmitted }: OfferActionsProps) {
+export function OfferActions({ offerId, status, converted, canConvert, offerType, navigationProposalMode, navigationSelectionSubmitted, isNoPriceConcept }: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -66,6 +77,16 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
       </div>
 
       <div className="space-y-3 p-5">
+        {/* Toggle between No-Price Concept and Priced Proposal */}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void action('toggle-concept')}
+          className={isNoPriceConcept ? 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-900 hover:bg-purple-800 text-white font-bold text-xs sm:text-sm py-3 transition shadow-md' : 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold text-xs sm:text-sm py-3 transition'}
+        >
+          {isNoPriceConcept ? '💰 Převést na nabídku s cenovou kalkulací' : '🔒 Přepnout na nezávazný koncept bez cen'}
+        </button>
+
         {isNavigationLocationSelection && navigationSelectionSubmitted ? (
           <a className={primaryButton} href={`/offers/${offerId}/navigation/edit`}>
             <FilePenLine aria-hidden="true" size={17} />
