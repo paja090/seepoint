@@ -28,13 +28,14 @@ function clientVisiblePhotos(offer: OfferView) {
 
 export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictView[] = [], today = new Date().toISOString().slice(0, 10)): OfferReadinessCheck[] {
   const type = offer.offerType ?? 'STANDARD_MEDIA';
-  const contactReady = Boolean(offer.client.name && offer.contactPerson && offer.contactEmail && emailPattern.test(offer.contactEmail));
+  const isNoPrice = (offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept === true;
+  const contactReady = isNoPrice || Boolean(offer.client.name && (!offer.contactEmail || emailPattern.test(offer.contactEmail)));
   const validityReady = Boolean(offer.validUntil && offer.validUntil >= today);
-  const calculationReady = Number(offer.totalWithTax ?? 0) > 0;
+  const calculationReady = isNoPrice || Number(offer.totalWithTax ?? 0) > 0;
   const common: OfferReadinessCheck[] = [
-    { id: 'client', label: 'Klient a kontakt', detail: contactReady ? 'Klient, kontaktní osoba a platný e-mail jsou vyplněné.' : 'Doplňte klienta, kontaktní osobu a platný e-mail.', status: contactReady ? 'ok' : 'error' },
+    { id: 'client', label: 'Klient a kontakt', detail: contactReady ? 'Klient je vyplněn.' : 'Doplňte název klienta.', status: contactReady ? 'ok' : 'error' },
     { id: 'validity', label: 'Platnost nabídky', detail: validityReady ? `Nabídka je platná do ${offer.validUntil}.` : 'Doplňte budoucí nebo dnešní datum platnosti nabídky.', status: validityReady ? 'ok' : 'error' },
-    { id: 'calculation', label: 'Kalkulace nabídky', detail: calculationReady ? 'Celková cena včetně DPH je připravena.' : 'Celková cena nabídky musí být vyšší než nula.', status: calculationReady ? 'ok' : 'error' },
+    { id: 'calculation', label: 'Kalkulace nabídky', detail: isNoPrice ? 'Nezávazný koncept bez cen (připraveno k odeslání).' : calculationReady ? 'Celková cena včetně DPH je připravena.' : 'Celková cena nabídky musí být vyšší než nula.', status: calculationReady ? 'ok' : 'error' },
   ];
 
   if (type === 'NAVIGATION') {
