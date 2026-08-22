@@ -70,6 +70,10 @@ export async function POST() {
       try {
         const parsed = await parseOpportunityFromAiInput(article.title, article.link);
 
+        if (!parsed.isRelevant) {
+          continue;
+        }
+
         const result = await createOpportunity({
           companyName: parsed.companyName,
           companyId: parsed.companyId,
