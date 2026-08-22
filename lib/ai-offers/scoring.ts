@@ -6,13 +6,35 @@ export function haversineMeters(a: { latitude: number; longitude: number }, b: {
   return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)));
 }
 
-export function scoreStandardSurface(input: { cityMatch: boolean; mediaMatch: boolean; price: number | null; budgetPerItem: number | null; hasGps: boolean }) {
+export function scoreStandardSurface(input: {
+  cityMatch: boolean;
+  mediaMatch: boolean;
+  price: number | null;
+  budgetPerItem: number | null;
+  hasGps: boolean;
+  targetDistanceMeters?: number | null;
+}) {
   const reasons = ['Plocha je v požadovaném období dostupná.'];
   let score = 40;
   if (input.cityMatch) { score += 20; reasons.push('Odpovídá požadovanému městu.'); }
   if (input.mediaMatch) { score += 15; reasons.push('Odpovídá požadovanému typu média.'); }
   if (input.price !== null && (input.budgetPerItem === null || input.price <= input.budgetPerItem)) { score += 10; reasons.push('Cena odpovídá rozpočtovému rámci.'); }
   if (input.hasGps) { score += 10; reasons.push('Má ověřitelnou polohu pro mapu a pokrytí.'); }
+
+  if (typeof input.targetDistanceMeters === 'number' && Number.isFinite(input.targetDistanceMeters)) {
+    const distKm = (input.targetDistanceMeters / 1000).toFixed(1);
+    if (input.targetDistanceMeters <= 1000) {
+      score += 25;
+      reasons.push(`Vynikající poloha – přímo u cíle (${distKm} km).`);
+    } else if (input.targetDistanceMeters <= 3000) {
+      score += 15;
+      reasons.push(`Blízká spádová oblast cíle (${distKm} km).`);
+    } else if (input.targetDistanceMeters <= 7000) {
+      score += 10;
+      reasons.push(`Širší spádová zóna (${distKm} km).`);
+    }
+  }
+
   return { score, reasons };
 }
 

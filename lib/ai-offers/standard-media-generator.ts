@@ -2,7 +2,7 @@ import type { MediaType } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { isSurfaceAvailable } from './availability';
 import { resolveCatalogPrice } from './price-resolver';
-import { scoreStandardSurface } from './scoring';
+import { haversineMeters, scoreStandardSurface } from './scoring';
 import type { AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
 
 export async function generateStandardMediaPreview(input: {
@@ -16,6 +16,10 @@ export async function generateStandardMediaPreview(input: {
   mediaType?: MediaType;
 }): Promise<AiOfferPreview> {
   const city = input.request.city?.trim() ?? '';
+  const targetCoords = input.request.targetLatitude && input.request.targetLongitude
+    ? { latitude: input.request.targetLatitude, longitude: input.request.targetLongitude }
+    : null;
+
   const candidates = await prisma.advertisingSurface.findMany({
     where: {
       status: { not: 'OUT_OF_SERVICE' },
@@ -53,14 +57,20 @@ export async function generateStandardMediaPreview(input: {
     const price = priceCache.get(surface.mediaType) ?? null;
     const priceQuantity = price && /měs|mes|month/i.test(price.unit) ? input.durationMonths : 1;
     const totalPrice = price ? price.unitPrice * priceQuantity : null;
+    const hasGps = surface.carrier.latitude != null && surface.carrier.longitude != null;
+    const targetDistanceMeters = targetCoords && hasGps
+      ? haversineMeters({ latitude: surface.carrier.latitude!, longitude: surface.carrier.longitude! }, targetCoords)
+      : null;
+
     const scoring = scoreStandardSurface({
       cityMatch: !city || surface.carrier.city.toLocaleLowerCase('cs').includes(city.toLocaleLowerCase('cs')),
       mediaMatch: !input.mediaType || surface.mediaType === input.mediaType,
       price: totalPrice, budgetPerItem,
-      hasGps: surface.carrier.latitude != null && surface.carrier.longitude != null,
+      hasGps,
+      targetDistanceMeters,
     });
-    return { surface, price, totalPrice, ...scoring };
-  }).sort((a, b) => b.score - a.score || (a.totalPrice ?? Number.MAX_SAFE_INTEGER) - (b.totalPrice ?? Number.MAX_SAFE_INTEGER));
+    return { surface, price, totalPrice, targetDistanceMeters, ...scoring };
+  }).sort((a, b) => b.score - a.score || (a.targetDistanceMeters ?? Number.MAX_SAFE_INTEGER) - (b.targetDistanceMeters ?? Number.MAX_SAFE_INTEGER) || (a.totalPrice ?? Number.MAX_SAFE_INTEGER) - (b.totalPrice ?? Number.MAX_SAFE_INTEGER));
 
   const requestedIds = new Set(input.request.selectedSurfaceIds ?? []);
   let selected: typeof ranked = [];
