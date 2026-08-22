@@ -159,8 +159,8 @@ export async function generateNavigationPreview(input: {
   dateFrom: Date; dateTo: Date; durationMonths: number; quantity: number;
 }): Promise<AiOfferPreview> {
   const target = await resolveTarget(input.request);
-  // Search origins in urban radius of 1.5 - 2.5 km
-  const radius = Math.min(2500, Math.max(1200, (input.request.maxRadiusKm ?? 3) * 1000));
+  // Search origins in urban radius of 2.0 - 4.5 km to capture high-traffic intersections further out
+  const radius = Math.min(4500, Math.max(2000, (input.request.maxRadiusKm ?? 4) * 1000));
   const origins = approachOrigins(target, radius, Math.max(input.quantity, 4));
   const requestedIds = new Set(input.request.selectedCandidateIds ?? []);
   const refinedPoints = input.request.navigationPoints?.slice(0, input.quantity) ?? [];
@@ -182,13 +182,13 @@ export async function generateNavigationPreview(input: {
 
     if (!isRefined && route?.status === 'OK' && route.polyline) {
       const decodedPoints = decodePolylinePoints(route.polyline);
-      // Filter points along polyline that are between 250m and 1200m from target store
+      // Filter points along polyline that are between 300m and 3500m (up to 3.5 km) from target store
       const decisionZoneCandidates = decodedPoints.filter((pt) => {
         const dist = haversineMeters(pt, target);
-        return dist >= 250 && dist <= 1400;
+        return dist >= 300 && dist <= 3500;
       });
 
-      // Find the first candidate point along polyline that is NOT on a restricted highway
+      // Find candidate point along polyline that is NOT on a restricted highway, prioritizing major intersections
       let foundValidPoint = false;
       for (const candidate of decisionZoneCandidates) {
         const revGeo = await reverseGeocode(candidate.latitude, candidate.longitude);
@@ -197,23 +197,33 @@ export async function generateNavigationPreview(input: {
         if (addressText && !isRestrictedHighwayOr1stClassRoad(addressText)) {
           selectedPoint = candidate;
           foundValidPoint = true;
-          // Extract street name from reverse geocode (e.g. "Výstavní, Ostrava" -> "Výstavní")
+          const distMeters = haversineMeters(candidate, target);
+          const distKm = (distMeters / 1000).toFixed(1);
           const streetPart = addressText.split(',')[0]?.trim() || '';
+
+          const isIntersectionOrSquare = /křižovatk|náměst|tříd|nárož|kruh|rondel|objezd/i.test(addressText);
+          const isFarIntersection = distMeters > 1000;
+
           if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
-            pointTitle = `Příjezdový bod na ${streetPart} (od ${direction})`;
+            pointTitle = isFarIntersection
+              ? `Vytížená křižovatka na ${streetPart} (${distKm} km, od ${direction})`
+              : `Příjezdový bod na ${streetPart} (od ${direction})`;
+            
             pointReasons = [
-              `Navigační bod umístěný na městské třídě ${streetPart} mimo dálnice a I. třídy.`,
-              `Vzdálenost cca ${Math.round(haversineMeters(candidate, target))} m od prodejny pro včasné odbočení řidičů.`,
+              isFarIntersection
+                ? `🚦 Frekventovaná křižovatka: Bod zachycuje vysoký průjezd aut na městské třídě ${streetPart} ve vzdálenosti cca ${distKm} km od cíle.`
+                : `Navigační bod na městské třídě ${streetPart} mimo dálnice a I. třídy.`,
+              `Strategický bod pro včasné nasměrování řidičů přijíždějících od ${direction}.`,
             ];
           }
           break;
         }
       }
 
-      // If all polyline points were on restricted highway, step 250m perpendicular towards target store
+      // If all polyline points were on restricted highway, step 300m perpendicular towards target store
       if (!foundValidPoint) {
-        const shiftLat = (target.latitude - selectedPoint.latitude) * 0.4;
-        const shiftLon = (target.longitude - selectedPoint.longitude) * 0.4;
+        const shiftLat = (target.latitude - selectedPoint.latitude) * 0.35;
+        const shiftLon = (target.longitude - selectedPoint.longitude) * 0.35;
         const candidatePoint = {
           latitude: selectedPoint.latitude + shiftLat,
           longitude: selectedPoint.longitude + shiftLon,
