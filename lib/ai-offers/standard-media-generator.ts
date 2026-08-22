@@ -125,10 +125,10 @@ export async function generateStandardMediaPreview(input: {
 
     if (isPromoTower && !addedTowerCarrierIds.has(item.surface.carrierId)) {
       addedTowerCarrierIds.add(item.surface.carrierId);
-      const siblingSurfaces = available.filter(
+      const siblingRanked = ranked.filter(
         (candidate) => candidate.surface.carrierId === item.surface.carrierId && candidate.surface.id !== item.surface.id
       );
-      for (const sibling of siblingSurfaces) {
+      for (const sibling of siblingRanked) {
         if (!expandedSelected.some((x) => x.surface.id === sibling.surface.id)) {
           expandedSelected.push(sibling);
         }
