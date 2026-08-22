@@ -1,5 +1,5 @@
 import type { MountingType } from '@prisma/client';
-import { geocodeAddress, computeGoogleRoute } from '@/lib/google-maps';
+import { geocodeAddress, computeGoogleRoute, reverseGeocode } from '@/lib/google-maps';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { resolveCatalogPrice } from './price-resolver';
 import { haversineMeters } from './scoring';
