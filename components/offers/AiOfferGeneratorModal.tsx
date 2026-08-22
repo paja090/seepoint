@@ -337,7 +337,7 @@ export function AiOfferGeneratorModal({
             <div className={`rounded-lg px-3 py-2 text-xs font-bold ${routeAnalysis === 'error' ? 'bg-amber-950 text-amber-200' : routeAnalysis === 'done' ? 'bg-emerald-950 text-emerald-200' : 'bg-sky-950 text-sky-200'}`}>{routeAnalysis === 'running' && <span className="mr-2 inline-block animate-spin">◌</span>}{routeAnalysisMessage || 'Analyzuji příjezdové trasy…'}</div>
             <GoogleNavigationOfferMap
               compact
-              readOnly
+              readOnly={false}
               target={{ latitude: preview.target.latitude, longitude: preview.target.longitude, label: preview.target.name, address: preview.target.address }}
               points={preview.items.filter((item) => item.latitude != null && item.longitude != null).map((item) => ({ id: item.selectionId, label: item.title, latitude: item.latitude!, longitude: item.longitude!, calculatedDistanceMeters: item.distanceMeters, routePolyline: item.routePolyline, arrowDirectionEnum: item.arrowDirection }))}
               mode="point"
@@ -345,7 +345,62 @@ export function AiOfferGeneratorModal({
               maxRadiusKm={maxRadiusKm}
               onSuggestedPoints={handleSuggestedPoints}
               onMapClick={() => undefined}
-              onPointMove={() => undefined}
+              onPointMove={async (pointId, latitude, longitude, _dist, _poly, passedAddress) => {
+                let freshAddress = passedAddress;
+                if (!freshAddress) {
+                  const geocoded = await reverseGeocode(latitude, longitude);
+                  freshAddress = geocoded?.formattedAddress || '';
+                }
+                const streetPart = freshAddress ? freshAddress.split(',')[0]?.trim() : '';
+
+                setPreview((prev) => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    items: prev.items.map((item) => {
+                      if (item.selectionId !== pointId) return item;
+                      const isHighway = isRestrictedHighwayOr1stClassRoad(freshAddress || '');
+                      const isHeritage = isOstravaRestrictedZone(latitude, longitude, freshAddress || '');
+                      const targetLat = prev.target?.latitude ?? latitude;
+                      const targetLng = prev.target?.longitude ?? longitude;
+                      const newDist = haversineMeters({ latitude, longitude }, { latitude: targetLat, longitude: targetLng });
+                      const distKm = (newDist / 1000).toFixed(1);
+
+                      let newTitle = item.title;
+                      let newReasons = [...item.reasons];
+
+                      if (isHeritage) {
+                        newTitle = `⚠️ Bod v Památkové zóně (${streetPart || 'centrum'})`;
+                        newReasons = [
+                          `🏛️ Upozornění: Bod leží v Městské památkové zóně (Nařízení č. 2/2020). Navigační desky VO podléhají schválení památkového odboru.`,
+                          `Vzdálenost cca ${distKm} km od prodejny.`,
+                        ];
+                      } else if (isHighway) {
+                        newTitle = `⚠️ Bod na I. třídě (${streetPart || 'hlavní tah'})`;
+                        newReasons = [
+                          `🛡️ Upozornění: Bod leží na rychlostní komunikaci (${streetPart}). Vyžaduje zvláštní povolení správce komunikace.`,
+                          `Vzdálenost cca ${distKm} km od prodejny.`,
+                        ];
+                      } else if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
+                        newTitle = `Příjezdový bod na ${streetPart}`;
+                        newReasons = [
+                          `Navigační bod přesunut na městskou třídu ${streetPart}.`,
+                          `Vzdálenost cca ${distKm} km od prodejny.`,
+                        ];
+                      }
+
+                      return {
+                        ...item,
+                        latitude,
+                        longitude,
+                        title: newTitle,
+                        reasons: newReasons,
+                        distanceMeters: newDist,
+                      };
+                    }),
+                  };
+                });
+              }}
               onTargetSelect={() => undefined}
             />
           </div>}

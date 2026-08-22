@@ -8,6 +8,7 @@ import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-a
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 import { compressImageFile } from '@/lib/image-compress';
+import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-generator';
 
 type ClientOption = {
   id: string;
@@ -1082,7 +1083,20 @@ export function NavigationOfferForm({
               freshAddress = await reverseGeocodeLocation(latitude, longitude);
             }
 
-            const addrObj = freshAddress ? { address: freshAddress } : {};
+            const streetPart = freshAddress ? freshAddress.split(',')[0]?.trim() : '';
+            const isHighway = isRestrictedHighwayOr1stClassRoad(freshAddress || '');
+            const isHeritage = isOstravaRestrictedZone(latitude, longitude, freshAddress || '');
+
+            let newLabel = currentPoint?.label || `Bod ${id}`;
+            if (isHeritage) {
+              newLabel = `⚠️ Bod v Památkové zóně (${streetPart || 'centrum'})`;
+            } else if (isHighway) {
+              newLabel = `⚠️ Bod na I. třídě (${streetPart || 'hlavní tah'})`;
+            } else if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
+              newLabel = `Příjezdový bod na ${streetPart}`;
+            }
+
+            const addrObj = freshAddress ? { address: freshAddress, label: newLabel } : { label: newLabel };
             updatePoint(id, { latitude, longitude, ...addrObj });
 
             if (target) {
