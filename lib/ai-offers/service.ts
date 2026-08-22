@@ -96,8 +96,14 @@ async function auditAiConfirmation(offerId: string, user: CurrentUser, preview: 
 
 async function confirmStandard(user: CurrentUser, request: AiOfferRequest, client: AiResolvedClient, preview: AiOfferPreview) {
   if (preview.items.some((item) => !item.surfaceId)) throw new OfferValidationError('Standardní návrh obsahuje neplatnou plochu. Připravte návrh znovu.');
+  const cleanName = request.targetName || client.name;
+  const cleanCity = request.city || 'Ostrava';
+  const shortTitle = request.isNoPriceConcept
+    ? `Koncept OOH kampaně – ${cleanName}`
+    : `Návrh OOH kampaně – ${cleanName} (${cleanCity})`;
+
   const result = await createOffer(user, {
-    clientId: client.id, title: `AI návrh – ${request.city || client.name}`, campaignName: request.prompt,
+    clientId: client.id, title: shortTitle, campaignName: shortTitle,
     pricingTier: client.pricingSegment, budget: request.budget ? String(request.budget) : '', taxRate: '21', confirmNegotiation: false, chargeSelections: [],
     internalNote: `AI Copilot: ${request.prompt}`,
     clientMessage: request.clientMessage?.trim() || preview.explanation || 'Na základě zadání jsme připravili transparentní návrh dostupných reklamních ploch.',
