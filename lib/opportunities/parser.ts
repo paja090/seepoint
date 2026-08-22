@@ -48,16 +48,19 @@ export async function parseOpportunityFromAiInput(
     }
   }
 
+  const todayISO = new Date().toISOString().slice(0, 10);
   const promptText = `Jsi AI Obchodní radar pro českou outdoorovou reklamní společnost SeePOINT (seepoint.cz).
+Dnešní datum je: ${todayISO}.
 Tvým úkolem je z textu novinové zprávy, tiskové zprávy nebo inzerátu identifikovat jakoukoliv OBCHODNÍ NEBO KULTURNÍ PŘÍLEŽITOST pro venkovní reklamu (OOH).
 
-VÍTANÉ PŘÍLEŽITOSTI (isRelevant = true):
-- Otevření nové prodejny, pobočky, restaurace, kavárny, autosalonu, provozovny
-- Koncert, festival, divadelní představení, veletrh, výstava, sportovní turnaj
+VÍTANÉ NADCHÁZEJÍCÍ PŘÍLEŽITOSTI (isRelevant = true):
+- Nadcházející otevření nové prodejny, pobočky, restaurace, kavárny, autosalonu, provozovny
+- Nadcházející koncert, festival, divadelní představení, veletrh, výstava, sportovní turnaj
 - Stěhování firmy, přístavba, expanze, nábor zaměstnanců
 - Významná marketingová akce nebo sezónní kampaň
 
 VYŘAZOVANÉ ČLÁNKY (isRelevant = false):
+- PŘÍSNÉ PRAVIDLO PRO PROBĚHLÉ UDÁLOSTI: Pokud se akce nebo otevření prodejny již stalo v minulosti (před dnešním datem ${todayISO}), zadej "isRelevant": false.
 - Pouze obecné články bez konkrétní značky či akce (např. "Předpověď počasí", "Dopravní nehoda na D1", "Přehled otevíracích dob o svátcích")
 
 Vrať VÝHRADNĚ platný JSON (JSON format) s těmito poli:
@@ -142,7 +145,13 @@ Text: "${pageContent.slice(0, 3000)}"`;
     }
   }
 
-  const isRelevant = parsed.isRelevant === true && Boolean(parsed.companyName) && String(parsed.companyName).trim().toLowerCase() !== 'nový potenciální klient';
+  const eventDateStr = typeof parsed.eventDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.eventDate) ? parsed.eventDate : undefined;
+  const isPastEvent = Boolean(eventDateStr && eventDateStr < todayISO);
+
+  const isRelevant = parsed.isRelevant === true &&
+    Boolean(parsed.companyName) &&
+    String(parsed.companyName).trim().toLowerCase() !== 'nový potenciální klient' &&
+    !isPastEvent;
   const companyName = String(parsed.companyName || '').trim() || 'Nespecifikovaná firma';
   const city = String(parsed.city || '').trim() || 'Ostrava';
   const title = String(parsed.title || '').trim() || `Příležitost ${companyName}`;
