@@ -77,19 +77,23 @@ Text: "${pageContent.slice(0, 3000)}"`;
   let jsonResultText = '';
 
   if (effectiveGeminiKey) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${effectiveGeminiKey}`;
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        jsonResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-lite'];
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveGeminiKey}`;
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          jsonResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (jsonResultText) break;
+        }
+      } catch {
+        // Try next model
       }
-    } catch {
-      // Ignore API error
     }
   } else if (effectiveOpenAiKey) {
     try {
