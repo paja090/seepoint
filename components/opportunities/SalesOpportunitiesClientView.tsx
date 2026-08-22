@@ -45,6 +45,7 @@ export function SalesOpportunitiesClientView({
   );
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [loading, setLoading] = useState(false);
+  const [isAutoDiscovering, setIsAutoDiscovering] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
 
   // Copilot integration state
@@ -141,12 +142,31 @@ export function SalesOpportunitiesClientView({
     setCopilotModalOpen(true);
   };
 
+  const handleAutoDiscover = async () => {
+    setIsAutoDiscovering(true);
+    try {
+      const res = await fetch('/api/sales/opportunities/auto-discover', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchOpportunities();
+      }
+    } catch (err) {
+      console.error('Auto discover failed', err);
+    } finally {
+      setIsAutoDiscovering(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & KPI Stats */}
       <SalesOpportunitiesHeader
         stats={stats}
         onOpenManualModal={() => setManualModalOpen(true)}
+        onAutoDiscover={handleAutoDiscover}
+        isAutoDiscovering={isAutoDiscovering}
       />
 
       {/* Filter Bar */}

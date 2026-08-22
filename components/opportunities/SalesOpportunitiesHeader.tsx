@@ -13,9 +13,13 @@ type Stats = {
 export function SalesOpportunitiesHeader({
   stats,
   onOpenManualModal,
+  onAutoDiscover,
+  isAutoDiscovering,
 }: {
   stats: Stats;
   onOpenManualModal: () => void;
+  onAutoDiscover: () => void;
+  isAutoDiscovering?: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -34,7 +38,17 @@ export function SalesOpportunitiesHeader({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button
+            type="button"
+            disabled={isAutoDiscovering}
+            onClick={onAutoDiscover}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50"
+          >
+            <Sparkles className={`w-4 h-4 text-purple-300 ${isAutoDiscovering ? 'animate-spin' : ''}`} />
+            <span>{isAutoDiscovering ? 'AI prohledává MS kraj…' : '🤖 Spustit AI Hledání v MS kraji'}</span>
+          </button>
+
           <button
             type="button"
             onClick={onOpenManualModal}
