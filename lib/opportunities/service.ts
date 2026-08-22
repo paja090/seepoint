@@ -107,13 +107,20 @@ export async function getOpportunityById(id: string) {
 
 export async function findDuplicateOpportunity(companyName: string, eventType: OpportunityEventType, city: string, sourceUrl?: string) {
   const normCompany = companyName.trim().toLowerCase();
-  const normCity = city.trim().toLowerCase();
 
+  // 1. Check exact source URL duplicate
+  if (sourceUrl?.trim()) {
+    const existingByUrl = await prisma.salesOpportunity.findFirst({
+      where: { sourceUrl: sourceUrl.trim() },
+      select: { id: true, companyName: true, sourceUrl: true, createdAt: true },
+    });
+    if (existingByUrl) return existingByUrl;
+  }
+
+  // 2. Check company name match in database
   const candidates = await prisma.salesOpportunity.findMany({
     where: {
-      eventType,
-      city: { contains: normCity, mode: 'insensitive' },
-      status: { notIn: ['DISMISSED'] },
+      companyName: { contains: normCompany, mode: 'insensitive' },
     },
     select: {
       id: true,
@@ -124,9 +131,7 @@ export async function findDuplicateOpportunity(companyName: string, eventType: O
   });
 
   return candidates.find(
-    (c) =>
-      c.companyName.trim().toLowerCase() === normCompany ||
-      (sourceUrl && c.sourceUrl && c.sourceUrl.trim().toLowerCase() === sourceUrl.trim().toLowerCase())
+    (c) => c.companyName.trim().toLowerCase() === normCompany
   );
 }
 
