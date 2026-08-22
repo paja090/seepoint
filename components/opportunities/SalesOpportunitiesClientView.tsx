@@ -98,6 +98,9 @@ export function SalesOpportunitiesClientView({
   };
 
   const handleUpdateStatus = async (id: string, status: string, dismissedReason?: string) => {
+    if (status === 'DISMISSED' && !filters.status) {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    }
     try {
       const res = await fetch(`/api/sales/opportunities/${id}`, {
         method: 'PATCH',

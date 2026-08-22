@@ -9,6 +9,8 @@ export async function getOpportunities(params: OpportunityFilterParams = {}) {
 
   if (params.status) {
     where.status = params.status;
+  } else {
+    where.status = { notIn: ['DISMISSED'] };
   }
   if (params.eventType) {
     where.eventType = params.eventType;
