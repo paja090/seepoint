@@ -102,24 +102,24 @@ export function SaaSProductShowcase() {
           </div>
 
           {/* SCREEN CONTENT BY TAB */}
-          <div className="p-4 sm:p-6 min-h-[460px] bg-slate-900/40 rounded-b-2xl relative">
-            {/* Floating Metric Badges */}
-            <div className="hidden lg:grid grid-cols-4 gap-3 absolute top-6 right-6 z-20 max-w-xl">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 shadow-xl backdrop-blur-md">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Síť nosičů</span>
-                <strong className="text-lg font-black text-white">842 nosičů</strong>
+          <div className="p-4 sm:p-6 min-h-[460px] bg-slate-900/40 rounded-b-2xl relative space-y-6">
+            {/* Top Metric Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 shadow-lg backdrop-blur-md">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Síť nosičů</span>
+                <strong className="text-base sm:text-lg font-black text-white">842 nosičů</strong>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 shadow-xl backdrop-blur-md">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Obsazenost</span>
-                <strong className="text-lg font-black text-emerald-400">68 % sítě</strong>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 shadow-lg backdrop-blur-md">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Obsazenost</span>
+                <strong className="text-base sm:text-lg font-black text-emerald-400">68 % sítě</strong>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-3 shadow-xl backdrop-blur-md">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase">Aktivní nabídky</span>
-                <strong className="text-lg font-black text-indigo-400">12 nabídek</strong>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 shadow-lg backdrop-blur-md">
+                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Aktivní nabídky</span>
+                <strong className="text-base sm:text-lg font-black text-indigo-400">12 nabídek</strong>
               </div>
-              <div className="rounded-xl border border-purple-800/80 bg-purple-950/90 p-3 shadow-xl backdrop-blur-md">
-                <span className="text-[10px] font-bold text-purple-300 block uppercase">AI Příležitosti</span>
-                <strong className="text-lg font-black text-purple-200">5 v MS kraji</strong>
+              <div className="rounded-2xl border border-purple-800/80 bg-purple-950/90 p-3.5 shadow-lg backdrop-blur-md">
+                <span className="text-[10px] font-bold text-purple-300 block uppercase tracking-wider">AI Příležitosti</span>
+                <strong className="text-base sm:text-lg font-black text-purple-200">5 v MS kraji</strong>
               </div>
             </div>
 
