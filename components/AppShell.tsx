@@ -10,6 +10,7 @@ const navGroups: NavGroup[] = [
     items: [
       ['/dashboard', '📊 Nástěnka / Přehled', 'barChart3', 'dashboard'],
       ['/map', '🗺️ Mapa nosičů', 'map', 'map'],
+      ['/carriers', '📦 Evidence nosičů', 'package', 'carriers'],
       ['/mobile-surveys', '📍 Průzkum lokalit', 'mapPinned', 'navigationProjects'],
       ['/my-tasks', '📋 Moje úkoly', 'calendarCheck', 'myTasks'],
       ['/work/route', '🚗 Pracovní výjezd', 'route', 'work'],
@@ -30,11 +31,11 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '🗺️ Městské projekty & Inventář',
+    label: '🗺️ Reklamní sítě & Projekty',
     items: [
-      ['/navigation', '🧭 Městská Navigace', 'mapPinned', 'navigationProjects'],
-      ['/projects/city-gallery', '🖼️ Galerie VENKU', 'galleryHorizontalEnd', 'cityGallery'],
-      ['/projects/city-inventory', '🪧 Městský Inventář (Postery/Lavičky)', 'panelsTopLeft', 'carriers'],
+      ['/navigation', '🧭 Navigační reklama (VO)', 'mapPinned', 'navigationProjects'],
+      ['/projects/city-gallery', '🖼️ Výstavní & Promo sítě', 'galleryHorizontalEnd', 'cityGallery'],
+      ['/projects/city-inventory', '🪧 Městský inventář & Mobiliář', 'panelsTopLeft', 'carriers'],
     ],
   },
   {
