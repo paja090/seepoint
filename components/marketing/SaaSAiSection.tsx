@@ -26,97 +26,128 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
           </p>
         </div>
 
-        {/* 3 AI Sub-features Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* 4 AI Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* FEATURE 1: AI SALES RADAR */}
-          <div className="rounded-3xl border border-purple-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-purple-950/40 p-6 sm:p-8 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between">
-              <div className="size-12 rounded-2xl bg-purple-950 text-purple-300 border border-purple-700 flex items-center justify-center font-black">
-                <Radar className="w-6 h-6" />
+          <div className="rounded-3xl border border-purple-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-purple-950/40 p-6 space-y-6 shadow-2xl relative flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="size-12 rounded-2xl bg-purple-950 text-purple-300 border border-purple-700 flex items-center justify-center font-black">
+                  <Radar className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
+                  Živý modul
+                </span>
               </div>
-              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
-                Živý modul
-              </span>
-            </div>
 
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-white">AI Sales Radar</h3>
-              <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                SeePoint OS průběžně vyhledává nově otevírané provozovny, stavební projekty a akce v regionu a propojuje je s vašimi nosiči.
-              </p>
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white">AI Sales Radar</h3>
+                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  Vyhledává otevírané pobočky, stavební projekty a akce v regionu a propojuje je s vaší sítí nosičů.
+                </p>
+              </div>
             </div>
 
             {/* Visual Box */}
-            <div className="rounded-2xl border border-purple-800/60 bg-slate-950 p-4 space-y-3">
+            <div className="rounded-2xl border border-purple-800/60 bg-slate-950 p-4 space-y-2">
               <div className="flex items-center justify-between text-[11px] font-bold">
                 <span className="text-purple-300">NOVÁ PŘÍLEŽITOST</span>
-                <span className="text-emerald-400">Potenciál: VYSOKÝ</span>
+                <span className="text-emerald-400">VYSOKÝ POTENCIÁL</span>
               </div>
-              <h4 className="font-bold text-xs text-white">Nová pobočka obchodu (Ostrava)</h4>
-              <p className="text-[11px] text-slate-400">Předpokládané otevření: Říjen</p>
+              <h4 className="font-bold text-xs text-white">Nová pobočka v Ostrava-Poruba</h4>
               <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800">
                 <span className="text-slate-300">Vhodné plochy: 12</span>
-                <span className="text-purple-300 font-bold">Připravit nabídku →</span>
+                <span className="text-purple-300 font-bold">Nabídka →</span>
               </div>
             </div>
           </div>
 
           {/* FEATURE 2: AI OFFER GENERATOR */}
-          <div className="rounded-3xl border border-indigo-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950/40 p-6 sm:p-8 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between">
-              <div className="size-12 rounded-2xl bg-indigo-950 text-indigo-300 border border-indigo-700 flex items-center justify-center font-black">
-                <FileSpreadsheet className="w-6 h-6" />
+          <div className="rounded-3xl border border-indigo-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950/40 p-6 space-y-6 shadow-2xl relative flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="size-12 rounded-2xl bg-indigo-950 text-indigo-300 border border-indigo-700 flex items-center justify-center font-black">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
+                  Živý modul
+                </span>
               </div>
-              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
-                Živý modul
-              </span>
-            </div>
 
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-white">AI Generátor Nabídek</h3>
-              <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                Zadejte zadání klienta přirozenou řečí (rozpočet, cílové město, typ nosičů). AI analyzuje trasy a vybere nejlepší křižovatky mimo památkové zóny.
-              </p>
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white">AI Generátor Nabídek</h3>
+                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  Zadejte přání klienta slovem. AI vybere křižovatky, zkontroluje vyhlášku a vytvoří klientský koncept bez cen.
+                </p>
+              </div>
             </div>
 
             {/* Visual Box */}
-            <div className="rounded-2xl border border-indigo-800/60 bg-slate-950 p-4 space-y-3 font-mono text-xs">
-              <div className="text-slate-400">Prompt: "Připrav kampaň pro novou prodejnu v Ostravě. Rozpočet 100 000 Kč."</div>
-              <div className="text-emerald-400 font-bold">✓ Analýza dostupnosti... OK</div>
-              <div className="text-emerald-400 font-bold">✓ Kontrola vyhlášky č. 2/2020... OK</div>
+            <div className="rounded-2xl border border-indigo-800/60 bg-slate-950 p-4 space-y-2 font-mono text-[11px]">
+              <div className="text-slate-400">Prompt: "Ostrava, rozpočet 100 tis."</div>
+              <div className="text-emerald-400 font-bold">✓ Vyhláška MPZ... OK</div>
               <div className="pt-2 text-indigo-300 font-bold border-t border-slate-800">Doporučeno: 12 nosičů</div>
             </div>
           </div>
 
-          {/* FEATURE 3: AI FOTODOKUMENTACE (PŘIPRAVUJEME) */}
-          <div className="rounded-3xl border border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 p-6 sm:p-8 space-y-6 shadow-2xl relative opacity-90">
-            <div className="flex items-center justify-between">
-              <div className="size-12 rounded-2xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center font-black">
-                <Camera className="w-6 h-6" />
+          {/* FEATURE 3: AI PURCHASING & WAREHOUSE RECEIPTS */}
+          <div className="rounded-3xl border border-emerald-800/80 bg-gradient-to-b from-slate-900 via-slate-900 to-emerald-950/40 p-6 space-y-6 shadow-2xl relative flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="size-12 rounded-2xl bg-emerald-950 text-emerald-300 border border-emerald-700 flex items-center justify-center font-black">
+                  <Zap className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  Živý modul
+                </span>
               </div>
-              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-950 text-amber-300 border border-amber-800">
-                PŘIPRAVUJEME
-              </span>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white">AI Sklad & Nákupy</h3>
+                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  Montážník vyfotí mobilní účtenku za palivo či materiál. AI automaticky vytěží dodavatele, DPH a zaeviduje nákup.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-white">AI Fotodokumentace</h3>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                Montér v terénu vyfotí instalaci na mobil. AI automaticky ověří správný nosič, motiv reklamy, kvalitu snímku a přiřadí fotografii ke kampani.
-              </p>
+            {/* Visual Box */}
+            <div className="rounded-2xl border border-emerald-800/60 bg-slate-950 p-4 space-y-2 text-xs">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400">Účtenka z mobilu</span>
+                <span className="text-emerald-400 font-bold">VYTĚŽENO AI</span>
+              </div>
+              <div className="text-[11px] font-mono text-emerald-300 font-bold">Barvy & Svorky: 2 450 Kč</div>
+              <div className="text-[10px] text-slate-400">Zaevidováno do zakázky & skladu</div>
+            </div>
+          </div>
+
+          {/* FEATURE 4: AI FOTODOKUMENTACE (PŘIPRAVUJEME) */}
+          <div className="rounded-3xl border border-slate-800 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 p-6 space-y-6 shadow-2xl relative flex flex-col justify-between opacity-90">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="size-12 rounded-2xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center font-black">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-950 text-amber-300 border border-amber-800">
+                  PŘIPRAVUJEME
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white">AI Fotodokumentace</h3>
+                <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                  Montér v terénu vyfotí instalovaný plakát. AI ověří správný nosič, motiv reklamy a čitelnost polepu.
+                </p>
+              </div>
             </div>
 
             {/* Visual Box */}
             <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Montér nahraje fotografii</span>
-                <span className="text-amber-400 font-bold">Koncept</span>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-400">Fotka z montáže</span>
+                <span className="text-amber-400 font-bold">Koncept AI</span>
               </div>
-              <div className="space-y-1 text-[11px] text-slate-300">
-                <div>✓ Správný nosič & GPS</div>
-                <div>✓ Kontrola čitelnosti plakátu</div>
-                <div>✓ Automatické zařazení do výkazu</div>
-              </div>
+              <div className="text-[10px] text-slate-300">✓ Kontrola čitelnosti & GPS</div>
             </div>
           </div>
         </div>
