@@ -218,7 +218,21 @@ export async function confirmAiOffer(user: CurrentUser, raw: unknown) {
   return { ok: true, offerId, offerType: preview.offerType, redirectUrl: preview.offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : `/offers/${offerId}`, warnings: preview.warnings };
 }
 
+import { logAIUsage } from '@/lib/ai-usage';
+
 export async function handleAiOffer(user: CurrentUser, raw: unknown) {
   const request = parseRequest(raw);
+  if (user.organizationId) {
+    void logAIUsage({
+      organizationId: user.organizationId,
+      userId: user.id,
+      feature: 'OFFER_GENERATOR',
+      modelName: 'gemini-2.5-flash',
+      promptTokens: (request.prompt?.length || 10) * 2,
+      outputTokens: 400,
+      costEstimateUsd: 0.002,
+      metadata: { promptSnippet: request.prompt?.slice(0, 100) },
+    });
+  }
   return request.action === 'confirm' ? confirmAiOffer(user, request) : previewAiOffer(request);
 }
