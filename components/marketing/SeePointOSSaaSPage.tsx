@@ -6,6 +6,7 @@ import { SaaSHero } from './SaaSHero';
 import { SaaSProductShowcase } from './SaaSProductShowcase';
 import { SaaSProblemSolution } from './SaaSProblemSolution';
 import { SaaSBentoOverview } from './SaaSBentoOverview';
+import { SaaSRoiCalculator } from './SaaSRoiCalculator';
 import { SaaSMapSection } from './SaaSMapSection';
 import { SaaSWorkflowSection } from './SaaSWorkflowSection';
 import { SaaSAiSection } from './SaaSAiSection';
@@ -60,6 +61,7 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
         <SaaSProductShowcase />
         <SaaSProblemSolution />
         <SaaSBentoOverview />
+        <SaaSRoiCalculator onOpenDemoModal={openDemoModal} />
         <SaaSMapSection onOpenDemoModal={openDemoModal} />
         <SaaSWorkflowSection />
         <SaaSAiSection onOpenDemoModal={openDemoModal} />
