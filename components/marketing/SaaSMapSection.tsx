@@ -5,12 +5,12 @@ import { trackSaaSEvent } from '@/lib/analytics';
 
 export function SaaSMapSection({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
   const mapFeatures = [
+    { title: 'Google Maps API Integrace', desc: 'Přímé vyhledávání adres, geokódování a satelitní/uliční náhledy' },
+    { title: 'Památkové zóny & Dálnice', desc: 'Automatická vizualizace ochranných pásem (např. MPZ Ostrava č. 2/2020) a dálnic' },
     { title: 'Dostupnost v čase', desc: 'Filtr volných nosičů pro konkrétní datumový rozsah kampaně' },
-    { title: 'Typy médií', desc: 'Barevné odlišení City Posterů, Laviček, Billboardů, Towerů a Navigací' },
-    { title: 'Přesné GPS souřadnice', desc: 'Každý nosič má zaměřenou polohu pro montážníky i klienty' },
+    { title: 'Typy médií & Sítě', desc: 'Barevné odlišení City Posterů, Laviček, Billboardů, Towerů a Navigací VO' },
     { title: 'Přiřazení ke klientovi', desc: 'Na mapě vidíte aktivní nájemce i vypršení jejich smlouvy' },
-    { title: 'Fotografie z terénu', desc: 'Klimatické foto z ulice, detailní pohled i vizualizace motivu' },
-    { title: 'Technický stav nosiče', desc: 'Evidence poškození, plánovaných oprav a výměn polepů' },
+    { title: 'Fotografie & Stav z terénu', desc: 'Fotodokumentace přímo z ulice a měření vzdáleností od křižovatek' },
   ];
 
   return (
