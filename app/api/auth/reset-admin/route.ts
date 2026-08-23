@@ -15,15 +15,44 @@ export async function GET(req: Request) {
         passwordHash: hashed,
         platformRole: 'SUPER_ADMIN',
         status: 'ACTIVE',
+        mustChangePassword: false,
       },
     });
 
+    // Ensure active organization membership exists
+    const org = await platformPrisma.organization.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (org) {
+      await platformPrisma.organizationMember.upsert({
+        where: {
+          organizationId_userId: {
+            organizationId: org.id,
+            userId: user.id,
+          },
+        },
+        create: {
+          organizationId: org.id,
+          userId: user.id,
+          role: 'OWNER',
+          isActive: true,
+        },
+        update: {
+          role: 'OWNER',
+          isActive: true,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      message: 'Heslo pro Super Admin účet bylo úspěšně nastaveno.',
+      message: 'Super Admin účet (admin@seepoint.cz) byl plně aktivován a heslo nastaveno.',
       email: user.email,
       password: defaultPassword,
       role: user.platformRole,
+      organization: org?.name,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Neplatný požadavek';
