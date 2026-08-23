@@ -15,11 +15,31 @@ body {
 }
 
 .input {
-  @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-sky-500 focus:ring-4 focus:ring-sky-100;
+  @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-purple-600 focus:ring-4 focus:ring-purple-100/80 shadow-2xs;
 }
 
 .card {
-  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 text-slate-950;
+  @apply rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/50 text-slate-950 transition duration-200 hover:shadow-md hover:border-slate-300;
+}
+
+.card-dark {
+  @apply rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-xl text-slate-100;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* High Contrast Helpers */

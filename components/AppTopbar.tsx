@@ -37,11 +37,17 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
   async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
 
   return (
-    <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-6 backdrop-blur">
-      <div className="min-w-0 flex items-center gap-4">
+    <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-4 border-b border-slate-200/90 bg-white/95 px-6 backdrop-blur-md shadow-2xs">
+      <div className="min-w-0 flex items-center gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Aktuální stránka</p>
-          <h2 className="truncate text-lg font-semibold text-slate-950">{title}</h2>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+              SeePoint OS
+            </span>
+            <span className="text-xs font-semibold text-slate-400">/</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Aktuální stránka</span>
+          </div>
+          <h2 className="truncate text-lg font-black text-slate-950 mt-0.5">{title}</h2>
         </div>
       </div>
 
