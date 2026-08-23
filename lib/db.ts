@@ -22,7 +22,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.platformPrisma = plat
 
 // Application code must use this guarded client. The unguarded platform client is
 // reserved for authentication, platform administration and the first public-token lookup.
-export const prisma = platformPrisma.$extends(tenantPrismaExtension) as unknown as PrismaClient;
+export const prisma = (platformPrisma.$extends(tenantPrismaExtension) as unknown) as PrismaClient & Record<string, any>;
 
 export const carrierInclude = {
   surfaces: {
