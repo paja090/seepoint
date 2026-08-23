@@ -8,20 +8,25 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
     {
       name: 'START',
       desc: 'Pro menší provozovatele reklamních ploch.',
-      badge: 'Do 50 nosičů',
+      badge: 'Do 100 nosičů',
+      price: '1 900 Kč',
+      period: '/ měsíc',
       highlight: false,
       features: [
         'Katalog nosičů & GPS mapa',
         'Kalendář obsazenosti nosičů',
         'Tvorba standardních nabídek',
         'Základní kartotéka klientů',
-        'Emailová podpora',
+        'Až 3 uživatelé v organizaci',
+        'E-mailová podpora',
       ],
     },
     {
       name: 'BUSINESS',
       desc: 'Pro rostoucí reklamní společnosti a agentury.',
       badge: 'DOPORUČUJEME',
+      price: '4 900 Kč',
+      period: '/ měsíc',
       highlight: true,
       features: [
         'Vše z tarifu START',
@@ -29,20 +34,24 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
         'Podpora konceptů bez cen',
         'Veřejné klientské odkaz /offer/[token]',
         'Mobilní výkazy pro montážníky',
-        'Až 300 spravovaných nosičů',
+        'Modul Navigace VO na sloupech',
+        'Až 500 spravovaných nosičů & 10 uživatelů',
       ],
     },
     {
       name: 'PRO',
       desc: 'Pro rozsáhlé OOH sítě a navigační systémy.',
-      badge: 'Až 1000 nosičů',
+      badge: 'Až 2000 nosičů',
+      price: '9 900 Kč',
+      period: '/ měsíc',
       highlight: false,
       features: [
         'Vše z tarifu BUSINESS',
         'AI Sales Radar (Příležitosti)',
-        'Specializovaný modul Navigace VO',
         'Klientský protokol fotodokumentace',
+        'Vlastní logo & branding na nabídkách',
         'Rozšířené uživatelské role (RBAC)',
+        'Až 30 uživatelů v organizaci',
         'Prioritní technická podpora',
       ],
     },
@@ -50,11 +59,13 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
       name: 'ENTERPRISE',
       desc: 'Individuální řešení na míru vašim procesům.',
       badge: 'Neomezeně',
+      price: 'Individuální',
+      period: 'kalkulace',
       highlight: false,
       features: [
         'Neomezený počet nosičů & uživatelů',
         'Asistovaná migrace dat z Excelu',
-        'Vlastní doména & SLA garantovaná dostupnost',
+        'Vlastní doména & SLA dostupnost',
         'Možnost úprav rozhraní na míru',
         'Dedikovaný manažer účtu',
       ],
@@ -100,6 +111,13 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-slate-300 border border-slate-800">
                     {pl.badge}
                   </span>
+                </div>
+
+                <div className="py-2 border-b border-slate-800/80">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-white tracking-tight">{pl.price}</span>
+                    <span className="text-xs text-slate-400 font-semibold">{pl.period}</span>
+                  </div>
                 </div>
 
                 <p className="text-xs text-slate-300 font-medium leading-relaxed">{pl.desc}</p>
