@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { SeePointOSSaaSPage } from '@/components/marketing/SeePointOSSaaSPage';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'SeePoint OS | Operační systém pro venkovní reklamu',
   description:
