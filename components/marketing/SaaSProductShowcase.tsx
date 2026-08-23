@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { MapPin, Layers, Calendar, FileText, Sparkles, Filter, CheckCircle2, Eye, ExternalLink, ChevronRight, Phone, Mail } from 'lucide-react';
+import { ShowcaseInteractiveMap } from './ShowcaseInteractiveMap';
 
 export function SaaSProductShowcase() {
   const [activeTab, setActiveTab] = useState<'map' | 'inventory' | 'occupancy' | 'offers' | 'ai'>('map');
@@ -127,8 +128,8 @@ export function SaaSProductShowcase() {
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                   <div>
-                    <h3 className="text-lg font-black text-white">Mapa reklamní sítě SeePoint OS</h3>
-                    <p className="text-xs text-slate-400 font-medium">Kompletní přehled nosičů s filtrem médií, obsazenosti a GPS lokace.</p>
+                    <h3 className="text-lg font-black text-white">Živá interaktivní mapa sítě SeePoint OS</h3>
+                    <p className="text-xs text-slate-400 font-medium">Klikněte na nosiče na mapě pro zobrazení detailu, stavu obsazenosti a ceny.</p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -141,64 +142,8 @@ export function SaaSProductShowcase() {
                   </div>
                 </div>
 
-                {/* Map Mockup Grid */}
-                <div className="rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden relative min-h-[340px] flex items-center justify-center p-6">
-                  {/* Map Grid Pattern background */}
-                  <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-40" />
-
-                  {/* Simulated Map Pins */}
-                  <div className="relative z-10 w-full max-w-3xl space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Pin Card 1 */}
-                      <div className="rounded-2xl border border-purple-800/80 bg-slate-900/90 p-4 space-y-2 shadow-xl backdrop-blur-md">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
-                            PROMO TOWER
-                          </span>
-                          <span className="text-[10px] font-bold text-emerald-400">Volné od 1.9.</span>
-                        </div>
-                        <h4 className="font-bold text-sm text-white">Ostrava – Místecká (Tower 4-stěnná)</h4>
-                        <p className="text-xs text-slate-400 font-mono">GPS: 49.8355, 18.2835 · 4 strany (A,B,C,D)</p>
-                        <div className="pt-2 flex items-center justify-between text-xs font-bold border-t border-slate-800">
-                          <span className="text-slate-300">Cena / mes</span>
-                          <span className="text-purple-300">24 900 Kč</span>
-                        </div>
-                      </div>
-
-                      {/* Pin Card 2 */}
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 space-y-2 shadow-xl backdrop-blur-md">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-sky-950 text-sky-300 border border-sky-800">
-                            CITY POSTER (CLP)
-                          </span>
-                          <span className="text-[10px] font-bold text-amber-400">Rezervováno</span>
-                        </div>
-                        <h4 className="font-bold text-sm text-white">Ostrava Centrum – 28. října</h4>
-                        <p className="text-xs text-slate-400 font-mono">Vitrína prosvětlená · U Pošty</p>
-                        <div className="pt-2 flex items-center justify-between text-xs font-bold border-t border-slate-800">
-                          <span className="text-slate-300">Cena / mes</span>
-                          <span className="text-white">6 800 Kč</span>
-                        </div>
-                      </div>
-
-                      {/* Pin Card 3 */}
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 space-y-2 shadow-xl backdrop-blur-md">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-orange-950 text-orange-300 border border-orange-800">
-                            NAVIGAČNÍ ZNAČKA
-                          </span>
-                          <span className="text-[10px] font-bold text-emerald-400">Volný sloupec VO</span>
-                        </div>
-                        <h4 className="font-bold text-sm text-white">Opava – Olomoucká (VO křižovatka)</h4>
-                        <p className="text-xs text-slate-400 font-mono">Sloup VO #142 · Městská třída</p>
-                        <div className="pt-2 flex items-center justify-between text-xs font-bold border-t border-slate-800">
-                          <span className="text-slate-300">Cena / mes</span>
-                          <span className="text-white">1 950 Kč</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* Live Interactive Map Engine Component */}
+                <ShowcaseInteractiveMap />
               </div>
             )}
 
