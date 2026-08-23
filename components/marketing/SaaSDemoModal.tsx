@@ -67,12 +67,23 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950 text-purple-300 text-[11px] font-black uppercase tracking-wider border border-purple-800">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>SEEPOINT OS UKÁZKA</span>
+            <span>SEEPOINT OS DEMO & VIZUALIZACE ZDARMA</span>
           </div>
-          <h3 className="text-2xl font-black text-white tracking-tight">Domluvit ukázku systému</h3>
+          <h3 className="text-2xl font-black text-white tracking-tight">Domluvit ukázku & Vizualizace z Excelu zdarma</h3>
           <p className="text-xs text-slate-400 font-medium">
-            Projdeme s vámi reálné workflow SeePoint OS a možný převod vašich nosičů a klientů.
+            Projdeme s vámi SeePoint OS a zašleme vám **živou interaktivní mapu i klientskou nabídku z vašich vlastních nosičů zdarma**.
           </p>
+        </div>
+
+        {/* Free Excel Visualization Banner */}
+        <div className="rounded-2xl border border-purple-800/80 bg-gradient-to-r from-purple-950/90 to-indigo-950/90 p-3.5 flex items-start gap-3 shadow-lg">
+          <span className="text-xl">📊</span>
+          <div className="space-y-0.5">
+            <h4 className="text-xs font-bold text-purple-200">Vyzkoušejte SeePoint OS na vašich vlastních datech</h4>
+            <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
+              Pošlete nám váš Excel např. s 20 nosiči. Do 24 hodin vám zdarma vygenerujeme interaktivní mapu sítě i ukázkovou nabídku pod vaší vlastní značkou!
+            </p>
+          </div>
         </div>
 
         {/* Success Banner */}

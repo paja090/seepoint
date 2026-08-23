@@ -38,6 +38,11 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
           <p className="text-sm sm:text-base text-slate-400 font-medium max-w-2xl mx-auto leading-relaxed">
             SeePoint OS propojuje obchod, kancelář a pracovníky v terénu – od první obchodní příležitosti až po dokončenou kampaň.
           </p>
+
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-purple-950/80 border border-purple-800 text-purple-200 text-xs font-bold shadow-lg">
+            <span>📊</span>
+            <span>Pošlete nám váš Excel s 20 nosiči – zdarma vám do 24h vygenerujeme živou mapu sítě i nabídku!</span>
+          </div>
         </div>
 
         {/* CTA Buttons */}
