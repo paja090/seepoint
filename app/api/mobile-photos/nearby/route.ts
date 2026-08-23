@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { isSurfaceDetailClientCurrent } from '@/lib/mobile-photo-nearby';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 
 function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const radius = 6371;
@@ -18,6 +19,8 @@ function surfaceSide(surface: { sidePosition: string | null; sourcePosition: str
 }
 
 export async function GET(req: Request) {
+  const auth = await requireApiAccess('carriers');
+  if (isApiDenied(auth)) return auth;
   try {
     const requestUrl = new URL(req.url);
     const latParam = requestUrl.searchParams.get('lat');

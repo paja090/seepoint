@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { deletePhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
+import { deleteStoredPhoto } from '@/lib/storage/photo-storage';
 
 export const runtime = 'nodejs';
 
@@ -115,7 +115,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     const id = (await params).id;
     const photo = await prisma.photo.findUnique({
       where: { id },
-      select: { id: true, driveFileId: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true },
+      select: { id: true, driveFileId: true, storageProvider: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true },
     });
     if (!photo) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
 
@@ -128,8 +128,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     }
 
     // Skip Google Drive deletion for carrier / surface photos as requested
-    if (photo.employeeId && photo.driveFileId) {
-      await deletePhotoFromGoogleDrive(photo.driveFileId);
+    if (photo.employeeId) {
+      await deleteStoredPhoto(photo);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -175,9 +175,6 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Photo delete failed:', error);
-    if (error instanceof GoogleDriveConfigurationError) {
-      return NextResponse.json({ error: 'Google Drive úložiště zatím není nakonfigurované.' }, { status: 503 });
-    }
     return NextResponse.json({ error: 'Fotografii se nepodařilo odstranit.' }, { status: 502 });
   }
 }

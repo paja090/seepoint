@@ -2,6 +2,7 @@ import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
 import { CityGalleryModuleClient } from '@/components/city-gallery/CityGalleryModuleClient';
+import { tenantSingletonId } from '@/lib/tenant-singleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default async function CityGalleryProjectsPage() {
           return [];
         }),
       prisma.cityGalleryFleetConfig
-        .findUnique({ where: { id: 'default' } })
+        .findUnique({ where: { id: tenantSingletonId('city-gallery-fleet') } })
         .catch((err) => {
           console.error('Error fetching CityGalleryFleetConfig:', err);
           return null;

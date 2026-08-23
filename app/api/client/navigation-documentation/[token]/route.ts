@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashToken, buildSnapshotItem, SnapshotItemData } from '@/lib/navigation-documentation';
+import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
 
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -9,8 +11,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   }
 
   const tokenHash = hashToken(token);
+  const owner = await enterPublicNavigationReportTenant(tokenHash);
+  if (!owner) {
+    return NextResponse.json({ error: 'Požadovaná fotodokumentace nebyla nalezena.' }, { status: 404 });
+  }
 
-  const report = await prisma.navigationDocumentationReport.findUnique({
+  const report = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.navigationDocumentationReport.findUnique({
     where: { publicTokenHash: tokenHash },
     include: {
       client: { select: { name: true, logoFileName: true } },
@@ -26,7 +32,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
         orderBy: { sortOrder: 'asc' },
       },
     },
-  });
+  }));
 
   if (!report || report.status === 'ARCHIVED' || report.status === 'DRAFT') {
     return NextResponse.json({ error: 'Požadovaná fotodokumentace nebyla nalezena nebo není publikována.' }, { status: 404 });

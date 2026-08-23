@@ -9,39 +9,48 @@ export async function GET() {
     return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   }
 
-  // Fetch active users in the system
-  const activeUsers = await prisma.user.findMany({
+  const activeUsers = await prisma.organizationMember.findMany({
     where: {
-      status: 'ACTIVE',
+      organizationId: user.organizationId!,
+      isActive: true,
+      user: { status: 'ACTIVE' },
     },
     select: {
-      id: true,
-      name: true,
-      email: true,
       role: true,
-      lastLoginAt: true,
-      employee: {
+      user: {
         select: {
-          firstName: true,
-          lastName: true,
-          phone: true,
-          position: true,
-          photos: { select: { url: true }, take: 1 },
+          id: true,
+          name: true,
+          lastLoginAt: true,
+          employees: {
+            where: { organizationId: user.organizationId! },
+            select: {
+              firstName: true,
+              lastName: true,
+              position: true,
+              photos: { select: { url: true }, take: 1 },
+            },
+            take: 1,
+          },
         },
       },
     },
-    orderBy: { lastLoginAt: 'desc' },
     take: 30,
   });
 
   return NextResponse.json(
-    activeUsers.map((u) => ({
-      id: u.id,
-      name: u.employee ? `${u.employee.firstName} ${u.employee.lastName}`.trim() : u.name,
-      roleLabel: roleLabel(u.role),
-      position: u.employee?.position || null,
-      photoUrl: u.employee?.photos[0]?.url || null,
-      lastActive: u.lastLoginAt?.toISOString() || null,
-    }))
+    activeUsers
+      .sort((left, right) => (right.user.lastLoginAt?.getTime() ?? 0) - (left.user.lastLoginAt?.getTime() ?? 0))
+      .map((membership) => {
+        const employee = membership.user.employees[0];
+        return {
+          id: membership.user.id,
+          name: employee ? `${employee.firstName} ${employee.lastName}`.trim() : membership.user.name,
+          roleLabel: roleLabel(membership.role === 'OWNER' ? 'ADMIN' : membership.role),
+          position: employee?.position || null,
+          photoUrl: employee?.photos[0]?.url || null,
+          lastActive: membership.user.lastLoginAt?.toISOString() || null,
+        };
+      })
   );
 }

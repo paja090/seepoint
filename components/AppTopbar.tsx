@@ -9,6 +9,7 @@ import { NotificationBellCenter } from '@/components/notifications/NotificationB
 import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 import { QuickSearchInput } from '@/components/QuickSearchInput';
 import { WeatherClockWidget } from '@/components/WeatherClockWidget';
+import { OrganizationSwitcher } from '@/components/OrganizationSwitcher';
 
 const pageTitles: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
@@ -29,7 +30,7 @@ const pageTitles: Array<[string, string]> = [
   ['/settings', 'Nastavení'],
 ];
 
-export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[] } }) {
+export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
   const pathname = usePathname();
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
@@ -47,6 +48,7 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
       <QuickSearchInput />
 
       <div className="flex items-center gap-3">
+        <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
         {/* 🌤️ Live Weather & Clock Widget */}
         <WeatherClockWidget />
 

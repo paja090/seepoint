@@ -8,6 +8,65 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PlatformRole {
+  SUPER_ADMIN
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MANAGER
+  SALES
+  TECHNICIAN
+  WORKER
+  ACCOUNTANT
+  VIEWER
+}
+
+enum OrganizationPlan {
+  INTERNAL
+  START
+  BUSINESS
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  INTERNAL
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum IntegrationProvider {
+  GOOGLE_DRIVE
+  GMAIL
+  GOOGLE_WORKSPACE
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  ERROR
+  REVOKED
+}
+
+enum OrganizationOnboardingStep {
+  COMPANY
+  OWNER
+  SETTINGS
+  INVENTORY
+  TEAM
+  COMPLETED
+}
+
+enum InventoryVisibility {
+  PRIVATE
+  PARTNER
+  SHARED
+  MARKETPLACE
+}
+
 enum Role {
   ADMIN
   MANAGER
@@ -408,23 +467,139 @@ enum ReservationStatus {
   CANCELLED
 }
 
-model User {
-  id                 String     @id @default(cuid())
+model Organization {
+  id                 String             @id @default(cuid())
   name               String
-  email              String     @unique
-  role               Role       @default(VIEWER)
-  roles              Role[]     @default([])
-  passwordHash       String?
-  mustChangePassword Boolean    @default(false)
-  status             UserStatus @default(INVITED)
-  lastLoginAt        DateTime?
-  sessionVersion     Int        @default(1)
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  slug               String             @unique
+  companyId          String?
+  vatId              String?
+  street             String?
+  city               String?
+  postalCode         String?
+  country            String             @default("CZ")
+  email              String?
+  phone              String?
+  website            String?
+  logoUrl            String?
+  primaryColor       String?
+  secondaryColor     String?
+  emailSignature     String?
+  defaultCurrency    String             @default("CZK")
+  bankAccount        String?
+  iban               String?
+  swift              String?
+  plan               OrganizationPlan   @default(START)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
+  members      OrganizationMember[]
+  invitations  OrganizationInvitation[]
+  onboarding   OrganizationOnboarding?
+  integrations IntegrationConnection[]
+
+  @@index([isActive])
+  @@index([plan])
+}
+
+model IntegrationConnection {
+  id                   String              @id @default(cuid())
+  organizationId       String
+  provider             IntegrationProvider
+  status               IntegrationStatus   @default(CONNECTED)
+  externalAccountId    String?
+  accountEmail         String?
+  credentialsEncrypted String?
+  scopes               String[]            @default([])
+  connectedAt          DateTime?
+  expiresAt            DateTime?
+  lastCheckedAt        DateTime?
+  error                String?
+  settings             Json?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+  @@index([organizationId, status])
+}
+
+model OrganizationOnboarding {
+  id                   String                     @id @default(cuid())
+  organizationId       String                     @unique
+  currentStep          OrganizationOnboardingStep @default(COMPANY)
+  companyCompletedAt   DateTime?
+  ownerCompletedAt     DateTime?
+  settingsCompletedAt  DateTime?
+  inventoryCompletedAt DateTime?
+  teamCompletedAt      DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([currentStep])
+}
+
+model OrganizationMember {
+  id             String             @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole
+  roles          OrganizationRole[] @default([])
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, isActive])
+  @@index([organizationId, role])
+}
+
+model OrganizationInvitation {
+  id             String           @id @default(cuid())
+  organizationId String
+  email          String
+  role           OrganizationRole
+  tokenHash      String           @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  invitedById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy      User?            @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, email])
+  @@index([organizationId, acceptedAt, revokedAt])
+  @@index([email, expiresAt])
+}
+
+model User {
+  id                 String        @id @default(cuid())
+  name               String
+  email              String        @unique
+  platformRole       PlatformRole?
+  role               Role          @default(VIEWER)
+  roles              Role[]        @default([])
+  passwordHash       String?
+  mustChangePassword Boolean       @default(false)
+  status             UserStatus    @default(INVITED)
+  lastLoginAt        DateTime?
+  sessionVersion     Int           @default(1)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  organizationMemberships        OrganizationMember[]
+  organizationInvitations        OrganizationInvitation[]
   importBatches                  ImportBatch[]
   workAssignments                WorkAssignment[]
-  employee                       Employee?
+  employees                      Employee[]
   sessions                       UserSession[]
   tokens                         UserToken[]
   auditActions                   UserAuditLog[]                  @relation("AuditActor")
@@ -459,14 +634,15 @@ model User {
 }
 
 model UserSession {
-  id             String   @id @default(cuid())
-  tokenHash      String   @unique
-  userId         String
-  sessionVersion Int
-  expiresAt      DateTime
-  createdAt      DateTime @default(now())
-  lastSeenAt     DateTime @default(now())
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  tokenHash            String   @unique
+  userId               String
+  activeOrganizationId String?
+  sessionVersion       Int
+  expiresAt            DateTime
+  createdAt            DateTime @default(now())
+  lastSeenAt           DateTime @default(now())
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -487,17 +663,19 @@ model UserToken {
 }
 
 model UserAuditLog {
-  id           String      @id @default(cuid())
-  action       AuditAction
-  actorUserId  String?
-  targetUserId String
-  metadata     Json?
-  createdAt    DateTime    @default(now())
-  actor        User?       @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-  target       User        @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  id             String      @id @default(cuid())
+  organizationId String      @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  action         AuditAction
+  actorUserId    String?
+  targetUserId   String
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+  actor          User?       @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target         User        @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@index([actorUserId])
   @@index([targetUserId, createdAt])
+  @@index([organizationId])
 }
 
 model RateLimitBucket {
@@ -516,10 +694,11 @@ model RateLimitBucket {
 
 model Employee {
   id             String         @id @default(cuid())
-  userId         String?        @unique
+  organizationId String         @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  userId         String?
   firstName      String
   lastName       String
-  email          String?        @unique
+  email          String?
   phone          String?
   position       String?
   positions      String[]       @default([])
@@ -535,27 +714,31 @@ model Employee {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  user                 User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user                       User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   assignedTasks              WorkTask[]              @relation("AssignedWorkTasks")
   createdTasks               WorkTask[]              @relation("CreatedWorkTasks")
   assignedQuickInternalTasks QuickInternalTask[]     @relation("AssignedQuickTasks")
   settlements                Settlement[]
-  vehicleReservations  VehicleReservation[]
-  fuelExpenses         VehicleFuelExpense[]
-  absences             EmployeeAbsence[]
-  billingProfile       EmployeeBillingProfile?
-  rates                EmployeeRate[]
-  photos               Photo[]
-  workEntries          WorkEntry[]
-  recurringAdjustments RecurringAdjustment[]
+  vehicleReservations        VehicleReservation[]
+  fuelExpenses               VehicleFuelExpense[]
+  absences                   EmployeeAbsence[]
+  billingProfile             EmployeeBillingProfile?
+  rates                      EmployeeRate[]
+  photos                     Photo[]
+  workEntries                WorkEntry[]
+  recurringAdjustments       RecurringAdjustment[]
 
+  @@unique([organizationId, userId])
+  @@unique([organizationId, email])
   @@index([role])
   @@index([isActive])
   @@index([lastName, firstName])
+  @@index([organizationId])
 }
 
 model EmployeeBillingProfile {
   id                  String             @id @default(cuid())
+  organizationId      String             @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   employeeId          String             @unique
   subjectType         BillingSubjectType @default(INDIVIDUAL)
   billingName         String
@@ -584,10 +767,12 @@ model EmployeeBillingProfile {
   employee            Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+  @@index([organizationId])
 }
 
 model EmployeeRate {
   id              String       @id @default(cuid())
+  organizationId  String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   employeeId      String
   type            RateType
   name            String
@@ -608,12 +793,14 @@ model EmployeeRate {
 
   @@index([employeeId, type, workType, validFrom])
   @@index([employeeId, isActive, validFrom, validTo])
+  @@index([organizationId])
 }
 
 model Client {
   id              String               @id @default(cuid())
+  organizationId  String               @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   name            String
-  normalizedName  String               @unique
+  normalizedName  String
   companyId       String?
   tradingName     String?
   dic             String?
@@ -629,7 +816,7 @@ model Client {
   contactPerson   String?
   email           String?
   phone           String?
-  externalCode    String?              @unique
+  externalCode    String?
   status          ClientStatus         @default(ACTIVE)
   clientType      ClientType           @default(DIRECT_CLIENT)
   pricingSegment  ClientPricingSegment @default(COMMERCIAL)
@@ -665,16 +852,22 @@ model Client {
   navigationContracts            NavigationContract[]
   navigationContactPersons       NavigationContactPerson[]
   salesOpportunities             SalesOpportunity[]
+
+  @@unique([organizationId, normalizedName])
+  @@unique([organizationId, externalCode])
+  @@index([organizationId])
 }
 
 model AdvertisingCarrier {
-  id                   String        @id @default(cuid())
+  id                   String              @id @default(cuid())
+  organizationId       String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   name                 String
-  code                 String        @unique
+  code                 String
+  visibility           InventoryVisibility @default(PRIVATE)
   type                 CarrierType
   latitude             Float?
   longitude            Float?
-  gpsStatus            GpsStatus     @default(UNVERIFIED)
+  gpsStatus            GpsStatus           @default(UNVERIFIED)
   street               String?
   address              String?
   locality             String?
@@ -682,8 +875,8 @@ model AdvertisingCarrier {
   region               String?
   cadastralArea        String?
   structureCode        String?
-  mountingType         MountingType  @default(UNKNOWN)
-  status               CarrierStatus @default(ACTIVE)
+  mountingType         MountingType        @default(UNKNOWN)
+  status               CarrierStatus       @default(ACTIVE)
   description          String?
   placementDescription String?
   note                 String?
@@ -693,10 +886,10 @@ model AdvertisingCarrier {
   sourceSystem         String?
   sourceSheet          String?
   sourceRow            Int?
-  sourceKey            String?       @unique
+  sourceKey            String?
   importBatchId        String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
   importBatch                  ImportBatch?                  @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   surfaces                     AdvertisingSurface[]
@@ -709,14 +902,18 @@ model AdvertisingCarrier {
   historyLogs                  CarrierHistoryLog[]
   candidatePoints              NavigationCandidatePoint[]
 
+  @@unique([organizationId, code])
+  @@unique([organizationId, sourceKey])
   @@index([importBatchId])
   @@index([archivedAt])
   @@index([city, structureCode])
   @@index([latitude, longitude])
+  @@index([organizationId])
 }
 
 model WorkTask {
   id                   String           @id @default(cuid())
+  organizationId       String           @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   title                String
   description          String?
   assignedToEmployeeId String?
@@ -752,10 +949,12 @@ model WorkTask {
   @@index([workOrderId])
   @@index([status, scheduledDate])
   @@index([priority, dueDate])
+  @@index([organizationId])
 }
 
 model Settlement {
   id                  String           @id @default(cuid())
+  organizationId      String           @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   employeeId          String
   periodFrom          DateTime
   periodTo            DateTime
@@ -784,26 +983,28 @@ model Settlement {
   @@unique([employeeId, periodYear, periodMonth])
   @@index([employeeId])
   @@index([status, periodFrom, periodTo])
+  @@index([organizationId])
 }
 
 model SettlementItem {
-  id           String       @id @default(cuid())
-  settlementId String
-  taskId       String?
-  workEntryId  String?      @unique
-  date         DateTime
-  description  String
-  quantity     Decimal?     @db.Decimal(10, 2)
-  unit         String?
-  unitPrice    Decimal?     @db.Decimal(12, 2)
-  amount       Decimal      @db.Decimal(12, 2)
-  appliedRate  Decimal      @default(0) @db.Decimal(12, 2)
-  rateType     RateType?
-  rateSource   RateSource?
-  rateId       String?
-  carrierType  CarrierType?
-  workType     WorkType?
-  note         String?
+  id             String       @id @default(cuid())
+  organizationId String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  settlementId   String
+  taskId         String?
+  workEntryId    String?      @unique
+  date           DateTime
+  description    String
+  quantity       Decimal?     @db.Decimal(10, 2)
+  unit           String?
+  unitPrice      Decimal?     @db.Decimal(12, 2)
+  amount         Decimal      @db.Decimal(12, 2)
+  appliedRate    Decimal      @default(0) @db.Decimal(12, 2)
+  rateType       RateType?
+  rateSource     RateSource?
+  rateId         String?
+  carrierType    CarrierType?
+  workType       WorkType?
+  note           String?
 
   settlement            Settlement             @relation(fields: [settlementId], references: [id], onDelete: Restrict)
   task                  WorkTask?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -813,10 +1014,12 @@ model SettlementItem {
   @@index([settlementId])
   @@index([taskId])
   @@index([date])
+  @@index([organizationId])
 }
 
 model Vehicle {
   id                       String        @id @default(cuid())
+  organizationId           String        @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   name                     String
   type                     VehicleType   @default(CAR)
   registrationNumber       String?
@@ -842,19 +1045,21 @@ model Vehicle {
 
   @@index([type, status])
   @@index([registrationNumber])
+  @@index([organizationId])
 }
 
 model VehicleReservation {
-  id         String            @id @default(cuid())
-  vehicleId  String
-  employeeId String
-  dateFrom   DateTime
-  dateTo     DateTime
-  purpose    String
-  status     ReservationStatus @default(RESERVED)
-  note       String?
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  organizationId String            @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  vehicleId      String
+  employeeId     String
+  dateFrom       DateTime
+  dateTo         DateTime
+  purpose        String
+  status         ReservationStatus @default(RESERVED)
+  note           String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -862,10 +1067,12 @@ model VehicleReservation {
   @@index([vehicleId])
   @@index([employeeId])
   @@index([status, dateFrom, dateTo])
+  @@index([organizationId])
 }
 
 model VehicleServiceRecord {
   id              String    @id @default(cuid())
+  organizationId  String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   vehicleId       String
   date            DateTime
   title           String
@@ -881,20 +1088,22 @@ model VehicleServiceRecord {
   @@index([vehicleId])
   @@index([date])
   @@index([nextServiceDate])
+  @@index([organizationId])
 }
 
 model VehicleFuelExpense {
-  id         String   @id @default(cuid())
-  vehicleId  String
-  employeeId String?
-  userId     String?
-  amount     Decimal  @db.Decimal(12, 2)
-  liters     Decimal? @db.Decimal(10, 2)
-  odometer   Int?
-  fuelType   String   @default("DIESEL")
-  receiptUrl String?
-  note       String?
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  vehicleId      String
+  employeeId     String?
+  userId         String?
+  amount         Decimal  @db.Decimal(12, 2)
+  liters         Decimal? @db.Decimal(10, 2)
+  odometer       Int?
+  fuelType       String   @default("DIESEL")
+  receiptUrl     String?
+  note           String?
+  createdAt      DateTime @default(now())
 
   vehicle  Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
@@ -902,6 +1111,7 @@ model VehicleFuelExpense {
   @@index([vehicleId])
   @@index([employeeId])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 enum AbsenceType {
@@ -918,25 +1128,28 @@ enum AbsenceStatus {
 }
 
 model EmployeeAbsence {
-  id         String        @id @default(cuid())
-  employeeId String
-  type       AbsenceType   @default(VACATION)
-  dateFrom   DateTime
-  dateTo     DateTime
-  note       String?
-  status     AbsenceStatus @default(APPROVED)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  organizationId String        @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  employeeId     String
+  type           AbsenceType   @default(VACATION)
+  dateFrom       DateTime
+  dateTo         DateTime
+  note           String?
+  status         AbsenceStatus @default(APPROVED)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId])
   @@index([dateFrom, dateTo])
   @@index([status])
+  @@index([organizationId])
 }
 
 model ChatMessage {
   id                 String    @id @default(cuid())
+  organizationId     String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   channel            String    @default("general")
   userId             String
   userName           String
@@ -954,37 +1167,42 @@ model ChatMessage {
 
   @@index([channel, createdAt])
   @@index([assignedToUserId])
+  @@index([organizationId])
 }
 
 model ChatRead {
-  id        String   @id @default(cuid())
-  messageId String
-  userId    String
-  readAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  messageId      String
+  userId         String
+  readAt         DateTime @default(now())
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
   @@index([userId])
+  @@index([organizationId])
 }
 
 model AdvertisingSurface {
-  id                   String        @id @default(cuid())
+  id                   String              @id @default(cuid())
+  organizationId       String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   carrierId            String
   currentClientId      String?
   importBatchId        String?
   name                 String
-  mediaType            MediaType     @default(OTHER)
+  visibility           InventoryVisibility @default(PRIVATE)
+  mediaType            MediaType           @default(OTHER)
   sourcePosition       String?
   directionDescription String?
   destinationName      String?
   distanceMeters       Int?
   rawMediaType         String?
-  sourceKey            String?       @unique
+  sourceKey            String?
   size                 String?
   orientation          String?
-  status               SurfaceStatus @default(AVAILABLE)
-  price                Decimal?      @db.Decimal(12, 2)
+  status               SurfaceStatus       @default(AVAILABLE)
+  price                Decimal?            @db.Decimal(12, 2)
   note                 String?
   contractId           String?
   artworkUrl           String?
@@ -992,13 +1210,13 @@ model AdvertisingSurface {
   currentRentStart     DateTime?
   currentRentEnd       DateTime?
   sidePosition         String?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
-  carrier          AdvertisingCarrier  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  currentClient    Client?             @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
-  contract         NavigationContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
-  importBatch      ImportBatch?        @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  carrier          AdvertisingCarrier         @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  currentClient    Client?                    @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
+  contract         NavigationContract?        @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  importBatch      ImportBatch?               @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   occupancies      Occupancy[]
   offerItems       OfferItem[]
   photos           Photo[]
@@ -1008,15 +1226,18 @@ model AdvertisingSurface {
   historyLogs      CarrierHistoryLog[]
   candidatePoints  NavigationCandidatePoint[]
 
+  @@unique([organizationId, sourceKey])
   @@index([carrierId])
   @@index([currentClientId])
   @@index([contractId])
   @@index([importBatchId])
   @@index([mediaType, status])
+  @@index([organizationId])
 }
 
 model Occupancy {
   id                     String                 @id @default(cuid())
+  organizationId         String                 @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   surfaceId              String
   clientId               String?
   clientName             String
@@ -1039,7 +1260,7 @@ model Occupancy {
   sourceColumn           Int?
   clientResolutionStatus ClientResolutionStatus @default(RESOLVED)
   statusDerivation       String?
-  sourceKey              String?                @unique
+  sourceKey              String?
   importBatchId          String?
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
@@ -1050,15 +1271,18 @@ model Occupancy {
   importBatch ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
   @@unique([offerId, surfaceId])
+  @@unique([organizationId, sourceKey])
   @@index([surfaceId])
   @@index([clientId])
   @@index([offerId])
   @@index([importBatchId])
   @@index([status, dateFrom, dateTo])
+  @@index([organizationId])
 }
 
 model Offer {
   id                    String               @id @default(cuid())
+  organizationId        String               @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId              String
   title                 String
   campaignName          String?
@@ -1118,10 +1342,12 @@ model Offer {
   @@index([status, validUntil])
   @@index([createdByUserId, createdAt])
   @@index([archivedAt])
+  @@index([organizationId])
 }
 
 model SalesOpportunity {
   id                      String               @id @default(cuid())
+  organizationId          String               @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   companyName             String
   companyId               String?
   website                 String?
@@ -1150,9 +1376,9 @@ model SalesOpportunity {
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
 
-  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  createdOffer Offer?    @relation(fields: [createdOfferId], references: [id], onDelete: SetNull)
-  assignedTo   User?     @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  client       Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdOffer Offer?  @relation(fields: [createdOfferId], references: [id], onDelete: SetNull)
+  assignedTo   User?   @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
 
   @@index([status, opportunityScore])
   @@index([city, region])
@@ -1160,10 +1386,12 @@ model SalesOpportunity {
   @@index([createdOfferId])
   @@index([assignedToUserId])
   @@index([companyName, eventType])
+  @@index([organizationId])
 }
 
 model NavigationOffer {
   id                    String   @id @default(cuid())
+  organizationId        String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   offerId               String   @unique
   targetName            String
   targetAddress         String?
@@ -1186,10 +1414,12 @@ model NavigationOffer {
   navigationDocumentationReports NavigationDocumentationReport[]
 
   @@index([targetLatitude, targetLongitude])
+  @@index([organizationId])
 }
 
 model NavigationPoint {
   id                String                @id @default(cuid())
+  organizationId    String                @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   navigationOfferId String?
   navigationOrderId String?
   carrierId         String?
@@ -1262,13 +1492,14 @@ model NavigationPoint {
   priceVersions                NavigationPriceVersion[]
   priceAuditLogs               NavigationPriceAuditLog[]
   navigationDocumentationItems NavigationDocumentationItem[]
-  convertedCandidatePoint      NavigationCandidatePoint?    @relation("CandidateConvertedPoint")
+  convertedCandidatePoint      NavigationCandidatePoint?     @relation("CandidateConvertedPoint")
 
   @@index([navigationOfferId, sortOrder])
   @@index([navigationOrderId])
   @@index([carrierId])
   @@index([surfaceId])
   @@index([latitude, longitude])
+  @@index([organizationId])
 }
 
 enum NavigationReportStatus {
@@ -1281,6 +1512,7 @@ enum NavigationReportStatus {
 
 model NavigationDocumentationReport {
   id                String                 @id @default(cuid())
+  organizationId    String                 @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId          String
   offerId           String?
   navigationOfferId String?
@@ -1310,10 +1542,12 @@ model NavigationDocumentationReport {
   @@index([clientId, year, quarter])
   @@index([status, createdAt])
   @@index([createdById])
+  @@index([organizationId])
 }
 
 model NavigationDocumentationItem {
   id                String   @id @default(cuid())
+  organizationId    String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   reportId          String
   navigationPointId String?
   carrierId         String?
@@ -1334,10 +1568,12 @@ model NavigationDocumentationItem {
   @@index([navigationPointId])
   @@index([carrierId])
   @@index([selectedPhotoId])
+  @@index([organizationId])
 }
 
 model NavigationReportAuditLog {
   id             String    @id @default(cuid())
+  organizationId String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   reportId       String
   actorUserId    String
   action         String
@@ -1351,10 +1587,12 @@ model NavigationReportAuditLog {
 
   @@index([reportId, createdAt])
   @@index([actorUserId])
+  @@index([organizationId])
 }
 
 model CityGalleryProject {
   id                  String                   @id @default(cuid())
+  organizationId      String                   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   title               String
   status              CityGalleryProjectStatus @default(DRAFT)
   city                String?
@@ -1380,17 +1618,22 @@ model CityGalleryProject {
   offers CityGalleryOffer[]
 
   @@index([status, city])
+  @@index([organizationId])
 }
 
 model CityGalleryFleetConfig {
   id               String   @id @default("default")
+  organizationId   String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   totalFrames      Int      @default(24)
   maintenanceCount Int      @default(0)
   updatedAt        DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model CityGalleryOffer {
   id              String   @id @default(cuid())
+  organizationId  String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   offerId         String   @unique
   projectId       String?
   concept         String?
@@ -1403,10 +1646,12 @@ model CityGalleryOffer {
   project CityGalleryProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@index([organizationId])
 }
 
 model MediaPackage {
   id              String   @id @default(cuid())
+  organizationId  String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   name            String
   description     String?
   active          Boolean  @default(true)
@@ -1420,33 +1665,37 @@ model MediaPackage {
   selections OfferPackageSelection[]
 
   @@index([active, name])
+  @@index([organizationId])
 }
 
 model MediaPackageRule {
-  id        String    @id @default(cuid())
-  packageId String
-  mediaType MediaType
-  city      String?
-  locality  String?
-  quantity  Int
-  sortOrder Int       @default(0)
-  createdAt DateTime  @default(now())
+  id             String    @id @default(cuid())
+  organizationId String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  packageId      String
+  mediaType      MediaType
+  city           String?
+  locality       String?
+  quantity       Int
+  sortOrder      Int       @default(0)
+  createdAt      DateTime  @default(now())
 
   package MediaPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
 
   @@index([packageId, sortOrder])
   @@index([mediaType, city])
+  @@index([organizationId])
 }
 
 model OfferPackageSelection {
-  id            String                    @id @default(cuid())
-  offerId       String
-  packageId     String?
-  packageName   String
-  selectionMode MediaPackageSelectionMode @default(MANUAL)
-  standardPrice Decimal?                  @db.Decimal(12, 2)
-  packagePrice  Decimal?                  @db.Decimal(12, 2)
-  createdAt     DateTime                  @default(now())
+  id             String                    @id @default(cuid())
+  organizationId String                    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  offerId        String
+  packageId      String?
+  packageName    String
+  selectionMode  MediaPackageSelectionMode @default(MANUAL)
+  standardPrice  Decimal?                  @db.Decimal(12, 2)
+  packagePrice   Decimal?                  @db.Decimal(12, 2)
+  createdAt      DateTime                  @default(now())
 
   offer   Offer         @relation(fields: [offerId], references: [id], onDelete: Cascade)
   package MediaPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
@@ -1454,11 +1703,13 @@ model OfferPackageSelection {
 
   @@index([offerId])
   @@index([packageId])
+  @@index([organizationId])
 }
 
 model OfferPriceRule {
   id                String                @id @default(cuid())
-  code              String                @unique
+  organizationId    String                @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  code              String
   category          OfferPriceCategory
   label             String
   description       String?
@@ -1486,37 +1737,42 @@ model OfferPriceRule {
   charges   OfferCharge[]
   items     OfferItem[]
 
+  @@unique([organizationId, code])
   @@index([category, active, sortOrder])
   @@index([mediaType, active])
   @@index([pricingSegment, mediaType, category, active])
   @@index([pricingSegment, mediaType, mountingType, category, active])
   @@index([validFrom, validTo])
+  @@index([organizationId])
 }
 
 model OfferCharge {
-  id          String             @id @default(cuid())
-  offerId     String
-  priceRuleId String?
-  category    OfferPriceCategory
-  code        String
-  label       String
-  description String?
-  quantity    Decimal            @db.Decimal(10, 2)
-  unit        String
-  unitPrice   Decimal            @db.Decimal(12, 2)
-  subtotal    Decimal            @db.Decimal(12, 2)
-  sortOrder   Int                @default(0)
-  createdAt   DateTime           @default(now())
+  id             String             @id @default(cuid())
+  organizationId String             @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  offerId        String
+  priceRuleId    String?
+  category       OfferPriceCategory
+  code           String
+  label          String
+  description    String?
+  quantity       Decimal            @db.Decimal(10, 2)
+  unit           String
+  unitPrice      Decimal            @db.Decimal(12, 2)
+  subtotal       Decimal            @db.Decimal(12, 2)
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
 
   offer     Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
   priceRule OfferPriceRule? @relation(fields: [priceRuleId], references: [id], onDelete: SetNull)
 
   @@index([offerId, sortOrder])
   @@index([priceRuleId])
+  @@index([organizationId])
 }
 
 model OfferItem {
   id                 String               @id @default(cuid())
+  organizationId     String               @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   offerId            String
   packageSelectionId String?
   surfaceId          String
@@ -1556,30 +1812,34 @@ model OfferItem {
   @@index([priceRuleId])
   @@index([packageSelectionId])
   @@index([dateFrom, dateTo])
+  @@index([organizationId])
 }
 
 model OfferEvent {
-  id          String         @id @default(cuid())
-  offerId     String
-  type        OfferEventType
-  fromStatus  OfferStatus?
-  toStatus    OfferStatus?
-  actorUserId String?
-  actorName   String?
-  actorEmail  String?
-  message     String?
-  metadata    Json?
-  createdAt   DateTime       @default(now())
+  id             String         @id @default(cuid())
+  organizationId String         @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  offerId        String
+  type           OfferEventType
+  fromStatus     OfferStatus?
+  toStatus       OfferStatus?
+  actorUserId    String?
+  actorName      String?
+  actorEmail     String?
+  message        String?
+  metadata       Json?
+  createdAt      DateTime       @default(now())
 
   offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
   actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([offerId, createdAt])
   @@index([actorUserId])
+  @@index([organizationId])
 }
 
 model Photo {
   id                     String    @id @default(cuid())
+  organizationId         String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   carrierId              String?
   surfaceId              String?
   employeeId             String?
@@ -1604,6 +1864,10 @@ model Photo {
   capturedByWorkerUserId String?
   capturedByWorkerName   String?
   storageProvider        String    @default("LOCAL") // GOOGLE_DRIVE, LOCAL
+  storageKey             String?
+  webStorageKey          String?
+  thumbnailStorageKey    String?
+  contentChecksum        String?
   content                Bytes?
   aiStatus               String?   @default("PENDING") // PENDING, ANALYZED, FAILED
   aiSuggestedCarrierCode String?
@@ -1619,7 +1883,7 @@ model Photo {
   crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
   navigationDocumentationItems NavigationDocumentationItem[]
   installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
-  siteNavigationPoint          NavigationPoint?               @relation("PointSitePhoto")
+  siteNavigationPoint          NavigationPoint?              @relation("PointSitePhoto")
   surveyCandidatePoint         NavigationCandidatePoint?     @relation("CandidatePhotos", fields: [surveyCandidatePointId], references: [id], onDelete: SetNull)
 
   @@unique([carrierId, driveFileId])
@@ -1627,27 +1891,30 @@ model Photo {
   @@index([carrierId, sortOrder])
   @@index([surfaceId])
   @@index([employeeId])
+  @@index([organizationId])
+  @@index([organizationId, storageProvider])
 }
 
 model ImportBatch {
-  id           String       @id @default(cuid())
-  fileName     String
-  sourceType   String
-  status       ImportStatus @default(DRAFT)
-  totalRows    Int          @default(0)
-  validRows    Int          @default(0)
-  importedRows Int          @default(0)
-  skippedRows  Int          @default(0)
-  errorRows    Int          @default(0)
-  mapping      Json?
-  fileHash     String?
-  reportPath   String?
-  environment  String?
-  createdById  String?
-  startedAt    DateTime?
-  finishedAt   DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  fileName       String
+  sourceType     String
+  status         ImportStatus @default(DRAFT)
+  totalRows      Int          @default(0)
+  validRows      Int          @default(0)
+  importedRows   Int          @default(0)
+  skippedRows    Int          @default(0)
+  errorRows      Int          @default(0)
+  mapping        Json?
+  fileHash       String?
+  reportPath     String?
+  environment    String?
+  createdById    String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   createdBy      User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   carriers       AdvertisingCarrier[]
@@ -1659,12 +1926,14 @@ model ImportBatch {
   @@index([createdById])
   @@index([status, createdAt])
   @@index([fileHash])
+  @@index([organizationId])
 }
 
 model PriceListItem {
   id              String       @id @default(cuid())
+  organizationId  String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   identityKey     String
-  versionKey      String       @unique
+  versionKey      String
   name            String
   carrierType     CarrierType?
   mediaType       MediaType?
@@ -1685,29 +1954,34 @@ model PriceListItem {
 
   importBatch ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
+  @@unique([organizationId, versionKey])
   @@index([identityKey, validFrom, validTo])
   @@index([isActive])
   @@index([importBatchId])
+  @@index([organizationId])
 }
 
 model ImportRowError {
-  id        String   @id @default(cuid())
-  batchId   String
-  rowNumber Int
-  sheetName String?
-  field     String?
-  code      String
-  message   String
-  rawData   Json
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  batchId        String
+  rowNumber      Int
+  sheetName      String?
+  field          String?
+  code           String
+  message        String
+  rawData        Json
+  createdAt      DateTime @default(now())
 
   batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([batchId, rowNumber])
+  @@index([organizationId])
 }
 
 model WorkOrder {
   id               String          @id @default(cuid())
+  organizationId   String          @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   title            String
   description      String
   status           WorkOrderStatus @default(NEW)
@@ -1735,26 +2009,28 @@ model WorkOrder {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  crmOrderId        String?
-  navigationOrderId String?
-  client            Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  crmOrder          CrmOrder?        @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
-  navigationOrder   NavigationOrder? @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
-  assignments       WorkAssignment[]
-  items             WorkOrderItem[]
-  workTasks         WorkTask[]
-  workEntries       WorkEntry[]
-  rates             WorkOrderRate[]
-  crmRealizations   CrmRealization[]
+  crmOrderId         String?
+  navigationOrderId  String?
+  client             Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  crmOrder           CrmOrder?           @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  navigationOrder    NavigationOrder?    @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
+  assignments        WorkAssignment[]
+  items              WorkOrderItem[]
+  workTasks          WorkTask[]
+  workEntries        WorkEntry[]
+  rates              WorkOrderRate[]
+  crmRealizations    CrmRealization[]
   warehouseMovements WarehouseMovement[]
 
   @@index([scheduledAt, status])
   @@index([priority, scheduledAt])
   @@index([clientId])
+  @@index([organizationId])
 }
 
 model WorkAssignment {
   id             String    @id @default(cuid())
+  organizationId String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   workOrderId    String
   userId         String?
   workerName     String
@@ -1767,16 +2043,18 @@ model WorkAssignment {
 
   @@index([workOrderId])
   @@index([userId])
+  @@index([organizationId])
 }
 
 model WorkOrderItem {
-  id          String   @id @default(cuid())
-  workOrderId String
-  carrierId   String?
-  surfaceId   String?
-  description String?
-  quantity    Int      @default(1)
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  workOrderId    String
+  carrierId      String?
+  surfaceId      String?
+  description    String?
+  quantity       Int      @default(1)
+  createdAt      DateTime @default(now())
 
   workOrder WorkOrder           @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
@@ -1785,6 +2063,7 @@ model WorkOrderItem {
   @@index([workOrderId])
   @@index([carrierId])
   @@index([surfaceId])
+  @@index([organizationId])
 }
 
 enum WorkEntryStatus {
@@ -1808,6 +2087,7 @@ enum RateSource {
 
 model WorkOrderRate {
   id              String       @id @default(cuid())
+  organizationId  String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   workOrderId     String
   type            RateType
   name            String
@@ -1830,10 +2110,12 @@ model WorkOrderRate {
   @@index([workOrderId])
   @@index([type, workType, validFrom])
   @@index([isActive, validFrom, validTo])
+  @@index([organizationId])
 }
 
 model CompanyRate {
   id              String       @id @default(cuid())
+  organizationId  String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   type            RateType
   name            String
   amount          Decimal      @db.Decimal(12, 2)
@@ -1852,10 +2134,12 @@ model CompanyRate {
 
   @@index([type, workType, validFrom])
   @@index([isActive, validFrom, validTo])
+  @@index([organizationId])
 }
 
 model WorkEntry {
   id                 String                  @id @default(cuid())
+  organizationId     String                  @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   employeeId         String
   workDate           DateTime
   workTaskId         String
@@ -1893,6 +2177,7 @@ model WorkEntry {
   @@index([workOrderId])
   @@index([status])
   @@index([workDate])
+  @@index([organizationId])
 }
 
 enum ExpenseType {
@@ -1929,6 +2214,7 @@ enum AdjustmentCategory {
 
 model WorkExpense {
   id               String        @id @default(cuid())
+  organizationId   String        @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   workEntryId      String
   type             ExpenseType
   description      String
@@ -1943,29 +2229,34 @@ model WorkExpense {
 
   workEntry   WorkEntry              @relation(fields: [workEntryId], references: [id], onDelete: Restrict)
   adjustments SettlementAdjustment[]
+
+  @@index([organizationId])
 }
 
 model RecurringAdjustment {
-  id          String             @id @default(cuid())
-  employeeId  String
-  type        AdjustmentType
-  category    AdjustmentCategory
-  description String
-  amount      Decimal            @db.Decimal(12, 2)
-  validFrom   DateTime
-  validTo     DateTime?
-  isActive    Boolean            @default(true)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id             String             @id @default(cuid())
+  organizationId String             @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  employeeId     String
+  type           AdjustmentType
+  category       AdjustmentCategory
+  description    String
+  amount         Decimal            @db.Decimal(12, 2)
+  validFrom      DateTime
+  validTo        DateTime?
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   employee    Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   adjustments SettlementAdjustment[]
 
   @@index([employeeId])
+  @@index([organizationId])
 }
 
 model SettlementAdjustment {
   id                             String             @id @default(cuid())
+  organizationId                 String             @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   settlementId                   String
   recurringAdjustmentId          String?
   workExpenseId                  String?            @unique
@@ -1999,45 +2290,52 @@ model SettlementAdjustment {
   @@index([settlementId])
   @@index([recurringAdjustmentId])
   @@index([workExpenseId])
+  @@index([organizationId])
 }
 
 model SystemSettings {
-  id          String   @id @default("default")
-  companyName String   @default("SeePoint s.r.o.")
-  companyId   String?
-  vatId       String?
-  street      String?
-  city        String?
-  postalCode  String?
-  country     String?
-  bankAccount String?
-  iban        String?
-  swift       String?
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default("default")
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  companyName    String   @default("SeePoint s.r.o.")
+  companyId      String?
+  vatId          String?
+  street         String?
+  city           String?
+  postalCode     String?
+  country        String?
+  bankAccount    String?
+  iban           String?
+  swift          String?
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model SettlementAuditLog {
-  id           String   @id @default(cuid())
-  settlementId String
-  userId       String
-  userName     String
-  action       String // e.g. "ITEM_UPDATE", "ITEM_DELETE", "ADJUSTMENT_ADD", "STATUS_CHANGE"
-  fieldName    String? // e.g. "amount", "unitPrice", "quantity", "status"
-  oldValue     String?
-  newValue     String?
-  reason       String
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  settlementId   String
+  userId         String
+  userName       String
+  action         String // e.g. "ITEM_UPDATE", "ITEM_DELETE", "ADJUSTMENT_ADD", "STATUS_CHANGE"
+  fieldName      String? // e.g. "amount", "unitPrice", "quantity", "status"
+  oldValue       String?
+  newValue       String?
+  reason         String
+  createdAt      DateTime @default(now())
 
   settlement Settlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
   @@index([settlementId])
+  @@index([organizationId])
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  settlementId  String        @unique
-  invoiceNumber String        @unique
-  status        InvoiceStatus @default(DRAFT)
+  id             String        @id @default(cuid())
+  organizationId String        @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  settlementId   String        @unique
+  invoiceNumber  String
+  status         InvoiceStatus @default(DRAFT)
 
   // Date details:
   issueDate  DateTime
@@ -2075,23 +2373,28 @@ model Invoice {
 
   settlement Settlement    @relation(fields: [settlementId], references: [id], onDelete: Restrict)
   items      InvoiceItem[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
 }
 
 model InvoiceItem {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  description String
-  quantity    Decimal @db.Decimal(10, 2)
-  unit        String
-  unitPrice   Decimal @db.Decimal(12, 2)
-  amount      Decimal @db.Decimal(12, 2)
-  vatRate     Decimal @default(0) @db.Decimal(5, 2)
-  vatAmount   Decimal @default(0) @db.Decimal(12, 2)
-  totalAmount Decimal @db.Decimal(12, 2)
+  id             String  @id @default(cuid())
+  organizationId String  @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  invoiceId      String
+  description    String
+  quantity       Decimal @db.Decimal(10, 2)
+  unit           String
+  unitPrice      Decimal @db.Decimal(12, 2)
+  amount         Decimal @db.Decimal(12, 2)
+  vatRate        Decimal @default(0) @db.Decimal(5, 2)
+  vatAmount      Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal @db.Decimal(12, 2)
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+  @@index([organizationId])
 }
 
 enum InvoiceStatus {
@@ -2246,6 +2549,7 @@ enum CrmTaskStatus {
 
 model ClientContact {
   id                     String                 @id @default(cuid())
+  organizationId         String                 @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId               String
   firstName              String
   lastName               String
@@ -2270,10 +2574,12 @@ model ClientContact {
   crmTasks       CrmTask[]
 
   @@index([clientId])
+  @@index([organizationId])
 }
 
 model ClientBranch {
   id               String   @id @default(cuid())
+  organizationId   String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId         String
   contactPersonId  String?
   name             String
@@ -2295,11 +2601,13 @@ model ClientBranch {
   crmOrders     CrmOrder[]
 
   @@index([clientId])
+  @@index([organizationId])
 }
 
 model CrmOrder {
   id              String         @id @default(cuid())
-  orderNumber     String         @unique
+  organizationId  String         @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  orderNumber     String
   clientOrderCode String?
   clientId        String
   contactId       String?
@@ -2332,12 +2640,15 @@ model CrmOrder {
   navigationOrder NavigationOrder?
   shoppingItems   CompanyShoppingItem[]
 
+  @@unique([organizationId, orderNumber])
   @@index([clientId])
   @@index([status])
+  @@index([organizationId])
 }
 
 model CrmRealization {
   id             String            @id @default(cuid())
+  organizationId String            @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   crmOrderId     String
   surfaceId      String?
   carrierId      String?
@@ -2360,13 +2671,15 @@ model CrmRealization {
 
   @@index([crmOrderId])
   @@index([status])
+  @@index([organizationId])
 }
 
 model ClientContract {
   id               String         @id @default(cuid())
+  organizationId   String         @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId         String
   assignedUserId   String?
-  contractNumber   String         @unique
+  contractNumber   String
   title            String
   type             ContractType   @default(RENTAL)
   signedAt         DateTime?
@@ -2388,15 +2701,18 @@ model ClientContract {
   documents    ClientDocument[]
   crmTasks     CrmTask[]
 
+  @@unique([organizationId, contractNumber])
   @@index([clientId])
   @@index([status, validTo])
+  @@index([organizationId])
 }
 
 model ClientInvoice {
   id             String              @id @default(cuid())
+  organizationId String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId       String
   crmOrderId     String?
-  invoiceNumber  String              @unique
+  invoiceNumber  String
   variableSymbol String?
   type           ClientInvoiceType   @default(REGULAR)
   status         ClientInvoiceStatus @default(ISSUED)
@@ -2419,12 +2735,15 @@ model ClientInvoice {
   crmTasks                 CrmTask[]
   navigationBillingPeriods NavigationBillingPeriod[]
 
+  @@unique([organizationId, invoiceNumber])
   @@index([clientId])
   @@index([status, dueDate])
+  @@index([organizationId])
 }
 
 model ClientInvoiceItem {
   id              String  @id @default(cuid())
+  organizationId  String  @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientInvoiceId String
   description     String
   quantity        Decimal @db.Decimal(10, 2)
@@ -2438,10 +2757,12 @@ model ClientInvoiceItem {
   clientInvoice ClientInvoice @relation(fields: [clientInvoiceId], references: [id], onDelete: Cascade)
 
   @@index([clientInvoiceId])
+  @@index([organizationId])
 }
 
 model ClientCommunication {
   id              String            @id @default(cuid())
+  organizationId  String            @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId        String
   contactId       String?
   authorUserId    String
@@ -2462,10 +2783,12 @@ model ClientCommunication {
 
   @@index([clientId])
   @@index([authorUserId])
+  @@index([organizationId])
 }
 
 model CrmTask {
   id             String          @id @default(cuid())
+  organizationId String          @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId       String
   contactId      String?
   crmOrderId     String?
@@ -2494,10 +2817,12 @@ model CrmTask {
 
   @@index([clientId])
   @@index([assignedUserId, status, dueDate])
+  @@index([organizationId])
 }
 
 model ClientDocument {
   id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   clientId       String
   crmOrderId     String?
   contractId     String?
@@ -2519,26 +2844,30 @@ model ClientDocument {
   uploaderUser User            @relation("ClientDocumentUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
 
   @@index([clientId])
+  @@index([organizationId])
 }
 
 model CrmAuditLog {
-  id          String   @id @default(cuid())
-  userId      String
-  userEmail   String
-  action      String
-  entityType  String
-  entityId    String
-  detailsJson String?
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  userId         String
+  userEmail      String
+  action         String
+  entityType     String
+  entityId       String
+  detailsJson    String?
+  createdAt      DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 model ClientMergeLog {
   id                String   @id @default(cuid())
+  organizationId    String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   targetClientId    String
   sourceClientId    String
   sourceClientName  String
@@ -2550,6 +2879,7 @@ model ClientMergeLog {
   performedByUser User   @relation(fields: [performedByUserId], references: [id], onDelete: Restrict)
 
   @@index([targetClientId])
+  @@index([organizationId])
 }
 
 enum NavigationOrderStatus {
@@ -2583,6 +2913,7 @@ enum NavigationBlockStatus {
 
 model NavigationOrder {
   id                 String                 @id @default(cuid())
+  organizationId     String                 @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   crmOrderId         String                 @unique
   status             NavigationOrderStatus  @default(POPTAVKA)
   blockStatus        NavigationBlockStatus?
@@ -2611,8 +2942,8 @@ model NavigationOrder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  crmOrder            CrmOrder                  @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
-  installerUser       User?                     @relation("NavOrderInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
+  crmOrder            CrmOrder                   @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  installerUser       User?                      @relation("NavOrderInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
   points              NavigationPoint[]
   billingPeriods      NavigationBillingPeriod[]
   navigationContracts NavigationContract[]
@@ -2621,10 +2952,12 @@ model NavigationOrder {
   candidatePoints     NavigationCandidatePoint[]
 
   @@index([status])
+  @@index([organizationId])
 }
 
 model SurveyRoute {
-  id                String          @id @default(cuid())
+  id                String   @id @default(cuid())
+  organizationId    String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   navigationOrderId String
   name              String
   description       String?
@@ -2633,19 +2966,21 @@ model SurveyRoute {
   originLongitude   Float?
   targetLatitude    Float?
   targetLongitude   Float?
-  routeOrder        Int             @default(0)
-  active            Boolean         @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  routeOrder        Int      @default(0)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  navigationOrder NavigationOrder          @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  navigationOrder NavigationOrder            @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
   candidatePoints NavigationCandidatePoint[]
 
   @@index([navigationOrderId, active, routeOrder])
+  @@index([organizationId])
 }
 
 model NavigationCandidatePoint {
   id                         String                     @id @default(cuid())
+  organizationId             String                     @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   navigationOrderId          String
   surveyRouteId              String?
   label                      String
@@ -2661,7 +2996,7 @@ model NavigationCandidatePoint {
   distanceSource             NavigationDistanceSource   @default(CALCULATED)
   ownershipType              CandidateOwnershipType     @default(UNKNOWN)
   ownerName                  String?
-  visibilityTowardTarget    CandidateVisibilityQuality @default(GOOD)
+  visibilityTowardTarget     CandidateVisibilityQuality @default(GOOD)
   permitStatus               CandidatePermitStatus      @default(UNKNOWN)
   internalNote               String?
   createdByUserId            String
@@ -2679,24 +3014,26 @@ model NavigationCandidatePoint {
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
 
-  navigationOrder          NavigationOrder          @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
-  surveyRoute              SurveyRoute?             @relation(fields: [surveyRouteId], references: [id], onDelete: SetNull)
-  createdByUser            User                     @relation("CandidateCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
-  assignedToUser           User?                    @relation("CandidateAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  supervisionByUser        User?                    @relation("CandidateSupervisionBy", fields: [supervisionByUserId], references: [id], onDelete: SetNull)
-  carrier                  AdvertisingCarrier?      @relation(fields: [carrierId], references: [id], onDelete: SetNull)
-  surface                  AdvertisingSurface?      @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
-  convertedNavigationPoint NavigationPoint?         @relation("CandidateConvertedPoint", fields: [convertedNavigationPointId], references: [id], onDelete: SetNull)
-  photos                   Photo[]                  @relation("CandidatePhotos")
+  navigationOrder          NavigationOrder     @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  surveyRoute              SurveyRoute?        @relation(fields: [surveyRouteId], references: [id], onDelete: SetNull)
+  createdByUser            User                @relation("CandidateCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignedToUser           User?               @relation("CandidateAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  supervisionByUser        User?               @relation("CandidateSupervisionBy", fields: [supervisionByUserId], references: [id], onDelete: SetNull)
+  carrier                  AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
+  surface                  AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
+  convertedNavigationPoint NavigationPoint?    @relation("CandidateConvertedPoint", fields: [convertedNavigationPointId], references: [id], onDelete: SetNull)
+  photos                   Photo[]             @relation("CandidatePhotos")
 
   @@index([navigationOrderId, supervisionStatus])
   @@index([surveyRouteId])
   @@index([createdByUserId])
   @@index([latitude, longitude])
+  @@index([organizationId])
 }
 
 model NavigationBillingPeriod {
   id                String              @id @default(cuid())
+  organizationId    String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   navigationOrderId String
   dateFrom          DateTime
   dateTo            DateTime
@@ -2712,10 +3049,12 @@ model NavigationBillingPeriod {
 
   @@unique([navigationOrderId, dateFrom, dateTo])
   @@index([navigationOrderId])
+  @@index([organizationId])
 }
 
 model NavigationPriceVersion {
   id                String    @id @default(cuid())
+  organizationId    String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   navigationPointId String
   validFrom         DateTime
   validTo           DateTime?
@@ -2732,10 +3071,12 @@ model NavigationPriceVersion {
   changedByUser   User?           @relation("NavigationPriceChangedUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
 
   @@index([navigationPointId, validFrom])
+  @@index([organizationId])
 }
 
 model NavigationPriceAuditLog {
   id                String   @id @default(cuid())
+  organizationId    String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   navigationPointId String
   oldUnitPrice      Decimal? @db.Decimal(12, 2)
   newUnitPrice      Decimal  @db.Decimal(12, 2)
@@ -2749,11 +3090,13 @@ model NavigationPriceAuditLog {
   changedByUser   User            @relation("NavigationPriceAuditUser", fields: [changedByUserId], references: [id], onDelete: Restrict)
 
   @@index([navigationPointId])
+  @@index([organizationId])
 }
 
 model NavigationContract {
   id                String   @id @default(cuid())
-  contractNumber    String   @unique
+  organizationId    String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  contractNumber    String
   contractType      String   @default("RENTAL") // RENTAL, PRODUCTION, SERVICE, MASTER
   clientId          String
   agencyName        String?
@@ -2780,50 +3123,56 @@ model NavigationContract {
   navigationOrder NavigationOrder?     @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
   surfaces        AdvertisingSurface[]
 
+  @@unique([organizationId, contractNumber])
   @@index([clientId])
   @@index([startDate, endDate])
   @@index([status])
+  @@index([organizationId])
 }
 
 model NavigationContactPerson {
-  id          String   @id @default(cuid())
-  clientId    String
-  contactType String   @default("CLIENT") // CLIENT, AGENCY, RESPONSIBLE_PERSON
-  name        String
-  agencyName  String?
-  role        String?
-  phone       String?
-  email       String?
-  isPrimary   Boolean  @default(false)
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  clientId       String
+  contactType    String   @default("CLIENT") // CLIENT, AGENCY, RESPONSIBLE_PERSON
+  name           String
+  agencyName     String?
+  role           String?
+  phone          String?
+  email          String?
+  isPrimary      Boolean  @default(false)
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
+  @@index([organizationId])
 }
 
 model CarrierHistoryLog {
-  id          String   @id @default(cuid())
-  carrierId   String
-  surfaceId   String?
-  eventType   String // INSTALLATION, REINSTALLATION, GRAPHICS_CHANGE, REPAIR, SERVICE, DEINSTALLATION, CLIENT_CHANGE, RENTAL_CHANGE
-  title       String
-  description String?
-  performedBy String?
-  performedAt DateTime @default(now())
-  clientId    String?
-  clientName  String?
-  photoUrl    String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  carrierId      String
+  surfaceId      String?
+  eventType      String // INSTALLATION, REINSTALLATION, GRAPHICS_CHANGE, REPAIR, SERVICE, DEINSTALLATION, CLIENT_CHANGE, RENTAL_CHANGE
+  title          String
+  description    String?
+  performedBy    String?
+  performedAt    DateTime @default(now())
+  clientId       String?
+  clientName     String?
+  photoUrl       String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
 
   carrier AdvertisingCarrier  @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   surface AdvertisingSurface? @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
 
   @@index([carrierId, performedAt])
   @@index([eventType])
+  @@index([organizationId])
 }
 
 enum ShoppingPriority {
@@ -2834,6 +3183,7 @@ enum ShoppingPriority {
 
 model CompanyShoppingItem {
   id                   String           @id @default(cuid())
+  organizationId       String           @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   category             String // "OFFICE" (Kancelář) or "WORKSHOP" (Dílna & Výroba)
   title                String
   quantity             String?
@@ -2862,6 +3212,7 @@ model CompanyShoppingItem {
   @@index([priority])
   @@index([assignedEmployeeId])
   @@index([crmOrderId])
+  @@index([organizationId])
 }
 
 enum WarehouseItemCategory {
@@ -2878,6 +3229,7 @@ enum WarehouseMovementType {
 
 model WarehouseItem {
   id              String                @id @default(cuid())
+  organizationId  String                @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   name            String
   code            String?
   category        WarehouseItemCategory @default(CONSUMABLE)
@@ -2897,10 +3249,12 @@ model WarehouseItem {
 
   @@index([category])
   @@index([location])
+  @@index([organizationId])
 }
 
 model WarehouseMovement {
   id                   String                @id @default(cuid())
+  organizationId       String                @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   itemId               String
   item                 WarehouseItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
   type                 WarehouseMovementType
@@ -2916,6 +3270,7 @@ model WarehouseMovement {
   @@index([itemId])
   @@index([workOrderId])
   @@index([assignedEmployeeId])
+  @@index([organizationId])
 }
 
 enum QuickInternalTaskStatus {
@@ -2926,6 +3281,7 @@ enum QuickInternalTaskStatus {
 
 model QuickInternalTask {
   id                   String                  @id @default(cuid())
+  organizationId       String                  @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   title                String
   description          String?
   assignedToEmployeeId String
@@ -2944,5 +3300,19 @@ model QuickInternalTask {
 
   @@index([assignedToEmployeeId, status])
   @@index([createdByUserId])
+  @@index([organizationId])
 }
 
+model DemoLead {
+  id           String   @id @default(cuid())
+  name         String
+  email        String
+  company      String
+  phone        String?
+  surfaceCount String?
+  source       String   @default("WEBSITE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
+}

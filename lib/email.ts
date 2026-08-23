@@ -136,6 +136,7 @@ async function sendEmail(input: {
     ? [input.bcc]
     : [process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean);
 
+  let resendFailure: string | undefined;
   if (process.env.RESEND_API_KEY) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -153,9 +154,14 @@ async function sendEmail(input: {
     });
     if (!response.ok) {
       const result = await response.json().catch(() => null) as { message?: string } | null;
-      throw new Error(`E-mail se nepodařilo odeslat přes Resend: ${result?.message ?? response.statusText}`);
+      resendFailure = `E-mail se nepodařilo odeslat přes Resend: ${result?.message ?? response.statusText}`;
+      console.warn('[email] Resend rejected the message; trying another configured provider', {
+        status: response.status,
+        message: result?.message ?? response.statusText,
+      });
+    } else {
+      return;
     }
-    return;
   }
 
   if (process.env.EMAIL_WEBHOOK_URL) {
@@ -169,6 +175,15 @@ async function sendEmail(input: {
     });
     if (!response.ok) throw new Error('E-mail se nepodařilo odeslat přes webhook.');
     return;
+  }
+
+  const googleConfigured = Boolean(
+    process.env.GOOGLE_DRIVE_CLIENT_ID &&
+    process.env.GOOGLE_DRIVE_CLIENT_SECRET &&
+    process.env.GOOGLE_DRIVE_REFRESH_TOKEN
+  );
+  if (!googleConfigured) {
+    throw new Error(resendFailure ?? 'Odesílání e-mailů není nakonfigurováno.');
   }
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {

@@ -38,9 +38,9 @@ describe('Modul NAVIGACE - Workflow a RBAC Testy', () => {
     assert.equal(canAccess(salesRole, 'settings'), false);
     assert.equal(canAccess(salesRole, 'import'), false);
 
-    // SALES může spravovat a převádět své nabídky
+    // SALES může spravovat své nabídky; převod do zakázky schvaluje ADMIN/MANAGER.
     assert.equal(canManageOfferRole(salesRole), true);
-    assert.equal(canConvertOfferRole(salesRole), true);
+    assert.equal(canConvertOfferRole(salesRole), false);
   });
 
   it('ověřuje vlastnictví nabídky pro roli SALES', () => {

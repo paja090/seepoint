@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
+import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 
@@ -13,8 +15,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     }
 
     const tokenHash = hashToken(token);
+    const owner = await enterPublicNavigationReportTenant(tokenHash);
+    if (!owner) {
+      return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
+    }
 
-    const report = await prisma.navigationDocumentationReport.findUnique({
+    const report = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.navigationDocumentationReport.findUnique({
       where: { publicTokenHash: tokenHash },
       select: {
         status: true,
@@ -27,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           },
         },
       },
-    });
+    }));
 
     if (!report || report.status === 'ARCHIVED') {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });

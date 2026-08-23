@@ -2,8 +2,9 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { carrierMapColor } from './carrier-map.ts';
 import type { Carrier, CarrierType, GpsStatus, MediaType, Occupancy, OccupancyStatus, Surface, SurfaceStatus } from './types';
 import { deriveSurfaceOccupancyState } from './occupancy';
+import { tenantPrismaExtension } from './tenant-prisma';
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { platformPrisma?: PrismaClient };
 const getDbUrl = () => {
   const url =
     (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) ||
@@ -16,8 +17,12 @@ const databaseUrl = getDbUrl();
 if (databaseUrl) {
   process.env.DATABASE_URL = databaseUrl;
 }
-export const prisma = globalForPrisma.prisma ?? new PrismaClient(databaseUrl ? { datasourceUrl: databaseUrl } : undefined);
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const platformPrisma = globalForPrisma.platformPrisma ?? new PrismaClient(databaseUrl ? { datasourceUrl: databaseUrl } : undefined);
+if (process.env.NODE_ENV !== 'production') globalForPrisma.platformPrisma = platformPrisma;
+
+// Application code must use this guarded client. The unguarded platform client is
+// reserved for authentication, platform administration and the first public-token lookup.
+export const prisma = platformPrisma.$extends(tenantPrismaExtension) as unknown as PrismaClient;
 
 export const carrierInclude = {
   surfaces: {
@@ -515,99 +520,15 @@ export async function updateOccupancyAction(id: string, action: OccupancyAction,
 }
 export { carrierMapColor };
 
-let schemaEnsured = false;
 export async function ensureWorkOrderSchema() {
-  if (schemaEnsured) return;
-  try {
-    await prisma.$executeRawUnsafe(`ALTER TABLE "WorkOrder" ADD COLUMN IF NOT EXISTS "estimatedHours" DECIMAL(5,2);`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "WorkOrder" ADD COLUMN IF NOT EXISTS "pdfUrl" TEXT;`);
-    schemaEnsured = true;
-  } catch {
-    // Ignore if SQLite or already exists
-  }
+  // Schema changes are deployed exclusively through Prisma migrations.
 }
 
-let vehicleSchemaEnsured = false;
 export async function ensureVehicleSchema() {
-  if (vehicleSchemaEnsured) return;
-  try {
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "highwayPassUntil" TIMESTAMP;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "responsiblePerson" TEXT;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "tiresInfo" TEXT;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "owner" TEXT;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "vtpUrl" TEXT;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "repairNotes" TEXT;`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Vehicle" ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;`);
-
-    const count = await prisma.vehicle.count();
-    if (count === 0) {
-      const { seedVehiclesFromExcel } = await import('../scripts/seed-vehicles-2026');
-      await seedVehiclesFromExcel();
-    }
-    vehicleSchemaEnsured = true;
-  } catch (e) {
-    console.error('ensureVehicleSchema error:', e);
-  }
+  // Schema changes and seed data are explicit deployment operations.
 }
 
-let warehouseSchemaEnsured = false;
 export async function ensureWarehouseSchema() {
-  if (warehouseSchemaEnsured) return;
-  try {
-    await prisma.$executeRawUnsafe(`
-      DO $$ BEGIN
-        CREATE TYPE "WarehouseItemCategory" AS ENUM ('CONSUMABLE', 'RETURNABLE');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
-    `);
-    await prisma.$executeRawUnsafe(`
-      DO $$ BEGIN
-        CREATE TYPE "WarehouseMovementType" AS ENUM ('RECEIPT', 'ISSUE', 'RETURN', 'ADJUSTMENT');
-      EXCEPTION WHEN duplicate_object THEN null; END $$;
-    `);
-
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "WarehouseItem" (
-        "id" TEXT PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "code" TEXT,
-        "category" "WarehouseItemCategory" NOT NULL DEFAULT 'CONSUMABLE',
-        "unit" TEXT NOT NULL DEFAULT 'ks',
-        "quantityInStock" DECIMAL(10,2) NOT NULL DEFAULT 0,
-        "minQuantity" DECIMAL(10,2),
-        "unitPrice" DECIMAL(10,2),
-        "location" TEXT,
-        "supplierName" TEXT,
-        "supplierContact" TEXT,
-        "photoUrl" TEXT,
-        "note" TEXT,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "WarehouseMovement" (
-        "id" TEXT PRIMARY KEY,
-        "itemId" TEXT NOT NULL,
-        "type" "WarehouseMovementType" NOT NULL,
-        "quantity" DECIMAL(10,2) NOT NULL,
-        "workOrderId" TEXT,
-        "assignedEmployeeId" TEXT,
-        "assignedEmployeeName" TEXT,
-        "performedByName" TEXT NOT NULL,
-        "note" TEXT,
-        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    const count = await prisma.warehouseItem.count();
-    if (count === 0) {
-      const { seedWarehouseItems } = await import('../scripts/seed-warehouse-2026');
-      await seedWarehouseItems();
-    }
-    warehouseSchemaEnsured = true;
-  } catch (e) {
-    console.error('ensureWarehouseSchema error:', e);
-  }
+  // Runtime DDL would bypass organization ownership. Use Prisma migrations.
 }
 

@@ -2,6 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import { prisma } from '../lib/db';
+import { enterTenantContext } from '../lib/tenant-context';
+
+enterTenantContext({ organizationId: process.env.ORGANIZATION_ID ?? 'org_seepoint_default', source: 'script' });
 
 async function main() {
   console.log('🧹 Zahajuji mazání demo / vzorových dat...\n');

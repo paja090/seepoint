@@ -50,6 +50,15 @@ export type OfferChargeView = {
 };
 
 export type OfferView = {
+  branding?: {
+    name: string;
+    logoUrl?: string | null;
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    website?: string | null;
+  } | null;
   id?: string;
   clientId?: string;
   title: string;

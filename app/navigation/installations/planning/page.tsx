@@ -6,7 +6,7 @@ import { InstallationPlanningView, type PlanningPointItem, type InstallerOption 
 export const dynamic = 'force-dynamic';
 
 export default async function MobilePlanningPage() {
-  await requirePageAccess('navigationProjects');
+  const currentUser = await requirePageAccess('navigationProjects');
 
   const pointsRaw = await prisma.navigationPoint.findMany({
     where: {
@@ -31,14 +31,14 @@ export default async function MobilePlanningPage() {
     orderBy: { createdAt: 'desc' },
   });
 
-  const usersRaw = await prisma.user.findMany({
+  const membersRaw = await prisma.organizationMember.findMany({
+    where: { organizationId: currentUser.organizationId!, isActive: true },
     select: {
-      id: true,
-      name: true,
-      email: true,
+      user: { select: { id: true, name: true, email: true } },
     },
-    orderBy: { name: 'asc' },
+    orderBy: { user: { name: 'asc' } },
   });
+  const usersRaw = membersRaw.map((member) => member.user);
 
   const points: PlanningPointItem[] = pointsRaw.map((p) => ({
     id: p.id,

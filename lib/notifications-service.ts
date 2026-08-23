@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import type { AppRole } from '@/lib/rbac';
+import { requireTenantContext } from '@/lib/tenant-context';
 
 export type SystemNotificationItem = {
   id: string;
@@ -34,15 +35,17 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   // 1. WORKER & TECHNICIAN: Personal Tasks & Route Alerts
   if (userRole === 'WORKER' || userRole === 'TECHNICIAN') {
     if (userId) {
+      const { organizationId } = requireTenantContext();
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { employee: { select: { id: true } } },
+        select: { employees: { where: { organizationId }, select: { id: true }, take: 1 } },
       });
 
-      if (user?.employee?.id) {
+      const employee = user?.employees[0];
+      if (employee?.id) {
         const myTasksToday = await prisma.workTask.findMany({
           where: {
-            assignedToEmployeeId: user.employee.id,
+            assignedToEmployeeId: employee.id,
             status: { in: ['TODO', 'IN_PROGRESS'] },
           },
           select: { id: true, title: true, scheduledDate: true },

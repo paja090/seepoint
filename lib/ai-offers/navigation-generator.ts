@@ -4,6 +4,9 @@ import { OfferValidationError } from '@/lib/offers/domain';
 import { resolveCatalogPrice } from './price-resolver';
 import { haversineMeters } from './scoring';
 import type { AiNavigationPointInput, AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
+import { isOstravaRestrictedZone, isRestrictedHighwayOr1stClassRoad } from './navigation-constraints';
+
+export { isOstravaRestrictedZone, isRestrictedHighwayOr1stClassRoad } from './navigation-constraints';
 
 const pricedMountingTypes = ['LIGHT_POLE', 'TRACTION', 'COLUMN'] as const;
 const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
@@ -15,82 +18,6 @@ const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
  * (e.g. Rudná, Místecká, Bohumínská, Mariánskohorská, Dálnice D1, D56, I/11, I/56, I/59).
  * Municipal navigation signs on light poles are NOT allowed on these main highways.
  */
-export function isRestrictedHighwayOr1stClassRoad(text: string): boolean {
-  if (!text) return false;
-  const norm = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const forbiddenKeywords = [
-    'rudna',
-    'rudne',
-    'mistecka',
-    'mistecke',
-    'bohuminska',
-    'bohuminske',
-    'marianskohorska',
-    'marianskohorske',
-    'plzenska',
-    'plzenske',
-    'opavska',
-    'opavske',
-    'slovenska',
-    'dalnice',
-    'dalnici',
-    'dalnic',
-    'd1',
-    'd56',
-    'd48',
-    'i/11',
-    'i/56',
-    'i/59',
-    'i/48',
-    'i/58',
-    'silnice 1',
-    'silnici 1',
-    '1. trid',
-    'i. trid',
-  ];
-
-  return forbiddenKeywords.some((keyword) => {
-    if (keyword.length <= 3) {
-      const regex = new RegExp(`\\b${keyword}\\b`, 'i');
-      return regex.test(norm);
-    }
-    return norm.includes(keyword);
-  });
-}
-
-/**
- * Checks if coordinates/address fall inside Ostrava's restricted Municipal Heritage Zones (Nařízení č. 2/2020)
- * where outdoor advertising & light pole navigation signs are prohibited.
- */
-export function isOstravaRestrictedZone(lat: number, lng: number, addressText = ''): boolean {
-  // 1. Moravská Ostrava Center Heritage Zone (Nařízení č. 2/2020)
-  if (lat >= 49.8310 && lat <= 49.8420 && lng >= 18.2810 && lng <= 18.2980) {
-    return true;
-  }
-  // 2. Poruba Hlavní třída Heritage Zone
-  if (lat >= 49.8235 && lat <= 49.8355 && lng >= 18.1600 && lng <= 18.1760) {
-    return true;
-  }
-  // 3. Vítkovice Mírové náměstí Heritage Zone
-  if (lat >= 49.8105 && lat <= 49.8185 && lng >= 18.2640 && lng <= 18.2760) {
-    return true;
-  }
-
-  if (addressText) {
-    const norm = addressText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const heritageKeywords = [
-      'masarykovo namesti',
-      'jiraskovo namesti',
-      'pamatkova zona',
-      'hlavni trida poruba',
-      'mirove namesti vitkovice',
-    ];
-    if (heritageKeywords.some((k) => norm.includes(k))) return true;
-  }
-
-  return false;
-}
-
 function rentalQuantity(unit: string, durationMonths: number) {
   if (/rok|year|annual/i.test(unit)) return durationMonths / 12;
   if (/měs|mes|month/i.test(unit)) return durationMonths;

@@ -108,11 +108,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
       const normalizedName = normalizeClientName(clientName);
       if (!normalizedName) throw new Error('Zadejte platný název klienta.');
-      const client = await transaction.client.upsert({
-        where: { normalizedName },
-        create: { name: clientName, normalizedName, active: true },
-        update: { active: true },
-      });
+      const existingClient = await transaction.client.findFirst({ where: { normalizedName } });
+      const client = existingClient
+        ? await transaction.client.update({ where: { id: existingClient.id }, data: { active: true } })
+        : await transaction.client.create({ data: { name: clientName, normalizedName, active: true } });
       const statuses = campaignStatuses(dateFrom, dateTo);
       const surface = await transaction.advertisingSurface.update({
         where: { id: surfaceId },

@@ -2,11 +2,14 @@ import { CityGalleryProjectStatus } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { tenantSingletonId } from '@/lib/tenant-singleton';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
     const [projectsRaw, fleetConfig] = await Promise.all([
       prisma.cityGalleryProject
         .findMany({
@@ -14,7 +17,7 @@ export async function GET() {
           take: 100,
         })
         .catch(() => []),
-      prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }).catch(() => null),
+      prisma.cityGalleryFleetConfig.findUnique({ where: { id: tenantSingletonId('city-gallery-fleet') } }).catch(() => null),
     ]);
 
     const totalFleet = fleetConfig?.totalFrames ?? 24;
@@ -56,7 +59,7 @@ export async function POST(request: Request) {
     const frameCount = Number(input.frameCount) || 6;
 
     const [fleetConfig, activeProjectsRaw] = await Promise.all([
-      prisma.cityGalleryFleetConfig.findUnique({ where: { id: 'default' } }).catch(() => null),
+      prisma.cityGalleryFleetConfig.findUnique({ where: { id: tenantSingletonId('city-gallery-fleet') } }).catch(() => null),
       prisma.cityGalleryProject.findMany({ where: { status: 'ACTIVE' } }).catch(() => []),
     ]);
 

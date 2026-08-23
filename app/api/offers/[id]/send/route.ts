@@ -24,7 +24,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       select: {
         name: true,
         email: true,
-        employee: {
+        employees: {
+          where: { organizationId: auth.organizationId! },
           select: {
             firstName: true,
             lastName: true,
@@ -40,8 +41,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         },
       },
     });
-    const salespersonName = salesperson?.employee
-      ? `${salesperson.employee.firstName} ${salesperson.employee.lastName}`
+    const employee = salesperson?.employees[0];
+    const salespersonName = employee
+      ? `${employee.firstName} ${employee.lastName}`
       : salesperson?.name || auth.name;
     await sendOfferEmail({
       to: recipient,
@@ -55,9 +57,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       logoUrl: new URL('/seepoint-logo.svg', request.url).toString(),
       salespersonName,
       salespersonEmail: salesperson?.email || auth.email,
-      salespersonPhone: salesperson?.employee?.phone,
+      salespersonPhone: employee?.phone,
       salespersonRole: 'Obchodní kontakt SeePOINT',
-      salespersonPhotoUrl: salesperson?.employee?.photos[0]
+      salespersonPhotoUrl: employee?.photos[0]
         ? new URL(`/api/proposals/${encodeURIComponent(delivery.token)}/salesperson-photo`, request.url).toString()
         : null,
     });

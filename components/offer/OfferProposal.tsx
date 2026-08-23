@@ -23,10 +23,12 @@ export function OfferProposal({
   offer,
   variant = 'public',
   token,
+  branding,
 }: {
   offer: ProposalOffer;
   variant?: 'public' | 'internal';
   token?: string;
+  branding?: { name: string; logoUrl?: string | null; email?: string | null; phone?: string | null } | null;
 }) {
   const [action, setAction] = useState<OfferActionType | null>(null);
   const [copied, setCopied] = useState(false);
@@ -64,7 +66,7 @@ export function OfferProposal({
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
       {variant === 'public' && (
-        <PublicOfferHeader salesperson={offer.salesperson} onDownloadPdf={handleDownloadPdf} onShare={handleShare} />
+        <PublicOfferHeader branding={branding} salesperson={offer.salesperson} onDownloadPdf={handleDownloadPdf} onShare={handleShare} />
       )}
 
       <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-10 px-4 py-6 lg:gap-14 lg:px-6 lg:py-10">
@@ -107,7 +109,7 @@ export function OfferProposal({
         )}
       </main>
 
-      {variant === 'public' && <PublicOfferFooter />}
+      {variant === 'public' && <PublicOfferFooter branding={branding} />}
 
       <OfferActionDialog action={action} offerStatus={offer.status} onClose={() => setAction(null)} onReject={() => setAction('reject')} token={token} />
 

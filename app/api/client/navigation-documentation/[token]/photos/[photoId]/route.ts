@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
+import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 
@@ -13,14 +15,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     }
 
     const tokenHash = hashToken(token);
+    const owner = await enterPublicNavigationReportTenant(tokenHash);
+    if (!owner) {
+      return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
+    }
 
-    const report = await prisma.navigationDocumentationReport.findUnique({
+    const report = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.navigationDocumentationReport.findUnique({
       where: { publicTokenHash: tokenHash },
       select: {
         status: true,
         tokenExpiresAt: true,
+        items: {
+          where: { isVisible: true },
+          select: {
+            selectedPhotoId: true,
+            navigationPoint: { select: { installedPhotoId: true, sitePhotoId: true } },
+          },
+        },
       },
-    });
+    }));
 
     if (!report || report.status === 'ARCHIVED') {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
@@ -30,7 +43,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       return NextResponse.json({ error: 'Platnost odkazu vypršela.' }, { status: 410 });
     }
 
-    const photo = await prisma.photo.findUnique({
+    const allowedPhotoIds = new Set(report.items.flatMap((item) => [
+      item.selectedPhotoId,
+      item.navigationPoint?.installedPhotoId,
+      item.navigationPoint?.sitePhotoId,
+    ]).filter((id): id is string => Boolean(id)));
+    if (!allowedPhotoIds.has(photoId)) {
+      return NextResponse.json({ error: 'Fotografie není dostupná.' }, { status: 404 });
+    }
+
+    const photo = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.photo.findUnique({
       where: { id: photoId },
       select: {
         id: true,
@@ -42,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
         isClientVisible: true,
         isPrivate: true,
       },
-    });
+    }));
 
     if (!photo || photo.isPrivate || photo.isClientVisible === false) {
       return NextResponse.json({ error: 'Fotografie není dostupná.' }, { status: 404 });

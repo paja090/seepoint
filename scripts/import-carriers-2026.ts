@@ -6,6 +6,8 @@ import { writeImportReports, writePhase3Reports } from '../lib/carriers-2026/rep
 import { applyResolutionCsv, writeResolutionCsv } from '../lib/carriers-2026/resolutions.ts';
 import type { ExistingState, ImportPlan, ImportScope, ScopePlan } from '../lib/carriers-2026/types.ts';
 import { parseCarriers2026Workbook } from '../lib/carriers-2026/workbook.ts';
+import { enterTenantContext, requireTenantContext } from '../lib/tenant-context.ts';
+import { tenantPrismaExtension } from '../lib/tenant-prisma.ts';
 
 type CliOptions = {
   file: string;
@@ -18,6 +20,7 @@ type CliOptions = {
   scopes: ImportScope[];
   asOfDate: string;
   plan?: string;
+  organizationId: string;
 };
 
 function optionValue(args: string[], name: string) {
@@ -46,6 +49,7 @@ function parseOptions(args: string[]): CliOptions {
     confirmBackup: args.includes('--confirm-backup'), reportPrefix: optionValue(args, '--report-prefix'),
     resolutions: optionValue(args, '--resolutions') ? resolve(optionValue(args, '--resolutions')!) : undefined,
     scopes, asOfDate, plan: optionValue(args, '--plan') ? resolve(optionValue(args, '--plan')!) : undefined,
+    organizationId: optionValue(args, '--organization-id') ?? process.env.ORGANIZATION_ID ?? 'org_seepoint_default',
   };
 }
 
@@ -63,6 +67,7 @@ function databaseEnvironment(): ImportPlan['databaseEnvironment'] {
 }
 
 async function readExistingState(prisma: PrismaClient): Promise<ExistingState> {
+  const { organizationId } = requireTenantContext();
   const [carriers, clients, photos] = await Promise.all([
     prisma.advertisingCarrier.findMany({
       select: {
@@ -100,6 +105,7 @@ async function readExistingState(prisma: PrismaClient): Promise<ExistingState> {
     if (columns[0]?.exists) {
       const rows = await prisma.$queryRaw<Array<{ id: string; sourceSystem: string | null; sourceKey: string | null; externalOrderReference: string | null }>>(Prisma.sql`
         SELECT "id", "sourceSystem", "sourceKey", "externalOrderReference" FROM "Occupancy"
+        WHERE "organizationId" = ${organizationId}
       `);
       rows.forEach(({ id, ...metadata }) => occupancyMetadata.set(id, metadata));
     }
@@ -241,7 +247,11 @@ async function applyPlan(prisma: PrismaClient, plan: ImportPlan, options: CliOpt
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   const workbook = await parseCarriers2026Workbook(options.file);
-  const prisma = new PrismaClient();
+  const platformPrisma = new PrismaClient();
+  const organization = await platformPrisma.organization.findFirst({ where: { id: options.organizationId, isActive: true }, select: { id: true } });
+  if (!organization) throw new Error(`Aktivní organizace ${options.organizationId} nebyla nalezena.`);
+  enterTenantContext({ organizationId: organization.id, source: 'script' });
+  const prisma = platformPrisma.$extends(tenantPrismaExtension) as unknown as PrismaClient;
   try {
     const state = await readExistingState(prisma);
     const plan = buildImportPlan(workbook, state, databaseEnvironment(), options.validFrom, { asOfDate: options.asOfDate, scopes: options.scopes });
@@ -268,7 +278,7 @@ async function main() {
       console.log(JSON.stringify(results, null, 2));
     }
   } finally {
-    await prisma.$disconnect();
+    await platformPrisma.$disconnect();
   }
 }
 

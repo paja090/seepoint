@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { requireTenantContext } from '@/lib/tenant-context';
 import { verifyFileInFolder, isGoogleDriveMockEnabled } from '@/lib/google-drive';
 
 export const runtime = 'nodejs';
@@ -80,9 +81,9 @@ export async function POST(request: Request) {
     const photo = await prisma.$transaction(async (tx) => {
       // Lock target to serialize concurrent links and prevent multiple primary photos
       if (targetCarrierId) {
-        await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE id = ${targetCarrierId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE "organizationId" = ${requireTenantContext().organizationId} AND id = ${targetCarrierId} FOR UPDATE`;
       } else if (targetSurfaceId) {
-        await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE id = ${targetSurfaceId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE "organizationId" = ${requireTenantContext().organizationId} AND id = ${targetSurfaceId} FOR UPDATE`;
       }
 
       const count = await tx.photo.count({

@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
-import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
-import { canAccessOffer } from '@/lib/offers/domain';
+import { readStoredPhoto } from '@/lib/storage/photo-storage';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +18,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         id: true,
         url: true,
         driveFileId: true,
+        storageKey: true,
+        storageProvider: true,
         content: true,
         fileName: true,
         mimeType: true,
@@ -76,68 +77,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     if (!allowed) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
 
-    // 1. Binary content stored directly in DB
-    if (photo.content) {
-      return new Response(photo.content, {
-        status: 200,
-        headers: {
-          'Content-Type': photo.mimeType ?? 'application/octet-stream',
-          'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? 'photo')}`,
-          'Cache-Control': 'private, max-age=3600',
-          'X-Content-Type-Options': 'nosniff',
-        },
-      });
-    }
-
-    // 2. Data URL (Base64) stored in url field
-    if (photo.url && photo.url.startsWith('data:')) {
-      const parts = photo.url.split(';');
-      const mime = parts[0].replace('data:', '') || photo.mimeType || 'image/jpeg';
-      const base64Data = parts[1].replace('base64,', '');
-      const buffer = Buffer.from(base64Data, 'base64');
-      return new Response(buffer, {
-        status: 200,
-        headers: {
-          'Content-Type': mime,
-          'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? 'photo')}`,
-          'Cache-Control': 'public, max-age=86400',
-          'X-Content-Type-Options': 'nosniff',
-        },
-      });
-    }
-
-    // 3. Google Drive file storage (primary storage for uploaded photos)
-    if (photo.driveFileId) {
-      const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
-      if (!file.ok || !file.body) {
-        return NextResponse.json({ error: 'Fotografii se nepodařilo načíst z Google Disku.' }, { status: file.status === 404 ? 404 : 502 });
-      }
-      return new Response(file.body, {
-        status: 200,
-        headers: {
-          'Content-Type': photo.mimeType ?? file.headers.get('Content-Type') ?? 'application/octet-stream',
-          'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? 'photo')}`,
-          'Cache-Control': 'private, max-age=3600',
-          'X-Content-Type-Options': 'nosniff',
-        },
-      });
-    }
-
-    // 4. External HTTP / URL link stored in url field (excluding self-referencing endpoint URLs)
-    if (
-      photo.url &&
-      (photo.url.startsWith('http://') || photo.url.startsWith('https://')) &&
-      !photo.url.includes(`/api/photos/${photo.id}`)
-    ) {
-      return NextResponse.redirect(photo.url);
-    }
-
-    return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
+    const stored = await readStoredPhoto(photo);
+    if (!stored) return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
+    if (stored.redirectUrl) return NextResponse.redirect(stored.redirectUrl);
+    return new Response(stored.body, { status: 200, headers: {
+      'Content-Type': stored.contentType ?? photo.mimeType ?? 'application/octet-stream',
+      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? 'photo')}`,
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+    } });
   } catch (error) {
     console.error('Photo download failed', error instanceof Error ? error.message : 'unknown error');
-    if (error instanceof GoogleDriveConfigurationError) {
-      return NextResponse.json({ error: 'Google Drive úložiště zatím není nakonfigurované.' }, { status: 503 });
-    }
     return NextResponse.json({ error: 'Fotografii se nepodařilo načíst.' }, { status: 502 });
   }
 }

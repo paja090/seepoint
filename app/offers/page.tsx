@@ -74,7 +74,11 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
       prisma.client.findMany({ where: { active: true }, select: { id: true, name: true, pricingSegment: true }, orderBy: { name: 'asc' } }),
       user.role === 'SALES'
         ? []
-        : prisma.user.findMany({ where: { role: { in: ['ADMIN', 'MANAGER', 'SALES'] } }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+        : prisma.organizationMember.findMany({
+            where: { organizationId: user.organizationId!, isActive: true, role: { in: ['OWNER', 'ADMIN', 'MANAGER', 'SALES'] } },
+            select: { user: { select: { id: true, name: true } } },
+            orderBy: { user: { name: 'asc' } },
+          }).then((members) => members.map((member) => member.user)),
     ]);
   } catch (error) {
     console.error('Offers page load failed', { userId: user.id, role: user.role }, error);

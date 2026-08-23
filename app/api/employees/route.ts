@@ -1,4 +1,4 @@
-import { EmploymentType, Prisma, Role } from '@prisma/client';
+import { EmploymentType, OrganizationRole, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser, hashPassword, validatePassword } from '@/lib/auth';
@@ -67,12 +67,14 @@ export async function POST(request: Request) {
   if (startDate && endDate && endDate < startDate) return NextResponse.json({ error: 'Datum ukončení nemůže být před datem nástupu.' }, { status: 400 });
 
   const [existingEmployee, existingUser] = email ? await Promise.all([
-    prisma.employee.findUnique({ where: { email }, select: { id: true } }),
-    prisma.user.findUnique({ where: { email }, include: { employee: { select: { id: true } } } }),
+    prisma.employee.findFirst({ where: { email }, select: { id: true } }),
+    prisma.user.findUnique({
+      where: { email },
+      include: { employees: { where: { organizationId: user.organizationId! }, select: { id: true } } },
+    }),
   ]) : [null, null];
   if (existingEmployee) return NextResponse.json({ error: 'Zaměstnanec s tímto e-mailem už existuje.' }, { status: 409 });
-  if (allowAccess && existingUser?.employee) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
-  if (allowAccess && existingUser) return NextResponse.json({ error: 'Účet s tímto e-mailem už existuje. Propojte ho v detailu zaměstnance.' }, { status: 409 });
+  if (allowAccess && existingUser?.employees[0]) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
 
   try {
     const passwordHash = allowAccess ? await hashPassword(temporaryPassword!) : undefined;
@@ -93,9 +95,30 @@ export async function POST(request: Request) {
         isActive: true,
         note: text(input, 'note'),
         ...(allowAccess && email ? {
-          user: { create: { name: `${firstName} ${lastName}`, email, role, status: 'ACTIVE', passwordHash, mustChangePassword: true } },
+          user: existingUser
+            ? { connect: { id: existingUser.id } }
+            : {
+                create: {
+                  name: `${firstName} ${lastName}`,
+                  email,
+                  role,
+                  status: 'ACTIVE',
+                  passwordHash,
+                  mustChangePassword: true,
+                  organizationMemberships: {
+                    create: { organizationId: user.organizationId!, role: role as OrganizationRole, roles: [role as OrganizationRole] },
+                  },
+                },
+              },
         } : {}),
       }, select: { id: true, userId: true, email: true } });
+      if (created.userId && existingUser) {
+        await tx.organizationMember.upsert({
+          where: { organizationId_userId: { organizationId: user.organizationId!, userId: created.userId } },
+          create: { organizationId: user.organizationId!, userId: created.userId, role: role as OrganizationRole, roles: [role as OrganizationRole], isActive: true },
+          update: { role: role as OrganizationRole, roles: [role as OrganizationRole], isActive: true },
+        });
+      }
       if (created.userId) {
         await tx.userAuditLog.create({ data: { action: 'ACCOUNT_CREATED', targetUserId: created.userId, actorUserId: user.id } });
       }

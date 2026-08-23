@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { getTenantContext, requireTenantContext } from './tenant-context';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const DRIVE_FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
@@ -181,7 +182,8 @@ async function getAccessToken() {
 }
 
 async function getOrCreatePhotoFolder(accessToken: string) {
-  if (process.env.GOOGLE_DRIVE_FOLDER_ID) return process.env.GOOGLE_DRIVE_FOLDER_ID;
+  const configuredRoot = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (configuredRoot) return getOrCreateOrganizationPhotoFolder(accessToken, configuredRoot);
 
   const query = [
     `mimeType = '${DRIVE_FOLDER_MIME_TYPE}'`,
@@ -203,7 +205,7 @@ async function getOrCreatePhotoFolder(accessToken: string) {
   if (!listResponse.ok) {
     throw new Error(`Google Drive folder lookup failed: ${listData.error?.message ?? listResponse.statusText}`);
   }
-  if (listData.files?.[0]?.id) return listData.files[0].id;
+  if (listData.files?.[0]?.id) return getOrCreateOrganizationPhotoFolder(accessToken, listData.files[0].id);
 
   const createResponse = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
     method: 'POST',
@@ -223,12 +225,37 @@ async function getOrCreatePhotoFolder(accessToken: string) {
     throw new Error(`Google Drive folder creation failed: ${createData.error?.message ?? createResponse.statusText}`);
   }
 
-  return createData.id;
+  return getOrCreateOrganizationPhotoFolder(accessToken, createData.id);
+}
+
+async function getOrCreateOrganizationPhotoFolder(accessToken: string, rootFolderId: string) {
+  const { organizationId } = requireTenantContext();
+  const query = [
+    `mimeType = '${DRIVE_FOLDER_MIME_TYPE}'`,
+    `'${rootFolderId}' in parents`,
+    `appProperties has { key='seepointOrganizationId' and value='${organizationId.replaceAll("'", '')}' }`,
+    'trashed = false',
+  ].join(' and ');
+  const params = new URLSearchParams({ q: query, spaces: 'drive', pageSize: '1', fields: 'files(id)' });
+  const listResponse = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' });
+  const listData = await listResponse.json() as { files?: Array<{ id: string }>; error?: { message?: string } };
+  if (!listResponse.ok) throw new Error(`Google Drive tenant folder lookup failed: ${listData.error?.message ?? listResponse.statusText}`);
+  if (listData.files?.[0]?.id) return listData.files[0].id;
+  const response = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: `organizations__${organizationId}`, mimeType: DRIVE_FOLDER_MIME_TYPE, parents: [rootFolderId], appProperties: { seepointOrganizationId: organizationId } }),
+  });
+  const data = await response.json() as { id?: string; error?: { message?: string } };
+  if (!response.ok || !data.id) throw new Error(`Google Drive tenant folder creation failed: ${data.error?.message ?? response.statusText}`);
+  return data.id;
 }
 
 export async function uploadPhotoToGoogleDrive(file: File, fileName: string, photoId: string) {
   if (isGoogleDriveMockEnabled()) {
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+    const organizationId = getTenantContext()?.organizationId;
+    const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+    const folderId = organizationId ? `${rootFolderId}/organizations/${organizationId}` : rootFolderId;
     const buffer = Buffer.from(await file.arrayBuffer());
     const mockFileId = `mock-uploaded-${crypto.randomUUID()}`;
     const newMockFile: MockFile = {
@@ -255,7 +282,7 @@ export async function uploadPhotoToGoogleDrive(file: File, fileName: string, pho
   const metadata = JSON.stringify({
     name: fileName,
     parents: [folderId],
-    appProperties: { seepointPhotoId: photoId },
+    appProperties: { seepointPhotoId: photoId, seepointOrganizationId: requireTenantContext().organizationId },
   });
   const body = new Blob(
     [

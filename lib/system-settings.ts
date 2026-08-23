@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { tenantSingletonId } from './tenant-singleton';
 
 export interface SystemSettingsInput {
   companyName?: string;
@@ -14,19 +15,21 @@ export interface SystemSettingsInput {
 }
 
 export async function getSystemSettings() {
+  const id = tenantSingletonId('system-settings');
   return await prisma.systemSettings.upsert({
-    where: { id: 'default' },
+    where: { id },
     update: {},
     create: {
-      id: 'default',
+      id,
       companyName: 'SeePoint s.r.o.',
     },
   });
 }
 
 export async function updateSystemSettings(data: SystemSettingsInput) {
+  const id = tenantSingletonId('system-settings');
   return await prisma.systemSettings.upsert({
-    where: { id: 'default' },
+    where: { id },
     update: {
       companyName: data.companyName,
       companyId: data.companyId,
@@ -40,7 +43,7 @@ export async function updateSystemSettings(data: SystemSettingsInput) {
       swift: data.swift,
     },
     create: {
-      id: 'default',
+      id,
       companyName: data.companyName || 'SeePoint s.r.o.',
       companyId: data.companyId,
       vatId: data.vatId,

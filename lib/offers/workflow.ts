@@ -29,7 +29,7 @@ function clientVisiblePhotos(offer: OfferView) {
 export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictView[] = [], today = new Date().toISOString().slice(0, 10)): OfferReadinessCheck[] {
   const type = offer.offerType ?? 'STANDARD_MEDIA';
   const isNoPrice = (offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept === true;
-  const contactReady = isNoPrice || Boolean(offer.client.name && (!offer.contactEmail || emailPattern.test(offer.contactEmail)));
+  const contactReady = isNoPrice || Boolean(offer.client.name && offer.contactEmail && emailPattern.test(offer.contactEmail));
   const validityReady = Boolean(offer.validUntil && offer.validUntil >= today);
   const calculationReady = isNoPrice || Number(offer.totalWithTax ?? 0) > 0;
   const common: OfferReadinessCheck[] = [

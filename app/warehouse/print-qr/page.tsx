@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
 import { Printer, ArrowLeft } from 'lucide-react';
+import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WarehousePrintQrPage() {
+  await requirePageAccess('work');
   await ensureWarehouseSchema();
 
   const items = await prisma.warehouseItem.findMany({

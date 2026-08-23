@@ -13,7 +13,7 @@ export async function PATCH(request:Request,{params}:{params:Promise<{id:string}
   if(employee.user&&!email) return NextResponse.json({error:'Účet s přístupem musí mít e-mail.'},{status:400});
   const positions=[...new Set((text('positions')??text('position')??'').split(',').map(value=>value.trim()).filter(Boolean))].slice(0,12);
   const isActive=input.isActive===true||input.isActive==='true';
-  try { await prisma.$transaction(async tx=>{ if(!isActive&&employee.isActive&&employee.user?.role==='ADMIN'&&employee.user.status==='ACTIVE'){const count=await tx.user.count({where:{role:'ADMIN',status:'ACTIVE',OR:[{employee:null},{employee:{is:{isActive:true}}}]}});if(count<=1)throw new Error('LAST_ADMIN')} await tx.employee.update({where:{id},data:{firstName,lastName,email,phone:text('phone'),position:positions[0]??null,positions,isActive,note:text('note')}}); if(employee.user)await tx.user.update({where:{id:employee.user.id},data:{name:`${firstName} ${lastName}`,email:email!,...(!isActive?{sessionVersion:{increment:1},sessions:{deleteMany:{}}}:{})}})}, {isolationLevel:Prisma.TransactionIsolationLevel.Serializable}); }
+  try { await prisma.$transaction(async tx=>{ if(!isActive&&employee.isActive&&employee.user){const member=await tx.organizationMember.findUnique({where:{organizationId_userId:{organizationId:actor.organizationId!,userId:employee.user.id}}});if(member&&['OWNER','ADMIN'].includes(member.role)){const count=await tx.organizationMember.count({where:{organizationId:actor.organizationId!,isActive:true,role:{in:['OWNER','ADMIN']}}});if(count<=1)throw new Error('LAST_ADMIN')}} await tx.employee.update({where:{id},data:{firstName,lastName,email,phone:text('phone'),position:positions[0]??null,positions,isActive,note:text('note')}}); if(employee.user){await tx.user.update({where:{id:employee.user.id},data:{name:`${firstName} ${lastName}`,email:email!}});if(!isActive){await tx.organizationMember.update({where:{organizationId_userId:{organizationId:actor.organizationId!,userId:employee.user.id}},data:{isActive:false}});await tx.userSession.deleteMany({where:{userId:employee.user.id,activeOrganizationId:actor.organizationId!}})}}}, {isolationLevel:Prisma.TransactionIsolationLevel.Serializable}); }
   catch(error){if(error instanceof Error&&error.message==='LAST_ADMIN')return NextResponse.json({error:'Posledního aktivního administrátora nelze deaktivovat.'},{status:409});throw error}
   return NextResponse.json({ok:true});
 }
@@ -35,7 +35,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   try {
     await prisma.$transaction(async (tx) => {
       if (employee.userId) {
-        await tx.user.delete({ where: { id: employee.userId } }).catch(() => null);
+        await tx.organizationMember.delete({
+          where: { organizationId_userId: { organizationId: actor.organizationId!, userId: employee.userId } },
+        }).catch(() => null);
+        await tx.userSession.deleteMany({ where: { userId: employee.userId, activeOrganizationId: actor.organizationId! } });
       }
       await tx.employee.delete({ where: { id } });
     });

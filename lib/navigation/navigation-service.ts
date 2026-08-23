@@ -9,6 +9,7 @@ import {
   AttentionAlertItem,
 } from './types.ts';
 import { nextCrmOrderNumber } from '../crm/domain.ts';
+import { requireTenantContext } from '../tenant-context.ts';
 
 export class NavigationServiceError extends Error {
   code: string;
@@ -704,8 +705,9 @@ export async function attachPointInstallationPhotos(
     const sourceKey = `NAVIGATION_POINT:${point.id}`;
     let carrierId = point.carrierId;
     if (!carrierId) {
+      const { organizationId } = requireTenantContext();
       const carrier = await tx.advertisingCarrier.upsert({
-        where: { sourceKey },
+        where: { organizationId_sourceKey: { organizationId, sourceKey } },
         update: {
           name: point.label,
           latitude: point.latitude,
@@ -734,7 +736,7 @@ export async function attachPointInstallationPhotos(
     const surface = point.surfaceId
       ? await tx.advertisingSurface.findUniqueOrThrow({ where: { id: point.surfaceId } })
       : await tx.advertisingSurface.upsert({
-          where: { sourceKey: surfaceSourceKey },
+          where: { organizationId_sourceKey: { organizationId: requireTenantContext().organizationId, sourceKey: surfaceSourceKey } },
           update: {
             carrierId,
             currentClientId: point.navigationOrder.crmOrder.clientId,

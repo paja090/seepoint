@@ -20,6 +20,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
           initialMessage={query.activated === '1' ? 'Heslo bylo bezpečně uloženo. Přihlaste se novým heslem.' : ''}
         />
         <Link className="mt-5 block text-center text-sm font-medium text-sky-700" href="/forgot-password">Zapomenuté heslo</Link>
+        <Link className="mt-4 block text-center text-xs font-bold text-slate-400 hover:text-slate-600 transition" href="/">← Zpět na představení produktu SeePoint OS</Link>
       </section>
     </main>
   );

@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const actor = await getCurrentUser();
-    if (!actor || !['ADMIN', 'MANAGER'].includes(actor.role)) {
-      return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+    if (!actor || actor.platformRole !== 'SUPER_ADMIN' || process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Nenalezeno.' }, { status: 404 });
     }
 
     const delEmps = await prisma.employee.deleteMany({
@@ -23,20 +23,9 @@ export async function GET() {
       },
     });
 
-    const delUsers = await prisma.user.deleteMany({
-      where: {
-        OR: [
-          { name: { contains: 'Milan', mode: 'insensitive' } },
-          { name: { contains: 'Pavel', mode: 'insensitive' } },
-          { email: { contains: 'milan', mode: 'insensitive' } },
-          { email: { contains: 'pavel', mode: 'insensitive' } },
-        ],
-      },
-    });
-
     return NextResponse.json({
       ok: true,
-      message: `Smazáno ${delEmps.count} testovacích zaměstnanců a ${delUsers.count} uživatelů.`,
+      message: `Smazáno ${delEmps.count} testovacích zaměstnanců v aktivní organizaci.`,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

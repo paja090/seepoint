@@ -73,7 +73,7 @@ export async function createClient(input: CreateClientInput, actorUserId: string
   const normalizedName = normalizeClientName(name);
 
   return prisma.$transaction(async (tx) => {
-  const existing = await tx.client.findUnique({
+  const existing = await tx.client.findFirst({
     where: { normalizedName },
   });
   if (existing) {

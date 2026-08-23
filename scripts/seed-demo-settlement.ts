@@ -1,7 +1,11 @@
 import { PrismaClient, WorkType } from '@prisma/client';
 import { hashPassword } from '../lib/auth-crypto.ts';
+import { enterTenantContext } from '../lib/tenant-context.ts';
+import { tenantPrismaExtension } from '../lib/tenant-prisma.ts';
 
-const prisma = new PrismaClient();
+const organizationId = process.env.ORGANIZATION_ID ?? 'org_seepoint_default';
+enterTenantContext({ organizationId, source: 'script' });
+const prisma = new PrismaClient().$extends(tenantPrismaExtension) as unknown as PrismaClient;
 
 async function main() {
   // 1. Verify NODE_ENV is not production
@@ -105,6 +109,12 @@ async function main() {
       status: 'ACTIVE',
       passwordHash: hashedPw
     }
+  });
+
+  await prisma.organizationMember.upsert({
+    where: { organizationId_userId: { organizationId, userId: demoUser.id } },
+    update: { role: 'WORKER', isActive: true },
+    create: { organizationId, userId: demoUser.id, role: 'WORKER' },
   });
   console.log(`Demo uživatelský účet vytvořen: ID=${demoUser.id}, Email=${demoUser.email}`);
 

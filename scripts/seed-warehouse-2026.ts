@@ -1,7 +1,10 @@
 import { PrismaClient, WarehouseItemCategory } from '@prisma/client';
+import { getTenantContext, enterTenantContext } from '../lib/tenant-context';
+import { tenantPrismaExtension } from '../lib/tenant-prisma';
 
 const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_PRISMA_URL ?? process.env.POSTGRES_URL;
-const prisma = new PrismaClient(databaseUrl ? { datasourceUrl: databaseUrl } : undefined);
+if (!getTenantContext()) enterTenantContext({ organizationId: process.env.ORGANIZATION_ID ?? 'org_seepoint_default', source: 'script' });
+const prisma = new PrismaClient(databaseUrl ? { datasourceUrl: databaseUrl } : undefined).$extends(tenantPrismaExtension) as unknown as PrismaClient;
 
 const defaultWarehouseItems = [
   // SPOTŘEBNÍ MATERIÁL (CONSUMABLE)

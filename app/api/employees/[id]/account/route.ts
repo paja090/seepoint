@@ -1,4 +1,4 @@
-import { Prisma, Role } from '@prisma/client';
+import { OrganizationRole, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { canAssignRole, canManageTarget, wouldRemoveLastActiveAdmin } from '@/lib/account-policy';
 import { audit } from '@/lib/audit';
@@ -8,12 +8,9 @@ import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { normalizeAuthEmail, temporaryPasswordError } from '@/lib/auth-onboarding';
+import { getAppUrl } from '@/lib/app-url';
 
 type AccountInput = { action?: 'enableAccess' | 'invite' | 'setTemporaryPassword' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[]; temporaryPassword?: string; temporaryPasswordConfirmation?: string };
-
-function activationUrl(token: string) {
-  return `${process.env.APP_URL ?? 'http://localhost:3000'}/activate/${token}`;
-}
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const actor = await getCurrentUser();
@@ -27,11 +24,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!employee.email) return NextResponse.json({ error: 'Pro přístup do aplikace musí mít zaměstnanec e-mail.' }, { status: 400 });
     if (!canAssignRole(actor.role, employee.role)) return NextResponse.json({ error: 'Manažer nemůže vytvořit administrátorský účet.' }, { status: 403 });
     const normalizedEmail = normalizeAuthEmail(employee.email);
-    const existing = await prisma.user.findFirst({ where: { email: { equals: normalizedEmail, mode: 'insensitive' } }, include: { employee: true } });
+    const existing = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      include: { employees: { where: { organizationId: actor.organizationId! }, take: 1 } },
+    });
     if (existing) {
-      if (existing.employee) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
+      if (existing.employees[0]) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
       if (actor.role !== 'ADMIN' && existing.role === 'ADMIN') return NextResponse.json({ error: 'Administrátorský účet může propojit pouze administrátor.' }, { status: 403 });
-      await prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, email: normalizedEmail, role: existing.role, roles: existing.roles } });
+      await prisma.$transaction([
+        prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, email: normalizedEmail, role: employee.role, roles: employee.roles } }),
+        prisma.organizationMember.upsert({
+          where: { organizationId_userId: { organizationId: actor.organizationId!, userId: existing.id } },
+          create: { organizationId: actor.organizationId!, userId: existing.id, role: employee.role as OrganizationRole, roles: employee.roles as OrganizationRole[], isActive: true },
+          update: { role: employee.role as OrganizationRole, roles: employee.roles as OrganizationRole[], isActive: true },
+        }),
+      ]);
       return NextResponse.json({ ok: true, linkedExistingAccount: true });
     }
     const rolesToAssign = body.roles && body.roles.length ? body.roles : (employee.roles.length ? employee.roles : [employee.role]);
@@ -43,14 +50,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           email: normalizedEmail,
           role: primaryRole,
           roles: rolesToAssign,
-          employee: { connect: { id: employee.id } },
+          employees: { connect: { id: employee.id } },
+          organizationMemberships: {
+            create: { organizationId: actor.organizationId!, role: primaryRole as OrganizationRole, roles: rolesToAssign as OrganizationRole[], isActive: true },
+          },
         },
       });
       await transaction.employee.update({ where: { id: employee.id }, data: { email: normalizedEmail } });
       return created;
     });
     try {
-      const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = activationUrl(token);
+      const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = getAppUrl(request, `/activate/${token}`);
       await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);
       return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
     } catch (error) {
@@ -68,7 +78,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (limited) return limited;
     if (target.status !== 'INVITED') return NextResponse.json({ error: 'Novou pozvánku lze poslat pouze účtu ve stavu INVITED.' }, { status: 400 });
     ensureEmailConfigured();
-    const token = await issueUserToken(target.id, 'ACTIVATION', 48); const url = activationUrl(token);
+    const token = await issueUserToken(target.id, 'ACTIVATION', 48); const url = getAppUrl(request, `/activate/${token}`);
     await sendActivationEmail(target.email, url); await audit('INVITATION_RESENT', target.id, actor.id);
     return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
   }
@@ -114,14 +124,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const rolesArray = body.roles && body.roles.length ? body.roles : Array.from(new Set([primaryRole, ...(target.roles || [])]));
     try {
       await prisma.$transaction(async (transaction) => {
-        const activeAdminCount = await transaction.user.count({ where: { role: 'ADMIN', status: 'ACTIVE', OR: [{ employee: null }, { employee: { is: { isActive: true } } }] } });
+        const activeAdminCount = await transaction.organizationMember.count({
+          where: { organizationId: actor.organizationId!, isActive: true, role: { in: ['OWNER', 'ADMIN'] } },
+        });
         if (wouldRemoveLastActiveAdmin({ targetRole: target.role, nextRole: primaryRole, suspending: body.action === 'suspend', activeAdminCount })) throw new Error('LAST_ADMIN');
         if (body.action === 'suspend') {
-          await transaction.user.update({ where: { id: target.id }, data: { status: 'SUSPENDED', sessionVersion: { increment: 1 }, sessions: { deleteMany: {} } } });
+          await transaction.organizationMember.update({
+            where: { organizationId_userId: { organizationId: actor.organizationId!, userId: target.id } },
+            data: { isActive: false },
+          });
+          await transaction.userSession.deleteMany({ where: { userId: target.id, activeOrganizationId: actor.organizationId! } });
           await transaction.userToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } });
         } else {
           await Promise.all([
-            transaction.user.update({ where: { id: target.id }, data: { role: primaryRole, roles: rolesArray } }),
+            transaction.organizationMember.update({
+              where: { organizationId_userId: { organizationId: actor.organizationId!, userId: target.id } },
+              data: { role: primaryRole as OrganizationRole, roles: rolesArray as OrganizationRole[] },
+            }),
             transaction.employee.update({ where: { id }, data: { role: primaryRole, roles: rolesArray } }),
           ]);
         }
@@ -135,7 +154,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'restore') {
-    await prisma.user.update({ where: { id: target.id }, data: { status: target.passwordHash ? 'ACTIVE' : 'INVITED' } });
+    await prisma.organizationMember.update({
+      where: { organizationId_userId: { organizationId: actor.organizationId!, userId: target.id } },
+      data: { isActive: true },
+    });
     await audit('ACCOUNT_RESTORED', target.id, actor.id); return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: 'Neplatná akce.' }, { status: 400 });

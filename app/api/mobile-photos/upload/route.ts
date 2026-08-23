@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
 import { uploadPhotoToGoogleDrive } from '@/lib/google-drive';
 import { analyzeCarrierPhotoWithAI } from '@/lib/ai-carrier-recognition';
@@ -13,6 +14,8 @@ import {
   storeMobilePhoto,
 } from '@/lib/mobile-photo-upload';
 import { MOBILE_PHOTO_DAMAGE_LABELS, isMobilePhotoDamageType } from '@/lib/mobile-photo-damage';
+import { requireTenantContext } from '@/lib/tenant-context';
+import { tenantStorageKey } from '@/lib/storage/tenant-storage-key';
 
 export const runtime = 'nodejs';
 
@@ -99,6 +102,9 @@ export async function POST(req: Request) {
     const fileName = `PHOTO_${safeCode}_${new Date().toISOString().slice(0, 10)}_${photoId.slice(-8)}.${extension}`;
     const stored = await storeMobilePhoto(file, fileName, photoId, uploadPhotoToGoogleDrive);
     const photoUrl = stablePhotoUrl(photoId);
+    const storageProvider = stored.storageProvider === 'LOCAL' ? 'DATABASE' : stored.storageProvider;
+    const storageKey = tenantStorageKey({ organizationId: requireTenantContext().organizationId, resource: 'photos', resourceId: photoId, fileName });
+    const contentChecksum = createHash('sha256').update(stored.bytes).digest('hex');
 
     let photo;
     try {
@@ -110,8 +116,10 @@ export async function POST(req: Request) {
           url: photoUrl,
           driveFileId: stored.driveFileId,
           content: stored.storageProvider === 'LOCAL' ? Buffer.from(stored.bytes) : undefined,
+          storageKey,
+          contentChecksum,
           fileName, mimeType, size: stored.bytes.byteLength, type: purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
-          note: photoNote, isClientVisible: purpose === 'CLIENT_REPORT', storageProvider: stored.storageProvider,
+          note: photoNote, isClientVisible: purpose === 'CLIENT_REPORT', storageProvider,
           capturedLatitude: coordinates.lat, capturedLongitude: coordinates.lng, capturedAccuracyMeters: accuracy,
           capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName,
           aiStatus: (purpose === 'DAMAGE' || !carrier) ? 'SKIPPED' : 'PENDING',

@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   if (price === null) return NextResponse.json({ error: 'Cena musí být kladné číslo s nejvýše dvěma desetinnými místy.' }, { status: 400 });
 
   const carrierCode = text(input, 'carrierCode');
-  const carrier = carrierCode ? await prisma.advertisingCarrier.findUnique({ where: { code: carrierCode }, select: { id: true } }) : null;
+  const carrier = carrierCode ? await prisma.advertisingCarrier.findFirst({ where: { code: carrierCode }, select: { id: true } }) : null;
   if (carrierCode && !carrier) return NextResponse.json({ error: 'Vyberte existující nosič z nabídky.' }, { status: 400 });
 
   const quantityText = text(input, 'quantity');

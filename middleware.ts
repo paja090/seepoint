@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const SESSION_COOKIE = 'seepoint_session';
 const publicPaths = [
+  '/',
+  '/os',
   '/login',
   '/forgot-password',
   '/activate',
@@ -12,6 +14,7 @@ const publicPaths = [
   '/api/auth',
   '/api/proposals',
   '/api/client',
+  '/api/leads',
 ];
 
 export function middleware(request: NextRequest) {

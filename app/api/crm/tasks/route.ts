@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     const task = await prisma.$transaction(async (tx) => {
       if (!await tx.client.count({ where: { id: clientId, active: true } })) throw new Error('CLIENT_NOT_FOUND');
-      if (!await tx.user.count({ where: { id: assignedUserId } })) throw new Error('INVALID_ASSIGNEE');
+      if (!await tx.organizationMember.count({ where: { organizationId: auth.organizationId!, userId: assignedUserId, isActive: true } })) throw new Error('INVALID_ASSIGNEE');
       const contactId = typeof body.contactId === 'string' && body.contactId ? body.contactId : null;
       const crmOrderId = typeof body.crmOrderId === 'string' && body.crmOrderId ? body.crmOrderId : null;
       const contractId = typeof body.contractId === 'string' && body.contractId ? body.contractId : null;
@@ -80,7 +80,7 @@ export async function PUT(req: NextRequest) {
   if (body.dueDate !== undefined && !dueDate) return NextResponse.json({ error: 'Termín úkolu není platný.' }, { status: 400 });
 
   try {
-    if (body.assignedUserId && !await prisma.user.count({ where: { id: String(body.assignedUserId) } })) {
+    if (body.assignedUserId && !await prisma.organizationMember.count({ where: { organizationId: auth.organizationId!, userId: String(body.assignedUserId), isActive: true } })) {
       return NextResponse.json({ error: 'Přiřazený uživatel neexistuje.' }, { status: 400 });
     }
     const status = body.status as CrmTaskStatus | undefined;

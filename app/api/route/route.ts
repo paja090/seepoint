@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { computeGoogleRoute } from '@/lib/google-maps';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   try {
     const body = (await request.json()) as {
       origin?: { latitude: number; longitude: number };

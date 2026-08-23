@@ -28,6 +28,9 @@ export function CampaignConceptPublicView({
 }) {
   const [activeTab, setActiveTab] = useState<'strategy' | 'map' | 'phases'>('strategy');
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
+  const brandName = offer.branding?.name || 'SeePOINT';
+  const brandEmail = offer.branding?.email || 'info@seepoint.cz';
+  const brandPhone = offer.branding?.phone || '+420 778 089 099';
 
   const rawPhases = (offer as unknown as Record<string, unknown>).campaignPhases;
   const phases: CampaignPhase[] = Array.isArray(rawPhases)
@@ -70,9 +73,9 @@ export function CampaignConceptPublicView({
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-4 sm:px-6 py-3.5 shadow-lg">
         <div className="mx-auto max-w-6xl flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="font-black text-xl text-white tracking-tight">
-              See<span className="text-purple-400">POINT</span>
-            </span>
+            {offer.branding?.logoUrl
+              ? <img alt={brandName} className="h-8 max-w-44 object-contain" src={offer.branding.logoUrl} />
+              : <span className="font-black text-xl text-white tracking-tight">{brandName}</span>}
             <span className="hidden sm:inline-block h-4 w-px bg-slate-800" />
             <span className="hidden sm:inline-block text-xs font-bold text-slate-400">
               Nezávazný koncept OOH kampaně
@@ -81,11 +84,11 @@ export function CampaignConceptPublicView({
 
           <div className="flex items-center gap-2">
             <a
-              href="tel:+420778089099"
+              href={`tel:${brandPhone.replace(/\s/g, '')}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-bold text-xs border border-purple-800/60 transition"
             >
               <PhoneCall className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">+420 778 089 099</span>
+              <span className="hidden sm:inline">{brandPhone}</span>
             </a>
           </div>
         </div>
@@ -397,7 +400,7 @@ export function CampaignConceptPublicView({
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
             <a
-              href="mailto:info@seepoint.cz?subject=Zájem%20o%20nacenění%20kampaně"
+            href={`mailto:${brandEmail}?subject=Zájem%20o%20nacenění%20kampaně`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:bg-slate-100 transition transform active:scale-95"
             >
               <Mail className="w-4 h-4 text-purple-600" />
@@ -405,11 +408,11 @@ export function CampaignConceptPublicView({
             </a>
 
             <a
-              href="tel:+420778089099"
+              href={`tel:${brandPhone.replace(/\s/g, '')}`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-950/80 hover:bg-purple-900 text-purple-200 font-extrabold text-xs sm:text-sm border border-purple-700/60 shadow-lg transition"
             >
               <PhoneCall className="w-4 h-4" />
-              <span>Zavolat obchodníkovi (+420 778 089 099)</span>
+              <span>Zavolat obchodníkovi ({brandPhone})</span>
             </a>
           </div>
         </section>

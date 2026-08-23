@@ -122,7 +122,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const clientName = text(input, 'clientName') || client?.name || 'Bez klienta';
 
   const carrierCode = text(input, 'carrierCode');
-  const carrier = carrierCode ? await prisma.advertisingCarrier.findUnique({ where: { code: carrierCode }, select: { id: true } }) : null;
+  const carrier = carrierCode ? await prisma.advertisingCarrier.findFirst({ where: { code: carrierCode }, select: { id: true } }) : null;
   if (carrierCode && !carrier) return NextResponse.json({ error: 'Vyberte existující nosič z nabídky.' }, { status: 400 });
 
   const ftdUrl = text(input, 'ftdUrl');

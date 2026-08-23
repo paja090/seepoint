@@ -55,6 +55,9 @@ const navGroups: NavGroup[] = [
       ['/employees', '👤 Zaměstnanci & Tým', 'userRound', 'employees'],
       ['/import', '📥 Import dat', 'fileUp', 'import'],
       ['/settings', '⚙️ Nastavení systému', 'settings', 'settings'],
+      ['/settings/company', '🏢 Nastavení firmy', 'settings', 'settings'],
+      ['/settings/members', '👥 Uživatelé organizace', 'users', 'settings'],
+      ['/settings/integrations', '🔌 Integrace', 'settings', 'settings'],
     ],
   },
 ];
@@ -83,6 +86,19 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
       };
     })
     .filter((group) => group.items.length > 0);
+
+  if (user.platformRole === 'SUPER_ADMIN') {
+    visibleGroups.push({
+      label: '🛡️ Platforma SeePoint',
+      items: [
+        ['/admin/organizations', 'Organizace', 'settings', 'settings'],
+        ['/onboarding', 'Onboarding agentury', 'userRound', 'settings'],
+      ],
+    });
+  } else if (user.membership?.role === 'OWNER' || user.membership?.role === 'ADMIN' || user.membership?.roles.includes('ADMIN')) {
+    const settingsGroup = visibleGroups.find((group) => group.label === '⚙️ Správa & Nastavení');
+    settingsGroup?.items.push(['/onboarding', 'Onboarding agentury', 'userRound', 'settings']);
+  }
 
   const userName = user.employee
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
@@ -113,6 +129,12 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         role: user.role,
         allowedRoles: user.allowedRoles || [user.role],
         avatarUrl,
+        organizationId: user.organizationId!,
+        organizations: user.memberships.map((membership) => ({
+          id: membership.organization.id,
+          name: membership.organization.name,
+          slug: membership.organization.slug,
+        })),
       }}
       employees={employees}
       visibleGroups={visibleGroups}

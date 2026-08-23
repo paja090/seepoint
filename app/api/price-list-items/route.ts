@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       const code = `PRINT_${mediaType}`;
       const label = `Tisk, výroba a instalace – ${name.replace(/\s*(komerce|kultura)\s*/i, '').trim() || mediaType}`;
       await prisma.offerPriceRule.upsert({
-        where: { code },
+        where: { organizationId_code: { organizationId: auth.organizationId!, code } },
         create: {
           code,
           category: 'PRINT',

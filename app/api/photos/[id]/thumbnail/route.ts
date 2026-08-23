@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
-import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
+import { readStoredPhoto } from '@/lib/storage/photo-storage';
 
 export const runtime = 'nodejs';
 
@@ -13,10 +13,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const photo = await prisma.photo.findUnique({
       where: { id: (await params).id },
-      select: { driveFileId: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true },
+      select: { id: true, url: true, content: true, driveFileId: true, storageKey: true, storageProvider: true, fileName: true, mimeType: true, employeeId: true, type: true, workEntryId: true, isPrivate: true },
     });
 
-    if (!photo?.driveFileId) {
+    if (!photo) {
       return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
     }
 
@@ -49,27 +49,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
     }
 
-    const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
-    if (!file.ok || !file.body) {
-      return NextResponse.json(
-        { error: 'Fotografii se nepodařilo načíst z Google Disku.' },
-        { status: file.status === 404 ? 404 : 502 }
-      );
-    }
-
-    return new Response(file.body, {
+    const stored = await readStoredPhoto(photo);
+    if (!stored) return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
+    if (stored.redirectUrl) return NextResponse.redirect(stored.redirectUrl);
+    return new Response(stored.body, {
       status: 200,
       headers: {
-        'Content-Type': photo.mimeType ?? file.headers.get('Content-Type') ?? 'application/octet-stream',
+        'Content-Type': stored.contentType ?? photo.mimeType ?? 'application/octet-stream',
         'Cache-Control': 'private, max-age=86400', // Cache thumbnails longer (e.g. 24h)
         'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (error) {
     console.error('Photo thumbnail download failed:', error);
-    if (error instanceof GoogleDriveConfigurationError) {
-      return NextResponse.json({ error: 'Google Drive úložiště zatím není nakonfigurované.' }, { status: 503 });
-    }
     return NextResponse.json({ error: 'Fotografii se nepodařilo načíst.' }, { status: 502 });
   }
 }

@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { deletePhotoFromGoogleDrive, GoogleDriveConfigurationError, uploadPhotoToGoogleDrive } from '@/lib/google-drive';
+import { requireTenantContext } from '@/lib/tenant-context';
+import { deleteStoredPhoto, storeTenantPhoto, type StoredTenantPhoto } from '@/lib/storage/photo-storage';
 import { canAccessOffer } from '@/lib/offers/domain';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PHOTO_TYPES = new Set(['LOCATION', 'CARRIER', 'CAMPAIGN', 'INSTALLATION', 'CHECK', 'ARCHIVE', 'EMPLOYEE_PROFILE']);
 
 export async function POST(request: Request) {
-  let driveFileId: string | undefined;
+  let storedFile: StoredTenantPhoto | undefined;
   try {
     const form = await request.formData(); const file = form.get('file');
     if (!(file instanceof File)) return NextResponse.json({ error: 'Fotografie je povinná.' }, { status: 400 });
@@ -41,14 +42,16 @@ export async function POST(request: Request) {
     if (!PHOTO_TYPES.has(rawType)) return NextResponse.json({ error: 'Neplatný typ fotografie.' }, { status: 400 });
     if (employeeId && rawType !== 'EMPLOYEE_PROFILE') return NextResponse.json({ error: 'Profilová fotografie má neplatný typ.' }, { status: 400 });
     const photoId = randomUUID(); const safeOriginalName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(-120) || 'photo';
-    const storedFile = await uploadPhotoToGoogleDrive(file, `${Date.now()}-${safeOriginalName}`, photoId); driveFileId = storedFile.id;
+    const storedName = `${Date.now()}-${safeOriginalName}`;
+    const storage = await storeTenantPhoto({ organizationId: requireTenantContext().organizationId, photoId, fileName: storedName, file });
+    storedFile = storage;
     const photo = await prisma.$transaction(async (tx) => {
       if (carrierId) {
-        await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE id = ${carrierId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id FROM "AdvertisingCarrier" WHERE "organizationId" = ${requireTenantContext().organizationId} AND id = ${carrierId} FOR UPDATE`;
       } else if (surfaceId) {
-        await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE id = ${surfaceId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id FROM "AdvertisingSurface" WHERE "organizationId" = ${requireTenantContext().organizationId} AND id = ${surfaceId} FOR UPDATE`;
       } else if (navigationPointId) {
-        await tx.$executeRaw`SELECT id FROM "NavigationPoint" WHERE id = ${navigationPointId} FOR UPDATE`;
+        await tx.$executeRaw`SELECT id FROM "NavigationPoint" WHERE "organizationId" = ${requireTenantContext().organizationId} AND id = ${navigationPointId} FOR UPDATE`;
       }
 
       const count = await tx.photo.count({
@@ -72,10 +75,14 @@ export async function POST(request: Request) {
         data: {
           id: photoId,
           url: `/api/photos/${photoId}/file`,
-          driveFileId: storedFile.id,
-          fileName: storedFile.name,
-          mimeType: storedFile.mimeType,
-          size: storedFile.size,
+          driveFileId: storage.driveFileId,
+          storageProvider: storage.storageProvider,
+          storageKey: storage.storageKey,
+          contentChecksum: storage.contentChecksum,
+          content: storage.storageProvider === 'DATABASE' ? Buffer.from(storage.bytes) : undefined,
+          fileName: storedName,
+          mimeType: file.type,
+          size: storage.bytes.byteLength,
           type: rawType as 'LOCATION'|'CARRIER'|'CAMPAIGN'|'INSTALLATION'|'CHECK'|'ARCHIVE'|'EMPLOYEE_PROFILE',
           carrierId,
           surfaceId,
@@ -88,11 +95,10 @@ export async function POST(request: Request) {
       if (navigationPointId) await tx.navigationPoint.update({ where: { id: navigationPointId }, data: { sitePhotoId: created.id } });
       return created;
     });
-    return NextResponse.json(photo, { status: 201 });
+    return NextResponse.json({ ...photo, storageWarning: storage.warning }, { status: 201 });
   } catch (error) {
-    if (driveFileId) await deletePhotoFromGoogleDrive(driveFileId).catch(() => undefined);
+    if (storedFile) await deleteStoredPhoto(storedFile).catch(() => undefined);
     console.error('Photo upload failed', error instanceof Error ? error.message : 'unknown error');
-    if (error instanceof GoogleDriveConfigurationError) return NextResponse.json({ error: 'Google Drive úložiště zatím není nakonfigurované.' }, { status: 503 });
     return NextResponse.json({ error: 'Fotografii se nepodařilo uložit.' }, { status: 502 });
   }
 }

@@ -9,6 +9,7 @@ import { recalculateSettlementTotals } from '../lib/settlement-recalculation.ts'
 import { validateWorkEntryTransition, approveWorkEntry, correctApprovedWorkEntry } from '../lib/work-entry-actions.ts';
 import { approveWorkExpense } from '../lib/work-expense-actions.ts';
 import { prisma } from '../lib/db.ts';
+import { runWithTenantContext } from '../lib/tenant-context.ts';
 
 const dec = (val: string | number) => new Prisma.Decimal(val);
 
@@ -710,10 +711,13 @@ test('18. SystemSettings singleton restriction', async () => {
 
   try {
     const input: any = { id: 'some-malicious-id', companyName: 'Hack Corp', vatRate: 15 };
-    await updateSystemSettings(input);
+    await runWithTenantContext(
+      { organizationId: 'org-test-settings', source: 'test' },
+      () => updateSystemSettings(input),
+    );
 
-    assert.equal(upsertArgs.where.id, 'default');
-    assert.equal(upsertArgs.create.id, 'default');
+    assert.equal(upsertArgs.where.id, 'system-settings:org-test-settings');
+    assert.equal(upsertArgs.create.id, 'system-settings:org-test-settings');
     assert.equal(upsertArgs.update.id, undefined);
     assert.equal(upsertArgs.update.companyName, 'Hack Corp');
   } finally {

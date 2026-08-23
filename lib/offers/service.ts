@@ -1,6 +1,9 @@
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
-import { prisma } from '@/lib/db';
+import { platformPrisma, prisma } from '@/lib/db';
+import { enterPublicOfferTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
+import { requireTenantContext } from '@/lib/tenant-context';
 import { convertOfferToNavigationOrderInTransaction } from '@/lib/navigation/navigation-service';
 import {
   assertOfferTransition,
@@ -748,20 +751,25 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
 }
 
 export async function getPublicRow(token: string) {
-  let row = null;
-  if (isPlausiblePublicOfferToken(token)) {
-    row = await prisma.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
-  }
-  if (!row) {
-    row = await prisma.offer.findUnique({ where: { id: token }, include: offerInclude });
-  }
+  if (!isPlausiblePublicOfferToken(token)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  const tokenHash = hashPublicOfferToken(token);
+  const owner = await enterPublicOfferTenant(tokenHash);
+  if (!owner) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  const row = await runWithTenantContext(
+    { organizationId: owner.organizationId, source: 'public-token' },
+    () => prisma.offer.findUnique({ where: { publicTokenHash: tokenHash }, include: offerInclude }),
+  );
   if (!row || row.archivedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   return row;
 }
 
 export async function getPublicOffer(token: string) {
   const row = await getPublicRow(token);
-  return serializeOffer(row, { publicToken: token, publicView: true });
+  const organization = await platformPrisma.organization.findUnique({
+    where: { id: row.organizationId },
+    select: { name: true, logoUrl: true, primaryColor: true, secondaryColor: true, email: true, phone: true, website: true },
+  });
+  return { ...serializeOffer(row, { publicToken: token, publicView: true }), branding: organization };
 }
 
 export async function getPublicClientLogo(token: string) {
@@ -778,8 +786,8 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
   const actorEmail = typeof body.email === 'string' ? body.email.trim().slice(0, 200) : '';
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, 4000) : '';
   if (!actorName || !actorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(actorEmail)) throw new OfferValidationError('Vyplňte jméno a platný e-mail.');
-  return prisma.$transaction(async (tx) => {
-    if (!isPlausiblePublicOfferToken(token)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  const publicRow = await getPublicRow(token);
+  return runWithTenantContext({ organizationId: publicRow.organizationId, source: 'public-token' }, () => prisma.$transaction(async (tx) => {
     const row = await tx.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
     if (!row || row.archivedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
     if (action === 'question' || action === 'revision') {
@@ -833,7 +841,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     }
 
     return { status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 }
 
 export async function getPublicPhoto(token: string, photoId: string) {
@@ -851,7 +859,7 @@ export async function getPublicPhoto(token: string, photoId: string) {
         (point.visualizedPhotoUrl && point.visualizedPhotoUrl.includes(photoId))
     ) ?? false) ||
     Boolean(
-      await prisma.photo.findFirst({
+      await runWithTenantContext({ organizationId: offer.organizationId, source: 'public-token' }, () => prisma.photo.findFirst({
         where: {
           id: photoId,
           siteNavigationPoint: {
@@ -859,7 +867,7 @@ export async function getPublicPhoto(token: string, photoId: string) {
           },
         },
         select: { id: true },
-      })
+      }))
     );
 
   if (!allowed) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
@@ -880,7 +888,8 @@ export async function convertOfferToOccupancy(user: CurrentUser, id: string, tar
     assertOfferSurfacesOfferable(offer);
     const surfaceIds = offer.items.map((item) => item.surfaceId);
     if (surfaceIds.length === 0) throw new OfferValidationError('Nabídka nemá žádné položky.', 'EMPTY_OFFER');
-    await tx.$queryRaw`SELECT "id" FROM "AdvertisingSurface" WHERE "id" IN (${Prisma.join(surfaceIds)}) FOR UPDATE`;
+    const { organizationId } = requireTenantContext();
+    await tx.$queryRaw`SELECT "id" FROM "AdvertisingSurface" WHERE "organizationId" = ${organizationId} AND "id" IN (${Prisma.join(surfaceIds)}) FOR UPDATE`;
     const existing = await tx.occupancy.findMany({ where: { offerId: id }, select: { id: true, surfaceId: true, status: true } });
     const conversionPlan = planOfferConversion(surfaceIds, existing.map((row) => row.surfaceId));
     if (conversionPlan === 'idempotent') {

@@ -23,7 +23,7 @@ async function loadOffer(token: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const offer = await loadOffer((await params).token);
-  const title = `${offer.campaignName || offer.title} | SeePOINT`;
+  const title = `${offer.campaignName || offer.title} | ${offer.branding?.name || 'SeePOINT'}`;
   const description = offer.clientMessage || offer.campaignGoal || `Reklamní nabídka připravená pro ${offer.client.name}.`;
 
   return {
@@ -52,10 +52,10 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
             <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-center gap-4">
                 <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-500">
-                  {offer.client.logoUrl ? <img alt={`Logo ${offer.client.name}`} className="h-full w-full object-contain p-2" src={offer.client.logoUrl} /> : offer.client.name.slice(0, 2).toUpperCase()}
+                  {offer.branding?.logoUrl ? <img alt={`Logo ${offer.branding.name}`} className="h-full w-full object-contain p-2" src={offer.branding.logoUrl} /> : offer.branding?.name.slice(0, 2).toUpperCase() || offer.client.name.slice(0, 2).toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-xs font-extrabold uppercase tracking-widest text-sky-600">SeePOINT · Nabídka navigace</p>
+                  <p className="text-xs font-extrabold uppercase tracking-widest text-sky-600">{offer.branding?.name || 'SeePOINT'} · Nabídka navigace</p>
                   <h1 className="text-2xl font-black text-slate-900">{offer.campaignName || offer.title}</h1>
                   <p className="text-sm font-semibold text-slate-500">Připraveno pro společnost {offer.client.name}</p>
                 </div>
@@ -69,5 +69,5 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
     );
   }
 
-  return <OfferProposal offer={toProposalOffer(offer)} token={token} />;
+  return <OfferProposal branding={offer.branding} offer={toProposalOffer(offer)} token={token} />;
 }

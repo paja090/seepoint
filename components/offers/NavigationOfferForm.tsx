@@ -8,7 +8,7 @@ import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-a
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 import { compressImageFile } from '@/lib/image-compress';
-import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-generator';
+import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
 
 type ClientOption = {
   id: string;

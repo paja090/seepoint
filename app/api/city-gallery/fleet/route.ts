@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { tenantSingletonId } from '@/lib/tenant-singleton';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,9 +21,9 @@ export async function POST(request: Request) {
     const maintenanceCount = Math.max(0, Number(input.maintenanceCount) || 0);
 
     const fleetConfig = await prisma.cityGalleryFleetConfig.upsert({
-      where: { id: 'default' },
+      where: { id: tenantSingletonId('city-gallery-fleet') },
       update: { totalFrames, maintenanceCount },
-      create: { id: 'default', totalFrames, maintenanceCount },
+      create: { id: tenantSingletonId('city-gallery-fleet'), totalFrames, maintenanceCount },
     });
 
     return NextResponse.json({ ok: true, fleetConfig });

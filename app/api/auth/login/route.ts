@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSession, verifyPassword } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { platformPrisma, prisma } from '@/lib/db';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { normalizeAuthEmail } from '@/lib/auth-onboarding';
@@ -10,11 +10,14 @@ export async function POST(request: Request) {
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(email ?? 'missing-email'), rateLimitPolicies.login);
   if (limited) return limited;
   if (!email || !body?.password) return NextResponse.json({ error: 'Vyplňte e-mail a heslo.' }, { status: 400 });
-  const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } }, include: { employee: true } });
+  const user = await platformPrisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    include: { organizationMemberships: { where: { isActive: true, organization: { isActive: true } }, take: 1 } },
+  });
   const valid = user?.passwordHash ? await verifyPassword(body.password, user.passwordHash) : false;
-  if (!user || !valid || user.status !== 'ACTIVE' || user.employee?.isActive === false) {
+  if (!user || !valid || user.status !== 'ACTIVE' || (user.platformRole !== 'SUPER_ADMIN' && user.organizationMemberships.length === 0)) {
     console.warn('[auth/login] Login rejected', {
-      reason: !user ? 'USER_NOT_FOUND' : !valid ? 'INVALID_PASSWORD' : user.status !== 'ACTIVE' ? 'USER_INACTIVE' : 'EMPLOYEE_INACTIVE',
+      reason: !user ? 'USER_NOT_FOUND' : !valid ? 'INVALID_PASSWORD' : user.status !== 'ACTIVE' ? 'USER_INACTIVE' : 'NO_ACTIVE_MEMBERSHIP',
     });
     return NextResponse.json({ error: 'Neplatné přihlašovací údaje nebo neaktivní účet.' }, { status: 401 });
   }

@@ -62,7 +62,7 @@ export function ResponsiveAppShell({
   visibleGroups,
 }: {
   children: React.ReactNode;
-  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; avatarUrl?: string | null };
+  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; avatarUrl?: string | null; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> };
   employees?: Array<{ id: string; firstName: string; lastName: string; position: string | null }>;
   visibleGroups: NavGroup[];
 }) {

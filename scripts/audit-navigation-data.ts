@@ -1,4 +1,7 @@
 import { prisma } from '../lib/db';
+import { enterTenantContext } from '../lib/tenant-context';
+
+enterTenantContext({ organizationId: process.env.ORGANIZATION_ID ?? 'org_seepoint_default', source: 'script' });
 
 export async function runNavigationAuditReport() {
   const navigationCarriers = await prisma.advertisingCarrier.findMany({

@@ -275,9 +275,9 @@ export function GoogleNavigationOfferMap({
         if (isHighwayOrHeritage) return [];
 
         const isTurn = /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd|držte|keep/i.test(`${instruction} ${step.maneuver ?? ''}`);
-        const isAvenue = /tříd|avenue|ulice|náměstí|nároží/i.test(instruction);
+          const isMainRoad = /tříd|avenue|ulice|náměstí|nároží/i.test(instruction);
         const usefulDistance = distanceMeters >= 300 && distanceMeters <= 3_500;
-        const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isAvenue ? 10 : 0) + (usefulDistance ? 8 : 0));
+          const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isMainRoad ? 10 : 0) + (usefulDistance ? 8 : 0));
         return [{ routeIndex, stepIndex, direction: origin.direction, latitude, longitude, distanceMeters, instruction, score, maneuver: step.maneuver }];
       });
     })).then(async (groups) => {
