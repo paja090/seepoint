@@ -23,17 +23,20 @@ export async function POST(req: Request) {
     // Save lead safely into Prisma database
     let leadId = `lead-${Date.now()}`;
     try {
-      const lead = await prisma.demoLead.create({
-        data: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          company: company.trim(),
-          phone: typeof phone === 'string' ? phone.trim() : null,
-          surfaceCount: typeof surfaceCount === 'string' ? surfaceCount.trim() : null,
-          source: 'WEBSITE_DEMO_MODAL',
-        },
-      });
-      leadId = lead.id;
+      const db = prisma as unknown as { demoLead?: { create: (args: Record<string, unknown>) => Promise<{ id: string }> } };
+      if (db.demoLead) {
+        const lead = await db.demoLead.create({
+          data: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            company: company.trim(),
+            phone: typeof phone === 'string' ? phone.trim() : null,
+            surfaceCount: typeof surfaceCount === 'string' ? surfaceCount.trim() : null,
+            source: 'WEBSITE_DEMO_MODAL',
+          },
+        });
+        leadId = lead.id;
+      }
     } catch (dbErr) {
       console.warn('Fallback lead storage (Prisma not migrated or table missing):', dbErr);
     }
