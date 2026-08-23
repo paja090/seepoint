@@ -7,12 +7,6 @@ async function main() {
       email: true,
       name: true,
       platformRole: true,
-      memberships: {
-        select: {
-          role: true,
-          organization: { select: { name: true, slug: true } },
-        },
-      },
     },
   });
 
