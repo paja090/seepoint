@@ -9,6 +9,7 @@ export type CurrentUser = {
   email: string;
   role: AppRole;
   allowedRoles?: AppRole[];
+  organizationId?: string;
 };
 
 export type AppSection =

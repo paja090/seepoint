@@ -1,5 +1,6 @@
 import { platformPrisma } from './db';
-import type { AIFeatureType } from '@prisma/client';
+
+export type AIFeatureType = 'OFFER_GENERATOR' | 'SALES_RADAR' | 'PHOTO_ANALYSIS' | 'ASSISTANT';
 
 export type LogAIUsageInput = {
   organizationId: string;
