@@ -1,11 +1,12 @@
 'use client';
 
-import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Play, Layers, MapPin, Building2, TrendingUp } from 'lucide-react';
+import Image from 'next/image';
+import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Play, Layers, MapPin, Building2, TrendingUp, Smartphone, Laptop } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
 export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
   return (
-    <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+    <section className="relative pt-32 pb-16 md:pt-40 md:pb-24 overflow-hidden">
       {/* Background Ambient Glowing Gradients */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] sm:w-[900px] h-[400px] bg-gradient-to-tr from-purple-900/30 via-indigo-900/20 to-blue-900/10 blur-[130px] rounded-full pointer-events-none -z-10" />
 
@@ -70,13 +71,44 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
         </div>
 
         {/* Trust Badge */}
-        <div className="pt-4 flex items-center justify-center gap-2 text-xs font-semibold text-slate-400">
+        <div className="pt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-400">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span>Vytvořeno na základě skutečného provozu outdoorové reklamní společnosti.</span>
         </div>
 
+        {/* Photorealistic Hero Showcase Visual with Laptop & Mobile */}
+        <div className="pt-6 max-w-5xl mx-auto">
+          <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 p-2 sm:p-3 shadow-2xl ring-1 ring-purple-500/30">
+            <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-slate-950">
+              <Image
+                src="/images/hero_showcase.jpg"
+                alt="SeePoint OS Web & Mobile Showcase"
+                fill
+                priority
+                unoptimized
+                className="object-cover"
+                sizes="(max-width: 1200px) 100vw, 1200px"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+
+              {/* Floating Badges on top of visual */}
+              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md">
+                  <Laptop className="w-4 h-4 text-purple-400" />
+                  <span className="font-bold">Webový dispečink & Obchod</span>
+                </div>
+
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md">
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span className="font-bold">Mobilní aplikace montážníka</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Key Pillars Strip */}
-        <div className="pt-8 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+        <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1">
             <div className="text-purple-400 font-black text-xl">800+</div>
             <div className="text-xs font-semibold text-slate-400">Spravovaných nosičů</div>
