@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
-import type { ProposalOffer } from '@/lib/offers/presentation';
+import type { ProposalCarrier, ProposalOffer } from '@/lib/offers/presentation';
 import { BenefitsGrid } from './BenefitsGrid';
 import { CarrierShowcase } from './CarrierShowcase';
 import { CaseStudies } from './CaseStudies';
@@ -32,10 +32,23 @@ export function OfferProposal({
 }) {
   const [action, setAction] = useState<OfferActionType | null>(null);
   const [copied, setCopied] = useState(false);
+  const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
   const canRespond = true;
 
-  const scrollToMap = useCallback(() => {
-    document.getElementById('offer-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const handleSelectCarrierFromMap = useCallback((carrierId: string) => {
+    setSelectedCarrierId(carrierId);
+    const el = document.getElementById(`carrier-card-${carrierId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
+  const handleSelectCarrierFromShowcase = useCallback((carrier: ProposalCarrier) => {
+    setSelectedCarrierId(carrier.id);
+    const mapEl = document.getElementById('offer-map');
+    if (mapEl) {
+      mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }, []);
 
   const handleDownloadPdf = useCallback(() => {
@@ -81,13 +94,21 @@ export function OfferProposal({
         <OfferStats offer={offer} />
 
         <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]" id="offer-map">
-          <OfferMapPreview offer={offer} />
+          <OfferMapPreview
+            offer={offer}
+            selectedCarrierId={selectedCarrierId}
+            onSelectCarrier={handleSelectCarrierFromMap}
+          />
           <PricingSummary offer={offer} />
         </div>
 
         <MediaMix offer={offer} />
 
-        <CarrierShowcase offer={offer} onOpenCarrier={scrollToMap} />
+        <CarrierShowcase
+          offer={offer}
+          selectedCarrierId={selectedCarrierId}
+          onOpenCarrier={handleSelectCarrierFromShowcase}
+        />
 
         <BenefitsGrid offer={offer} />
 

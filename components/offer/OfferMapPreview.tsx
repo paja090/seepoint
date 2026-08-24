@@ -34,7 +34,15 @@ function Chip({
   );
 }
 
-export function OfferMapPreview({ offer }: { offer: ProposalOffer }) {
+export function OfferMapPreview({
+  offer,
+  selectedCarrierId,
+  onSelectCarrier,
+}: {
+  offer: ProposalOffer;
+  selectedCarrierId?: string | null;
+  onSelectCarrier?: (id: string) => void;
+}) {
   const cities = useMemo(() => Array.from(new Set(offer.carriers.map((c) => c.city))), [offer.carriers]);
   const mediaKeys = useMemo(
     () => Array.from(new Set(offer.carriers.map((c) => c.mediaType))) as ProposalMediaTypeKey[],
@@ -97,6 +105,8 @@ export function OfferMapPreview({ offer }: { offer: ProposalOffer }) {
       <OfferMap
         className="mt-5 h-[340px] sm:h-[420px]"
         target={offer.navigationTarget ? { label: offer.navigationTarget.name, latitude: offer.navigationTarget.latitude, longitude: offer.navigationTarget.longitude } : undefined}
+        selectedPointId={selectedCarrierId}
+        onPointClick={onSelectCarrier}
         points={visible.map((carrier) => ({
           id: carrier.id,
           code: carrier.code,

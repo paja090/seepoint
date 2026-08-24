@@ -81,6 +81,8 @@ export function GoogleNavigationOfferMap({
   suggestionCount,
   maxRadiusKm = 5,
   onSuggestedPoints,
+  selectedPointId,
+  onPointClick,
 }: {
   target?: { latitude: number; longitude: number; label: string; address?: string; placeId?: string };
   points: GoogleOfferMapPoint[];
@@ -94,6 +96,8 @@ export function GoogleNavigationOfferMap({
   suggestionCount?: number;
   maxRadiusKm?: number;
   onSuggestedPoints?: (points: SuggestedNavigationPoint[], error?: string) => void;
+  selectedPointId?: string | null;
+  onPointClick?: (id: string) => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -275,9 +279,9 @@ export function GoogleNavigationOfferMap({
         if (isHighwayOrHeritage) return [];
 
         const isTurn = /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd|držte|keep/i.test(`${instruction} ${step.maneuver ?? ''}`);
-          const isMainRoad = /tříd|avenue|ulice|náměstí|nároží/i.test(instruction);
+        const isMainRoad = /tříd|avenue|ulice|náměstí|nároží/i.test(instruction);
         const usefulDistance = distanceMeters >= 300 && distanceMeters <= 3_500;
-          const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isMainRoad ? 10 : 0) + (usefulDistance ? 8 : 0));
+        const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isMainRoad ? 10 : 0) + (usefulDistance ? 8 : 0));
         return [{ routeIndex, stepIndex, direction: origin.direction, latitude, longitude, distanceMeters, instruction, score, maneuver: step.maneuver }];
       });
     })).then(async (groups) => {
@@ -482,27 +486,35 @@ export function GoogleNavigationOfferMap({
     points.forEach((point, index) => {
       const pointPos = { lat: point.latitude, lng: point.longitude };
       bounds.extend(pointPos);
+      const isSelected = selectedPointId === point.id;
 
       const marker = new googleMaps.Marker({
         position: pointPos,
         map,
         title: point.label,
         draggable: !readOnly,
+        zIndex: isSelected ? 99999 : 100 + index,
         label: {
           text: `#${index + 1}`,
-          color: '#000000',
+          color: isSelected ? '#ffffff' : '#000000',
           fontWeight: '900',
-          fontSize: '13px',
+          fontSize: isSelected ? '14px' : '13px',
         },
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-          fillColor: '#0284c7',
+          fillColor: isSelected ? '#ea580c' : '#0284c7',
           fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 1.8,
+          strokeColor: isSelected ? '#fde047' : '#ffffff',
+          strokeWeight: isSelected ? 3.5 : 2,
+          scale: isSelected ? 2.3 : 1.8,
           anchor: new googleMaps.Point(12, 22),
         },
+      });
+
+      marker.addListener('click', () => {
+        if (onPointClick) {
+          onPointClick(point.id);
+        }
       });
 
       marker.addListener('dragend', (e) => {
@@ -538,9 +550,9 @@ export function GoogleNavigationOfferMap({
         const polyline = new googleMaps.Polyline({
           path: polylinePath,
           geodesic: true,
-          strokeColor: '#0284c7',
-          strokeOpacity: 0.8,
-          strokeWeight: 4,
+          strokeColor: isSelected ? '#ea580c' : '#0284c7',
+          strokeOpacity: isSelected ? 1 : 0.8,
+          strokeWeight: isSelected ? 5 : 4,
           map,
         });
 
@@ -577,10 +589,21 @@ export function GoogleNavigationOfferMap({
       markersRef.current.push(userMarker);
     }
 
-    if ((points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
+    if (!selectedPointId && (points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly]);
+  }, [mapsLoaded, target, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick]);
+
+  // Center/Pan smoothly to selected point when it changes
+  useEffect(() => {
+    if (!mapRef.current || !selectedPointId) return;
+    const pt = points.find((p) => p.id === selectedPointId);
+    if (!pt) return;
+    const map = mapRef.current as { panTo?: (pos: { lat: number; lng: number }) => void };
+    if (typeof map?.panTo === 'function') {
+      map.panTo({ lat: pt.latitude, lng: pt.longitude });
+    }
+  }, [selectedPointId, points]);
 
   // Graceful Leaflet Fallback if API key missing or load error
   if (loadError || !apiKey) {
@@ -598,6 +621,8 @@ export function GoogleNavigationOfferMap({
           onMapClick={onMapClick}
           onPointMove={(id, lat, lng) => onPointMove(id, lat, lng)}
           userLocation={userLocation}
+          selectedPointId={selectedPointId}
+          onPointClick={onPointClick}
         />
       </div>
     );

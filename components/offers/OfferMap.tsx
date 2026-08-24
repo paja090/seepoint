@@ -18,12 +18,14 @@ export function OfferMap({
   points,
   target,
   className = 'h-80',
+  selectedPointId,
   onPointClick,
   onBoundsChange,
 }: {
   points: MapPoint[];
   target?: { label: string; latitude: number; longitude: number } | null;
   className?: string;
+  selectedPointId?: string | null;
   onPointClick?: (id: string) => void;
   onBoundsChange?: (bounds: OfferMapBounds) => void;
 }) {
@@ -107,16 +109,17 @@ export function OfferMap({
 
       // 2. Render Point Markers & Polyline Route Lines
       located.forEach((point, idx) => {
+        const isPointSelected = selectedPointId === point.id;
         const isNav = point.code.startsWith('NAV-');
-        const fillGradStart = isNav ? '#0284c7' : point.selected ? '#059669' : '#0f172a';
-        const fillGradEnd = isNav ? '#0369a1' : point.selected ? '#047857' : '#1e293b';
+        const fillGradStart = isPointSelected ? '#ea580c' : isNav ? '#0284c7' : point.selected ? '#059669' : '#0f172a';
+        const fillGradEnd = isPointSelected ? '#c2410c' : isNav ? '#0369a1' : point.selected ? '#047857' : '#1e293b';
 
         const markerHtml = `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
             <div style="
               position: absolute;
               top: -24px;
-              background: #0f172a;
+              background: ${isPointSelected ? '#ea580c' : '#0f172a'};
               color: #ffffff;
               padding: 2px 8px;
               border-radius: 8px;
@@ -124,12 +127,12 @@ export function OfferMap({
               font-size: 11px;
               font-weight: 800;
               white-space: nowrap;
-              border: 1px solid #38bdf8;
-              box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+              border: ${isPointSelected ? '2px solid #fde047' : '1px solid #38bdf8'};
+              box-shadow: ${isPointSelected ? '0 4px 14px rgba(234, 88, 12, 0.7)' : '0 3px 8px rgba(0,0,0,0.3)'};
             ">
               ${point.code}
             </div>
-            <svg width="34" height="44" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px rgba(0,0,0,0.35));">
+            <svg width="${isPointSelected ? 40 : 34}" height="${isPointSelected ? 52 : 44}" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px ${isPointSelected ? 'rgba(234, 88, 12, 0.6)' : 'rgba(0,0,0,0.35)'});">
               <path d="M18 0C8.059 0 0 8.059 0 18C0 29.25 15.3 45.225 17.235 47.19C17.658 47.613 18.342 47.613 18.765 47.19C20.7 45.225 36 29.25 36 18C36 8.059 27.941 0 18 0Z" fill="url(#offerPinGrad_${idx})"/>
               <circle cx="18" cy="18" r="11" fill="#FFFFFF" stroke="${fillGradStart}" stroke-width="2"/>
               <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="11" fill="${fillGradStart}">#${idx + 1}</text>
@@ -147,10 +150,14 @@ export function OfferMap({
           html: markerHtml,
           className: 'custom-offer-svg-pin',
           iconSize: [120, 60],
-          iconAnchor: [60, 44],
+          iconAnchor: [60, isPointSelected ? 52 : 44],
         });
 
-        const marker = L.marker([point.latitude, point.longitude], { icon, title: `${point.code} · ${point.city}` }).addTo(map);
+        const marker = L.marker([point.latitude, point.longitude], {
+          icon,
+          title: `${point.code} · ${point.city}`,
+          zIndexOffset: isPointSelected ? 1200 : 100,
+        }).addTo(map);
 
         marker.bindTooltip(`<strong>${point.code}</strong> · ${point.city}`, { permanent: false, direction: 'top' });
 
@@ -166,10 +173,10 @@ export function OfferMap({
               [target.latitude, target.longitude],
             ],
             {
-              color: '#0284c7',
-              weight: 3,
+              color: isPointSelected ? '#ea580c' : '#0284c7',
+              weight: isPointSelected ? 4 : 3,
               dashArray: '8, 8',
-              opacity: 0.7,
+              opacity: isPointSelected ? 0.9 : 0.7,
             },
           ).addTo(map);
         }
@@ -192,7 +199,15 @@ export function OfferMap({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [located, target, onBoundsChange, onPointClick]);
+  }, [located, target, onBoundsChange, onPointClick, selectedPointId]);
+
+  // Pan to selected point when it changes
+  useEffect(() => {
+    if (!mapRef.current || !selectedPointId) return;
+    const pt = located.find((p) => p.id === selectedPointId);
+    if (!pt || typeof pt.latitude !== 'number' || typeof pt.longitude !== 'number') return;
+    mapRef.current.panTo([pt.latitude, pt.longitude], { animate: true });
+  }, [selectedPointId, located]);
 
   if (located.length === 0 && !target) {
     return (

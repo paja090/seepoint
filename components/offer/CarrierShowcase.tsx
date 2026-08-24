@@ -8,9 +8,11 @@ import { SectionHeading } from './SectionHeading';
 
 export function CarrierShowcase({
   offer,
+  selectedCarrierId,
   onOpenCarrier,
 }: {
   offer: ProposalOffer;
+  selectedCarrierId?: string | null;
   onOpenCarrier: (carrier: ProposalCarrier) => void;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -33,7 +35,7 @@ export function CarrierShowcase({
         <div className="mb-6 hidden gap-2 sm:flex print:hidden">
           <button
             aria-label="Předchozí nosiče"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
             onClick={() => scrollBy(-1)}
             type="button"
           >
@@ -41,7 +43,7 @@ export function CarrierShowcase({
           </button>
           <button
             aria-label="Další nosiče"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 cursor-pointer"
             onClick={() => scrollBy(1)}
             type="button"
           >
@@ -56,7 +58,11 @@ export function CarrierShowcase({
       >
         {offer.carriers.map((carrier) => (
           <div className="snap-start" key={carrier.id}>
-            <CarrierPreviewCard carrier={carrier} onOpen={onOpenCarrier} />
+            <CarrierPreviewCard
+              carrier={carrier}
+              isSelected={selectedCarrierId === carrier.id}
+              onOpen={onOpenCarrier}
+            />
           </div>
         ))}
       </div>

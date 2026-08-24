@@ -312,6 +312,14 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               };
             })}
             mode="point"
+            selectedPointId={selectedPointId}
+            onPointClick={(id) => {
+              setSelectedPointId(id);
+              const el = document.getElementById(`nav-point-card-${id}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+            }}
             onTargetSelect={() => {}}
             onPointMove={() => {}}
             onMapClick={() => {}}
@@ -334,15 +342,17 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           <div className="space-y-3 max-h-[620px] overflow-y-auto pr-1">
             {navigation.points.map((point, index) => {
               const isSelected = selectedPointIds.includes(point.id);
+              const isFocused = selectedPointId === point.id;
               const pObj = point as unknown as Record<string, unknown>;
 
               return (
                 <article
+                  id={`nav-point-card-${point.id}`}
                   key={point.id}
                   onClick={() => setSelectedPointId(point.id)}
-                  className={`cursor-pointer rounded-2xl border p-4 transition-all ${
-                    selectedPointId === point.id
-                      ? 'border-sky-500 bg-sky-50/50 shadow-md ring-2 ring-sky-500/20'
+                  className={`cursor-pointer rounded-2xl border p-4 transition-all duration-300 ${
+                    isFocused
+                      ? 'border-amber-500 bg-amber-50/70 shadow-lg ring-4 ring-amber-400/40 scale-[1.01]'
                       : isSelected
                       ? 'border-slate-200 bg-white hover:border-sky-300'
                       : 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
