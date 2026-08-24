@@ -11,6 +11,7 @@ const publicPaths = [
   '/proposal',
   '/offer',
   '/client',
+  '/images',
   '/api/auth',
   '/api/proposals',
   '/api/client',
@@ -28,5 +29,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|seepoint-logo.svg|placeholder.svg).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|seepoint-logo.svg|placeholder.svg).*)'],
 };
