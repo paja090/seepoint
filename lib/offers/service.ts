@@ -2,9 +2,7 @@ import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
 import { sendTransactionalEmail } from '@/lib/email';
-import { enterPublicOfferTenant } from '@/lib/public-tenant';
-import { runWithTenantContext } from '@/lib/tenant-context';
-import { requireTenantContext } from '@/lib/tenant-context';
+import { enterTenantContext, runWithTenantContext, requireTenantContext } from '@/lib/tenant-context';
 import { convertOfferToNavigationOrderInTransaction } from '@/lib/navigation/navigation-service';
 import {
   assertOfferTransition,
