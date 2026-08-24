@@ -716,16 +716,16 @@ export function SaaSProductShowcase() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-950 text-blue-300 border border-blue-800">
-                        B2B PARTNERSKÁ BURZA PLOCH
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-950 text-amber-300 border border-amber-800">
+                        PŘIPRAVUJEME · PŘIPOJTE SE MEZI PRVNÍ
                       </span>
-                      <span className="text-xs text-emerald-400 font-bold">● 42 zapojených agentur v ČR</span>
+                      <span className="text-xs text-blue-400 font-bold">● Vize propojování OOH agentur v ČR</span>
                     </div>
                     <h3 className="text-lg sm:text-xl font-black text-white mt-1">
-                      SeePoint Network: Prodávejte kampaně po celé republice bez investic do vlastních sloupů
+                      SeePoint Network: V budoucnu prodávejte kampaně po celé republice bez investic do vlastních sloupů
                     </h3>
                     <p className="text-xs text-slate-300">
-                      Zkombinujte vlastní nosiče s volnou kapacitou partnerských agentur. Systém automaticky rozdělí marže a odešle montážní podklady.
+                      Ukázka připravované B2B burzy ploch. Zapojené agentury budou moci sdílet volné kapacity, získávat provize z cizích měst a vytěžovat prázdné nosiče.
                     </p>
                   </div>
 
