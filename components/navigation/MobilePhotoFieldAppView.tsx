@@ -418,6 +418,23 @@ export function MobilePhotoFieldAppView() {
           </div>
           <ChevronRight size={18} className="text-sky-300 group-hover:translate-x-1 transition" />
         </a>
+
+        {/* Quick Banner to Field Route Optimizer */}
+        <a
+          href="/work/route"
+          className="mt-2.5 flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 p-3 text-xs font-bold text-white border border-emerald-700/50 shadow-md hover:border-emerald-400 active:scale-[0.99] transition group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-500/30">
+              <Compass size={18} />
+            </div>
+            <div>
+              <span className="block font-black text-emerald-200">🚗 Optimalizovat trasu dnešního výjezdu</span>
+              <span className="text-[11px] text-emerald-300/80 font-medium">Spočítat nejkratší trasu mezi nosiči & spustit Waze/Google Maps</span>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-emerald-300 group-hover:translate-x-1 transition" />
+        </a>
       </div>
 
       {/* Filter Radius & Search */}
