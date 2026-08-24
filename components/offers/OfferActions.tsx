@@ -23,16 +23,33 @@ type OfferActionsProps = {
   navigationProposalMode?: string;
   navigationSelectionSubmitted?: boolean;
   isNoPriceConcept?: boolean;
+  hasPublicLink?: boolean;
+  publicToken?: string | null;
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
 const primaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50';
 
-export function OfferActions({ offerId, status, converted, canConvert, offerType, navigationProposalMode, navigationSelectionSubmitted, isNoPriceConcept }: OfferActionsProps) {
+export function OfferActions({
+  offerId,
+  status,
+  converted,
+  canConvert,
+  offerType,
+  navigationProposalMode,
+  navigationSelectionSubmitted,
+  isNoPriceConcept,
+  hasPublicLink,
+  publicToken,
+}: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
-  const [publicUrl, setPublicUrl] = useState('');
+  const [customToken, setCustomToken] = useState<string | null>(null);
+
+  const activeToken = customToken || publicToken || offerId;
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const persistentPublicUrl = `${currentOrigin}/offer/${activeToken}`;
 
   async function action(name: string, body?: unknown) {
     setBusy(name);
@@ -43,9 +60,9 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
         headers: body ? { 'Content-Type': 'application/json' } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
-      const data = await response.json() as { error?: string; path?: string; offer?: { id?: string } };
+      const data = await response.json() as { error?: string; path?: string; token?: string; offer?: { id?: string } };
       if (!response.ok) throw new Error(data.error || 'Akci se nepodařilo dokončit.');
-      if (data.path) setPublicUrl(`${window.location.origin}${data.path}`);
+      if (data.token) setCustomToken(data.token);
       if (name === 'duplicate' && data.offer?.id) router.push(`/offers/${data.offer.id}`);
       else router.refresh();
       setMessage('Akce byla úspěšně dokončena.');
@@ -89,39 +106,58 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
           {isNavigationLocationSelection ? 'Upravit lokační návrh (přidat/odebrat body)' : 'Upravit nabídku (přidat/odebrat plochy)'}
         </a>
 
-        {/* Generate / Copy Client Link Direct Button */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => void action('publish')}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm py-3 transition shadow-md cursor-pointer disabled:opacity-50"
-        >
-          <Link2 aria-hidden="true" size={17} />
-          {publicUrl ? '✓ Vygenerovat nový odkaz pro klienta' : '🔗 Vygenerovat veřejný odkaz pro klienta'}
-        </button>
+        {/* 🔗 Permanent Public Client Link Card */}
+        <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-3.5 space-y-2.5 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-bold text-sky-950">
+            <span className="flex items-center gap-1.5">
+              <Link2 size={14} className="text-sky-600" />
+              Veřejný odkaz pro klienta:
+            </span>
+            <span className="text-emerald-700 font-extrabold text-[11px] bg-emerald-100/80 px-2 py-0.5 rounded-md">
+              ● Aktivní online
+            </span>
+          </div>
 
-        {publicUrl && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-blue-900">
-              <span>Veřejný odkaz pro klienta:</span>
-              <span className="text-emerald-700 font-extrabold text-[11px]">● Aktivní</span>
-            </div>
-            <a className="block break-all text-xs text-blue-700 underline font-mono" href={publicUrl} target="_blank" rel="noreferrer">
-              {publicUrl}
-            </a>
+          <a
+            className="block break-all text-xs text-sky-700 hover:text-sky-900 underline font-mono bg-white/80 p-2 rounded-lg border border-sky-100"
+            href={persistentPublicUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {persistentPublicUrl}
+          </a>
+
+          <div className="flex flex-wrap gap-2 pt-0.5">
             <button
               type="button"
               onClick={() => {
-                void navigator.clipboard.writeText(publicUrl);
+                void navigator.clipboard.writeText(persistentPublicUrl);
                 setMessage('✓ Odkaz byl zkopírován do schránky!');
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
             >
               <Copy size={13} />
-              Zkopírovat odkaz do schránky
+              Zkopírovat odkaz
+            </button>
+            <a
+              href={persistentPublicUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs transition cursor-pointer"
+            >
+              <ExternalLink size={13} />
+              Otevřít
+            </a>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => void action('publish')}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium text-[11px] transition cursor-pointer disabled:opacity-50"
+            >
+              🔄 Nový token
             </button>
           </div>
-        )}
+        </div>
 
         <a className={primaryButton} href={`/offers/${offerId}/preview`}>
           <Eye aria-hidden="true" size={17} />
