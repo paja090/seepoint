@@ -65,7 +65,8 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
 
   const errorLogs: string[] = [];
 
-    // Smart model routing: Gemini 2.5 Flash / Flash-Lite for ultra-cheap high speed vision & OCR
+  // Smart model routing: Gemini 2.5 Flash / Flash-Lite for ultra-cheap high speed vision & OCR
+  if (effectiveGeminiKey) {
     const modelsToTry = [
       'gemini-2.5-flash',
       'gemini-2.5-flash-lite',
