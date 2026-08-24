@@ -125,12 +125,55 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         if (pointIds.length > 0) {
           await tx.navigationPoint.updateMany({
             where: { id: { in: pointIds } },
-            data: { sitePhotoId: null },
+            data: { sitePhotoId: null, installedPhotoId: null },
           });
         }
 
         await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
-        return tx.offer.update({ where: { id: offerId }, data: { ...common, navigationOffer: { update: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, points: { create: input.points } } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+        return tx.offer.update({
+          where: { id: offerId },
+          data: {
+            ...common,
+            navigationOffer: {
+              upsert: {
+                create: {
+                  targetName: input.targetName,
+                  targetAddress: nullable(input.targetAddress),
+                  targetLatitude: input.targetLatitude,
+                  targetLongitude: input.targetLongitude,
+                  targetNote: nullable(input.targetNote),
+                  targetPhotoUrl: input.targetPhotoUrl,
+                  googlePlaceId: input.googlePlaceId,
+                  formattedAddress: input.formattedAddress,
+                  proposalMode: input.proposalMode,
+                  graphicArtworkUrl: input.graphicArtworkUrl,
+                  includeGraphicProof: input.includeGraphicProof,
+                  clientArtworkUrl: input.clientArtworkUrl,
+                  clientArtworkFileName: input.clientArtworkFileName,
+                  points: { create: input.points },
+                },
+                update: {
+                  targetName: input.targetName,
+                  targetAddress: nullable(input.targetAddress),
+                  targetLatitude: input.targetLatitude,
+                  targetLongitude: input.targetLongitude,
+                  targetNote: nullable(input.targetNote),
+                  targetPhotoUrl: input.targetPhotoUrl,
+                  googlePlaceId: input.googlePlaceId,
+                  formattedAddress: input.formattedAddress,
+                  proposalMode: input.proposalMode,
+                  graphicArtworkUrl: input.graphicArtworkUrl,
+                  includeGraphicProof: input.includeGraphicProof,
+                  clientArtworkUrl: input.clientArtworkUrl,
+                  clientArtworkFileName: input.clientArtworkFileName,
+                  points: { create: input.points },
+                },
+              },
+            },
+            events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } },
+          },
+          select: { id: true },
+        });
       }
     return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

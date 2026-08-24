@@ -27,7 +27,8 @@ export function offerErrorResponse(error: unknown, context = 'Offer request fail
     return NextResponse.json({ error: 'Stejný záznam už existuje.', code: 'DUPLICATE' }, { status: 409 });
   }
   logOfferFailure(context, error);
-  return NextResponse.json({ error: 'Požadavek se nepodařilo dokončit.' }, { status: 500 });
+  const message = error instanceof Error && error.message ? error.message : 'Požadavek se nepodařilo dokončit.';
+  return NextResponse.json({ error: message }, { status: 500 });
 }
 
 export async function optionalJson(request: Request) {
