@@ -24,6 +24,9 @@ import {
   Sparkles,
   AlertCircle,
   ChevronRight,
+  Camera,
+  FileCheck,
+  ExternalLink,
 } from 'lucide-react';
 
 type Partner = {
@@ -80,13 +83,33 @@ type HoldItem = {
   daysLeft: number;
 };
 
+type ProofItem = {
+  id: string;
+  direction: 'INCOMING' | 'OUTGOING';
+  partnerName: string;
+  campaignName: string;
+  carrierCode: string;
+  surfaceName: string;
+  city: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  installedAt: string;
+  installerName: string;
+  photoUrl: string;
+  status: 'APPROVED' | 'PENDING_REVIEW' | 'REJECTED';
+  gpsVerified: boolean;
+  clientReportReady: boolean;
+};
+
 export function NetworkHubView() {
-  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PRIVACY'>('INVENTORY');
+  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PROOFS' | 'PRIVACY'>('INVENTORY');
 
   // State
   const [partners, setPartners] = useState<Partner[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [holds, setHolds] = useState<HoldItem[]>([]);
+  const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchCity, setSearchCity] = useState('ALL');
   const [searchMediaType, setSearchMediaType] = useState('ALL');
@@ -102,11 +125,12 @@ export function NetworkHubView() {
     const fetchNetworkData = async () => {
       setLoading(true);
       try {
-        const [partnersRes, inventoryRes, holdsRes, notifRes] = await Promise.all([
+        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes] = await Promise.all([
           fetch('/api/network/partners'),
           fetch('/api/network/inventory'),
           fetch('/api/network/holds'),
           fetch('/api/network/notifications'),
+          fetch('/api/network/proofs'),
         ]);
 
         if (isMounted) {
@@ -126,6 +150,10 @@ export function NetworkHubView() {
             const nData = await notifRes.json();
             setNotifications(nData.notifications || []);
             setUnreadCount(nData.unreadCount || 0);
+          }
+          if (proofsRes.ok) {
+            const prData = await proofsRes.json();
+            setProofs(prData.proofs || []);
           }
         }
       } catch (err) {
@@ -215,6 +243,29 @@ export function NetworkHubView() {
       });
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleProofAction = async (proofId: string, action: 'APPROVE' | 'REJECT') => {
+    try {
+      const res = await fetch('/api/network/proofs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proofId, action }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionSuccess(data.message);
+        setProofs((prev) =>
+          prev.map((p) =>
+            p.id === proofId
+              ? { ...p, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED', clientReportReady: action === 'APPROVE' }
+              : p
+          )
+        );
+      }
     } catch (err) {
       console.error(err);
     }
@@ -381,6 +432,18 @@ export function NetworkHubView() {
         >
           <Clock size={15} />
           <span>⏳ Poptávky & Holdy ({holds.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('PROOFS')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl transition cursor-pointer ${
+            activeTab === 'PROOFS'
+              ? 'bg-slate-900 text-white font-black shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Camera size={15} />
+          <span>📸 Fotodokumentace ({proofs.length})</span>
         </button>
 
         <button
@@ -662,7 +725,137 @@ export function NetworkHubView() {
         </div>
       )}
 
-      {/* Tab 4: Bezpečnost a pravidla sítě (Privacy) */}
+      {/* Tab 4: Sdílená fotodokumentace (Proofs) */}
+      {activeTab === 'PROOFS' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+            <div>
+              <h2 className="text-base font-black text-slate-900">Sdílená fotodokumentace montáže z terénu</h2>
+              <p className="text-xs text-slate-500">
+                Příchozí a odchozí fotoreporty realizací mezi agenturami s GPS ověřením a časovým razítkem.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActionSuccess('White-label fotoreport pro klienta byl úspěšně vygenerován!')}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition shadow-xs shrink-0 cursor-pointer"
+            >
+              <FileCheck size={15} />
+              <span>📥 Vygenerovat klientský fotoreport (PDF)</span>
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {proofs.map((proof) => (
+              <div
+                key={proof.id}
+                className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs hover:border-indigo-400 hover:shadow-lg transition group"
+              >
+                <div>
+                  <div className="relative h-48 w-full bg-slate-900">
+                    <Image
+                      src={proof.photoUrl}
+                      alt={proof.carrierCode}
+                      fill
+                      unoptimized
+                      className="object-cover group-hover:scale-105 transition duration-300"
+                    />
+
+                    <div className="absolute top-3 left-3">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border backdrop-blur ${
+                        proof.direction === 'INCOMING'
+                          ? 'bg-indigo-950/90 text-indigo-300 border-indigo-600'
+                          : 'bg-emerald-950/90 text-emerald-300 border-emerald-600'
+                      }`}>
+                        {proof.direction === 'INCOMING' ? '📥 Subdodávka od partnera' : '📤 Naše realizace pro partnera'}
+                      </span>
+                    </div>
+
+                    <div className="absolute top-3 right-3">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border backdrop-blur ${
+                        proof.status === 'APPROVED'
+                          ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600'
+                          : proof.status === 'REJECTED'
+                          ? 'bg-rose-950/90 text-rose-300 border-rose-600'
+                          : 'bg-amber-950/90 text-amber-300 border-amber-600'
+                      }`}>
+                        {proof.status === 'APPROVED' ? '✓ Schváleno' : proof.status === 'REJECTED' ? '✕ K přefocení' : '⏳ Ke kontrole'}
+                      </span>
+                    </div>
+
+                    {proof.gpsVerified && (
+                      <div className="absolute bottom-3 left-3">
+                        <span className="rounded-lg bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md flex items-center gap-1">
+                          <MapPin size={10} /> GPS Ověřeno ({proof.latitude.toFixed(3)}, {proof.longitude.toFixed(3)})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-mono font-black text-indigo-600">{proof.carrierCode}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">
+                        {new Date(proof.installedAt).toLocaleString('cs-CZ', { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                    </div>
+
+                    <h3 className="font-black text-sm text-slate-900">{proof.surfaceName}</h3>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <MapPin size={13} className="text-amber-500 shrink-0" />
+                      <span>{proof.city} · {proof.location}</span>
+                    </p>
+
+                    <div className="mt-2 rounded-2xl bg-slate-50 p-2.5 border border-slate-100 text-xs space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-slate-400">Partner:</span>
+                        <span className="font-bold text-slate-800">{proof.partnerName}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-slate-400">Montážník:</span>
+                        <span className="font-semibold text-slate-700">{proof.installerName}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 pt-0 flex gap-2">
+                  {proof.status === 'PENDING_REVIEW' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleProofAction(proof.id, 'REJECT')}
+                        className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer"
+                      >
+                        Požádat o přefocení
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleProofAction(proof.id, 'APPROVE')}
+                        className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer"
+                      >
+                        ✓ Schválit foto
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setActionSuccess('Fotodokumentace je připravena v klientském fotoreportu.')}
+                      className="w-full py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs hover:bg-slate-200 transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ExternalLink size={13} />
+                      <span>Zobrazit v reportu kampaně</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Bezpečnost a pravidla sítě (Privacy) */}
       {activeTab === 'PRIVACY' && (
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
