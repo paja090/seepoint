@@ -16,6 +16,8 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/api/auth/login/route.ts', 2],
   ['app/api/auth/reset-admin/route.ts', 4],
   ['app/api/auth/set-password/route.ts', 5],
+  ['app/api/network/inventory/route.ts', 2],
+  ['app/api/network/partners/route.ts', 2],
   ['app/api/organization/invitations/[id]/route.ts', 6],
   ['app/api/organization/invitations/route.ts', 6],
   ['app/api/onboarding/route.ts', 7],
