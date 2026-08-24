@@ -705,7 +705,6 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
 }
 
 export async function publishOffer(user: CurrentUser, id: string) {
-  const generated = createPublicOfferToken();
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
@@ -714,23 +713,22 @@ export async function publishOffer(user: CurrentUser, id: string) {
       assertOfferReady(existing, conflicts);
     }
     const newStatus = existing.status === 'DRAFT' ? 'SENT' : existing.status;
+    const isFirstPublish = !existing.publishedAt;
     return tx.offer.update({
       where: { id },
       data: {
-        publicTokenHash: generated.hash,
-        publishedAt: new Date(),
+        publishedAt: existing.publishedAt || new Date(),
         status: newStatus,
         updatedByUserId: user.id,
-        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
+        ...(isFirstPublish ? { events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } } : {}),
       },
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: generated.token, path: `/offer/${generated.token}` };
+  return { offer: serializeOffer(row), token: id, path: `/offer/${id}` };
 }
 
 export async function prepareOfferDelivery(user: CurrentUser, id: string, emailDraft?: { clientMessage?: string }) {
-  const generated = createPublicOfferToken();
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
@@ -739,19 +737,19 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
     }
     const conflicts = existing.offerType === 'STANDARD_MEDIA' ? await findConflicts(tx, existing.items) : [];
     assertOfferReady(existing, conflicts);
+    const isFirstPublish = !existing.publishedAt;
     return tx.offer.update({
       where: { id },
       data: {
-        publicTokenHash: generated.hash,
-        publishedAt: new Date(),
+        publishedAt: existing.publishedAt || new Date(),
         clientMessage: emailDraft?.clientMessage ?? existing.clientMessage,
         updatedByUserId: user.id,
-        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
+        ...(isFirstPublish ? { events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } } : {}),
       },
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: generated.token, path: `/offer/${generated.token}` };
+  return { offer: serializeOffer(row), token: id, path: `/offer/${id}` };
 }
 
 export async function getPublicRow(token: string) {

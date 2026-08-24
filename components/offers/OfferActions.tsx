@@ -137,7 +137,7 @@ export function OfferActions({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
             >
               <Copy size={13} />
-              Zkopírovat odkaz
+              Zkopírovat odkaz pro klienta
             </button>
             <a
               href={persistentPublicUrl}
@@ -146,16 +146,8 @@ export function OfferActions({
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs transition cursor-pointer"
             >
               <ExternalLink size={13} />
-              Otevřít
+              Otevřít odkaz
             </a>
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => void action('publish')}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium text-[11px] transition cursor-pointer disabled:opacity-50"
-            >
-              🔄 Nový token
-            </button>
           </div>
         </div>
 
