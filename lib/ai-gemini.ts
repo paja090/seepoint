@@ -65,61 +65,12 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
 
   const errorLogs: string[] = [];
 
-  // Try OpenAI GPT-4o if OpenAI key is detected
-  if (effectiveOpenAiKey) {
-    try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${effectiveOpenAiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          response_format: { type: 'json_object' },
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                {
-                  type: 'image_url',
-                  image_url: { url: `data:${mimeType};base64,${base64Data}` },
-                },
-              ],
-            },
-          ],
-          max_tokens: 1000,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) {
-          const cleanText = content.replace(/```json/g, '').replace(/```/g, '').trim();
-          return JSON.parse(cleanText);
-        }
-      } else {
-        const errText = await res.text();
-        console.warn('OpenAI Vision returned HTTP', res.status, errText);
-        errorLogs.push(`OpenAI GPT-4o HTTP ${res.status}: ${errText.slice(0, 100)}`);
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Chyba OpenAI';
-      console.warn('OpenAI GPT-4o vision call failed:', msg);
-      errorLogs.push(`OpenAI: ${msg}`);
-    }
-  }
-
-  // Try Google Gemini Vision models
+  // Try Google Gemini Vision models FIRST (ultra-cheap Gemini Flash rates)
   if (effectiveGeminiKey) {
     const modelsToTry = [
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
       'gemini-2.5-flash',
-      'gemini-2.0-flash',
       'gemini-1.5-flash',
+      'gemini-2.0-flash',
       'gemini-flash-latest',
     ];
 
