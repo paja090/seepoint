@@ -1,81 +1,190 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Layers, Calendar, FileText, Sparkles, Filter, CheckCircle2, Eye, ExternalLink, ChevronRight, Phone, Mail } from 'lucide-react';
+import {
+  MapPin,
+  Layers,
+  Calendar,
+  FileText,
+  Sparkles,
+  Navigation,
+  Receipt,
+  CheckCircle2,
+  ExternalLink,
+  ChevronRight,
+  ArrowRight,
+  TrendingUp,
+  Cpu,
+  Clock,
+  Car,
+  Wrench,
+  Fuel,
+  Check,
+  RefreshCw,
+} from 'lucide-react';
 import { ShowcaseInteractiveMap } from './ShowcaseInteractiveMap';
 
 export function SaaSProductShowcase() {
-  const [activeTab, setActiveTab] = useState<'map' | 'inventory' | 'occupancy' | 'offers' | 'ai'>('map');
+  const [activeTab, setActiveTab] = useState<
+    'map' | 'inventory' | 'occupancy' | 'offers' | 'ai' | 'route' | 'warehouse'
+  >('map');
+
+  // Interactive Route Simulator State
+  const [routeOptimized, setRouteOptimized] = useState(false);
+  const [optimizing, setOptimizing] = useState(false);
+
+  // Interactive AI Offer Generator Sandbox State
+  const [selectedAiPrompt, setSelectedAiPrompt] = useState('Autoservis Ostrava');
+  const [isGeneratingAiOffer, setIsGeneratingAiOffer] = useState(false);
+  const [generatedAiResult, setGeneratedAiResult] = useState<{
+    client: string;
+    budget: string;
+    carriers: string[];
+    summary: string;
+  } | null>({
+    client: 'Autocentrum Poruba',
+    budget: '45 000 Kč / měsíc',
+    carriers: ['Promo Tower Místecká (4s)', 'City Poster 28. října', 'Navigační tabule Rudná'],
+    summary: 'Optimální zásah řidičů z D1 a návštěvníků nákupní zóny Poruba s odhadovaným zásahem 85 000 kontaktů/týden.',
+  });
+
+  // Interactive Warehouse Receipt Scanner State
+  const [selectedReceipt, setSelectedReceipt] = useState<'fuel' | 'tools'>('fuel');
+  const [scanningReceipt, setScanningReceipt] = useState(false);
+
+  const handleSimulateRoute = () => {
+    setOptimizing(true);
+    setTimeout(() => {
+      setRouteOptimized(true);
+      setOptimizing(false);
+    }, 600);
+  };
+
+  const handleSimulateAiOffer = (preset: string) => {
+    setSelectedAiPrompt(preset);
+    setIsGeneratingAiOffer(true);
+    setTimeout(() => {
+      if (preset === 'Autoservis Ostrava') {
+        setGeneratedAiResult({
+          client: 'Autocentrum Poruba',
+          budget: '45 000 Kč / měsíc',
+          carriers: ['Promo Tower Místecká (4s)', 'City Poster 28. října', 'Navigační tabule Rudná'],
+          summary: 'Optimální zásah řidičů z D1 a návštěvníků nákupní zóny Poruba s odhadovaným zásahem 85 000 kontaktů/týden.',
+        });
+      } else if (preset === 'Restaurace & Fast Food') {
+        setGeneratedAiResult({
+          client: 'Burger & Grill D1',
+          budget: '28 000 Kč / měsíc',
+          carriers: ['3x Sloup VO Sjezd D1', 'City Poster Centrum', 'Směrová tabule Hlučínská'],
+          summary: 'Navigační řetězec navádějící tranzitní dopravu přímo ze sjezdu dálnice k restauraci.',
+        });
+      } else {
+        setGeneratedAiResult({
+          client: 'Havířovský Letní Festival',
+          budget: '75 000 Kč (Kampaň 14 dní)',
+          carriers: ['Promo Tower Havířov Centrum', '6x City Poster zastávky MHD', 'Billboard Hlavní třída'],
+          summary: 'Masivní zásah pěších i řidičů před zahájením městského festivalu s vysokou frekvencí zhlédnutí.',
+        });
+      }
+      setIsGeneratingAiOffer(false);
+    }, 500);
+  };
 
   return (
     <section id="produkt" className="py-12 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
         {/* Tab Selector Bar */}
         <div className="flex items-center justify-center overflow-x-auto py-2 scrollbar-none">
-          <div className="flex items-center gap-2 bg-slate-900/90 p-2 rounded-2xl border border-slate-800 backdrop-blur-md shadow-xl">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-md shadow-xl">
             <button
               type="button"
               onClick={() => setActiveTab('map')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
                 activeTab === 'map'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <MapPin className="w-4 h-4" />
-              <span>🗺️ Mapa nosičů</span>
+              <span>🗺️ Živá Mapa</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('inventory')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
                 activeTab === 'inventory'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <Layers className="w-4 h-4" />
-              <span>📦 Evidence ploch</span>
+              <span>📦 Evidence</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('occupancy')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
                 activeTab === 'occupancy'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <Calendar className="w-4 h-4" />
-              <span>📅 Obsazenost & Kalendář</span>
+              <span>📅 Obsazenost</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('offers')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
                 activeTab === 'offers'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>📜 Nabídky & Koncepty</span>
+              <span>📜 Nabídky</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('ai')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
                 activeTab === 'ai'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-              <span>🤖 SeePoint AI Radar</span>
+              <span>🤖 AI Nabídky & Radar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('route')}
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                activeTab === 'route'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Navigation className="w-4 h-4 text-emerald-300" />
+              <span>🚗 Optimalizátor Tras</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('warehouse')}
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                activeTab === 'warehouse'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Receipt className="w-4 h-4 text-amber-300" />
+              <span>🧾 AI Účtenky & Sklad</span>
             </button>
           </div>
         </div>
@@ -96,40 +205,22 @@ export function SaaSProductShowcase() {
             <div className="hidden sm:flex items-center gap-3">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Živý systém v provozu
+                Interaktivní simulace SeePoint OS
               </span>
             </div>
           </div>
 
           {/* SCREEN CONTENT BY TAB */}
           <div className="p-4 sm:p-6 min-h-[460px] bg-slate-900/40 rounded-b-2xl relative space-y-6">
-            {/* Top Metric Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 shadow-lg backdrop-blur-md">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Síť nosičů</span>
-                <strong className="text-base sm:text-lg font-black text-white">842 nosičů</strong>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 shadow-lg backdrop-blur-md">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Obsazenost</span>
-                <strong className="text-base sm:text-lg font-black text-emerald-400">68 % sítě</strong>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/90 p-3.5 shadow-lg backdrop-blur-md">
-                <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">Aktivní nabídky</span>
-                <strong className="text-base sm:text-lg font-black text-indigo-400">12 nabídek</strong>
-              </div>
-              <div className="rounded-2xl border border-purple-800/80 bg-purple-950/90 p-3.5 shadow-lg backdrop-blur-md">
-                <span className="text-[10px] font-bold text-purple-300 block uppercase tracking-wider">AI Příležitosti</span>
-                <strong className="text-base sm:text-lg font-black text-purple-200">5 v MS kraji</strong>
-              </div>
-            </div>
-
             {/* TAB 1: MAP */}
             {activeTab === 'map' && (
               <div className="space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                   <div>
-                    <h3 className="text-lg font-black text-white">Živá interaktivní mapa sítě SeePoint OS</h3>
-                    <p className="text-xs text-slate-400 font-medium">Klikněte na nosiče na mapě pro zobrazení detailu, stavu obsazenosti a ceny.</p>
+                    <h3 className="text-lg font-black text-white">Živá interaktivní mapa nosičů</h3>
+                    <p className="text-xs text-slate-400 font-medium">
+                      Vyzkoušejte si kliknout na nosiče na mapě, prohlédnout detaily, obsazenost a chráněné památkové zóny.
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -142,7 +233,6 @@ export function SaaSProductShowcase() {
                   </div>
                 </div>
 
-                {/* Live Interactive Map Engine Component */}
                 <ShowcaseInteractiveMap />
               </div>
             )}
@@ -151,8 +241,13 @@ export function SaaSProductShowcase() {
             {activeTab === 'inventory' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="text-lg font-black text-white">Katalog reklamních nosičů a ploch</h3>
-                  <span className="text-xs font-bold text-slate-400">Přehled 842 položek</span>
+                  <div>
+                    <h3 className="text-lg font-black text-white">Katalog reklamních nosičů a ploch</h3>
+                    <p className="text-xs text-slate-400">Přehled 842 položek s GPS a fotografiemi</p>
+                  </div>
+                  <span className="px-3 py-1 rounded-xl text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800">
+                    Fulltext filtr & Export do Excelu
+                  </span>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -168,28 +263,40 @@ export function SaaSProductShowcase() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
-                      <tr>
+                      <tr className="hover:bg-slate-900/60 transition">
                         <td className="p-3 font-mono text-purple-300 font-bold">CP-OSTR-012</td>
                         <td className="p-3 font-bold text-white">City Poster 28. října / Pošta</td>
                         <td className="p-3">City Poster (CLP)</td>
                         <td className="p-3">Ostrava centrum</td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Aktivní · Výborný</span></td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            Aktivní · Výborný
+                          </span>
+                        </td>
                         <td className="p-3 font-bold text-white">6 800 Kč</td>
                       </tr>
-                      <tr>
+                      <tr className="hover:bg-slate-900/60 transition">
                         <td className="p-3 font-mono text-purple-300 font-bold">TOW-MIST-01</td>
                         <td className="p-3 font-bold text-white">Promo Tower Místecká (Set 4 strany A,B,C,D)</td>
                         <td className="p-3">Promo Tower</td>
-                        <td className="p-3">Ostrava jich</td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Aktivní · Kompletní</span></td>
+                        <td className="p-3">Ostrava jih</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            Aktivní · Kompletní
+                          </span>
+                        </td>
                         <td className="p-3 font-bold text-white">24 900 Kč</td>
                       </tr>
-                      <tr>
+                      <tr className="hover:bg-slate-900/60 transition">
                         <td className="p-3 font-mono text-purple-300 font-bold">NAV-OPAV-14</td>
                         <td className="p-3 font-bold text-white">Městská navigace VO (Sloup #142)</td>
                         <td className="p-3">Navigační tabule</td>
                         <td className="p-3">Opava</td>
-                        <td className="p-3"><span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Povoleno městem</span></td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            Povoleno městem
+                          </span>
+                        </td>
                         <td className="p-3 font-bold text-white">1 950 Kč</td>
                       </tr>
                     </tbody>
@@ -245,9 +352,12 @@ export function SaaSProductShowcase() {
             {activeTab === 'offers' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="text-lg font-black text-white">Generování a náhledy klientských nabídek</h3>
+                  <div>
+                    <h3 className="text-lg font-black text-white">Interaktivní klientské nabídky</h3>
+                    <p className="text-xs text-slate-400">Digitální nabídka pro klienta bez nutnosti tisknout PDF</p>
+                  </div>
                   <span className="px-3 py-1 rounded-lg text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800">
-                    🔒 Podpora nezávazných konceptů bez cen
+                    🔒 Neveřejný token pro klienta
                   </span>
                 </div>
 
@@ -255,86 +365,318 @@ export function SaaSProductShowcase() {
                   <div className="flex items-start justify-between">
                     <div>
                       <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
-                        Případová nabídka
+                        Vzorová nabídka
                       </span>
-                      <h4 className="text-base font-bold text-white mt-1">Koncept OOH kampaně – Primark (Ostrava)</h4>
-                      <p className="text-xs text-slate-400">Připraveno pro klienta · 12 vybraných blízkých nosičů</p>
+                      <h4 className="text-base font-bold text-white mt-1">Koncept OOH kampaně – Primark Ostrava</h4>
+                      <p className="text-xs text-slate-400">12 vybraných prémiových nosičů v okolí prodejny</p>
                     </div>
 
                     <span className="px-3 py-1 rounded-xl text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
-                      Připraveno k odeslání
+                      Klient si může vybrat nosiče online
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block">Proximity bod</span>
-                      <strong className="text-white">Nová prodejna Karolina</strong>
+                      <span className="text-slate-400 block">Lokalita kampaně</span>
+                      <strong className="text-white">Centrum + OC Nová Karolina</strong>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block">Doporučená média</span>
-                      <strong className="text-white">Tower (4s) + CLP + Lavičky</strong>
+                      <span className="text-slate-400 block">Skladba nosičů</span>
+                      <strong className="text-white">Tower (4s) + 6x CLP + 2x Lavička</strong>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block">Veřejný klientský odkaz</span>
-                      <strong className="text-purple-300">os.seepoint.cz/offer/token</strong>
+                      <span className="text-slate-400 block">Interaktivní schválení</span>
+                      <strong className="text-emerald-400">1-klik schválení klientem</strong>
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 5: AI */}
+            {/* TAB 5: AI RADAR & OFFER GENERATOR SANDBOX */}
             {activeTab === 'ai' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    <h3 className="text-lg font-black text-white">SeePoint AI Sales Radar</h3>
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-purple-400" />
+                      <span>Vyzkoušejte si SeePoint AI naživo</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">Klikněte na vzorové zadání a podívejte se na výsledek AI</p>
                   </div>
                   <span className="text-xs font-bold text-purple-300 bg-purple-950 px-3 py-1 rounded-full border border-purple-800">
-                    Moravskoslezský kraj (Živé sledování)
+                    Běží na Gemini Flash Engine
                   </span>
                 </div>
 
+                {/* Preset Prompt Buttons */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSimulateAiOffer('Autoservis Ostrava')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      selectedAiPrompt === 'Autoservis Ostrava'
+                        ? 'bg-purple-600 text-white border-purple-400 shadow-lg'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
+                    }`}
+                  >
+                    🚗 Kampaň pro Autoservis (Ostrava)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSimulateAiOffer('Restaurace & Fast Food')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      selectedAiPrompt === 'Restaurace & Fast Food'
+                        ? 'bg-purple-600 text-white border-purple-400 shadow-lg'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
+                    }`}
+                  >
+                    🍔 Navigační cedule pro Restauraci (D1)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSimulateAiOffer('Městský Festival')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                      selectedAiPrompt === 'Městský Festival'
+                        ? 'bg-purple-600 text-white border-purple-400 shadow-lg'
+                        : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
+                    }`}
+                  >
+                    🎪 Letní Festival (Havířov)
+                  </button>
+                </div>
+
+                {/* Generated AI Result Card */}
+                {isGeneratingAiOffer ? (
+                  <div className="p-8 rounded-2xl bg-slate-950 border border-purple-800/80 flex flex-col items-center justify-center space-y-3">
+                    <RefreshCw className="w-8 h-8 text-purple-400 animate-spin" />
+                    <span className="text-sm font-bold text-purple-200">SeePoint AI analyzuje nosiče a počítá kampaň...</span>
+                  </div>
+                ) : (
+                  generatedAiResult && (
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-950 to-indigo-950/70 border border-purple-700/80 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between border-b border-purple-800/60 pb-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-purple-300 tracking-wider">
+                            AI Vygenerovaná kampaň
+                          </span>
+                          <h4 className="text-base font-black text-white">{generatedAiResult.client}</h4>
+                        </div>
+                        <span className="px-3 py-1 rounded-xl text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          {generatedAiResult.budget}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed font-medium">{generatedAiResult.summary}</p>
+
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[11px] font-bold text-slate-400 block uppercase">
+                          Doporučené nosiče ze sítě:
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {generatedAiResult.carriers.map((c, i) => (
+                            <span
+                              key={i}
+                              className="px-3 py-1 rounded-lg bg-slate-900 text-xs font-bold text-purple-200 border border-purple-800/80"
+                            >
+                              📍 {c}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* TAB 6: FIELD ROUTE OPTIMIZER SIMULATOR */}
+            {activeTab === 'route' && (
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                      <Navigation className="w-5 h-5 text-emerald-400" />
+                      <span>AI Optimalizátor Tras Montáží v terénu</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Montážník má na den 5 výlepů. Podívejte se, jak systém ušetří kilometry a čas.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSimulateRoute}
+                    disabled={optimizing}
+                    className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+                  >
+                    {optimizing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Přepočítávám trasu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>⚡ Spustit optimalizaci trasy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Route Result Comparison Box */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="rounded-2xl border border-purple-800/80 bg-slate-950 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
-                        Nová obchodní příležitost
-                      </span>
-                      <span className="text-xs font-bold text-emerald-400">Potenciál: VYSOKÝ</span>
-                    </div>
-
-                    <h4 className="font-bold text-sm text-white">Otevření nové pobočky obchodu v Ostrava-Poruba</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      AI detekovala oficiální zprávu o dokončení stavby nové obchodní jednotky na Hlavní třídě.
-                    </p>
-
-                    <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800">
-                      <span className="text-slate-400">Doporučené nosiče: 6x CLP + 2x Lavička</span>
-                      <span className="text-purple-300 font-bold">Vygenerovat nabídku →</span>
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Původní neoptimalizovaná trasa
+                    </span>
+                    <div className="text-2xl font-black text-rose-400">42.8 km · 110 min</div>
+                    <p className="text-xs text-slate-400">Náhodné pořadí zakázek dle data zadání (křížení po městě).</p>
+                    <div className="text-xs text-slate-500 font-mono space-y-1 pt-2 border-t border-slate-900">
+                      <div>1. Poruba → 2. Havířov → 3. Centrum → 4. Vítkovice</div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
+                  <div
+                    className={`p-4 rounded-2xl border transition-all duration-300 space-y-3 ${
+                      routeOptimized
+                        ? 'bg-emerald-950/60 border-emerald-600 shadow-xl'
+                        : 'bg-slate-950 border-slate-800 opacity-60'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
-                        Kulturní událost
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                        Optimalizováno SeePoint TSP Engine
                       </span>
-                      <span className="text-xs font-bold text-sky-400">Potenciál: STŘEDNÍ</span>
+                      {routeOptimized && (
+                        <span className="px-2 py-0.5 rounded bg-emerald-900 text-emerald-200 text-[10px] font-black">
+                          Úspora -57 % km!
+                        </span>
+                      )}
                     </div>
-
-                    <h4 className="font-bold text-sm text-white">Městský festival Havířov 2026</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Plánovaný 3denní festival s očekávanou návštěvností 15 000 lidí.
+                    <div className="text-2xl font-black text-emerald-400">18.4 km · 45 min</div>
+                    <p className="text-xs text-slate-300">
+                      Seřazeno podle nejkratší trasy s 1-klik otevřením do Google Maps / Waze.
                     </p>
-
-                    <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800">
-                      <span className="text-slate-400">Doporučené nosiče: Promo Tower + Billboardy</span>
-                      <span className="text-indigo-300 font-bold">Vygenerovat nabídku →</span>
+                    <div className="text-xs text-emerald-300 font-mono space-y-1 pt-2 border-t border-emerald-900/60">
+                      <div>1. Poruba → 2. Vítkovice → 3. Centrum → 4. Havířov</div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 7: WAREHOUSE & OCR RECEIPT SCANNER */}
+            {activeTab === 'warehouse' && (
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                      <Receipt className="w-5 h-5 text-amber-400" />
+                      <span>AI Sklad, Nákupy & OCR Účtenky z mobilu</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Montážník vyfotí účtenku na benzínce nebo materiál v dílně – AI okamžitě vytěží data.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReceipt('fuel')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        selectedReceipt === 'fuel'
+                          ? 'bg-amber-600 text-white border-amber-400'
+                          : 'bg-slate-900 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      ⛽ Účtenka za palivo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReceipt('tools')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        selectedReceipt === 'tools'
+                          ? 'bg-amber-600 text-white border-amber-400'
+                          : 'bg-slate-900 text-slate-400 border-slate-800'
+                      }`}
+                    >
+                      📦 Nářadí & Regál dílny
+                    </button>
+                  </div>
+                </div>
+
+                {/* Receipt Result Card */}
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-950/50 via-slate-950 to-slate-950 border border-amber-700/60 space-y-4 shadow-xl">
+                  {selectedReceipt === 'fuel' ? (
+                    <>
+                      <div className="flex items-center justify-between border-b border-amber-800/60 pb-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-amber-300">
+                            Vytěženo z fotografie účtenky
+                          </span>
+                          <h4 className="text-base font-black text-white">ORLEN Benzina – Ostrava Rudná</h4>
+                        </div>
+                        <span className="px-3 py-1 rounded-xl text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          1 450,50 Kč
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-400 block">Palivo</span>
+                          <strong className="text-white">Diesel (Efecta)</strong>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-400 block">Objem</span>
+                          <strong className="text-white">38,50 litrů</strong>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-400 block">Tachometr</span>
+                          <strong className="text-white">184 250 km</strong>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                          <span className="text-slate-400 block">Stav</span>
+                          <strong className="text-emerald-400">Připsáno k vozidlu 1T4-8921</strong>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between border-b border-amber-800/60 pb-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-amber-300">
+                            AI Detekce materiálu v dílně
+                          </span>
+                          <h4 className="text-base font-black text-white">Rozpoznané položky z fotky regálu</h4>
+                        </div>
+                        <span className="px-3 py-1 rounded-xl text-xs font-black bg-amber-950 text-amber-300 border border-amber-800">
+                          4 položky detekovány
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                          <div>
+                            <strong className="text-white block">Stahovací pásky černé 500mm</strong>
+                            <span className="text-slate-400">Regál B2 - Spojovací materiál</span>
+                          </div>
+                          <span className="font-bold text-amber-400">5 balení (500 ks)</span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                          <div>
+                            <strong className="text-white block">Aku vrtačka DeWalt 18V</strong>
+                            <span className="text-slate-400">Regál A1 - Vratné nářadí</span>
+                          </div>
+                          <span className="font-bold text-emerald-400">2 sady</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
