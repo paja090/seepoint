@@ -27,6 +27,7 @@ const navGroups: NavGroup[] = [
       ['/clients/dashboard', '🎯 CRM Dashboard', 'barChart3', 'clients'],
       ['/clients', '👥 Klienti & Adresář', 'users', 'clients'],
       ['/offers', '📄 Nabídky', 'badgeDollarSign', 'offers'],
+      ['/network', '🌐 B2B Media Network', 'globe', 'offers'],
       ['/occupancy', '📅 Obsazenost ploch', 'calendarRange', 'occupancy'],
     ],
   },
