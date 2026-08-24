@@ -40,6 +40,7 @@ export function OfferSurfaceBrowser({
   onToggle: (surface: OfferSurfaceOption) => void;
   onBulkToggle: (surfaces: OfferSurfaceOption[], select: boolean) => void;
 }) {
+  const [source, setSource] = useState<'all' | 'own' | 'partner'>('all');
   const [mediaType, setMediaType] = useState('');
   const [status, setStatus] = useState('');
   const [availability, setAvailability] = useState<SurfaceAvailabilityFilter>('all');
@@ -51,7 +52,7 @@ export function OfferSurfaceBrowser({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const conflictMap = useMemo(() => new Map(conflicts.map((conflict) => [conflict.surfaceId, conflict.severity])), [conflicts]);
 
-  const baseFiltered = useMemo(() => filterOfferSurfaces(surfaces, { query, mediaType, status, availability, gpsOnly }, conflictMap), [availability, conflictMap, gpsOnly, mediaType, query, status, surfaces]);
+  const baseFiltered = useMemo(() => filterOfferSurfaces(surfaces, { query, mediaType, status, availability, gpsOnly, source }, conflictMap), [availability, conflictMap, gpsOnly, mediaType, query, source, status, surfaces]);
   const filtered = useMemo(() => !viewportOnly || !mapBounds ? baseFiltered : baseFiltered.filter((surface) => isOfferSurfaceInBounds(surface, mapBounds)), [baseFiltered, mapBounds, viewportOnly]);
   const { currentPage, pageCount, rows: visible } = paginateOfferSurfaces(filtered, page, PAGE_SIZE);
   const active = surfaces.find((surface) => surface.id === activeId) ?? null;
@@ -89,6 +90,45 @@ export function OfferSurfaceBrowser({
 
   return (
     <div className="space-y-4">
+      {/* Source Selector Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <button
+          type="button"
+          onClick={() => { setSource('all'); resetPage(); }}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+            source === 'all'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          🏢 Všechny plochy ({surfaces.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setSource('own'); resetPage(); }}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+            source === 'own'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <span>🟢 Moje interní plochy</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setSource('partner'); resetPage(); }}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+            source === 'partner'
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100'
+          }`}
+        >
+          <span>🤝 Partnerská B2B síť ({surfaces.filter((s) => s.isPartner).length})</span>
+        </button>
+      </div>
+
       <div className="grid gap-2 lg:grid-cols-[minmax(220px,1fr)_170px_150px_170px_auto]">
         <label className="relative">
           <span className="sr-only">Hledat reklamní plochu</span>
@@ -168,6 +208,13 @@ export function OfferSurfaceBrowser({
                       {conflict && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${conflict === 'block' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{conflict === 'block' ? 'Kolize' : 'Jednání'}</span>}
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">{surface.carrier.city}, {surface.carrier.locality || surface.carrier.street || 'lokalita neuvedena'}</span>
+
+                    {surface.isPartner && (
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-black text-indigo-700 border border-indigo-200">
+                        🤝 B2B Partner · Nákup: {money(surface.wholesaleB2BPrice || surface.price)} (Marže {surface.partnerDiscountPercent || 20} %)
+                      </span>
+                    )}
+
                     <span className="mt-2 flex justify-between text-xs"><span>{mediaLabel(surface.mediaType)}</span><b>{money(surface.price)}</b></span>
                     <span className={`mt-1 block text-[10px] font-medium ${surface.priceSource === 'MISSING' ? 'text-amber-600' : 'text-slate-400'}`}>{surface.priceSource === 'CATALOG' ? 'Automatická cena z ceníku' : surface.priceSource === 'SURFACE' ? 'Individuální cena plochy' : 'Cena zatím není nastavena'}</span>
                   </span>

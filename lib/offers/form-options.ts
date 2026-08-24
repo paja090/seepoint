@@ -52,6 +52,11 @@ export async function getOfferFormOptions() {
       ?? '0.00';
     const priceSource = surface.price ? 'SURFACE' : catalogItem ? 'CATALOG' : 'MISSING';
 
+    const numPrice = Number(resolvedPrice) || 8500;
+    const isPartner = surface.visibility === 'PARTNER' || surface.carrier.visibility === 'PARTNER' || surface.carrier.visibility === 'MARKETPLACE';
+    const partnerDiscountPercent = isPartner ? 20 : 0;
+    const wholesaleB2BPrice = isPartner ? (numPrice * 0.8).toFixed(2) : undefined;
+
     return {
       id: surface.id,
       name: surface.name,
@@ -59,6 +64,9 @@ export async function getOfferFormOptions() {
       status: surface.status,
       price: resolvedPrice,
       priceSource,
+      isPartner,
+      partnerDiscountPercent,
+      wholesaleB2BPrice,
       currentClient: surface.currentClient?.name,
       photos: [...surface.photos, ...surface.carrier.photos]
         .filter((photo, index, all) => all.findIndex((item) => item.id === photo.id) === index)
@@ -104,5 +112,17 @@ export async function getOfferFormOptions() {
     })),
   }));
 
-  return { clients: clientOptions, surfaces: surfaceOptions, priceRules: pricing, mediaPackages, priceListItems: priceListItems.map(item => ({ id: item.id, name: item.name, mediaType: item.mediaType, carrierType: item.carrierType, rentalPrice: item.rentalPrice.toFixed(2) })) };
+  return {
+    clients: clientOptions,
+    surfaces: surfaceOptions,
+    priceRules: pricing,
+    mediaPackages,
+    priceListItems: priceListItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      mediaType: item.mediaType,
+      carrierType: item.carrierType,
+      rentalPrice: item.rentalPrice.toNumber().toFixed(2),
+    })),
+  };
 }
