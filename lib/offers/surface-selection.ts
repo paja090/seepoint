@@ -8,6 +8,7 @@ export type SurfaceFilters = {
   status: string;
   availability: SurfaceAvailabilityFilter;
   gpsOnly: boolean;
+  source?: 'all' | 'own' | 'partner';
 };
 export type SurfaceMapBounds = { north: number; south: number; east: number; west: number };
 
@@ -30,6 +31,8 @@ export function filterOfferSurfaces(
       surface.carrier.description,
     ].filter(Boolean).join(' ').toLocaleLowerCase('cs');
     if (needle && !searchText.includes(needle)) return false;
+    if (filters.source === 'own' && surface.isPartner) return false;
+    if (filters.source === 'partner' && !surface.isPartner) return false;
     if (filters.mediaType && surface.mediaType !== filters.mediaType) return false;
     if (filters.status && surface.status !== filters.status) return false;
     if (filters.gpsOnly && (surface.carrier.latitude == null || surface.carrier.longitude == null)) return false;

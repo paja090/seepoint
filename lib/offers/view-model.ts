@@ -110,6 +110,7 @@ export type OfferView = {
 };
 
 export type OfferClientOption = { id: string; name: string; logoUrl?: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };
+
 export type OfferPriceRuleOption = {
   id: string;
   code: string;
@@ -129,6 +130,7 @@ export type OfferPriceRuleOption = {
   unitPrice: string;
   defaultSelected: boolean;
 };
+
 export type OfferSurfaceOption = {
   id: string;
   name: string;
@@ -139,6 +141,10 @@ export type OfferSurfaceOption = {
   currentClient?: string | null;
   photos: Array<{ id: string; url: string }>;
   carrier: { id: string; code: string; name: string; city: string; type: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };
+  isPartner?: boolean;
+  partnerName?: string;
+  partnerDiscountPercent?: number;
+  wholesaleB2BPrice?: string;
 };
 
 export type MediaPackageOption = {
