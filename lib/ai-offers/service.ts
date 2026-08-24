@@ -227,7 +227,7 @@ export async function handleAiOffer(user: CurrentUser, raw: unknown) {
       organizationId: user.organizationId,
       userId: user.id,
       feature: 'OFFER_GENERATOR',
-      modelName: 'gemini-3.6-flash',
+      modelName: 'gemini-2.5-flash',
       promptTokens: (request.prompt?.length || 10) * 2,
       outputTokens: 400,
       costEstimateUsd: 0.002,
