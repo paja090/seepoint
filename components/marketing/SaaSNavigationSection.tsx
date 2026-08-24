@@ -80,17 +80,13 @@ export function SaaSNavigationSection({ onOpenDemoModal }: { onOpenDemoModal: ()
             </div>
 
             <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  trackSaaSEvent('demo_cta_clicked', { source: 'navigation_section' });
-                  onOpenDemoModal();
-                }}
+              <a
+                href="#produkt"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs sm:text-sm shadow-xl transition cursor-pointer"
               >
-                <span>Ukázat modul navigační reklamy</span>
+                <span>Vyzkoušet na interaktivní mapě</span>
                 <ArrowRight className="w-4 h-4" />
-              </button>
+              </a>
             </div>
           </div>
         </div>

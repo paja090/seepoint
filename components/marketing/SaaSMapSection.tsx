@@ -30,17 +30,13 @@ export function SaaSMapSection({ onOpenDemoModal }: { onOpenDemoModal: () => voi
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              trackSaaSEvent('demo_cta_clicked', { source: 'map_section' });
-              onOpenDemoModal();
-            }}
+          <a
+            href="#produkt"
             className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-purple-950 text-purple-200 hover:bg-purple-900 font-extrabold text-xs sm:text-sm border border-purple-700/80 transition shadow-lg shrink-0 cursor-pointer"
           >
-            <span>Prohlédnout správu ploch</span>
+            <span>Vyzkoušet živou mapu a plochy</span>
             <ArrowRight className="w-4 h-4 text-purple-300" />
-          </button>
+          </a>
         </div>
 
         {/* Full-width Map Showcase Visual */}
