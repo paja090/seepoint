@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Play, Layers, MapPin, Building2, TrendingUp, Smartphone, Laptop } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Play, Layers, MapPin, Building2, TrendingUp, Smartphone, Laptop, Check } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
 export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
@@ -76,32 +76,74 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
           <span>Vytvořeno na základě skutečného provozu outdoorové reklamní společnosti.</span>
         </div>
 
-        {/* Photorealistic Hero Showcase Visual with Laptop & Mobile */}
-        <div className="pt-6 max-w-5xl mx-auto">
-          <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 p-2 sm:p-3 shadow-2xl ring-1 ring-purple-500/30">
-            <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden bg-slate-950">
-              <Image
-                src="/images/hero_showcase.jpg"
-                alt="SeePoint OS Web & Mobile Showcase"
-                fill
-                priority
-                unoptimized
-                className="object-cover"
-                sizes="(max-width: 1200px) 100vw, 1200px"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+        {/* REAL AUTHENTIC APP SHOWCASE: LAPTOP + MOBILE PHONE FRAME */}
+        <div className="pt-8 max-w-6xl mx-auto relative">
+          <div className="relative rounded-3xl border border-slate-800 bg-slate-950 p-3 sm:p-5 shadow-2xl ring-1 ring-purple-500/20">
+            {/* Top Browser Chrome Bar */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-2.5 bg-slate-900/90 rounded-t-2xl mb-2">
+              <div className="flex items-center gap-2">
+                <span className="size-3 rounded-full bg-rose-500/80" />
+                <span className="size-3 rounded-full bg-amber-500/80" />
+                <span className="size-3 rounded-full bg-emerald-500/80" />
+                <span className="ml-3 text-xs font-bold text-slate-300 font-mono flex items-center gap-1.5">
+                  <span className="text-emerald-400">🔒 https://</span>os.seepoint.cz/map
+                </span>
+              </div>
 
-              {/* Floating Badges on top of visual */}
-              <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md">
-                  <Laptop className="w-4 h-4 text-purple-400" />
-                  <span className="font-bold">Webový dispečink & Obchod</span>
+              <div className="hidden sm:flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  874 nosičů v síti
+                </span>
+              </div>
+            </div>
+
+            {/* Main Screen Layout Container */}
+            <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner flex flex-col md:flex-row items-center gap-4">
+              {/* Laptop Real Screen Frame */}
+              <div className="relative w-full aspect-[16/9] overflow-hidden rounded-xl bg-slate-900 flex-1">
+                <Image
+                  src="/images/real_seepoint_map_screen.png"
+                  alt="SeePoint OS Reálná Mapa Nosičů"
+                  fill
+                  priority
+                  unoptimized
+                  className="object-cover object-top"
+                  sizes="(max-width: 1200px) 100vw, 1200px"
+                />
+              </div>
+
+              {/* Floating Mobile Phone Frame Overlap */}
+              <div className="hidden lg:block absolute -bottom-6 -right-4 w-72 aspect-[9/19] rounded-[40px] p-2.5 bg-slate-900 border-4 border-slate-700 shadow-2xl ring-2 ring-purple-500/40 z-20 overflow-hidden transform hover:scale-105 transition duration-300">
+                {/* Mobile Camera Notch */}
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-4 bg-slate-950 rounded-full z-30 flex items-center justify-center">
+                  <div className="size-2 rounded-full bg-slate-800" />
                 </div>
 
-                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md">
-                  <Smartphone className="w-4 h-4 text-emerald-400" />
-                  <span className="font-bold">Mobilní aplikace montážníka</span>
+                <div className="relative w-full h-full rounded-[30px] overflow-hidden bg-slate-950 border border-slate-800">
+                  <Image
+                    src="/images/real_seepoint_mobile_screen.png"
+                    alt="SeePoint OS Mobilní Aplikace"
+                    fill
+                    priority
+                    unoptimized
+                    className="object-cover object-top"
+                    sizes="300px"
+                  />
                 </div>
+              </div>
+            </div>
+
+            {/* Bottom floating legend badges */}
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-900 text-slate-200 border border-slate-800">
+                <Laptop className="w-4 h-4 text-purple-400" />
+                <span className="font-bold">Webový dispečink (874 nosičů na mapě)</span>
+              </div>
+
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-900 text-slate-200 border border-slate-800">
+                <Smartphone className="w-4 h-4 text-emerald-400" />
+                <span className="font-bold">Mobilní aplikace montážníka (Foto & GPS)</span>
               </div>
             </div>
           </div>
