@@ -14,6 +14,10 @@ import {
   FileDown,
   CheckCircle2,
   ClipboardList,
+  UploadCloud,
+  Sparkles,
+  FileText,
+  RefreshCw,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
@@ -108,11 +112,48 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     return typeof value === 'string' ? value : '';
   });
   const [artworkMessage, setArtworkMessage] = useState('');
+  const [isUploadingArtwork, setIsUploadingArtwork] = useState(false);
   const artworkUploadEnabled = canUploadNavigationArtwork(offer);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(
     navigation?.points[0]?.id || null,
   );
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
+
+  async function handleArtworkFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setArtworkMessage('Soubor může mít maximálně 5 MB.');
+      return;
+    }
+    setIsUploadingArtwork(true);
+    setArtworkMessage('');
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      try {
+        if (!effectiveProposalKey) throw new Error('Chybí identifikátor nabídky.');
+        const response = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/artwork`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientArtworkUrl: dataUrl, clientArtworkFileName: file.name }),
+        });
+        const result = await response.json().catch(() => null) as { error?: string } | null;
+        if (!response.ok) throw new Error(result?.error || 'Nahrání podkladů selhalo.');
+        setUploadedArtworkName(file.name);
+        setArtworkMessage('Podklady byly úspěšně uloženy a předány grafikovi SeePOINT.');
+      } catch (err: unknown) {
+        setArtworkMessage(err instanceof Error ? err.message : 'Podklady se nepodařilo nahrát.');
+      } finally {
+        setIsUploadingArtwork(false);
+      }
+    };
+    reader.onerror = () => {
+      setIsUploadingArtwork(false);
+      setArtworkMessage('Soubor se nepodařilo načíst.');
+    };
+    reader.readAsDataURL(file);
+  }
 
   function togglePointSelection(id: string) {
     setSelectedPointIds((prev) =>
@@ -685,57 +726,92 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <span>Přesný rozměr pro danou lokalitu a finální grafický návrh budou před výrobou zaslány klientovi ke korektuře a odsouhlasení.</span>
             </div>
 
-            {/* Client artwork upload option */}
+            {/* 🚀 High-Visibility Dedicated Artwork & Logo Upload Studio Card */}
             <div className="pt-2">
-              {artworkUploadEnabled ? (
-                <div className="space-y-2">
-                  <label className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-300 hover:bg-sky-500/20 hover:text-white transition cursor-pointer shadow-lg shadow-sky-500/10">
-                    <span>📤 Nahrát vlastní logo / grafické podklady</span>
-                    <input
-                      type="file"
-                      accept="image/*,.pdf,.ai,.eps,.svg"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 3 * 1024 * 1024) {
-                          setArtworkMessage('Soubor může mít maximálně 3 MB.');
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = async (ev) => {
-                          const dataUrl = ev.target?.result as string;
-                          try {
-                            if (!effectiveProposalKey) throw new Error('Chybí identifikátor nabídky.');
-                            const response = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/artwork`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ clientArtworkUrl: dataUrl, clientArtworkFileName: file.name }),
-                            });
-                            const result = await response.json().catch(() => null) as { error?: string } | null;
-                            if (!response.ok) throw new Error(result?.error || 'Nahrání podkladů selhalo.');
-                            setUploadedArtworkName(file.name);
-                            setArtworkMessage('Podklady byly úspěšně předány obchodníkovi SeePOINT.');
-                          } catch {
-                            setArtworkMessage('Podklady se nepodařilo nahrát.');
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </label>
+              <div className="rounded-2xl border-2 border-dashed border-sky-400/60 bg-gradient-to-br from-sky-950/80 via-slate-900/95 to-blue-950/70 p-4 shadow-xl transition-all duration-300 hover:border-sky-400 hover:shadow-sky-500/10">
+                <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500 text-slate-950 font-black">
+                      <Sparkles size={14} />
+                    </span>
+                    <span className="text-xs font-black uppercase tracking-wider text-sky-300">
+                      Nahrát logo / Grafické podklady
+                    </span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300">
+                    Vizualizace ZDARMA
+                  </span>
+                </div>
+
+                <div className="mt-3">
                   {uploadedArtworkName ? (
-                    <div className="text-[11px] font-bold text-sky-400 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-                      📁 Nahrané podklady od klienta: {uploadedArtworkName}
+                    <div className="rounded-xl border border-emerald-500/50 bg-emerald-950/40 p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+                          <span className="text-xs font-black text-emerald-200">
+                            Podklady úspěšně uloženy k nabídce
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-400/80 bg-emerald-900/60 px-2 py-0.5 rounded">
+                          Předáno grafikovi
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-lg bg-slate-950/80 p-2.5 text-xs font-mono font-bold text-sky-300 border border-slate-800">
+                        <FileText size={15} className="text-sky-400 shrink-0" />
+                        <span className="truncate">{uploadedArtworkName}</span>
+                      </div>
+                      <label className="flex items-center justify-center gap-1.5 pt-1 text-[11px] font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer">
+                        <span>🔄 Nahrát jiný soubor nebo aktualizovat verzi loga</span>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf,.ai,.eps,.svg"
+                          className="hidden"
+                          onChange={handleArtworkFileChange}
+                        />
+                      </label>
                     </div>
-                  ) : null}
+                  ) : (
+                    <label className="group flex flex-col items-center justify-center gap-2.5 rounded-xl border border-sky-500/40 bg-sky-500/10 p-4 text-center transition cursor-pointer hover:bg-sky-500/20 hover:border-sky-400">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/25 group-hover:scale-110 transition duration-300">
+                        {isUploadingArtwork ? (
+                          <RefreshCw size={22} className="animate-spin" />
+                        ) : (
+                          <UploadCloud size={24} />
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-sm font-black text-white group-hover:text-sky-300 transition">
+                          {isUploadingArtwork ? 'Nahrávám grafické podklady…' : 'Klikněte pro nahrání vašeho loga'}
+                        </span>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Grafik SeePOINT bezplatně připraví reálný návrh panelu s vaším logem a směrovkou.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                        <span className="rounded bg-slate-900/90 border border-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-300">PDF</span>
+                        <span className="rounded bg-slate-900/90 border border-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-300">AI / EPS</span>
+                        <span className="rounded bg-slate-900/90 border border-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-300">SVG</span>
+                        <span className="rounded bg-slate-900/90 border border-slate-700 px-2 py-0.5 text-[10px] font-bold text-slate-300">PNG / JPG</span>
+                        <span className="text-[10px] font-medium text-slate-400">(max 5 MB)</span>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf,.ai,.eps,.svg"
+                        disabled={isUploadingArtwork}
+                        className="hidden"
+                        onChange={handleArtworkFileChange}
+                      />
+                    </label>
+                  )}
                 </div>
-              ) : (
-                <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs font-medium text-slate-400 text-center">
-                  Grafické podklady nahrajete zde po schválení cenové nabídky. SeePOINT následně připraví finální návrh k samostatné korektuře před výrobou.
-                </div>
-              )}
-              {artworkMessage ? <p className="text-xs font-semibold text-sky-400 pt-2" role="status">{artworkMessage}</p> : null}
+
+                {artworkMessage ? (
+                  <p className={`text-xs font-semibold pt-2 text-center ${artworkMessage.includes('úspěšně') ? 'text-emerald-400' : 'text-rose-400'}`} role="status">
+                    {artworkMessage}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

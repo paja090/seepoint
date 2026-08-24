@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { sendTransactionalEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +22,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (!clientArtworkUrl) {
       return NextResponse.json({ error: 'Chybí soubor podkladů' }, { status: 400 });
     }
-    if (clientArtworkUrl.length > 4_200_000 || !clientArtworkUrl.startsWith('data:')) {
-      throw new OfferValidationError('Soubor podkladů je příliš velký nebo nemá platný formát.');
+    if (clientArtworkUrl.length > 5_500_000 || !clientArtworkUrl.startsWith('data:')) {
+      throw new OfferValidationError('Soubor podkladů je příliš velký nebo nemá platný formát (max 4 MB).');
     }
 
     const offer = await getPublicRow(token);
@@ -30,8 +31,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (!offer.navigationOffer) {
       return NextResponse.json({ error: 'Nabídka nebyla nalezena' }, { status: 404 });
     }
-    if (offer.navigationOffer.proposalMode !== 'PRICED_QUOTE' || offer.status !== 'ACCEPTED') {
-      throw new OfferValidationError('Grafické podklady lze nahrát až po schválení cenové nabídky.');
+    if (['REJECTED', 'ARCHIVED'].includes(offer.status)) {
+      throw new OfferValidationError('K této nabídce již nelze nahrávat grafické podklady.');
     }
 
     // Save client uploaded artwork to navigation offer
@@ -43,9 +44,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       },
     });
 
-    // Add event log to offer
+    // Add event log to offer with explicit organizationId
     await prisma.offerEvent.create({
       data: {
+        organizationId: offer.organizationId,
         offerId: offer.id,
         type: 'UPDATED',
         actorName: 'Klient (Veřejný odkaz)',
@@ -53,6 +55,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         metadata: { channel: 'public-token', action: 'navigation-artwork-upload' },
       },
     });
+
+    // Notify salesperson by email
+    const salesEmail = offer.createdByUser?.email || offer.contactEmail || process.env.SALES_NOTIFICATION_EMAIL || 'info@seepoint.cz';
+    try {
+      await sendTransactionalEmail({
+        to: salesEmail,
+        subject: `[SeePOINT] Klient nahrál logo / grafické podklady k nabídce ${offer.title}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 16px;">
+            <h2 style="color: #0284c7; margin-top: 0;">🎨 Klient nahrál grafické podklady</h2>
+            <p>Klient <strong>${offer.client?.name || 'Zákazník'}</strong> právě nahrál grafické podklady přes veřejný odkaz nabídky.</p>
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin: 16px 0;">
+              <p style="margin: 0 0 8px 0;"><strong>Nabídka:</strong> ${offer.title}</p>
+              <p style="margin: 0 0 8px 0;"><strong>Soubor:</strong> ${clientArtworkFileName}</p>
+              <p style="margin: 0;"><strong>Klient:</strong> ${offer.client?.name || 'Nezadáno'}</p>
+            </div>
+            <p style="margin-top: 24px;">Podklady jsou uloženy v detailu nabídky v administraci SeePOINT.</p>
+          </div>
+        `,
+      });
+    } catch {
+      // Background email delivery fallback
+    }
 
     return NextResponse.json({
       success: true,
