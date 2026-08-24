@@ -8,4 +8,4 @@ import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
 
-export default async function EditCityGalleryOfferPage({ params }: { params: Promise<{ id: string }> }) { const user = await requirePageAccess('offers'); const id = (await params).id; const [offer, options] = await Promise.all([getOffer(user, id) as Promise<OfferView>, getSpecializedOfferOptions()]); if (offer.offerType !== 'CITY_GALLERY' || offer.status !== 'DRAFT') notFound(); return <AppShell><CityGalleryOfferForm {...options} initialOffer={offer} /></AppShell>; }
+export default async function EditCityGalleryOfferPage({ params }: { params: Promise<{ id: string }> }) { const user = await requirePageAccess('offers'); const id = (await params).id; const [offer, options] = await Promise.all([getOffer(user, id) as Promise<OfferView>, getSpecializedOfferOptions()]); if (offer.offerType !== 'CITY_GALLERY' || ['CONVERTED', 'ARCHIVED'].includes(offer.status)) notFound(); return <AppShell><CityGalleryOfferForm {...options} initialOffer={offer} /></AppShell>; }

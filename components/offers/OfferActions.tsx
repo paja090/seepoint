@@ -86,8 +86,42 @@ export function OfferActions({ offerId, status, converted, canConvert, offerType
 
         <a className={secondaryButton} href={offerType === 'NAVIGATION' ? `/offers/${offerId}/navigation/edit` : offerType === 'CITY_GALLERY' ? `/offers/${offerId}/city-gallery/edit` : `/offers/${offerId}/edit`}>
           <FilePenLine aria-hidden="true" size={17} />
-          {isNavigationLocationSelection ? 'Upravit lokační návrh' : 'Upravit nabídku'}
+          {isNavigationLocationSelection ? 'Upravit lokační návrh (přidat/odebrat body)' : 'Upravit nabídku (přidat/odebrat plochy)'}
         </a>
+
+        {/* Generate / Copy Client Link Direct Button */}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => void action('publish')}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs sm:text-sm py-3 transition shadow-md cursor-pointer disabled:opacity-50"
+        >
+          <Link2 aria-hidden="true" size={17} />
+          {publicUrl ? '✓ Vygenerovat nový odkaz pro klienta' : '🔗 Vygenerovat veřejný odkaz pro klienta'}
+        </button>
+
+        {publicUrl && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-blue-900">
+              <span>Veřejný odkaz pro klienta:</span>
+              <span className="text-emerald-700 font-extrabold text-[11px]">● Aktivní</span>
+            </div>
+            <a className="block break-all text-xs text-blue-700 underline font-mono" href={publicUrl} target="_blank" rel="noreferrer">
+              {publicUrl}
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(publicUrl);
+                setMessage('✓ Odkaz byl zkopírován do schránky!');
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer"
+            >
+              <Copy size={13} />
+              Zkopírovat odkaz do schránky
+            </button>
+          </div>
+        )}
 
         <a className={primaryButton} href={`/offers/${offerId}/preview`}>
           <Eye aria-hidden="true" size={17} />

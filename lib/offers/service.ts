@@ -513,7 +513,7 @@ export async function updateOffer(user: CurrentUser, id: string, raw: unknown) {
   return prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
-    if (existing.status !== 'DRAFT') throw new OfferValidationError('Upravovat lze pouze koncept nabídky.', 'INVALID_STATUS_TRANSITION');
+    if (['CONVERTED', 'ARCHIVED'].includes(existing.status)) throw new OfferValidationError('Převedenou nebo archivovanou nabídku již nelze přímo upravovat. Můžete ji duplikovat.', 'INVALID_STATUS_TRANSITION');
     await validateSurfaces(tx, input);
     const packageSelection = await resolvePackageSelection(tx, input);
     const calculated = calculateOffer(input.items, input.taxRate, await resolveCharges(tx, input));
@@ -556,7 +556,7 @@ export async function updateOfferPricing(user: CurrentUser, id: string, raw: unk
   return prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
-    if (existing.status !== 'DRAFT') throw new OfferValidationError('Ceník lze upravovat pouze u konceptu.', 'INVALID_STATUS_TRANSITION');
+    if (['CONVERTED', 'ARCHIVED'].includes(existing.status)) throw new OfferValidationError('Ceník nelze upravovat u převedené nebo archivované nabídky.', 'INVALID_STATUS_TRANSITION');
     
     const items = existing.items.map((item) => {
       const input = existingItemInput(item);
