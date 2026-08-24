@@ -30,6 +30,9 @@ import {
   DollarSign,
   Receipt,
   CreditCard,
+  Megaphone,
+  Send,
+  MessageSquare,
 } from 'lucide-react';
 
 type Partner = {
@@ -122,8 +125,25 @@ type SettlementItem = {
   items: Array<{ code: string; name: string; clientPrice: number; b2bPrice: number; margin: number }>;
 };
 
+type DemandItem = {
+  id: string;
+  direction: 'INCOMING' | 'OUTGOING';
+  requesterOrg: string;
+  title: string;
+  city: string;
+  mediaType: string;
+  period: string;
+  quantityNeeded: number;
+  budgetMax: number;
+  clientSegment: string;
+  status: 'ACTIVE' | 'FULFILLED' | 'CLOSED';
+  createdAt: string;
+  bidsCount: number;
+  bids: Array<{ id: string; partnerName: string; offeredSurfacesCount: number; totalB2BPrice: number; note: string }>;
+};
+
 export function NetworkHubView() {
-  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PROOFS' | 'SETTLEMENTS' | 'PRIVACY'>('INVENTORY');
+  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PROOFS' | 'SETTLEMENTS' | 'DEMANDS' | 'PRIVACY'>('INVENTORY');
 
   // State
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -131,6 +151,7 @@ export function NetworkHubView() {
   const [holds, setHolds] = useState<HoldItem[]>([]);
   const [proofs, setProofs] = useState<ProofItem[]>([]);
   const [settlements, setSettlements] = useState<SettlementItem[]>([]);
+  const [demands, setDemands] = useState<DemandItem[]>([]);
   const [settlementMetrics, setSettlementMetrics] = useState<{ totalB2BRevenue: number; totalNetMargin: number; totalPayable: number; totalReceivable: number }>({
     totalB2BRevenue: 0,
     totalNetMargin: 0,
@@ -146,19 +167,35 @@ export function NetworkHubView() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
 
+  // Modals
+  const [showCreateDemandModal, setShowCreateDemandModal] = useState(false);
+  const [newDemandTitle, setNewDemandTitle] = useState('');
+  const [newDemandCity, setNewDemandCity] = useState('Praha');
+  const [newDemandMediaType, setNewDemandMediaType] = useState('BILLBOARD');
+  const [newDemandPeriod, setNewDemandPeriod] = useState('Září 2026');
+  const [newDemandQty, setNewDemandQty] = useState(4);
+  const [newDemandBudget, setNewDemandBudget] = useState(35000);
+  const [newDemandSegment, setNewDemandSegment] = useState('Automotive / FMCG');
+
+  const [bidDemandId, setBidDemandId] = useState<string | null>(null);
+  const [bidQty, setBidQty] = useState(2);
+  const [bidPrice, setBidPrice] = useState(16000);
+  const [bidNote, setBidNote] = useState('');
+
   // Fetch all network data on load
   useEffect(() => {
     let isMounted = true;
     const fetchNetworkData = async () => {
       setLoading(true);
       try {
-        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes, settlementsRes] = await Promise.all([
+        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes, settlementsRes, demandsRes] = await Promise.all([
           fetch('/api/network/partners'),
           fetch('/api/network/inventory'),
           fetch('/api/network/holds'),
           fetch('/api/network/notifications'),
           fetch('/api/network/proofs'),
           fetch('/api/network/settlements'),
+          fetch('/api/network/demands'),
         ]);
 
         if (isMounted) {
@@ -187,6 +224,10 @@ export function NetworkHubView() {
             const sData = await settlementsRes.json();
             setSettlements(sData.settlements || []);
             if (sData.metrics) setSettlementMetrics(sData.metrics);
+          }
+          if (demandsRes.ok) {
+            const dData = await demandsRes.json();
+            setDemands(dData.demands || []);
           }
         }
       } catch (err) {
@@ -325,6 +366,85 @@ export function NetworkHubView() {
               : s
           )
         );
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCreateDemandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/network/demands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CREATE_DEMAND',
+          demandData: {
+            title: newDemandTitle,
+            city: newDemandCity,
+            mediaType: newDemandMediaType,
+            period: newDemandPeriod,
+            quantityNeeded: newDemandQty,
+            budgetMax: newDemandBudget,
+            clientSegment: newDemandSegment,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.demand) {
+        setActionSuccess(data.message);
+        setDemands((prev) => [data.demand, ...prev]);
+        setShowCreateDemandModal(false);
+        setNewDemandTitle('');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSubmitBidForDemand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bidDemandId) return;
+    try {
+      const res = await fetch('/api/network/demands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SUBMIT_BID',
+          demandId: bidDemandId,
+          bidData: {
+            offeredSurfacesCount: bidQty,
+            totalB2BPrice: bidPrice,
+            note: bidNote,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionSuccess(data.message);
+        setDemands((prev) =>
+          prev.map((d) =>
+            d.id === bidDemandId
+              ? {
+                  ...d,
+                  bidsCount: d.bidsCount + 1,
+                  bids: [
+                    {
+                      id: `bid-${Date.now()}`,
+                      partnerName: 'SeePOINT Praha (Vy)',
+                      offeredSurfacesCount: bidQty,
+                      totalB2BPrice: bidPrice,
+                      note: bidNote,
+                    },
+                    ...d.bids,
+                  ],
+                }
+              : d
+          )
+        );
+        setBidDemandId(null);
+        setBidNote('');
       }
     } catch (err) {
       console.error(err);
@@ -516,6 +636,18 @@ export function NetworkHubView() {
         >
           <DollarSign size={15} />
           <span>💰 Finanční clearing ({settlements.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('DEMANDS')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl transition cursor-pointer ${
+            activeTab === 'DEMANDS'
+              ? 'bg-slate-900 text-white font-black shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Megaphone size={15} />
+          <span>📢 Poptávková burza ({demands.length})</span>
         </button>
 
         <button
@@ -1074,7 +1206,287 @@ export function NetworkHubView() {
         </div>
       )}
 
-      {/* Tab 6: Bezpečnost a pravidla sítě (Privacy) */}
+      {/* Tab 6: Poptávková burza kapacit (Demands) */}
+      {activeTab === 'DEMANDS' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+            <div>
+              <h2 className="text-base font-black text-slate-900">Poptávková burza kapacit (Demand Board)</h2>
+              <p className="text-xs text-slate-500">
+                Zadávejte chybějící kapacity v regionech a reagujte na poptávky ostatních agentur v síti.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowCreateDemandModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-2.5 text-xs font-black text-white hover:brightness-110 transition shadow-xs shrink-0 cursor-pointer"
+            >
+              <Plus size={15} />
+              <span>+ Zadat novou poptávku do sítě</span>
+            </button>
+          </div>
+
+          {/* Demands Grid */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {demands.map((demand) => (
+              <div key={demand.id} className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-5 space-y-4 shadow-xs hover:border-indigo-300 transition">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                      demand.direction === 'OUTGOING'
+                        ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                        : 'bg-purple-50 text-purple-800 border border-purple-200'
+                    }`}>
+                      {demand.direction === 'OUTGOING' ? '📤 Naše poptávka' : '📥 Poptávka z B2B sítě'}
+                    </span>
+
+                    <span className="text-[11px] font-bold text-slate-500">
+                      {demand.bidsCount} {demand.bidsCount === 1 ? 'nabídka' : demand.bidsCount >= 2 && demand.bidsCount <= 4 ? 'nabídky' : 'nabídek'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900">{demand.title}</h3>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <MapPin size={13} className="text-amber-500 shrink-0" />
+                      <span>{demand.city} · {demand.period}</span>
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-50 p-3 border border-slate-100 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Počet ploch:</span>
+                      <span className="font-black text-slate-900">{demand.quantityNeeded}×</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Max rozpočet:</span>
+                      <span className="font-black text-slate-900">{demand.budgetMax.toLocaleString('cs-CZ')} Kč</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase">Zadavatel:</span>
+                      <span className="font-bold text-slate-800 truncate block">{demand.requesterOrg}</span>
+                    </div>
+                  </div>
+
+                  {/* Bids received */}
+                  {demand.bids.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <span className="text-[11px] font-black uppercase text-indigo-600 block">
+                        Přijaté nabídky kapacit ({demand.bids.length}):
+                      </span>
+                      {demand.bids.map((b) => (
+                        <div key={b.id} className="rounded-xl bg-indigo-50/50 p-2.5 border border-indigo-100 text-xs flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-slate-900 block">{b.partnerName}</span>
+                            <span className="text-[11px] text-slate-500">{b.note}</span>
+                          </div>
+                          <div className="text-right shrink-0 ml-2">
+                            <span className="font-black text-indigo-700">{b.totalB2BPrice.toLocaleString('cs-CZ')} Kč</span>
+                            <span className="text-[10px] text-slate-400 block">{b.offeredSurfacesCount} plochy</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  {demand.direction === 'INCOMING' ? (
+                    <button
+                      type="button"
+                      onClick={() => setBidDemandId(demand.id)}
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Send size={13} />
+                      <span>🎯 Nabídnout naše volné kapacity</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setActionSuccess('Poptávka byla uzavřena a plochy byly převedeny do B2B nabídky.')}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>✓ Vytvořit nabídku z přijatých kapacit</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Create Demand */}
+      {showCreateDemandModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900">Zadat novou poptávku do B2B sítě</h3>
+              <button onClick={() => setShowCreateDemandModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateDemandSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Název poptávky:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="např. Hledáme 4× Eurobillboard v Liberci na září"
+                  value={newDemandTitle}
+                  onChange={(e) => setNewDemandTitle(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Město / Region:</label>
+                  <input
+                    type="text"
+                    required
+                    value={newDemandCity}
+                    onChange={(e) => setNewDemandCity(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Typ média:</label>
+                  <select
+                    value={newDemandMediaType}
+                    onChange={(e) => setNewDemandMediaType(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="BILLBOARD">Billboard (5,1×2,4)</option>
+                    <option value="PROMO_BENCH">Promo lavička</option>
+                    <option value="CITYLIGHT">Citylight (CLV)</option>
+                    <option value="FACADE">Fasáda / LED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Počet ploch:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={newDemandQty}
+                    onChange={(e) => setNewDemandQty(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Max rozpočet (Kč):</label>
+                  <input
+                    type="number"
+                    step="1000"
+                    value={newDemandBudget}
+                    onChange={(e) => setNewDemandBudget(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Termín:</label>
+                  <input
+                    type="text"
+                    value={newDemandPeriod}
+                    onChange={(e) => setNewDemandPeriod(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateDemandModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-xs"
+                >
+                  Odeslat do B2B sítě
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Submit Bid */}
+      {bidDemandId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900">Nabídnout kapacity zadavateli</h3>
+              <button onClick={() => setBidDemandId(null)} className="text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+
+            <form onSubmit={handleSubmitBidForDemand} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Počet nabízených ploch:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={bidQty}
+                    onChange={(e) => setBidQty(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Celková B2B cena (Kč):</label>
+                  <input
+                    type="number"
+                    step="500"
+                    value={bidPrice}
+                    onChange={(e) => setBidPrice(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Lokalita a specifikace ploch:</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="např. Máme 2 volné billboardy na hlavní třídě u nákupní zóny."
+                  value={bidNote}
+                  onChange={(e) => setBidNote(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setBidDemandId(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-xs"
+                >
+                  Odeslat nabídku
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 7: Bezpečnost a pravidla sítě (Privacy) */}
       {activeTab === 'PRIVACY' && (
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
