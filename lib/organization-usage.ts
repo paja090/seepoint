@@ -53,14 +53,15 @@ export async function getOrganizationFullUsageReport(organizationId: string): Pr
     // Estimate storage: Each photo ~ 2.5 MB on average
     const estimatedStorageMb = Math.round(photoCount * 2.5);
     const estimatedStorageGb = Number((estimatedStorageMb / 1024).toFixed(2));
-    const storageCostCzk = Math.round(estimatedStorageGb * 2.5); // ~ 2.5 CZK per GB
+    // Official Google Cloud Storage + Egress: $0.026 / GB / month (~ 0.61 Kč / GB)
+    const storageCostCzk = Math.round(estimatedStorageGb * 1.5);
 
-    // 3. Google Maps API usage estimates
-    // Geocodings & map requests based on carriers and active surfaces
+    // 3. Google Maps API usage estimates (Official Google Maps Platform Rates 2026)
+    // - Dynamic Maps JS API: $7.00 per 1,000 requests ($0.007 / load)
+    // - Geocoding API: $5.00 per 1,000 requests ($0.005 / geocode)
     const googleMapsGeocodes = Math.round(totalSurfacesCount * 0.4);
     const googleMapsMapLoads = Math.round(totalSurfacesCount * 3.5);
-    // Google Maps pricing estimate: ~$0.005 per geocode/map load
-    const googleMapsCostUsd = (googleMapsGeocodes + googleMapsMapLoads) * 0.003;
+    const googleMapsCostUsd = (googleMapsGeocodes * 0.005) + (googleMapsMapLoads * 0.007);
     const googleMapsCostCzk = Math.round(googleMapsCostUsd * 23.5);
 
     const totalEstimatedCostCzk = aiCostCzk + storageCostCzk + googleMapsCostCzk;
