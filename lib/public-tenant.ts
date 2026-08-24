@@ -14,6 +14,7 @@ export async function enterPublicOfferTenant(tokenOrHash: string) {
         { publicTokenHash: clean },
         { publicTokenHash: sha },
         { id: clean },
+        { publicTokenHash: { startsWith: clean } },
       ],
     },
     select: { id: true, organizationId: true, publishedAt: true, archivedAt: true },

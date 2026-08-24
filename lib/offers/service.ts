@@ -768,6 +768,7 @@ export async function getPublicRow(token: string) {
         { publicTokenHash: cleanToken },
         { publicTokenHash: tokenHash },
         { id: cleanToken },
+        { publicTokenHash: { startsWith: cleanToken } },
       ],
     },
     include: offerInclude,

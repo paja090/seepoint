@@ -47,7 +47,7 @@ export function OfferActions({
   const [message, setMessage] = useState('');
   const [customToken, setCustomToken] = useState<string | null>(null);
 
-  const activeToken = customToken || publicToken || offerId;
+  const activeToken = customToken || offerId;
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   const persistentPublicUrl = `${currentOrigin}/offer/${activeToken}`;
 
