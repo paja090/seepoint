@@ -39,10 +39,10 @@ export async function getOrganizationFullUsageReport(organizationId: string): Pr
     const aiCostCzk = Math.round(aiCostUsd * 23.5);
 
     // 2. Count Photos & Storage
-    const photoCount = await platformPrisma.advertisingPhoto.count({
+    const photoCount = await platformPrisma.photo.count({
       where: {
         createdAt: { gte: startOfMonth },
-        surface: { organizationId },
+        organizationId,
       },
     }).catch(() => 0);
 
