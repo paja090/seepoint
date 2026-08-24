@@ -25,9 +25,8 @@ export function SaaSHeader({
 
   const navItems = [
     { label: 'Produkt', href: '#produkt' },
-    { label: 'Řešení', href: '#reseni' },
-    { label: 'AI Platforma', href: '#ai' },
-    { label: 'Pro kým', href: '#pro-koho' },
+    { label: 'AI Funkce', href: '#ai' },
+    { label: 'B2B Network', href: '#network' },
     { label: 'Ceník', href: '#cenik' },
     { label: 'FAQ', href: '#faq' },
   ];

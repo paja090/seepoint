@@ -13,6 +13,7 @@ import { SaaSWorkflowSection } from './SaaSWorkflowSection';
 import { SaaSAiSection } from './SaaSAiSection';
 import { SaaSFieldMobileSection } from './SaaSFieldMobileSection';
 import { SaaSNavigationSection } from './SaaSNavigationSection';
+import { SaaSNetworkSection } from './SaaSNetworkSection';
 import { SaaSTargetAudience } from './SaaSTargetAudience';
 import { SaaSOnboardingSection } from './SaaSOnboardingSection';
 import { SaaSIntegrationsSection } from './SaaSIntegrationsSection';
@@ -70,6 +71,7 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
         <SaaSAiSection onOpenDemoModal={openDemoModal} />
         <SaaSFieldMobileSection />
         <SaaSNavigationSection onOpenDemoModal={openDemoModal} />
+        <SaaSNetworkSection onOpenDemoModal={openDemoModal} />
         <SaaSTargetAudience onOpenDemoModal={openDemoModal} />
         <SaaSOnboardingSection onOpenDemoModal={openDemoModal} />
         <SaaSIntegrationsSection />
