@@ -101,7 +101,7 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-sky-300">
               <UserCheck className="w-4 h-4 text-sky-400" />
-              <span>Import vašeho Excelu v ceně</span>
+              <span>Ukázkový import 20 nosičů zdarma</span>
             </div>
           </div>
         </div>
