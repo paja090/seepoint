@@ -101,6 +101,9 @@ const permissions: Record<AppRole, AppSection[]> = {
     'mySettlements',
     'vehicles',
     'work',
+    'tasks',
+    'myTasks',
+    'myWorkEntries',
     'team',
   ],
   TECHNICIAN: [
