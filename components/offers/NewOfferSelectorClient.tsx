@@ -110,11 +110,29 @@ export function NewOfferSelectorClient({
           </span>
           <h2 className="mt-6 text-xl font-semibold text-slate-950">Standardní reklamní média</h2>
           <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">
-            Existující lavičky, citypostery, CLV, towery a další pevné plochy s dostupností.
+            Existující billboardy, lavičky, citypostery, CLV, towery a fasády s dostupností.
           </p>
           <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
             Pokračovat manuálně <ArrowRight className="transition group-hover:translate-x-1" size={16} />
           </span>
+        </Link>
+      </div>
+
+      {/* Templates & Catalog Promo Banner */}
+      <div className="rounded-3xl border border-emerald-300/60 bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
+        <div className="space-y-1">
+          <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Katalog hotových konceptů</span>
+          <h3 className="text-lg font-black text-white">Hledáte inspiraci nebo hotový balíček pro klienta?</h3>
+          <p className="text-xs text-slate-300">
+            Prohlédněte si vzorové šablony pro Billboardové sítě, Městský mobiliář, Fasády či Navigační řetězce.
+          </p>
+        </div>
+        <Link
+          href={clientId ? `/offers/templates?clientId=${encodeURIComponent(clientId)}` : '/offers/templates'}
+          className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shrink-0 flex items-center gap-2 shadow-sm"
+        >
+          <span>Otevřít Katalog šablon</span>
+          <ArrowRight size={14} />
         </Link>
       </div>
 

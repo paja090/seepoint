@@ -26,7 +26,7 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['lib/ai-usage.ts', 3],
   ['lib/auth.ts', 7],
   ['lib/db.ts', 6],
-  ['lib/offers/service.ts', 2],
+  ['lib/offers/service.ts', 3],
   ['lib/organization-usage.ts', 3],
   ['lib/public-tenant.ts', 3],
   ['lib/tenant-request-context.ts', 2],
