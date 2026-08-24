@@ -757,9 +757,6 @@ export async function getPublicRow(token: string) {
   const cleanToken = token.trim();
   const tokenHash = hashPublicOfferToken(cleanToken);
 
-  const owner = await enterPublicOfferTenant(cleanToken);
-  if (!owner) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
-
   const row = await platformPrisma.offer.findFirst({
     where: {
       OR: [
@@ -773,6 +770,7 @@ export async function getPublicRow(token: string) {
   });
 
   if (!row || row.archivedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  enterTenantContext({ organizationId: row.organizationId, source: 'public-token' });
   return row;
 }
 
