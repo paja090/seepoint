@@ -92,16 +92,21 @@ export function NetworkHubView() {
   const [searchMediaType, setSearchMediaType] = useState('ALL');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  const [notifications, setNotifications] = useState<Array<{ id: string; type: string; title: string; message: string; severity: string; createdAt: string; isRead: boolean }>>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifDrawer, setShowNotifDrawer] = useState(false);
+
   // Fetch all network data on load
   useEffect(() => {
     let isMounted = true;
     const fetchNetworkData = async () => {
       setLoading(true);
       try {
-        const [partnersRes, inventoryRes, holdsRes] = await Promise.all([
+        const [partnersRes, inventoryRes, holdsRes, notifRes] = await Promise.all([
           fetch('/api/network/partners'),
           fetch('/api/network/inventory'),
           fetch('/api/network/holds'),
+          fetch('/api/network/notifications'),
         ]);
 
         if (isMounted) {
@@ -116,6 +121,11 @@ export function NetworkHubView() {
           if (holdsRes.ok) {
             const hData = await holdsRes.json();
             setHolds(hData.holds || []);
+          }
+          if (notifRes.ok) {
+            const nData = await notifRes.json();
+            setNotifications(nData.notifications || []);
+            setUnreadCount(nData.unreadCount || 0);
           }
         }
       } catch (err) {
@@ -160,7 +170,51 @@ export function NetworkHubView() {
       const data = await res.json();
       if (data.success) {
         setActionSuccess('Dočasný B2B Hold na 5 dní byl úspěšně aktivován!');
+        if (data.hold) {
+          setHolds((prev) => [data.hold, ...prev]);
+        }
       }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleHoldAction = async (holdId: string, action: 'CONFIRM' | 'EXTEND' | 'RELEASE') => {
+    try {
+      const res = await fetch('/api/network/holds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ holdId, action }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionSuccess(data.message);
+        if (action === 'RELEASE') {
+          setHolds((prev) => prev.filter((h) => h.id !== holdId));
+        } else if (action === 'EXTEND') {
+          setHolds((prev) =>
+            prev.map((h) => (h.id === holdId ? { ...h, daysLeft: h.daysLeft + 3 } : h))
+          );
+        } else if (action === 'CONFIRM') {
+          setHolds((prev) =>
+            prev.map((h) => (h.id === holdId ? { ...h, status: 'CONFIRMED' } : h))
+          );
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllNotifsRead = async () => {
+    try {
+      await fetch('/api/network/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'MARK_ALL_READ' }),
+      });
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
     } catch (err) {
       console.error(err);
     }
@@ -195,6 +249,19 @@ export function NetworkHubView() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowNotifDrawer(!showNotifDrawer)}
+              className="relative inline-flex items-center gap-2 rounded-2xl bg-slate-900 border border-slate-700 px-4 py-3 text-xs font-bold text-slate-200 hover:bg-slate-800 transition cursor-pointer"
+            >
+              <span>🔔 B2B Události</span>
+              {unreadCount > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
             <Link
               href="/offers/new"
               className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition cursor-pointer"
@@ -204,6 +271,47 @@ export function NetworkHubView() {
             </Link>
           </div>
         </div>
+
+        {/* Real-time B2B Notifications Drawer */}
+        {showNotifDrawer && (
+          <div className="mt-6 rounded-2xl bg-slate-900/95 p-4 border border-indigo-500/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase text-indigo-400 tracking-wider">
+                🔔 Upozornění sítě & Holdů v reálném čase
+              </span>
+              <button
+                type="button"
+                onClick={handleMarkAllNotifsRead}
+                className="text-[11px] font-bold text-slate-400 hover:text-white"
+              >
+                Označit vše jako přečtené
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={`p-3 rounded-xl border text-xs flex items-start justify-between gap-3 ${
+                    n.severity === 'HIGH'
+                      ? 'bg-rose-950/40 border-rose-800/60 text-rose-200'
+                      : n.severity === 'MEDIUM'
+                      ? 'bg-amber-950/40 border-amber-800/60 text-amber-200'
+                      : 'bg-slate-950/50 border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <div>
+                    <h4 className="font-black text-white">{n.title}</h4>
+                    <p className="mt-0.5 text-[11px] opacity-90">{n.message}</p>
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">
+                    {new Date(n.createdAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Global KPI Metrics */}
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-slate-800/80">
@@ -523,16 +631,27 @@ export function NetworkHubView() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
-                    className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"
+                    onClick={() => handleHoldAction(hold.id, 'RELEASE')}
+                    className="flex-1 min-w-[100px] py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer"
                   >
                     Uvolnit hold
                   </button>
+
                   <button
                     type="button"
-                    className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs"
+                    onClick={() => handleHoldAction(hold.id, 'EXTEND')}
+                    className="flex-1 min-w-[110px] py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs hover:bg-amber-100 transition cursor-pointer"
+                  >
+                    + Prodloužit (3 dny)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleHoldAction(hold.id, 'CONFIRM')}
+                    className="flex-1 min-w-[130px] py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer"
                   >
                     Potvrdit do zakázky
                   </button>
