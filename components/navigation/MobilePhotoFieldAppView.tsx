@@ -105,6 +105,12 @@ export function MobilePhotoFieldAppView() {
   const [clientMismatch, setClientMismatch] = useState<ClientMismatch | null>(null);
   const [photoNote, setPhotoNote] = useState('');
 
+  // GPS Carrier Refinement State
+  const [pendingNewGps, setPendingNewGps] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [updatingGps, setUpdatingGps] = useState(false);
+  const [gpsUpdateSuccessMsg, setGpsUpdateSuccessMsg] = useState<string | null>(null);
+  const [gpsUpdateErrorMsg, setGpsUpdateErrorMsg] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
@@ -284,6 +290,65 @@ export function MobilePhotoFieldAppView() {
     } catch (error) {
       console.error('[mobile-photos/confirm]', error);
       setUploadErrorMsg('Přiřazení fotografie se nepodařilo potvrdit. Zkuste akci zopakovat.');
+    }
+  };
+
+  const handleGetNewPhoneGps = () => {
+    setGpsUpdateErrorMsg(null);
+    setGpsUpdateSuccessMsg(null);
+    if (!navigator.geolocation) {
+      setGpsUpdateErrorMsg('Geolokace není v tomto prohlížeči podporována.');
+      return;
+    }
+    setUpdatingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPendingNewGps({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+        setUpdatingGps(false);
+      },
+      (err) => {
+        console.warn('GPS Refinement Error:', err);
+        setGpsUpdateErrorMsg('Nepodařilo se načíst přesnou polohu z telefonu. Skontrolujte oprávnění GPS.');
+        setUpdatingGps(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleSaveCarrierGps = async () => {
+    if (!selectedCarrier || !pendingNewGps) return;
+    setUpdatingGps(true);
+    setGpsUpdateErrorMsg(null);
+    setGpsUpdateSuccessMsg(null);
+
+    try {
+      const res = await fetch(`/api/carriers/${selectedCarrier.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: pendingNewGps.lat,
+          longitude: pendingNewGps.lng,
+          gpsStatus: 'VERIFIED',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Aktualizace GPS polohy nosiče se nepodařila.');
+      }
+
+      setGpsUpdateSuccessMsg(`📍 GPS poloha nosiče byla v systému úspěšně zpřesněna! (${pendingNewGps.lat.toFixed(5)}, ${pendingNewGps.lng.toFixed(5)})`);
+      setSelectedCarrier((prev) => prev ? { ...prev, latitude: pendingNewGps.lat, longitude: pendingNewGps.lng } : null);
+      setPendingNewGps(null);
+      fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm);
+    } catch (err: unknown) {
+      setGpsUpdateErrorMsg(err instanceof Error ? err.message : 'Došlo k chybě při ukládání GPS polohy.');
+    } finally {
+      setUpdatingGps(false);
     }
   };
 
@@ -534,6 +599,72 @@ export function MobilePhotoFieldAppView() {
                 </button>
               )) : <div className="text-sm font-bold text-slate-400">Plochy nosiče nejsou evidovány.</div>}
             </div>
+          </div>
+
+          {/* GPS Location Refinement Block */}
+          <div className="mb-4 rounded-2xl border border-sky-800/80 bg-sky-950/40 p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-sky-400" />
+                <span className="text-xs font-bold text-sky-200">GPS poloha nosiče v systému</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-slate-300">
+                {selectedCarrier.latitude && selectedCarrier.longitude
+                  ? `${selectedCarrier.latitude.toFixed(5)}, ${selectedCarrier.longitude.toFixed(5)}`
+                  : 'Nezaměřeno'}
+              </span>
+            </div>
+
+            {gpsUpdateSuccessMsg && (
+              <div className="p-2.5 rounded-xl bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                <span>{gpsUpdateSuccessMsg}</span>
+              </div>
+            )}
+
+            {gpsUpdateErrorMsg && (
+              <div className="p-2.5 rounded-xl bg-rose-950 border border-rose-700 text-rose-300 text-xs font-bold flex items-center gap-2">
+                <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+                <span>{gpsUpdateErrorMsg}</span>
+              </div>
+            )}
+
+            {!pendingNewGps ? (
+              <button
+                type="button"
+                onClick={handleGetNewPhoneGps}
+                disabled={updatingGps}
+                className="w-full py-2.5 rounded-xl bg-sky-900/80 hover:bg-sky-800 text-sky-200 font-bold text-xs border border-sky-700/80 transition flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
+              >
+                <MapPin size={14} className="text-sky-300" />
+                <span>{updatingGps ? 'Zjišťuji novou GPS polohu...' : '📍 Zpřesnit polohu nosiče dle mé GPS'}</span>
+              </button>
+            ) : (
+              <div className="p-3 rounded-xl bg-slate-900 border border-sky-600/80 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                  <span>Zaměřená poloha telefonu:</span>
+                  <span className="font-mono">{pendingNewGps.lat.toFixed(5)}, {pendingNewGps.lng.toFixed(5)}</span>
+                </div>
+                <div className="text-[10px] text-slate-400">Přesnost senzoru: ± {Math.round(pendingNewGps.accuracy)} metrů</div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setPendingNewGps(null)}
+                    className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs"
+                  >
+                    Zrušit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveCarrierGps}
+                    disabled={updatingGps}
+                    className="flex-2 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {updatingGps ? 'Ukládám...' : '💾 Uložit novou GPS nosiče'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Messages */}
