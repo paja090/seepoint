@@ -27,6 +27,9 @@ import {
   Camera,
   FileCheck,
   ExternalLink,
+  DollarSign,
+  Receipt,
+  CreditCard,
 } from 'lucide-react';
 
 type Partner = {
@@ -102,14 +105,38 @@ type ProofItem = {
   clientReportReady: boolean;
 };
 
+type SettlementItem = {
+  id: string;
+  period: string;
+  partnerId: string;
+  partnerName: string;
+  type: 'PAYABLE' | 'RECEIVABLE';
+  itemsCount: number;
+  clientBilledAmount: number;
+  wholesaleB2BAmount: number;
+  netMarginAmount: number;
+  marginPercent: number;
+  status: 'PENDING' | 'INVOICED' | 'SETTLED';
+  invoiceNumber: string | null;
+  dueDate: string;
+  items: Array<{ code: string; name: string; clientPrice: number; b2bPrice: number; margin: number }>;
+};
+
 export function NetworkHubView() {
-  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PROOFS' | 'PRIVACY'>('INVENTORY');
+  const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PROOFS' | 'SETTLEMENTS' | 'PRIVACY'>('INVENTORY');
 
   // State
   const [partners, setPartners] = useState<Partner[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [holds, setHolds] = useState<HoldItem[]>([]);
   const [proofs, setProofs] = useState<ProofItem[]>([]);
+  const [settlements, setSettlements] = useState<SettlementItem[]>([]);
+  const [settlementMetrics, setSettlementMetrics] = useState<{ totalB2BRevenue: number; totalNetMargin: number; totalPayable: number; totalReceivable: number }>({
+    totalB2BRevenue: 0,
+    totalNetMargin: 0,
+    totalPayable: 0,
+    totalReceivable: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [searchCity, setSearchCity] = useState('ALL');
   const [searchMediaType, setSearchMediaType] = useState('ALL');
@@ -125,12 +152,13 @@ export function NetworkHubView() {
     const fetchNetworkData = async () => {
       setLoading(true);
       try {
-        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes] = await Promise.all([
+        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes, settlementsRes] = await Promise.all([
           fetch('/api/network/partners'),
           fetch('/api/network/inventory'),
           fetch('/api/network/holds'),
           fetch('/api/network/notifications'),
           fetch('/api/network/proofs'),
+          fetch('/api/network/settlements'),
         ]);
 
         if (isMounted) {
@@ -154,6 +182,11 @@ export function NetworkHubView() {
           if (proofsRes.ok) {
             const prData = await proofsRes.json();
             setProofs(prData.proofs || []);
+          }
+          if (settlementsRes.ok) {
+            const sData = await settlementsRes.json();
+            setSettlements(sData.settlements || []);
+            if (sData.metrics) setSettlementMetrics(sData.metrics);
           }
         }
       } catch (err) {
@@ -263,6 +296,33 @@ export function NetworkHubView() {
             p.id === proofId
               ? { ...p, status: action === 'APPROVE' ? 'APPROVED' : 'REJECTED', clientReportReady: action === 'APPROVE' }
               : p
+          )
+        );
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSettlementAction = async (settlementId: string, action: 'GENERATE_INVOICE' | 'MARK_SETTLED') => {
+    try {
+      const res = await fetch('/api/network/settlements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settlementId, action }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionSuccess(data.message);
+        setSettlements((prev) =>
+          prev.map((s) =>
+            s.id === settlementId
+              ? {
+                  ...s,
+                  status: data.status,
+                  invoiceNumber: action === 'GENERATE_INVOICE' ? 'B2B-2026-0899' : s.invoiceNumber,
+                }
+              : s
           )
         );
       }
@@ -444,6 +504,18 @@ export function NetworkHubView() {
         >
           <Camera size={15} />
           <span>📸 Fotodokumentace ({proofs.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('SETTLEMENTS')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl transition cursor-pointer ${
+            activeTab === 'SETTLEMENTS'
+              ? 'bg-slate-900 text-white font-black shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <DollarSign size={15} />
+          <span>💰 Finanční clearing ({settlements.length})</span>
         </button>
 
         <button
@@ -855,7 +927,154 @@ export function NetworkHubView() {
         </div>
       )}
 
-      {/* Tab 5: Bezpečnost a pravidla sítě (Privacy) */}
+      {/* Tab 5: Finanční clearing & Fakturace (Settlements) */}
+      {activeTab === 'SETTLEMENTS' && (
+        <div className="space-y-6">
+          {/* Financial KPIs Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs space-y-1">
+              <span className="text-[10px] font-black uppercase text-slate-400">Celkový obrat B2B sítě</span>
+              <span className="text-xl font-black text-slate-900 block">
+                {settlementMetrics.totalB2BRevenue.toLocaleString('cs-CZ')} Kč
+              </span>
+            </div>
+
+            <div className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-xs space-y-1">
+              <span className="text-[10px] font-black uppercase text-emerald-700">Čistá B2B marže (Zisk)</span>
+              <span className="text-xl font-black text-emerald-800 block">
+                +{settlementMetrics.totalNetMargin.toLocaleString('cs-CZ')} Kč
+              </span>
+            </div>
+
+            <div className="rounded-3xl border border-rose-200 bg-rose-50/50 p-5 shadow-xs space-y-1">
+              <span className="text-[10px] font-black uppercase text-rose-700">K úhradě partnerům (Závazky)</span>
+              <span className="text-xl font-black text-rose-800 block">
+                {settlementMetrics.totalPayable.toLocaleString('cs-CZ')} Kč
+              </span>
+            </div>
+
+            <div className="rounded-3xl border border-indigo-200 bg-indigo-50/50 p-5 shadow-xs space-y-1">
+              <span className="text-[10px] font-black uppercase text-indigo-700">Pohledávky za partnery</span>
+              <span className="text-xl font-black text-indigo-800 block">
+                {settlementMetrics.totalReceivable.toLocaleString('cs-CZ')} Kč
+              </span>
+            </div>
+          </div>
+
+          {/* Settlements Table */}
+          <div className="bg-white rounded-3xl border border-slate-200 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black text-slate-900">Měsíční zúčtovací protokoly se subdodavateli</h2>
+                <p className="text-xs text-slate-500">
+                  Přehled vzájemných zúčtování nákupních velkoobchodních cen, marží a stavu B2B faktur.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActionSuccess('Kompletní měsíční clearingový report (PDF / XML) byl vygenerován.')}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition shadow-xs shrink-0 cursor-pointer"
+              >
+                <Receipt size={15} />
+                <span>📥 Exportovat měsíční clearing</span>
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {settlements.map((set) => (
+                <div key={set.id} className="py-4 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          set.type === 'PAYABLE'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        }`}>
+                          {set.type === 'PAYABLE' ? '📤 Náš závazek partnerovi' : '📥 Pohledávka za partnerem'}
+                        </span>
+
+                        <span className="font-mono text-xs font-black text-slate-500">[{set.period}]</span>
+
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          set.status === 'SETTLED'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : set.status === 'INVOICED'
+                            ? 'bg-blue-50 text-blue-800'
+                            : 'bg-amber-50 text-amber-800'
+                        }`}>
+                          {set.status === 'SETTLED' ? '✓ Vyrovnáno' : set.status === 'INVOICED' ? '📄 Vyfakturováno' : '⏳ K fakturaci'}
+                        </span>
+                      </div>
+
+                      <h3 className="font-black text-sm text-slate-900">{set.partnerName}</h3>
+                      <p className="text-xs text-slate-500">
+                        {set.itemsCount} zúčtovaných ploch · Splatnost: {new Date(set.dueDate).toLocaleDateString('cs-CZ')}
+                        {set.invoiceNumber && <span className="ml-2 font-mono font-bold text-slate-700">· Faktura: {set.invoiceNumber}</span>}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 font-bold block uppercase">B2B Nákupní částka:</span>
+                        <span className="text-sm font-black text-slate-900">
+                          {set.wholesaleB2BAmount.toLocaleString('cs-CZ')} Kč
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-600 block">
+                          (Marže +{set.netMarginAmount.toLocaleString('cs-CZ')} Kč)
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {set.status !== 'SETTLED' && (
+                          <>
+                            {set.status === 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => handleSettlementAction(set.id, 'GENERATE_INVOICE')}
+                                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition shadow-xs cursor-pointer"
+                              >
+                                Vygenerovat B2B fakturu
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleSettlementAction(set.id, 'MARK_SETTLED')}
+                              className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer"
+                            >
+                              ✓ Označit jako vyrovnané
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Items List Breakdown */}
+                  <div className="grid gap-2 sm:grid-cols-2 pt-2 border-t border-slate-50">
+                    {set.items.map((item, idx) => (
+                      <div key={idx} className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="font-mono font-black text-indigo-600">{item.code}</span>
+                          <p className="font-bold text-slate-800">{item.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-500 font-medium">Klient: {item.clientPrice.toLocaleString('cs-CZ')} Kč</span>
+                          <p className="font-black text-slate-900">B2B: {item.b2bPrice.toLocaleString('cs-CZ')} Kč</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 6: Bezpečnost a pravidla sítě (Privacy) */}
       {activeTab === 'PRIVACY' && (
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-3 shadow-xs">
