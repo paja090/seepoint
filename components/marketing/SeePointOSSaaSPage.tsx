@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { SaaSHeader } from './SaaSHeader';
 import { SaaSHero } from './SaaSHero';
+import { SaaSSegmentsBar } from './SaaSSegmentsBar';
 import { SaaSProductShowcase } from './SaaSProductShowcase';
 import { SaaSProblemSolution } from './SaaSProblemSolution';
 import { SaaSBentoOverview } from './SaaSBentoOverview';
@@ -58,6 +59,7 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
       {/* Main Content Sections */}
       <main>
         <SaaSHero onOpenDemoModal={openDemoModal} />
+        <SaaSSegmentsBar />
         <SaaSProductShowcase />
         <SaaSProblemSolution />
         <SaaSBentoOverview />

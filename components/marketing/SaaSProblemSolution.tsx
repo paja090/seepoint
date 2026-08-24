@@ -1,101 +1,87 @@
 'use client';
 
-import { XCircle, CheckCircle2, ArrowRight, Table, Folder, Map, Mail, MessageSquare, FileText, Calculator } from 'lucide-react';
+import { XCircle, CheckCircle2, ArrowRight, Sparkles, Clock, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export function SaaSProblemSolution() {
-  const chaosItems = [
-    { title: 'Excel tabulky obsazenosti', desc: 'Duplicity, neaktuální stavy, manuální přepisování dat' },
-    { title: 'Google Drive & složky', desc: 'Hledání fotografií a podkladů v nepřehledné struktuře' },
-    { title: 'Roztrštěné Google Maps', desc: 'Žádné přímé propojení nosičů s klienty a nabídkami' },
-    { title: 'Email, WhatsApp & telefony', desc: 'Domlouvání zakázek bez centrální historie a zodpovědnosti' },
-    { title: 'Papírové zakázky v terénu', desc: 'Montážníci bez aktuálních informací a GPS lokace nosičů' },
-  ];
-
-  const solutionItems = [
-    { title: 'Jediný centrální systém', desc: 'Klienti, nosiče, nabídky a realizace na jednom místě' },
-    { title: 'Živá mapa sítě & obsazenosti', desc: 'Okamžitý přehled co je volné dnes i za půl roku' },
-    { title: 'AI Copilot pro nabídky', desc: 'Sestavení klientské prezentace s fotkami během 3 minut' },
-    { title: 'Mobilní aplikace pro terén', desc: 'Montáže, navigace a fotodokumentace přímo ze sloupu' },
-    { title: 'Kompletní příběh zakázky', desc: 'Od první příležitosti až po vytvoření faktury na klíč' },
+  const comparisonRows = [
+    {
+      feature: 'Přehled a stav nosičů',
+      oldWay: '15 verzí tabulek Excelu (seznam_ploch_v4_final.xlsx) s duplicitami',
+      newWay: 'Jediná živá mapa sítě synchronizovaná v reálném čase pro celý tým',
+    },
+    {
+      feature: 'Tvorba klientské nabídky',
+      oldWay: '3 dny ručního hledání fotek v Google Drive a skládání do PDF',
+      newWay: 'AI generátor sestaví interaktivní online nabídku za méně než 60 sekund',
+    },
+    {
+      feature: 'Práce montážníků v terénu',
+      oldWay: 'Papírové zakázky, ztracené fotky ve WhatsApp chatu a zmatky s klíči',
+      newWay: 'Mobilní aplikace: navigace ke sloupu, offline kešování a fotky z mobilu',
+    },
+    {
+      feature: 'Optimalizace výjezdů',
+      oldWay: 'Křižování městem bez plánu, zbytečné kilometry a přeplatky za palivo',
+      newWay: 'AI Optimalizátor tras: zkrátí trasu o 57 % a seřadí nosiče za sebou',
+    },
+    {
+      feature: 'Památkové zóny & Vyhlášky',
+      oldWay: 'Riziko pokut od města kvůli neznalosti hranic zóny (např. MPZ)',
+      newWay: 'Automatické vrstvy ochranných pásem a vyhlášek přímo v mapě',
+    },
   ];
 
   return (
-    <section className="py-20 bg-slate-900/50 border-y border-slate-800/80 relative overflow-hidden">
+    <section id="srovnani" className="py-20 bg-slate-900/60 border-y border-slate-800/80 relative overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
-            PROČ SEEPOINT OS
-          </span>
+          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-purple-950/80 border border-purple-800 text-purple-300 text-xs font-black uppercase tracking-widest">
+            <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+            <span>SROVNÁNÍ NÁSTROJŮ</span>
+          </div>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            Méně tabulek. Méně hledání. Více kontroly.
+            Starý svět Excelu vs. SeePoint OS
           </h2>
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-            Typická reklamní společnost ztrácí desítky hodin týdně přepínáním mezi rozdrobenými nástroji. SeePoint OS spojuje celý provoz do jednoho spolehlivého motoru.
+            Podívejte se, kolik času a zbytečných chyb ušetří přechod z rozdrobených tabulek a chatů na jediný centrální operační systém.
           </p>
         </div>
 
-        {/* Problem vs Solution Comparison Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          {/* CHAOS SIDE (Left) */}
-          <div className="lg:col-span-5 rounded-3xl border border-rose-900/40 bg-slate-950/80 p-6 sm:p-8 space-y-6 shadow-xl relative">
-            <div className="flex items-center gap-3 border-b border-rose-900/40 pb-4">
-              <div className="size-10 rounded-2xl bg-rose-950/80 border border-rose-800 text-rose-400 flex items-center justify-center font-black">
-                ✕
-              </div>
-              <div>
-                <h3 className="font-black text-lg text-white">Běžný chaos v reklamní agentuře</h3>
-                <p className="text-xs text-rose-300/80 font-medium">7 různých nástrojů bez propojení</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {chaosItems.map((item) => (
-                <div key={item.title} className="flex items-start gap-3 p-3 rounded-2xl bg-rose-950/20 border border-rose-900/30">
-                  <XCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-xs font-bold text-slate-200 block">{item.title}</strong>
-                    <span className="text-[11px] font-medium text-slate-400">{item.desc}</span>
-                  </div>
-                </div>
+        {/* Direct Side-by-Side Comparison Table */}
+        <div className="rounded-3xl border border-slate-800 bg-slate-950 p-3 sm:p-6 shadow-2xl overflow-x-auto ring-1 ring-slate-800/80">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400">
+                <th className="p-3 sm:p-4 font-black uppercase text-[11px] w-1/4">Činnost v agentuře</th>
+                <th className="p-3 sm:p-4 font-black uppercase text-[11px] text-rose-400 w-3/8 bg-rose-950/20 rounded-t-2xl">
+                  ❌ Starý způsob (Excel + WhatsApp + Složky)
+                </th>
+                <th className="p-3 sm:p-4 font-black uppercase text-[11px] text-purple-300 w-3/8 bg-purple-950/40 rounded-t-2xl border-l border-r border-purple-800/60">
+                  ✨ S SeePoint OS
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-850">
+              {comparisonRows.map((row, idx) => (
+                <tr key={idx} className="hover:bg-slate-900/40 transition">
+                  <td className="p-3 sm:p-4 font-black text-white">{row.feature}</td>
+                  <td className="p-3 sm:p-4 text-slate-300 bg-rose-950/10 space-y-1">
+                    <div className="flex items-start gap-2">
+                      <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                      <span className="text-xs text-rose-200/90 font-medium leading-relaxed">{row.oldWay}</span>
+                    </div>
+                  </td>
+                  <td className="p-3 sm:p-4 text-slate-200 bg-purple-950/20 border-l border-r border-purple-800/40">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span className="text-xs text-white font-bold leading-relaxed">{row.newWay}</span>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
-
-          {/* ARROW TRANSFORMER (Center) */}
-          <div className="lg:col-span-2 flex flex-col items-center justify-center text-center py-4">
-            <div className="size-14 rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-600 text-white flex items-center justify-center font-black shadow-xl animate-pulse">
-              <ArrowRight className="w-7 h-7" />
-            </div>
-            <span className="mt-3 text-xs font-black uppercase tracking-wider text-purple-300">
-              Přechod na
-            </span>
-          </div>
-
-          {/* SOLUTION SIDE (Right) */}
-          <div className="lg:col-span-5 rounded-3xl border border-purple-800/80 bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/30 p-6 sm:p-8 space-y-6 shadow-2xl relative">
-            <div className="flex items-center gap-3 border-b border-purple-800/60 pb-4">
-              <div className="size-10 rounded-2xl bg-purple-950 text-purple-300 border border-purple-700 flex items-center justify-center font-black">
-                ✓
-              </div>
-              <div>
-                <h3 className="font-black text-lg text-white">SeePoint OS</h3>
-                <p className="text-xs text-purple-300 font-medium">Jediný integrovaný operační systém</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {solutionItems.map((item) => (
-                <div key={item.title} className="flex items-start gap-3 p-3 rounded-2xl bg-purple-950/30 border border-purple-800/40">
-                  <CheckCircle2 className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-xs font-bold text-white block">{item.title}</strong>
-                    <span className="text-[11px] font-medium text-slate-300">{item.desc}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
