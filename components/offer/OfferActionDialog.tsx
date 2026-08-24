@@ -37,7 +37,7 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
   if (!action) return null;
   const { title, description, submitLabel, Icon, accent, placeholder } = config[action];
   const requiresConsent = action === 'approve' || action === 'reject';
-  const isAlreadyClosed = (action === 'approve' || action === 'reject') && offerStatus !== 'SENT';
+  const isAlreadyClosed = (action === 'approve' || action === 'reject') && ['ACCEPTED', 'REJECTED', 'ARCHIVED', 'CONVERTED'].includes(offerStatus);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,7 +60,7 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
         }),
       });
       const body = await response.json().catch(() => ({})) as { message?: string; error?: string };
-      setResult({ ok: response.ok, message: response.ok ? body.message || 'Odpověď byla uložena.' : body.error || 'Odpověď se nepodařilo odeslat.' });
+      setResult({ ok: response.ok, message: response.ok ? body.message || 'Odpověď byla uložena a odeslána obchodníkovi.' : body.error || 'Odpověď se nepodařilo odeslat.' });
     } catch {
       setResult({ ok: false, message: 'Odpověď se nepodařilo odeslat. Zkontrolujte připojení a zkuste to znovu.' });
     } finally {
@@ -78,7 +78,7 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
             <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600"><CheckCircle2 aria-hidden size={28} /></div>
             <h2 className="text-lg font-semibold text-slate-900" id="offer-dialog-title">Odesláno</h2>
             <p className="text-sm leading-6 text-slate-600">{result.message}</p>
-            <button className="mt-2 min-h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white" onClick={onClose} type="button">Zavřít</button>
+            <button className="mt-2 min-h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white cursor-pointer" onClick={onClose} type="button">Zavřít</button>
           </div>
         ) : (
           <form onSubmit={submit}>
@@ -93,10 +93,10 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
             {isAlreadyClosed && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Tato nabídka už není ve stavu, ve kterém ji lze přijmout.</p>}
             {result && !result.ok && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{result.message}</p>}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
-              <button className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white disabled:opacity-50 ${accent}`} disabled={pending || isAlreadyClosed} type="submit">{pending ? <Loader2 aria-hidden className="animate-spin" size={16} /> : <Icon aria-hidden size={16} />}{submitLabel}</button>
-              <button className="min-h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-700" onClick={onClose} type="button">Zrušit</button>
+              <button className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white disabled:opacity-50 cursor-pointer ${accent}`} disabled={pending || isAlreadyClosed} type="submit">{pending ? <Loader2 aria-hidden className="animate-spin" size={16} /> : <Icon aria-hidden size={16} />}{submitLabel}</button>
+              <button className="min-h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 cursor-pointer" onClick={onClose} type="button">Zrušit</button>
             </div>
-            {action === 'approve' && <button className="mt-3 w-full text-center text-sm font-medium text-red-700 hover:text-red-800" onClick={onReject} type="button">Nabídku odmítnout</button>}
+            {action === 'approve' && <button className="mt-3 w-full text-center text-sm font-medium text-red-700 hover:text-red-800 cursor-pointer" onClick={onReject} type="button">Nabídku odmítnout</button>}
           </form>
         )}
       </div>

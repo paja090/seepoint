@@ -1,6 +1,7 @@
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
+import { sendTransactionalEmail } from '@/lib/email';
 import { enterPublicOfferTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { requireTenantContext } from '@/lib/tenant-context';
@@ -790,7 +791,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
   const message = typeof body.message === 'string' ? body.message.trim().slice(0, 4000) : '';
   if (!actorName || !actorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(actorEmail)) throw new OfferValidationError('Vyplňte jméno a platný e-mail.');
   const publicRow = await getPublicRow(token);
-  return runWithTenantContext({ organizationId: publicRow.organizationId, source: 'public-token' }, () => prisma.$transaction(async (tx) => {
+  const result = await runWithTenantContext({ organizationId: publicRow.organizationId, source: 'public-token' }, () => prisma.$transaction(async (tx) => {
     const row = await tx.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
     if (!row || row.archivedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
     if (action === 'question' || action === 'revision') {
@@ -799,6 +800,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       await tx.offerEvent.create({
         data: {
           offerId: row.id,
+          organizationId: row.organizationId,
           type: 'QUESTION',
           actorName,
           actorEmail,
@@ -807,10 +809,11 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
         },
       });
       return {
+        row,
         status: row.status,
         message: action === 'revision'
-          ? 'Požadavek na úpravu byl uložen. Obchodník se vám ozve.'
-          : 'Dotaz byl uložen. Obchodník se vám ozve.',
+          ? 'Požadavek na úpravu byl uložen a odeslán obchodníkovi.'
+          : 'Dotaz byl uložen a odeslán obchodníkovi.',
       };
     }
     const target = action === 'accept' ? 'ACCEPTED' : action === 'reject' ? 'REJECTED' : null;
@@ -825,7 +828,18 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
         status: target,
         acceptedAt: target === 'ACCEPTED' ? now : undefined,
         rejectedAt: target === 'REJECTED' ? now : undefined,
-        events: { create: { type: target, fromStatus: row.status, toStatus: target, actorName, actorEmail, message: message || null, metadata: { consent: true, channel: 'public-token' } } },
+        events: {
+          create: {
+            organizationId: row.organizationId,
+            type: target,
+            fromStatus: row.status,
+            toStatus: target,
+            actorName,
+            actorEmail,
+            message: message || null,
+            metadata: { consent: true, channel: 'public-token' },
+          },
+        },
       },
     });
 
@@ -843,8 +857,42 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       });
     }
 
-    return { status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
+    return { row, status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
+
+  // Asynchronously send notification email to salesperson / agency team
+  try {
+    const row = result.row;
+    const recipientEmail = row.createdByUser?.email || row.contactEmail || process.env.EMAIL_BCC || 'info@seepoint.cz';
+    const actionLabel = action === 'accept' ? 'PŘIJATA' : action === 'reject' ? 'ODMÍTNUTA' : action === 'revision' ? 'ŽÁDOST O ÚPRAVU' : 'NOVÝ DOTAZ';
+    const emailSubject = action === 'accept'
+      ? `🎉 Nabídka ${row.campaignName} byla PŘIJATA klientem ${actorName}`
+      : action === 'reject'
+      ? `❌ Nabídka ${row.campaignName} byla odmítnuta (${actorName})`
+      : action === 'revision'
+      ? `✏️ Požadavek na úpravu nabídky ${row.campaignName} od ${actorName}`
+      : `💬 Nový dotaz k nabídce ${row.campaignName} od ${actorName}`;
+
+    const emailText = `Klient reagoval na nabídku v systému SeePOINT:\n\n`
+      + `Kampaň: ${row.campaignName}\n`
+      + `Klient: ${row.client.name}\n`
+      + `Jméno: ${actorName}\n`
+      + `E-mail: ${actorEmail}\n`
+      + `Stav / Akce: ${actionLabel}\n\n`
+      + `Zpráva od klienta:\n${message || 'Bez další textové zprávy'}\n\n`
+      + `Detail nabídky v systému:\n${process.env.NEXT_PUBLIC_APP_URL || 'https://os.seepoint.cz'}/offers/${row.id}`;
+
+    await sendTransactionalEmail({
+      to: recipientEmail,
+      subject: emailSubject,
+      message: emailText,
+      template: 'offer-client-response',
+    });
+  } catch (emailError) {
+    console.error('[respondToPublicOffer] Failed to send email notification:', emailError);
+  }
+
+  return { status: result.status, message: result.message };
 }
 
 export async function getPublicPhoto(token: string, photoId: string) {
