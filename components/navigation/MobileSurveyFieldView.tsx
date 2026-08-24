@@ -696,15 +696,53 @@ export function MobileSurveyFieldView({
 
             {/* Form Inputs */}
             <div className="space-y-3 pt-1">
-              <label className="text-xs font-bold text-slate-700 block">
-                Příjezdová trasa
-                <select value={formRouteId} onChange={(e) => setFormRouteId(e.target.value)} className="input text-xs mt-1 font-bold">
-                  <option value="">-- Bez trasy / Obecné místo --</option>
-                  {data.surveyRoutes.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Příjezdová trasa / Koridor
+                  <select value={formRouteId} onChange={(e) => setFormRouteId(e.target.value)} className="input text-xs mt-1 font-bold">
+                    <option value="">-- Bez trasy / Obecné místo --</option>
+                    {data.surveyRoutes.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                    <option value="__NEW__">➕ Vytvořit novou trasa (např. Příjezd od Hlučína)...</option>
+                  </select>
+                </label>
+                <p className="text-[10px] text-slate-500 font-medium">
+                  Trasy slouží ke seskupování navigačních cedulí podle směrů, odkud klienti přijíždějí.
+                </p>
+
+                {formRouteId === '__NEW__' && (
+                  <div className="p-3 rounded-2xl bg-purple-50 border border-purple-200 space-y-2 mt-2">
+                    <span className="text-xs font-bold text-purple-900 block">Zadejte název nové příjezdové trasy:</span>
+                    <input
+                      type="text"
+                      placeholder="Např. Hlavní příjezd od Opavy / Dálnice D1"
+                      className="input text-xs bg-white border-purple-300"
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                          e.preventDefault();
+                          const val = e.currentTarget.value.trim();
+                          try {
+                            const res = await fetch(`/api/navigation/orders/${orderId}/routes`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ name: val }),
+                            });
+                            if (res.ok) {
+                              const routeData = await res.json();
+                              setData((prev) => prev ? { ...prev, surveyRoutes: [...prev.surveyRoutes, routeData] } : null);
+                              setFormRouteId(routeData.id);
+                            }
+                          } catch (err) {
+                            console.error('Create route error:', err);
+                          }
+                        }
+                      }}
+                    />
+                    <span className="text-[10px] text-purple-700 block">Stiskněte Enter pro uložení nové trasy.</span>
+                  </div>
+                )}
+              </div>
 
               <label className="text-xs font-bold text-slate-700 block">
                 Název / Označení místa
