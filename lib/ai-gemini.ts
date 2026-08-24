@@ -68,9 +68,10 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   // Try Google Gemini Vision models FIRST (ultra-cheap Gemini Flash rates)
   if (effectiveGeminiKey) {
     const modelsToTry = [
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
       'gemini-2.5-flash',
       'gemini-1.5-flash',
-      'gemini-2.0-flash',
       'gemini-flash-latest',
     ];
 
