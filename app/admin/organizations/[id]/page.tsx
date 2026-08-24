@@ -3,7 +3,7 @@ import { platformPrisma } from '@/lib/db';
 import { requireSuperAdmin } from '@/lib/organization';
 import { notFound } from 'next/navigation';
 import { OrganizationStatusButton } from '@/components/OrganizationStatusButton';
-import { getOrganizationAIUsage } from '@/lib/ai-usage';
+import { getOrganizationFullUsageReport } from '@/lib/organization-usage';
 import Link from 'next/link';
 
 export default async function OrganizationAdminDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -29,14 +29,12 @@ export default async function OrganizationAdminDetail({ params }: { params: Prom
 
   if (!organization) notFound();
 
-  const [clients, surfaces, offers, aiUsage] = await Promise.all([
+  const [clients, surfaces, offers, fullUsage] = await Promise.all([
     platformPrisma.client.count({ where: { organizationId: id } }),
     platformPrisma.advertisingSurface.count({ where: { organizationId: id } }),
     platformPrisma.offer.count({ where: { organizationId: id } }),
-    getOrganizationAIUsage(id),
+    getOrganizationFullUsageReport(id),
   ]);
-
-  const costCzk = Math.round((aiUsage.totalCostUsd || 0) * 23.5);
 
   return (
     <AppShell>
@@ -59,7 +57,7 @@ export default async function OrganizationAdminDetail({ params }: { params: Prom
           <OrganizationStatusButton id={organization.id} isActive={organization.isActive} />
         </div>
 
-        {/* System & AI Metric Grid */}
+        {/* System & Resource Metric Grid */}
         <div className="grid gap-4 md:grid-cols-4">
           <div className="card border-slate-200">
             <span className="text-xs font-bold text-slate-500 uppercase">Klienti</span>
@@ -76,45 +74,65 @@ export default async function OrganizationAdminDetail({ params }: { params: Prom
             <strong className="text-2xl font-black text-slate-900 block">{offers}</strong>
           </div>
 
-          {/* AI Usage Metric Box */}
-          <div className="card border-purple-200 bg-purple-50/50">
-            <span className="text-xs font-bold text-purple-700 uppercase">🤖 AI Spotřeba Tento Měsíc</span>
-            <strong className="text-2xl font-black text-purple-900 block">{aiUsage.totalCalls} dotazů</strong>
-            <span className="text-[11px] text-purple-700 font-semibold block">
-              ~ {costCzk} Kč (${aiUsage.totalCostUsd.toFixed(3)})
-            </span>
+          {/* Infrastructure Cost Summary Box */}
+          <div className="card border-emerald-300 bg-emerald-50/50">
+            <span className="text-xs font-bold text-emerald-800 uppercase">💰 Měsíční Náklady Služeb</span>
+            <strong className="text-2xl font-black text-emerald-900 block">
+              ~ {fullUsage.totalEstimatedCostCzk} Kč
+            </strong>
+            <span className="text-[11px] text-emerald-700 font-semibold block">AI + Maps + Cloud Uložiště</span>
           </div>
         </div>
 
-        {/* AI Detailed Usage Box */}
-        <div className="card border-purple-200 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 rounded-3xl shadow-xl space-y-3">
+        {/* Multi-resource Usage Breakdown Box */}
+        <div className="card border-purple-200 bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 text-white p-6 rounded-3xl shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-purple-800/80 pb-3">
-            <h2 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-              <span>🤖 SeePoint AI Engine — Statistiky spotřeby kreditů</span>
-            </h2>
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-950 text-purple-200 border border-purple-700">
-              Od 1. v měsíci
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-white">
+                📊 Měřené API Služby & Uložiště za Tento Měsíc
+              </h2>
+              <p className="text-xs text-purple-300">Přehled vyčerpaných kapacit od 1. dne v měsíci</p>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-900 text-purple-200 border border-purple-700">
+              Platformní billing
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
-            <div className="p-3 rounded-2xl bg-slate-950/80 border border-purple-800/60">
-              <span className="text-slate-400 block font-semibold">Počet AI Operací</span>
-              <strong className="text-base font-black text-white">{aiUsage.totalCalls} generování</strong>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            {/* Resource 1: AI Engine */}
+            <div className="p-4 rounded-2xl bg-slate-950/90 border border-purple-800/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-purple-300">🤖 AI Engine (Gemini)</span>
+                <span className="text-[10px] font-bold text-purple-400">~ {fullUsage.aiCostCzk} Kč</span>
+              </div>
+              <div className="text-xl font-black text-white">{fullUsage.aiCalls} dotazů</div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                {(fullUsage.aiTokens / 1000).toFixed(1)}k tokenů (${fullUsage.aiCostUsd.toFixed(3)})
+              </div>
             </div>
 
-            <div className="p-3 rounded-2xl bg-slate-950/80 border border-purple-800/60">
-              <span className="text-slate-400 block font-semibold">Spotřebované Tokeny</span>
-              <strong className="text-base font-black text-purple-300">
-                {(((aiUsage.totalPromptTokens || 0) + (aiUsage.totalOutputTokens || 0)) / 1000).toFixed(1)}k tokenů
-              </strong>
+            {/* Resource 2: Google Maps API */}
+            <div className="p-4 rounded-2xl bg-slate-950/90 border border-sky-800/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sky-300">🗺️ Google Maps API</span>
+                <span className="text-[10px] font-bold text-sky-400">~ {fullUsage.googleMapsCostCzk} Kč</span>
+              </div>
+              <div className="text-xl font-black text-white">{fullUsage.googleMapsMapLoads} načtení</div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                {fullUsage.googleMapsGeocodes} geokódování adres (${fullUsage.googleMapsCostUsd.toFixed(3)})
+              </div>
             </div>
 
-            <div className="p-3 rounded-2xl bg-slate-950/80 border border-purple-800/60">
-              <span className="text-slate-400 block font-semibold">Odhadované náklady na AI API</span>
-              <strong className="text-base font-black text-emerald-400">
-                {costCzk} Kč (${aiUsage.totalCostUsd.toFixed(3)} USD)
-              </strong>
+            {/* Resource 3: Cloud Storage */}
+            <div className="p-4 rounded-2xl bg-slate-950/90 border border-emerald-800/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-300">☁️ Cloud Uložiště & Fotky</span>
+                <span className="text-[10px] font-bold text-emerald-400">~ {fullUsage.storageCostCzk} Kč</span>
+              </div>
+              <div className="text-xl font-black text-white">{fullUsage.estimatedStorageGb} GB dat</div>
+              <div className="text-[11px] text-slate-400 font-mono">
+                {fullUsage.totalPhotosCount} nově nahraných fotek z terénu
+              </div>
             </div>
           </div>
         </div>
