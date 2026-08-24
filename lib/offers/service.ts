@@ -759,29 +759,20 @@ export async function getPublicRow(token: string) {
   const cleanToken = token.trim();
   const tokenHash = hashPublicOfferToken(cleanToken);
 
-  let owner = await enterPublicOfferTenant(tokenHash);
-  let matchedHash = tokenHash;
-
-  if (!owner) {
-    owner = await enterPublicOfferTenant(cleanToken);
-    matchedHash = cleanToken;
-  }
-
+  const owner = await enterPublicOfferTenant(cleanToken);
   if (!owner) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
 
-  const row = await runWithTenantContext(
-    { organizationId: owner.organizationId, source: 'public-token' },
-    () => prisma.offer.findFirst({
-      where: {
-        OR: [
-          { publicTokenHash: matchedHash },
-          { publicTokenHash: tokenHash },
-          { id: cleanToken },
-        ],
-      },
-      include: offerInclude,
-    }),
-  );
+  const row = await platformPrisma.offer.findFirst({
+    where: {
+      OR: [
+        { publicTokenHash: cleanToken },
+        { publicTokenHash: tokenHash },
+        { id: cleanToken },
+      ],
+    },
+    include: offerInclude,
+  });
+
   if (!row || row.archivedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   return row;
 }
