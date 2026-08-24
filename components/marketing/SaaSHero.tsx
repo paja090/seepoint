@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Play, Layers, MapPin, Building2, TrendingUp, Smartphone, Laptop } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Play, Layers, MapPin, Building2, TrendingUp, Smartphone, Laptop, Clock, BarChart3 } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
 export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
@@ -26,14 +26,14 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
         {/* H1 Title */}
         <div className="space-y-4 max-w-4xl mx-auto">
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.08]">
-            Operační systém pro <br />
+            Mějte své reklamní plochy <br />
             <span className="bg-gradient-to-r from-purple-400 via-indigo-300 to-sky-400 bg-clip-text text-transparent">
-              venkovní reklamu.
+              plně pod kontrolou.
             </span>
           </h1>
 
           <p className="text-lg sm:text-2xl font-bold text-slate-200 leading-snug max-w-3xl mx-auto">
-            Reklamní plochy, klienti, nabídky, kampaně, realizace, fotodokumentace a AI v jednom systému.
+            Chytrý systém pro správu venkovní reklamy, který šetří čas, zvyšuje obsazenost a přináší přehled o celém vašem portfoliu.
           </p>
 
           <p className="text-sm sm:text-base text-slate-400 font-medium max-w-2xl mx-auto leading-relaxed">
@@ -70,10 +70,20 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
           </a>
         </div>
 
-        {/* Trust Badge */}
-        <div className="pt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-400">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Vytvořeno na základě skutečného provozu outdoorové reklamní společnosti.</span>
+        {/* 3 Micro-Benefits Strip (matching reference) */}
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-slate-300">
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm">
+            <MapPin className="w-4 h-4 text-purple-400" />
+            <span>Přehledná mapa všech nosičů</span>
+          </div>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm">
+            <BarChart3 className="w-4 h-4 text-emerald-400" />
+            <span>Vytíží obsazenost až o 15 %</span>
+          </div>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/70 border border-slate-800 backdrop-blur-sm">
+            <Clock className="w-4 h-4 text-sky-400" />
+            <span>Úspora času a méně chyb</span>
+          </div>
         </div>
 
         {/* Photorealistic 3D Product Mockup Visual */}
