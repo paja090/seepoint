@@ -40,7 +40,7 @@ export default async function CompanySettingsPage() {
             <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-purple-800/60">
               <span className="text-slate-400 block font-semibold">Spotřebované Tokeny</span>
               <strong className="text-lg font-black text-purple-300">
-                {((aiUsage.totalPromptTokens + aiUsage.totalOutputTokens) / 1000).toFixed(1)}k tokenů
+                {(((aiUsage.totalPromptTokens || 0) + (aiUsage.totalOutputTokens || 0)) / 1000).toFixed(1)}k tokenů
               </strong>
             </div>
 
