@@ -62,18 +62,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       await sendTransactionalEmail({
         to: salesEmail,
         subject: `[SeePOINT] Klient nahrál logo / grafické podklady k nabídce ${offer.title}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 16px;">
-            <h2 style="color: #0284c7; margin-top: 0;">🎨 Klient nahrál grafické podklady</h2>
-            <p>Klient <strong>${offer.client?.name || 'Zákazník'}</strong> právě nahrál grafické podklady přes veřejný odkaz nabídky.</p>
-            <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin: 16px 0;">
-              <p style="margin: 0 0 8px 0;"><strong>Nabídka:</strong> ${offer.title}</p>
-              <p style="margin: 0 0 8px 0;"><strong>Soubor:</strong> ${clientArtworkFileName}</p>
-              <p style="margin: 0;"><strong>Klient:</strong> ${offer.client?.name || 'Nezadáno'}</p>
-            </div>
-            <p style="margin-top: 24px;">Podklady jsou uloženy v detailu nabídky v administraci SeePOINT.</p>
-          </div>
-        `,
+        template: 'artwork-uploaded',
+        message: `Klient ${offer.client?.name || 'Zákazník'} právě nahrál grafické podklady k nabídce "${offer.title}".\n\nSoubor: ${clientArtworkFileName}\nKlient: ${offer.client?.name || 'Nezadáno'}\n\nPodklady jsou uloženy v detailu nabídky v administraci SeePOINT.`,
       });
     } catch {
       // Background email delivery fallback
