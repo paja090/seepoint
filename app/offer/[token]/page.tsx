@@ -7,7 +7,6 @@ import { OfferValidationError } from '@/lib/offers/domain';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getPublicOffer } from '@/lib/offers/service';
 import type { OfferView } from '@/lib/offers/view-model';
-
 import { CampaignConceptPublicView } from '@/components/offers/CampaignConceptPublicView';
 
 export const dynamic = 'force-dynamic';
@@ -16,26 +15,43 @@ async function loadOffer(token: string) {
   try {
     return await getPublicOffer(token) as OfferView;
   } catch (error) {
-    if (error instanceof OfferValidationError) notFound();
-    throw error;
+    if (error instanceof OfferValidationError || (error as { code?: string })?.code === 'NOT_FOUND') {
+      notFound();
+    }
+    console.error('[PublicOfferPage] Error loading offer:', error);
+    notFound();
   }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
-  const offer = await loadOffer((await params).token);
-  const title = `${offer.campaignName || offer.title} | ${offer.branding?.name || 'SeePOINT'}`;
-  const description = offer.clientMessage || offer.campaignGoal || `Reklamní nabídka připravená pro ${offer.client.name}.`;
+  try {
+    const { token } = await params;
+    const offer = await getPublicOffer(token).catch(() => null) as OfferView | null;
+    if (!offer) {
+      return {
+        title: 'Nabídka | SeePOINT',
+        robots: { index: false, follow: false },
+      };
+    }
+    const title = `${offer.campaignName || offer.title || 'Nabídka'} | ${offer.branding?.name || 'SeePOINT'}`;
+    const description = offer.clientMessage || offer.campaignGoal || `Reklamní nabídka připravená pro ${offer.client?.name || 'klienta'}.`;
 
-  return {
-    title,
-    description,
-    robots: { index: false, follow: false },
-    openGraph: { title, description, type: 'website' },
-  };
+    return {
+      title,
+      description,
+      robots: { index: false, follow: false },
+      openGraph: { title, description, type: 'website' },
+    };
+  } catch {
+    return {
+      title: 'Nabídka | SeePOINT',
+      robots: { index: false, follow: false },
+    };
+  }
 }
 
 export default async function PublicOfferPage({ params }: { params: Promise<{ token: string }> }) {
-  const token = (await params).token;
+  const { token } = await params;
   const offer = await loadOffer(token);
 
   if ((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept) {
@@ -52,7 +68,7 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
             <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-center gap-4">
                 <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-500">
-                  {offer.client.logoUrl ? (
+                  {offer.client?.logoUrl ? (
                     <img alt={`Logo ${offer.client.name}`} className="h-full w-full object-contain p-2" src={offer.client.logoUrl} />
                   ) : offer.branding?.logoUrl ? (
                     <img alt={`Logo ${offer.branding.name}`} className="h-full w-full object-contain p-2" src={offer.branding.logoUrl} />
@@ -63,7 +79,7 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold uppercase tracking-widest text-sky-600">{offer.branding?.name || 'SeePOINT'} · Nabídka navigace</p>
                   <h1 className="text-2xl font-black text-slate-900">{offer.campaignName || offer.title}</h1>
-                  <p className="text-sm font-semibold text-slate-500">Připraveno pro společnost {offer.client.name}</p>
+                  <p className="text-sm font-semibold text-slate-500">Připraveno pro společnost {offer.client?.name || 'klienta'}</p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">

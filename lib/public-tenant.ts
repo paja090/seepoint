@@ -2,12 +2,17 @@ import 'server-only';
 import { platformPrisma } from './db';
 import { enterTenantContext } from './tenant-context';
 
-export async function enterPublicOfferTenant(publicTokenHash: string) {
-  const owner = await platformPrisma.offer.findUnique({
-    where: { publicTokenHash },
+export async function enterPublicOfferTenant(tokenOrHash: string) {
+  const owner = await platformPrisma.offer.findFirst({
+    where: {
+      OR: [
+        { publicTokenHash: tokenOrHash },
+        { id: tokenOrHash },
+      ],
+    },
     select: { id: true, organizationId: true, publishedAt: true, archivedAt: true },
   });
-  if (!owner || !owner.publishedAt || owner.archivedAt) return null;
+  if (!owner || owner.archivedAt) return null;
   enterTenantContext({ organizationId: owner.organizationId, source: 'public-token' });
   return owner;
 }
@@ -21,4 +26,3 @@ export async function enterPublicNavigationReportTenant(publicTokenHash: string)
   enterTenantContext({ organizationId: owner.organizationId, source: 'public-token' });
   return owner;
 }
-

@@ -755,13 +755,32 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
 }
 
 export async function getPublicRow(token: string) {
-  if (!isPlausiblePublicOfferToken(token)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
-  const tokenHash = hashPublicOfferToken(token);
-  const owner = await enterPublicOfferTenant(tokenHash);
+  if (!token || typeof token !== 'string') throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  const cleanToken = token.trim();
+  const tokenHash = hashPublicOfferToken(cleanToken);
+
+  let owner = await enterPublicOfferTenant(tokenHash);
+  let matchedHash = tokenHash;
+
+  if (!owner) {
+    owner = await enterPublicOfferTenant(cleanToken);
+    matchedHash = cleanToken;
+  }
+
   if (!owner) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+
   const row = await runWithTenantContext(
     { organizationId: owner.organizationId, source: 'public-token' },
-    () => prisma.offer.findUnique({ where: { publicTokenHash: tokenHash }, include: offerInclude }),
+    () => prisma.offer.findFirst({
+      where: {
+        OR: [
+          { publicTokenHash: matchedHash },
+          { publicTokenHash: tokenHash },
+          { id: cleanToken },
+        ],
+      },
+      include: offerInclude,
+    }),
   );
   if (!row || row.archivedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   return row;

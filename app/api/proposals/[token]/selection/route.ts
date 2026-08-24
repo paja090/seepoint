@@ -42,6 +42,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         })
       ));
       await tx.offerEvent.create({ data: {
+        organizationId: offer.organizationId,
         offerId: offer.id,
         type: 'UPDATED',
         actorName: 'Klient (veřejný odkaz)',
