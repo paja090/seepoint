@@ -4,10 +4,29 @@ import { requireTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
+export type HoldRecord = {
+  id: string;
+  surfaceId: string;
+  direction: 'INCOMING' | 'OUTGOING';
+  partnerName: string;
+  surfaceName: string;
+  carrierCode: string;
+  city: string;
+  street: string;
+  b2bPrice: number;
+  clientPrice: number;
+  marginCzk: number;
+  createdAt: string;
+  expiresAt: string;
+  status: string;
+  daysLeft: number;
+};
+
 // In-memory / transactional mock hold store for real-time demonstration
-let activeHolds = [
+let activeHolds: HoldRecord[] = [
   {
     id: 'hold-101',
+    surfaceId: 'surf-brn-04',
     direction: 'OUTGOING', // Odchozí: My rezervujeme cizí plochu
     partnerName: 'Outdoor Media Brno s.r.o.',
     surfaceName: 'Strana A (Eurobillboard)',
@@ -24,6 +43,7 @@ let activeHolds = [
   },
   {
     id: 'hold-102',
+    surfaceId: 'surf-pha-12',
     direction: 'INCOMING', // Příchozí: Partner si drží naši plochu v Praze
     partnerName: 'Ostrava Outdoor s.r.o.',
     surfaceName: 'Strana A (Promo lavička)',
@@ -56,26 +76,28 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { holdId, surfaceId, action, reason } = body;
+    const { holdId, surfaceId, action } = body;
 
     if (action === 'CONFIRM') {
       activeHolds = activeHolds.map((h) =>
-        h.id === holdId ? { ...h, status: 'CONFIRMED' } : h
+        h.id === holdId || (surfaceId && h.surfaceId === surfaceId)
+          ? { ...h, status: 'CONFIRMED' }
+          : h
       );
       return NextResponse.json({
         success: true,
-        message: 'B2B Rezervace byla úspěšně potvrzena do závazné zakázky!',
+        message: 'B2B Hold byl úspěšně potvrzen a plocha byla převedena do závazné zakázky!',
         status: 'CONFIRMED',
       });
     }
 
     if (action === 'EXTEND') {
       activeHolds = activeHolds.map((h) =>
-        h.id === holdId
+        h.id === holdId || (surfaceId && h.surfaceId === surfaceId)
           ? {
               ...h,
-              expiresAt: new Date(new Date(h.expiresAt).getTime() + 3 * 86400000).toISOString(),
               daysLeft: h.daysLeft + 3,
+              expiresAt: new Date(new Date(h.expiresAt).getTime() + 3 * 86400000).toISOString(),
             }
           : h
       );
@@ -87,7 +109,9 @@ export async function POST(req: Request) {
     }
 
     if (action === 'RELEASE') {
-      activeHolds = activeHolds.filter((h) => h.id !== holdId && h.surfaceId !== surfaceId);
+      activeHolds = activeHolds.filter(
+        (h) => h.id !== holdId && (!surfaceId || h.surfaceId !== surfaceId)
+      );
       return NextResponse.json({
         success: true,
         message: 'B2B Hold byl uvolněn a plocha je opět plně dostupná pro ostatní.',
@@ -96,8 +120,9 @@ export async function POST(req: Request) {
     }
 
     if (action === 'CREATE') {
-      const newHold = {
+      const newHold: HoldRecord = {
         id: `hold-${Date.now().toString().slice(-4)}`,
+        surfaceId: surfaceId || `surf-${Date.now()}`,
         direction: 'OUTGOING',
         partnerName: 'Outdoor Media Partner s.r.o.',
         surfaceName: 'Strana A (Plocha ze sítě)',
@@ -112,10 +137,11 @@ export async function POST(req: Request) {
         status: 'ACTIVE_HOLD',
         daysLeft: 5,
       };
-      activeHolds.unshift(newHold);
+      activeHolds.push(newHold);
+
       return NextResponse.json({
         success: true,
-        message: 'Dočasná B2B rezervace (Hold na 5 dní) byla úspěšně vytvořena.',
+        message: 'Dočasný 5denní B2B Hold byl úspěšně vytvořen!',
         hold: newHold,
       });
     }
@@ -123,6 +149,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: 'Neznámá akce.' }, { status: 400 });
   } catch (error: unknown) {
     console.error('[api/network/holds]', error);
-    return NextResponse.json({ success: false, error: 'Akci se nepodařilo provést.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Chyba při zpracování holdu.' }, { status: 500 });
   }
 }
