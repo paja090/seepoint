@@ -1,27 +1,14 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { OfferProposal } from '@/components/offer/OfferProposal';
 import { SpecializedOfferSummary } from '@/components/offers/SpecializedOfferSummary';
 import { SpecializedOfferResponseActions } from '@/components/offers/SpecializedOfferResponseActions';
-import { OfferValidationError } from '@/lib/offers/domain';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getPublicOffer } from '@/lib/offers/service';
 import type { OfferView } from '@/lib/offers/view-model';
 import { CampaignConceptPublicView } from '@/components/offers/CampaignConceptPublicView';
 
 export const dynamic = 'force-dynamic';
-
-async function loadOffer(token: string) {
-  try {
-    return await getPublicOffer(token) as OfferView;
-  } catch (error) {
-    if (error instanceof OfferValidationError || (error as { code?: string })?.code === 'NOT_FOUND') {
-      notFound();
-    }
-    console.error('[PublicOfferPage] Error loading offer:', error);
-    notFound();
-  }
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   try {
@@ -52,7 +39,42 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
 
 export default async function PublicOfferPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const offer = await loadOffer(token);
+  let offer: OfferView | null = null;
+
+  try {
+    offer = (await getPublicOffer(token)) as OfferView;
+  } catch (error) {
+    console.error('[PublicOfferPage] Offer load error:', error);
+  }
+
+  if (!offer) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl space-y-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/seepoint-logo.svg" alt="SeePOINT" className="h-10 mx-auto object-contain" />
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 text-amber-950 space-y-2">
+            <h2 className="text-xl font-black">Nabídka nebyla nalezena</h2>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Odkaz na tuto nabídku již není platný nebo byl vygenerován nový odkaz. Pokud jste nabídku obdrželi e-mailem, zkontrolujte prosím nejnovější zprávu od obchodníka SeePOINT.
+            </p>
+          </div>
+          <p className="text-xs text-slate-500">
+            Máte dotaz? Napište nám na{' '}
+            <a href="mailto:info@seepoint.cz" className="text-sky-600 font-bold underline">
+              info@seepoint.cz
+            </a>
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition w-full"
+          >
+            Přejít na SeePOINT.cz
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if ((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept) {
     return <CampaignConceptPublicView offer={offer} token={token} />;
@@ -69,10 +91,13 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
               <div className="flex min-w-0 items-center gap-4">
                 <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-500">
                   {offer.client?.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img alt={`Logo ${offer.client.name}`} className="h-full w-full object-contain p-2" src={offer.client.logoUrl} />
                   ) : offer.branding?.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img alt={`Logo ${offer.branding.name}`} className="h-full w-full object-contain p-2" src={offer.branding.logoUrl} />
                   ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img alt="SeePOINT" className="h-full w-full object-contain p-2" src="/seepoint-logo.svg" />
                   )}
                 </span>
@@ -83,6 +108,7 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img alt={offer.branding?.name || 'SeePOINT'} className="h-8 max-w-36 object-contain" src={offer.branding?.logoUrl || '/seepoint-logo.svg'} />
               </div>
             </div>
