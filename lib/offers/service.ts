@@ -375,8 +375,9 @@ function offerData(input: OfferInput, user: CurrentUser, calculated: ReturnType<
   };
 }
 
-function itemData(item: ReturnType<typeof calculateOffer>['items'][number], index: number) {
+function itemData(item: ReturnType<typeof calculateOffer>['items'][number], index: number, user?: CurrentUser) {
   return {
+    organizationId: user?.organizationId,
     surfaceId: item.surfaceId,
     dateFrom: parseDateOnly(item.dateFrom, 'Začátek kampaně'),
     dateTo: parseDateOnly(item.dateTo, 'Konec kampaně'),
@@ -398,8 +399,9 @@ function itemData(item: ReturnType<typeof calculateOffer>['items'][number], inde
   };
 }
 
-function chargeData(charge: ReturnType<typeof calculateOffer>['charges'][number]) {
+function chargeData(charge: ReturnType<typeof calculateOffer>['charges'][number], user?: CurrentUser) {
   return {
+    organizationId: user?.organizationId,
     priceRuleId: charge.priceRuleId,
     category: charge.category,
     code: charge.code,
@@ -494,11 +496,12 @@ export async function createOffer(user: CurrentUser, raw: unknown, intent: 'draf
         offerType: 'STANDARD_MEDIA',
         sentAt: null,
         ...serverOfferAuthor(user),
-        items: { create: calculated.items.map(itemData) },
-        charges: { create: calculated.charges.map(chargeData) },
-        packageSelections: packageSelection ? { create: packageSelection } : undefined,
+        organizationId: user.organizationId,
+        items: { create: calculated.items.map((item, idx) => itemData(item, idx, user)) },
+        charges: { create: calculated.charges.map((charge) => chargeData(charge, user)) },
+        packageSelections: packageSelection ? { create: { ...packageSelection, organizationId: user.organizationId } } : undefined,
         events: { create: [
-          { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name },
+          { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId },
         ] },
       },
       include: offerInclude,
@@ -526,10 +529,10 @@ export async function updateOffer(user: CurrentUser, id: string, raw: unknown) {
       where: { id },
       data: {
         ...offerData(input, user, calculated),
-        items: { create: calculated.items.map(itemData) },
-        charges: { create: calculated.charges.map(chargeData) },
-        packageSelections: packageSelection ? { create: packageSelection } : undefined,
-        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } },
+        items: { create: calculated.items.map((item, idx) => itemData(item, idx, user)) },
+        charges: { create: calculated.charges.map((charge) => chargeData(charge, user)) },
+        packageSelections: packageSelection ? { create: { ...packageSelection, organizationId: user.organizationId } } : undefined,
+        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
       },
       include: offerInclude,
     });
@@ -581,9 +584,9 @@ export async function updateOfferPricing(user: CurrentUser, id: string, raw: unk
         totalPrice: new Prisma.Decimal(calculated.totals.subtotal),
         totalWithTax: new Prisma.Decimal(calculated.totals.totalWithTax),
         updatedByUserId: user.id,
-        items: { create: calculated.items.map(itemData) },
-        charges: { create: calculated.charges.map(chargeData) },
-        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, message: 'Upravena cenová kalkulace a sleva.' } },
+        items: { create: calculated.items.map((item, idx) => itemData(item, idx, user)) },
+        charges: { create: calculated.charges.map((charge) => chargeData(charge, user)) },
+        events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, message: 'Upravena cenová kalkulace a sleva.', organizationId: user.organizationId } },
       },
       include: offerInclude,
     });
@@ -717,7 +720,7 @@ export async function publishOffer(user: CurrentUser, id: string) {
         publishedAt: new Date(),
         status: newStatus,
         updatedByUserId: user.id,
-        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name } },
+        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
       },
       include: offerInclude,
     });
@@ -742,7 +745,7 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
         publishedAt: new Date(),
         clientMessage: emailDraft?.clientMessage ?? existing.clientMessage,
         updatedByUserId: user.id,
-        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name } },
+        events: { create: { type: 'PUBLISHED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
       },
       include: offerInclude,
     });

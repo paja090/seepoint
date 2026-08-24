@@ -130,13 +130,16 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         }
 
         await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
+        const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
         return tx.offer.update({
           where: { id: offerId },
           data: {
             ...common,
+            organizationId: user.organizationId,
             navigationOffer: {
               upsert: {
                 create: {
+                  organizationId: user.organizationId,
                   targetName: input.targetName,
                   targetAddress: nullable(input.targetAddress),
                   targetLatitude: input.targetLatitude,
@@ -150,7 +153,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
                   includeGraphicProof: input.includeGraphicProof,
                   clientArtworkUrl: input.clientArtworkUrl,
                   clientArtworkFileName: input.clientArtworkFileName,
-                  points: { create: input.points },
+                  points: { create: pointsWithOrg },
                 },
                 update: {
                   targetName: input.targetName,
@@ -166,16 +169,17 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
                   includeGraphicProof: input.includeGraphicProof,
                   clientArtworkUrl: input.clientArtworkUrl,
                   clientArtworkFileName: input.clientArtworkFileName,
-                  points: { create: input.points },
+                  points: { create: pointsWithOrg },
                 },
               },
             },
-            events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } },
+            events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
           },
           select: { id: true },
         });
       }
-    return tx.offer.create({ data: { ...common, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: input.points } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+    const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
+    return tx.offer.create({ data: { ...common, organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
@@ -194,7 +198,7 @@ export async function createCityGalleryOffer(user: CurrentUser, raw: unknown) {
   const client = await prisma.client.findFirst({ where: { id: input.clientId, active: true }, select: { id: true } });
   if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
   if (input.projectId && !await prisma.cityGalleryProject.findUnique({ where: { id: input.projectId }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen.');
-  return prisma.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, offerType: 'CITY_GALLERY', status: 'DRAFT', contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+  return prisma.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, offerType: 'CITY_GALLERY', status: 'DRAFT', contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { organizationId: user.organizationId, projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
 }
 
 export async function updateCityGalleryOffer(user: CurrentUser, offerId: string, raw: unknown) {
@@ -206,7 +210,7 @@ export async function updateCityGalleryOffer(user: CurrentUser, offerId: string,
     if (['CONVERTED', 'ARCHIVED'].includes(existing.status)) throw new OfferValidationError('Převedenou nebo archivovanou nabídku již nelze upravovat.', 'INVALID_STATUS_TRANSITION');
     const client = await tx.client.findFirst({ where: { id: input.clientId, active: true }, select: { id: true } }); if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
     if (input.projectId && !await tx.cityGalleryProject.findUnique({ where: { id: input.projectId }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen.');
-    return tx.offer.update({ where: { id: offerId }, data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), subtotal: input.subtotal, totalPrice: input.subtotal, taxAmount: input.taxAmount, totalWithTax: input.totalWithTax, updatedByUserId: user.id, cityGalleryOffer: { update: { projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name } } }, select: { id: true } });
+    return tx.offer.update({ where: { id: offerId }, data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), subtotal: input.subtotal, totalPrice: input.subtotal, taxAmount: input.taxAmount, totalWithTax: input.totalWithTax, updatedByUserId: user.id, cityGalleryOffer: { update: { projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
