@@ -15,8 +15,11 @@ import {
   ChevronRight,
   Compass,
   ExternalLink,
+  Plus,
+  Sparkles,
 } from 'lucide-react';
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType } from '@/lib/mobile-photo-damage';
+import { MobileCreateCarrierModal } from '@/components/navigation/MobileCreateCarrierModal';
 
 type NearbyCarrier = {
   id: string;
@@ -111,8 +114,16 @@ export function MobilePhotoFieldAppView() {
   const [gpsUpdateSuccessMsg, setGpsUpdateSuccessMsg] = useState<string | null>(null);
   const [gpsUpdateErrorMsg, setGpsUpdateErrorMsg] = useState<string | null>(null);
 
+  // Create New Carrier State
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createPhotoFile, setCreatePhotoFile] = useState<File | null>(null);
+  const [createPreviewUrl, setCreatePreviewUrl] = useState<string | null>(null);
+  const [createSuccessAlert, setCreateSuccessAlert] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const createFileInputRef = useRef<HTMLInputElement | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const createPreviewUrlRef = useRef<string | null>(null);
 
   const clearPreview = () => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
@@ -122,9 +133,46 @@ export function MobilePhotoFieldAppView() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const clearCreatePreview = () => {
+    if (createPreviewUrlRef.current) URL.revokeObjectURL(createPreviewUrlRef.current);
+    createPreviewUrlRef.current = null;
+    setCreatePreviewUrl(null);
+    setCreatePhotoFile(null);
+    if (createFileInputRef.current) createFileInputRef.current.value = '';
+  };
+
   useEffect(() => () => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (createPreviewUrlRef.current) URL.revokeObjectURL(createPreviewUrlRef.current);
   }, []);
+
+  const handleCreateFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
+          throw new Error('Vybraný soubor není podporovaná fotografie.');
+        }
+        if (createPreviewUrlRef.current) URL.revokeObjectURL(createPreviewUrlRef.current);
+        const nextUrl = URL.createObjectURL(file);
+        createPreviewUrlRef.current = nextUrl;
+        setCreatePhotoFile(file);
+        setCreatePreviewUrl(nextUrl);
+        setIsCreateModalOpen(true);
+      } catch (error) {
+        console.error('[mobile-photos/create-camera]', error);
+        clearCreatePreview();
+      }
+    }
+  };
+
+  const handleCreateCarrierSuccess = (newCarrier: NearbyCarrier, message: string) => {
+    setCreateSuccessAlert(message);
+    setCarriers((prev) => [newCarrier, ...prev.filter((c) => c.id !== newCarrier.id)]);
+    setSelectedCarrier(newCarrier);
+    setSelectedSurfaceId(newCarrier.surfaces[0]?.id || null);
+    clearCreatePreview();
+  };
 
   // Auto request location on load
   useEffect(() => {
@@ -402,6 +450,28 @@ export function MobilePhotoFieldAppView() {
         </div>
         {gpsError && <p className="mt-2 text-xs text-amber-400 font-medium flex items-center gap-1"><AlertTriangle size={14} /> {gpsError}</p>}
 
+        {/* Primary Action: Create New Carrier from Photo */}
+        <div className="mt-4 pt-4 border-t border-slate-800/80">
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            ref={createFileInputRef}
+            onChange={handleCreateFileChange}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => createFileInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 py-3.5 px-4 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-xs tracking-wide"
+          >
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-950/20">
+              <Plus size={16} className="text-slate-950" />
+            </div>
+            <span>+ ZALOŽIT NOVOU REKLAMNÍ PLOCHU Z FOTKY</span>
+          </button>
+        </div>
+
         {/* Quick Switcher Banner to Location Survey */}
         <a
           href="/mobile-surveys"
@@ -436,6 +506,22 @@ export function MobilePhotoFieldAppView() {
           <ChevronRight size={18} className="text-emerald-300 group-hover:translate-x-1 transition" />
         </a>
       </div>
+
+      {/* Global Success Alert after Creating Carrier */}
+      {createSuccessAlert && (
+        <div className="flex items-center justify-between rounded-2xl bg-emerald-950/90 p-4 text-xs font-bold text-emerald-300 border border-emerald-700/80 shadow-md animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <span>{createSuccessAlert}</span>
+          </div>
+          <button
+            onClick={() => setCreateSuccessAlert(null)}
+            className="text-emerald-400 hover:text-white px-2 py-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Filter Radius & Search */}
       <div className="flex gap-2">
@@ -475,10 +561,20 @@ export function MobilePhotoFieldAppView() {
         </div>
 
         {filteredCarriers.length === 0 && !loadingCarriers && (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
-            <MapPin size={32} className="mx-auto text-slate-300 mb-2" />
-            <p className="text-sm font-bold text-slate-700">Žádné nosiče v tomto okruhu</p>
-            <p className="text-xs text-slate-400 mt-1">Zkuste zvětšit okruh vyhledávání nebo zadat název do vyhledávače.</p>
+          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-3">
+            <MapPin size={32} className="mx-auto text-slate-300" />
+            <div>
+              <p className="text-sm font-bold text-slate-700">Žádné nosiče v tomto okruhu</p>
+              <p className="text-xs text-slate-400 mt-1">Zkuste zvětšit okruh vyhledávání nebo založit nový nosič na tomto místě.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => createFileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-sm"
+            >
+              <Plus size={14} />
+              <span>Založit novou plochu z fotky</span>
+            </button>
           </div>
         )}
 
@@ -887,6 +983,20 @@ export function MobilePhotoFieldAppView() {
           )}
         </div>
       )}
+
+      {/* Modal for Creating New Carrier from Photo */}
+      <MobileCreateCarrierModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          clearCreatePreview();
+        }}
+        coords={coords}
+        initialFile={createPhotoFile}
+        initialPreviewUrl={createPreviewUrl}
+        onRetake={() => createFileInputRef.current?.click()}
+        onSuccess={handleCreateCarrierSuccess}
+      />
     </div>
   );
 }
