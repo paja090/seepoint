@@ -78,6 +78,8 @@ export function SaaSSegmentsBar() {
                     src={seg.image}
                     alt={seg.label}
                     fill
+                    unoptimized
+                    priority
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                     sizes="(max-width: 768px) 100vw, 20vw"
                   />
