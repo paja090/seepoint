@@ -60,6 +60,72 @@ function scopeCreateData(modelName: string, value: unknown, organizationId: stri
     if ('create' in relationInput) relationInput.create = scopeCreateData(target, relationInput.create, organizationId);
     const createMany = record(relationInput.createMany);
     if (createMany && 'data' in createMany) createMany.data = scopeCreateData(target, createMany.data, organizationId);
+    if ('update' in relationInput) relationInput.update = scopeUpdateData(target, relationInput.update, organizationId);
+    const updateMany = record(relationInput.updateMany);
+    if (updateMany) {
+      if ('data' in updateMany) updateMany.data = scopeUpdateData(target, updateMany.data, organizationId);
+      if (tenantModels.has(target) && 'where' in updateMany) updateMany.where = tenantWhere(updateMany.where, organizationId);
+    }
+    if ('upsert' in relationInput) {
+      const upsert = record(relationInput.upsert);
+      if (upsert) {
+        if ('create' in upsert) upsert.create = scopeCreateData(target, upsert.create, organizationId);
+        if ('update' in upsert) upsert.update = scopeUpdateData(target, upsert.update, organizationId);
+      }
+    }
+    if ('connect' in relationInput && tenantModels.has(target)) {
+      const connect = relationInput.connect;
+      relationInput.connect = Array.isArray(connect)
+        ? connect.map((item) => tenantWhere(item, organizationId))
+        : tenantWhere(connect, organizationId);
+    }
+    const connectOrCreate = relationInput.connectOrCreate;
+    if (connectOrCreate) {
+      const entries = Array.isArray(connectOrCreate) ? connectOrCreate : [connectOrCreate];
+      for (const entryValue of entries) {
+        const entry = record(entryValue);
+        if (!entry) continue;
+        if (tenantModels.has(target)) entry.where = tenantWhere(entry.where, organizationId);
+        entry.create = scopeCreateData(target, entry.create, organizationId);
+      }
+    }
+  }
+  return data;
+}
+
+function scopeUpdateData(modelName: string, value: unknown, organizationId: string): unknown {
+  if (Array.isArray(value)) return value.map((item) => scopeUpdateData(modelName, item, organizationId));
+  const data = record(value);
+  if (!data) return value;
+
+  if (tenantModels.has(modelName) && 'organizationId' in data) {
+    assertOrganizationId(data.organizationId, organizationId);
+    delete data.organizationId;
+  }
+
+  const model = datamodel.get(modelName);
+  for (const field of model?.fields ?? []) {
+    if (field.kind !== 'object' || !(field.name in data)) continue;
+    const relationInput = record(data[field.name]);
+    if (!relationInput) continue;
+    const target = field.type;
+
+    if ('create' in relationInput) relationInput.create = scopeCreateData(target, relationInput.create, organizationId);
+    const createMany = record(relationInput.createMany);
+    if (createMany && 'data' in createMany) createMany.data = scopeCreateData(target, createMany.data, organizationId);
+    if ('update' in relationInput) relationInput.update = scopeUpdateData(target, relationInput.update, organizationId);
+    const updateMany = record(relationInput.updateMany);
+    if (updateMany) {
+      if ('data' in updateMany) updateMany.data = scopeUpdateData(target, updateMany.data, organizationId);
+      if (tenantModels.has(target) && 'where' in updateMany) updateMany.where = tenantWhere(updateMany.where, organizationId);
+    }
+    if ('upsert' in relationInput) {
+      const upsert = record(relationInput.upsert);
+      if (upsert) {
+        if ('create' in upsert) upsert.create = scopeCreateData(target, upsert.create, organizationId);
+        if ('update' in upsert) upsert.update = scopeUpdateData(target, upsert.update, organizationId);
+      }
+    }
     if ('connect' in relationInput && tenantModels.has(target)) {
       const connect = relationInput.connect;
       relationInput.connect = Array.isArray(connect)
@@ -92,18 +158,10 @@ export function scopeTenantQuery(model: string | undefined, operation: string, a
   if (operation === 'createMany' || operation === 'createManyAndReturn') args.data = scopeCreateData(model, args.data, organizationId);
   if (operation === 'upsert') {
     args.create = scopeCreateData(model, args.create, organizationId);
-    const update = record(args.update);
-    if (update) {
-      assertOrganizationId(update.organizationId, organizationId);
-      delete update.organizationId;
-    }
+    args.update = scopeUpdateData(model, args.update, organizationId);
   }
   if (operation === 'update' || operation === 'updateMany') {
-    const data = record(args.data);
-    if (data) {
-      assertOrganizationId(data.organizationId, organizationId);
-      delete data.organizationId;
-    }
+    args.data = scopeUpdateData(model, args.data, organizationId);
   }
   return args;
 }

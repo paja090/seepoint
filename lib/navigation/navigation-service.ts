@@ -63,6 +63,7 @@ async function convertOfferToNavigationOrderWithTransaction(
 
     const crmOrder = await tx.crmOrder.create({
       data: {
+        organizationId: offer.organizationId,
         orderNumber,
         clientId: offer.clientId,
         offerId: offer.id,
@@ -85,6 +86,7 @@ async function convertOfferToNavigationOrderWithTransaction(
 
     const navOrder = await tx.navigationOrder.create({
       data: {
+        organizationId: offer.organizationId,
         crmOrderId: crmOrder.id,
         status: 'POTVRZENO_KLIENTEM',
         blockStatus: 'CEKA_NA_OBJEDNAVKU',
@@ -101,6 +103,7 @@ async function convertOfferToNavigationOrderWithTransaction(
       for (const p of selectedPoints) {
         await tx.navigationPoint.create({
           data: {
+            organizationId: offer.organizationId,
             navigationOrderId: navOrder.id,
             // Body nabídky jsou unikátní budoucí pozice. Fyzický nosič se zakládá
             // až po skutečné montáži, nikdy se nekopíruje z nabídky.
@@ -134,6 +137,7 @@ async function convertOfferToNavigationOrderWithTransaction(
 
     await tx.crmAuditLog.create({
       data: {
+        organizationId: offer.organizationId,
         userId: actorUser.id,
         userEmail: actorUser.email,
         action: 'CONVERT_OFFER_TO_NAVIGATION_ORDER',
