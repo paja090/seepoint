@@ -52,13 +52,22 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
             <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-center gap-4">
                 <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-500">
-                  {offer.branding?.logoUrl ? <img alt={`Logo ${offer.branding.name}`} className="h-full w-full object-contain p-2" src={offer.branding.logoUrl} /> : offer.branding?.name.slice(0, 2).toUpperCase() || offer.client.name.slice(0, 2).toUpperCase()}
+                  {offer.client.logoUrl ? (
+                    <img alt={`Logo ${offer.client.name}`} className="h-full w-full object-contain p-2" src={offer.client.logoUrl} />
+                  ) : offer.branding?.logoUrl ? (
+                    <img alt={`Logo ${offer.branding.name}`} className="h-full w-full object-contain p-2" src={offer.branding.logoUrl} />
+                  ) : (
+                    <img alt="SeePOINT" className="h-full w-full object-contain p-2" src="/seepoint-logo.svg" />
+                  )}
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold uppercase tracking-widest text-sky-600">{offer.branding?.name || 'SeePOINT'} · Nabídka navigace</p>
                   <h1 className="text-2xl font-black text-slate-900">{offer.campaignName || offer.title}</h1>
                   <p className="text-sm font-semibold text-slate-500">Připraveno pro společnost {offer.client.name}</p>
                 </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <img alt={offer.branding?.name || 'SeePOINT'} className="h-8 max-w-36 object-contain" src={offer.branding?.logoUrl || '/seepoint-logo.svg'} />
               </div>
             </div>
           </header>

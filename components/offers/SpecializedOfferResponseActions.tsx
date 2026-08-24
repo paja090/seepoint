@@ -6,7 +6,7 @@ import { OfferActionDialog, type OfferActionType } from '@/components/offer/Offe
 
 export function SpecializedOfferResponseActions({ status, token }: { status: string; token: string }) {
   const [action, setAction] = useState<OfferActionType | null>(null);
-  const canRespond = status === 'SENT';
+  const canRespond = !['ACCEPTED', 'REJECTED', 'ARCHIVED', 'CONVERTED'].includes(status);
 
   if (!canRespond) {
     return (
