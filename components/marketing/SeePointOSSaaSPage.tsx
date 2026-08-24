@@ -22,6 +22,7 @@ import { SaaSPricingSection } from './SaaSPricingSection';
 import { SaaSFaqSection } from './SaaSFaqSection';
 import { SaaSFinalCta } from './SaaSFinalCta';
 import { SaaSDemoModal } from './SaaSDemoModal';
+import { SaaSLiveActivityToast } from './SaaSLiveActivityToast';
 import { SaaSFooter } from './SaaSFooter';
 
 export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
@@ -84,6 +85,9 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
 
       {/* Demo Booking Modal */}
       <SaaSDemoModal isOpen={isDemoModalOpen} onClose={closeDemoModal} />
+
+      {/* Floating Live Activity Toast */}
+      <SaaSLiveActivityToast />
     </div>
   );
 }

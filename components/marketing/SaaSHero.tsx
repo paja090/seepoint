@@ -1,8 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, MapPin, Building2, TrendingUp, Smartphone, Laptop, Clock, BarChart3, Layers } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, CheckCircle2, MapPin, Building2, TrendingUp, Smartphone, Laptop, Clock, BarChart3, Layers, Zap } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
+import { AnimatedCounter } from './AnimatedCounter';
 
 export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
   return (
@@ -54,7 +55,7 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
                   trackSaaSEvent('demo_cta_clicked', { source: 'hero' });
                   onOpenDemoModal();
                 }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-black text-sm shadow-xl hover:shadow-purple-900/50 transition transform active:scale-95 cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl text-white font-black text-sm shadow-xl hover:shadow-purple-900/50 transition transform active:scale-95 cursor-pointer shimmer-btn"
               >
                 <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
                 <span>Domluvit ukázku</span>
@@ -72,24 +73,24 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
             {/* 3 Micro-Benefits Strip */}
             <div className="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-bold text-slate-300">
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-purple-750 transition">
                 <MapPin className="w-4 h-4 text-purple-400 shrink-0" />
                 <span className="text-[11px] leading-tight">Přehledná mapa všech nosičů</span>
               </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-emerald-750 transition">
                 <BarChart3 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="text-[11px] leading-tight">Vytíží obsazenost až o 15 %</span>
               </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-sky-750 transition">
                 <Clock className="w-4 h-4 text-sky-400 shrink-0" />
                 <span className="text-[11px] leading-tight">Úspora času a méně chyb</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: 3D Product Showcase Device Frame */}
-          <div className="lg:col-span-6 relative">
-            <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 p-2 sm:p-3 shadow-2xl ring-1 ring-purple-500/30">
+          {/* Right Column: 3D Product Showcase Device Frame with Floating Animation */}
+          <div className="lg:col-span-6 relative animate-float-slow">
+            <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-950 p-2 sm:p-3 shadow-2xl ring-1 ring-purple-500/30 animate-pulse-glow">
               <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl overflow-hidden bg-slate-950">
                 <Image
                   src="/images/hero_showcase.jpg"
@@ -104,12 +105,12 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
                 {/* Floating Micro-Badges on top of visual */}
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 text-[11px]">
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md shadow-lg">
                     <Laptop className="w-3.5 h-3.5 text-purple-400" />
                     <span className="font-bold">Webový dispečink</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md">
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md shadow-lg">
                     <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="font-bold">Mobilní aplikace montážníka</span>
                   </div>
@@ -119,26 +120,34 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
           </div>
         </div>
 
-        {/* Key Pillars Strip (Below Hero) */}
+        {/* Key Pillars Strip with Animated Count-Ups */}
         <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1">
-            <div className="text-purple-400 font-black text-xl">800+</div>
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-purple-700/60 transition group">
+            <div className="text-purple-400 font-black text-2xl group-hover:scale-105 transition">
+              <AnimatedCounter target={800} suffix="+" />
+            </div>
             <div className="text-xs font-semibold text-slate-400">Spravovaných nosičů</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1">
-            <div className="text-indigo-400 font-black text-xl">100 %</div>
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-indigo-700/60 transition group">
+            <div className="text-indigo-400 font-black text-2xl group-hover:scale-105 transition">
+              <AnimatedCounter target={100} suffix=" %" />
+            </div>
             <div className="text-xs font-semibold text-slate-400">Kontrola nad nabídkami</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1">
-            <div className="text-sky-400 font-black text-xl">Terén & Web</div>
-            <div className="text-xs font-semibold text-slate-400">Živá synchronizace</div>
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-sky-700/60 transition group">
+            <div className="text-sky-400 font-black text-2xl group-hover:scale-105 transition">
+              <AnimatedCounter target={57} prefix="-" suffix=" %" />
+            </div>
+            <div className="text-xs font-semibold text-slate-400">Kilometrů na výjezdech</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1">
-            <div className="text-emerald-400 font-black text-xl">SeePoint AI</div>
-            <div className="text-xs font-semibold text-slate-400">Prodeje & Generátor</div>
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-emerald-700/60 transition group">
+            <div className="text-emerald-400 font-black text-2xl group-hover:scale-105 transition">
+              <AnimatedCounter target={60} suffix=" s" />
+            </div>
+            <div className="text-xs font-semibold text-slate-400">AI Sestavení nabídky</div>
           </div>
         </div>
       </div>
