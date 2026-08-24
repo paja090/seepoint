@@ -20,8 +20,15 @@ export function OffersPageClientActions({ clients = [] }: { clients?: ClientOpti
       </button>
 
       <Link
+        href="/offers/templates"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition shadow-xs"
+      >
+        <span>📚 Vzory & Šablony</span>
+      </Link>
+
+      <Link
         href="/offers/new"
-        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
+        className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition shadow-xs"
       >
         <Plus size={16} />
         <span>Nový návrh kampaně</span>
