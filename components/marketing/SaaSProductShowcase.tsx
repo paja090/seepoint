@@ -26,7 +26,7 @@ import { ShowcaseInteractiveMap } from './ShowcaseInteractiveMap';
 
 export function SaaSProductShowcase() {
   const [activeTab, setActiveTab] = useState<
-    'map' | 'inventory' | 'occupancy' | 'offers' | 'ai' | 'route' | 'warehouse'
+    'map' | 'inventory' | 'occupancy' | 'offers' | 'ai' | 'route' | 'warehouse' | 'network'
   >('map');
 
   // Interactive Route Simulator State
@@ -51,6 +51,21 @@ export function SaaSProductShowcase() {
   // Interactive Warehouse Receipt Scanner State
   const [selectedReceipt, setSelectedReceipt] = useState<'fuel' | 'tools'>('fuel');
   const [scanningReceipt, setScanningReceipt] = useState(false);
+
+  // Interactive B2B Network Simulator State
+  const [selectedNetworkCampaign, setSelectedNetworkCampaign] = useState<'cz_national' | 'moravia_regional' | 'd1_highway'>('cz_national');
+  const [networkDispatched, setNetworkDispatched] = useState(false);
+  const [isSimulatingNetwork, setIsSimulatingNetwork] = useState(false);
+
+  const handleSimulateNetwork = (type: 'cz_national' | 'moravia_regional' | 'd1_highway') => {
+    setSelectedNetworkCampaign(type);
+    setIsSimulatingNetwork(true);
+    setNetworkDispatched(false);
+    setTimeout(() => {
+      setIsSimulatingNetwork(false);
+      setNetworkDispatched(true);
+    }, 500);
+  };
 
   const handleSimulateRoute = () => {
     setOptimizing(true);
@@ -184,7 +199,20 @@ export function SaaSProductShowcase() {
               }`}
             >
               <Receipt className="w-4 h-4 text-amber-300" />
-              <span>🧾 AI Účtenky & Sklad</span>
+              <span>🧾 AI Sklad & Účtenky</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('network')}
+              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                activeTab === 'network'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 text-sky-300 animate-pulse" />
+              <span>🌐 SeePoint Network (B2B Burza)</span>
             </button>
           </div>
         </div>
@@ -680,9 +708,182 @@ export function SaaSProductShowcase() {
                 </div>
               </div>
             )}
+
+            {/* TAB 8: SEEPOINT B2B NETWORK & SHARING */}
+            {activeTab === 'network' && (
+              <div className="p-4 sm:p-6 space-y-6">
+                {/* Header info */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-950 text-blue-300 border border-blue-800">
+                        B2B PARTNERSKÁ BURZA PLOCH
+                      </span>
+                      <span className="text-xs text-emerald-400 font-bold">● 42 zapojených agentur v ČR</span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                      SeePoint Network: Prodávejte kampaně po celé republice bez investic do vlastních sloupů
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      Zkombinujte vlastní nosiče s volnou kapacitou partnerských agentur. Systém automaticky rozdělí marže a odešle montážní podklady.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300">
+                      Vaše agentura: <strong className="text-purple-300">SeePoint Ostrava (280 nosičů)</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Campaign Selector Presets */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-400 block">
+                    Zvolte typ meziměstské klientské poptávky k simulaci:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateNetwork('cz_national')}
+                      className={`p-3.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between space-y-1 ${
+                        selectedNetworkCampaign === 'cz_national'
+                          ? 'border-blue-500 bg-blue-950/40 shadow-lg ring-1 ring-blue-500/30'
+                          : 'border-slate-800 bg-slate-900/60 hover:bg-slate-900 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <strong className="text-xs font-black text-white">🇨🇿 Celorepubliková kampaň</strong>
+                        <span className="text-[10px] font-bold text-blue-300">Ostrava + Brno + Olomouc</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">15 nosičů · Automobilový prodejce</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateNetwork('moravia_regional')}
+                      className={`p-3.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between space-y-1 ${
+                        selectedNetworkCampaign === 'moravia_regional'
+                          ? 'border-blue-500 bg-blue-950/40 shadow-lg ring-1 ring-blue-500/30'
+                          : 'border-slate-800 bg-slate-900/60 hover:bg-slate-900 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <strong className="text-xs font-black text-white">🎯 Region Severní Morava</strong>
+                        <span className="text-[10px] font-bold text-blue-300">Ostrava + Opava + Havířov</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">10 nosičů · Nákupní park & Retail</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateNetwork('d1_highway')}
+                      className={`p-3.5 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between space-y-1 ${
+                        selectedNetworkCampaign === 'd1_highway'
+                          ? 'border-blue-500 bg-blue-950/40 shadow-lg ring-1 ring-blue-500/30'
+                          : 'border-slate-800 bg-slate-900/60 hover:bg-slate-900 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <strong className="text-xs font-black text-white">🚗 Dálniční koridor D1</strong>
+                        <span className="text-[10px] font-bold text-blue-300">Praha ➔ Brno ➔ Ostrava</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">8 Bigboardů · Fast Food řetězec</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Network Breakdown Visual Pipeline */}
+                <div className="rounded-2xl border border-blue-900/50 bg-gradient-to-b from-slate-950 via-slate-900 to-blue-950/20 p-4 sm:p-6 space-y-6">
+                  {/* Financial & Volume Summary Matrix */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 1. Own Carriers */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-purple-800/60 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-purple-300">1. VLASTNÍ NOSIČE (Ostrava)</span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-950 text-purple-300 border border-purple-800">
+                          100 % VÝNOS
+                        </span>
+                      </div>
+                      <div className="text-xl font-black text-white">
+                        {selectedNetworkCampaign === 'cz_national' && '8 nosičů · 28 000 Kč'}
+                        {selectedNetworkCampaign === 'moravia_regional' && '6 nosičů · 21 000 Kč'}
+                        {selectedNetworkCampaign === 'd1_highway' && '3 Bigboardy · 36 000 Kč'}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Vlastní plocha: Promo Tower Místecká, CLP 28. října a Billboardy Rudná.
+                      </p>
+                    </div>
+
+                    {/* 2. Partner Carriers Network */}
+                    <div className="p-4 rounded-2xl bg-slate-950 border border-blue-800/60 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-blue-300">2. PARTNERSKÁ SÍŤ B2B</span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-950 text-blue-300 border border-blue-800">
+                          +15 % PROVIZE
+                        </span>
+                      </div>
+                      <div className="text-xl font-black text-white">
+                        {selectedNetworkCampaign === 'cz_national' && '7 nosičů · +4 200 Kč provize'}
+                        {selectedNetworkCampaign === 'moravia_regional' && '4 nosiče · +2 400 Kč provize'}
+                        {selectedNetworkCampaign === 'd1_highway' && '5 Bigboardů · +9 000 Kč provize'}
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {selectedNetworkCampaign === 'cz_national' && '4x Brno (MedialBrno) + 3x Olomouc (Haná OOH).'}
+                        {selectedNetworkCampaign === 'moravia_regional' && '2x Opava (OpavaMedia) + 2x Havířov (OOH Havířov).'}
+                        {selectedNetworkCampaign === 'd1_highway' && '3x D1 Praha-Brno + 2x D1 Vysočina.'}
+                      </p>
+                    </div>
+
+                    {/* 3. Total Agency Gain */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/70 to-slate-950 border border-emerald-700/80 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-emerald-300">CELKOVÝ ZISK VAŠÍ AGENTURY</span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          JEDINÁ NABÍDKA
+                        </span>
+                      </div>
+                      <div className="text-2xl font-black text-emerald-400">
+                        {selectedNetworkCampaign === 'cz_national' && '32 200 Kč'}
+                        {selectedNetworkCampaign === 'moravia_regional' && '23 400 Kč'}
+                        {selectedNetworkCampaign === 'd1_highway' && '45 000 Kč'}
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-medium">
+                        Klient zaplatí vám. Systém automaticky vyúčtuje provize partnerským agenturám.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Automated Dispatch Status Box */}
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-xl bg-blue-950 text-blue-400 border border-blue-800 flex items-center justify-center font-black">
+                        📲
+                      </div>
+                      <div>
+                        <strong className="text-xs font-bold text-white block">
+                          Automatická synchronizace montáží do mobilních aplikací partnerů
+                        </strong>
+                        <span className="text-[11px] text-slate-400">
+                          Po schválení klientem se montážní úkoly s tiskovými daty samy rozešlou montážníkům v Brně i Olomouci.
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateNetwork(selectedNetworkCampaign)}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg transition cursor-pointer shrink-0"
+                    >
+                      {isSimulatingNetwork ? 'Simuluji přepočet sítě...' : '⚡ Přepočítat síťové marže'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </section>
   );
 }
+
