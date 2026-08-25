@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import type { NearbyCarrier } from './MobilePhotoFieldAppView';
 import {
   Camera,
   MapPin,
@@ -33,18 +34,23 @@ type Props = {
   initialFile: File | null;
   initialPreviewUrl: string | null;
   onRetake: () => void;
-  onSuccess: (newCarrier: any, successMessage: string) => void;
+  onSuccess: (newCarrier: NearbyCarrier, successMessage: string) => void;
 };
 
-const CARRIER_TYPES = [
-  { value: 'BILLBOARD', label: 'Billboard', defaultSize: '5.1 x 2.4 m', icon: '🪧' },
-  { value: 'CITYLIGHT', label: 'Citylight (CLV)', defaultSize: '118.5 x 175 cm', icon: '💡' },
-  { value: 'BANNER', label: 'Plachta / Banner', defaultSize: 'Dle konstrukce', icon: '🚩' },
-  { value: 'FACADE', label: 'Fasáda', defaultSize: 'Velkoformát', icon: '🏢' },
-  { value: 'PROMO_TOWER', label: 'Promo věž', defaultSize: 'Trojboká věž', icon: '🗼' },
-  { value: 'LED_SCREEN', label: 'LED obrazovka', defaultSize: 'Digitální plocha', icon: '📺' },
-  { value: 'NAVIGATION', label: 'Navigační tabule', defaultSize: '100 x 50 cm', icon: '🧭' },
-  { value: 'OTHER', label: 'Jiný typ', defaultSize: 'Atypický rozměr', icon: '➕' },
+export const CARRIER_TYPES = [
+  { value: 'BILLBOARD', label: 'Billboard', defaultSize: '5,1 × 2,4 m', defaultSurfaces: 1 as const, icon: '🪧' },
+  { value: 'BIGBOARD', label: 'Bigboard', defaultSize: '9,6 × 3,6 m', defaultSurfaces: 1 as const, icon: '🖼️' },
+  { value: 'CITYLIGHT', label: 'Citylight (CLV)', defaultSize: '118,5 × 175 cm', defaultSurfaces: 1 as const, icon: '💡' },
+  { value: 'CITY_POSTER', label: 'City Poster', defaultSize: '118,5 × 175 cm', defaultSurfaces: 1 as const, icon: '📰' },
+  { value: 'PROMO_BENCH', label: 'Promo lavička', defaultSize: '118,5 × 35 cm', defaultSurfaces: 1 as const, icon: '🪑' },
+  { value: 'PROMO_TOWER', label: 'Promo věž (4boká)', defaultSize: '4× 118,5 × 175 cm', defaultSurfaces: 4 as const, icon: '🗼' },
+  { value: 'PROMO_MINITOWER', label: 'Promo minivěž', defaultSize: '100 × 150 cm', defaultSurfaces: 3 as const, icon: '🏛️' },
+  { value: 'PROMO_HORIZON', label: 'Promo Horizon', defaultSize: '200 × 50 cm', defaultSurfaces: 1 as const, icon: '🌅' },
+  { value: 'NAVIGATION', label: 'Navigační tabule (VO)', defaultSize: '120 × 40 cm', defaultSurfaces: 1 as const, icon: '🧭' },
+  { value: 'BANNER', label: 'Plachta / Banner', defaultSize: 'Dle konstrukce', defaultSurfaces: 1 as const, icon: '🚩' },
+  { value: 'FACADE', label: 'Fasáda / Štítová stěna', defaultSize: 'Velkoformát', defaultSurfaces: 1 as const, icon: '🏢' },
+  { value: 'LED_SCREEN', label: 'LED obrazovka', defaultSize: 'Digitální plocha', defaultSurfaces: 1 as const, icon: '📺' },
+  { value: 'OTHER', label: 'Atypický nosič', defaultSize: 'Atypický rozměr', defaultSurfaces: 1 as const, icon: '➕' },
 ];
 
 export function MobileCreateCarrierModal({
@@ -63,8 +69,8 @@ export function MobileCreateCarrierModal({
   const [city, setCity] = useState('Praha');
   const [street, setStreet] = useState('');
   const [locality, setLocality] = useState('');
-  const [surfaceCount, setSurfaceCount] = useState<1 | 2>(1);
-  const [surfaceSize, setSurfaceSize] = useState('5.1 x 2.4 m');
+  const [surfaceCount, setSurfaceCount] = useState<1 | 2 | 3 | 4>(1);
+  const [surfaceSize, setSurfaceSize] = useState('5,1 × 2,4 m');
   const [note, setNote] = useState('');
 
   // Client Selection State
@@ -141,12 +147,13 @@ export function MobileCreateCarrierModal({
     };
   }, [isOpen, clientMode, clients.length]);
 
-  // Auto-update size placeholder when type changes
+  // Auto-update size placeholder and surface count when type changes
   const handleTypeChange = (typeVal: string) => {
     setCarrierType(typeVal);
     const found = CARRIER_TYPES.find((c) => c.value === typeVal);
     if (found) {
       setSurfaceSize(found.defaultSize);
+      setSurfaceCount(found.defaultSurfaces);
       if (street || city) {
         const place = street || locality || city;
         setName(`${place} – ${found.label}`);
@@ -250,42 +257,40 @@ export function MobileCreateCarrierModal({
           </button>
         </div>
 
-        {/* Scrollable Body */}
+        {/* Modal Body / Scrollable Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-          {/* Photo & GPS Banner */}
-          <div className="flex gap-3 items-center rounded-2xl bg-slate-900 p-3 border border-slate-800">
+          {/* Photo Preview & Retake Bar */}
+          <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 h-36 flex items-center justify-center">
             {initialPreviewUrl ? (
-              <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl border border-slate-700 bg-slate-800">
-                <Image
-                  src={initialPreviewUrl}
-                  alt="Náhled plochy"
-                  fill
-                  unoptimized
-                  className="object-cover"
-                />
-              </div>
+              <Image
+                src={initialPreviewUrl}
+                alt="Náhled nové plochy"
+                fill
+                className="object-cover"
+                unoptimized
+              />
             ) : (
-              <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-500 border border-slate-700">
+              <div className="text-slate-500 flex flex-col items-center gap-1">
                 <Camera size={24} />
+                <span className="text-[10px]">Chybí náhled fotografie</span>
               </div>
             )}
 
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                <Compass size={14} className="animate-pulse" />
-                <span>GPS zaměřeno (±{Math.round(coords?.accuracy || 0)} m)</span>
-              </div>
-              <div className="font-mono text-[10px] text-slate-400 truncate">
-                {coords ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}` : 'Čekám na GPS...'}
-              </div>
-              <button
-                type="button"
-                onClick={onRetake}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 hover:underline"
-              >
-                <Camera size={12} /> Vyfotit znovu
-              </button>
+            <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-lg bg-slate-950/80 px-2 py-1 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 backdrop-blur-xs">
+              <MapPin size={10} />
+              <span>
+                GPS: {coords ? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}` : 'Nezaměřeno'}
+              </span>
             </div>
+
+            <button
+              type="button"
+              onClick={onRetake}
+              className="absolute bottom-2 right-2 flex items-center gap-1 rounded-xl bg-slate-900/90 px-3 py-1.5 text-[11px] font-bold text-white shadow border border-slate-700 hover:bg-slate-800 transition"
+            >
+              <Camera size={12} />
+              <span>Přeformátovat / Přefotit</span>
+            </button>
           </div>
 
           {/* Error Message */}
@@ -301,7 +306,7 @@ export function MobileCreateCarrierModal({
             <label className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
               <Tag size={12} /> 1. Typ reklamního nosiče
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {CARRIER_TYPES.map((t) => (
                 <button
                   key={t.value}
@@ -309,7 +314,7 @@ export function MobileCreateCarrierModal({
                   onClick={() => handleTypeChange(t.value)}
                   className={`rounded-xl p-2 text-left border transition ${
                     carrierType === t.value
-                      ? 'border-emerald-500 bg-emerald-950/70 text-white font-bold'
+                      ? 'border-emerald-500 bg-emerald-950/70 text-white font-bold shadow-sm'
                       : 'border-slate-800 bg-slate-900 text-slate-400 hover:border-slate-700'
                   }`}
                 >
@@ -387,7 +392,7 @@ export function MobileCreateCarrierModal({
                 <span className="text-[10px] text-slate-400 block mb-1">Rozměr plochy:</span>
                 <input
                   type="text"
-                  placeholder="5.1 x 2.4 m"
+                  placeholder="5,1 × 2,4 m"
                   value={surfaceSize}
                   onChange={(e) => setSurfaceSize(e.target.value)}
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
@@ -396,36 +401,62 @@ export function MobileCreateCarrierModal({
             </div>
           </div>
 
-          {/* 3. Number of Surfaces (Strana A vs Strana A + B) */}
+          {/* 3. Number of Surfaces (1, 2, 3, 4 strany) */}
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
-              <Layers size={12} /> 3. Počet reklamních ploch (stran)
+              <Layers size={12} /> 3. Počet reklamních ploch (stran nosiče)
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               <button
                 type="button"
                 onClick={() => setSurfaceCount(1)}
-                className={`rounded-xl p-2.5 border text-left transition ${
+                className={`rounded-xl p-2 text-left border transition ${
                   surfaceCount === 1
                     ? 'border-emerald-500 bg-emerald-950/70 text-white font-bold'
                     : 'border-slate-800 bg-slate-900 text-slate-400'
                 }`}
               >
-                <div className="font-bold text-xs">🅰️ 1 plocha (Jednostranný)</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Pouze Strana A</div>
+                <div className="font-bold text-xs">🅰️ 1 plocha</div>
+                <div className="text-[9px] text-slate-400 mt-0.5">Strana A</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setSurfaceCount(2)}
-                className={`rounded-xl p-2.5 border text-left transition ${
+                className={`rounded-xl p-2 text-left border transition ${
                   surfaceCount === 2
                     ? 'border-emerald-500 bg-emerald-950/70 text-white font-bold'
                     : 'border-slate-800 bg-slate-900 text-slate-400'
                 }`}
               >
-                <div className="font-bold text-xs">🅰️🅱️ 2 plochy (Oboustranný)</div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Strana A + Strana B</div>
+                <div className="font-bold text-xs">🅰️🅱️ 2 plochy</div>
+                <div className="text-[9px] text-slate-400 mt-0.5">Strany A + B</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSurfaceCount(3)}
+                className={`rounded-xl p-2 text-left border transition ${
+                  surfaceCount === 3
+                    ? 'border-emerald-500 bg-emerald-950/70 text-white font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <div className="font-bold text-xs">🔺 3 plochy</div>
+                <div className="text-[9px] text-slate-400 mt-0.5">3 strany</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSurfaceCount(4)}
+                className={`rounded-xl p-2 text-left border transition ${
+                  surfaceCount === 4
+                    ? 'border-emerald-500 bg-emerald-950/70 text-white font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <div className="font-bold text-xs">🏢 4 plochy</div>
+                <div className="text-[9px] text-slate-400 mt-0.5">Čtyřboká věž</div>
               </button>
             </div>
           </div>
@@ -518,36 +549,39 @@ export function MobileCreateCarrierModal({
                           key={c.id}
                           type="button"
                           onClick={() => setSelectedClientId(c.id)}
-                          className={`w-full rounded-lg px-2.5 py-1.5 text-left flex items-center justify-between transition ${
+                          className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition ${
                             selectedClientId === c.id
                               ? 'bg-blue-600 text-white font-bold'
-                              : 'text-slate-300 hover:bg-slate-800'
+                              : 'text-slate-300 hover:bg-slate-900'
                           }`}
                         >
-                          <span className="truncate">{c.name}</span>
-                          {selectedClientId === c.id && <Check size={14} className="shrink-0" />}
+                          <div>
+                            <div className="font-bold">{c.name}</div>
+                            {c.companyId && <div className="text-[9px] opacity-75">IČO: {c.companyId}</div>}
+                          </div>
+                          {selectedClientId === c.id && <Check size={14} />}
                         </button>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2 rounded-xl bg-emerald-950/40 p-2.5 border border-emerald-800/60">
+                  <div className="space-y-2 rounded-xl bg-slate-950 p-2.5 border border-emerald-500/40">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-emerald-300">Založit nového klienta:</span>
+                      <span className="text-[10px] font-bold text-emerald-400">Nový klient:</span>
                       <button
                         type="button"
                         onClick={() => setIsCreatingNewClient(false)}
                         className="text-[10px] text-slate-400 hover:text-white"
                       >
-                        Zpět na výběr
+                        Zpět k výběru
                       </button>
                     </div>
                     <input
                       type="text"
-                      placeholder="Název nové firmy / inzerenta"
+                      placeholder="Název firmy / Jméno klienta"
                       value={newClientName}
                       onChange={(e) => setNewClientName(e.target.value)}
-                      className="w-full rounded-lg border border-emerald-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none"
+                      className="w-full rounded-xl border border-emerald-500/60 bg-slate-900 px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -555,42 +589,42 @@ export function MobileCreateCarrierModal({
             )}
           </div>
 
-          {/* 5. Optional Note */}
+          {/* 5. Note */}
           <div>
-            <span className="text-[10px] text-slate-400 block mb-1">Doplňující poznámka k nosiči:</span>
-            <input
-              type="text"
-              placeholder="Např. výborná viditelnost, nutno opravit spodní lem..."
+            <span className="text-[10px] text-slate-400 block mb-1">Poznámka / doplňující info k ploše:</span>
+            <textarea
+              rows={2}
+              placeholder="Např. přístupnost, osvětlení, stav konstrukce..."
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none resize-none"
             />
           </div>
 
-          {/* Action Footer Buttons */}
-          <div className="pt-2 flex gap-2">
+          {/* Action Buttons */}
+          <div className="pt-2 flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="flex-1 rounded-xl bg-slate-800 py-3 text-xs font-bold text-slate-300 hover:bg-slate-700 transition"
+              className="flex-1 rounded-xl bg-slate-800 py-3 text-xs font-bold text-slate-300 hover:bg-slate-700 hover:text-white transition disabled:opacity-50"
             >
               Zrušit
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-2 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-98 transition disabled:opacity-50"
+              className="flex-2 rounded-xl bg-emerald-500 py-3 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
               {saving ? (
                 <>
-                  <RefreshCw size={16} className="animate-spin" />
+                  <RefreshCw size={14} className="animate-spin" />
                   <span>Ukládám do databáze...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={16} />
-                  <span>ULOŽIT NOVOU PLOCHU</span>
+                  <Check size={16} />
+                  <span>Uložit a založit nosič</span>
                 </>
               )}
             </button>

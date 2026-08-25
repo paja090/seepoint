@@ -12,7 +12,7 @@ import {
   stablePhotoUrl,
   storeMobilePhoto,
 } from '@/lib/mobile-photo-upload';
-import { requireTenantContext } from '@/lib/tenant-context';
+import { enterTenantContext, getTenantContext } from '@/lib/tenant-context';
 import { tenantStorageKey } from '@/lib/storage/tenant-storage-key';
 import type { CarrierType, MountingType, MediaType } from '@prisma/client';
 
@@ -59,8 +59,21 @@ export async function POST(req: Request) {
       return jsonError('UNAUTHORIZED', 'Pro tuto akci musíte být přihlášeni.', 401);
     }
 
-    const tenantContext = requireTenantContext();
-    const organizationId = tenantContext.organizationId;
+    let organizationId: string | undefined = user.organizationId || user.membership?.organizationId || undefined;
+    if (!organizationId) {
+      const currentTenant = getTenantContext();
+      organizationId = currentTenant?.organizationId || undefined;
+    }
+
+    if (!organizationId) {
+      return jsonError('TENANT_REQUIRED', 'Nebyla nalezena organizace pro uložení nosiče.', 400);
+    }
+
+    enterTenantContext({
+      organizationId,
+      userId: user.id,
+      source: 'session',
+    });
 
     const formData = await req.formData();
     const file = formData.get('file');
@@ -72,7 +85,8 @@ export async function POST(req: Request) {
     const street = String(formData.get('street') || '').trim() || null;
     const locality = String(formData.get('locality') || '').trim() || null;
     const note = String(formData.get('note') || '').trim() || null;
-    const surfacesCount = parseInt(String(formData.get('surfacesCount') || '1'), 10) === 2 ? 2 : 1;
+    const parsedSurfacesCount = parseInt(String(formData.get('surfacesCount') || '1'), 10);
+    const surfacesCount = [1, 2, 3, 4].includes(parsedSurfacesCount) ? parsedSurfacesCount : 1;
     const surfaceSize = String(formData.get('surfaceSize') || '').trim() || null;
     const clientId = String(formData.get('clientId') || '').trim() || null;
     const newClientName = String(formData.get('newClientName') || '').trim() || null;
@@ -105,6 +119,8 @@ export async function POST(req: Request) {
         FACADE: 'FAC',
         LED_SCREEN: 'LED',
         PROMO_BENCH: 'PB',
+        PROMO_HORIZON: 'PH',
+        CITY_POSTER: 'CP',
         PROMO_TOWER: 'TW',
         PROMO_MINITOWER: 'MTW',
         NAVIGATION: 'NAV',
@@ -182,11 +198,23 @@ export async function POST(req: Request) {
         },
       });
 
-      // 2. Create Surface(s)
+      // 2. Create Surface(s) based on surfacesCount (1, 2, 3, 4)
       const createdSurfaces = [];
-      const surfaceConfigs = surfacesCount === 2
-        ? [{ name: 'Strana A', side: 'SIDE_A' }, { name: 'Strana B', side: 'SIDE_B' }]
-        : [{ name: 'Strana A', side: 'SIDE_A' }];
+      let surfaceConfigs: Array<{ name: string; side: 'SIDE_A' | 'SIDE_B' | null }> = [];
+      if (surfacesCount === 1) {
+        surfaceConfigs = [{ name: 'Strana A', side: 'SIDE_A' }];
+      } else if (surfacesCount === 2) {
+        surfaceConfigs = [{ name: 'Strana A', side: 'SIDE_A' }, { name: 'Strana B', side: 'SIDE_B' }];
+      } else if (surfacesCount === 3) {
+        surfaceConfigs = [{ name: 'Strana 1', side: 'SIDE_A' }, { name: 'Strana 2', side: 'SIDE_B' }, { name: 'Strana 3', side: null }];
+      } else if (surfacesCount === 4) {
+        surfaceConfigs = [
+          { name: 'Strana 1 (Čelo A)', side: 'SIDE_A' },
+          { name: 'Strana 2 (Bok B)', side: 'SIDE_B' },
+          { name: 'Strana 3 (Záda C)', side: null },
+          { name: 'Strana 4 (Bok D)', side: null },
+        ];
+      }
 
       for (const sc of surfaceConfigs) {
         const surface = await tx.advertisingSurface.create({

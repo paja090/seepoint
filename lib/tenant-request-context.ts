@@ -32,11 +32,15 @@ const resolveSessionTenant = cache(async (token: string): Promise<TenantContext 
   });
   if (!session || session.expiresAt <= new Date()) return null;
   if (session.sessionVersion !== session.user.sessionVersion || session.user.status !== 'ACTIVE') return null;
+
   const membership = session.user.organizationMemberships.find(
     (item) => item.organizationId === session.activeOrganizationId,
   ) ?? session.user.organizationMemberships[0];
-  return membership
-    ? { organizationId: membership.organizationId, userId: session.userId, source: 'session' }
+
+  const orgId = membership?.organizationId || session.activeOrganizationId;
+
+  return orgId
+    ? { organizationId: orgId, userId: session.userId, source: 'session' }
     : null;
 });
 
