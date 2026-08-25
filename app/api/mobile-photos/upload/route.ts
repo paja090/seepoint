@@ -14,7 +14,7 @@ import {
   storeMobilePhoto,
 } from '@/lib/mobile-photo-upload';
 import { MOBILE_PHOTO_DAMAGE_LABELS, isMobilePhotoDamageType } from '@/lib/mobile-photo-damage';
-import { requireTenantContext } from '@/lib/tenant-context';
+import { enterTenantContext, getTenantContext } from '@/lib/tenant-context';
 import { tenantStorageKey } from '@/lib/storage/tenant-storage-key';
 
 export const runtime = 'nodejs';
@@ -35,6 +35,21 @@ function jsonError(code: string, error: string, status: number) {
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
+
+    let organizationId: string | undefined = user?.organizationId || user?.membership?.organizationId || undefined;
+    if (!organizationId) {
+      const currentTenant = getTenantContext();
+      organizationId = currentTenant?.organizationId || undefined;
+    }
+
+    if (organizationId) {
+      enterTenantContext({
+        organizationId,
+        userId: user?.id,
+        source: 'session',
+      });
+    }
+
     const formData = await req.formData();
     const file = formData.get('file');
     const carrierId = formData.get('carrierId');
@@ -103,7 +118,7 @@ export async function POST(req: Request) {
     const stored = await storeMobilePhoto(file, fileName, photoId, uploadPhotoToGoogleDrive);
     const photoUrl = stablePhotoUrl(photoId);
     const storageProvider = stored.storageProvider === 'LOCAL' ? 'DATABASE' : stored.storageProvider;
-    const storageKey = tenantStorageKey({ organizationId: requireTenantContext().organizationId, resource: 'photos', resourceId: photoId, fileName });
+    const storageKey = tenantStorageKey({ organizationId: organizationId || 'default', resource: 'photos', resourceId: photoId, fileName });
     const contentChecksum = createHash('sha256').update(stored.bytes).digest('hex');
 
     let photo;
