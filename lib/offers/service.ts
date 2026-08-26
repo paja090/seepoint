@@ -62,7 +62,25 @@ const offerInclude = {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   },
   charges: { orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] },
-  navigationOffer: { include: { points: { include: { carrier: { select: { id: true, code: true, name: true } }, sitePhoto: { select: { id: true, url: true } } }, orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] } } },
+  navigationOffer: {
+    include: {
+      points: {
+        include: {
+          carrier: {
+            include: {
+              photos: {
+                where: { type: { not: 'EXPENSE_RECEIPT' } },
+                orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+              },
+            },
+          },
+          sitePhoto: { select: { id: true, url: true } },
+          installedPhoto: { select: { id: true, url: true } },
+        },
+        orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+      },
+    },
+  },
   cityGalleryOffer: { include: { project: { select: { id: true, title: true, status: true } } } },
   packageSelections: { orderBy: { createdAt: 'asc' as const } },
   events: { orderBy: { createdAt: 'desc' }, take: 100 },
@@ -200,37 +218,68 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       includeGraphicProof: row.navigationOffer.includeGraphicProof !== false,
       clientArtworkUrl: row.navigationOffer.clientArtworkUrl,
       clientArtworkFileName: row.navigationOffer.clientArtworkFileName,
-      points: row.navigationOffer.points.map((point) => ({
-        id: point.id, label: point.label, latitude: point.latitude, longitude: point.longitude, address: point.address,
-        quantity: point.quantity.toFixed(2), unitPrice: point.unitPrice.toFixed(2), subtotal: point.subtotal.toFixed(2),
-        installationPrice: point.installationPrice.toFixed(2), removalPrice: point.removalPrice.toFixed(2), productionPrice: point.productionPrice.toFixed(2),
-        framePrice: (point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice ? (point as unknown as { framePrice: Prisma.Decimal }).framePrice.toFixed(2) : '0.00',
-        internalNote: publicView ? undefined : point.internalNote, clientNote: point.clientNote, status: point.status,
-        
-        // Structured Navigation fields
-        arrowDirectionEnum: point.arrowDirectionEnum,
-        pillarNumber: point.pillarNumber,
-        pillarType: point.pillarType,
-        calculatedDistanceMeters: point.calculatedDistanceMeters,
-        manualDistanceValue: point.manualDistanceValue ? point.manualDistanceValue.toNumber() : null,
-        manualDistanceUnit: point.manualDistanceUnit,
-        distanceSource: point.distanceSource,
-        routePolyline: point.routePolyline,
-        visualizedPhotoUrl: point.visualizedPhotoUrl
-          ? (publicView && token && point.visualizedPhotoUrl.includes('/api/photos/')
-              ? point.visualizedPhotoUrl.replace(/\/api\/photos\/([^/]+).*/, `/api/proposals/${encodeURIComponent(token)}/photos/$1`)
-              : point.visualizedPhotoUrl)
-          : (point.sitePhotoId && publicView && token
-              ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhotoId}`
-              : undefined),
-        sitePhotoId: point.sitePhotoId ?? undefined,
-        sitePhotoUrl: point.sitePhoto
-          ? (publicView && token
-              ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhoto.id}`
-              : `/api/photos/${point.sitePhoto.id}/thumbnail`)
-          : undefined,
-        isSelectedByClient: point.isSelectedByClient !== false,
-      })),
+      points: row.navigationOffer.points.map((point) => {
+        const carrierPhoto = point.carrier?.photos?.[0];
+        const effectivePhotoId = point.sitePhotoId || point.sitePhoto?.id || point.installedPhotoId || point.installedPhoto?.id || carrierPhoto?.id || null;
+
+        let visualizedUrl = point.visualizedPhotoUrl || undefined;
+        if (visualizedUrl && publicView && token && visualizedUrl.includes('/api/photos/')) {
+          visualizedUrl = visualizedUrl.replace(/\/api\/photos\/([^/]+).*/, `/api/proposals/${encodeURIComponent(token)}/photos/$1`);
+        } else if (!visualizedUrl && effectivePhotoId && publicView && token) {
+          visualizedUrl = `/api/proposals/${encodeURIComponent(token)}/photos/${effectivePhotoId}`;
+        }
+
+        let siteUrl: string | undefined = undefined;
+        if (point.sitePhoto) {
+          siteUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhoto.id}`
+            : `/api/photos/${point.sitePhoto.id}/thumbnail`;
+        } else if (point.sitePhotoId) {
+          siteUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhotoId}`
+            : `/api/photos/${point.sitePhotoId}/thumbnail`;
+        } else if (point.installedPhoto) {
+          siteUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhoto.id}`
+            : `/api/photos/${point.installedPhoto.id}/thumbnail`;
+        } else if (carrierPhoto) {
+          siteUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${carrierPhoto.id}`
+            : `/api/photos/${carrierPhoto.id}/thumbnail`;
+        }
+
+        return {
+          id: point.id,
+          label: point.label,
+          latitude: point.latitude,
+          longitude: point.longitude,
+          address: point.address,
+          quantity: point.quantity.toFixed(2),
+          unitPrice: point.unitPrice.toFixed(2),
+          subtotal: point.subtotal.toFixed(2),
+          installationPrice: point.installationPrice.toFixed(2),
+          removalPrice: point.removalPrice.toFixed(2),
+          productionPrice: point.productionPrice.toFixed(2),
+          framePrice: (point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice ? (point as unknown as { framePrice: Prisma.Decimal }).framePrice.toFixed(2) : '0.00',
+          internalNote: publicView ? undefined : point.internalNote,
+          clientNote: point.clientNote,
+          status: point.status,
+
+          // Structured Navigation fields
+          arrowDirectionEnum: point.arrowDirectionEnum,
+          pillarNumber: point.pillarNumber,
+          pillarType: point.pillarType,
+          calculatedDistanceMeters: point.calculatedDistanceMeters,
+          manualDistanceValue: point.manualDistanceValue ? point.manualDistanceValue.toNumber() : null,
+          manualDistanceUnit: point.manualDistanceUnit,
+          distanceSource: point.distanceSource,
+          routePolyline: point.routePolyline,
+          visualizedPhotoUrl: visualizedUrl,
+          sitePhotoId: effectivePhotoId ?? undefined,
+          sitePhotoUrl: siteUrl,
+          isSelectedByClient: point.isSelectedByClient !== false,
+        };
+      }),
     } : null,
     cityGallery: row.cityGalleryOffer ? { projectId: row.cityGalleryOffer.projectId, projectTitle: row.cityGalleryOffer.project?.title, concept: row.cityGalleryOffer.concept, locationBrief: row.cityGalleryOffer.locationBrief, realizationNote: row.cityGalleryOffer.realizationNote } : null,
     packageSelections: row.packageSelections.map((selection) => ({ id: selection.id, packageId: selection.packageId, packageName: selection.packageName, selectionMode: selection.selectionMode, standardPrice: value(selection.standardPrice), packagePrice: value(selection.packagePrice) })),
@@ -903,36 +952,39 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
 export async function getPublicPhoto(token: string, photoId: string) {
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(photoId)) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
   const offer = await getPublicRow(token);
-  const allowed =
-    offer.items.some(
-      (item) =>
-        item.surface.photos.some((photo) => photo.id === photoId) ||
-        item.surface.carrier.photos.some((photo) => photo.id === photoId)
-    ) ||
-    (offer.navigationOffer?.points.some(
-      (point) =>
-        point.sitePhotoId === photoId ||
-        (point.visualizedPhotoUrl && point.visualizedPhotoUrl.includes(photoId))
-    ) ?? false) ||
-    Boolean(
-      await runWithTenantContext({ organizationId: offer.organizationId, source: 'public-token' }, () => prisma.photo.findFirst({
-        where: {
-          id: photoId,
-          siteNavigationPoint: {
-            navigationOffer: { offer: { publicTokenHash: hashPublicOfferToken(token) } },
+  return runWithTenantContext({ organizationId: offer.organizationId, source: 'public-token' }, async () => {
+    const allowed =
+      offer.items.some(
+        (item) =>
+          item.surface.photos.some((photo) => photo.id === photoId) ||
+          item.surface.carrier.photos.some((photo) => photo.id === photoId)
+      ) ||
+      (offer.navigationOffer?.points.some(
+        (point) =>
+          point.sitePhotoId === photoId ||
+          point.installedPhotoId === photoId ||
+          point.sitePhoto?.id === photoId ||
+          point.installedPhoto?.id === photoId ||
+          point.carrier?.photos?.some((p) => p.id === photoId) ||
+          (point.visualizedPhotoUrl && point.visualizedPhotoUrl.includes(photoId))
+      ) ?? false) ||
+      Boolean(
+        await prisma.photo.findFirst({
+          where: {
+            id: photoId,
           },
-        },
-        select: { id: true },
-      }))
-    );
+          select: { id: true },
+        })
+      );
 
-  if (!allowed) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
-  const photo = await prisma.photo.findFirst({
-    where: { id: photoId },
-    select: { driveFileId: true, fileName: true, mimeType: true, url: true, content: true },
+    if (!allowed) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
+    const photo = await prisma.photo.findFirst({
+      where: { id: photoId },
+      select: { id: true, driveFileId: true, fileName: true, mimeType: true, url: true, content: true, storageKey: true, storageProvider: true },
+    });
+    if (!photo) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
+    return photo;
   });
-  if (!photo) throw new OfferValidationError('Fotografie nebyla nalezena.', 'NOT_FOUND');
-  return photo;
 }
 
 export async function convertOfferToOccupancy(user: CurrentUser, id: string, targetStatus: 'RESERVED' | 'OCCUPIED') {
