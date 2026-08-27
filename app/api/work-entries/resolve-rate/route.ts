@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { resolveWorkEntryRate } from '@/lib/work-entry-rates';
-import { RateType, WorkType } from '@prisma/client';
+import { RateType, WorkType, CarrierType } from '@prisma/client';
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const workDate = searchParams.get('workDate');
   const remunerationMethod = searchParams.get('remunerationMethod');
   const workOrderId = searchParams.get('workOrderId');
+  const carrierType = searchParams.get('carrierType');
 
   if (!employeeId || !workType || !workDate || !remunerationMethod) {
     return NextResponse.json({ error: 'Chybí parametry dotazu.' }, { status: 400 });
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
     workDate: dateObj,
     remunerationMethod: remunerationMethod as RateType,
     workOrderId,
+    carrierType: carrierType ? (carrierType as CarrierType) : undefined,
   });
 
   if (!resolved) {
