@@ -5,6 +5,8 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+const isInlineImage = (value?: string | null) => Boolean(value?.startsWith('data:'));
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -28,7 +30,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Fetch channel messages - newest first, then reverse to chronological order
   const messagesDesc = await prisma.chatMessage.findMany({
     where: whereClause,
     include: {
@@ -40,9 +41,12 @@ export async function GET(request: Request) {
     take: 50,
   });
 
-  const messages = messagesDesc.reverse();
+  // Legacy inline images can be >1 MB each. Never send them during channel polling.
+  const messages = messagesDesc.reverse().map((message) => ({
+    ...message,
+    imageUrl: isInlineImage(message.imageUrl) ? null : message.imageUrl,
+  }));
 
-  // Opening or polling a channel makes all currently delivered messages read.
   if (!before && messages.length > 0) {
     await prisma.chatRead.createMany({
       data: messages.map((message) => ({ messageId: message.id, userId: user.id })),
@@ -87,6 +91,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Neplatná data.' }, { status: 400 });
   }
 
+  if (isInlineImage(body.imageUrl) || isInlineImage(body.fuelExpense?.receiptUrl) || isInlineImage(body.vehicleFault?.photoUrl)) {
+    return NextResponse.json(
+      { error: 'Obrázek je nutné nejdříve nahrát do úložiště. Base64 obrázky nelze ukládat do chatu.' },
+      { status: 400 }
+    );
+  }
+
   const channel = body.channel || 'general';
   let content = body.content?.trim() || '';
   let fuelExpenseId: string | undefined = undefined;
@@ -95,7 +106,6 @@ export async function POST(request: Request) {
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
     : user.name || user.email;
 
-  // Handle fuel receipt expense creation if attached
   if (body.fuelExpense) {
     const fe = body.fuelExpense;
     if (!fe.vehicleId || !fe.amount || fe.amount <= 0) {
@@ -122,7 +132,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Handle vehicle fault reporting if attached
   if (body.vehicleFault) {
     const vf = body.vehicleFault;
     if (!vf.vehicleId || !vf.title) {
@@ -168,7 +177,6 @@ export async function POST(request: Request) {
     },
   });
 
-  // Automatically mark read for sender
   await prisma.chatRead.create({
     data: {
       messageId: msg.id,
@@ -176,7 +184,6 @@ export async function POST(request: Request) {
     },
   }).catch(() => null);
 
-  // Update user last login / active timestamp
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
