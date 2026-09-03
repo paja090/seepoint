@@ -160,7 +160,7 @@ export function QuickSearchInput() {
             </div>
           ) : !hasResults ? (
             <div className="py-8 text-center text-xs text-slate-500">
-              <p className="font-bold text-slate-700">Žádné výsledky pro "{query}"</p>
+              <p className="font-bold text-slate-700">Žádné výsledky pro „{query}“</p>
               <p className="mt-1">Zkuste zadat jiné slovo, kód nosiče nebo jméno klienta.</p>
             </div>
           ) : (

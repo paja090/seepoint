@@ -4,16 +4,11 @@ import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Package,
-  Mic,
-  Camera,
   RotateCcw,
   ArrowUpRight,
-  ArrowDownLeft,
   Search,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
-  Wrench,
   Layers,
   UserCheck,
   Star,
@@ -40,6 +35,7 @@ type MovementData = {
   quantity: number | string;
   performedByName: string | null;
   assignedEmployeeName: string | null;
+  assignedEmployeeId: string | null;
   createdAt: Date | string;
   item: {
     id: string;
@@ -60,12 +56,14 @@ export function MobileWarehouseAppClient({
   employees,
   recentMovements,
   currentUserName,
+  currentEmployeeId,
 }: {
   items: WarehouseItemData[];
   workOrders: { id: string; title: string; clientName: string }[];
   employees: { id: string; firstName: string; lastName: string }[];
   recentMovements: MovementData[];
   currentUserName?: string;
+  currentEmployeeId?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -83,10 +81,10 @@ export function MobileWarehouseAppClient({
         setFavoriteIds(JSON.parse(saved));
       } else {
         // Default top 3 items if not set yet
-        setFavoriteIds(items.slice(0, 3).map((i) => i.id));
+        setFavoriteIds((current) => current.length > 0 ? current : items.slice(0, 3).map((item) => item.id));
       }
-    } catch (e) {}
-  }, []);
+    } catch {}
+  }, [items]);
 
   const toggleFavorite = (itemId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -94,7 +92,7 @@ export function MobileWarehouseAppClient({
       const next = prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId];
       try {
         localStorage.setItem('seepoint_warehouse_favorites', JSON.stringify(next));
-      } catch (err) {}
+      } catch {}
       return next;
     });
   };
@@ -109,13 +107,14 @@ export function MobileWarehouseAppClient({
   sortedMovements.forEach((m) => {
     if (!m.item || m.item.category !== 'RETURNABLE') return;
 
-    // Flexible user matching checking if currentUserName shares words with performedByName/assignedEmployeeName
+    // Prefer the stable employee id. Exact names are only a fallback for legacy/self-issued rows.
     const matchesUser = (() => {
-      if (!currentUserName) return true;
-      const userTokens = currentUserName.toLowerCase().split(/\s+/).filter(Boolean);
-      const perfText = (m.performedByName || '').toLowerCase();
-      const assText = (m.assignedEmployeeName || '').toLowerCase();
-      return userTokens.some((tok) => perfText.includes(tok) || assText.includes(tok));
+      if (currentEmployeeId && m.assignedEmployeeId) return currentEmployeeId === m.assignedEmployeeId;
+      if (!currentUserName) return false;
+      const normalizedUser = currentUserName.trim().toLocaleLowerCase('cs-CZ');
+      const performedBy = (m.performedByName || '').trim().toLocaleLowerCase('cs-CZ');
+      const assignedTo = (m.assignedEmployeeName || '').trim().toLocaleLowerCase('cs-CZ');
+      return normalizedUser === performedBy || normalizedUser === assignedTo;
     })();
 
     if (!matchesUser) return;
@@ -171,8 +170,8 @@ export function MobileWarehouseAppClient({
       startTransition(() => {
         router.refresh();
       });
-    } catch (err: any) {
-      setStatusMessage({ type: 'error', text: `⚠️ ${err.message}` });
+    } catch (err: unknown) {
+      setStatusMessage({ type: 'error', text: `⚠️ ${err instanceof Error ? err.message : 'Operace se nezdařila.'}` });
     } finally {
       setProcessingItemIds((prev) => {
         const next = { ...prev };
@@ -253,7 +252,7 @@ export function MobileWarehouseAppClient({
             }`}
           >
             <RotateCcw size={16} />
-            <span>Moje výpůjčky</span>
+            <span>Nedávné výpůjčky</span>
           </button>
 
           <button
@@ -489,18 +488,18 @@ export function MobileWarehouseAppClient({
           <div className="rounded-2xl border border-purple-200 bg-purple-50/70 p-4">
             <div className="flex items-center gap-2 text-purple-900 font-bold text-sm">
               <RotateCcw size={18} className="text-purple-600" />
-              <span>Vracení vypůjčeného nářadí a materiálu</span>
+              <span>Orientační přehled nedávno vypůjčeného nářadí</span>
             </div>
             <p className="mt-1 text-xs text-purple-700">
-              Přišli jste zpět do skladu? Klepnutím na zelené tlačítko položku ihned vrátíte zpět na pozici.
+              Přehled se počítá z posledních 100 pohybů. Pro úplnou dlouhodobou evidenci je potřeba samostatný stav aktivních výpůjček.
             </p>
           </div>
 
           {activeBorrowings.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
               <CheckCircle2 size={32} className="mx-auto text-emerald-500 mb-2" />
-              <h4 className="font-bold text-slate-800">Nemáte žádné aktivní výpůjčky</h4>
-              <p className="text-xs text-slate-500 mt-1">Všechno vypůjčené nářadí je řádně vráceno ve skladu.</p>
+              <h4 className="font-bold text-slate-800">V nedávné historii nebyla nalezena otevřená výpůjčka</h4>
+              <p className="text-xs text-slate-500 mt-1">Tento výsledek nepotvrzuje stav starších pohybů mimo posledních 100 záznamů.</p>
             </div>
           ) : (
             <div className="space-y-3">

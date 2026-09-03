@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   assertOfferTransition,
@@ -143,8 +144,29 @@ test('převod je idempotentní a částečný stav se zastaví před zápisy', (
   assert.throws(() => planOfferConversion(['a', 'b'], ['a']), (error: unknown) => error instanceof OfferValidationError && error.code === 'PARTIAL_CONVERSION');
 });
 
+test('detail nabídky nikdy nesestaví veřejný odkaz z interního ID nebo databázového hashe', () => {
+  const actions = readFileSync(new URL('../components/offers/OfferActions.tsx', import.meta.url), 'utf8');
+  const service = readFileSync(new URL('../lib/offers/service.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(actions, /customToken\s*\|\|\s*offerId/);
+  assert.doesNotMatch(actions, /publicToken\?:/);
+  assert.match(actions, /action\('publish'\)/);
+  assert.doesNotMatch(service, /publicToken:\s*publicView/);
+});
+
 test('schválení cenové navigační nabídky automaticky zakládá realizační zakázku', () => {
   assert.equal(shouldCreateNavigationOrderAfterAcceptance({ offerType: 'NAVIGATION', proposalMode: 'PRICED_QUOTE' }), true);
   assert.equal(shouldCreateNavigationOrderAfterAcceptance({ offerType: 'NAVIGATION', proposalMode: 'LOCATION_SELECTION' }), false);
   assert.equal(shouldCreateNavigationOrderAfterAcceptance({ offerType: 'STANDARD_MEDIA', proposalMode: null }), false);
+});
+
+test('CRM převod nabídky vyžaduje oprávněnou roli i stav ACCEPTED na všech vrstvách', () => {
+  const route = readFileSync(new URL('../app/api/crm/orders/convert-from-offer/route.ts', import.meta.url), 'utf8');
+  const service = readFileSync(new URL('../lib/crm/order-service.ts', import.meta.url), 'utf8');
+  const clientTab = readFileSync(new URL('../components/crm/ClientOffersTab.tsx', import.meta.url), 'utf8');
+
+  assert.match(route, /canConvertOfferRole\(user\.role\)/);
+  assert.match(service, /offer\.status !== 'ACCEPTED'/);
+  assert.doesNotMatch(service, /data:\s*\{\s*status:\s*'ACCEPTED'/);
+  assert.match(clientTab, /canConvert && offer\.status === 'ACCEPTED'/);
+  assert.doesNotMatch(clientTab, /offer\.status === 'SENT'/);
 });

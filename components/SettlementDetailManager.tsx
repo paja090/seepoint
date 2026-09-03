@@ -139,7 +139,7 @@ const adjustmentTypeLabels: Record<string, string> = {
   CARRY_OVER_SUB: 'Korekce (-) carry-over',
 };
 
-export function SettlementDetailManager({ settlement }: SettlementDetailManagerProps) {
+export function SettlementDetailManager({ settlement, currentUser }: SettlementDetailManagerProps) {
   const router = useRouter();
 
   // Tabs state
@@ -164,12 +164,7 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
   const [deletingAdjId, setDeletingAdjId] = useState<string | null>(null);
   const [deleteAdjReason, setDeleteAdjReason] = useState('');
 
-  const refreshData = async () => {
-    try {
-      router.refresh();
-      window.location.reload();
-    } catch {}
-  };
+  const refreshData = async () => router.refresh();
 
   const handleAction = async (action: string, confirmText?: string) => {
     setErrorMsg('');
@@ -227,8 +222,8 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
     setErrorMsg('');
     setSuccessMsg('');
 
-    const amt = parseFloat(adjAmount);
-    if (isNaN(amt) || amt === 0) {
+    const normalizedAmount = adjAmount.trim().replace(',', '.');
+    if (!/^-?\d+(?:\.\d{1,2})?$/.test(normalizedAmount) || Number(normalizedAmount) === 0) {
       setErrorMsg('Částka musí být platné číslo různé od nuly.');
       return;
     }
@@ -246,7 +241,7 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          amount: amt,
+          amount: normalizedAmount,
           category: adjCategory,
           description: adjDescription,
           reason: adjReason,
@@ -297,7 +292,8 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
     }
   };
 
-  const isEditable = settlement.status === 'DRAFT' || settlement.status === 'SUBMITTED' || settlement.status === 'APPROVED' || settlement.status === 'REJECTED';
+  const canManage = currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER';
+  const isEditable = canManage && (settlement.status === 'DRAFT' || settlement.status === 'SUBMITTED' || settlement.status === 'APPROVED' || settlement.status === 'REJECTED');
 
   return (
     <div className="space-y-6">
@@ -337,7 +333,7 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
         </div>
 
         {/* Action Controls Panel */}
-        <div className="flex flex-col gap-2 justify-end border-t md:border-t-0 pt-4 md:pt-0">
+        {canManage && <div className="flex flex-col gap-2 justify-end border-t md:border-t-0 pt-4 md:pt-0">
           <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-2 text-right">Akce vyúčtování</h4>
           
           {(settlement.status === 'DRAFT' || settlement.status === 'REJECTED') && (
@@ -392,7 +388,7 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
               🔒 Vyplaceno (Terminální stav)
             </div>
           )}
-        </div>
+        </div>}
       </section>
 
       {/* Rejection Settlement Reason Modal */}
@@ -476,7 +472,9 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
               Částka (Kladná zvyšuje, záporná snižuje) <span className="text-red-500">*</span>
               <input
                 type="number"
-                step="any"
+                step="0.01"
+                max="9999999999.99"
+                min="-9999999999.99"
                 required
                 className="input mt-1 w-full"
                 value={adjAmount}
@@ -504,6 +502,7 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
               Popis korekce <span className="text-red-500">*</span>
               <input
                 required
+                maxLength={250}
                 className="input mt-1 w-full"
                 value={adjDescription}
                 onChange={(e) => setAdjDescription(e.target.value)}
@@ -515,6 +514,8 @@ export function SettlementDetailManager({ settlement }: SettlementDetailManagerP
               Důvod pro provedení korekce (povinný) <span className="text-red-500">*</span>
               <input
                 required
+                minLength={5}
+                maxLength={500}
                 className="input mt-1 w-full"
                 value={adjReason}
                 onChange={(e) => setAdjReason(e.target.value)}

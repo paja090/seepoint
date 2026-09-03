@@ -175,7 +175,7 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
     }
 
     return NextResponse.json({ ok: true, createdCount: createdTasks.length, tasks: createdTasks });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Chyba při zpracování AI úkolů.' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při zpracování AI úkolů.' }, { status: 500 });
   }
 }

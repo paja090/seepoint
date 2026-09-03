@@ -468,32 +468,36 @@ enum ReservationStatus {
 }
 
 model Organization {
-  id                 String             @id @default(cuid())
-  name               String
-  slug               String             @unique
-  companyId          String?
-  vatId              String?
-  street             String?
-  city               String?
-  postalCode         String?
-  country            String             @default("CZ")
-  email              String?
-  phone              String?
-  website            String?
-  logoUrl            String?
-  primaryColor       String?
-  secondaryColor     String?
-  emailSignature     String?
-  defaultCurrency    String             @default("CZK")
-  bankAccount        String?
-  iban               String?
-  swift              String?
-  plan               OrganizationPlan   @default(START)
-  subscriptionStatus SubscriptionStatus @default(TRIAL)
-  trialEndsAt        DateTime?
-  isActive           Boolean            @default(true)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                  String             @id @default(cuid())
+  name                String
+  slug                String             @unique
+  companyId           String?
+  vatId               String?
+  street              String?
+  city                String?
+  postalCode          String?
+  country             String             @default("CZ")
+  email               String?
+  phone               String?
+  website             String?
+  logoUrl             String?
+  primaryColor        String?
+  secondaryColor      String?
+  emailSignature      String?
+  defaultCurrency     String             @default("CZK")
+  invoiceDueDays      Int                @default(14)
+  defaultVatRate      Decimal            @default(21) @db.Decimal(5, 2)
+  invoiceNumberPrefix String             @default("NAV")
+  invoiceSequence     Int                @default(0)
+  bankAccount         String?
+  iban                String?
+  swift               String?
+  plan                OrganizationPlan   @default(START)
+  subscriptionStatus  SubscriptionStatus @default(TRIAL)
+  trialEndsAt         DateTime?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   members      OrganizationMember[]
   invitations  OrganizationInvitation[]
@@ -2710,25 +2714,29 @@ model ClientContract {
 }
 
 model ClientInvoice {
-  id             String              @id @default(cuid())
-  organizationId String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
-  clientId       String
-  crmOrderId     String?
-  invoiceNumber  String
-  variableSymbol String?
-  type           ClientInvoiceType   @default(REGULAR)
-  status         ClientInvoiceStatus @default(ISSUED)
-  issueDate      DateTime            @default(now())
-  dueDate        DateTime
-  paidAt         DateTime?
-  subtotal       Decimal             @db.Decimal(12, 2)
-  taxAmount      Decimal             @default(0) @db.Decimal(12, 2)
-  totalAmount    Decimal             @db.Decimal(12, 2)
-  note           String?
-  pdfUrl         String?
-  driveFileId    String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id               String              @id @default(cuid())
+  organizationId   String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  clientId         String
+  crmOrderId       String?
+  invoiceNumber    String
+  variableSymbol   String?
+  type             ClientInvoiceType   @default(REGULAR)
+  status           ClientInvoiceStatus @default(ISSUED)
+  issueDate        DateTime            @default(now())
+  dueDate          DateTime
+  paidAt           DateTime?
+  subtotal         Decimal             @db.Decimal(12, 2)
+  taxAmount        Decimal             @default(0) @db.Decimal(12, 2)
+  totalAmount      Decimal             @db.Decimal(12, 2)
+  currency         String              @default("CZK")
+  note             String?
+  recipientEmail   String?
+  supplierSnapshot Json?
+  customerSnapshot Json?
+  pdfUrl           String?
+  driveFileId      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   client                   Client                    @relation(fields: [clientId], references: [id], onDelete: Restrict)
   crmOrder                 CrmOrder?                 @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)

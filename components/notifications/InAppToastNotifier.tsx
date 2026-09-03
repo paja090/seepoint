@@ -23,7 +23,8 @@ export function InAppToastNotifier() {
   // Web Audio Chime Synthesizer
   function playAlertChime(isUrgent = false) {
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const audioWindow = window as Window & { webkitAudioContext?: typeof AudioContext };
+      const AudioCtx = window.AudioContext || audioWindow.webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();

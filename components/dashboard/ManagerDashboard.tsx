@@ -1,37 +1,16 @@
 import Link from 'next/link';
-import {
-  Archive,
-  ArrowUpRight,
-  BarChart3,
-  Building2,
-  CalendarClock,
-  CheckCircle2,
-  Clock3,
-  DollarSign,
-  Layers,
-  MapPinOff,
-  PanelsTopLeft,
-  PieChart,
-  RadioTower,
-  ShieldAlert,
-  Sparkles,
-  Tag,
-  TrendingUp,
-} from 'lucide-react';
-import { EmptyState, PageHeader, StatCard, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
+import { BarChart3, Building2, CalendarClock, DollarSign, Layers, PieChart, Sparkles, Tag, TrendingUp } from 'lucide-react';
+import { EmptyState, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { StatusBadge } from '@/components/StatusBadge';
 
 interface ManagerDashboardProps {
-  totalCarriers: number;
-  activeCarriers: number;
-  archivedCarriers: number;
-  missingGps: number;
   totalSurfaces: number;
   availableSurfaces: number;
   occupiedSurfaces: number;
-  reservedSurfaces: number;
-  mrrAmount: number;
-  arrAmount: number;
+  knownMonthlyRent: number;
+  annualizedKnownRent: number;
+  pricedOccupiedSurfaces: number;
+  unpricedOccupiedSurfaces: number;
   occupancyPercent: number;
   waitingOffers: number;
   seasonalityData: number[];
@@ -44,30 +23,13 @@ interface ManagerDashboardProps {
     client: { name: string } | null;
     surface: { carrier: { code: string; city: string } };
   }>;
-  ending30: Array<{
-    id: string;
-    campaignName: string;
-    clientName: string;
-    dateTo: Date;
-    status: string;
-    client: { name: string } | null;
-    surface: { carrier: { code: string; city: string } };
-  }>;
-  missingGpsRows: Array<{
-    id: string;
-    code: string;
-    name: string;
-    city: string;
-    street: string | null;
-    address: string | null;
-  }>;
   mediaBreakdown: Array<{
     type: string;
     label: string;
     count: number;
     occupiedCount: number;
     occupancyPercent: number;
-    estimatedRevenue: number;
+    knownMonthlyRent: number;
   }>;
   topCities: Array<{
     city: string;
@@ -78,22 +40,17 @@ interface ManagerDashboardProps {
 }
 
 export function ManagerDashboard({
-  totalCarriers,
-  activeCarriers,
-  archivedCarriers,
-  missingGps,
   totalSurfaces,
   availableSurfaces,
   occupiedSurfaces,
-  reservedSurfaces,
-  mrrAmount,
-  arrAmount,
+  knownMonthlyRent,
+  annualizedKnownRent,
+  pricedOccupiedSurfaces,
+  unpricedOccupiedSurfaces,
   occupancyPercent,
   waitingOffers,
   seasonalityData,
   ending7,
-  ending30,
-  missingGpsRows,
   mediaBreakdown,
   topCities,
 }: ManagerDashboardProps) {
@@ -103,8 +60,8 @@ export function ManagerDashboard({
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Manažerský Dashboard & Reálná Analytika"
-        description="Kompletní přehled finančních toků, sezónní obsazenosti nosičů, reálného rozdělení tržeb a doporučení z databáze."
+        title="Manažerský Dashboard & Provozní Analytika"
+        description="Přehled kapacity, kampaní a explicitně evidovaného nájemného bez dopočítaných cenových odhadů."
         actions={
           <div className="flex items-center gap-2">
             <Link href="/occupancy" className="btn-primary">
@@ -121,27 +78,27 @@ export function ManagerDashboard({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 p-6 text-white shadow-lg">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-emerald-200">Měsíční tržby (MRR)</span>
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-200">Evidované měsíční nájemné</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm">
               <DollarSign size={20} />
             </div>
           </div>
-          <p className="mt-4 text-3xl font-black">{mrrAmount.toLocaleString('cs-CZ')} Kč</p>
+          <p className="mt-4 text-3xl font-black">{knownMonthlyRent.toLocaleString('cs-CZ')} Kč</p>
           <div className="mt-2 flex items-center gap-1.5 text-xs font-bold text-emerald-200">
             <TrendingUp size={14} />
-            <span>Aktuální platný výnos ze smluv</span>
+            <span>{pricedOccupiedSurfaces} obsazených ploch s explicitní cenou</span>
           </div>
         </div>
 
         <div className="rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 p-6 text-white shadow-lg border border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Roční portfolio (ARR)</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Roční přepočet evidovaného nájemného</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 backdrop-blur-sm">
               <TrendingUp size={20} className="text-emerald-400" />
             </div>
           </div>
-          <p className="mt-4 text-3xl font-black">{arrAmount.toLocaleString('cs-CZ')} Kč</p>
-          <p className="mt-2 text-xs text-slate-400 font-medium">Reálný roční objem z obsazených smluv</p>
+          <p className="mt-4 text-3xl font-black">{annualizedKnownRent.toLocaleString('cs-CZ')} Kč</p>
+          <p className="mt-2 text-xs text-slate-400 font-medium">12× měsíční hodnota; {unpricedOccupiedSurfaces} obsazených ploch bez ceny</p>
         </div>
 
         <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
@@ -286,7 +243,7 @@ export function ManagerDashboard({
         <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-950 flex items-center gap-2 mb-1">
             <Layers className="text-emerald-600" size={20} />
-            <span>Reálná Struktura Médií & Tržeb</span>
+            <span>Struktura médií & Evidované nájemné</span>
           </h2>
           <p className="text-xs text-slate-500 mb-6">Rozdělení z reálné databáze nosičů</p>
 
@@ -304,7 +261,7 @@ export function ManagerDashboard({
                   />
                 </div>
                 <p className="text-[11px] font-semibold text-emerald-700 text-right">
-                  {item.estimatedRevenue.toLocaleString('cs-CZ')} Kč / měsíc
+                  {item.knownMonthlyRent.toLocaleString('cs-CZ')} Kč / měsíc
                 </p>
               </div>
             ))}

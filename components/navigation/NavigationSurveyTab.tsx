@@ -22,8 +22,39 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+type SurveyPhoto = { id: string; url?: string | null };
+type SurveyCandidate = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+  distanceValue?: number | null;
+  supervisionStatus: 'PENDING_REVIEW' | 'APPROVED' | 'NEEDS_RECHECK' | 'REJECTED';
+  convertedNavigationPointId?: string | null;
+  surveyRoute?: { name: string } | null;
+  placementType?: string | null;
+  arrowDirection?: string | null;
+  visibilityTowardTarget?: string | null;
+  ownershipType?: string | null;
+  permitStatus?: string | null;
+  createdByUser?: { name: string } | null;
+  internalNote?: string | null;
+  supervisionNote?: string | null;
+  photos: SurveyPhoto[];
+};
+type SurveyData = {
+  targetName: string;
+  targetAddress?: string | null;
+  surveyRoutes: Array<{ id: string; name: string }>;
+  candidatePoints: SurveyCandidate[];
+};
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: string }) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<SurveyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING_REVIEW' | 'APPROVED' | 'NEEDS_RECHECK' | 'REJECTED'>('ALL');
 
@@ -34,7 +65,7 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
   const [savingRoute, setSavingRoute] = useState(false);
 
   // Supervision Action State
-  const [supervisionModalCandidate, setSupervisionModalCandidate] = useState<any>(null);
+  const [supervisionModalCandidate, setSupervisionModalCandidate] = useState<SurveyCandidate | null>(null);
   const [supervisionAction, setSupervisionAction] = useState<'NEEDS_RECHECK' | 'REJECT' | null>(null);
   const [supervisionNote, setSupervisionNote] = useState('');
   const [submittingSupervision, setSubmittingSupervision] = useState(false);
@@ -87,7 +118,7 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
     }
   };
 
-  const handleSupervise = async (candidate: any, action: 'APPROVE' | 'NEEDS_RECHECK' | 'REJECT') => {
+  const handleSupervise = async (candidate: SurveyCandidate, action: 'APPROVE' | 'NEEDS_RECHECK' | 'REJECT') => {
     if (action === 'APPROVE') {
       if (!confirm(`Opravdu chcete schválit kandidátní místo "${candidate.label}"?`)) return;
       try {
@@ -97,8 +128,8 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
           body: JSON.stringify({ action: 'APPROVE' }),
         });
         if (res.ok) fetchSurvey();
-      } catch (e: any) {
-        alert(e.message || 'Chyba při schvalování.');
+      } catch (error: unknown) {
+        alert(errorMessage(error, 'Chyba při schvalování.'));
       }
     } else {
       setSupervisionModalCandidate(candidate);
@@ -166,16 +197,16 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
   }
 
   const candidates = data.candidatePoints || [];
-  const filteredCandidates = candidates.filter((c: any) => {
+  const filteredCandidates = candidates.filter((c) => {
     if (activeFilter === 'ALL') return true;
     return c.supervisionStatus === activeFilter;
   });
 
   const totalCandidates = candidates.length;
-  const pendingCount = candidates.filter((c: any) => c.supervisionStatus === 'PENDING_REVIEW').length;
-  const approvedCount = candidates.filter((c: any) => c.supervisionStatus === 'APPROVED').length;
-  const recheckCount = candidates.filter((c: any) => c.supervisionStatus === 'NEEDS_RECHECK').length;
-  const rejectedCount = candidates.filter((c: any) => c.supervisionStatus === 'REJECTED').length;
+  const pendingCount = candidates.filter((c) => c.supervisionStatus === 'PENDING_REVIEW').length;
+  const approvedCount = candidates.filter((c) => c.supervisionStatus === 'APPROVED').length;
+  const recheckCount = candidates.filter((c) => c.supervisionStatus === 'NEEDS_RECHECK').length;
+  const rejectedCount = candidates.filter((c) => c.supervisionStatus === 'REJECTED').length;
 
   return (
     <div className="space-y-6 text-slate-900">
@@ -271,7 +302,7 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
           {data.surveyRoutes.length === 0 ? (
             <span className="text-slate-400 italic">Zatím nebyly zadané žádné trasy</span>
           ) : (
-            data.surveyRoutes.map((r: any) => (
+            data.surveyRoutes.map((r) => (
               <span key={r.id} className="bg-slate-100 text-slate-800 px-3 py-1 rounded-xl border border-slate-200 font-bold shrink-0">
                 🚗 {r.name}
               </span>
@@ -289,7 +320,7 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
             <p className="text-xs text-slate-500">Pracovníci v terénu mohou přidávat místa přes mobilní rozhraní.</p>
           </div>
         ) : (
-          filteredCandidates.map((c: any) => (
+          filteredCandidates.map((c) => (
             <div key={c.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-3">
                 <div className="space-y-1">
@@ -377,7 +408,7 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
                     <p className="text-slate-400 italic">Bez fotografií</p>
                   ) : (
                     <div className="flex items-center gap-2 overflow-x-auto">
-                      {c.photos.map((p: any) => {
+                      {c.photos.map((p) => {
                         const photoSrc = p.url || `/api/photos/${p.id}/file`;
                         return (
                           <a key={p.id} href={photoSrc} target="_blank" rel="noreferrer" className="relative size-14 rounded-xl overflow-hidden border border-slate-300 shrink-0 block bg-slate-100">

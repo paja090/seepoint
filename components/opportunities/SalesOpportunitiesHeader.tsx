@@ -1,6 +1,6 @@
 'use client';
 
-import { Radar, Sparkles, Building2, Flame, CalendarClock, FileText, CheckCircle2, Plus } from 'lucide-react';
+import { Radar, Sparkles, Flame, CalendarClock, FileText, CheckCircle2, Plus } from 'lucide-react';
 
 type Stats = {
   totalNew: number;
@@ -15,11 +15,13 @@ export function SalesOpportunitiesHeader({
   onOpenManualModal,
   onAutoDiscover,
   isAutoDiscovering,
+  canAutoDiscover,
 }: {
   stats: Stats;
   onOpenManualModal: () => void;
   onAutoDiscover: () => void;
   isAutoDiscovering?: boolean;
+  canAutoDiscover: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -39,15 +41,17 @@ export function SalesOpportunitiesHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <button
-            type="button"
-            disabled={isAutoDiscovering}
-            onClick={onAutoDiscover}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50"
-          >
-            <Sparkles className={`w-4 h-4 text-purple-300 ${isAutoDiscovering ? 'animate-spin' : ''}`} />
-            <span>{isAutoDiscovering ? 'AI prohledává MS kraj…' : '🤖 Spustit AI Hledání v MS kraji'}</span>
-          </button>
+          {canAutoDiscover ? (
+            <button
+              type="button"
+              disabled={isAutoDiscovering}
+              onClick={onAutoDiscover}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50"
+            >
+              <Sparkles className={`w-4 h-4 text-purple-300 ${isAutoDiscovering ? 'animate-spin' : ''}`} />
+              <span>{isAutoDiscovering ? 'AI prohledává MS kraj…' : '🤖 Spustit AI Hledání v MS kraji'}</span>
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -85,11 +89,11 @@ export function SalesOpportunitiesHeader({
         {/* KPI 3 */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-1.5 shadow-md">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-black uppercase tracking-wider">K oslovení tento týden</span>
+            <span className="text-[11px] font-black uppercase tracking-wider">K oslovení do 30 dnů</span>
             <CalendarClock className="w-4 h-4 text-amber-400" />
           </div>
           <p className="text-2xl sm:text-3xl font-black text-amber-400">{stats.totalContactThisWeek}</p>
-          <p className="text-[10px] font-semibold text-slate-400">Události do 30-90 dnů</p>
+          <p className="text-[10px] font-semibold text-slate-400">Nadcházející události v příštích 30 dnech</p>
         </div>
 
         {/* KPI 4 */}
@@ -99,7 +103,7 @@ export function SalesOpportunitiesHeader({
             <FileText className="w-4 h-4 text-sky-400" />
           </div>
           <p className="text-2xl sm:text-3xl font-black text-sky-400">{stats.totalProposals}</p>
-          <p className="text-[10px] font-semibold text-slate-400">Odeslané koncepty kampaní</p>
+          <p className="text-[10px] font-semibold text-slate-400">Připravené koncepty kampaní</p>
         </div>
 
         {/* KPI 5 */}

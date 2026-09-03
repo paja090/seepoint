@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
+import { canRecordWarehouseMovement } from '@/lib/rbac';
+import { recordWarehouseMovements, WarehouseStockError } from '@/lib/warehouse-stock';
+import { WarehouseInputError, warehouseText } from '@/lib/warehouse-validation';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
+  if (!canRecordWarehouseMovement(user.role)) {
+    return NextResponse.json({ error: 'Nemáte oprávnění zapisovat pohyby skladu.' }, { status: 403 });
+  }
 
   await ensureWarehouseSchema();
 
@@ -14,11 +20,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { speechText, workOrderId, assignedEmployeeId } = body;
 
-    if (!speechText || typeof speechText !== 'string' || !speechText.trim()) {
-      return NextResponse.json({ error: 'Nebylo zachyceno žádné slovo.' }, { status: 400 });
-    }
-
-    const text = speechText.trim().toLowerCase();
+    const cleanSpeechText = warehouseText(speechText, 'Hlasový příkaz', 500, true)!;
+    const text = cleanSpeechText.toLowerCase();
     const allItems = await prisma.warehouseItem.findMany();
 
     if (allItems.length === 0) {
@@ -58,6 +61,11 @@ export async function POST(request: Request) {
         error: `AI nerozpoznala v příkazu "${speechText}" žádnou známou skladovou položku. Zkuste vyslovit např. "pásky", "lepidlo" nebo "žebřík".`,
       }, { status: 400 });
     }
+    if (matchedIssues.length > 1) {
+      return NextResponse.json({
+        error: 'Příkaz odpovídá více skladovým položkám. Kvůli bezpečnému výdeji vyslovte vždy jen jednu položku a její množství.',
+      }, { status: 400 });
+    }
 
     const isReturn = /vrátil|vracím|vracim|dávám zpět|davam zpet|vráceno|vraceno|zpět do skladu|zpet do skladu/i.test(text);
     const movementType = isReturn ? 'RETURN' : 'ISSUE';
@@ -66,59 +74,31 @@ export async function POST(request: Request) {
       ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
       : user.name || user.email;
 
-    let assignedEmployeeName: string | null = null;
-    if (assignedEmployeeId) {
-      const emp = await prisma.employee.findUnique({ where: { id: assignedEmployeeId } });
-      if (emp) assignedEmployeeName = `${emp.firstName} ${emp.lastName}`.trim();
-    }
-
-    const results = [];
-
-    for (const issue of matchedIssues) {
-      const currentStock = Number(issue.item.quantityInStock);
-
-      let newStock = currentStock;
-      if (movementType === 'RETURN') {
-        newStock = currentStock + issue.quantity;
-      } else {
-        newStock = Math.max(0, currentStock - issue.quantity);
-      }
-
-      const [movement] = await prisma.$transaction([
-        prisma.warehouseMovement.create({
-          data: {
-            itemId: issue.item.id,
-            type: movementType,
-            quantity: issue.quantity,
-            workOrderId: workOrderId || null,
-            assignedEmployeeId: assignedEmployeeId || null,
-            assignedEmployeeName: assignedEmployeeName || null,
-            performedByName,
-            note: `Hlasový pohyb (${isReturn ? 'Vracení' : 'Výdej'}): "${speechText}"`,
-          },
-        }),
-        prisma.warehouseItem.update({
-          where: { id: issue.item.id },
-          data: { quantityInStock: newStock },
-        }),
-      ]);
-
-      results.push({
-        name: issue.item.name,
-        quantity: issue.quantity,
-        unit: issue.item.unit,
-        newStock,
-      });
-    }
+    const movements = await recordWarehouseMovements(matchedIssues.map((issue) => ({
+      itemId: issue.item.id,
+      type: movementType,
+      quantity: issue.quantity,
+      workOrderId,
+      assignedEmployeeId,
+      note: `Hlasový pohyb (${isReturn ? 'Vracení' : 'Výdej'}): "${cleanSpeechText}"`,
+    })), performedByName);
+    const results = movements.map((movement) => ({
+      name: movement.item.name,
+      quantity: Number(movement.quantity),
+      unit: movement.item.unit,
+      newStock: Number(movement.item.quantityInStock),
+    }));
 
     const actionTitle = isReturn ? 'Úspěšně vráceno do skladu' : 'Úspěšně vydáno ze skladu';
     return NextResponse.json({
       success: true,
-      speechText,
+      speechText: cleanSpeechText,
       issuedItems: results,
       message: `${actionTitle}: ${results.map((r) => `${r.quantity} ${r.unit} ${r.name}`).join(', ')}`,
     });
   } catch (error) {
+    if (error instanceof WarehouseInputError) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error instanceof WarehouseStockError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('Voice issue error:', error);
     return NextResponse.json({ error: 'Zpracování hlasového příkazu selhalo.' }, { status: 500 });
   }

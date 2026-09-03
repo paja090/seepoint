@@ -52,7 +52,7 @@ export default async function MySettlementsPage() {
         <section className="card">
           <h2 className="text-xl font-bold">Profil nenalezen</h2>
           <p className="mt-2 text-sm text-slate-500">
-            Pro mock uživatele {user.email} zatím není založený zaměstnanecký profil.
+            Pro účet {user.email} zatím není založený zaměstnanecký profil.
           </p>
         </section>
       ) : (

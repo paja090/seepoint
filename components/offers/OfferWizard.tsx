@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, CalendarDays, Check, LayoutGrid,
@@ -63,12 +63,16 @@ function StepTitle({ title, subtitle }: { title: string; subtitle: string }) { r
 function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) { return <label className={className}><span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>{children}</label>; }
 function SummaryRow({ label, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">{label}</dt><dd className="text-right font-medium text-slate-900">{value}</dd></div>; }
 
-export function OfferWizard({ clients: initialClients, surfaces, priceRules, mediaPackages, priceListItems = [], initialOffer }: { clients: OfferClientOption[]; surfaces: OfferSurfaceOption[]; priceRules: OfferPriceRuleOption[]; mediaPackages: MediaPackageOption[]; priceListItems?: Array<{ id: string; name: string; mediaType: string | null; carrierType: string | null; rentalPrice: string }>; initialOffer?: OfferView }) {
+export function OfferWizard({ clients: initialClients, surfaces, priceRules, mediaPackages, priceListItems = [], initialOffer, initialClientId }: { clients: OfferClientOption[]; surfaces: OfferSurfaceOption[]; priceRules: OfferPriceRuleOption[]; mediaPackages: MediaPackageOption[]; priceListItems?: Array<{ id: string; name: string; mediaType: string | null; carrierType: string | null; rentalPrice: string }>; initialOffer?: OfferView; initialClientId?: string }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [step, setStep] = useState(0);
   const [dirty, setDirty] = useState(false);
-  const [clientId, setClientId] = useState(initialOffer?.clientId ?? initialClients[0]?.id ?? '');
+  const requestedClientId = initialOffer?.clientId ?? initialClientId;
+  const defaultClientId = requestedClientId && initialClients.some((client) => client.id === requestedClientId)
+    ? requestedClientId
+    : initialClients[0]?.id ?? '';
+  const [clientId, setClientId] = useState(defaultClientId);
   const selectedClient = clients.find((client) => client.id === clientId);
   const [title, setTitle] = useState(initialOffer?.title ?? 'Nová obchodní nabídka');
   const [campaignName, setCampaignName] = useState(initialOffer?.campaignName ?? '');
@@ -102,7 +106,7 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
   const [showClientForm, setShowClientForm] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', contactPerson: '', email: '', phone: '', companyId: '', note: '' });
 
-  function getCatalogPrice(surface: OfferSurfaceOption, tier: 'komerce' | 'kultura') {
+  const getCatalogPrice = useCallback((surface: OfferSurfaceOption, tier: 'komerce' | 'kultura') => {
     const candidates = priceListItems.filter(
       (item) => item.mediaType === surface.mediaType || item.carrierType === surface.carrier.type
     );
@@ -118,7 +122,7 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
     );
     if (generalMatch) return parseFloat(generalMatch.rentalPrice);
     return parseFloat(candidates[0].rentalPrice);
-  }
+  }, [priceListItems]);
 
   const resolvedSurfaces = useMemo(() => {
     return surfaces.map((surface) => {
@@ -126,7 +130,7 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
       const price = surface.priceSource === 'SURFACE' ? surface.price : catalogPrice.toFixed(2);
       return { ...surface, price };
     });
-  }, [surfaces, pricingTier, priceListItems]);
+  }, [surfaces, pricingTier, getCatalogPrice]);
 
   useEffect(() => { const listener = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); }; window.addEventListener('beforeunload', listener); return () => window.removeEventListener('beforeunload', listener); }, [dirty]);
   const cityOptions = useMemo(() => [...new Set(resolvedSurfaces.map((surface) => surface.carrier.city))].sort(), [resolvedSurfaces]);

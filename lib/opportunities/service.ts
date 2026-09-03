@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/db';
 import type { OpportunityEventType, OpportunityStatus, Prisma } from '@prisma/client';
 import { calculateOpportunityScore } from './scoring';
-import type { CreateOpportunityInput, OpportunityFilterParams, OpportunityScoreReason } from './types';
+import type { CreateOpportunityInput, OpportunityFilterParams } from './types';
 import { normalizeClientName } from '@/lib/crm/domain';
+import { assertOpportunityTransition, OpportunityValidationError } from './policy';
 
-export async function getOpportunities(params: OpportunityFilterParams = {}) {
-  const where: Prisma.SalesOpportunityWhereInput = {};
+export async function getOpportunities(params: OpportunityFilterParams = {}, organizationId: string) {
+  const where: Prisma.SalesOpportunityWhereInput = { organizationId };
 
   if (params.status) {
     where.status = params.status;
@@ -83,9 +84,9 @@ export async function getOpportunities(params: OpportunityFilterParams = {}) {
   return { items, total };
 }
 
-export async function getOpportunityById(id: string) {
-  return prisma.salesOpportunity.findUnique({
-    where: { id },
+export async function getOpportunityById(id: string, organizationId: string) {
+  return prisma.salesOpportunity.findFirst({
+    where: { id, organizationId },
     include: {
       client: true,
       createdOffer: {
@@ -105,13 +106,15 @@ export async function getOpportunityById(id: string) {
   });
 }
 
-export async function findDuplicateOpportunity(companyName: string, eventType: OpportunityEventType, city: string, sourceUrl?: string) {
+export async function findDuplicateOpportunity(companyName: string, eventType: OpportunityEventType, city: string, organizationId: string, sourceUrl?: string) {
   const normCompany = companyName.trim().toLowerCase();
 
   // 1. Check exact source URL duplicate
-  if (sourceUrl?.trim()) {
+  const source = sourceUrl?.trim();
+  const isGenericInternalSource = source === 'https://seepoint.cz' || source === 'https://seepoint.cz/';
+  if (source && !isGenericInternalSource) {
     const existingByUrl = await prisma.salesOpportunity.findFirst({
-      where: { sourceUrl: sourceUrl.trim() },
+      where: { organizationId, sourceUrl: source },
       select: { id: true, companyName: true, sourceUrl: true, createdAt: true },
     });
     if (existingByUrl) return existingByUrl;
@@ -120,7 +123,11 @@ export async function findDuplicateOpportunity(companyName: string, eventType: O
   // 2. Check company name match in database
   const candidates = await prisma.salesOpportunity.findMany({
     where: {
+      organizationId,
       companyName: { contains: normCompany, mode: 'insensitive' },
+      eventType,
+      city: { equals: city.trim(), mode: 'insensitive' },
+      createdAt: { gte: new Date(Date.now() - 180 * 24 * 60 * 60_000) },
     },
     select: {
       id: true,
@@ -135,20 +142,33 @@ export async function findDuplicateOpportunity(companyName: string, eventType: O
   );
 }
 
-export async function createOpportunity(input: CreateOpportunityInput) {
+export async function createOpportunity(input: CreateOpportunityInput, organizationId: string) {
   const duplicate = await findDuplicateOpportunity(
     input.companyName,
     input.eventType || 'NEW_BRANCH',
     input.city,
+    organizationId,
     input.sourceUrl
   );
   if (duplicate) {
-    return { created: false, duplicateId: duplicate.id, opportunity: await getOpportunityById(duplicate.id) };
+    return { created: false, duplicateId: duplicate.id, opportunity: await getOpportunityById(duplicate.id, organizationId) };
+  }
+
+  if (input.clientId) {
+    const clientExists = await prisma.client.count({ where: { id: input.clientId, organizationId, active: true } });
+    if (!clientExists) throw new OpportunityValidationError('Vybraný klient v aktivní organizaci neexistuje.', 404);
+  }
+  if (input.assignedToUserId) {
+    const assigneeExists = await prisma.organizationMember.count({
+      where: { organizationId, userId: input.assignedToUserId, isActive: true },
+    });
+    if (!assigneeExists) throw new OpportunityValidationError('Vybraný obchodník není aktivním členem organizace.');
   }
 
   // Check carriers in city for scoring
   const carrierCount = await prisma.advertisingCarrier.count({
     where: {
+      organizationId,
       archivedAt: null,
       status: 'ACTIVE',
       city: { contains: input.city.trim(), mode: 'insensitive' },
@@ -160,6 +180,7 @@ export async function createOpportunity(input: CreateOpportunityInput) {
   if (!linkedClientId && input.companyName) {
     const existingClient = await prisma.client.findFirst({
       where: {
+        organizationId,
         active: true,
         OR: [
           { name: { equals: input.companyName.trim(), mode: 'insensitive' } },
@@ -211,6 +232,7 @@ export async function createOpportunity(input: CreateOpportunityInput) {
 
   const opportunity = await prisma.salesOpportunity.create({
     data: {
+      organizationId,
       companyName: input.companyName.trim(),
       companyId: input.companyId?.trim() || null,
       website: input.website?.trim() || null,
@@ -248,9 +270,17 @@ export async function createOpportunity(input: CreateOpportunityInput) {
 export async function updateOpportunityStatus(
   id: string,
   status: OpportunityStatus,
+  organizationId: string,
   dismissedReason?: string,
   assignedToUserId?: string
 ) {
+  const current = await prisma.salesOpportunity.findFirst({ where: { id, organizationId }, select: { status: true } });
+  if (!current) throw new OpportunityValidationError('Příležitost nebyla nalezena.', 404);
+  assertOpportunityTransition(current.status, status);
+  if (assignedToUserId) {
+    const member = await prisma.organizationMember.count({ where: { organizationId, userId: assignedToUserId, isActive: true } });
+    if (!member) throw new OpportunityValidationError('Vybraný obchodník není aktivním členem organizace.');
+  }
   const data: Prisma.SalesOpportunityUpdateInput = { status };
   if (dismissedReason !== undefined) {
     data.dismissedReason = dismissedReason;
@@ -258,9 +288,13 @@ export async function updateOpportunityStatus(
   if (assignedToUserId !== undefined) {
     data.assignedTo = assignedToUserId ? { connect: { id: assignedToUserId } } : { disconnect: true };
   }
-  return prisma.salesOpportunity.update({
-    where: { id },
+  const changed = await prisma.salesOpportunity.updateMany({
+    where: { id, organizationId, status: current.status },
     data,
+  });
+  if (changed.count !== 1) throw new OpportunityValidationError('Příležitost mezitím změnil jiný uživatel. Obnovte stránku.', 409);
+  return prisma.salesOpportunity.findFirstOrThrow({
+    where: { id, organizationId },
     include: {
       client: true,
       createdOffer: true,
@@ -269,34 +303,38 @@ export async function updateOpportunityStatus(
   });
 }
 
-export async function linkOpportunityToClient(id: string, clientId: string) {
-  const client = await prisma.client.findUnique({ where: { id: clientId } });
+export async function linkOpportunityToClient(id: string, clientId: string, organizationId: string) {
+  const client = await prisma.client.findFirst({ where: { id: clientId, organizationId, active: true } });
   if (!client) throw new Error('Vybraný klient v CRM neexistuje.');
 
-  return prisma.salesOpportunity.update({
-    where: { id },
+  await prisma.salesOpportunity.updateMany({
+    where: { id, organizationId },
     data: {
       clientId,
       status: 'REVIEWED',
     },
+  });
+  return prisma.salesOpportunity.findFirstOrThrow({
+    where: { id, organizationId },
     include: {
       client: true,
     },
   });
 }
 
-export async function getOpportunityStats() {
+export async function getOpportunityStats(organizationId: string) {
   const [totalNew, totalHighScore, totalContactThisWeek, totalProposals, totalConverted] = await Promise.all([
-    prisma.salesOpportunity.count({ where: { status: 'NEW' } }),
-    prisma.salesOpportunity.count({ where: { opportunityScore: { gte: 80 }, status: { notIn: ['DISMISSED'] } } }),
+    prisma.salesOpportunity.count({ where: { organizationId, status: 'NEW' } }),
+    prisma.salesOpportunity.count({ where: { organizationId, opportunityScore: { gte: 80 }, status: { notIn: ['DISMISSED'] } } }),
     prisma.salesOpportunity.count({
       where: {
+        organizationId,
         status: { in: ['NEW', 'REVIEWED', 'CONTACT_PLANNED'] },
         eventDate: { gte: new Date(), lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
       },
     }),
-    prisma.salesOpportunity.count({ where: { status: 'PROPOSAL_CREATED' } }),
-    prisma.salesOpportunity.count({ where: { status: 'CONVERTED' } }),
+    prisma.salesOpportunity.count({ where: { organizationId, status: 'PROPOSAL_CREATED' } }),
+    prisma.salesOpportunity.count({ where: { organizationId, status: 'CONVERTED' } }),
   ]);
 
   return {

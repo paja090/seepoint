@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || '';
     const filter = searchParams.get('filter') || 'all';
 
-    const whereCondition: any = {};
+    const whereCondition: Prisma.NavigationOrderWhereInput = {};
 
     if (search.trim()) {
       whereCondition.OR = [
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
         some: { supervisionStatus: 'PENDING_REVIEW' },
       };
     } else if (filter === 'active') {
-      whereCondition.status = { notIn: ['DOKONCENO', 'STORNO'] };
+      whereCondition.status = { not: 'DOKONCENO' };
     }
 
     const orders = await prisma.navigationOrder.findMany({
@@ -68,23 +69,23 @@ export async function GET(request: Request) {
       take: 100,
     });
 
-    const formattedSurveys = orders.map((order: any) => {
+    const formattedSurveys = orders.map((order) => {
       const totalCandidates = order.candidatePoints.length;
       const pendingReviewCount = order.candidatePoints.filter(
-        (c: any) => c.supervisionStatus === 'PENDING_REVIEW'
+        (candidate) => candidate.supervisionStatus === 'PENDING_REVIEW'
       ).length;
       const approvedCount = order.candidatePoints.filter(
-        (c: any) => c.supervisionStatus === 'APPROVED'
+        (candidate) => candidate.supervisionStatus === 'APPROVED'
       ).length;
       const recheckCount = order.candidatePoints.filter(
-        (c: any) => c.supervisionStatus === 'NEEDS_RECHECK'
+        (candidate) => candidate.supervisionStatus === 'NEEDS_RECHECK'
       ).length;
       const rejectedCount = order.candidatePoints.filter(
-        (c: any) => c.supervisionStatus === 'REJECTED'
+        (candidate) => candidate.supervisionStatus === 'REJECTED'
       ).length;
 
-      const lastSurveyAt = order.candidatePoints.reduce((latest: Date, c: any) => {
-        return c.createdAt > latest ? c.createdAt : latest;
+      const lastSurveyAt = order.candidatePoints.reduce((latest, candidate) => {
+        return candidate.createdAt > latest ? candidate.createdAt : latest;
       }, order.createdAt);
 
       return {
@@ -113,10 +114,10 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ surveys: formattedSurveys });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching navigation surveys:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při načítání průzkumů.' },
+      { error: error instanceof Error ? error.message : 'Chyba při načítání průzkumů.' },
       { status: 500 }
     );
   }

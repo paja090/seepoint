@@ -1,14 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 
 export const dynamic = 'force-dynamic';
 
+type AresCandidate = {
+  ico?: string;
+  dic?: string;
+  obchodniJmeno?: string;
+  sidlo?: {
+    textovaAdresa?: string;
+    nazevObce?: string;
+    ulice?: string;
+    cisloDomovni?: number | string;
+    psc?: number | string;
+  };
+};
+
 export async function POST(request: Request) {
   try {
-    const actor = await getCurrentUser();
-    if (!actor) {
-      return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
-    }
+    const actor = await requireApiAccess('clients');
+    if (isApiDenied(actor)) return actor;
+    const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${actor.organizationId}:${actor.id}`), rateLimitPolicies.crmAi);
+    if (limited) return limited;
 
     const { query } = (await request.json().catch(() => ({}))) as { query?: string };
     const searchKeyword = (query || '').trim();
@@ -16,18 +31,19 @@ export async function POST(request: Request) {
     if (!searchKeyword) {
       return NextResponse.json({ error: 'Zadejte název firmy nebo IČO.' }, { status: 400 });
     }
+    if (searchKeyword.length > 200) return NextResponse.json({ error: 'Hledaný text je příliš dlouhý.' }, { status: 400 });
 
     const icoToSearch = searchKeyword.replace(/\s+/g, '');
     const isIco = /^\d{8}$/.test(icoToSearch);
 
-    let aresCandidates: any[] = [];
+    let aresCandidates: AresCandidate[] = [];
 
     // 1A. Exact IČO Lookup in ARES
     if (isIco) {
       try {
         const aresRes = await fetch(
           `https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${icoToSearch}`,
-          { headers: { Accept: 'application/json' } }
+          { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) }
         );
         if (aresRes.ok) {
           const singleSub = await aresRes.json();
@@ -47,6 +63,7 @@ export async function POST(request: Request) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({ obchodniJmeno: searchKeyword, start: 0, pocet: 10 }),
+            signal: AbortSignal.timeout(10_000),
           }
         );
         if (aresSearchRes.ok) {
@@ -107,18 +124,19 @@ Vrať POUZE platný JSON bez markdownu ve tvaru:
   "website": "https://www.canis.cz"
 }`;
 
-      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      const modelsToTry = [process.env.GEMINI_CRM_MODEL?.trim() || 'gemini-2.5-flash'];
       for (const model of modelsToTry) {
         try {
           const aiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 tools: [{ googleSearch: {} }],
               }),
+              signal: AbortSignal.timeout(20_000),
             }
           );
 
@@ -151,8 +169,8 @@ Vrať POUZE platný JSON bez markdownu ve tvaru:
     };
 
     return NextResponse.json({ ok: true, data: finalData });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('AI Lookup API error:', err);
-    return NextResponse.json({ error: err.message || 'Chyba při načítání firmy.' }, { status: 500 });
+    return NextResponse.json({ error: 'Firmu se nepodařilo bezpečně dohledat.' }, { status: 500 });
   }
 }

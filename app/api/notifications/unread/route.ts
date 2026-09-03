@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { canAccess } from '@/lib/rbac';
 
 export const runtime = 'nodejs';
 
@@ -19,7 +20,7 @@ export async function GET() {
 
   const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults] = await Promise.all([
     // Tasks assigned to user
-    prisma.workAssignment.findMany({
+    canAccess(user.role, 'work') ? prisma.workAssignment.findMany({
       where: {
         OR: [
           { workerName: { contains: userName, mode: 'insensitive' } },
@@ -41,11 +42,11 @@ export async function GET() {
         },
       },
       take: 10,
-    }),
+    }) : Promise.resolve([]),
     // Chat messages assigned to user to solve
     prisma.chatMessage.findMany({
       where: {
-        assignedToUserId: user.id,
+        assignedToUserId: { in: [user.id, ...(user.employee?.id ? [user.employee.id] : [])] },
         isResolved: { not: true },
       },
       take: 10,
@@ -63,7 +64,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     }),
     // Vehicle fault reports in last 24h
-    prisma.vehicleServiceRecord.findMany({
+    canAccess(user.role, 'vehicles') ? prisma.vehicleServiceRecord.findMany({
       where: {
         title: { contains: 'Hlášená závada', mode: 'insensitive' },
         createdAt: { gte: last24h },
@@ -73,7 +74,7 @@ export async function GET() {
       },
       take: 5,
       orderBy: { createdAt: 'desc' },
-    }),
+    }) : Promise.resolve([]),
   ]);
 
   const items = [

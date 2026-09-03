@@ -4,6 +4,7 @@ import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
+import { isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
 
 export const runtime = 'nodejs';
 
@@ -29,25 +30,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           where: { isVisible: true },
           select: {
             selectedPhotoId: true,
-            navigationPoint: { select: { installedPhotoId: true, sitePhotoId: true } },
           },
         },
       },
     }));
 
-    if (!report || report.status === 'ARCHIVED') {
+    if (!report || !isPublicNavigationReportStatus(report.status)) {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
-    if (report.tokenExpiresAt && new Date() > report.tokenExpiresAt) {
+    if (!report.tokenExpiresAt || new Date() > report.tokenExpiresAt) {
       return NextResponse.json({ error: 'Platnost odkazu vypršela.' }, { status: 410 });
     }
 
-    const allowedPhotoIds = new Set(report.items.flatMap((item) => [
-      item.selectedPhotoId,
-      item.navigationPoint?.installedPhotoId,
-      item.navigationPoint?.sitePhotoId,
-    ]).filter((id): id is string => Boolean(id)));
+    const allowedPhotoIds = new Set(report.items.map((item) => item.selectedPhotoId).filter((id): id is string => Boolean(id)));
     if (!allowedPhotoIds.has(photoId)) {
       return NextResponse.json({ error: 'Fotografie není dostupná.' }, { status: 404 });
     }

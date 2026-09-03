@@ -18,8 +18,11 @@ import { ClientDocumentsTab } from '@/components/crm/ClientDocumentsTab';
 import { ClientAuditTab } from '@/components/crm/ClientAuditTab';
 import { ClientAiEnrichCard } from '@/components/clients/ClientAiEnrichCard';
 import { ClientProfileData } from '@/lib/crm/types';
+import { canConvertOfferRole } from '@/lib/offers/domain';
 
 export const dynamic = 'force-dynamic';
+
+const crmDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague' });
 
 type SearchParams = Promise<{ tab?: string }>;
 type Params = Promise<{ id: string }>;
@@ -31,7 +34,7 @@ export default async function ClientProfilePage({
   params: Params;
   searchParams: SearchParams;
 }) {
-  await requirePageAccess('clients');
+  const user = await requirePageAccess('clients');
   const { id } = await params;
   const { tab = 'overview' } = await searchParams;
 
@@ -40,7 +43,14 @@ export default async function ClientProfilePage({
     notFound();
   }
 
-  const client = rawClient as unknown as ClientProfileData;
+  const client = {
+    ...rawClient,
+    invoices: rawClient.invoices.map((invoice) => ({
+      ...invoice,
+      issueDateLabel: crmDateFormatter.format(invoice.issueDate),
+      dueDateLabel: crmDateFormatter.format(invoice.dueDate),
+    })),
+  } as unknown as ClientProfileData;
 
   const tabs = [
     { id: 'overview', icon: '📊', name: 'Přehled' },
@@ -62,7 +72,7 @@ export default async function ClientProfilePage({
     <AppShell>
       <div className="space-y-6 pb-12">
         {/* Main Client Profile Header & Metrics */}
-        <ClientHeader client={client} />
+        <ClientHeader client={client} canManageLifecycle={user.role === 'ADMIN' || user.role === 'MANAGER'} />
 
         {/* AI Client Enrichment & ARES Lookup Card */}
         <ClientAiEnrichCard
@@ -111,7 +121,7 @@ export default async function ClientProfilePage({
         {tab === 'overview' && <ClientOverviewTab client={client} />}
         {tab === 'contacts' && <ClientContactsTab client={client} />}
         {tab === 'branches' && <ClientBranchesTab client={client} />}
-        {tab === 'offers' && <ClientOffersTab client={client} />}
+        {tab === 'offers' && <ClientOffersTab client={client} canConvert={canConvertOfferRole(user.role)} />}
         {tab === 'orders' && <ClientOrdersTab client={client} />}
         {tab === 'realizations' && <ClientRealizationsTab client={client} />}
         {tab === 'surfaces' && <ClientSurfacesTab client={client} />}

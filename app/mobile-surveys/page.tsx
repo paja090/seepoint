@@ -4,8 +4,21 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { Compass, MapPin, Search, Plus, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
+
+type SurveyListItem = {
+  id: string;
+  isOffer?: boolean;
+  targetName: string;
+  targetAddress?: string | null;
+  crmOrderId: string;
+  crmOrder?: { client?: { name: string } | null } | null;
+  candidatePoints: Array<{ id: string; supervisionStatus: string; createdAt: Date }>;
+  surveyRoutes: Array<{ id: string }>;
+  updatedAt: Date;
+};
 
 export default async function MobileSurveysPage({
   searchParams,
@@ -16,11 +29,11 @@ export default async function MobileSurveysPage({
   const user = await getCurrentUser();
   const { search = '', filter = 'all' } = await searchParams;
 
-  let orders: any[] = [];
+  let orders: SurveyListItem[] = [];
   let fetchError: string | null = null;
 
   try {
-    const whereCondition: any = {};
+    const whereCondition: Prisma.NavigationOrderWhereInput = {};
 
     if (search.trim()) {
       whereCondition.OR = [
@@ -83,28 +96,28 @@ export default async function MobileSurveysPage({
       take: 50,
     });
 
-    const mappedOffers = navOffers.map((o: any) => ({
-      id: o.id,
+    const mappedOffers: SurveyListItem[] = navOffers.map((offer) => ({
+      id: offer.id,
       isOffer: true,
-      targetName: o.navigationOffer?.targetName || o.title || 'Navigační nabídka',
-      targetAddress: o.navigationOffer?.targetAddress || null,
-      crmOrderId: o.id,
+      targetName: offer.navigationOffer?.targetName || offer.title || 'Navigační nabídka',
+      targetAddress: offer.navigationOffer?.targetAddress || null,
+      crmOrderId: offer.id,
       crmOrder: {
         client: {
-          name: o.client?.name || o.client?.tradingName || 'Klient',
+          name: offer.client?.name || offer.client?.tradingName || 'Klient',
         },
       },
-      candidatePoints: (o.navigationOffer?.points || []).map((p: any) => ({
-        id: p.id,
+      candidatePoints: (offer.navigationOffer?.points || []).map((point) => ({
+        id: point.id,
         supervisionStatus: 'APPROVED',
-        createdAt: p.createdAt,
+        createdAt: point.createdAt,
       })),
       surveyRoutes: [],
-      updatedAt: o.updatedAt,
+      updatedAt: offer.updatedAt,
     }));
 
     orders = [...navOrders, ...mappedOffers].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error loading mobile surveys:', err);
     fetchError = err instanceof Error ? err.message : 'Nepodařilo se načíst průzkumy z databáze.';
   }
@@ -185,12 +198,12 @@ export default async function MobileSurveysPage({
               <p className="text-xs text-slate-500">Pro zadaný filtr nebyly v databázi nalezeny žádné navigační zakázky.</p>
             </div>
           ) : (
-            orders.map((o: any) => {
+            orders.map((o) => {
               const candidates = o.candidatePoints || [];
               const routes = o.surveyRoutes || [];
               const totalCandidates = candidates.length;
-              const pendingReviewCount = candidates.filter((c: any) => c.supervisionStatus === 'PENDING_REVIEW').length;
-              const approvedCount = candidates.filter((c: any) => c.supervisionStatus === 'APPROVED').length;
+              const pendingReviewCount = candidates.filter((candidate) => candidate.supervisionStatus === 'PENDING_REVIEW').length;
+              const approvedCount = candidates.filter((candidate) => candidate.supervisionStatus === 'APPROVED').length;
 
               return (
                 <Link

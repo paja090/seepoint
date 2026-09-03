@@ -51,10 +51,10 @@ export async function POST(
     });
 
     return NextResponse.json({ route });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating survey route:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při zakládání trasy.' },
+      { error: error instanceof Error ? error.message : 'Chyba při zakládání trasy.' },
       { status: 500 }
     );
   }

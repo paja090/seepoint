@@ -27,7 +27,7 @@ export async function GET() {
       ok: true,
       message: `Smazáno ${delEmps.count} testovacích zaměstnanců v aktivní organizaci.`,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při čištění zaměstnanců.' }, { status: 500 });
   }
 }

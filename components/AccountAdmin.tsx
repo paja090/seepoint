@@ -13,6 +13,8 @@ interface AccountAdminProps {
   rolesList?: AppRole[];
   lastLoginAt: string | null;
   canSetAdmin: boolean;
+  canResetPassword: boolean;
+  protectedOwner: boolean;
 }
 
 export function AccountAdmin({
@@ -22,6 +24,8 @@ export function AccountAdmin({
   rolesList = [],
   lastLoginAt,
   canSetAdmin,
+  canResetPassword,
+  protectedOwner,
 }: AccountAdminProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -178,10 +182,10 @@ export function AccountAdmin({
                   status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                 }`}>
                   <UserCheck size={14} />
-                  <span>{status === 'ACTIVE' ? 'Aktivní (Přihlašuje se)' : 'Pozván (INVITED)'}</span>
+                  <span>{status === 'ACTIVE' ? 'Aktivní (Přihlašuje se)' : status === 'SUSPENDED' ? 'Pozastaven v této organizaci' : 'Pozván (INVITED)'}</span>
                 </span>
                 <span className="text-xs text-slate-500">
-                  Poslední přihlášení: <b>{lastLoginAt ? new Date(lastLoginAt).toLocaleString('cs-CZ') : 'Zatím nepřihlášen'}</b>
+                  Poslední přihlášení: <b>{lastLoginAt ? new Intl.DateTimeFormat('cs-CZ', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Europe/Prague' }).format(new Date(lastLoginAt)) : 'Zatím nepřihlášen'}</b>
                 </span>
               </div>
             </div>
@@ -206,7 +210,7 @@ export function AccountAdmin({
                 >
                   Obnovit účet
                 </button>
-              ) : (
+              ) : !protectedOwner ? (
                 <button
                   disabled={busy}
                   className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-500 transition"
@@ -214,7 +218,7 @@ export function AccountAdmin({
                 >
                   Pozastavit účet
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -223,15 +227,15 @@ export function AccountAdmin({
               <Lock className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
               <div>
                 <h3 className="text-sm font-black text-amber-950">Nastavit dočasné heslo</h3>
-                <p className="mt-1 text-xs text-amber-800">Zaměstnanec se tímto heslem přihlásí pouze pro první vstup. Aplikace ho ihned přesměruje na povinnou změnu hesla. Staré session a pozvánky se zneplatní.</p>
+                <p className="mt-1 text-xs text-amber-800">{canResetPassword ? 'Zaměstnanec se tímto heslem přihlásí pouze pro první vstup. Aplikace ho ihned přesměruje na povinnou změnu hesla. Staré session a pozvánky se zneplatní.' : 'Tento účet je členem více organizací. Globální heslo si musí změnit uživatel nebo platformní administrátor.'}</p>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-bold text-slate-800">Dočasné heslo
-                <input className="input mt-1" type="password" value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} minLength={12} autoComplete="new-password" placeholder="Alespoň 12 znaků, písmeno a číslo" />
+                <input className="input mt-1" type="password" value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} minLength={12} autoComplete="new-password" placeholder="Alespoň 12 znaků, písmeno a číslo" disabled={!canResetPassword} />
               </label>
               <label className="text-xs font-bold text-slate-800">Potvrzení hesla
-                <input className="input mt-1" type="password" value={temporaryPasswordConfirmation} onChange={(event) => setTemporaryPasswordConfirmation(event.target.value)} minLength={12} autoComplete="new-password" />
+                <input className="input mt-1" type="password" value={temporaryPasswordConfirmation} onChange={(event) => setTemporaryPasswordConfirmation(event.target.value)} minLength={12} autoComplete="new-password" disabled={!canResetPassword} />
               </label>
             </div>
             <p className="text-xs font-semibold text-amber-900">Heslo musí mít alespoň 12 znaků, jedno písmeno a jedno číslo.</p>
@@ -239,14 +243,14 @@ export function AccountAdmin({
               <button
                 type="button"
                 onClick={generateTemporaryPassword}
-                disabled={busy}
+                disabled={busy || !canResetPassword}
                 className="rounded-xl border border-amber-700 px-4 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 disabled:opacity-50"
               >
                 Vygenerovat bezpečné heslo
               </button>
               <button
                 type="button"
-                disabled={busy || !temporaryPassword || !temporaryPasswordConfirmation}
+                disabled={busy || !canResetPassword || !temporaryPassword || !temporaryPasswordConfirmation}
                 onClick={setTemporaryAccessPassword}
                 className="rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50"
               >
@@ -275,29 +279,26 @@ export function AccountAdmin({
                 return (
                   <div
                     key={r}
-                    onClick={() => toggleRole(r)}
-                    className={`cursor-pointer flex items-center justify-between rounded-xl border p-3 text-xs font-bold transition ${
+                    className={`flex items-center justify-between rounded-xl border p-3 text-xs font-bold transition ${
                       isChecked
                         ? 'border-emerald-500 bg-emerald-50/60 text-slate-900 shadow-sm'
                         : 'border-slate-200 bg-slate-50/50 text-slate-500 hover:border-slate-300'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
+                    <button type="button" disabled={protectedOwner} onClick={() => toggleRole(r)} className="flex flex-1 items-center gap-2 text-left disabled:cursor-not-allowed">
                       <div className={`flex h-5 w-5 items-center justify-center rounded-md border ${
                         isChecked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
                       }`}>
                         {isChecked && <Check size={14} />}
                       </div>
                       <span>{roleLabel(r)}</span>
-                    </div>
+                    </button>
 
                     {isChecked && (
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPrimaryRole(r);
-                        }}
+                        disabled={protectedOwner}
+                        onClick={() => setPrimaryRole(r)}
                         className={`rounded-md px-2 py-0.5 text-[10px] font-black transition ${
                           isPrimary
                             ? 'bg-emerald-700 text-white'
@@ -318,7 +319,7 @@ export function AccountAdmin({
                 Přiřazené role: <b>{selectedRoles.map((r) => roleLabel(r)).join(', ')}</b> (Primární: <b>{roleLabel(primaryRole)}</b>)
               </p>
               <button
-                disabled={busy}
+                disabled={busy || protectedOwner}
                 onClick={saveRoles}
                 className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition active:scale-95 shadow-md shadow-emerald-600/20"
               >
@@ -329,7 +330,7 @@ export function AccountAdmin({
         </div>
       )}
 
-      {msg && <p className="mt-4 rounded-xl bg-slate-900 p-3 text-xs font-semibold text-emerald-400 break-all">{msg}</p>}
+      {msg && <p role="status" aria-live="polite" className="mt-4 rounded-xl bg-slate-900 p-3 text-xs font-semibold text-emerald-400 break-all">{msg}</p>}
     </section>
   );
 }

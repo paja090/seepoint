@@ -14,6 +14,11 @@ export interface GoogleDriveFile {
   thumbnailLink?: string;
 }
 
+export type GoogleDriveFilePage = {
+  files: GoogleDriveFile[];
+  nextPageToken: string | null;
+};
+
 interface MockFile {
   id: string;
   name: string;
@@ -109,6 +114,16 @@ export async function resolveGoogleDriveAccessToken(
 }
 
 async function getAccessToken() {
+  if (getTenantContext()?.organizationId) {
+    try {
+      const { connectedGoogleAccessToken } = await import('./integrations/google-oauth');
+      const connectedToken = await connectedGoogleAccessToken('GOOGLE_DRIVE');
+      if (connectedToken) return connectedToken;
+    } catch (error) {
+      console.warn('Tenant Google Drive OAuth failed; falling back to shared storage credentials.', error);
+    }
+  }
+
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
@@ -325,6 +340,53 @@ export async function uploadPhotoToGoogleDrive(file: File, fileName: string, pho
   };
 }
 
+export async function uploadDocumentToGoogleDrive(file: File, fileName: string, documentId: string) {
+  if (isGoogleDriveMockEnabled()) {
+    const organizationId = getTenantContext()?.organizationId;
+    const rootFolderId = process.env.GOOGLE_DRIVE_INVOICE_FOLDER_ID || process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+    const folderId = organizationId ? `${rootFolderId}/organizations/${organizationId}` : rootFolderId;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mockFileId = `mock-document-${crypto.randomUUID()}`;
+    getMockDriveFiles().set(mockFileId, {
+      id: mockFileId,
+      name: fileName,
+      mimeType: file.type,
+      size: file.size,
+      content: buffer,
+      parents: [folderId],
+    });
+    return { id: mockFileId, name: fileName, mimeType: file.type, size: file.size };
+  }
+
+  const accessToken = await getAccessToken();
+  const configuredRoot = process.env.GOOGLE_DRIVE_INVOICE_FOLDER_ID || process.env.GOOGLE_DRIVE_FOLDER_ID;
+  const folderId = configuredRoot
+    ? await getOrCreateOrganizationPhotoFolder(accessToken, configuredRoot)
+    : await getOrCreatePhotoFolder(accessToken);
+  const boundary = `seepoint-${crypto.randomUUID()}`;
+  const metadata = JSON.stringify({
+    name: fileName,
+    parents: [folderId],
+    appProperties: { seepointDocumentId: documentId, seepointOrganizationId: requireTenantContext().organizationId },
+  });
+  const body = new Blob(
+    [
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
+      `--${boundary}\r\nContent-Type: ${file.type}\r\n\r\n`,
+      file,
+      `\r\n--${boundary}--`,
+    ],
+    { type: `multipart/related; boundary=${boundary}` },
+  );
+  const response = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,size',
+    { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': body.type }, body },
+  );
+  const data = await response.json() as { id?: string; name?: string; mimeType?: string; size?: string; error?: { message?: string } };
+  if (!response.ok || !data.id) throw new Error(`Google Drive document upload failed: ${data.error?.message ?? response.statusText}`);
+  return { id: data.id, name: data.name ?? fileName, mimeType: data.mimeType ?? file.type, size: Number(data.size ?? file.size) };
+}
+
 export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Response> {
   if (isGoogleDriveMockEnabled()) {
     const file = getMockDriveFiles().get(fileId);
@@ -347,6 +409,8 @@ export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Resp
   );
 }
 
+export const downloadFileFromGoogleDrive = downloadPhotoFromGoogleDrive;
+
 export async function deletePhotoFromGoogleDrive(fileId: string) {
   if (isGoogleDriveMockEnabled()) {
     getMockDriveFiles().delete(fileId);
@@ -367,7 +431,11 @@ export async function deletePhotoFromGoogleDrive(fileId: string) {
   }
 }
 
-export async function listImagesInFolder(folderId: string): Promise<GoogleDriveFile[]> {
+export async function listImagesInFolderPage(
+  folderId: string,
+  options: { pageSize?: number; pageToken?: string } = {},
+): Promise<GoogleDriveFilePage> {
+  const pageSize = Math.max(1, Math.min(options.pageSize ?? 100, 200));
   if (isGoogleDriveMockEnabled()) {
     const list: GoogleDriveFile[] = [];
     getMockDriveFiles().forEach(file => {
@@ -381,24 +449,28 @@ export async function listImagesInFolder(folderId: string): Promise<GoogleDriveF
         });
       }
     });
-    return list;
+    const offset = Math.max(0, Number.parseInt(options.pageToken ?? '0', 10) || 0);
+    const files = list.slice(offset, offset + pageSize);
+    return { files, nextPageToken: offset + files.length < list.length ? String(offset + files.length) : null };
   }
 
   const accessToken = await getAccessToken();
   const query = `'${folderId}' in parents and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'image/webp') and trashed = false`;
   const params = new URLSearchParams({
     q: query,
-    fields: 'files(id, name, mimeType, size, thumbnailLink)',
-    pageSize: '1000',
+    fields: 'nextPageToken, files(id, name, mimeType, size, thumbnailLink)',
+    pageSize: String(pageSize),
     supportsAllDrives: 'true',
     includeItemsFromAllDrives: 'true',
   });
+  if (options.pageToken) params.set('pageToken', options.pageToken);
   const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
   const data = (await response.json()) as {
     files?: Array<{ id: string; name: string; mimeType: string; size?: string; thumbnailLink?: string }>;
+    nextPageToken?: string;
     error?: { message?: string };
   };
 
@@ -406,13 +478,20 @@ export async function listImagesInFolder(folderId: string): Promise<GoogleDriveF
     throw new Error(`Google Drive list failed: ${data.error?.message ?? response.statusText}`);
   }
 
-  return (data.files ?? []).map(file => ({
-    id: file.id,
-    name: file.name,
-    mimeType: file.mimeType,
-    size: Number(file.size ?? 0),
-    thumbnailLink: file.thumbnailLink,
-  }));
+  return {
+    files: (data.files ?? []).map(file => ({
+      id: file.id,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: Number(file.size ?? 0),
+      thumbnailLink: file.thumbnailLink,
+    })),
+    nextPageToken: data.nextPageToken ?? null,
+  };
+}
+
+export async function listImagesInFolder(folderId: string): Promise<GoogleDriveFile[]> {
+  return (await listImagesInFolderPage(folderId, { pageSize: 200 })).files;
 }
 
 export async function verifyFileInFolder(fileId: string, folderId: string): Promise<boolean> {

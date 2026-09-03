@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset } from 'lucide-react';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
@@ -303,6 +302,8 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           surfaces={surfaceOptions}
           clients={clients}
           currentUserName={currentUserName}
+          defaultDateFrom={today.toISOString().slice(0, 10)}
+          defaultDateTo={in30.toISOString().slice(0, 10)}
         />
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -345,6 +346,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
             <OccupancyTableWithBulk
               rows={tableRows}
               clients={clients}
+              referenceDate={today.toISOString()}
             />
           )}
         </section>

@@ -14,8 +14,10 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/api/admin/organizations/[id]/route.ts', 3],
   ['app/api/admin/organizations/route.ts', 5],
   ['app/api/auth/login/route.ts', 2],
-  ['app/api/auth/reset-admin/route.ts', 4],
   ['app/api/auth/set-password/route.ts', 5],
+  // Passwords are global identities. This route performs one cross-tenant
+  // membership count before allowing an organizational admin to replace one.
+  ['app/api/employees/[id]/account/route.ts', 2],
   ['app/api/network/inventory/route.ts', 2],
   ['app/api/network/partners/route.ts', 2],
   ['app/api/organization/invitations/[id]/route.ts', 6],
@@ -66,7 +68,6 @@ const API_ROUTE_EXCEPTIONS = new Set([
   'app/api/auth/forgot-password/route.ts',
   'app/api/auth/login/route.ts',
   'app/api/auth/logout/route.ts',
-  'app/api/auth/reset-admin/route.ts',
   'app/api/auth/switch-organization/route.ts',
   // Public lead capture from marketing landing page.
   'app/api/leads/demo/route.ts',

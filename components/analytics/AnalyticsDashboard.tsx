@@ -1,6 +1,6 @@
 'use client';
 
-import { DollarSign, TrendingUp, Percent, PanelsTopLeft, Building2, Calendar, Award } from 'lucide-react';
+import { DollarSign, TrendingUp, Percent, PanelsTopLeft, Building2, Calendar } from 'lucide-react';
 function getCarrierBadgeMeta(type: string) {
   switch (type) {
     case 'NAVIGATION':
@@ -78,19 +78,21 @@ function getCarrierBadgeMeta(type: string) {
 
 type AnalyticsDashboardProps = {
   metrics: {
-    totalRevenue: number;
+    knownMonthlyRent: number;
     totalCarriers: number;
     totalSurfaces: number;
     occupiedSurfaces: number;
     overallOccupancyRate: number;
-    avgPricePerSurface: number;
+    pricedOccupiedSurfaces: number;
+    unpricedOccupiedSurfaces: number;
+    avgKnownRentPerSurface: number;
   };
   typeList: Array<{
     type: string;
     surfaceCount: number;
     occupiedCount: number;
     occupancyRate: number;
-    revenue: number;
+    knownMonthlyRent: number;
   }>;
   cityList: Array<{
     city: string;
@@ -98,7 +100,7 @@ type AnalyticsDashboardProps = {
     surfaceCount: number;
     occupiedCount: number;
     occupancyRate: number;
-    revenue: number;
+    knownMonthlyRent: number;
   }>;
   recentOccupancies: Array<{
     id: string;
@@ -106,8 +108,8 @@ type AnalyticsDashboardProps = {
     campaignName: string;
     status: string;
     price: number;
-    dateFrom: string;
-    dateTo: string;
+    dateFromLabel: string;
+    dateToLabel: string;
   }>;
 };
 
@@ -125,10 +127,10 @@ export function AnalyticsDashboard({
           📊 Finanční & Provozní Analýza
         </span>
         <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">
-          Analytics & Přehled Tržeb SeePOINT
+          Analytics & Přehled Kapacity SeePOINT
         </h1>
         <p className="mt-1 text-sm font-semibold text-slate-500">
-          Analýza vytíženosti reklamních nosičů, výnosnosti měsíčních nájmů a žebříček ziskovosti měst.
+          Analýza vytíženosti reklamních nosičů a evidovaného měsíčního nájemného bez dopočítaných odhadů.
         </p>
       </div>
 
@@ -137,13 +139,13 @@ export function AnalyticsDashboard({
         {/* Card 1: Total Monthly Revenue */}
         <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-500 to-teal-700 p-5 text-white shadow-lg space-y-2">
           <div className="flex items-center justify-between text-emerald-100">
-            <span className="text-xs font-black uppercase tracking-wider">Měsíční tržby</span>
+            <span className="text-xs font-black uppercase tracking-wider">Evidované měsíční nájemné</span>
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 text-white">
               <DollarSign size={20} />
             </div>
           </div>
-          <p className="text-2xl font-black tracking-tight">{Math.round(metrics.totalRevenue).toLocaleString('cs-CZ')} Kč</p>
-          <p className="text-[11px] font-semibold text-emerald-100">Z aktivně obsazených reklamních ploch</p>
+          <p className="text-2xl font-black tracking-tight">{Math.round(metrics.knownMonthlyRent).toLocaleString('cs-CZ')} Kč</p>
+          <p className="text-[11px] font-semibold text-emerald-100">Pouze aktivní záznamy s explicitní cenou</p>
         </div>
 
         {/* Card 2: Overall Occupancy Rate */}
@@ -166,8 +168,8 @@ export function AnalyticsDashboard({
               <TrendingUp size={20} />
             </div>
           </div>
-          <p className="text-2xl font-black tracking-tight">{Math.round(metrics.avgPricePerSurface).toLocaleString('cs-CZ')} Kč</p>
-          <p className="text-[11px] font-semibold text-amber-100">Průměrná měsíční cenová hladina</p>
+          <p className="text-2xl font-black tracking-tight">{Math.round(metrics.avgKnownRentPerSurface).toLocaleString('cs-CZ')} Kč</p>
+          <p className="text-[11px] font-semibold text-amber-100">Průměr z {metrics.pricedOccupiedSurfaces} oceněných ploch</p>
         </div>
 
         {/* Card 4: Database Infrastructure */}
@@ -187,8 +189,8 @@ export function AnalyticsDashboard({
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-950">Vytíženost & Tržby podle Typu Nosičů</h2>
-            <p className="text-xs font-semibold text-slate-500">Porovnání ziskovosti laviček, navigace VO, billboardů a LED obrazovek.</p>
+            <h2 className="text-lg font-extrabold text-slate-950">Vytíženost & Evidované nájemné podle typu nosičů</h2>
+            <p className="text-xs font-semibold text-slate-500">Porovnání obsazenosti a explicitně uloženého měsíčního nájemného.</p>
           </div>
           <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
             {typeList.length} kategorií
@@ -198,9 +200,9 @@ export function AnalyticsDashboard({
         <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5 text-xs text-sky-950 flex items-start gap-2.5">
           <span className="text-base">🧭</span>
           <div>
-            <strong className="font-extrabold block">Logika výpočtu Měsíčních Nájmů (MRR) & Obsazenosti:</strong>
+            <strong className="font-extrabold block">Logika evidovaného měsíčního nájemného & obsazenosti:</strong>
             <p className="text-[11px] text-sky-900 mt-0.5 font-medium leading-relaxed">
-              Systém u všech reklamních i navigačních nosičů započítává <strong>výhradně stálý měsíční nájem</strong> po dobu platnosti smlouvy. Jednorázové poplatky za výrobu grafiky, tisk, montáž nebo demontáž se do opakovaného měsíčního výnosu nezapočítávají.
+              Započítává se pouze explicitní cena z právě platné smlouvy nebo aktivní obsazenosti. Ceníkové ceny ani odhady podle typu média se nepoužívají. <strong>{metrics.unpricedOccupiedSurfaces} obsazených ploch nyní nemá explicitní cenu</strong> a do částky se nezapočítává.
             </p>
           </div>
         </div>
@@ -239,7 +241,7 @@ export function AnalyticsDashboard({
 
                   <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
                     <span className="text-slate-700 font-extrabold">{t.occupiedCount} z {t.surfaceCount} ploch</span>
-                    <span className="font-black text-slate-950">{Math.round(t.revenue).toLocaleString('cs-CZ')} Kč / měsíc</span>
+                    <span className="font-black text-slate-950">{Math.round(t.knownMonthlyRent).toLocaleString('cs-CZ')} Kč / měsíc</span>
                   </div>
                 </div>
               </div>
@@ -254,8 +256,8 @@ export function AnalyticsDashboard({
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-sky-600" />
             <div>
-              <h2 className="text-lg font-extrabold text-slate-950">Top Města & Lokality Podle Ziskovosti</h2>
-              <p className="text-xs font-semibold text-slate-500">Žebříček měst s nejvyšším měsíčním výnosem a vytížením.</p>
+              <h2 className="text-lg font-extrabold text-slate-950">Města & Lokality podle evidovaného nájemného</h2>
+              <p className="text-xs font-semibold text-slate-500">Žebříček měst podle explicitně evidovaného měsíčního nájemného a vytížení.</p>
             </div>
           </div>
           <span className="rounded-xl bg-sky-100 px-3 py-1 text-xs font-black text-sky-800">
@@ -271,7 +273,7 @@ export function AnalyticsDashboard({
                 <th className="py-2 pr-3">Počet Nosičů</th>
                 <th className="py-2 pr-3">Reklamní Plochy</th>
                 <th className="py-2 pr-3">Obsazenost (%)</th>
-                <th className="py-2 pr-3">Měsíční Výnos (Kč)</th>
+                <th className="py-2 pr-3">Evidované měsíční nájemné (Kč)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-semibold">
@@ -294,7 +296,7 @@ export function AnalyticsDashboard({
                     </div>
                   </td>
                   <td className="py-3 pr-3 font-extrabold text-emerald-700 text-sm">
-                    {Math.round(c.revenue).toLocaleString('cs-CZ')} Kč
+                    {Math.round(c.knownMonthlyRent).toLocaleString('cs-CZ')} Kč
                   </td>
                 </tr>
               ))}
@@ -325,7 +327,7 @@ export function AnalyticsDashboard({
               <h4 className="font-extrabold text-slate-950 text-sm leading-snug">{occ.clientName}</h4>
               <p className="text-slate-600 font-medium">Kampaň: <strong>{occ.campaignName}</strong></p>
               <div className="text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-200">
-                Platnost: {new Date(occ.dateFrom).toLocaleDateString('cs-CZ')} – {new Date(occ.dateTo).toLocaleDateString('cs-CZ')}
+                Platnost: {occ.dateFromLabel} – {occ.dateToLabel}
               </div>
             </div>
           ))}

@@ -1,17 +1,33 @@
 {
   "name": "SeePOINT Outdoor Reklama",
   "short_name": "SeePOINT",
-  "description": "Interní systém pro správa reklamních nosičů, montáží, vozidel a nabídek SeePOINT",
+  "description": "Interní systém pro správu reklamních nosičů, montáží, vozidel a nabídek SeePOINT",
+  "id": "/",
+  "scope": "/",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#020617",
   "orientation": "portrait",
+  "lang": "cs",
+  "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "/seepoint-logo.svg",
-      "sizes": "192x192 512x512",
+      "src": "/seepoint-app-icon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/seepoint-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/seepoint-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

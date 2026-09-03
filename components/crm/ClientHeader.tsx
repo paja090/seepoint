@@ -7,7 +7,7 @@ import { Button } from '@/components/ui';
 import { CLIENT_PRICING_SEGMENT_LABELS, CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS, CLIENT_SOURCE_LABELS, ClientProfileData, ClientStatus } from '@/lib/crm/types';
 import { Building2, ShieldCheck, Mail, Phone, Globe, MapPin, Plus, Edit3, Trash2, Link2, CheckSquare, MessageSquare, FilePlus, Store, AlertTriangle, TrendingUp, DollarSign, Layers } from 'lucide-react';
 
-export function ClientHeader({ client }: { client: ClientProfileData }) {
+export function ClientHeader({ client, canManageLifecycle }: { client: ClientProfileData; canManageLifecycle: boolean }) {
   const router = useRouter();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
@@ -233,24 +233,23 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
     }
   };
 
-  const handleDeleteClient = async (permanent: boolean) => {
-    const actionName = permanent ? 'TRVALE SMAZAT' : 'DEAKTIVOVAT';
-    if (!confirm(`Opravdu chcete klienta ${client.name} ${actionName}?`)) return;
+  const handleArchiveClient = async () => {
+    if (!confirm(`Opravdu chcete klienta ${client.name} archivovat? Data i historie zůstanou zachované.`)) return;
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/crm/clients/${client.id}${permanent ? '?permanent=true' : ''}`, {
+      const res = await fetch(`/api/crm/clients/${client.id}`, {
         method: 'DELETE',
       });
       if (res.ok) {
-        alert(`Klient byl úspěšně ${permanent ? 'trvale smazán' : 'deaktivován'}.`);
+        alert('Klient byl bezpečně archivován.');
         router.push('/clients');
       } else {
         const errData = await res.json();
         alert(errData.error || 'Chyba při odstraňování klienta.');
       }
-    } catch (e: any) {
-      alert(e.message || 'Chyba spojení.');
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : 'Chyba spojení.');
     } finally {
       setSaving(false);
     }
@@ -346,14 +345,18 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
             <Edit3 size={13} className="mr-1 text-sky-400" />
             <span>Upravit profil</span>
           </Button>
-          <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs font-bold cursor-pointer">
-            <Link2 size={13} className="mr-1 text-purple-400" />
-            <span>Sloučit</span>
-          </Button>
-          <Button onClick={() => setShowDeleteModal(true)} variant="secondary" className="!bg-rose-950 !text-rose-200 border-rose-800 hover:!bg-rose-900 text-xs font-bold cursor-pointer">
-            <Trash2 size={13} className="mr-1 text-rose-400" />
-            <span>Smazat</span>
-          </Button>
+          {canManageLifecycle && (
+            <>
+              <Button onClick={() => setShowMergeModal(true)} variant="secondary" className="!bg-purple-950 !text-purple-200 border-purple-800 hover:!bg-purple-900 text-xs font-bold cursor-pointer">
+                <Link2 size={13} className="mr-1 text-purple-400" />
+                <span>Sloučit</span>
+              </Button>
+              <Button onClick={() => setShowDeleteModal(true)} variant="secondary" className="!bg-rose-950 !text-rose-200 border-rose-800 hover:!bg-rose-900 text-xs font-bold cursor-pointer">
+                <Trash2 size={13} className="mr-1 text-rose-400" />
+                <span>Archivovat</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -605,19 +608,15 @@ export function ClientHeader({ client }: { client: ClientProfileData }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
           <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-bold text-base text-slate-900">🗑️ Odstranění / Deaktivace Klienta</h3>
+              <h3 className="font-bold text-base text-slate-900">📦 Archivace klienta</h3>
               <button onClick={() => setShowDeleteModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
             </div>
             <div className="space-y-3 text-xs text-slate-700">
-              <p>Zvolte, jaký druh odstranění chcete provést pro klienta <strong>{client.name}</strong>:</p>
+              <p>Klient <strong>{client.name}</strong> se přestane zobrazovat mezi aktivními klienty. Všechny kontakty, zakázky, faktury a auditní historie zůstanou zachované.</p>
               <div className="space-y-2 pt-1">
-                <button type="button" onClick={() => handleDeleteClient(false)} className="w-full p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-left transition">
-                  <strong className="text-amber-950 block font-bold">1. Archivovat / Deaktivovat (Doporučeno)</strong>
-                  <span className="text-amber-800 text-[11px]">Klient bude označen jako neaktivní. Všechna jeho data zůstanou bezpečně v systému.</span>
-                </button>
-                <button type="button" onClick={() => handleDeleteClient(true)} className="w-full p-3 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-left transition">
-                  <strong className="text-rose-950 block font-bold">2. Trvale smazat z databáze</strong>
-                  <span className="text-rose-800 text-[11px]">Klient i všechny jeho navázané kontakty a pobočky budou trvale smazány z databáze.</span>
+                <button type="button" onClick={handleArchiveClient} disabled={saving} className="w-full p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-left transition disabled:opacity-50">
+                  <strong className="text-amber-950 block font-bold">Archivovat / deaktivovat</strong>
+                  <span className="text-amber-800 text-[11px]">Bez nevratného mazání dat. Akci smí provést pouze administrátor nebo manažer.</span>
                 </button>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
-import { AccessDenied, canAccess } from '@/lib/rbac';
+import { canManageWarehouseCatalog } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { WarehouseItemModal } from '@/components/warehouse/WarehouseItemModal';
 import { WarehouseMovementModal } from '@/components/warehouse/WarehouseMovementModal';
@@ -10,7 +10,8 @@ import { WarehousePhotoScannerModal } from '@/components/warehouse/WarehousePhot
 import { WarehouseAiImportModal } from '@/components/warehouse/WarehouseAiImportModal';
 import { MobileWarehouseAppClient } from '@/components/warehouse/MobileWarehouseAppClient';
 import { RestockButton } from '@/components/warehouse/RestockButton';
-import { Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, RotateCcw, Building2, MapPin, Wrench, ShoppingCart, Printer, Camera, Sparkles } from 'lucide-react';
+import { AlertTriangle, MapPin, Printer } from 'lucide-react';
+import { Prisma, type WarehouseItemCategory } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +20,8 @@ function first(value: string | string[] | undefined) { return Array.isArray(valu
 function clean(value: string | string[] | undefined) { return first(value)?.trim() || undefined; }
 
 export default async function WarehousePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const user = await requirePageAccess('vehicles'); // Standard manager access
-  if (!canAccess(user.role, 'vehicles')) return <AppShell><AccessDenied /></AppShell>;
+  const user = await requirePageAccess('warehouse');
+  const canManageCatalog = canManageWarehouseCatalog(user.role);
   await ensureWarehouseSchema();
 
   const params = await searchParams;
@@ -28,7 +29,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
   const categoryFilter = clean(params.category);
   const lowStockOnly = clean(params.lowStock) === 'true';
 
-  const where: any = {};
+  const where: Prisma.WarehouseItemWhereInput = {};
   if (q) {
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
@@ -38,7 +39,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
     ];
   }
   if (categoryFilter && ['CONSUMABLE', 'RETURNABLE'].includes(categoryFilter)) {
-    where.category = categoryFilter;
+    where.category = categoryFilter as WarehouseItemCategory;
   }
 
   const [itemsRaw, workOrders, employees, recentMovementsRaw] = await Promise.all([
@@ -98,6 +99,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
               quantity: Number(m.quantity),
               performedByName: m.performedByName,
               assignedEmployeeName: m.assignedEmployeeName,
+              assignedEmployeeId: m.assignedEmployeeId,
               createdAt: m.createdAt,
               item: {
                 id: m.item!.id,
@@ -114,6 +116,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
                 : null,
             }))}
           currentUserName={user.name || undefined}
+          currentEmployeeId={user.employee?.id}
         />
       </div>
 
@@ -127,7 +130,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <WarehouseAiImportModal />
+          {canManageCatalog && <WarehouseAiImportModal />}
           <WarehouseVoiceInputModal workOrders={workOrders} employees={employees} />
           <WarehousePhotoScannerModal workOrders={workOrders} employees={employees} />
 
@@ -139,7 +142,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
             <span>🖨️ Tisk QR štítků</span>
           </Link>
 
-          <WarehouseItemModal />
+          {canManageCatalog && <WarehouseItemModal />}
 
           <Link className="rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition" href="/shopping">
             🛒 Otevřít Nákupy
@@ -314,7 +317,7 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
 
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                        {isLow && (
+                        {isLow && canManageCatalog && (
                           <RestockButton itemId={item.id} itemName={item.name} />
                         )}
 
@@ -328,12 +331,14 @@ export default async function WarehousePage({ searchParams }: { searchParams: Pr
                           employees={employees}
                         />
 
-                        <WarehouseItemModal item={{
-                          ...item,
-                          quantityInStock: Number(item.quantityInStock),
-                          minQuantity: item.minQuantity ? Number(item.minQuantity) : null,
-                          unitPrice: item.unitPrice ? Number(item.unitPrice) : null,
-                        }} />
+                        {canManageCatalog && (
+                          <WarehouseItemModal item={{
+                            ...item,
+                            quantityInStock: Number(item.quantityInStock),
+                            minQuantity: item.minQuantity ? Number(item.minQuantity) : null,
+                            unitPrice: item.unitPrice ? Number(item.unitPrice) : null,
+                          }} />
+                        )}
                       </div>
                     </td>
                   </tr>

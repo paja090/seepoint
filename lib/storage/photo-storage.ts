@@ -69,7 +69,7 @@ export async function readStoredPhoto(photo: {
     if (!file.ok || !file.body) return null;
     return { body: file.body, contentType: photo.mimeType ?? file.headers.get('Content-Type') };
   }
-  if (/^https?:\/\//.test(photo.url) && !photo.url.includes(`/api/photos/${photo.id}`)) return { redirectUrl: photo.url };
+  if (/^https:\/\//.test(photo.url) && !photo.url.includes(`/api/photos/${photo.id}`)) return { redirectUrl: photo.url };
   if (photo.storageProvider === 'SEEPOINT_STORAGE' && photo.storageKey) throw new Error('SeePoint object storage adapter is not configured.');
   return null;
 }

@@ -115,7 +115,11 @@ export type ClientInvoiceRecordItem = {
   status: ClientInvoiceStatus;
   issueDate: Date | string;
   dueDate: Date | string;
+  issueDateLabel: string;
+  dueDateLabel: string;
   totalAmount: unknown;
+  pdfUrl?: string | null;
+  driveFileId?: string | null;
 };
 
 export type CommunicationRecordItem = {

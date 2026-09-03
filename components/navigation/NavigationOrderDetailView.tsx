@@ -29,7 +29,27 @@ import { NavigationSurveyTab } from './NavigationSurveyTab';
 
 export type NavigationTabKey = 'overview' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
 
-export function NavigationOrderDetailView({ order }: { order: NavigationOrderDetail }) {
+const navigationDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'UTC' });
+const navigationDateTimeFormatter = new Intl.DateTimeFormat('cs-CZ', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: 'Europe/Prague',
+});
+const navigationNumberFormatter = new Intl.NumberFormat('cs-CZ');
+
+function formatNavigationDate(value: string) {
+  return navigationDateFormatter.format(new Date(value));
+}
+
+export function NavigationOrderDetailView({
+  order,
+  canInvoice,
+  currentDate,
+}: {
+  order: NavigationOrderDetail;
+  canInvoice: boolean;
+  currentDate: string;
+}) {
   const [currentOrder, setCurrentOrder] = useState<NavigationOrderDetail>(order);
   const [activeTab, setActiveTab] = useState<NavigationTabKey>('overview');
   const [transitioning, setTransitioning] = useState(false);
@@ -45,7 +65,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
   // Price Edit Modal
   const [selectedPointForPrice, setSelectedPointForPrice] = useState<NavigationPointItem | null>(null);
   const [newUnitPrice, setNewUnitPrice] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [effectiveDate, setEffectiveDate] = useState(currentDate);
   const [priceReason, setPriceReason] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
 
@@ -230,7 +250,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
       case 'PRIPRAVENO_K_INSTALACI':
         return { label: 'Naplánovat a zahájit montáž ➔', status: 'INSTALACE', btnClass: 'bg-orange-600 hover:bg-orange-700' };
       case 'INSTALACE':
-        return { label: 'Odeslat fotodokumentaciju ke kontrole ➔', status: 'FOTODOKUMENTACE', btnClass: 'bg-teal-600 hover:bg-teal-700' };
+        return { label: 'Odeslat fotodokumentaci ke kontrole ➔', status: 'FOTODOKUMENTACE', btnClass: 'bg-teal-600 hover:bg-teal-700' };
       case 'FOTODOKUMENTACE':
         return { label: 'Schválit fotodokumentaci k fakturaci ➔', status: 'PRIPRAVENO_K_FAKTURACI', btnClass: 'bg-emerald-600 hover:bg-emerald-700' };
       case 'PRIPRAVENO_K_FAKTURACI':
@@ -275,7 +295,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
             )}
             <div className="text-right ml-2 border-l border-slate-200 pl-4">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Celková cena</span>
-              <span className="text-lg font-black text-slate-900">{currentOrder.totalPrice?.toLocaleString('cs-CZ')} Kč</span>
+              <span className="text-lg font-black text-slate-900">{typeof currentOrder.totalPrice === 'number' ? navigationNumberFormatter.format(currentOrder.totalPrice) : null} Kč</span>
             </div>
 
             {mainAction && (
@@ -409,19 +429,19 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-slate-400 font-medium block">Začátek pronájmu</span>
-                    <span className="font-bold text-slate-900">{currentOrder.rentStart ? new Date(currentOrder.rentStart).toLocaleDateString('cs-CZ') : 'Neuveden'}</span>
+                    <span className="font-bold text-slate-900">{currentOrder.rentStart ? formatNavigationDate(currentOrder.rentStart) : 'Neuveden'}</span>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-slate-400 font-medium block">Konec pronájmu</span>
-                    <span className="font-bold text-slate-900">{currentOrder.rentEnd ? new Date(currentOrder.rentEnd).toLocaleDateString('cs-CZ') : 'Neuveden'}</span>
+                    <span className="font-bold text-slate-900">{currentOrder.rentEnd ? formatNavigationDate(currentOrder.rentEnd) : 'Neuveden'}</span>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-slate-400 font-medium block">Plánovaná montáž</span>
-                    <span className="font-bold text-slate-900">{currentOrder.installationDate ? new Date(currentOrder.installationDate).toLocaleDateString('cs-CZ') : 'Neuvedena'}</span>
+                    <span className="font-bold text-slate-900">{currentOrder.installationDate ? formatNavigationDate(currentOrder.installationDate) : 'Neuvedena'}</span>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-slate-400 font-medium block">Plánovaná demontáž</span>
-                    <span className="font-bold text-slate-900">{currentOrder.deinstallationDate ? new Date(currentOrder.deinstallationDate).toLocaleDateString('cs-CZ') : 'Neuvedena'}</span>
+                    <span className="font-bold text-slate-900">{currentOrder.deinstallationDate ? formatNavigationDate(currentOrder.deinstallationDate) : 'Neuvedena'}</span>
                   </div>
                 </div>
               </div>
@@ -486,8 +506,8 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                           )}
                         </td>
                         <td className="p-3">{p.quantity} ks</td>
-                        <td className="p-3 font-semibold">{p.unitPrice.toLocaleString('cs-CZ')} Kč</td>
-                        <td className="p-3 font-bold text-slate-900">{p.subtotal.toLocaleString('cs-CZ')} Kč</td>
+                        <td className="p-3 font-semibold">{navigationNumberFormatter.format(p.unitPrice)} Kč</td>
+                        <td className="p-3 font-bold text-slate-900">{navigationNumberFormatter.format(p.subtotal)} Kč</td>
                         <td className="p-3 text-right space-x-2">
                           <button
                             onClick={() => {
@@ -545,7 +565,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="rounded-xl border border-slate-200 p-4 space-y-2">
                   <span className="font-bold text-slate-900">Termín montáže</span>
-                  <p className="text-slate-600">{currentOrder.installationDate ? new Date(currentOrder.installationDate).toLocaleDateString('cs-CZ') : 'Zatím nenaplánováno'}</p>
+                  <p className="text-slate-600">{currentOrder.installationDate ? formatNavigationDate(currentOrder.installationDate) : 'Zatím nenaplánováno'}</p>
                 </div>
                 <div className="rounded-xl border border-slate-200 p-4 space-y-2">
                   <span className="font-bold text-slate-900">Přiřazený montážní pracovník</span>
@@ -597,14 +617,16 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
               {currentOrder.billingPeriods.length === 0 ? (
                 <div className="space-y-3">
                   <p className="text-xs text-slate-500">Zatím nebylo vygenerováno žádné fakturační období.</p>
-                  <button
-                    type="button"
-                    onClick={handleCreateAndSendInvoice}
-                    disabled={creatingInvoice}
-                    className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-50"
-                  >
-                    {creatingInvoice ? 'Vytvářím a odesílám…' : 'Vytvořit a odeslat fakturu klientovi'}
-                  </button>
+                  {canInvoice && currentOrder.status === 'PRIPRAVENO_K_FAKTURACI' && (
+                    <button
+                      type="button"
+                      onClick={handleCreateAndSendInvoice}
+                      disabled={creatingInvoice}
+                      className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                    >
+                      {creatingInvoice ? 'Vytvářím a odesílám…' : 'Vytvořit a odeslat fakturu klientovi'}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -612,19 +634,24 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                     <div key={bp.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs">
                       <div>
                         <span className="font-bold text-slate-900">
-                          {new Date(bp.dateFrom).toLocaleDateString('cs-CZ')} – {new Date(bp.dateTo).toLocaleDateString('cs-CZ')}
+                          {bp.dateFromLabel} – {bp.dateToLabel}
                         </span>
                         {bp.invoiceNumber && <span className="ml-3 font-semibold text-sky-800">Faktura: {bp.invoiceNumber}</span>}
+                        {bp.invoiceId && (
+                          <a href={`/api/crm/invoices/${bp.invoiceId}/pdf`} target="_blank" rel="noreferrer" className="ml-3 font-semibold text-sky-700 hover:underline">
+                            Otevřít PDF
+                          </a>
+                        )}
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="font-bold text-slate-900">{bp.amount.toLocaleString('cs-CZ')} Kč</span>
+                        <span className="font-bold text-slate-900">{navigationNumberFormatter.format(bp.amount)} Kč</span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
                           {bp.status}
                         </span>
                       </div>
                     </div>
                   ))}
-                  {currentOrder.billingPeriods.some((period) => period.status !== 'SENT') && (
+                  {canInvoice && currentOrder.status === 'PRIPRAVENO_K_FAKTURACI' && currentOrder.billingPeriods.some((period) => period.status !== 'SENT') && (
                     <button
                       type="button"
                       onClick={handleCreateAndSendInvoice}
@@ -653,7 +680,7 @@ export function NavigationOrderDetailView({ order }: { order: NavigationOrderDet
                     <div key={log.id} className="relative text-xs space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">{log.action}</span>
-                        <span className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleString('cs-CZ')}</span>
+                        <span className="text-[10px] text-slate-400">{navigationDateTimeFormatter.format(new Date(log.createdAt))}</span>
                       </div>
                       {log.userEmail && <p className="text-[11px] text-slate-600">Uživatel: {log.userEmail}</p>}
                       {log.details && <pre className="text-[10px] bg-slate-100 p-2 rounded text-slate-700 overflow-x-auto">{log.details}</pre>}

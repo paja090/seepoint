@@ -19,6 +19,7 @@ export type AppSection =
   | 'occupancy'
   | 'clients'
   | 'offers'
+  | 'billing'
   | 'navigationProjects'
   | 'navigationContracts'
   | 'navigationContacts'
@@ -32,6 +33,7 @@ export type AppSection =
   | 'settlements'
   | 'mySettlements'
   | 'vehicles'
+  | 'warehouse'
   | 'import'
   | 'settings'
   | 'workEntries'
@@ -45,6 +47,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'occupancy',
     'clients',
     'offers',
+    'billing',
     'navigationProjects',
     'navigationContracts',
     'navigationContacts',
@@ -58,6 +61,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'settlements',
     'mySettlements',
     'vehicles',
+    'warehouse',
     'import',
     'settings',
     'workEntries',
@@ -70,6 +74,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'occupancy',
     'clients',
     'offers',
+    'billing',
     'navigationProjects',
     'navigationContracts',
     'navigationContacts',
@@ -83,6 +88,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'settlements',
     'mySettlements',
     'vehicles',
+    'warehouse',
     'workEntries',
     'myWorkEntries',
   ],
@@ -114,6 +120,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'tasks',
     'myTasks',
     'vehicles',
+    'warehouse',
     'myWorkEntries',
     'mySettlements',
     'navigationProjects',
@@ -127,11 +134,13 @@ const permissions: Record<AppRole, AppSection[]> = {
     'mySettlements',
     'myWorkEntries',
     'vehicles',
+    'warehouse',
     'navigationProjects',
     'team',
   ],
   ACCOUNTANT: [
     'dashboard',
+    'billing',
     'employees',
     'settlements',
     'mySettlements',
@@ -162,6 +171,18 @@ export function canViewAllTasks(role: AppRole) {
 
 export function canViewAllSettlements(role: AppRole) {
   return role === 'ADMIN' || role === 'MANAGER' || role === 'ACCOUNTANT';
+}
+
+export function canManageWarehouseCatalog(role: AppRole | string) {
+  return role === 'ADMIN' || role === 'MANAGER';
+}
+
+export function canRecordWarehouseMovement(role: AppRole | string) {
+  return role === 'ADMIN' || role === 'MANAGER' || role === 'TECHNICIAN' || role === 'WORKER';
+}
+
+export function canEditShoppingList(role: AppRole | string) {
+  return roles.includes(role as AppRole) && role !== 'VIEWER';
 }
 
 export function roleLabel(role: AppRole | string) {

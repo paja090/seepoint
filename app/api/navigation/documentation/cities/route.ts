@@ -15,17 +15,25 @@ export async function GET(request: Request) {
     return NextResponse.json([]);
   }
 
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, organizationId: auth.organizationId, active: true },
+    select: { id: true },
+  });
+  if (!client) return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
+
   const citiesSet = new Set<string>();
 
   // 1. Extract cities from NavigationPoints for this client
   const points = await prisma.navigationPoint.findMany({
     where: {
+      organizationId: auth.organizationId,
       OR: [
         { navigationOrder: { crmOrder: { clientId } } },
         { navigationOffer: { offer: { clientId } } },
       ],
       status: { notIn: ['REMOVED', 'CANCELLED'] },
     },
+    take: 250,
     select: {
       address: true,
       carrier: {
@@ -52,6 +60,7 @@ export async function GET(request: Request) {
   // 2. Extract cities from AdvertisingCarriers occupied by this client
   const carriers = await prisma.advertisingCarrier.findMany({
     where: {
+      organizationId: auth.organizationId,
       archivedAt: null,
       surfaces: {
         some: {
@@ -62,6 +71,7 @@ export async function GET(request: Request) {
         },
       },
     },
+    take: 250,
     select: {
       city: true,
       address: true,

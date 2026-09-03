@@ -3,14 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ProjectSubNav } from '../navigation/ProjectSubNav';
-import { PanelsTopLeft, MapPin, Search, Calendar, Layers, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Search, Layers } from 'lucide-react';
+import { StatusBadge } from '@/components/StatusBadge';
+import { cityInventoryCategory, type CityInventoryCategory, type CityInventorySummary } from '@/lib/city-inventory';
+import { carrierTypeLabel } from '@/lib/carrier-filters';
+import type { CarrierType } from '@prisma/client';
 
 export type CarrierItem = {
   id: string;
   code: string;
   name: string;
   city: string;
-  type: string;
+  type: CarrierType;
   status: string;
   address: string | null;
 };
@@ -22,15 +26,11 @@ const navItems = [
   { href: '/map', label: '🗺️ Mapa nosičů' },
 ];
 
-export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[] }) {
+export function CityInventoryModuleClient({ carriers, summary }: { carriers: CarrierItem[]; summary: CityInventorySummary }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('ALL');
+  const [selectedType, setSelectedType] = useState<'ALL' | CityInventoryCategory>('ALL');
 
-  const totalCarriers = carriers.length;
-  const cityPosters = carriers.filter((c) => c.type.toLowerCase().includes('poster') || c.type.toLowerCase().includes('plakát') || c.code.startsWith('CP'));
-  const benches = carriers.filter((c) => c.type.toLowerCase().includes('lavičk') || c.type.toLowerCase().includes('bench') || c.code.startsWith('LAV'));
-  const crossings = carriers.filter((c) => c.type.toLowerCase().includes('přechod') || c.type.toLowerCase().includes('chodník') || c.code.startsWith('PRE'));
-  const others = carriers.filter((c) => !cityPosters.includes(c) && !benches.includes(c) && !crossings.includes(c));
+  const totalCarriers = summary.total;
 
   const filteredCarriers = carriers.filter((c) => {
     const matchesSearch =
@@ -39,11 +39,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
       c.city.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (selectedType === 'ALL') return matchesSearch;
-    if (selectedType === 'POSTER') return matchesSearch && cityPosters.includes(c);
-    if (selectedType === 'BENCH') return matchesSearch && benches.includes(c);
-    if (selectedType === 'CROSSING') return matchesSearch && crossings.includes(c);
-    if (selectedType === 'OTHER') return matchesSearch && others.includes(c);
-    return matchesSearch;
+    return matchesSearch && cityInventoryCategory(c.type) === selectedType;
   });
 
   return (
@@ -66,6 +62,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
         <button
           type="button"
           onClick={() => setSelectedType(selectedType === 'POSTER' ? 'ALL' : 'POSTER')}
+          aria-pressed={selectedType === 'POSTER'}
           className={`card text-left p-5 transition cursor-pointer border-2 ${
             selectedType === 'POSTER' ? 'border-sky-500 bg-sky-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
@@ -75,7 +72,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
             <span className="text-[11px] font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md">City Postery</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{cityPosters.length} ks</div>
+            <div className="text-2xl font-black text-slate-900">{summary.categories.POSTER} ks</div>
             <p className="text-xs text-slate-500 mt-0.5">Plakáty na sloupech VO a panelech</p>
           </div>
         </button>
@@ -84,6 +81,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
         <button
           type="button"
           onClick={() => setSelectedType(selectedType === 'BENCH' ? 'ALL' : 'BENCH')}
+          aria-pressed={selectedType === 'BENCH'}
           className={`card text-left p-5 transition cursor-pointer border-2 ${
             selectedType === 'BENCH' ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
@@ -93,26 +91,27 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
             <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">Lavičky</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{benches.length} ks</div>
+            <div className="text-2xl font-black text-slate-900">{summary.categories.BENCH} ks</div>
             <p className="text-xs text-slate-500 mt-0.5">Reklama na městských lavičkách</p>
           </div>
         </button>
 
-        {/* Přechody & Chodníky */}
+        {/* Navigační nosiče */}
         <button
           type="button"
-          onClick={() => setSelectedType(selectedType === 'CROSSING' ? 'ALL' : 'CROSSING')}
+          onClick={() => setSelectedType(selectedType === 'NAVIGATION' ? 'ALL' : 'NAVIGATION')}
+          aria-pressed={selectedType === 'NAVIGATION'}
           className={`card text-left p-5 transition cursor-pointer border-2 ${
-            selectedType === 'CROSSING' ? 'border-amber-500 bg-amber-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
+            selectedType === 'NAVIGATION' ? 'border-amber-500 bg-amber-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="rounded-xl bg-amber-100 p-2 text-amber-700 font-bold">🚶</span>
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">Přechody</span>
+            <span className="rounded-xl bg-amber-100 p-2 text-amber-700 font-bold">🧭</span>
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">Navigace</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{crossings.length} ks</div>
-            <p className="text-xs text-slate-500 mt-0.5">Plochy u přechodů & koridorů</p>
+            <div className="text-2xl font-black text-slate-900">{summary.categories.NAVIGATION} ks</div>
+            <p className="text-xs text-slate-500 mt-0.5">Navigační směrové nosiče</p>
           </div>
         </button>
 
@@ -120,6 +119,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
         <button
           type="button"
           onClick={() => setSelectedType(selectedType === 'OTHER' ? 'ALL' : 'OTHER')}
+          aria-pressed={selectedType === 'OTHER'}
           className={`card text-left p-5 transition cursor-pointer border-2 ${
             selectedType === 'OTHER' ? 'border-purple-500 bg-purple-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
@@ -129,7 +129,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
             <span className="text-[11px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md">Solitéry & Ostatní</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{others.length} ks</div>
+            <div className="text-2xl font-black text-slate-900">{summary.categories.OTHER} ks</div>
             <p className="text-xs text-slate-500 mt-0.5">Ostatní nosiče a panely</p>
           </div>
         </button>
@@ -142,7 +142,7 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
             <Layers size={20} className="text-slate-700" />
             <h2 className="text-lg font-bold text-slate-900">Seznam inventáře nosičů</h2>
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
-              {filteredCarriers.length} / {totalCarriers}
+              {filteredCarriers.length} / {summary.displayed} z {totalCarriers}
             </span>
           </div>
 
@@ -153,7 +153,8 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Hledat kód, název, město..."
+                placeholder="Hledat v zobrazeném náhledu..."
+                aria-label="Hledat v zobrazeném náhledu inventáře"
                 className="input w-full pl-8 py-1.5 text-xs border-slate-300 rounded-xl"
               />
             </div>
@@ -165,6 +166,18 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
               + Správa nosičů
             </Link>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <span>
+            Aktivní: <strong>{summary.statuses.ACTIVE}</strong> · Údržba: <strong>{summary.statuses.MAINTENANCE}</strong> · Neaktivní: <strong>{summary.statuses.INACTIVE}</strong>
+          </span>
+          {summary.displayed < summary.total && (
+            <span>
+              Dashboard zobrazuje vyvážený náhled {summary.displayed} z {summary.total} nearchivovaných nosičů, nejvýše 60 z každé kategorie.{' '}
+              <Link href="/carriers" className="font-bold text-sky-700 hover:underline">Otevřít úplnou stránkovanou evidenci</Link>
+            </span>
+          )}
         </div>
 
         {/* Table */}
@@ -195,12 +208,9 @@ export function CityInventoryModuleClient({ carriers }: { carriers: CarrierItem[
                     <td className="py-2.5 px-3 text-slate-600">
                       📍 {c.city} {c.address ? `(${c.address})` : ''}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 font-medium">{c.type}</td>
+                    <td className="py-2.5 px-3 text-slate-600 font-medium">{carrierTypeLabel(c.type)}</td>
                     <td className="py-2.5 px-3">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold">
-                        <CheckCircle size={11} />
-                        {c.status}
-                      </span>
+                      <StatusBadge value={c.status} />
                     </td>
                     <td className="py-2.5 px-3 text-right">
                       <Link

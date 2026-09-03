@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Table, TableHead, TableHeaderCell, TableCell, EmptyState, Button } from '@/components/ui';
-import { PREFERRED_COMM_LABELS, ClientContactItem, ClientProfileData } from '@/lib/crm/types';
-import { Edit3, Trash2, Plus, Mail, Phone, User, Check, X } from 'lucide-react';
+import { ClientContactItem, ClientProfileData } from '@/lib/crm/types';
+import { Edit3, Trash2, Plus, Mail, Phone } from 'lucide-react';
 
 export function ClientContactsTab({ client }: { client: ClientProfileData }) {
   const router = useRouter();
@@ -96,7 +96,7 @@ export function ClientContactsTab({ client }: { client: ClientProfileData }) {
   };
 
   const handleDelete = async (contactId: string, name: string) => {
-    if (!confirm(`Opravdu chcete smazat kontakt "${name}"?`)) return;
+    if (!confirm(`Opravdu chcete archivovat kontakt "${name}"? Kontakt zmizí z aktivního seznamu, ale historie zůstane zachována.`)) return;
     try {
       const res = await fetch(`/api/crm/clients/${client.id}/contacts/${contactId}`, {
         method: 'DELETE',
@@ -188,10 +188,10 @@ export function ClientContactsTab({ client }: { client: ClientProfileData }) {
                     <button
                       onClick={() => handleDelete(contact.id, `${contact.firstName} ${contact.lastName}`)}
                       className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold transition flex items-center gap-1"
-                      title="Odstranit kontakt"
+                      title="Archivovat kontakt"
                     >
                       <Trash2 size={13} className="text-rose-600" />
-                      <span>Smazat</span>
+                      <span>Archivovat</span>
                     </button>
                   </div>
                 </TableCell>

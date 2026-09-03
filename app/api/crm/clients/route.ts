@@ -2,18 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { createClient, findDuplicateClients } from '@/lib/crm/client-service';
 import { normalizeClientName } from '@/lib/crm/domain';
+import { CrmClientValidationError, parseClientInput, parseClientListQuery } from '@/lib/crm/client-policy';
 import { prisma } from '@/lib/db';
-import { ClientSource, ClientStatus, ClientType, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
   const authResult = await requireApiAccess('clients');
   if (isApiDenied(authResult)) return authResult;
 
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get('q')?.trim();
-  const status = searchParams.get('status')?.trim();
-  const clientType = searchParams.get('clientType')?.trim();
-  const assignedUserId = searchParams.get('assignedUserId')?.trim();
+  let parsed;
+  try {
+    parsed = parseClientListQuery(searchParams);
+  } catch (error) {
+    if (error instanceof CrmClientValidationError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
+  const { q, status, clientType, assignedUserId, page, pageSize } = parsed;
   const inactiveDays = searchParams.get('inactiveDays')?.trim();
 
   const where: Prisma.ClientWhereInput = { active: true };
@@ -30,11 +35,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (status) {
-    where.status = status as Prisma.EnumClientStatusFilter;
+    where.status = status;
   }
 
   if (clientType) {
-    where.clientType = clientType as Prisma.EnumClientTypeFilter;
+    where.clientType = clientType;
   }
 
   if (assignedUserId) {
@@ -50,24 +55,29 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const clients = await prisma.client.findMany({
-    where,
-    orderBy: { name: 'asc' },
-    include: {
-      assignedUser: { select: { id: true, name: true, email: true } },
-      _count: {
-        select: {
-          occupancies: true,
-          offers: true,
-          crmOrders: true,
-          invoices: true,
-          crmTasks: true,
+  const [clients, total] = await Promise.all([
+    prisma.client.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        assignedUser: { select: { id: true, name: true, email: true } },
+        _count: {
+          select: {
+            occupancies: true,
+            offers: true,
+            crmOrders: true,
+            invoices: true,
+            crmTasks: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.client.count({ where }),
+  ]);
 
-  return NextResponse.json({ clients });
+  return NextResponse.json({ clients, pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } });
 }
 
 export async function POST(req: NextRequest) {
@@ -76,18 +86,14 @@ export async function POST(req: NextRequest) {
   const user = authResult;
 
   try {
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
-    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {
-      return NextResponse.json({ error: 'Název společnosti je povinný.' }, { status: 400 });
-    }
-    if (body.status && !Object.values(ClientStatus).includes(body.status)) return NextResponse.json({ error: 'Neplatný stav klienta.' }, { status: 400 });
-    if (body.clientType && !Object.values(ClientType).includes(body.clientType)) return NextResponse.json({ error: 'Neplatný typ klienta.' }, { status: 400 });
-    if (body.source && !Object.values(ClientSource).includes(body.source)) return NextResponse.json({ error: 'Neplatný zdroj klienta.' }, { status: 400 });
+    if (!user.organizationId) return NextResponse.json({ error: 'Chybí aktivní organizace.' }, { status: 400 });
+    const rawBody = await req.json().catch(() => null);
+    const body = parseClientInput(rawBody);
+    const ignoreDuplicates = Boolean(rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody) && (rawBody as Record<string, unknown>).ignoreDuplicates === true);
 
     // Check duplicates before creating
-    const duplicates = await findDuplicateClients(body.companyId, body.name, body.email);
-    if (duplicates.length > 0 && !body.ignoreDuplicates) {
+    const duplicates = await findDuplicateClients(body.companyId ?? undefined, body.name, body.email ?? undefined);
+    if (duplicates.length > 0 && !ignoreDuplicates) {
       const canForceCreate = !duplicates.some((client) => normalizeClientName(client.name) === normalizeClientName(body.name));
       return NextResponse.json({
         hasDuplicates: true,
@@ -97,9 +103,11 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    const client = await createClient(body, user.id, user.email);
-    return NextResponse.json({ success: true, client });
+    const client = await createClient(body, user.id, user.email, user.organizationId);
+    return NextResponse.json({ success: true, client }, { status: 201 });
   } catch (err: unknown) {
+    if (err instanceof CrmClientValidationError) return NextResponse.json({ error: err.message }, { status: 400 });
+    if (err instanceof Error && err.message === 'INVALID_ASSIGNEE') return NextResponse.json({ error: 'Přiřazený uživatel není aktivním členem organizace.' }, { status: 400 });
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return NextResponse.json({ error: 'Klient se stejným názvem už existuje.' }, { status: 409 });
     }

@@ -55,8 +55,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
 
     return NextResponse.json({ ok: true, task: updated });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Chyba při aktualizaci úkolu.' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při aktualizaci úkolu.' }, { status: 500 });
   }
 }
 
@@ -70,7 +70,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { id } = await params;
     await prisma.quickInternalTask.delete({ where: { id } });
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Chyba při mazání úkolu.' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při mazání úkolu.' }, { status: 500 });
   }
 }

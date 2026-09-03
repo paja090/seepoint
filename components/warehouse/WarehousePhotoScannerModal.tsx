@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, Upload, X, Loader2, CheckCircle2, Sparkles, Minus, Plus } from 'lucide-react';
+import { Camera, X, Loader2, CheckCircle2, Sparkles, Minus, Plus } from 'lucide-react';
 
 interface DetectedItem {
   itemId: string;
@@ -36,6 +36,11 @@ export function WarehousePhotoScannerModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) {
+      setError('Fotka musí být JPEG, PNG nebo WebP a může mít nejvýše 3 MB.');
+      return;
+    }
+
     setPhotoPreview(URL.createObjectURL(file));
     setLoading(true);
     setError(null);
@@ -54,6 +59,9 @@ export function WarehousePhotoScannerModal({
       if (!res.ok) throw new Error(data.error || 'Rozpoznání fotky selhalo.');
 
       setDetectedItems(data.detectedItems || []);
+      if (Array.isArray(data.unmatchedItems) && data.unmatchedItems.length > 0) {
+        setError(`${data.unmatchedItems.length} položek se nepodařilo bezpečně spárovat se skladem a nebudou vydány.`);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Chyba při rozpoznávání fotky.');
     } finally {
@@ -80,20 +88,22 @@ export function WarehousePhotoScannerModal({
     setError(null);
 
     try {
-      for (const item of detectedItems) {
-        await fetch('/api/warehouse/movements', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      const res = await fetch('/api/warehouse/movements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          movements: detectedItems.map((item) => ({
             itemId: item.itemId,
             type: 'ISSUE',
             quantity: item.detectedQty,
             workOrderId: workOrderId || undefined,
             assignedEmployeeId: assignedEmployeeId || undefined,
             note: 'Výdej z AI Fotky materiálu',
-          }),
-        });
-      }
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Hromadný výdej selhal.');
 
       setSuccessMessage('Všechny rozpoznané položky byly úspěšně vydány ze skladu!');
       setDetectedItems([]);
@@ -166,7 +176,7 @@ export function WarehousePhotoScannerModal({
                   <span className="text-[10px] text-slate-400">Pásky, lepidla, žebřík, krabice...</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     className="hidden"
                     onChange={handlePhotoUpload}
@@ -187,7 +197,7 @@ export function WarehousePhotoScannerModal({
               <div className="space-y-3 border-t border-slate-100 pt-3">
                 <h4 className="text-xs font-extrabold uppercase text-slate-500 tracking-wider flex items-center gap-1">
                   <Sparkles size={14} className="text-emerald-600" />
-                  Rozpoznané položky na fotce (Můžete upravit kusi):
+                  Rozpoznané položky na fotce (množství můžete upravit):
                 </h4>
 
                 <div className="space-y-2">
@@ -237,6 +247,24 @@ export function WarehousePhotoScannerModal({
                       {employees.map((emp) => (
                         <option key={emp.id} value={emp.id}>
                           👤 {emp.firstName} {emp.lastName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {workOrders.length > 0 && (
+                  <label className="block font-bold text-slate-700 text-xs mt-3">
+                    Propojit se zakázkou (volitelné)
+                    <select
+                      className="input mt-1 w-full text-xs font-normal"
+                      value={workOrderId}
+                      onChange={(e) => setWorkOrderId(e.target.value)}
+                    >
+                      <option value="">-- Bez zakázky --</option>
+                      {workOrders.map((order) => (
+                        <option key={order.id} value={order.id}>
+                          {order.title} · {order.clientName}
                         </option>
                       ))}
                     </select>

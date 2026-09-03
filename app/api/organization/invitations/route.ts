@@ -1,12 +1,15 @@
 import { OrganizationRole, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { hashToken, newToken } from '@/lib/auth';
-import { normalizeAuthEmail } from '@/lib/auth-onboarding';
+import { isValidAuthEmail, normalizeAuthEmail } from '@/lib/auth-onboarding';
 import { platformPrisma } from '@/lib/db';
 import { sendActivationEmail } from '@/lib/email';
 import { requireOrganizationRole } from '@/lib/organization';
 import { getAppUrl } from '@/lib/app-url';
 import { canAssignOrganizationRole } from '@/lib/organization-invitation-policy';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { effectiveOrganizationRole } from '@/lib/account-policy';
 
 function appRole(role: OrganizationRole): Role {
   return role === 'OWNER' ? Role.ADMIN : role as Role;
@@ -33,10 +36,13 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null) as { email?: unknown; role?: unknown } | null;
     if (!body || typeof body.email !== 'string' || typeof body.role !== 'string') return NextResponse.json({ error: 'E-mail a role jsou povinné.' }, { status: 400 });
     const email = normalizeAuthEmail(body.email);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: 'E-mail není platný.' }, { status: 400 });
+    if (!isValidAuthEmail(email)) return NextResponse.json({ error: 'E-mail není platný.' }, { status: 400 });
     if (!Object.values(OrganizationRole).includes(body.role as OrganizationRole)) return NextResponse.json({ error: 'Role není platná.' }, { status: 400 });
     const role = body.role as OrganizationRole;
-    if (!canAssignOrganizationRole(context.membership.role, role)) return NextResponse.json({ error: 'Vlastníka může pozvat pouze vlastník.' }, { status: 403 });
+    const actorRole = effectiveOrganizationRole(context.membership.role, context.membership.roles);
+    if (!canAssignOrganizationRole(actorRole, role)) return NextResponse.json({ error: 'Vlastníka může pozvat pouze vlastník.' }, { status: 403 });
+    const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${context.organizationId}:${email}`), rateLimitPolicies.resendInvitation);
+    if (limited) return limited;
 
     let user = await platformPrisma.user.findUnique({ where: { email } });
     const existingMember = user
@@ -88,7 +94,10 @@ export async function POST(request: Request) {
     let warning: string | undefined;
     const activationUrl = getAppUrl(request, `/activate/${token}`);
     if (needsActivation) {
-      try { await sendActivationEmail(email, activationUrl); }
+      try {
+        const delivery = await sendActivationEmail(email, activationUrl);
+        if (delivery.status === 'skipped') warning = 'Preview: členství vzniklo, ale aktivační e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.';
+      }
       catch (error) {
         console.error('[organization/invitations] Activation email delivery failed', {
           organizationId: context.organizationId,

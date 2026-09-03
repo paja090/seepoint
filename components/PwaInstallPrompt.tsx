@@ -1,63 +1,107 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Smartphone, Download, Share, X, CheckCircle2, Sparkles, MoreVertical, PlusSquare } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Smartphone, Download, Share, X, Sparkles, MoreVertical, PlusSquare, WifiOff } from 'lucide-react';
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+};
+
+const INSTALL_PROMPT_DISMISSAL_KEY = 'seepoint_pwa_prompt_dismissed_at';
+const INSTALL_PROMPT_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+
+function installPromptDismissalExpired() {
+  try {
+    const dismissedAt = Number(window.localStorage.getItem(INSTALL_PROMPT_DISMISSAL_KEY) || 0);
+    return !dismissedAt || Date.now() - dismissedAt > INSTALL_PROMPT_COOLDOWN_MS;
+  } catch {
+    return true;
+  }
+}
+
+function rememberInstallPromptDismissal() {
+  try {
+    window.localStorage.setItem(INSTALL_PROMPT_DISMISSAL_KEY, String(Date.now()));
+  } catch {
+    // A restricted browser storage mode must not break the install UI.
+  }
+}
 
 export function PwaInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIos, setIsIos] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     // Register Service Worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => null);
+      navigator.serviceWorker.register('/sw.js').catch((error) => console.error('Registrace offline režimu selhala.', error));
     }
 
     // Check if running as standalone PWA already
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone;
+      Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
 
     if (isStandalone) {
       setInstalled(true);
-      return;
     }
 
     // Detect iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
-    const iosDevice = /iphone|ipad|ipod/.test(userAgent);
+    const iosDevice = /iphone|ipad|ipod/.test(userAgent)
+      || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
     setIsIos(iosDevice);
+
+    const updateConnectionStatus = () => setOffline(!window.navigator.onLine);
+    updateConnectionStatus();
+    window.addEventListener('online', updateConnectionStatus);
+    window.addEventListener('offline', updateConnectionStatus);
+
+    const handleAppInstalled = () => {
+      setInstalled(true);
+      setShowPrompt(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     // Capture Android/Chrome install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
-      setShowPrompt(true);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      if (installPromptDismissalExpired()) setShowPrompt(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     // Always show install bar on mobile browsers if not installed
-    const isMobile = /mobile|android|iphone|ipad/.test(userAgent);
-    if (isMobile && !isStandalone) {
+    const isMobile = /mobile|android|iphone|ipad/.test(userAgent) || iosDevice;
+    if (isMobile && !isStandalone && installPromptDismissalExpired()) {
       setShowPrompt(true);
     }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('online', updateConnectionStatus);
+      window.removeEventListener('offline', updateConnectionStatus);
     };
   }, []);
 
   async function handleInstallClick() {
     if (deferredPrompt) {
       try {
-        deferredPrompt.prompt();
+        await deferredPrompt.prompt();
         const choice = await deferredPrompt.userChoice;
         if (choice.outcome === 'accepted') {
           setInstalled(true);
+          setShowPrompt(false);
+        } else {
+          rememberInstallPromptDismissal();
           setShowPrompt(false);
         }
         setDeferredPrompt(null);
@@ -71,10 +115,20 @@ export function PwaInstallPrompt() {
     setShowInstructions(true);
   }
 
-  if (installed || !showPrompt) return null;
+  const dismissPrompt = () => {
+    rememberInstallPromptDismissal();
+    setShowPrompt(false);
+  };
 
   return (
-    <div className="fixed bottom-20 left-3 right-3 sm:left-4 sm:right-4 z-50 mx-auto max-w-md animate-in slide-in-from-bottom duration-300">
+    <>
+      {offline && (
+        <div role="status" className="fixed left-1/2 top-3 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-xs font-black text-slate-950 shadow-xl">
+          <WifiOff size={15} />
+          <span>Bez připojení — změny nyní neodesílejte</span>
+        </div>
+      )}
+      {!installed && showPrompt && <div className="fixed bottom-20 left-3 right-3 sm:left-4 sm:right-4 z-50 mx-auto max-w-md animate-in slide-in-from-bottom duration-300">
       <div className="rounded-3xl bg-slate-950 p-4 text-white shadow-2xl border border-emerald-500/50 backdrop-blur-xl flex flex-col gap-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -91,8 +145,9 @@ export function PwaInstallPrompt() {
           </div>
 
           <button
-            onClick={() => setShowPrompt(false)}
+            onClick={dismissPrompt}
             className="rounded-xl p-1 text-slate-400 hover:bg-slate-900 hover:text-white"
+            aria-label="Skrýt nabídku instalace na 14 dní"
           >
             <X size={16} />
           </button>
@@ -118,7 +173,7 @@ export function PwaInstallPrompt() {
                 </p>
                 <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-300 font-medium">
                   <li>V Safari dole klikněte na ikonu <b>Sdílet</b> <Share size={12} className="inline text-emerald-400" /> (čtvereček se šipkou).</li>
-                  <li>Klepněte na <b>"Přidat na plochu"</b> <PlusSquare size={12} className="inline text-emerald-400" /> (Add to Home Screen).</li>
+                  <li>Klepněte na <b>„Přidat na plochu“</b> <PlusSquare size={12} className="inline text-emerald-400" /> (Add to Home Screen).</li>
                   <li>Potvrďte tlačítkem <b>Přidat</b> — ikona se objeví na ploše!</li>
                 </ol>
               </>
@@ -130,7 +185,7 @@ export function PwaInstallPrompt() {
                 </p>
                 <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-300 font-medium">
                   <li>V prohlížeči Chrome vpravo nahoře klepněte na <b>3 tečky</b> <MoreVertical size={12} className="inline text-emerald-400" />.</li>
-                  <li>Vyberte položku <b>"Přidat na plochu"</b> nebo <b>"Nainstalovat aplikaci"</b>.</li>
+                  <li>Vyberte položku <b>„Přidat na plochu“</b> nebo <b>„Nainstalovat aplikaci“</b>.</li>
                   <li>Aplikace SeePOINT se uloží přímo mezi vaše mobilní aplikace!</li>
                 </ol>
               </>
@@ -138,6 +193,7 @@ export function PwaInstallPrompt() {
           </div>
         )}
       </div>
-    </div>
+    </div>}
+    </>
   );
 }

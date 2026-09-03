@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Route, CheckSquare, Square, Zap } from 'lucide-react';
+import { Route, CheckSquare, Square } from 'lucide-react';
 import { Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { StatusBadge } from '@/components/StatusBadge';
 import { mediaTypeLabel } from '@/lib/carrier-filters';
@@ -45,11 +45,14 @@ type ClientOption = {
 export function OccupancyTableWithBulk({
   rows,
   clients,
+  referenceDate,
 }: {
   rows: OccupancyRow[];
   clients: ClientOption[];
+  referenceDate: string;
 }) {
   const [selectedSurfaceIds, setSelectedSurfaceIds] = useState<string[]>([]);
+  const referenceTime = new Date(referenceDate).getTime();
 
   const toggleSelect = (surfaceId: string) => {
     if (selectedSurfaceIds.includes(surfaceId)) {
@@ -120,11 +123,8 @@ export function OccupancyTableWithBulk({
         <tbody>
           {rows.map((row) => {
             const isSelected = selectedSurfaceIds.includes(row.surface.id);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
             const dateToObj = new Date(row.dateTo);
-            dateToObj.setHours(0, 0, 0, 0);
-            const diffDays = Math.ceil((dateToObj.getTime() - today.getTime()) / (1000 * 3600 * 24));
+            const diffDays = Math.ceil((dateToObj.getTime() - referenceTime) / (1000 * 3600 * 24));
             const isEndingSoon = diffDays >= 0 && diffDays <= 7 && ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(row.status);
             const freeFromDate = new Date(dateToObj.getTime() + 86400000).toISOString().slice(0, 10);
 
@@ -161,7 +161,7 @@ export function OccupancyTableWithBulk({
                 <TableCell>
                   {row.surface.name}
                   <br />
-                  <span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType as any)}</span>
+                  <span className="text-slate-500">{mediaTypeLabel(row.surface.mediaType)}</span>
                 </TableCell>
                 <TableCell>
                   <OccupancyClientPairing

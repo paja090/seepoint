@@ -1,0 +1,10 @@
+.git
+.next
+.worktrees
+data
+node_modules
+output
+reports
+scratch
+tmp
+*.tsbuildinfo

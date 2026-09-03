@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { generateSecureToken } from '@/lib/navigation-documentation';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -10,8 +9,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   try {
-    const existing = await prisma.navigationDocumentationReport.findUnique({
-      where: { id },
+    const existing = await prisma.navigationDocumentationReport.findFirst({
+      where: { id, organizationId: auth.organizationId },
       include: { client: true },
     });
 
@@ -30,11 +29,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const periodFrom = new Date(nextYear, (nextQuarter - 1) * 3, 1);
     const periodTo = new Date(nextYear, nextQuarter * 3, 0);
 
-    const { token, hash } = generateSecureToken();
+    const duplicate = await prisma.navigationDocumentationReport.findFirst({
+      where: {
+        organizationId: auth.organizationId,
+        clientId: existing.clientId,
+        offerId: existing.offerId,
+        quarter: nextQuarter,
+        year: nextYear,
+        status: { not: 'ARCHIVED' },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      return NextResponse.json({ error: 'Report pro stejného klienta, nabídku a čtvrtletí již existuje.', reportId: duplicate.id }, { status: 409 });
+    }
 
     // Re-query current live active navigation points & latest photos
     const points = await prisma.navigationPoint.findMany({
       where: {
+        organizationId: auth.organizationId,
         navigationOffer: {
           offer: {
             clientId: existing.clientId,
@@ -59,6 +72,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const newReport = await prisma.navigationDocumentationReport.create({
       data: {
+        organizationId: auth.organizationId,
         clientId: existing.clientId,
         offerId: existing.offerId,
         navigationOfferId: existing.navigationOfferId,
@@ -69,10 +83,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         quarter: nextQuarter,
         year: nextYear,
         status: 'DRAFT',
-        publicTokenHash: hash,
         createdById: auth.id,
         items: {
           create: points.map((point, index) => ({
+            organizationId: auth.organizationId,
             navigationPointId: point.id,
             carrierId: point.carrierId ?? undefined,
             selectedPhotoId: point.carrier?.photos[0]?.id ?? undefined,
@@ -82,6 +96,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         },
         auditLogs: {
           create: {
+            organizationId: auth.organizationId,
             actorUserId: auth.id,
             action: 'CREATED',
             message: `Vytvořen nový koncept pro ${nextQuarter}. čtvrtletí ${nextYear} na základě předchozího reportu ${existing.title}. Znovu načtena živá data.`,
@@ -94,9 +109,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     });
 
-    return NextResponse.json({ report: newReport, token });
+    return NextResponse.json({ report: newReport }, { status: 201 });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Chyba při vytváření reportu pro další kvartál.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[navigation/documentation/next-quarter] Creation failed', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'Report pro další čtvrtletí se nepodařilo vytvořit.' }, { status: 500 });
   }
 }

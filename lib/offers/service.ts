@@ -119,7 +119,6 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     taxAmount: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.taxAmount),
     totalWithTax: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.totalWithTax ?? row.totalPrice),
     hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash),
-    publicToken: publicView ? undefined : (row as Record<string, unknown>).publicTokenHash as string | undefined,
     publishedAt: row.publishedAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     acceptedAt: row.acceptedAt?.toISOString() ?? null,
@@ -752,6 +751,7 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
 }
 
 export async function publishOffer(user: CurrentUser, id: string) {
+  const publicToken = createPublicOfferToken();
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
@@ -764,6 +764,7 @@ export async function publishOffer(user: CurrentUser, id: string) {
     return tx.offer.update({
       where: { id },
       data: {
+        publicTokenHash: publicToken.hash,
         publishedAt: existing.publishedAt || new Date(),
         status: newStatus,
         updatedByUserId: user.id,
@@ -772,10 +773,11 @@ export async function publishOffer(user: CurrentUser, id: string) {
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: id, path: `/offer/${id}` };
+  return { offer: serializeOffer(row), token: publicToken.token, path: `/offer/${publicToken.token}` };
 }
 
 export async function prepareOfferDelivery(user: CurrentUser, id: string, emailDraft?: { clientMessage?: string }) {
+  const publicToken = createPublicOfferToken();
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
@@ -788,6 +790,7 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
     return tx.offer.update({
       where: { id },
       data: {
+        publicTokenHash: publicToken.hash,
         publishedAt: existing.publishedAt || new Date(),
         clientMessage: emailDraft?.clientMessage ?? existing.clientMessage,
         updatedByUserId: user.id,
@@ -796,23 +799,17 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: id, path: `/offer/${id}` };
+  return { offer: serializeOffer(row), token: publicToken.token, path: `/offer/${publicToken.token}` };
 }
 
 export async function getPublicRow(token: string) {
   if (!token || typeof token !== 'string') throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   const cleanToken = token.trim();
+  if (!isPlausiblePublicOfferToken(cleanToken)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   const tokenHash = hashPublicOfferToken(cleanToken);
 
-  const row = await platformPrisma.offer.findFirst({
-    where: {
-      OR: [
-        { publicTokenHash: cleanToken },
-        { publicTokenHash: tokenHash },
-        { id: cleanToken },
-        { publicTokenHash: { startsWith: cleanToken } },
-      ],
-    },
+  const row = await platformPrisma.offer.findUnique({
+    where: { publicTokenHash: tokenHash },
     include: offerInclude,
   });
 
@@ -914,8 +911,14 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     return { row, status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 
+  // Reserved .invalid addresses are used only by isolated Preview E2E tests.
+  // Never contact an external email provider for those tests; Production is unchanged.
+  const suppressPreviewTestEmail =
+    process.env.VERCEL_ENV === 'preview'
+    && actorEmail.toLowerCase().endsWith('.invalid');
+
   // Asynchronously send notification email to salesperson / agency team
-  try {
+  if (!suppressPreviewTestEmail) try {
     const row = result.row;
     const recipientEmail = row.createdByUser?.email || row.contactEmail || process.env.EMAIL_BCC || 'info@seepoint.cz';
     const actionLabel = action === 'accept' ? 'PŘIJATA' : action === 'reject' ? 'ODMÍTNUTA' : action === 'revision' ? 'ŽÁDOST O ÚPRAVU' : 'NOVÝ DOTAZ';
@@ -989,7 +992,8 @@ export async function getPublicPhoto(token: string, photoId: string) {
 
 export async function convertOfferToOccupancy(user: CurrentUser, id: string, targetStatus: 'RESERVED' | 'OCCUPIED') {
   if (!canConvertOfferRole(user.role)) throw new OfferValidationError('Převod může provést pouze administrátor nebo manažer.', 'FORBIDDEN');
-  return prisma.$transaction(async (tx) => {
+  if (!user.organizationId) throw new OfferValidationError('Pro převod musí být zvolená aktivní organizace.', 'FORBIDDEN');
+  return runWithTenantContext({ organizationId: user.organizationId, userId: user.id, source: 'session' }, () => prisma.$transaction(async (tx) => {
     const offer = await getOfferRow(tx, id);
     if (offer.offerType !== 'STANDARD_MEDIA') throw new OfferValidationError('Na obsazenost lze převést pouze nabídku standardních médií.', 'INVALID_OFFER_TYPE');
     if (offer.status !== 'ACCEPTED') throw new OfferValidationError('Převést lze pouze přijatou nabídku.', 'INVALID_STATUS_TRANSITION');
@@ -1029,7 +1033,7 @@ export async function convertOfferToOccupancy(user: CurrentUser, id: string, tar
     }
     await tx.offer.update({ where: { id }, data: { updatedByUserId: user.id, events: { create: { type: 'CONVERTED', actorUserId: user.id, actorName: user.name, metadata: { targetStatus, occupancyIds: occupancies.map((row) => row.id) } } } } });
     return { converted: true, idempotent: false, occupancies };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 5000, timeout: 15000 }));
 }
 
 export async function checkOfferAvailability(user: CurrentUser, raw: unknown) {

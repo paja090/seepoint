@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { MediaType } from '@prisma/client';
+import type { InventoryVisibility, Prisma } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { platformPrisma } from '@/lib/db';
-import { requireTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,19 +10,29 @@ export async function GET(req: Request) {
   const auth = await requireApiAccess('offers');
   if (isApiDenied(auth)) return auth;
 
-  const { organizationId } = requireTenantContext();
+  const organizationId = auth.organizationId;
+  if (!organizationId) return NextResponse.json({ success: false, error: 'Aktivní organizace není vybrána.' }, { status: 403 });
   const url = new URL(req.url);
   const city = url.searchParams.get('city')?.trim();
-  const mediaType = url.searchParams.get('mediaType')?.trim();
-  const visibility = url.searchParams.get('visibility')?.trim();
+  const requestedMediaType = url.searchParams.get('mediaType')?.trim();
+  const requestedVisibility = url.searchParams.get('visibility')?.trim();
+  const networkVisibilities: InventoryVisibility[] = ['PARTNER', 'SHARED', 'MARKETPLACE'];
+  const ownVisibility = networkVisibilities.includes(requestedVisibility as InventoryVisibility)
+    ? requestedVisibility as InventoryVisibility
+    : { in: networkVisibilities };
+  const mediaType = Object.values(MediaType).includes(requestedMediaType as MediaType)
+    ? requestedMediaType as MediaType
+    : undefined;
 
   try {
-    const where: any = {
+    const where: Prisma.AdvertisingCarrierWhereInput = {
       status: 'ACTIVE',
-      // Look for carriers outside own organization marked as PARTNER or MARKETPLACE, or own shared
-      visibility: visibility && visibility !== 'ALL'
-        ? visibility
-        : { in: ['PARTNER', 'SHARED', 'MARKETPLACE'] },
+      OR: [
+        { organizationId, visibility: ownVisibility },
+        // Until persistent partnerships exist, another tenant may expose inventory
+        // only through the explicit platform-wide MARKETPLACE visibility.
+        { organizationId: { not: organizationId }, visibility: 'MARKETPLACE' },
+      ],
     };
 
     if (city && city !== 'ALL') {
@@ -32,7 +43,14 @@ export async function GET(req: Request) {
       where,
       include: {
         surfaces: {
-          where: { status: 'AVAILABLE' },
+          where: {
+            status: 'AVAILABLE',
+            OR: [
+              { organizationId, visibility: ownVisibility },
+              { organizationId: { not: organizationId }, visibility: 'MARKETPLACE' },
+            ],
+            ...(mediaType ? { mediaType } : {}),
+          },
           select: {
             id: true,
             name: true,
@@ -44,7 +62,7 @@ export async function GET(req: Request) {
           },
         },
         photos: {
-          where: { type: { not: 'EXPENSE_RECEIPT' } },
+          where: { type: { not: 'EXPENSE_RECEIPT' }, isPrivate: false, isClientVisible: true },
           select: { id: true, url: true, note: true },
           take: 2,
         },
@@ -56,11 +74,11 @@ export async function GET(req: Request) {
     const items = carriers.flatMap((carrier) => {
       const isOwn = carrier.organizationId === organizationId;
       const ownerLabel = isOwn ? 'Moje firma' : 'B2B Partner';
-      const b2bDiscount = isOwn ? 0 : 20; // 20% B2B partner discount
+      const b2bDiscount = 0;
 
       return carrier.surfaces.map((surface) => {
-        const listPrice = surface.price ? Number(surface.price) : 8500;
-        const b2bWholesalePrice = Math.round(listPrice * (1 - b2bDiscount / 100));
+        const listPrice = surface.price ? Number(surface.price) : 0;
+        const b2bWholesalePrice = listPrice;
 
         return {
           id: surface.id,

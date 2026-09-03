@@ -10,38 +10,27 @@ import {
   Tag,
   Clock,
   ShieldCheck,
-  Building2,
   TrendingUp,
-  Search,
   CheckCircle2,
   Plus,
-  RefreshCw,
-  ArrowRight,
   Filter,
-  Eye,
   Lock,
-  Layers,
-  Sparkles,
   AlertCircle,
-  ChevronRight,
   Camera,
   FileCheck,
   ExternalLink,
   DollarSign,
   Receipt,
-  CreditCard,
   Megaphone,
   Send,
-  MessageSquare,
 } from 'lucide-react';
+import { NETWORK_BETA_MESSAGE, NETWORK_TRANSACTIONS_ENABLED } from '@/lib/network-capabilities';
 
 type Partner = {
   id: string;
   name: string;
   city: string;
   logoUrl?: string | null;
-  email?: string | null;
-  phone?: string | null;
   status: 'CONNECTED' | 'AVAILABLE';
   discountPercent: number;
   sharedSurfacesCount: number;
@@ -158,10 +147,11 @@ export function NetworkHubView() {
     totalPayable: 0,
     totalReceivable: 0,
   });
-  const [loading, setLoading] = useState(true);
   const [searchCity, setSearchCity] = useState('ALL');
   const [searchMediaType, setSearchMediaType] = useState('ALL');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [notifications, setNotifications] = useState<Array<{ id: string; type: string; title: string; message: string; severity: string; createdAt: string; isRead: boolean }>>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -175,7 +165,7 @@ export function NetworkHubView() {
   const [newDemandPeriod, setNewDemandPeriod] = useState('Září 2026');
   const [newDemandQty, setNewDemandQty] = useState(4);
   const [newDemandBudget, setNewDemandBudget] = useState(35000);
-  const [newDemandSegment, setNewDemandSegment] = useState('Automotive / FMCG');
+  const newDemandSegment = 'Automotive / FMCG';
 
   const [bidDemandId, setBidDemandId] = useState<string | null>(null);
   const [bidQty, setBidQty] = useState(2);
@@ -186,7 +176,6 @@ export function NetworkHubView() {
   useEffect(() => {
     let isMounted = true;
     const fetchNetworkData = async () => {
-      setLoading(true);
       try {
         const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes, settlementsRes, demandsRes] = await Promise.all([
           fetch('/api/network/partners'),
@@ -199,6 +188,22 @@ export function NetworkHubView() {
         ]);
 
         if (isMounted) {
+          const failedResources = [
+            ['organizace', partnersRes],
+            ['katalog', inventoryRes],
+            ['holdy', holdsRes],
+            ['notifikace', notifRes],
+            ['fotodokumentace', proofsRes],
+            ['clearing', settlementsRes],
+            ['poptávky', demandsRes],
+          ].filter(([, response]) => !(response as Response).ok).map(([label]) => label);
+
+          setLoadError(
+            failedResources.length > 0
+              ? `Část B2B dat se nepodařilo načíst: ${failedResources.join(', ')}. Zobrazené nuly proto nemusí znamenat prázdná data.`
+              : null
+          );
+
           if (partnersRes.ok) {
             const pData = await partnersRes.json();
             setPartners(pData.partners || []);
@@ -232,8 +237,9 @@ export function NetworkHubView() {
         }
       } catch (err) {
         console.error('Failed to load network data:', err);
-      } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoadError('B2B data se nepodařilo načíst. Zkuste stránku obnovit; žádná transakční operace nebyla provedena.');
+        }
       }
     };
 
@@ -244,6 +250,7 @@ export function NetworkHubView() {
   }, []);
 
   const handlePartnerAction = async (targetOrgId: string, action: string, discount = 20) => {
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       const res = await fetch('/api/network/partners', {
         method: 'POST',
@@ -263,6 +270,7 @@ export function NetworkHubView() {
   };
 
   const handleCreateHold = async (surfaceId: string) => {
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       const res = await fetch('/api/network/holds', {
         method: 'POST',
@@ -271,7 +279,7 @@ export function NetworkHubView() {
       });
       const data = await res.json();
       if (data.success) {
-        setActionSuccess('Dočasný B2B Hold na 5 dní byl úspěšně aktivován!');
+        setActionSuccess(data.message);
         if (data.hold) {
           setHolds((prev) => [data.hold, ...prev]);
         }
@@ -282,6 +290,7 @@ export function NetworkHubView() {
   };
 
   const handleHoldAction = async (holdId: string, action: 'CONFIRM' | 'EXTEND' | 'RELEASE') => {
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       const res = await fetch('/api/network/holds', {
         method: 'POST',
@@ -309,6 +318,7 @@ export function NetworkHubView() {
   };
 
   const handleMarkAllNotifsRead = async () => {
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       await fetch('/api/network/notifications', {
         method: 'POST',
@@ -323,6 +333,7 @@ export function NetworkHubView() {
   };
 
   const handleProofAction = async (proofId: string, action: 'APPROVE' | 'REJECT') => {
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       const res = await fetch('/api/network/proofs', {
         method: 'POST',
@@ -346,6 +357,7 @@ export function NetworkHubView() {
   };
 
   const handleSettlementAction = async (settlementId: string, action: 'GENERATE_INVOICE' | 'MARK_SETTLED') => {
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       const res = await fetch('/api/network/settlements', {
         method: 'POST',
@@ -355,17 +367,9 @@ export function NetworkHubView() {
       const data = await res.json();
       if (data.success) {
         setActionSuccess(data.message);
-        setSettlements((prev) =>
-          prev.map((s) =>
-            s.id === settlementId
-              ? {
-                  ...s,
-                  status: data.status,
-                  invoiceNumber: action === 'GENERATE_INVOICE' ? 'B2B-2026-0899' : s.invoiceNumber,
-                }
-              : s
-          )
-        );
+        if (data.settlement) {
+          setSettlements((prev) => prev.map((s) => (s.id === settlementId ? data.settlement : s)));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -374,6 +378,7 @@ export function NetworkHubView() {
 
   const handleCreateDemandSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     try {
       const res = await fetch('/api/network/demands', {
         method: 'POST',
@@ -405,6 +410,7 @@ export function NetworkHubView() {
 
   const handleSubmitBidForDemand = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
     if (!bidDemandId) return;
     try {
       const res = await fetch('/api/network/demands', {
@@ -423,26 +429,9 @@ export function NetworkHubView() {
       const data = await res.json();
       if (data.success) {
         setActionSuccess(data.message);
-        setDemands((prev) =>
-          prev.map((d) =>
-            d.id === bidDemandId
-              ? {
-                  ...d,
-                  bidsCount: d.bidsCount + 1,
-                  bids: [
-                    {
-                      id: `bid-${Date.now()}`,
-                      partnerName: 'SeePOINT Praha (Vy)',
-                      offeredSurfacesCount: bidQty,
-                      totalB2BPrice: bidPrice,
-                      note: bidNote,
-                    },
-                    ...d.bids,
-                  ],
-                }
-              : d
-          )
-        );
+        if (data.demand) {
+          setDemands((prev) => prev.map((d) => (d.id === bidDemandId ? data.demand : d)));
+        }
         setBidDemandId(null);
         setBidNote('');
       }
@@ -475,7 +464,7 @@ export function NetworkHubView() {
               Partnerská síť reklamních ploch
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Sdílejte a poptávejte volné reklamní kapacity mezi ověřenými outdoorovými agenturami v ČR za velkoobchodní B2B ceny se 100% ochranou vašich koncových klientů.
+              Pilotní katalog ploch, které organizace výslovně zveřejnily do marketplace. Transakční partnerství a obchodní workflow zatím nejsou aktivní.
             </p>
           </div>
 
@@ -508,12 +497,14 @@ export function NetworkHubView() {
           <div className="mt-6 rounded-2xl bg-slate-900/95 p-4 border border-indigo-500/50 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black uppercase text-indigo-400 tracking-wider">
-                🔔 Upozornění sítě & Holdů v reálném čase
+                🔔 Události sítě (transakční režim zatím není aktivní)
               </span>
               <button
                 type="button"
                 onClick={handleMarkAllNotifsRead}
-                className="text-[11px] font-bold text-slate-400 hover:text-white"
+                disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                className="text-[11px] font-bold text-slate-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Označit vše jako přečtené
               </button>
@@ -540,6 +531,11 @@ export function NetworkHubView() {
                   </span>
                 </div>
               ))}
+              {notifications.length === 0 && (
+                <p className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
+                  Žádné události. Transakční notifikace zatím nejsou aktivní.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -551,8 +547,8 @@ export function NetworkHubView() {
             <span className="text-xl font-black text-indigo-400 mt-0.5 block">{connectedPartnersCount} agentur</span>
           </div>
           <div className="rounded-2xl bg-slate-900/80 p-3.5 border border-slate-800">
-            <span className="text-[10px] font-bold text-slate-400 block uppercase">Dostupné plochy v síti</span>
-            <span className="text-xl font-black text-emerald-400 mt-0.5 block">{partnerSurfacesCount + 24} ploch</span>
+            <span className="text-[10px] font-bold text-slate-400 block uppercase">Dostupné plochy v katalogu</span>
+            <span className="text-xl font-black text-emerald-400 mt-0.5 block">{partnerSurfacesCount} ploch</span>
           </div>
           <div className="rounded-2xl bg-slate-900/80 p-3.5 border border-slate-800">
             <span className="text-[10px] font-bold text-slate-400 block uppercase">Aktivní B2B Holdy</span>
@@ -560,10 +556,17 @@ export function NetworkHubView() {
           </div>
           <div className="rounded-2xl bg-slate-900/80 p-3.5 border border-slate-800">
             <span className="text-[10px] font-bold text-slate-400 block uppercase">Průměrná B2B sleva</span>
-            <span className="text-xl font-black text-teal-400 mt-0.5 block">20 – 25 % marže</span>
+            <span className="text-xl font-black text-teal-400 mt-0.5 block">Není aktivní</span>
           </div>
         </div>
       </div>
+
+      {!NETWORK_TRANSACTIONS_ENABLED && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <strong className="block font-black">B2B síť je zatím v režimu katalogu</strong>
+          <span>{NETWORK_BETA_MESSAGE}</span>
+        </div>
+      )}
 
       {/* Action Toast Alert */}
       {actionSuccess && (
@@ -573,6 +576,22 @@ export function NetworkHubView() {
             <span>{actionSuccess}</span>
           </div>
           <button onClick={() => setActionSuccess(null)} className="text-emerald-400 hover:text-white">✕</button>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="flex items-center justify-between rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs font-bold text-rose-800">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={18} className="shrink-0" />
+            <span>{actionError}</span>
+          </div>
+          <button type="button" onClick={() => setActionError(null)} className="text-rose-700 hover:text-rose-950">✕</button>
+        </div>
+      )}
+
+      {loadError && (
+        <div role="alert" className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-sm font-semibold text-rose-900">
+          {loadError}
         </div>
       )}
 
@@ -784,7 +803,9 @@ export function NetworkHubView() {
                   <button
                     type="button"
                     onClick={() => handleCreateHold(item.id)}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-indigo-600 py-2.5 text-xs font-black text-white shadow-sm transition active:scale-98 cursor-pointer"
+                    disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                    title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-indigo-600 py-2.5 text-xs font-black text-white shadow-sm transition active:scale-98 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
                     <Clock size={14} />
                     <span>Aktivovat B2B Hold (5 dní)</span>
@@ -792,6 +813,11 @@ export function NetworkHubView() {
                 </div>
               </div>
             ))}
+            {filteredInventory.length === 0 && (
+              <p className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                Žádná plocha není pro zvolené filtry výslovně zveřejněna v B2B katalogu.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -801,9 +827,9 @@ export function NetworkHubView() {
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-3xl border border-slate-200 space-y-4 shadow-xs">
             <div>
-              <h2 className="text-base font-black text-slate-900">Adresář propojených B2B partnerů</h2>
+              <h2 className="text-base font-black text-slate-900">Adresář organizací dostupných na platformě</h2>
               <p className="text-xs text-slate-500">
-                Spravujte provizní slevy a B2B smlouvy s ostatními agenturami registrovanými na platformě.
+                Kontaktní údaje ani smluvní stav se nezpřístupňují, dokud není implementováno bezpečné perzistentní partnerství.
               </p>
             </div>
 
@@ -840,7 +866,9 @@ export function NetworkHubView() {
                         <button
                           type="button"
                           onClick={() => handlePartnerAction(partner.id, 'DISCONNECT')}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-bold text-xs transition"
+                          disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                          title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-bold text-xs transition disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Odpojit
                         </button>
@@ -849,7 +877,9 @@ export function NetworkHubView() {
                       <button
                         type="button"
                         onClick={() => handlePartnerAction(partner.id, 'REQUEST_CONNECTION', 20)}
-                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-sm"
+                        disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                        title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-sm disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         + Navázat B2B partnerství
                       </button>
@@ -857,6 +887,9 @@ export function NetworkHubView() {
                   </div>
                 </div>
               ))}
+              {partners.length === 0 && (
+                <p className="py-6 text-center text-sm text-slate-500">Na platformě zatím není dostupná další organizace.</p>
+              )}
             </div>
           </div>
         </div>
@@ -902,6 +935,8 @@ export function NetworkHubView() {
                   <button
                     type="button"
                     onClick={() => handleHoldAction(hold.id, 'RELEASE')}
+                    disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                    title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                     className="flex-1 min-w-[100px] py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer"
                   >
                     Uvolnit hold
@@ -910,6 +945,8 @@ export function NetworkHubView() {
                   <button
                     type="button"
                     onClick={() => handleHoldAction(hold.id, 'EXTEND')}
+                    disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                    title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                     className="flex-1 min-w-[110px] py-2 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs hover:bg-amber-100 transition cursor-pointer"
                   >
                     + Prodloužit (3 dny)
@@ -918,6 +955,8 @@ export function NetworkHubView() {
                   <button
                     type="button"
                     onClick={() => handleHoldAction(hold.id, 'CONFIRM')}
+                    disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                    title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                     className="flex-1 min-w-[130px] py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer"
                   >
                     Potvrdit do zakázky
@@ -925,6 +964,11 @@ export function NetworkHubView() {
                 </div>
               </div>
             ))}
+            {holds.length === 0 && (
+              <p className="md:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                Holdy nejsou aktivní. Jejich API zatím záměrně neprovádí žádné zápisy.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -942,8 +986,10 @@ export function NetworkHubView() {
 
             <button
               type="button"
-              onClick={() => setActionSuccess('White-label fotoreport pro klienta byl úspěšně vygenerován!')}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition shadow-xs shrink-0 cursor-pointer"
+              onClick={() => setActionError(NETWORK_BETA_MESSAGE)}
+              disabled={!NETWORK_TRANSACTIONS_ENABLED}
+              title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition shadow-xs shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               <FileCheck size={15} />
               <span>📥 Vygenerovat klientský fotoreport (PDF)</span>
@@ -1030,6 +1076,8 @@ export function NetworkHubView() {
                       <button
                         type="button"
                         onClick={() => handleProofAction(proof.id, 'REJECT')}
+                        disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                        title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                         className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer"
                       >
                         Požádat o přefocení
@@ -1037,6 +1085,8 @@ export function NetworkHubView() {
                       <button
                         type="button"
                         onClick={() => handleProofAction(proof.id, 'APPROVE')}
+                        disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                        title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                         className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer"
                       >
                         ✓ Schválit foto
@@ -1045,8 +1095,10 @@ export function NetworkHubView() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setActionSuccess('Fotodokumentace je připravena v klientském fotoreportu.')}
-                      className="w-full py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs hover:bg-slate-200 transition cursor-pointer flex items-center justify-center gap-1.5"
+                      onClick={() => setActionError(NETWORK_BETA_MESSAGE)}
+                      disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                      title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                      className="w-full py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs hover:bg-slate-200 transition cursor-pointer flex items-center justify-center gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <ExternalLink size={13} />
                       <span>Zobrazit v reportu kampaně</span>
@@ -1055,6 +1107,11 @@ export function NetworkHubView() {
                 </div>
               </div>
             ))}
+            {proofs.length === 0 && (
+              <p className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                Fotodokumentace partnerů není aktivní a nejsou zde žádné simulované reporty.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -1105,8 +1162,10 @@ export function NetworkHubView() {
 
               <button
                 type="button"
-                onClick={() => setActionSuccess('Kompletní měsíční clearingový report (PDF / XML) byl vygenerován.')}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition shadow-xs shrink-0 cursor-pointer"
+                onClick={() => setActionError(NETWORK_BETA_MESSAGE)}
+                disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition shadow-xs shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 <Receipt size={15} />
                 <span>📥 Exportovat měsíční clearing</span>
@@ -1165,6 +1224,8 @@ export function NetworkHubView() {
                               <button
                                 type="button"
                                 onClick={() => handleSettlementAction(set.id, 'GENERATE_INVOICE')}
+                                disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                                title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                                 className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition shadow-xs cursor-pointer"
                               >
                                 Vygenerovat B2B fakturu
@@ -1174,6 +1235,8 @@ export function NetworkHubView() {
                             <button
                               type="button"
                               onClick={() => handleSettlementAction(set.id, 'MARK_SETTLED')}
+                              disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                              title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                               className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs cursor-pointer"
                             >
                               ✓ Označit jako vyrovnané
@@ -1201,6 +1264,11 @@ export function NetworkHubView() {
                   </div>
                 </div>
               ))}
+              {settlements.length === 0 && (
+                <p className="py-6 text-center text-sm text-slate-500">
+                  Clearing není aktivní; žádné částky ani doklady nejsou dopočítávány nebo simulovány.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1220,7 +1288,9 @@ export function NetworkHubView() {
             <button
               type="button"
               onClick={() => setShowCreateDemandModal(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-2.5 text-xs font-black text-white hover:brightness-110 transition shadow-xs shrink-0 cursor-pointer"
+              disabled={!NETWORK_TRANSACTIONS_ENABLED}
+              title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 py-2.5 text-xs font-black text-white hover:brightness-110 transition shadow-xs shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300"
             >
               <Plus size={15} />
               <span>+ Zadat novou poptávku do sítě</span>
@@ -1296,6 +1366,8 @@ export function NetworkHubView() {
                     <button
                       type="button"
                       onClick={() => setBidDemandId(demand.id)}
+                      disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                      title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                       className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Send size={13} />
@@ -1304,7 +1376,9 @@ export function NetworkHubView() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setActionSuccess('Poptávka byla uzavřena a plochy byly převedeny do B2B nabídky.')}
+                      onClick={() => setActionError(NETWORK_BETA_MESSAGE)}
+                      disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                      title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
                       className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <span>✓ Vytvořit nabídku z přijatých kapacit</span>
@@ -1313,6 +1387,11 @@ export function NetworkHubView() {
                 </div>
               </div>
             ))}
+            {demands.length === 0 && (
+              <p className="md:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+                Poptávková burza zatím nepřijímá zápisy a neobsahuje žádná simulovaná data.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -1493,9 +1572,9 @@ export function NetworkHubView() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
               <Lock size={20} />
             </div>
-            <h3 className="font-black text-base text-slate-900">100% Ochrana inzerentů</h3>
+            <h3 className="font-black text-base text-slate-900">Požadavek: ochrana inzerentů</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Vlastník plochy nikdy nevidí, pro jakého klienta plochu poptáváte, ani za jakou koncovou cenu ji inzerentovi prodáváte. Všechny nabídky vystupují výhradně pod vaší značkou.
+              Před aktivací transakcí musí server oddělit identitu koncového klienta a koncovou cenu od dat dostupných vlastníkovi plochy. Současný katalog tyto údaje vůbec nepřenáší.
             </p>
           </div>
 
@@ -1503,9 +1582,9 @@ export function NetworkHubView() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
               <ShieldCheck size={20} />
             </div>
-            <h3 className="font-black text-base text-slate-900">Prevence Double-Bookingu</h3>
+            <h3 className="font-black text-base text-slate-900">Požadavek: prevence double-bookingu</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Díky dočasnému stavu B2B Hold (5 dní) máte jistotu, že partner plochu neprodá někomu jinému, zatímco klient zvažuje vaši nabídku.
+              Budoucí hold musí být atomický, časově omezený a kontrolovat kolize s obsazeností. Dokud tento databázový mechanismus neexistuje, tlačítka holdů zůstávají vypnutá.
             </p>
           </div>
 
@@ -1513,9 +1592,9 @@ export function NetworkHubView() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
               <TrendingUp size={20} />
             </div>
-            <h3 className="font-black text-base text-slate-900">Automatický clearing & Provize</h3>
+            <h3 className="font-black text-base text-slate-900">Požadavek: auditovatelný clearing</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Systém na konci měsíce automaticky vygeneruje přesné subdodavatelské podklady a faktury s vaší sjednanou velkoobchodní marží.
+              Vyúčtování musí vznikat pouze ze schválených realizací, mít neměnný auditní záznam a generovat čísla dokladů na serveru. Automatická fakturace zatím není aktivní.
             </p>
           </div>
         </div>

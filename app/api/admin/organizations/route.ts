@@ -39,7 +39,10 @@ export async function POST(request: Request) {
     });
     let warning: string | undefined;
     const activationUrl = getAppUrl(request, `/activate/${token}`);
-    if (needsActivation) try { await sendActivationEmail(ownerEmail, activationUrl); } catch { warning = 'Organizace vznikla, ale aktivační e-mail se nepodařilo odeslat.'; }
+    if (needsActivation) try {
+      const delivery = await sendActivationEmail(ownerEmail, activationUrl);
+      if (delivery.status === 'skipped') warning = 'Preview: organizace vznikla, ale aktivační e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.';
+    } catch { warning = 'Organizace vznikla, ale aktivační e-mail se nepodařilo odeslat.'; }
     const exposeActivationUrl = process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV !== 'production';
     return NextResponse.json({ ok: true, organization: result.organization, warning, ...(exposeActivationUrl && needsActivation ? { activationUrl } : {}) }, { status: 201 });
   } catch (error) {

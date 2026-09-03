@@ -8,7 +8,6 @@ import {
   ExternalLink,
   FilePenLine,
   Link2,
-  LoaderCircle,
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -24,7 +23,6 @@ type OfferActionsProps = {
   navigationSelectionSubmitted?: boolean;
   isNoPriceConcept?: boolean;
   hasPublicLink?: boolean;
-  publicToken?: string | null;
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
@@ -40,16 +38,16 @@ export function OfferActions({
   navigationSelectionSubmitted,
   isNoPriceConcept,
   hasPublicLink,
-  publicToken,
 }: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [customToken, setCustomToken] = useState<string | null>(null);
 
-  const activeToken = customToken || offerId;
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const persistentPublicUrl = `${currentOrigin}/offer/${activeToken}`;
+  const linkExists = Boolean(hasPublicLink || customToken);
+  const persistentPublicUrl = customToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/offer/${customToken}`
+    : null;
 
   async function action(name: string, body?: unknown) {
     setBusy(name);
@@ -113,41 +111,60 @@ export function OfferActions({
               <Link2 size={14} className="text-sky-600" />
               Veřejný odkaz pro klienta:
             </span>
-            <span className="text-emerald-700 font-extrabold text-[11px] bg-emerald-100/80 px-2 py-0.5 rounded-md">
-              ● Aktivní online
+            <span className={`${linkExists ? 'text-emerald-700 bg-emerald-100/80' : 'text-slate-600 bg-slate-100'} font-extrabold text-[11px] px-2 py-0.5 rounded-md`}>
+              {linkExists ? '● Aktivní – token skrytý' : '○ Zatím nevytvořen'}
             </span>
           </div>
 
-          <a
-            className="block break-all text-xs text-sky-700 hover:text-sky-900 underline font-mono bg-white/80 p-2 rounded-lg border border-sky-100"
-            href={persistentPublicUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {persistentPublicUrl}
-          </a>
-
-          <div className="flex flex-wrap gap-2 pt-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(persistentPublicUrl);
-                setMessage('✓ Odkaz byl zkopírován do schránky!');
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
-            >
-              <Copy size={13} />
-              Zkopírovat odkaz pro klienta
-            </button>
+          {persistentPublicUrl ? (
             <a
+              className="block break-all text-xs text-sky-700 hover:text-sky-900 underline font-mono bg-white/80 p-2 rounded-lg border border-sky-100"
               href={persistentPublicUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs transition cursor-pointer"
             >
-              <ExternalLink size={13} />
-              Otevřít odkaz
+              {persistentPublicUrl}
             </a>
+          ) : (
+            <p className="rounded-lg border border-sky-100 bg-white/80 p-2 text-xs leading-relaxed text-sky-900">
+              Z bezpečnostních důvodů se ukládá pouze hash tokenu. Existující odkaz nelze znovu zobrazit; můžete jej bezpečně obnovit.
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-2 pt-0.5">
+            {persistentPublicUrl ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(persistentPublicUrl);
+                    setMessage('✓ Odkaz byl zkopírován do schránky!');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                >
+                  <Copy size={13} />
+                  Zkopírovat odkaz pro klienta
+                </button>
+                <a
+                  href={persistentPublicUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs transition cursor-pointer"
+                >
+                  <ExternalLink size={13} />
+                  Otevřít odkaz
+                </a>
+              </>
+            ) : null}
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => void action('publish')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Link2 size={13} />
+              {linkExists ? 'Obnovit bezpečný odkaz' : 'Vytvořit bezpečný odkaz'}
+            </button>
           </div>
         </div>
 

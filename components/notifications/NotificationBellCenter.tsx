@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Bell, AlertTriangle, Clock, FileText, CheckCircle2, ChevronRight, RefreshCw, X, Sparkles, MessageSquare, ExternalLink } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Bell, CheckCircle2, ChevronRight, RefreshCw, X, Sparkles, MessageSquare, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 
 type NotificationItem = {
@@ -22,16 +22,10 @@ export function NotificationBellCenter() {
   const [highCount, setHighCount] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // refresh every 60s
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async (includeAi = false) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/notifications');
+      const res = await fetch(includeAi ? '/api/notifications?includeAi=1' : '/api/notifications');
       const data = await res.json();
       if (res.ok && data.notifications) {
         setNotifications(data.notifications);
@@ -44,12 +38,22 @@ export function NotificationBellCenter() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000); // refresh every 60s
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          const nextOpen = !open;
+          setOpen(nextOpen);
+          if (nextOpen) void fetchNotifications(true);
+        }}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition active:scale-95 shadow-2xs"
         title="Centrum notifikací & AI Asistent"
       >
@@ -80,7 +84,7 @@ export function NotificationBellCenter() {
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={fetchNotifications}
+                  onClick={() => void fetchNotifications(true)}
                   disabled={loading}
                   className="p-1 text-slate-400 hover:text-slate-600"
                   title="Obnovit"

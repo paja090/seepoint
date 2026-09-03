@@ -74,8 +74,8 @@ export function QuickInternalTasksView({
       setCompletionTaskId(null);
       setCompletionNoteInput('');
       router.refresh();
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err: unknown) {
+      setModalError(err instanceof Error ? err.message : 'Úkol se nepodařilo aktualizovat.');
     } finally {
       setBusy(false);
     }

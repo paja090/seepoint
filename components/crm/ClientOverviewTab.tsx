@@ -1,7 +1,7 @@
 'use client';
 
 import { ORDER_STATUS_LABELS, ClientProfileData, OfferRecordItem, CrmOrderRecordItem } from '@/lib/crm/types';
-import { Sparkles, Building2, Lightbulb, Target, Store, FileText, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Sparkles, Building2, Lightbulb, Target, Store, MessageSquare, AlertTriangle } from 'lucide-react';
 
 function FormattedClientNote({ note }: { note: string }) {
   if (!note) return null;
@@ -66,13 +66,22 @@ function FormattedClientNote({ note }: { note: string }) {
             <Sparkles size={16} />
           </div>
           <div>
-            <h3 className="font-extrabold text-slate-900 text-sm">AI Profil Klienta & Obchodní Strategie</h3>
-            <p className="text-[11px] text-slate-500">Dohledaná data, pobočková síť v MS kraji a doporučené nosiče SeePoint</p>
+            <h3 className="font-extrabold text-slate-900 text-sm">Historický AI návrh profilu klienta</h3>
+            <p className="text-[11px] text-slate-500">Starší automaticky vytvořený obsah uložený v poznámce klienta</p>
           </div>
         </div>
         <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-[10px] font-black text-sky-800 uppercase tracking-wider">
-          ULOŽENO V CRM
+          NEOVĚŘENÝ HISTORICKÝ NÁVRH
         </span>
+      </div>
+
+      <div className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+        <p>
+          Tento obsah vznikl ve starší verzi aplikace. Pobočky, kontakty, vedení firmy i obchodní doporučení
+          mohou být zastaralé nebo nepřesné; před použitím je ověřte v oficiálním zdroji. Nové AI návrhy se
+          už do CRM automaticky neukládají.
+        </p>
       </div>
 
       {/* Manual Notes (if any) */}

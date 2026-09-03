@@ -9,7 +9,7 @@ import type { OfferView } from '@/lib/offers/view-model';
 type Client = { id: string; name: string };
 type Project = { id: string; title: string; city: string | null; status: string };
 
-export function CityGalleryOfferForm({ clients, projects, initialOffer }: { clients: Client[]; projects: Project[]; initialOffer?: OfferView }) {
+export function CityGalleryOfferForm({ clients, projects, initialOffer, initialProjectId }: { clients: Client[]; projects: Project[]; initialOffer?: OfferView; initialProjectId?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +39,7 @@ export function CityGalleryOfferForm({ clients, projects, initialOffer }: { clie
       <form action={(data) => void submit(data)} className="space-y-5">
         <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
           <label className="text-sm font-medium">Klient<select className={field} defaultValue={initialOffer?.clientId ?? ''} name="clientId" required><option value="">Vyberte klienta</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></label>
-          <label className="text-sm font-medium">Existující projekt (volitelné)<select className={field} defaultValue={initialOffer?.cityGallery?.projectId ?? ''} name="projectId"><option value="">Nová příležitost bez projektu</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}{project.city ? ` · ${project.city}` : ''}</option>)}</select></label>
+          <label className="text-sm font-medium">Existující projekt (volitelné)<select className={field} defaultValue={initialOffer?.cityGallery?.projectId ?? initialProjectId ?? ''} name="projectId"><option value="">Nová příležitost bez projektu</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}{project.city ? ` · ${project.city}` : ''}</option>)}</select></label>
           <label className="text-sm font-medium md:col-span-2">Název nabídky<input className={field} defaultValue={initialOffer?.title ?? ''} name="title" required /></label>
           <label className="text-sm font-medium md:col-span-2">Název kampaně<input className={field} defaultValue={initialOffer?.campaignName ?? ''} name="campaignName" /></label>
           <label className="text-sm font-medium">Kontaktní osoba<input className={field} defaultValue={initialOffer?.contactPerson ?? ''} name="contactPerson" /></label><label className="text-sm font-medium">Kontaktní e-mail<input className={field} defaultValue={initialOffer?.contactEmail ?? ''} name="contactEmail" type="email" /></label><label className="text-sm font-medium">Telefon<input className={field} defaultValue={initialOffer?.contactPhone ?? ''} name="contactPhone" /></label><label className="text-sm font-medium">Platnost nabídky<input className={field} defaultValue={initialOffer?.validUntil ?? ''} name="validUntil" type="date" /></label>

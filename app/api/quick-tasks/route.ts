@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { QuickInternalTaskStatus } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const assignedEmployeeId = searchParams.get('assignedEmployeeId');
     const status = searchParams.get('status');
+    if (status && !Object.values(QuickInternalTaskStatus).includes(status as QuickInternalTaskStatus)) {
+      return NextResponse.json({ error: 'Neplatný stav rychlého úkolu.' }, { status: 400 });
+    }
 
     const tasks = await prisma.quickInternalTask.findMany({
       where: {
         ...(assignedEmployeeId ? { assignedToEmployeeId: assignedEmployeeId } : {}),
-        ...(status ? { status: status as any } : {}),
+        ...(status ? { status: status as QuickInternalTaskStatus } : {}),
       },
       include: {
         assignedToEmployee: { select: { id: true, firstName: true, lastName: true, position: true } },
@@ -27,8 +31,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ ok: true, tasks });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Chyba při načítání rychlých úkolů.' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při načítání rychlých úkolů.' }, { status: 500 });
   }
 }
 
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, task });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Chyba při vytváření úkolu.' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při vytváření úkolu.' }, { status: 500 });
   }
 }

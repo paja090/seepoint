@@ -84,7 +84,7 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
 
             {/* Visual Box */}
             <div className="rounded-2xl border border-indigo-800/60 bg-slate-950 p-4 space-y-2 font-mono text-[11px]">
-              <div className="text-slate-400">Prompt: "Ostrava, rozpočet 100 tis."</div>
+              <div className="text-slate-400">Prompt: „Ostrava, rozpočet 100 tis.“</div>
               <div className="text-emerald-400 font-bold">✓ Vyhláška MPZ... OK</div>
               <div className="pt-2 text-indigo-300 font-bold border-t border-slate-800">Doporučeno: 12 nosičů</div>
             </div>

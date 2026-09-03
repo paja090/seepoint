@@ -1,28 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
-import { attachPointInstallationPhotos, type StoredInstallationPhoto } from '@/lib/navigation/navigation-service';
-import { deletePhotoFromGoogleDrive, GoogleDriveConfigurationError, uploadPhotoToGoogleDrive } from '@/lib/google-drive';
+import { attachPointInstallationPhotos, NavigationServiceError, type StoredInstallationPhoto } from '@/lib/navigation/navigation-service';
+import { PhotoValidationError, safePhotoFileName, validatePhotoFile } from '@/lib/photo-validation';
+import { deleteStoredPhoto, storeTenantPhoto, type StoredTenantPhoto } from '@/lib/storage/photo-storage';
+import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
-
-const MAX_FILE_SIZE = 4 * 1024 * 1024;
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-function validatePhoto(file: FormDataEntryValue | null, required: boolean) {
-  if (!(file instanceof File)) {
-    if (required) throw new Error('Fotografie po montáži je povinná.');
-    return null;
-  }
-  if (!ALLOWED_TYPES.has(file.type)) throw new Error('Povolené formáty fotografií jsou JPEG, PNG a WebP.');
-  if (!file.size || file.size > MAX_FILE_SIZE) throw new Error('Každá fotografie musí mít nejvýše 4 MB.');
-  return file;
-}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const authResult = await requireApiAccess('navigationProjects');
   if (isApiDenied(authResult)) return authResult;
-  const uploadedFileIds: string[] = [];
+  const limited = await enforcePhotoUploadRateLimit(req, authResult);
+  if (limited) return limited;
+  const organizationId = authResult.organizationId || authResult.membership?.organizationId;
+  if (!organizationId) return NextResponse.json({ error: 'Nebyla nalezena organizace pro uložení fotografie.' }, { status: 400 });
+  const uploadedPhotos: StoredTenantPhoto[] = [];
 
   try {
     const navigationOrderId = (await params).id;
@@ -30,29 +23,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const navigationPointId = String(form.get('navigationPointId') ?? '');
     if (!navigationPointId) return NextResponse.json({ error: 'Chybí navigační bod.' }, { status: 400 });
 
-    const beforeFile = validatePhoto(form.get('beforePhoto'), false);
-    const afterFile = validatePhoto(form.get('afterPhoto'), true)!;
-    const note = String(form.get('note') ?? '').trim();
+    const beforePhoto = await validatePhotoFile(form.get('beforePhoto'), { required: false });
+    const afterPhoto = await validatePhotoFile(form.get('afterPhoto'));
+    const note = String(form.get('note') ?? '').trim().slice(0, 1000);
     const storedPhotos: StoredInstallationPhoto[] = [];
 
     for (const entry of [
-      beforeFile ? { file: beforeFile, type: 'BEFORE_INSTALLATION' as const } : null,
-      { file: afterFile, type: 'AFTER_INSTALLATION' as const },
-    ].filter(Boolean) as Array<{ file: File; type: 'BEFORE_INSTALLATION' | 'AFTER_INSTALLATION' }>) {
+      beforePhoto ? { ...beforePhoto, type: 'BEFORE_INSTALLATION' as const } : null,
+      { ...afterPhoto!, type: 'AFTER_INSTALLATION' as const },
+    ].filter(Boolean) as Array<{ file: File; mimeType: string; type: 'BEFORE_INSTALLATION' | 'AFTER_INSTALLATION' }>) {
       const photoId = randomUUID();
-      const safeName = entry.file.name.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(-100) || 'montaz.jpg';
-      const stored = await uploadPhotoToGoogleDrive(
-        entry.file,
-        `${navigationOrderId}-${navigationPointId}-${entry.type.toLowerCase()}-${Date.now()}-${safeName}`,
-        photoId,
-      );
-      uploadedFileIds.push(stored.id);
+      const safeName = safePhotoFileName(entry.file.name, 'montaz.jpg');
+      const storedName = `${navigationOrderId}-${navigationPointId}-${entry.type.toLowerCase()}-${Date.now()}-${safeName}`;
+      const stored = await storeTenantPhoto({ organizationId, photoId, fileName: storedName, file: entry.file });
+      uploadedPhotos.push(stored);
       storedPhotos.push({
         id: photoId,
-        driveFileId: stored.id,
-        fileName: stored.name,
-        mimeType: stored.mimeType,
-        size: stored.size,
+        driveFileId: stored.driveFileId,
+        fileName: storedName,
+        mimeType: entry.mimeType,
+        size: stored.bytes.byteLength,
+        storageProvider: stored.storageProvider,
+        storageKey: stored.storageKey,
+        contentChecksum: stored.contentChecksum,
+        content: stored.storageProvider === 'DATABASE' ? stored.bytes : undefined,
         type: entry.type,
         note: note || undefined,
       });
@@ -66,9 +60,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
     return NextResponse.json({ success: true, ...result });
   } catch (err: unknown) {
-    await Promise.all(uploadedFileIds.map((fileId) => deletePhotoFromGoogleDrive(fileId).catch(() => undefined)));
-    const msg = err instanceof Error ? err.message : 'Chyba při nahrávání fotografie realizace.';
-    const status = err instanceof GoogleDriveConfigurationError ? 503 : 400;
-    return NextResponse.json({ error: msg }, { status });
+    await Promise.all(uploadedPhotos.map((photo) => deleteStoredPhoto(photo).catch(() => undefined)));
+    if (err instanceof PhotoValidationError) return NextResponse.json({ error: err.message, code: err.code }, { status: err.status });
+    if (err instanceof NavigationServiceError) return NextResponse.json({ error: err.message, code: err.code }, { status: err.code === 'NOT_FOUND' ? 404 : 400 });
+    console.error('[navigation/photo] Uložení montážní fotografie selhalo', err);
+    return NextResponse.json({ error: 'Fotografii realizace se nepodařilo uložit.' }, { status: 502 });
   }
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Sparkles, MapPin, Target, Layers, Calendar, CheckCircle2, ChevronRight, MessageSquare, PhoneCall, Mail, ExternalLink } from 'lucide-react';
+import { Sparkles, MapPin, Target, Layers, Calendar, CheckCircle2, PhoneCall, Mail } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import type { CampaignPhase } from '@/lib/opportunities/types';
 
@@ -19,13 +19,7 @@ const mediaLabels: Record<string, { label: string; icon: string; desc: string }>
 
 type ItemType = OfferView['items'][number];
 
-export function CampaignConceptPublicView({
-  offer,
-  token,
-}: {
-  offer: OfferView;
-  token: string;
-}) {
+export function CampaignConceptPublicView({ offer }: { offer: OfferView }) {
   const [activeTab, setActiveTab] = useState<'strategy' | 'map' | 'phases'>('strategy');
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const brandName = offer.branding?.name || 'SeePOINT';

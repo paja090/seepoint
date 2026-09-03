@@ -23,17 +23,22 @@ export type ReportItemEdit = {
     status: string;
     orientation?: string | null;
     variant?: string | null;
+    carrier?: ReportCarrierEdit | null;
   } | null;
-  carrier?: {
+  carrier?: ReportCarrierEdit | null;
+  selectedPhoto?: { id: string; url?: string | null; isClientVisible: boolean } | null;
+};
+
+type ReportPhotoEdit = { id: string; url?: string | null; isClientVisible: boolean; isPrivate: boolean; createdAt: string };
+type ReportCarrierEdit = {
     code: string;
     name: string;
     address?: string | null;
     city?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    photos: Array<{ id: string; url?: string | null; isClientVisible: boolean; isPrivate: boolean; createdAt: string }>;
-  } | null;
-  selectedPhoto?: { id: string; url?: string | null; isClientVisible: boolean } | null;
+    photos: ReportPhotoEdit[];
+    surfaces?: Array<{ directionDescription?: string | null; orientation?: string | null }>;
 };
 
 const DIRECTION_PRESETS = [
@@ -73,8 +78,8 @@ export function NavigationReportEditor({
     setItems((current) =>
       current.map((item) => {
         if (item.id !== id) return item;
-        const availablePhotos = item.carrier?.photos || (item.navigationPoint as any)?.carrier?.photos || [];
-        const foundPhoto = availablePhotos.find((p: any) => p.id === photoId) ?? null;
+        const availablePhotos = item.carrier?.photos || item.navigationPoint?.carrier?.photos || [];
+        const foundPhoto = availablePhotos.find((photo) => photo.id === photoId) ?? null;
         return {
           ...item,
           selectedPhotoId: photoId || null,
@@ -152,12 +157,12 @@ export function NavigationReportEditor({
           const label = item.navigationPoint?.label || item.carrier?.code || item.carrier?.name || `Navigační bod #${idx + 1}`;
           const address = item.navigationPoint?.address || item.carrier?.address || 'Adresa neuvedena';
           const city = item.carrier?.city || 'Lokalita neuvedena';
-          const effectiveCarrier = item.carrier || (item.navigationPoint as any)?.carrier;
+          const effectiveCarrier = item.carrier || item.navigationPoint?.carrier;
           const currentDir =
             item.customDirection ||
             item.navigationPoint?.orientation ||
-            (effectiveCarrier?.surfaces?.[0] as any)?.directionDescription ||
-            (effectiveCarrier?.surfaces?.[0] as any)?.orientation ||
+            effectiveCarrier?.surfaces?.[0]?.directionDescription ||
+            effectiveCarrier?.surfaces?.[0]?.orientation ||
             item.snapshot?.direction ||
             'Obousměrný (A/B)';
 
@@ -206,7 +211,7 @@ export function NavigationReportEditor({
                         onChange={(e) => updatePhoto(item.id, e.target.value)}
                       >
                         <option value="">-- Bez fotky --</option>
-                        {availablePhotos.map((p: any, pIdx: number) => (
+                        {availablePhotos.map((p, pIdx) => (
                           <option key={p.id} value={p.id}>
                             Fotka #{pIdx + 1} ({new Date(p.createdAt).toLocaleDateString('cs-CZ')})
                           </option>

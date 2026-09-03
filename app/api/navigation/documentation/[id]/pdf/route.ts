@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { buildSnapshotItem, SnapshotItemData } from '@/lib/navigation-documentation';
+import { isClientApprovedPhoto } from '@/lib/navigation-documentation-policy';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -9,8 +10,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
 
-  const report = await prisma.navigationDocumentationReport.findUnique({
-    where: { id },
+  const report = await prisma.navigationDocumentationReport.findFirst({
+    where: { id, organizationId: auth.organizationId },
     include: {
       client: true,
       offer: true,
@@ -40,9 +41,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       clientNote: item.clientNote,
       navigationPoint: item.navigationPoint,
       carrier: item.carrier,
-      selectedPhoto: item.selectedPhoto,
+      selectedPhoto: isClientApprovedPhoto(item.selectedPhoto) ? item.selectedPhoto : null,
     });
   });
+
+  for (let index = 0; index < items.length; index += 1) {
+    if (!isClientApprovedPhoto(report.items[index]?.selectedPhoto)) items[index].photoUrl = null;
+  }
 
   return NextResponse.json({
     reportId: report.id,

@@ -108,6 +108,9 @@ export type Photo = {
   taskId?: string;
   workEntryId?: string;
   createdAt?: string;
+  capturedLatitude?: number;
+  capturedLongitude?: number;
+  capturedAccuracyMeters?: number;
   capturedByWorkerName?: string;
 };
 

@@ -1,40 +1,30 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 
 export const dynamic = 'force-dynamic';
 
-function cleanOldAiNotes(rawNote: string | null): string {
-  if (!rawNote) return '';
-
-  const paragraphs = rawNote.split('\n\n');
-  const pureManualParagraphs = paragraphs.filter((p) => {
-    const lower = p.toLowerCase();
-    const hasAiMarker =
-      p.includes('🤖') ||
-      p.includes('💡') ||
-      p.includes('🎯') ||
-      p.includes('🏬') ||
-      lower.includes('ai profil') ||
-      lower.includes('obor činnosti:') ||
-      lower.includes('profil firmy:') ||
-      lower.includes('vedení / jednatelé:') ||
-      lower.includes('pobočky a prodejny') ||
-      lower.includes('tipy pro obchodníka') ||
-      lower.includes('doporučená reklamní strategie') ||
-      lower.includes('seepoint (ostrava');
-    return !hasAiMarker;
-  });
-
-  return pureManualParagraphs.join('\n\n').trim();
-}
+type AresCandidate = {
+  ico?: string;
+  dic?: string;
+  obchodniJmeno?: string;
+  sidlo?: {
+    textovaAdresa?: string;
+    nazevObce?: string;
+    ulice?: string;
+    cisloDomovni?: number | string;
+    psc?: number | string;
+  };
+};
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await getCurrentUser();
-    if (!actor) {
-      return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
-    }
+    const actor = await requireApiAccess('clients');
+    if (isApiDenied(actor)) return actor;
+    const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${actor.organizationId}:${actor.id}`), rateLimitPolicies.crmAi);
+    if (limited) return limited;
 
     const { id } = await params;
     const body = (await request.json().catch(() => ({}))) as {
@@ -42,26 +32,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       overrideIco?: string;
     };
 
-    const client = await prisma.client.findUnique({
-      where: { id },
-      include: { contacts: true, branches: true },
+    const client = await prisma.client.findFirst({
+      where: { id, organizationId: actor.organizationId, active: true },
+      select: {
+        name: true,
+        tradingName: true,
+        companyId: true,
+        dic: true,
+        website: true,
+        billingCity: true,
+      },
     });
 
     if (!client) {
       return NextResponse.json({ error: 'Klient nenalezen.' }, { status: 404 });
     }
 
-    const searchKeyword = (body.searchQuery || body.overrideIco || client.companyId || client.name || '').trim();
+    const searchKeyword = (body.searchQuery || body.overrideIco || client.companyId || client.name || '').trim().slice(0, 200);
+    if (!searchKeyword) return NextResponse.json({ error: 'Zadejte název firmy nebo IČO.' }, { status: 400 });
     const icoToSearch = body.overrideIco?.replace(/\s+/g, '') || client.companyId?.replace(/\s+/g, '') || '';
 
-    let aresCandidates: any[] = [];
+    let aresCandidates: AresCandidate[] = [];
 
     // 1A. Exact IČO Lookup in ARES
     if (icoToSearch && /^\d{8}$/.test(icoToSearch)) {
       try {
         const aresRes = await fetch(
           `https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${icoToSearch}`,
-          { headers: { Accept: 'application/json' } }
+          { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) }
         );
         if (aresRes.ok) {
           const singleSub = await aresRes.json();
@@ -81,6 +79,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({ obchodniJmeno: searchKeyword, start: 0, pocet: 10 }),
+            signal: AbortSignal.timeout(10_000),
           }
         );
         if (aresSearchRes.ok) {
@@ -224,18 +223,19 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
   ]
 }`;
 
-      const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+      const modelsToTry = [process.env.GEMINI_CRM_MODEL?.trim() || 'gemini-2.5-flash'];
       for (const model of modelsToTry) {
         try {
           const aiRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 tools: [{ googleSearch: {} }],
               }),
+              signal: AbortSignal.timeout(20_000),
             }
           );
 
@@ -258,13 +258,11 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
     const selectedCandIdx = (aiEnrichmentResult?.selectedIndex || 1) - 1;
     const matchedAres = aresCandidates[selectedCandIdx] || aresCandidates[0] || null;
 
-    // Fallback AI Enrichment Result if Gemini API is temporarily unavailable or out of quota (HTTP 429)
+    // If AI is unavailable, return only factual registry/current-CRM data. Do not invent contacts,
+    // branches, executives or media recommendations as a "successful" fallback.
     if (!aiEnrichmentResult && (matchedAres || client.name)) {
       const compName = matchedAres?.obchodniJmeno || client.name;
-      const compCity = matchedAres?.sidlo?.nazevObce || client.billingCity || 'Ostrava / MS kraj';
-      const compStreet = matchedAres?.sidlo?.ulice
-        ? `${matchedAres.sidlo.ulice} ${matchedAres.sidlo.cisloDomovni || ''}`.trim()
-        : client.billingStreet || undefined;
+      const compCity = matchedAres?.sidlo?.nazevObce || client.billingCity || undefined;
 
       aiEnrichmentResult = {
         selectedOfficialName: compName,
@@ -272,188 +270,15 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
         selectedIco: matchedAres?.ico || client.companyId || undefined,
         selectedDic: matchedAres?.dic || client.dic || undefined,
         foundWebsite: client.website || undefined,
-        businessField: 'Podnikatelský subjekt a obchodní činnost',
-        companySummary: `${compName} je společnost působící se sídlem v ${compCity}. V státním rejstříku ARES evidována pod IČO ${matchedAres?.ico || client.companyId || 'Neuvedeno'}.`,
-        executives: client.contactPerson || 'Vedení / Jednatelé společnosti',
-        msRegionBranches: [
-          {
-            name: `${compName} - Sídlo / Prodejna ${compCity}`,
-            street: compStreet,
-            city: compCity,
-            zip: matchedAres?.sidlo?.psc ? String(matchedAres.sidlo.psc) : client.billingZip || undefined,
-          },
-        ],
-        salesAdvice: [
-          `Zacílit obchodní nabídku na podporu navštěvnosti a viditelnosti v ${compCity} a Moravskoslezském kraji.`,
-          `Navrhnout outdoorovou reklamní kampaň a městskou navigaci SeePoint na klíčových tepnách v Ostravě.`,
-        ],
-        recommendedCarriers: [
-          {
-            type: `Městská navigace a směrové tabule SeePoint (${compCity})`,
-            reason: 'Přímé navedení B2B i B2C zákazníků ke klientské provozovně a sídlu.',
-          },
-          {
-            type: 'Bigboardy a Billboardové plochy Ostrava (Rudná / Místecká / Opavská)',
-            reason: 'Vysokofrekvenční oslovení řidičů a firemní klientely v celém MS kraji.',
-          },
-          {
-            type: 'City Light Postery na uzlech MHD Ostrava (Poruba / Svinov / ÚAN)',
-            reason: 'Dominantní zásah zákazníků a veřejnosti v nákupních zónách.',
-          },
-        ],
+        foundCity: compCity,
+        companySummary: matchedAres
+          ? `${compName} je v rejstříku ARES evidována pod IČO ${matchedAres.ico || 'neuvedeno'}.`
+          : undefined,
       };
-    }
-
-    const finalOfficialName =
-      aiEnrichmentResult?.selectedOfficialName || matchedAres?.obchodniJmeno || client.name;
-    const finalTradingName = aiEnrichmentResult?.tradingName || client.tradingName || client.name;
-
-    const finalIco =
-      matchedAres?.ico || aiEnrichmentResult?.selectedIco || body.overrideIco || client.companyId || null;
-    const finalDic = matchedAres?.dic || aiEnrichmentResult?.selectedDic || client.dic || null;
-    const finalWebsite = client.website || aiEnrichmentResult?.foundWebsite || null;
-    const finalEmail = client.email || aiEnrichmentResult?.foundEmail || null;
-    const finalPhone = client.phone || aiEnrichmentResult?.foundPhone || null;
-    const firstExecName = aiEnrichmentResult?.contactPersons?.[0]
-      ? `${aiEnrichmentResult.contactPersons[0].firstName} ${aiEnrichmentResult.contactPersons[0].lastName}`
-      : aiEnrichmentResult?.executives || client.contactPerson;
-
-    const finalStreet = matchedAres?.sidlo?.ulice
-      ? `${matchedAres.sidlo.ulice} ${matchedAres.sidlo.cisloDomovni || ''}`.trim()
-      : aiEnrichmentResult?.foundStreet || client.billingStreet || null;
-
-    const finalCity = matchedAres?.sidlo?.nazevObce || aiEnrichmentResult?.foundCity || client.billingCity || null;
-    const finalZip = matchedAres?.sidlo?.psc ? String(matchedAres.sidlo.psc) : aiEnrichmentResult?.foundZip || client.billingZip || null;
-
-    // Build complete formatted AI Note focused on ALL MS Region branches & Ostrava
-    let formattedAiNote = '';
-    if (aiEnrichmentResult) {
-      const parts: string[] = [];
-      parts.push(`🤖 AI PROFIL & STRATEGIE SEEPOINT - OSTRAVA A MS KRAJ (${new Date().toLocaleDateString('cs-CZ')}):`);
-      if (aiEnrichmentResult.businessField) {
-        parts.push(`• Obor činnosti: ${aiEnrichmentResult.businessField}`);
-      }
-      if (aiEnrichmentResult.companySummary) {
-        parts.push(`• Profil firmy: ${aiEnrichmentResult.companySummary}`);
-      }
-      if (aiEnrichmentResult.executives) {
-        parts.push(`• Vedení / Jednatelé: ${aiEnrichmentResult.executives}`);
-      }
-
-      if (aiEnrichmentResult.msRegionBranches && aiEnrichmentResult.msRegionBranches.length > 0) {
-        parts.push(`\n🏬 POBOČKY A PRODEJNY V OSTRAVĚ & MS KRAJI (${aiEnrichmentResult.msRegionBranches.length}):`);
-        aiEnrichmentResult.msRegionBranches.forEach((b) => parts.push(`  - ${b.name}: ${b.street || ''}, ${b.city || ''}`));
-      }
-
-      if (aiEnrichmentResult.salesAdvice && aiEnrichmentResult.salesAdvice.length > 0) {
-        parts.push(`\n💡 TIPY PRO OBCHODNÍKA (ZACÍLENÍ MS KRAJ):`);
-        aiEnrichmentResult.salesAdvice.forEach((tip) => parts.push(`  - ${tip}`));
-      }
-
-      if (aiEnrichmentResult.recommendedCarriers && aiEnrichmentResult.recommendedCarriers.length > 0) {
-        parts.push(`\n🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE SEEPOINT (OSTRAVA & MS KRAJ):`);
-        aiEnrichmentResult.recommendedCarriers.forEach((rec) => parts.push(`  - [${rec.type}]: ${rec.reason}`));
-      }
-
-      formattedAiNote = parts.join('\n');
-    }
-
-    // Completely purge any old AI notes, duplicate attempts or stale profile text
-    const manualNotesOnly = cleanOldAiNotes(client.note);
-    const updatedNote = manualNotesOnly
-      ? `${manualNotesOnly}\n\n${formattedAiNote}`
-      : formattedAiNote;
-
-    // Save CORRECT official legal name, verified data & REPLACED/CLEANED AI Note directly into DB
-    const updatedClient = await prisma.client.update({
-      where: { id },
-      data: {
-        name: finalOfficialName,
-        tradingName: finalTradingName,
-        companyId: finalIco,
-        dic: finalDic,
-        website: finalWebsite,
-        email: finalEmail,
-        phone: finalPhone,
-        contactPerson: firstExecName || client.contactPerson,
-        billingStreet: finalStreet,
-        billingCity: finalCity,
-        billingZip: finalZip,
-        note: updatedNote,
-      },
-    });
-
-    // Step 4: Automatically insert contact persons into client.contacts (`ClientContact` table)
-    let createdContactsCount = 0;
-    if (aiEnrichmentResult?.contactPersons && Array.isArray(aiEnrichmentResult.contactPersons)) {
-      for (const cp of aiEnrichmentResult.contactPersons) {
-        if (!cp.firstName || !cp.lastName) continue;
-        const exists = client.contacts.some(
-          (existing) =>
-            existing.firstName.toLowerCase() === cp.firstName.toLowerCase() &&
-            existing.lastName.toLowerCase() === cp.lastName.toLowerCase()
-        );
-
-        if (!exists) {
-          await prisma.clientContact.create({
-            data: {
-              clientId: id,
-              firstName: cp.firstName,
-              lastName: cp.lastName,
-              title: cp.title || 'Jednatel / Kontaktní osoba',
-              email: cp.email || finalEmail || null,
-              phone: cp.phone || finalPhone || null,
-              isPrimary: client.contacts.length === 0,
-              isCommercial: true,
-            },
-          });
-          createdContactsCount++;
-        }
-      }
-    }
-
-    // Step 5: Update & Upsert MS Region branches in `ClientBranch` table (overwriting outdated addresses)
-    let createdBranchesCount = 0;
-    if (aiEnrichmentResult?.msRegionBranches && Array.isArray(aiEnrichmentResult.msRegionBranches)) {
-      for (const b of aiEnrichmentResult.msRegionBranches) {
-        if (!b.name) continue;
-        const existingBranch = client.branches.find(
-          (existing) => existing.name.toLowerCase() === b.name.toLowerCase()
-        );
-
-        if (existingBranch) {
-          // Update address with 100% verified live Google Search Grounding address
-          await prisma.clientBranch.update({
-            where: { id: existingBranch.id },
-            data: {
-              street: b.street || existingBranch.street,
-              city: b.city || existingBranch.city,
-              zip: b.zip || existingBranch.zip,
-              note: b.note || existingBranch.note,
-            },
-          });
-        } else {
-          // Create new verified branch
-          await prisma.clientBranch.create({
-            data: {
-              clientId: id,
-              name: b.name,
-              street: b.street || null,
-              city: b.city || 'Ostrava',
-              zip: b.zip || null,
-              note: b.note || 'Dohledáno AI pro Moravskoslezský kraj',
-            },
-          });
-          createdBranchesCount++;
-        }
-      }
     }
 
     return NextResponse.json({
       ok: true,
-      client: updatedClient,
-      createdContactsCount,
-      createdBranchesCount,
       aresData: matchedAres
         ? {
             ico: matchedAres.ico,
@@ -464,8 +289,8 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
         : null,
       aiEnrichment: aiEnrichmentResult,
     });
-  } catch (err: any) {
-    console.error('AI Client Enrich API error:', err);
-    return NextResponse.json({ error: err.message || 'Chyba při AI dohledání klienta.' }, { status: 500 });
+  } catch (err: unknown) {
+    console.error('AI Client Enrich API error:', err instanceof Error ? err.message : 'unknown error');
+    return NextResponse.json({ error: 'Návrhy klienta se nepodařilo bezpečně načíst.' }, { status: 500 });
   }
 }

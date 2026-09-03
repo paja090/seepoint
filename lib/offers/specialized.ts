@@ -6,6 +6,12 @@ import { calculateNavigationOfferTotals, calculateNavigationPointSubtotal } from
 
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const nullable = (value: string) => value || null;
+const boundedText = (value: unknown, label: string, maxLength: number, required = false) => {
+  const result = text(value);
+  if (required && !result) throw new OfferValidationError(`${label} je povinný údaj.`);
+  if (result.length > maxLength) throw new OfferValidationError(`${label} je příliš dlouhý.`);
+  return result;
+};
 const coordinate = (value: unknown, kind: 'latitude' | 'longitude') => {
   const parsed = Number(value);
   const limit = kind === 'latitude' ? 90 : 180;
@@ -186,30 +192,55 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
 export function parseCityGalleryOfferInput(raw: unknown) {
   if (!raw || typeof raw !== 'object') throw new OfferValidationError('Data nabídky nejsou platná.');
   const input = raw as Record<string, unknown>;
-  const clientId = text(input.clientId); const title = text(input.title);
-  if (!clientId || !title) throw new OfferValidationError('Klient a název nabídky jsou povinné.');
+  const clientId = boundedText(input.clientId, 'Klient', 80, true);
+  const title = boundedText(input.title, 'Název nabídky', 180, true);
   const validUntil = text(input.validUntil); if (validUntil) parseDateOnly(validUntil, 'Platnost nabídky');
-  const subtotal = decimal(input.subtotal, 'Cena bez DPH'); const taxAmount = subtotal.mul(21).div(100).toDecimalPlaces(2);
-  return { clientId, title, campaignName: text(input.campaignName) || title, projectId: text(input.projectId), concept: text(input.concept), locationBrief: text(input.locationBrief), realizationNote: text(input.realizationNote), internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone), validUntil, subtotal, taxAmount, totalWithTax: subtotal.add(taxAmount).toDecimalPlaces(2) };
+  const subtotal = decimal(input.subtotal, 'Cena bez DPH');
+  if (subtotal.gt(1_000_000_000)) throw new OfferValidationError('Cena bez DPH je příliš vysoká.');
+  const contactEmail = boundedText(input.contactEmail, 'Kontaktní e-mail', 254);
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) throw new OfferValidationError('Kontaktní e-mail není platný.');
+  const taxAmount = subtotal.mul(21).div(100).toDecimalPlaces(2);
+  return {
+    clientId,
+    title,
+    campaignName: boundedText(input.campaignName, 'Název kampaně', 180) || title,
+    projectId: boundedText(input.projectId, 'Projekt', 80),
+    concept: boundedText(input.concept, 'Koncept projektu', 5000),
+    locationBrief: boundedText(input.locationBrief, 'Lokalita projektu', 3000),
+    realizationNote: boundedText(input.realizationNote, 'Poznámka k realizaci', 3000),
+    internalNote: boundedText(input.internalNote, 'Interní poznámka', 5000),
+    clientMessage: boundedText(input.clientMessage, 'Sdělení klientovi', 5000),
+    contactPerson: boundedText(input.contactPerson, 'Kontaktní osoba', 180),
+    contactEmail,
+    contactPhone: boundedText(input.contactPhone, 'Telefon', 80),
+    validUntil,
+    subtotal,
+    taxAmount,
+    totalWithTax: subtotal.add(taxAmount).toDecimalPlaces(2),
+  };
 }
 
 export async function createCityGalleryOffer(user: CurrentUser, raw: unknown) {
   assertRole(user); const input = parseCityGalleryOfferInput(raw);
-  const client = await prisma.client.findFirst({ where: { id: input.clientId, active: true }, select: { id: true } });
-  if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
-  if (input.projectId && !await prisma.cityGalleryProject.findUnique({ where: { id: input.projectId }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen.');
-  return prisma.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, offerType: 'CITY_GALLERY', status: 'DRAFT', contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { organizationId: user.organizationId, projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+  if (!user.organizationId) throw new OfferValidationError('Není vybraná aktivní organizace.', 'FORBIDDEN');
+  return prisma.$transaction(async (tx) => {
+    const client = await tx.client.findFirst({ where: { id: input.clientId, organizationId: user.organizationId, active: true }, select: { id: true } });
+    if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
+    if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen nebo je archivovaný.');
+    return tx.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, offerType: 'CITY_GALLERY', status: 'DRAFT', contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { organizationId: user.organizationId, projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function updateCityGalleryOffer(user: CurrentUser, offerId: string, raw: unknown) {
   assertRole(user); const input = parseCityGalleryOfferInput(raw);
+  if (!user.organizationId) throw new OfferValidationError('Není vybraná aktivní organizace.', 'FORBIDDEN');
   return prisma.$transaction(async (tx) => {
     const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { offerType: true, status: true, createdByUserId: true } });
     if (!existing || existing.offerType !== 'CITY_GALLERY') throw new OfferValidationError('Nabídka Galerie venku nebyla nalezena.', 'NOT_FOUND');
     if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
     if (['CONVERTED', 'ARCHIVED'].includes(existing.status)) throw new OfferValidationError('Převedenou nebo archivovanou nabídku již nelze upravovat.', 'INVALID_STATUS_TRANSITION');
-    const client = await tx.client.findFirst({ where: { id: input.clientId, active: true }, select: { id: true } }); if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
-    if (input.projectId && !await tx.cityGalleryProject.findUnique({ where: { id: input.projectId }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen.');
+    const client = await tx.client.findFirst({ where: { id: input.clientId, organizationId: user.organizationId, active: true }, select: { id: true } }); if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
+    if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen nebo je archivovaný.');
     return tx.offer.update({ where: { id: offerId }, data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), subtotal: input.subtotal, totalPrice: input.subtotal, taxAmount: input.taxAmount, totalWithTax: input.totalWithTax, updatedByUserId: user.id, cityGalleryOffer: { update: { projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

@@ -19,6 +19,7 @@ import {
 import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
 import { WorkOrderForm } from './WorkOrderForm';
+import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -318,10 +319,10 @@ export function WorkModuleClient({
             requestedBy: o.requestedBy,
             scheduledAt: o.scheduledAt,
             deadlineAt: o.deadlineAt || undefined,
-            status: o.status as any,
-            priority: o.priority as any,
+            status: o.status as WorkOrderStatus,
+            priority: o.priority as WorkPriority,
             price: o.price,
-            workType: o.workType as any,
+            workType: o.workType as WorkType,
             ftdSent: o.ftdSent || false,
             invoiced: o.invoiced || false,
             workers: o.assignments.map((a) => a.workerName),

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { hashToken, buildSnapshotItem, SnapshotItemData } from '@/lib/navigation-documentation';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
+import { isClientApprovedPhoto, isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
 
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -34,11 +35,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     },
   }));
 
-  if (!report || report.status === 'ARCHIVED' || report.status === 'DRAFT') {
+  if (!report || !isPublicNavigationReportStatus(report.status)) {
     return NextResponse.json({ error: 'Požadovaná fotodokumentace nebyla nalezena nebo není publikována.' }, { status: 404 });
   }
 
-  if (report.tokenExpiresAt && new Date() > report.tokenExpiresAt) {
+  if (!report.tokenExpiresAt || new Date() > report.tokenExpiresAt) {
     return NextResponse.json({ error: 'Platnost přístupového odkazu vypršela. Vyžádejte si prosím nový odkaz.' }, { status: 410 });
   }
 
@@ -56,7 +57,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       });
     }
 
-    if (item.selectedPhotoId) {
+    baseItem.photoUrl = null;
+    if (item.selectedPhotoId && isClientApprovedPhoto(item.selectedPhoto)) {
       baseItem.photoUrl = `/api/client/navigation-documentation/${encodeURIComponent(token)}/photos/${encodeURIComponent(item.selectedPhotoId)}`;
     }
 
@@ -72,7 +74,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     year: report.year,
     publishedAt: report.publishedAt || report.createdAt,
     clientName: report.client.name,
-    clientLogoUrl: report.client.logoFileName ? `/api/proposals/${encodeURIComponent(token)}/logo` : null,
+    clientLogoUrl: report.client.logoFileName ? `/api/client/navigation-documentation/${encodeURIComponent(token)}/logo` : null,
     campaignTitle,
     itemsCount: items.length,
     items,

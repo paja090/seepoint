@@ -6,6 +6,9 @@ import { platformPrisma } from '@/lib/db';
 import { sendActivationEmail } from '@/lib/email';
 import { requireOrganizationRole } from '@/lib/organization';
 import { canAssignOrganizationRole, invitationLifecycleStatus } from '@/lib/organization-invitation-policy';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { effectiveOrganizationRole } from '@/lib/account-policy';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,11 +23,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       where: { id, organizationId: context.organizationId },
     });
     if (!invitation) return NextResponse.json({ error: 'Pozvánka nebyla nalezena.' }, { status: 404 });
+    const actorRole = effectiveOrganizationRole(context.membership.role, context.membership.roles);
     const status = invitationLifecycleStatus(invitation);
     if (status === 'ACCEPTED' || status === 'REVOKED') {
       return NextResponse.json({ error: 'Pozvánka už není aktivní.' }, { status: 409 });
     }
-    if (invitation.role === 'OWNER' && context.membership.role !== 'OWNER') {
+    if (invitation.role === 'OWNER' && actorRole !== 'OWNER') {
       return NextResponse.json({ error: 'Pozvánku vlastníka může spravovat pouze vlastník.' }, { status: 403 });
     }
 
@@ -36,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: 'Role není platná.' }, { status: 400 });
       }
       const role = body.role as OrganizationRole;
-      if (!canAssignOrganizationRole(context.membership.role, role)) {
+      if (!canAssignOrganizationRole(actorRole, role)) {
         return NextResponse.json({ error: 'Vlastníka může nastavit pouze vlastník.' }, { status: 403 });
       }
       await platformPrisma.$transaction(async (tx) => {
@@ -64,6 +68,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (user.status !== 'INVITED') {
       return NextResponse.json({ error: 'Účet už byl aktivován.' }, { status: 409 });
     }
+    const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${context.organizationId}:${invitation.email}`), rateLimitPolicies.resendInvitation);
+    if (limited) return limited;
     const token = newToken();
     const tokenHash = hashToken(token);
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -91,7 +97,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const activationUrl = getAppUrl(request, `/activate/${token}`);
     let warning: string | undefined;
     try {
-      await sendActivationEmail(invitation.email, activationUrl);
+      const delivery = await sendActivationEmail(invitation.email, activationUrl);
+      if (delivery.status === 'skipped') warning = 'Preview: pozvánka byla obnovena, ale e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.';
     } catch (error) {
       console.error('[organization/invitations/resend] Activation email delivery failed', {
         organizationId: context.organizationId,

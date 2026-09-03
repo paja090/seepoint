@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import type { PhotoType } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { requireTenantContext } from '@/lib/tenant-context';
 import { verifyFileInFolder, isGoogleDriveMockEnabled } from '@/lib/google-drive';
 
 export const runtime = 'nodejs';
+const LINKABLE_PHOTO_TYPES = new Set(['LOCATION', 'CARRIER', 'SURFACE', 'CAMPAIGN', 'INSTALLATION', 'CONTROL', 'DAMAGE', 'CHECK', 'ARCHIVE']);
+const LINKABLE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_LINKED_PHOTO_SIZE = 4 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
@@ -27,22 +31,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Fotografie musí patřit nosiči nebo ploše.' }, { status: 400 });
     }
 
+    // Authenticate before looking up tenant data.
+    const auth = await requireApiAccess('carriers');
+    if (isApiDenied(auth)) return auth;
+
     if (targetSurfaceId && !targetCarrierId) {
       const surf = await prisma.advertisingSurface.findUnique({ where: { id: targetSurfaceId }, select: { carrierId: true } });
       if (surf) targetCarrierId = surf.carrierId;
     }
 
-    // Require carriers permission
-    const auth = await requireApiAccess('carriers');
-    if (isApiDenied(auth)) return auth;
-
-    // Check if target exists
-    const targetExists = targetCarrierId
-      ? await prisma.advertisingCarrier.count({ where: { id: targetCarrierId } })
-      : await prisma.advertisingSurface.count({ where: { id: targetSurfaceId! } });
-
-    if (!targetExists) {
+    if (!targetCarrierId || !await prisma.advertisingCarrier.count({ where: { id: targetCarrierId } })) {
       return NextResponse.json({ error: 'Cílový nosič nebo plocha neexistuje.' }, { status: 404 });
+    }
+    if (targetSurfaceId && !await prisma.advertisingSurface.count({ where: { id: targetSurfaceId, carrierId: targetCarrierId } })) {
+      return NextResponse.json({ error: 'Cílová plocha nepatří k vybranému nosiči.' }, { status: 400 });
+    }
+
+    const targetType = String(type || 'CARRIER').toUpperCase();
+    const targetMimeType = String(mimeType || '').toLowerCase();
+    const targetSize = size == null ? null : Number(size);
+    if (!LINKABLE_PHOTO_TYPES.has(targetType)) return NextResponse.json({ error: 'Neplatný typ fotografie.' }, { status: 400 });
+    if (!LINKABLE_MIME_TYPES.has(targetMimeType)) return NextResponse.json({ error: 'Povolené formáty jsou JPEG, PNG a WebP.' }, { status: 415 });
+    if (targetSize !== null && (!Number.isInteger(targetSize) || targetSize <= 0 || targetSize > MAX_LINKED_PHOTO_SIZE)) {
+      return NextResponse.json({ error: 'Fotografie musí mít nejvýše 4 MB.' }, { status: 413 });
     }
 
     // Verify folder placement securely
@@ -75,7 +86,6 @@ export async function POST(request: Request) {
     }
 
     const photoId = randomUUID();
-    const targetType = type || 'CARRIER';
 
     // Perform transaction to compute sorting order and primary photo flags atomically
     const photo = await prisma.$transaction(async (tx) => {
@@ -108,11 +118,12 @@ export async function POST(request: Request) {
           id: photoId,
           url: `/api/photos/${photoId}/file`,
           driveFileId,
-          fileName,
-          mimeType: mimeType || 'image/jpeg',
-          size: size ? Number(size) : null,
-          type: targetType,
-          note: note ? String(note) : null,
+          storageProvider: 'GOOGLE_DRIVE',
+          fileName: String(fileName).slice(0, 180),
+          mimeType: targetMimeType,
+          size: targetSize,
+          type: targetType as PhotoType,
+          note: note ? String(note).trim().slice(0, 1000) : null,
           sortOrder: count,
           isPrimary,
           isClientVisible: isClientVisible === true,

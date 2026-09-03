@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { getNavigationOrderDetail } from '@/lib/navigation/navigation-service';
 import { NavigationOrderDetailView } from '@/components/navigation/NavigationOrderDetailView';
+import { canInvoiceNavigationOrderRole } from '@/lib/navigation/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,11 @@ export default async function NavigationOrderDetailPage({
     const order = await getNavigationOrderDetail(id, user);
     return (
       <AppShell>
-        <NavigationOrderDetailView order={order} />
+        <NavigationOrderDetailView
+          order={order}
+          canInvoice={canInvoiceNavigationOrderRole(user.role)}
+          currentDate={new Date().toISOString().slice(0, 10)}
+        />
       </AppShell>
     );
   } catch {

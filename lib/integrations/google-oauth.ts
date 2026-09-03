@@ -11,6 +11,65 @@ export const GOOGLE_OAUTH_VERIFIER_COOKIE = 'seepoint_google_oauth_verifier';
 
 type GoogleCredentials = { refreshToken: string };
 
+export async function connectedGoogleAccessToken(provider: IntegrationProvider) {
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { provider },
+    select: { id: true, status: true, credentialsEncrypted: true },
+  });
+  if (!connection || connection.status === 'REVOKED') return null;
+  if (!connection.credentialsEncrypted) {
+    await prisma.integrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: 'ERROR',
+        lastCheckedAt: new Date(),
+        expiresAt: null,
+        error: 'Google Drive připojení nemá obnovovací token a je potřeba ho připojit znovu.',
+      },
+    });
+    return null;
+  }
+
+  const config = googleOAuthConfiguration();
+  try {
+    const { refreshToken } = decryptIntegrationSecret<GoogleCredentials>(connection.credentialsEncrypted, config.encryptionKey);
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+      cache: 'no-store',
+    });
+    const data = await response.json() as { access_token?: string; expires_in?: number };
+    if (!response.ok || !data.access_token) throw new Error('Google OAuth access token refresh failed.');
+    await prisma.integrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: 'CONNECTED',
+        lastCheckedAt: new Date(),
+        expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null,
+        error: null,
+      },
+    });
+    return data.access_token;
+  } catch (error) {
+    await prisma.integrationConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: 'ERROR',
+        lastCheckedAt: new Date(),
+        expiresAt: null,
+        error: 'Google Drive připojení vyžaduje znovu ověřit.',
+      },
+    }).catch(() => undefined);
+    throw error;
+  }
+}
+
 export function googleOAuthConfiguration() {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();

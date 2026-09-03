@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Send,
@@ -13,22 +13,13 @@ import {
   CheckCheck,
   Sparkles,
   MessageSquare,
-  Wrench,
-  Car,
-  Tag,
   X,
-  Plus,
-  ShieldCheck,
-  Clock,
-  Paperclip,
   AlertTriangle,
   FileImage,
   UserCheck,
-  CheckCircle,
   ShoppingBag,
 } from 'lucide-react';
-import type { AppRole } from '@/lib/rbac';
-import { roleLabel } from '@/lib/rbac';
+import { canEditShoppingList, type AppRole } from '@/lib/rbac';
 import { CompanyShoppingListModal } from './CompanyShoppingListModal';
 
 interface VehicleOption {
@@ -45,6 +36,7 @@ interface TeamMemberOption {
 interface TeamChatContainerProps {
   currentUser: {
     id: string;
+    employeeId?: string;
     name: string;
     role: AppRole;
   };
@@ -122,7 +114,6 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const previousMessageCount = useRef<number>(0);
 
   useEffect(() => {
     if (!previewImageUrl) return;
@@ -188,6 +179,12 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 12 * 1024 * 1024) {
+      alert('Vyberte obrázek JPEG, PNG nebo WebP do 12 MB.');
+      e.target.value = '';
+      return;
+    }
+
     try {
       const compressedDataUrl = await compressImageForChat(file);
       setImageUrl(compressedDataUrl);
@@ -219,10 +216,13 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
   }
 
   // Sound chime synthesizer via Web Audio API
-  function playNewMessageChime() {
+  const playNewMessageChime = useCallback(() => {
     if (!audioEnabled) return;
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioWindow = window as Window & { webkitAudioContext?: typeof AudioContext };
+      const AudioContextConstructor = window.AudioContext || audioWindow.webkitAudioContext;
+      if (!AudioContextConstructor) return;
+      const ctx = new AudioContextConstructor();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
@@ -237,10 +237,10 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     } catch {
       // Ignore audio context errors
     }
-  }
+  }, [audioEnabled]);
 
   // Fetch messages for active channel
-  async function fetchMessages(isPolling = false, isInitial = false) {
+  const fetchMessages = useCallback(async (isPolling = false, isInitial = false) => {
     try {
       const res = await fetch(`/api/chat/messages?channel=${activeChannel}`);
       if (!res.ok) return;
@@ -291,7 +291,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     } catch {
       // Ignore polling errors
     }
-  }
+  }, [activeChannel, currentUser.id, playNewMessageChime]);
 
   // Load older messages on demand
   async function loadOlderMessages() {
@@ -330,8 +330,8 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     }
   }
 
-  // Fetch online active users
-  async function fetchPresence() {
+  // Fetch active organization members. This is a directory, not real-time presence.
+  const fetchPresence = useCallback(async () => {
     try {
       const res = await fetch('/api/chat/presence');
       if (res.ok) {
@@ -341,7 +341,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     } catch {
       // Ignore errors
     }
-  }
+  }, []);
 
   useEffect(() => {
     setMessages([]);
@@ -353,7 +353,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
       fetchPresence();
     }, 4000);
     return () => clearInterval(interval);
-  }, [activeChannel]);
+  }, [fetchMessages, fetchPresence]);
 
   async function handleSendMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -401,6 +401,9 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
       if (res.ok) {
         setAssigningMsgId(null);
         await fetchMessages();
+      } else {
+        const error = await res.json().catch(() => null);
+        alert(error?.error || 'Řešitele se nepodařilo přiřadit.');
       }
     } catch {
       alert('Chyba při přiřazování řešitele.');
@@ -420,6 +423,9 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
       if (res.ok) {
         await fetchMessages();
+      } else {
+        const error = await res.json().catch(() => null);
+        alert(error?.error || 'Stav zprávy se nepodařilo změnit.');
       }
     } catch {
       alert('Chyba změny stavu.');
@@ -584,7 +590,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
           <div className="flex items-center gap-1.5 overflow-x-auto pt-1.5 border-t border-slate-900 scrollbar-none text-xs shrink-0">
             <span className="font-extrabold text-[10px] text-emerald-400 shrink-0 flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
-              <span>Aktivní v týmu ({activeUsers.length}):</span>
+              <span>Členové týmu ({activeUsers.length}):</span>
             </span>
             {activeUsers.map((u) => (
               <span
@@ -678,7 +684,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
           <div className="flex items-center justify-between px-2 mb-2">
             <span className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
               <Users size={12} className="text-emerald-400" />
-              <span>Aktivní v týmu ({activeUsers.length})</span>
+              <span>Členové týmu ({activeUsers.length})</span>
             </span>
           </div>
 
@@ -892,6 +898,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
+              maxLength={4000}
               placeholder={`Napište zprávu do skupiny ${channels.find((c) => c.id === activeChannel)?.label}...`}
               className="flex-1 min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
             />
@@ -1076,7 +1083,10 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                 <label className="block text-xs font-bold text-slate-700 mb-1">Závažnost poruchy</label>
                 <select
                   value={faultSeverity}
-                  onChange={(e) => setFaultSeverity(e.target.value as any)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'LOW' || value === 'MEDIUM' || value === 'HIGH' || value === 'CRITICAL') setFaultSeverity(value);
+                  }}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
                 >
                   <option value="LOW">Lehká (Vozidlo normálně pojízdné)</option>
@@ -1136,6 +1146,8 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
         isOpen={showShoppingModal}
         onClose={() => setShowShoppingModal(false)}
         currentUserName={currentUser.name}
+        currentEmployeeId={currentUser.employeeId}
+        canEdit={canEditShoppingList(currentUser.role)}
       />
 
       {previewImageUrl && (

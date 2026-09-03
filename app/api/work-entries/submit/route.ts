@@ -24,14 +24,21 @@ export async function POST(request: Request) {
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     return NextResponse.json({ error: 'Musíte vybrat alespoň jeden záznam k odeslání.' }, { status: 400 });
   }
+  if (ids.length > 100 || ids.some((id) => typeof id !== 'string' || !id.trim() || id.length > 100)) {
+    return NextResponse.json({ error: 'Najednou lze odeslat nejvýše 100 platných záznamů.' }, { status: 400 });
+  }
+  const uniqueIds = [...new Set(ids.map((id) => id.trim()))];
 
   try {
     const actor = { id: user.id, email: user.email, role: user.role };
-    await submitWorkEntries(ids, actor);
+    await submitWorkEntries(uniqueIds, actor);
 
     return NextResponse.json({ success: true, message: 'Záznamy byly úspěšně odeslány ke schválení.' });
   } catch (error: unknown) {
     const err = error as Error;
-    return NextResponse.json({ error: err.message || 'Nastala chyba při odesílání.' }, { status: 400 });
+    const known = ['nebyly nalezeny', 'cizí záznam', 'koncepty a vrácené záznamy', 'Zaměstnanecký profil'];
+    if (known.some((message) => err.message.includes(message))) return NextResponse.json({ error: err.message }, { status: 400 });
+    console.error('Submit work entries failed', error);
+    return NextResponse.json({ error: 'Záznamy se nepodařilo odeslat.' }, { status: 500 });
   }
 }

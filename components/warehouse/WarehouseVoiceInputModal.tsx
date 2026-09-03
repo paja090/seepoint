@@ -4,6 +4,23 @@ import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mic, MicOff, Loader2, X, CheckCircle2, Sparkles, Volume2 } from 'lucide-react';
 
+type SpeechResultEvent = {
+  resultIndex: number;
+  results: ArrayLike<{ 0: { transcript: string } }>;
+};
+type SpeechErrorEvent = { error: string };
+type SpeechRecognitionInstance = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: ((event: SpeechErrorEvent) => void) | null;
+  onend: (() => void) | null;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
 export function WarehouseVoiceInputModal({ workOrders = [], employees = [], triggerClassName }: {
   workOrders?: { id: string; title: string; clientName: string }[];
   employees?: { id: string; firstName: string; lastName: string }[];
@@ -29,22 +46,26 @@ export function WarehouseVoiceInputModal({ workOrders = [], employees = [], trig
   ];
 
   useEffect(() => {
-    let recognition: any = null;
+    let recognition: SpeechRecognitionInstance | null = null;
     if (listening) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const speechWindow = window as Window & {
+        SpeechRecognition?: SpeechRecognitionConstructor;
+        webkitSpeechRecognition?: SpeechRecognitionConstructor;
+      };
+      const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.lang = 'cs-CZ';
         recognition.continuous = false;
         recognition.interimResults = true;
 
-        recognition.onresult = (event: any) => {
+        recognition.onresult = (event) => {
           const current = event.resultIndex;
           const transcript = event.results[current][0].transcript;
           setSpeechText(transcript);
         };
 
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event) => {
           console.error('Speech error:', event.error);
           setListening(false);
         };

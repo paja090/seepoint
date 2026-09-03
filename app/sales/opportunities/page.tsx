@@ -7,13 +7,13 @@ import { SalesOpportunitiesClientView } from '@/components/opportunities/SalesOp
 export const dynamic = 'force-dynamic';
 
 export default async function SalesOpportunitiesPage() {
-  await requirePageAccess('clients');
+  const user = await requirePageAccess('clients');
 
   const [opportunitiesData, stats, clients] = await Promise.all([
-    getOpportunities({ take: 50 }),
-    getOpportunityStats(),
+    getOpportunities({ take: 50 }, user.organizationId),
+    getOpportunityStats(user.organizationId),
     prisma.client.findMany({
-      where: { active: true },
+      where: { organizationId: user.organizationId, active: true },
       select: { id: true, name: true, pricingSegment: true },
       orderBy: { name: 'asc' },
       take: 200,
@@ -25,6 +25,7 @@ export default async function SalesOpportunitiesPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         <SalesOpportunitiesClientView
           clients={clients}
+          canAutoDiscover={user.role === 'ADMIN' || user.role === 'MANAGER'}
           initialOpportunityData={{
             items: JSON.parse(JSON.stringify(opportunitiesData.items)),
             total: opportunitiesData.total,

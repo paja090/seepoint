@@ -17,12 +17,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Název ceníkové položky je povinný.' }, { status: 400 });
     }
 
-    const carrierType = body.carrierType ? (body.carrierType as CarrierType) : null;
-    const mediaType = body.mediaType ? (body.mediaType as MediaType) : null;
-    const rentalMonths = Math.max(1, parseInt(body.rentalMonths) || 1);
-    const minQuantity = Math.max(1, parseInt(body.minQuantity) || 1);
-    const rentalPrice = parseFloat(body.rentalPrice) || 0;
-    const productionPrice = parseFloat(body.productionPrice) || 0;
+    const carrierType = body.carrierType ? String(body.carrierType) : null;
+    const mediaType = body.mediaType ? String(body.mediaType) : null;
+    if (carrierType && !Object.values(CarrierType).includes(carrierType as CarrierType)) {
+      return NextResponse.json({ error: 'Neplatný typ nosiče.' }, { status: 400 });
+    }
+    if (mediaType && !Object.values(MediaType).includes(mediaType as MediaType)) {
+      return NextResponse.json({ error: 'Neplatný typ média.' }, { status: 400 });
+    }
+    const rentalMonths = Number(body.rentalMonths ?? 1);
+    const minQuantity = Number(body.minQuantity ?? 1);
+    const rentalPrice = Number(body.rentalPrice ?? 0);
+    const productionPrice = Number(body.productionPrice ?? 0);
+    if (!Number.isInteger(rentalMonths) || rentalMonths < 1 || !Number.isInteger(minQuantity) || minQuantity < 1) {
+      return NextResponse.json({ error: 'Doba pronájmu a minimální množství musí být kladná celá čísla.' }, { status: 400 });
+    }
+    if (!Number.isFinite(rentalPrice) || rentalPrice < 0 || !Number.isFinite(productionPrice) || productionPrice < 0) {
+      return NextResponse.json({ error: 'Ceny musí být platná nezáporná čísla.' }, { status: 400 });
+    }
     const totalPrice = rentalPrice + productionPrice;
     
     const validFromDate = body.validFrom ? new Date(body.validFrom) : new Date();
@@ -40,8 +52,8 @@ export async function POST(request: Request) {
         name,
         identityKey,
         versionKey,
-        carrierType,
-        mediaType,
+        carrierType: carrierType as CarrierType | null,
+        mediaType: mediaType as MediaType | null,
         rentalMonths,
         minQuantity,
         rentalPrice,
@@ -61,7 +73,7 @@ export async function POST(request: Request) {
           code,
           category: 'PRINT',
           label,
-          mediaType,
+          mediaType: mediaType as MediaType,
           calculation: 'PER_SURFACE',
           unit: 'ks',
           unitPrice: productionPrice,
@@ -70,7 +82,7 @@ export async function POST(request: Request) {
         },
         update: {
           label,
-          mediaType,
+          mediaType: mediaType as MediaType,
           unitPrice: productionPrice,
           defaultSelected: true,
           active: true,

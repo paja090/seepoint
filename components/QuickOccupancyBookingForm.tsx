@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   CalendarPlus,
   ShieldAlert,
-  CheckCircle2,
   AlertTriangle,
-  Sparkles,
   MapPin,
   User,
   Tag,
@@ -28,32 +26,35 @@ type ClientOption = {
   name: string;
 };
 
+type BookingStatus = 'RESERVED' | 'NEGOTIATION' | 'OCCUPIED';
+
 export function QuickOccupancyBookingForm({
   surfaces,
   clients,
   currentUserName,
+  defaultDateFrom,
+  defaultDateTo,
 }: {
   surfaces: SurfaceOption[];
   clients: ClientOption[];
   currentUserName?: string;
+  defaultDateFrom: string;
+  defaultDateTo: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
-  const [success, setSuccess] = useState('');
 
   // Form fields
   const [surfaceId, setSurfaceId] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientNameInput, setClientNameInput] = useState('');
   const [campaignName, setCampaignName] = useState('');
-  const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 10));
-  const [dateTo, setDateTo] = useState(
-    new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
-  );
-  const [status, setStatus] = useState<'RESERVED' | 'NEGOTIATION' | 'OCCUPIED'>('RESERVED');
+  const [dateFrom, setDateFrom] = useState(defaultDateFrom);
+  const [dateTo, setDateTo] = useState(defaultDateTo);
+  const [status, setStatus] = useState<BookingStatus>('RESERVED');
   const [price, setPrice] = useState('');
   const [note, setNote] = useState('');
   const [allowNegotiationConflict, setAllowNegotiationConflict] = useState(false);
@@ -63,7 +64,6 @@ export function QuickOccupancyBookingForm({
     setSubmitting(true);
     setError('');
     setWarning('');
-    setSuccess('');
 
     if (!surfaceId) {
       setError('Vyberte nosič a reklamní plochu.');
@@ -110,7 +110,6 @@ export function QuickOccupancyBookingForm({
         throw new Error(data.error || 'Chyba při ukládání obsazenosti.');
       }
 
-      setSuccess(`Kampaň "${campaignName}" byla úspěšně zaregistrována.`);
       setSubmitting(false);
       setOpen(false);
       router.refresh();
@@ -239,7 +238,7 @@ export function QuickOccupancyBookingForm({
               <select
                 className="input w-full text-xs font-bold"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus(e.target.value as BookingStatus)}
               >
                 <option value="RESERVED">🟧 Rezervace (Předběžná blokace)</option>
                 <option value="NEGOTIATION">🟦 V jednání (Nabídka odeslána)</option>

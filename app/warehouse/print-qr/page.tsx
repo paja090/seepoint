@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
-import { Printer, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { requirePageAccess } from '@/lib/page-auth';
+import { WarehousePrintButton } from '@/components/warehouse/WarehousePrintButton';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WarehousePrintQrPage() {
-  await requirePageAccess('work');
+  await requirePageAccess('warehouse');
   await ensureWarehouseSchema();
 
   const items = await prisma.warehouseItem.findMany({
@@ -30,14 +31,7 @@ export default async function WarehousePrintQrPage() {
             <span>Zpět do skladu</span>
           </Link>
 
-          {/* Trigger browser print dialog */}
-          <button
-            onClick={undefined}
-            className="flex items-center gap-1.5 rounded-xl bg-slate-950 px-5 py-2 text-xs font-black text-white hover:bg-slate-800 transition shadow-md"
-          >
-            <Printer size={14} />
-            <span>Vytisknout arch (Ctrl+P)</span>
-          </button>
+          <WarehousePrintButton />
         </div>
       </div>
 
@@ -45,7 +39,8 @@ export default async function WarehousePrintQrPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 print:grid-cols-3 print:gap-2">
         {items.map((item) => {
           // Generate quick QR image URL via quickchart / Google API chart
-          const qrData = encodeURIComponent(`SEEPOINT_WH:${item.id}:${item.name}`);
+          // The external renderer receives only an opaque item identifier, never the item name.
+          const qrData = encodeURIComponent(`SEEPOINT_WH:${item.id}`);
           const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
 
           return (
@@ -66,6 +61,7 @@ export default async function WarehousePrintQrPage() {
               <img
                 src={qrUrl}
                 alt={item.name}
+                referrerPolicy="no-referrer"
                 className="h-28 w-28 object-contain my-1 print:h-24 print:w-24"
               />
 

@@ -10,6 +10,25 @@ export type EmployeeOption = {
   position: string | null;
 };
 
+type CreatedQuickTask = {
+  id: string;
+  title: string;
+  description?: string | null;
+  priority: string;
+  assignedToEmployee?: { firstName: string; lastName: string } | null;
+};
+type SpeechResultEvent = { results: ArrayLike<{ 0: { transcript: string } }> };
+type SpeechRecognitionInstance = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
 export function AiQuickTaskModal({
   isOpen,
   onClose,
@@ -26,7 +45,7 @@ export function AiQuickTaskModal({
   const [isRecording, setIsRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdTasks, setCreatedTasks] = useState<any[]>([]);
+  const [createdTasks, setCreatedTasks] = useState<CreatedQuickTask[]>([]);
 
   if (!isOpen) return null;
 
@@ -36,7 +55,12 @@ export function AiQuickTaskModal({
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const speechWindow = window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
     const recognition = new SpeechRecognition();
     recognition.lang = 'cs-CZ';
     recognition.continuous = false;
@@ -45,7 +69,7 @@ export function AiQuickTaskModal({
     if (!isRecording) {
       setIsRecording(true);
       recognition.start();
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         setPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
         setIsRecording(false);
@@ -80,8 +104,8 @@ export function AiQuickTaskModal({
 
       setCreatedTasks(data.tasks || []);
       if (onTasksCreated) onTasksCreated();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'AI úkoly se nepodařilo zpracovat.');
     } finally {
       setLoading(false);
     }
@@ -174,7 +198,7 @@ export function AiQuickTaskModal({
                 onChange={(e) => setTargetAssigneeId(e.target.value)}
                 className="input w-full p-2.5 text-xs border-slate-300 rounded-xl mb-3 font-semibold text-slate-800"
               >
-                <option value="AUTO">🤖 AI Automaticky (podle jména v pokynu nebo "sám sobě")</option>
+                <option value="AUTO">🤖 AI Automaticky (podle jména v pokynu nebo „sám sobě“)</option>
                 {employees.map((e) => (
                   <option key={e.id} value={e.id}>
                     👤 {e.firstName} {e.lastName} ({e.position || 'Pracovník'})
@@ -212,7 +236,7 @@ export function AiQuickTaskModal({
                 </button>
               </div>
               <span className="text-[11px] text-slate-400 mt-1 block">
-                💡 Tip: Můžete říct <i>"Sám sobě"</i> nebo napsat seznam úkolů oddělený čárkami.
+                💡 Tip: Můžete říct <i>„Sám sobě“</i> nebo napsat seznam úkolů oddělený čárkami.
               </span>
             </div>
 

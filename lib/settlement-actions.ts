@@ -357,7 +357,7 @@ export async function paySettlement(
 export async function addManualAdjustment(
   params: {
     settlementId: string;
-    amount: number;
+    amount: string | number;
     description: string;
     reason: string;
     category?: string;
@@ -372,7 +372,16 @@ export async function addManualAdjustment(
     throw new Error('Nemáte oprávnění přidat korekci.');
   }
 
-  if (params.amount === 0) {
+  if (!cleanDescription) throw new Error('Popis korekce je povinný.');
+  if (cleanDescription.length > 250) throw new Error('Popis korekce je příliš dlouhý (maximálně 250 znaků).');
+  if (typeof params.category !== 'undefined' && !Object.values(AdjustmentCategory).includes(params.category as AdjustmentCategory)) {
+    throw new Error('Kategorie korekce není platná.');
+  }
+  const rawAmount = String(params.amount).trim().replace(',', '.');
+  if (!/^-?\d+(?:\.\d{1,2})?$/.test(rawAmount)) throw new Error('Částka korekce musí být platné číslo s nejvýše 2 desetinnými místy.');
+  const signedAmount = new Prisma.Decimal(rawAmount);
+  if (signedAmount.abs().gt('9999999999.99')) throw new Error('Částka korekce překračuje povolený rozsah.');
+  if (signedAmount.isZero()) {
     throw new Error('Částka korekce nesmí být nulová.');
   }
 
@@ -389,8 +398,8 @@ export async function addManualAdjustment(
       throw new Error('Korekci lze přidat pouze do otevřeného vyúčtování.');
     }
 
-    const type = params.amount > 0 ? 'BONUS' : 'DEDUCTION';
-    const absAmount = new Prisma.Decimal(Math.abs(params.amount));
+    const type = signedAmount.gt(0) ? 'BONUS' : 'DEDUCTION';
+    const absAmount = signedAmount.abs();
     const finalCategory = (params.category || 'OTHER') as AdjustmentCategory;
 
     const adjustment = await transaction.settlementAdjustment.create({
@@ -414,7 +423,7 @@ export async function addManualAdjustment(
         action: 'ADJUSTMENT_ADD',
         fieldName: 'amount',
         oldValue: null,
-        newValue: `${params.amount} CZK (${type})`,
+        newValue: `${signedAmount.toFixed(2)} CZK (${type})`,
         reason: cleanReason,
       },
     });

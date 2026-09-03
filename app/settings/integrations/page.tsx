@@ -8,7 +8,7 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
   await requireOrganizationRole('ADMIN');
   const connection = await prisma.integrationConnection.findFirst({
     where: { provider: 'GOOGLE_DRIVE' },
-    select: { status: true, accountEmail: true, connectedAt: true },
+    select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true },
   });
   const result = (await searchParams).google;
   const configured = isGoogleOAuthConfigured();
@@ -24,7 +24,11 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
       <div className="grid gap-5 lg:grid-cols-2">
         <GoogleIntegrationCard
           configured={configured}
-          connection={connection ? { ...connection, connectedAt: connection.connectedAt?.toISOString() ?? null } : null}
+          connection={connection ? {
+            ...connection,
+            connectedAt: connection.connectedAt?.toISOString() ?? null,
+            lastCheckedAt: connection.lastCheckedAt?.toISOString() ?? null,
+          } : null}
         />
         <section className="card space-y-3 opacity-75">
           <h2 className="text-xl font-bold">Gmail a Google Workspace</h2>

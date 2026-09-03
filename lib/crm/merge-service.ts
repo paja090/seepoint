@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 
 export async function mergeDuplicateClients(
   targetClientId: string,
@@ -10,18 +11,25 @@ export async function mergeDuplicateClients(
     throw new Error('Nelze sloučit klienta sám se sebou.');
   }
 
-  const [targetClient, sourceClient] = await Promise.all([
-    prisma.client.findUnique({ where: { id: targetClientId } }),
-    prisma.client.findUnique({ where: { id: sourceClientId } }),
-  ]);
+  return prisma.$transaction(async (tx) => {
+    const [targetClient, sourceClient] = await Promise.all([
+      tx.client.findFirst({ where: { id: targetClientId, active: true } }),
+      tx.client.findFirst({ where: { id: sourceClientId, active: true } }),
+    ]);
+    if (!targetClient || !sourceClient) throw new Error('CLIENT_NOT_FOUND');
 
-  if (!targetClient || !sourceClient) {
-    throw new Error('Cílový nebo zdrojový klient nebyl nalezen.');
-  }
-  if (!targetClient.active) throw new Error('Cílový klient není aktivní.');
-  if (!sourceClient.active) throw new Error('Zdrojový klient už byl archivován nebo sloučen.');
-
-  return await prisma.$transaction(async (tx) => {
+    const [targetPrimary, sourcePrimaryContacts] = await Promise.all([
+      tx.clientContact.findFirst({ where: { clientId: targetClientId, active: true, isPrimary: true }, select: { id: true } }),
+      tx.clientContact.findMany({ where: { clientId: sourceClientId, active: true, isPrimary: true }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
+    ]);
+    if (targetPrimary) {
+      await tx.clientContact.updateMany({ where: { clientId: sourceClientId, isPrimary: true }, data: { isPrimary: false } });
+    } else if (sourcePrimaryContacts.length > 1) {
+      await tx.clientContact.updateMany({
+        where: { clientId: sourceClientId, isPrimary: true, id: { not: sourcePrimaryContacts[0].id } },
+        data: { isPrimary: false },
+      });
+    }
     // 1. Move ClientContact records
     await tx.clientContact.updateMany({
       where: { clientId: sourceClientId },
@@ -106,7 +114,15 @@ export async function mergeDuplicateClients(
       data: { clientId: targetClientId },
     });
 
-    // 15. Create ClientMergeLog
+    // 15. Move the remaining client-linked modules
+    await Promise.all([
+      tx.navigationContract.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.navigationContactPerson.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.salesOpportunity.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.carrierHistoryLog.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId, clientName: targetClient.name } }),
+    ]);
+
+    // 16. Create ClientMergeLog
     const mergeLog = await tx.clientMergeLog.create({
       data: {
         targetClientId,
@@ -122,7 +138,7 @@ export async function mergeDuplicateClients(
       },
     });
 
-    // 16. Audit Log
+    // 17. Audit Log
     await tx.crmAuditLog.create({
       data: {
         userId: actorUserId,
@@ -137,9 +153,9 @@ export async function mergeDuplicateClients(
       },
     });
 
-    // 17. Soft-deactivate/archive source client
+    // 18. Soft-deactivate/archive source client
     await tx.client.update({
-      where: { id: sourceClientId },
+      where: { id: sourceClientId, active: true },
       data: {
         active: false,
         status: 'INACTIVE',
@@ -153,5 +169,5 @@ export async function mergeDuplicateClients(
       sourceClientId,
       mergeLogId: mergeLog.id,
     };
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

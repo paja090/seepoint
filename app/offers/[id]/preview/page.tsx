@@ -28,7 +28,7 @@ export default async function OfferPreviewPage({ params }: { params: Promise<{ i
         <OfferProcessStepper current="preview" offerId={offer.id!} offerType={offer.offerType ?? 'STANDARD_MEDIA'} />
         <div className="mb-6 flex items-start gap-3 rounded-xl bg-sky-50 p-4 text-sm text-sky-800 ring-1 ring-sky-200"><Info aria-hidden="true" className="mt-0.5 shrink-0" size={17} /><p><strong>Toto je stránka, kterou uvidí klient.</strong> Po vizuální kontrole pokračujte na finální audit a odeslání.</p></div>
         {(offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept ? (
-          <CampaignConceptPublicView offer={offer} token={offer.id!} />
+          <CampaignConceptPublicView offer={offer} />
         ) : offer.offerType === 'NAVIGATION' || offer.offerType === 'CITY_GALLERY' ? (
           <SpecializedOfferSummary offer={offer} />
         ) : (

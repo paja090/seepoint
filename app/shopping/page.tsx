@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { ShoppingListModule } from '@/components/shopping/ShoppingListModule';
+import { canEditShoppingList } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,9 @@ export default async function ShoppingPage({
   return (
     <AppShell>
       <ShoppingListModule
-        currentUserId={user.id}
+        currentEmployeeId={user.employee?.id}
         currentUserName={user.name}
+        canEdit={canEditShoppingList(user.role)}
         initialCategory={category}
       />
     </AppShell>

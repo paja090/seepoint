@@ -27,6 +27,7 @@ export function ClientInvoicesTab({ client }: { client: ClientProfileData }) {
               <TableHeaderCell>Splatnost</TableHeaderCell>
               <TableHeaderCell>Částka s DPH</TableHeaderCell>
               <TableHeaderCell>Stav úhrady</TableHeaderCell>
+              <TableHeaderCell>Doklad</TableHeaderCell>
             </tr>
           </TableHead>
           <tbody>
@@ -39,13 +40,18 @@ export function ClientInvoicesTab({ client }: { client: ClientProfileData }) {
                     {inv.variableSymbol && <div className="text-xs text-slate-500 font-mono">VS: {inv.variableSymbol}</div>}
                   </TableCell>
                   <TableCell>{inv.type}</TableCell>
-                  <TableCell>{new Date(inv.issueDate).toLocaleDateString('cs-CZ')}</TableCell>
-                  <TableCell>{new Date(inv.dueDate).toLocaleDateString('cs-CZ')}</TableCell>
+                  <TableCell>{inv.issueDateLabel}</TableCell>
+                  <TableCell>{inv.dueDateLabel}</TableCell>
                   <TableCell className="font-bold">{Number(inv.totalAmount).toLocaleString('cs-CZ')} Kč</TableCell>
                   <TableCell>
                     <span className={`px-2.5 py-1 rounded text-xs font-semibold border ${statusObj.badge}`}>
                       {statusObj.label}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {inv.driveFileId ? (
+                      <a href={`/api/crm/invoices/${inv.id}/pdf`} target="_blank" rel="noreferrer" className="table-action">Otevřít PDF</a>
+                    ) : <span className="text-xs text-slate-400">Chybí PDF</span>}
                   </TableCell>
                 </tr>
               );

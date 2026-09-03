@@ -1,18 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const SESSION_COOKIE = 'seepoint_session';
-const publicPaths = [
+const publicExactPaths = new Set([
   '/',
   '/os',
   '/login',
   '/forgot-password',
+  '/api/auth/login',
+  '/api/auth/forgot-password',
+  '/api/auth/set-password',
+]);
+
+const publicPathPrefixes = [
   '/activate',
   '/reset-password',
   '/proposal',
   '/offer',
   '/client',
   '/images',
-  '/api/auth',
   '/api/proposals',
   '/api/client',
   '/api/leads',
@@ -20,7 +25,9 @@ const publicPaths = [
 
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  if (publicPaths.some((item) => path === item || path.startsWith(`${item}/`))) return NextResponse.next();
+  const isPublicPath = publicExactPaths.has(path)
+    || publicPathPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  if (isPublicPath) return NextResponse.next();
   if (!request.cookies.has(SESSION_COOKIE)) {
     if (path.startsWith('/api/')) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
     return NextResponse.redirect(new URL('/login', request.url));
@@ -29,5 +36,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|seepoint-logo.svg|placeholder.svg).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|manifest.json|sw.js|offline.html|seepoint-logo.svg|seepoint-app-icon.svg|seepoint-app-icon-192.png|seepoint-app-icon-512.png|placeholder.svg).*)'],
 };

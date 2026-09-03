@@ -19,9 +19,9 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
       orderBy: { name: 'asc' },
     }),
     prisma.employee.findMany({
-      where: { isActive: true },
+      where: { isActive: true, userId: { not: null } },
       select: {
-        id: true,
+        userId: true,
         firstName: true,
         lastName: true,
         role: true,
@@ -33,6 +33,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
 
   const currentUserData = {
     id: user.id,
+    employeeId: user.employee?.id,
     name: user.employee
       ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
       : user.name || user.email,
@@ -50,7 +51,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
             label: `${v.name}${v.registrationNumber ? ` (${v.registrationNumber})` : ''}`,
           }))}
           teamMembers={employees.map((e) => ({
-            id: e.id,
+            id: e.userId!,
             name: `${e.firstName} ${e.lastName}`.trim(),
             position: e.position || null,
           }))}

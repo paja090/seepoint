@@ -3,39 +3,24 @@ import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
 import { CityGalleryModuleClient } from '@/components/city-gallery/CityGalleryModuleClient';
 import { tenantSingletonId } from '@/lib/tenant-singleton';
+import type { CityGalleryFleetConfig, CityGalleryProject } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function CityGalleryProjectsPage() {
-  await requirePageAccess('cityGallery');
-
-  let projectsRaw: any[] = [];
-  let fleetConfig: any = null;
-
-  try {
-    const results = await Promise.all([
-      prisma.cityGalleryProject
-        .findMany({
-          include: { _count: { select: { offers: true } } },
-          orderBy: { updatedAt: 'desc' },
-          take: 100,
-        })
-        .catch((err) => {
-          console.error('Error fetching CityGalleryProject:', err);
-          return [];
-        }),
-      prisma.cityGalleryFleetConfig
-        .findUnique({ where: { id: tenantSingletonId('city-gallery-fleet') } })
-        .catch((err) => {
-          console.error('Error fetching CityGalleryFleetConfig:', err);
-          return null;
-        }),
-    ]);
-    projectsRaw = results[0] || [];
-    fleetConfig = results[1] || null;
-  } catch (err) {
-    console.error('Error in CityGalleryPage queries:', err);
-  }
+  const user = await requirePageAccess('cityGallery');
+  if (!user.organizationId) throw new Error('Není vybraná aktivní organizace.');
+  const [projectsRaw, fleetConfig]: [Array<CityGalleryProject & { _count: { offers: number } }>, CityGalleryFleetConfig | null] = await Promise.all([
+    prisma.cityGalleryProject.findMany({
+      where: { organizationId: user.organizationId },
+      include: { _count: { select: { offers: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+    }),
+    prisma.cityGalleryFleetConfig.findFirst({
+      where: { id: tenantSingletonId('city-gallery-fleet', user.organizationId), organizationId: user.organizationId },
+    }),
+  ]);
 
   const totalFleet = fleetConfig?.totalFrames ?? 24;
   const maintenanceCount = fleetConfig?.maintenanceCount ?? 0;
@@ -77,7 +62,11 @@ export default async function CityGalleryProjectsPage() {
 
   return (
     <AppShell>
-      <CityGalleryModuleClient initialProjects={projects} initialFleet={fleet} />
+      <CityGalleryModuleClient
+        canManageFleet={user.role === 'ADMIN' || user.role === 'MANAGER'}
+        initialProjects={projects}
+        initialFleet={fleet}
+      />
     </AppShell>
   );
 }

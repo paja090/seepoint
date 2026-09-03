@@ -31,6 +31,7 @@ export function BulkOccupancyBookingModal({
   onClearSelection: () => void;
 }) {
   const router = useRouter();
+  const { toggleSurface, isSurfaceSelected } = useOfferBasket();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -94,8 +95,6 @@ export function BulkOccupancyBookingModal({
       setSubmitting(false);
     }
   };
-
-  const { toggleSurface, isSurfaceSelected } = useOfferBasket();
 
   const addAllToBasket = () => {
     selectedSurfaces.forEach((s) => {
@@ -269,7 +268,10 @@ export function BulkOccupancyBookingModal({
                 <select
                   className="input w-full text-xs font-bold"
                   value={status}
-                  onChange={(e) => setStatus(e.target.value as any)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'RESERVED' || value === 'OCCUPIED' || value === 'NEGOTIATION') setStatus(value);
+                  }}
                 >
                   <option value="RESERVED">🟧 Rezervace (Předběžná blokace)</option>
                   <option value="OCCUPIED">🟥 Obsazeno / Schváleno (Smlouva podepsána)</option>
