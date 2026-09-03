@@ -80,8 +80,8 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
     .map((group) => {
       const groupItems = group.items.filter(([href, , , section]) => {
         if (!canAccess(user.role, section as AppSection)) return false;
-        // Check organization-level module feature flag (Superadmin retains access)
-        if (user.platformRole !== 'SUPER_ADMIN' && activeOrg) {
+        // Check organization-level module feature flag
+        if (activeOrg) {
           const modId = getModuleIdForPath(href);
           if (modId && !isModuleEnabled(activeOrg, modId)) {
             return false;
