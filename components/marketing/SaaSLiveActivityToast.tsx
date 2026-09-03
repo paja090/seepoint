@@ -75,7 +75,7 @@ export function SaaSLiveActivityToast() {
   const Icon = event.icon;
 
   return (
-    <div className="fixed bottom-5 left-5 z-40 max-w-sm hidden sm:block pointer-events-none">
+    <div className="fixed bottom-5 right-5 z-40 max-w-sm hidden sm:block pointer-events-none">
       <div
         className={`p-3.5 rounded-2xl bg-slate-950/95 border border-slate-800 shadow-2xl backdrop-blur-md transition-all duration-500 ease-out transform ${
           isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95'

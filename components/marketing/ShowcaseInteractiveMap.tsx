@@ -52,11 +52,15 @@ function ShowcaseLeafletMapInner() {
       scrollWheelZoom: false,
     });
 
-    // Add CartoDB Dark Matter tile layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19,
+    // High-quality dark canvas tile layer (Esri Dark Gray Canvas - fast CDN, no watermark, no API key required)
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '&copy; Esri &copy; OpenStreetMap contributors',
+      maxZoom: 16,
+    }).addTo(map);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+      attribution: '',
+      maxZoom: 16,
     }).addTo(map);
 
     // Custom Icon Generator
@@ -149,18 +153,21 @@ function ShowcaseLeafletMapInner() {
       <div ref={setMapContainer} className="w-full h-full z-10" />
 
       {/* Map Legend Overlay */}
-      <div className="absolute bottom-3 left-3 z-20 bg-slate-950/95 p-3.5 rounded-xl border border-slate-800 backdrop-blur-md shadow-xl text-[11px] font-bold text-slate-300 space-y-1.5 hidden sm:block">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] uppercase font-black text-purple-400">Živá síť nosičů na mapě (24 nosičů)</span>
-          <span className="text-[10px] text-emerald-400 font-bold">● 18 volných</span>
+      <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-20 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 backdrop-blur-md shadow-2xl text-[11px] font-bold text-slate-300 space-y-1.5">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-1.5">
+          <span className="text-[11px] uppercase tracking-wider font-black text-purple-400">Živá síť nosičů na mapě (24 nosičů)</span>
+          <span className="text-[11px] text-emerald-400 font-extrabold flex items-center gap-1">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            18 volných
+          </span>
         </div>
-        <div className="flex items-center gap-3 flex-wrap pt-1">
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-purple-500" /> Promo Tower (5)</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-sky-400" /> City Poster (6)</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-indigo-500" /> Billboard (5)</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-emerald-500" /> Lavičky (4)</span>
-          <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-orange-500" /> Navigace VO (4)</span>
-          <span className="flex items-center gap-1.5 text-rose-400"><span className="size-2.5 rounded-full bg-rose-500" /> Památková zóna</span>
+        <div className="flex items-center gap-2.5 flex-wrap pt-0.5 text-[11px]">
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-purple-500" /> Promo Tower (5)</span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-sky-400" /> City Poster (6)</span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-indigo-500" /> Billboard (5)</span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-emerald-500" /> Lavičky (4)</span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-orange-500" /> Navigace VO (4)</span>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-950/60 border border-rose-900/60 text-rose-300"><span className="size-2 rounded-full bg-rose-500" /> Památková zóna</span>
         </div>
       </div>
     </div>
