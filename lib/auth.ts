@@ -51,7 +51,7 @@ export async function getCurrentUser() {
         },
       },
     },
-  });
+  }).catch(() => null);
   if (!session || session.expiresAt <= new Date() || session.sessionVersion !== session.user.sessionVersion || session.user.status !== 'ACTIVE') return null;
 
   const user = session.user;
