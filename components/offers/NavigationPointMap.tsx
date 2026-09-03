@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
+import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
 
 export type NavigationMapPoint = {
   id: string;
@@ -52,6 +53,28 @@ export function NavigationPointMap({
 
       map.on('click', (event) => clickRef.current(event.latlng.lat, event.latlng.lng));
       mapRef.current = map;
+
+      // Render all 12 official Ostrava restricted advertising zones from GeoJSON
+      try {
+        L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
+          style: {
+            color: '#dc2626',
+            fillColor: '#ef4444',
+            fillOpacity: 0.16,
+            weight: 2,
+            dashArray: '5, 5',
+          },
+          onEachFeature: (feature: { properties?: { CISLO?: string; ID?: string } }, polyLayer: import('leaflet').Layer) => {
+            const num = feature.properties?.CISLO || feature.properties?.ID || '';
+            polyLayer.bindTooltip(`Zóna zákazu šíření reklamy č. ${num} (Nařízení města č. 2/2020 a č. 11/2019)`, {
+              sticky: true,
+            });
+          },
+        }).addTo(map);
+      } catch {
+        // Ignore if geometry fails
+      }
+
       layerRef.current = L.layerGroup().addTo(map);
     });
 
