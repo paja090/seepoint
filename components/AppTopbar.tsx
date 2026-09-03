@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
 import { NotificationBellCenter } from '@/components/notifications/NotificationBellCenter';
-import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 import { QuickSearchInput } from '@/components/QuickSearchInput';
 import { WeatherClockWidget } from '@/components/WeatherClockWidget';
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher';
@@ -52,7 +51,6 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
       <div className="flex items-center gap-2.5">
         <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
         <WeatherClockWidget />
-        <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} />
 
         <div className="h-6 w-px bg-slate-200 mx-0.5" />
 
