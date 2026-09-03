@@ -53,9 +53,11 @@ export function MapView({
   const [pendingLocation, setPendingLocation] = useState<PendingLocation>();
   const [locationSaving, setLocationSaving] = useState(false);
   const [locationError, setLocationError] = useState('');
+  const [showRestrictedZones, setShowRestrictedZones] = useState(true);
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
+  const restrictedLayerRef = useRef<LayerGroup | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
   const locationEditIdRef = useRef<string | undefined>(undefined);
 
@@ -97,11 +99,37 @@ export function MapView({
     async function initializeMap() {
       const L = await import('leaflet');
       if (cancelled || !mapElementRef.current || mapRef.current) return;
-      const map = L.map(mapElementRef.current, { center: [49.9, 15.3], zoom: 7, scrollWheelZoom: true });
+      const map = L.map(mapElementRef.current, { center: [49.835, 18.275], zoom: 12, scrollWheelZoom: true });
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19,
       }).addTo(map);
+
+      const restrictedLayer = L.layerGroup().addTo(map);
       const markerLayer = L.layerGroup().addTo(map);
+
+      // Load all 12 official Ostrava restricted advertising zones from GIS GeoJSON
+      fetch('/data/ostrava_zakaz_reklam.geojson')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((geoData) => {
+          if (cancelled || !geoData) return;
+          L.geoJSON(geoData, {
+            style: {
+              color: '#dc2626',
+              fillColor: '#ef4444',
+              fillOpacity: 0.18,
+              weight: 2,
+              dashArray: '6, 6',
+            },
+            onEachFeature: (feature: { properties?: { CISLO?: string; ID?: string } }, layer: import('leaflet').Layer) => {
+              const num = feature.properties?.CISLO || feature.properties?.ID || '';
+              layer.bindTooltip(`Zóna zákazu šíření reklamy č. ${num} (Nařízení města č. 2/2020 a č. 11/2019)`, {
+                sticky: true,
+              });
+            },
+          }).addTo(restrictedLayer);
+        })
+        .catch(() => {});
+
       map.on('click', (event) => {
         if (locationEditIdRef.current) {
           setPendingLocation({ latitude: event.latlng.lat, longitude: event.latlng.lng });
@@ -113,6 +141,7 @@ export function MapView({
       leafletRef.current = L;
       mapRef.current = map;
       markerLayerRef.current = markerLayer;
+      restrictedLayerRef.current = restrictedLayer;
       setMapReady(true);
     }
     void initializeMap();
@@ -121,9 +150,22 @@ export function MapView({
       mapRef.current?.remove();
       mapRef.current = null;
       markerLayerRef.current = null;
+      restrictedLayerRef.current = null;
       leafletRef.current = null;
     };
   }, []);
+
+  // Handle toggling of restricted advertising zones
+  useEffect(() => {
+    const map = mapRef.current;
+    const restrictedLayer = restrictedLayerRef.current;
+    if (!map || !restrictedLayer) return;
+    if (showRestrictedZones) {
+      if (!map.hasLayer(restrictedLayer)) map.addLayer(restrictedLayer);
+    } else {
+      if (map.hasLayer(restrictedLayer)) map.removeLayer(restrictedLayer);
+    }
+  }, [showRestrictedZones]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -215,6 +257,19 @@ export function MapView({
           <label><span className="sr-only">Filtrovat podle klienta</span><select className="input min-w-52" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}><option value={ALL_CLIENTS}>Všichni klienti</option><option value={WITHOUT_CLIENT}>Bez klienta</option>{clientNames.map((clientName) => <option key={clientName} value={clientName}>{clientName}</option>)}</select></label>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
+          <button
+            type="button"
+            onClick={() => setShowRestrictedZones((prev) => !prev)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
+              showRestrictedZones
+                ? 'bg-red-50 text-red-700 border-red-200 shadow-xs'
+                : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+            }`}
+            title="Přepnout zobrazení 12 zón zákazu šíření reklamy (Ostrava)"
+          >
+            <span className={`h-2 w-2 rounded-full ${showRestrictedZones ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`} />
+            <span>Zákaz reklamy Ostrava (12 zón)</span>
+          </button>
           {legend.map((item) => <span key={item.label} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />{item.label}</span>)}
           <strong className="text-slate-900">{carrierCountLabel(filteredItems.length)}</strong>
           {missingGpsCount > 0 && <strong className="text-amber-700">{missingGpsCount} bez GPS</strong>}
