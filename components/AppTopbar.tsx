@@ -1,10 +1,9 @@
 'use client';
 
-import { LogOut, MessageSquare, PhoneCall, UserRound } from 'lucide-react';
+import { LogOut, MessageSquare, PhoneCall } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
-import { roleLabel } from '@/lib/rbac';
 import { NotificationBellCenter } from '@/components/notifications/NotificationBellCenter';
 import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 import { QuickSearchInput } from '@/components/QuickSearchInput';
@@ -37,52 +36,67 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
   async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
 
   return (
-    <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-4 border-b border-slate-200/90 bg-white/95 px-6 backdrop-blur-md shadow-2xs">
-      <div className="min-w-0 flex items-center gap-3">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
-              SeePoint OS
-            </span>
-            <span className="text-xs font-semibold text-slate-400">/</span>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Aktuální stránka</span>
-          </div>
-          <h2 className="truncate text-lg font-black text-slate-950 mt-0.5">{title}</h2>
-        </div>
+    <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-5 backdrop-blur-md shadow-2xs">
+      <div className="min-w-0 flex items-center gap-2">
+        <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 shrink-0">
+          SeePoint OS
+        </span>
+        <span className="text-slate-300">/</span>
+        <h1 className="truncate text-base font-bold text-slate-900 tracking-tight">{title}</h1>
       </div>
 
-      <QuickSearchInput />
+      <div className="flex-1 max-w-md mx-2">
+        <QuickSearchInput />
+      </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
-        {/* 🌤️ Live Weather & Clock Widget */}
         <WeatherClockWidget />
-
         <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} />
 
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-          <p className="text-xs text-slate-500">Aktivní: {roleLabel(user.role)}</p>
-          {user.isPlatformSuperAdmin && <p className="text-[10px] font-semibold text-purple-700">Platforma: Superadmin</p>}
-        </div>
+        <div className="h-6 w-px bg-slate-200 mx-0.5" />
 
         <NotificationBellCenter />
 
-        <Link href="/chat" className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition" title="💬 Týmový Chat & Účtenky za palivo">
-          <MessageSquare size={16} />
-          <span className="hidden md:inline">Chat & Účtenky</span>
+        <Link
+          href="/chat"
+          className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 transition shrink-0"
+          title="💬 Týmový Chat & Účtenky za palivo"
+        >
+          <MessageSquare size={15} />
+          <span className="hidden xl:inline">Chat</span>
         </Link>
 
-        <Link href="/team" className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition" title="📞 Telefonní seznam týmu SeePOINT">
-          <PhoneCall size={17} />
+        <Link
+          href="/team"
+          className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition shrink-0"
+          title="📞 Telefonní seznam týmu SeePOINT"
+        >
+          <PhoneCall size={16} />
         </Link>
 
-        <div className="grid h-10 w-10 place-items-center rounded-full bg-slate-950 text-sm font-semibold text-white" title={user.email}>{initials}</div>
+        <div className="h-6 w-px bg-slate-200 mx-0.5" />
 
-        <Link className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" href="/profile" title="Můj profil"><UserRound size={18} /></Link>
+        {/* Unified User Profile Button */}
+        <Link
+          href="/profile"
+          className="flex items-center gap-2 rounded-xl p-1 pr-2.5 border border-slate-200 bg-slate-50/70 hover:bg-slate-100 hover:border-slate-300 transition group shrink-0"
+          title={`Můj profil: ${user.name} (${user.email})`}
+        >
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-slate-950 text-xs font-bold text-white shadow-xs group-hover:bg-purple-700 transition">
+            {initials}
+          </div>
+          <div className="text-left hidden 2xl:block">
+            <p className="text-xs font-bold text-slate-900 leading-tight truncate max-w-[120px]">{user.name}</p>
+          </div>
+        </Link>
 
-        <button className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900" onClick={logout} title="Odhlásit">
-          <LogOut size={18} />
+        <button
+          className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-red-50 hover:border-red-200 hover:text-red-600 shrink-0"
+          onClick={logout}
+          title="Odhlásit ze systému"
+        >
+          <LogOut size={16} />
         </button>
       </div>
     </header>
