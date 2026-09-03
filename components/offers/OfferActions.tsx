@@ -48,6 +48,9 @@ export function OfferActions({
   const persistentPublicUrl = customToken && typeof window !== 'undefined'
     ? `${window.location.origin}/offer/${customToken}`
     : null;
+  const persistentCampaignUrl = customToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/campaign/${customToken}`
+    : null;
 
   async function action(name: string, body?: unknown) {
     setBusy(name);
@@ -152,8 +155,20 @@ export function OfferActions({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs transition cursor-pointer"
                 >
                   <ExternalLink size={13} />
-                  Otevřít odkaz
+                  Náhled nabídky
                 </a>
+                {persistentCampaignUrl && (
+                  <a
+                    href={persistentCampaignUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                    title="Otevřít Klientský Live Portál & Proof of Play fotodokumentaci"
+                  >
+                    <ExternalLink size={13} />
+                    🌟 Klientský Live Portál
+                  </a>
+                )}
               </>
             ) : null}
             <button
