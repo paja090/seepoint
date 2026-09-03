@@ -156,7 +156,7 @@ export async function generateNavigationPreview(input: {
         const isHighway = isRestrictedHighwayOr1stClassRoad(addressText);
         const isHeritageZone = isOstravaRestrictedZone(candidate.latitude, candidate.longitude, addressText);
 
-        if (addressText && !isHighway && !isHeritageZone) {
+        if (addressText && !isHighway) {
           selectedPoint = candidate;
           foundValidPoint = true;
           const distMeters = haversineMeters(candidate, target);
@@ -166,15 +166,19 @@ export async function generateNavigationPreview(input: {
           const isFarIntersection = distMeters > 1000;
 
           if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
-            pointTitle = isFarIntersection
-              ? `Vytížená křižovatka na ${streetPart} (${distKm} km, od ${direction})`
-              : `Příjezdový bod na ${streetPart} (od ${direction})`;
+            pointTitle = isHeritageZone
+              ? `Navigační bod na ${streetPart} (${distKm} km, od ${direction})`
+              : (isFarIntersection
+                ? `Vytížená křižovatka na ${streetPart} (${distKm} km, od ${direction})`
+                : `Příjezdový bod na ${streetPart} (od ${direction})`);
             
             pointReasons = [
               isFarIntersection
                 ? `🚦 Frekventovaná křižovatka: Bod zachycuje vysoký průjezd aut na městské třídě ${streetPart} ve vzdálenosti cca ${distKm} km od cíle.`
-                : `Navigační bod na městské třídě ${streetPart} mimo dálnice, I. třídy a památkovou zónu.`,
-              `Strategický bod pro včasné nasměrování řidičů přijíždějících od ${direction}.`,
+                : `Navigační bod na městské třídě ${streetPart} s přímou viditelností pro přijíždějící řidiče.`,
+              isHeritageZone
+                ? `🏛️ Upozornění: Bod leží v regulované zóně města Ostrava (Nařízení č. 2/2020 a č. 11/2019) – při realizaci ověřte soulad se schválením.`
+                : `Strategický bod pro včasné nasměrování řidičů přijíždějících od ${direction}.`,
             ];
           }
           break;
