@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   SYSTEM_MODULES,
   CATEGORY_LABELS,
@@ -21,6 +22,7 @@ export function OrganizationModulesCard({
   initialPlan,
   initialEnabledModules,
 }: Props) {
+  const router = useRouter();
   const [currentPlan, setCurrentPlan] = useState<string>(initialPlan);
   const [modulesMap, setModulesMap] = useState<Record<string, boolean>>(() =>
     getOrganizationEnabledModules({
@@ -96,6 +98,7 @@ export function OrganizationModulesCard({
           type: 'success',
           text: 'Nastavení modulů bylo úspěšně uloženo a aplikováno pro celou organizaci.',
         });
+        router.refresh();
       } catch (err: unknown) {
         setMessage({
           type: 'error',
