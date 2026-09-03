@@ -108,111 +108,111 @@ export function SaaSProductShowcase() {
   return (
     <section id="produkt" className="py-12 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Tab Selector Bar */}
+        {/* Modern Clean Tab Selector Bar */}
         <div className="flex items-center justify-center overflow-x-auto py-2 scrollbar-none">
-          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 backdrop-blur-md shadow-xl">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800/90 backdrop-blur-md shadow-2xl">
             <button
               type="button"
               onClick={() => setActiveTab('map')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'map'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <MapPin className="w-4 h-4" />
-              <span>🗺️ Živá Mapa</span>
+              <MapPin className={`w-4 h-4 ${activeTab === 'map' ? 'text-white' : 'text-purple-400'}`} />
+              <span>Živá Mapa</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('inventory')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'inventory'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Layers className="w-4 h-4" />
-              <span>📦 Evidence</span>
+              <Layers className={`w-4 h-4 ${activeTab === 'inventory' ? 'text-white' : 'text-sky-400'}`} />
+              <span>Evidence</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('occupancy')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'occupancy'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Calendar className="w-4 h-4" />
-              <span>📅 Obsazenost</span>
+              <Calendar className={`w-4 h-4 ${activeTab === 'occupancy' ? 'text-white' : 'text-emerald-400'}`} />
+              <span>Obsazenost</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('offers')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'offers'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <FileText className="w-4 h-4" />
-              <span>📜 Nabídky</span>
+              <FileText className={`w-4 h-4 ${activeTab === 'offers' ? 'text-white' : 'text-amber-400'}`} />
+              <span>Nabídky</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('ai')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'ai'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-900/30 border border-purple-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
-              <span>🤖 AI Nabídky & Radar</span>
+              <Sparkles className={`w-4 h-4 ${activeTab === 'ai' ? 'text-white' : 'text-purple-400 animate-pulse'}`} />
+              <span>AI Nabídky & Radar</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('route')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'route'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-900/30 border border-emerald-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Navigation className="w-4 h-4 text-emerald-300" />
-              <span>🚗 Optimalizátor Tras</span>
+              <Navigation className={`w-4 h-4 ${activeTab === 'route' ? 'text-white' : 'text-emerald-400'}`} />
+              <span>Optimalizátor Tras</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('warehouse')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'warehouse'
-                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-900/30 border border-amber-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Receipt className="w-4 h-4 text-amber-300" />
-              <span>🧾 AI Sklad & Účtenky</span>
+              <Receipt className={`w-4 h-4 ${activeTab === 'warehouse' ? 'text-white' : 'text-amber-400'}`} />
+              <span>AI Sklad & Účtenky</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('network')}
-              className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                 activeTab === 'network'
-                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-900/30 border border-indigo-500/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <TrendingUp className="w-4 h-4 text-sky-300 animate-pulse" />
-              <span>🌐 SeePoint Network (B2B Burza)</span>
+              <TrendingUp className={`w-4 h-4 ${activeTab === 'network' ? 'text-white' : 'text-sky-400 animate-pulse'}`} />
+              <span>SeePoint Network (B2B)</span>
             </button>
           </div>
         </div>
@@ -274,7 +274,7 @@ export function SaaSProductShowcase() {
                     <p className="text-xs text-slate-400">Přehled 842 položek s GPS a fotografiemi</p>
                   </div>
                   <span className="px-3 py-1 rounded-xl text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800">
-                    Fulltext filtr & Export do Excelu
+                    Fulltext filtr & bezpečný import
                   </span>
                 </div>
 
@@ -886,4 +886,3 @@ export function SaaSProductShowcase() {
     </section>
   );
 }
-
