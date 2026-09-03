@@ -8,6 +8,7 @@ import { carrierMapColor } from '@/lib/mock-data';
 import { CarrierDetail } from './CarrierDetail';
 import { CarrierForm } from './CarrierForm';
 import { CarrierMapCard } from './CarrierMapCard';
+import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
 
 type LeafletModule = typeof import('leaflet');
 type StatusFilter = 'ALL' | CarrierStatus;
@@ -107,28 +108,26 @@ export function MapView({
       const restrictedLayer = L.layerGroup().addTo(map);
       const markerLayer = L.layerGroup().addTo(map);
 
-      // Load all 12 official Ostrava restricted advertising zones from GIS GeoJSON
-      fetch('/data/ostrava_zakaz_reklam.geojson')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((geoData) => {
-          if (cancelled || !geoData) return;
-          L.geoJSON(geoData, {
-            style: {
-              color: '#dc2626',
-              fillColor: '#ef4444',
-              fillOpacity: 0.18,
-              weight: 2,
-              dashArray: '6, 6',
-            },
-            onEachFeature: (feature: { properties?: { CISLO?: string; ID?: string } }, layer: import('leaflet').Layer) => {
-              const num = feature.properties?.CISLO || feature.properties?.ID || '';
-              layer.bindTooltip(`Zóna zákazu šíření reklamy č. ${num} (Nařízení města č. 2/2020 a č. 11/2019)`, {
-                sticky: true,
-              });
-            },
-          }).addTo(restrictedLayer);
-        })
-        .catch(() => {});
+      // Render all 12 official Ostrava restricted advertising zones from GeoJSON
+      try {
+        L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
+          style: {
+            color: '#dc2626',
+            fillColor: '#ef4444',
+            fillOpacity: 0.18,
+            weight: 2,
+            dashArray: '6, 6',
+          },
+          onEachFeature: (feature: { properties?: { CISLO?: string; ID?: string } }, layer: import('leaflet').Layer) => {
+            const num = feature.properties?.CISLO || feature.properties?.ID || '';
+            layer.bindTooltip(`Zóna zákazu šíření reklamy č. ${num} (Nařízení města č. 2/2020 a č. 11/2019)`, {
+              sticky: true,
+            });
+          },
+        }).addTo(restrictedLayer);
+      } catch {
+        // Ignore if geometry fails
+      }
 
       map.on('click', (event) => {
         if (locationEditIdRef.current) {

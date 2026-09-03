@@ -18,6 +18,7 @@ const publicPathPrefixes = [
   '/offer',
   '/client',
   '/images',
+  '/data',
   '/api/proposals',
   '/api/client',
   '/api/leads',
@@ -36,5 +37,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|manifest.json|sw.js|offline.html|seepoint-logo.svg|seepoint-app-icon.svg|seepoint-app-icon-192.png|seepoint-app-icon-512.png|placeholder.svg).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|data|manifest.json|sw.js|offline.html|seepoint-logo.svg|seepoint-app-icon.svg|seepoint-app-icon-192.png|seepoint-app-icon-512.png|placeholder.svg).*)'],
 };

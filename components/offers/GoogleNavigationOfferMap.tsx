@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
 import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
+import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
 
 declare global {
   interface Window {
@@ -443,64 +444,33 @@ export function GoogleNavigationOfferMap({
 
     // Render Ostrava Municipal Heritage & Restricted Advertising Zones (Nařízení č. 2/2020 a č. 11/2019)
     if (googleMaps.Polygon) {
-      fetch('/data/ostrava_zakaz_reklam.geojson')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((geoData) => {
-          if (!geoData || !map) return;
-          const features = geoData.features as Array<{
-            geometry?: { coordinates?: number[][][] };
-            properties?: { CISLO?: string; ID?: string };
-          }>;
-          features?.forEach((feature) => {
-            const rawCoords = feature.geometry?.coordinates?.[0];
-            if (Array.isArray(rawCoords) && rawCoords.length > 0) {
-              const path = rawCoords.map((coord) => ({
-                lat: coord[1],
-                lng: coord[0],
-              }));
-              const poly = new googleMaps.Polygon!({
-                paths: path,
-                strokeColor: '#ef4444',
-                strokeOpacity: 0.85,
-                strokeWeight: 2,
-                fillColor: '#f87171',
-                fillOpacity: 0.16,
-                map,
-              });
-              polylinesRef.current.push(poly as unknown as { setMap: (map: unknown) => void });
-            }
-          });
-        })
-        .catch(() => {
-          // Fallback legacy polygons if fetch fails
-          const fallbackHeritageZones = [
-            [
-              { lat: 49.8418, lng: 18.2835 },
-              { lat: 49.8398, lng: 18.2978 },
-              { lat: 49.8318, lng: 18.2945 },
-              { lat: 49.8312, lng: 18.284 },
-              { lat: 49.8362, lng: 18.281 },
-            ],
-            [
-              { lat: 49.8355, lng: 18.161 },
-              { lat: 49.8355, lng: 18.175 },
-              { lat: 49.8235, lng: 18.176 },
-              { lat: 49.8235, lng: 18.16 },
-            ],
-          ];
-          fallbackHeritageZones.forEach((path) => {
+      try {
+        const features = (OSTRAVA_RESTRICTED_ZONES_GEOJSON?.features ?? []) as Array<{
+          geometry?: { coordinates?: number[][][] };
+          properties?: { CISLO?: string; ID?: string };
+        }>;
+        features.forEach((feature) => {
+          const rawCoords = feature.geometry?.coordinates?.[0];
+          if (Array.isArray(rawCoords) && rawCoords.length > 0) {
+            const path = rawCoords.map((coord) => ({
+              lat: coord[1],
+              lng: coord[0],
+            }));
             const poly = new googleMaps.Polygon!({
               paths: path,
               strokeColor: '#ef4444',
-              strokeOpacity: 0.8,
+              strokeOpacity: 0.85,
               strokeWeight: 2,
               fillColor: '#f87171',
-              fillOpacity: 0.15,
+              fillOpacity: 0.16,
               map,
             });
             polylinesRef.current.push(poly as unknown as { setMap: (map: unknown) => void });
-          });
+          }
         });
+      } catch {
+        // Ignore if geometry fails
+      }
     }
 
     // 2. Navigation Points Markers & Route Polylines
