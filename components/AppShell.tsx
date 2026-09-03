@@ -71,24 +71,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
   if (!user) redirect('/login');
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
 
-  let activeOrg: { plan?: string; enabledModules?: unknown } | null = null;
-  if (user.organizationId) {
-    try {
-      activeOrg = await prisma.organization.findUnique({
-        where: { id: user.organizationId },
-        select: { plan: true, enabledModules: true },
-      });
-    } catch {
-      try {
-        activeOrg = await prisma.organization.findUnique({
-          where: { id: user.organizationId },
-          select: { plan: true },
-        });
-      } catch {
-        activeOrg = null;
-      }
-    }
-  }
+  const activeOrg = user.organization;
 
   // Filter groups and eliminate duplicate links within each role's view
   const seenHrefs = new Set<string>();
@@ -139,16 +122,18 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         where: { employeeId: user.employee.id, isPrimary: true },
         select: { url: true },
         orderBy: { createdAt: 'desc' },
-      })
+      }).catch(() => null)
     : null;
 
   const avatarUrl = employeePhoto?.url || null;
 
-  const employees = await prisma.employee.findMany({
-    where: { isActive: true },
-    select: { id: true, firstName: true, lastName: true, position: true },
-    orderBy: { firstName: 'asc' },
-  });
+  const employees = user.organizationId
+    ? await prisma.employee.findMany({
+        where: { isActive: true },
+        select: { id: true, firstName: true, lastName: true, position: true },
+        orderBy: { firstName: 'asc' },
+      }).catch(() => [])
+    : [];
 
   return (
     <ResponsiveAppShell
@@ -161,8 +146,8 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         organizationRoleLabel: user.membership?.role === 'OWNER' ? 'Vlastník organizace' : roleLabel(user.primaryRole),
         isPlatformSuperAdmin: user.platformRole === 'SUPER_ADMIN',
         avatarUrl,
-        organizationId: user.organizationId!,
-        organizations: user.memberships.map((membership) => ({
+        organizationId: user.organizationId || '',
+        organizations: (user.memberships || []).map((membership) => ({
           id: membership.organization.id,
           name: membership.organization.name,
           slug: membership.organization.slug,
