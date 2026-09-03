@@ -71,12 +71,24 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
   if (!user) redirect('/login');
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
 
-  const activeOrg = user.organizationId
-    ? await prisma.organization.findUnique({
+  let activeOrg: { plan?: string; enabledModules?: unknown } | null = null;
+  if (user.organizationId) {
+    try {
+      activeOrg = await prisma.organization.findUnique({
         where: { id: user.organizationId },
         select: { plan: true, enabledModules: true },
-      })
-    : null;
+      });
+    } catch {
+      try {
+        activeOrg = await prisma.organization.findUnique({
+          where: { id: user.organizationId },
+          select: { plan: true },
+        });
+      } catch {
+        activeOrg = null;
+      }
+    }
+  }
 
   // Filter groups and eliminate duplicate links within each role's view
   const seenHrefs = new Set<string>();
