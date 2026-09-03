@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
 
 export function ShowcaseInteractiveMap() {
   const [mounted, setMounted] = useState(false);
@@ -127,43 +128,26 @@ function ShowcaseLeafletMapInner() {
       `);
     });
 
-    // Load and render all 12 official Ostrava restricted advertising / heritage zones from GeoJSON
-    fetch('/data/ostrava_zakaz_reklam.geojson')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((geoData) => {
-        if (!geoData) return;
-        L.geoJSON(geoData, {
-          style: {
-            color: '#ef4444',
-            fillColor: '#f87171',
-            fillOpacity: 0.22,
-            weight: 2,
-            dashArray: '5, 5',
-          },
-          onEachFeature: (feature: { properties?: { CISLO?: string; ID?: string } }, layer: import('leaflet').Layer) => {
-            const num = feature.properties?.CISLO || feature.properties?.ID || '';
-            layer.bindTooltip(`Zóna zákazu šíření reklamy č. ${num} (Nařízení města č. 2/2020 a č. 11/2019)`, {
-              sticky: true,
-            });
-          },
-        }).addTo(map);
-      })
-      .catch(() => {
-        // Fallback polygon if fetch fails
-        const heritageZoneCoords: [number, number][] = [
-          [49.8385, 18.2865],
-          [49.8395, 18.2965],
-          [49.8325, 18.2985],
-          [49.8315, 18.2855],
-        ];
-        L.polygon(heritageZoneCoords, {
+    // Render all 12 official Ostrava restricted advertising / heritage zones from GeoJSON
+    try {
+      L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
+        style: {
           color: '#ef4444',
           fillColor: '#f87171',
-          fillOpacity: 0.25,
+          fillOpacity: 0.22,
           weight: 2,
-          dashArray: '4, 4',
-        }).addTo(map).bindTooltip('Památková zóna Moravská Ostrava (Nařízení č. 2/2020)', { sticky: true });
-      });
+          dashArray: '5, 5',
+        },
+        onEachFeature: (feature: { properties?: { CISLO?: string; ID?: string } }, layer: import('leaflet').Layer) => {
+          const num = feature.properties?.CISLO || feature.properties?.ID || '';
+          layer.bindTooltip(`Zóna zákazu šíření reklamy č. ${num} (Nařízení města č. 2/2020 a č. 11/2019)`, {
+            sticky: true,
+          });
+        },
+      }).addTo(map);
+    } catch {
+      // Ignore if geometry fails
+    }
 
     return () => {
       map.remove();
