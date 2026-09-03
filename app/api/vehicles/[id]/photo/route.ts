@@ -1,59 +1,74 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma, ensureVehicleSchema } from '@/lib/db';
+import { PhotoValidationError, safePhotoFileName, validatePhotoFile } from '@/lib/photo-validation';
+import { deleteStoredPhoto, storeTenantPhoto } from '@/lib/storage/photo-storage';
+import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
-  }
+function photoIdFromUrl(url: string | null) {
+  const match = url?.match(/^\/api\/photos\/([a-zA-Z0-9_-]+)\/file$/);
+  return match?.[1] || null;
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiAccess('vehicles');
+  if (isApiDenied(auth)) return auth;
+  const limited = await enforcePhotoUploadRateLimit(request, auth);
+  if (limited) return limited;
+  const organizationId = auth.organizationId || auth.membership?.organizationId;
+  if (!organizationId) return NextResponse.json({ error: 'Nebyla nalezena organizace pro uložení fotografie.' }, { status: 400 });
 
   await ensureVehicleSchema();
-  const { id } = await params;
-
+  let stored: Awaited<ReturnType<typeof storeTenantPhoto>> | undefined;
   try {
-    const vehicle = await prisma.vehicle.findUnique({ where: { id } });
-    if (!vehicle) {
-      return NextResponse.json({ error: 'Vozidlo nebylo nalezeno.' }, { status: 404 });
-    }
+    const { id } = await params;
+    const vehicle = await prisma.vehicle.findUnique({ where: { id }, select: { id: true, photoUrl: true } });
+    if (!vehicle) return NextResponse.json({ error: 'Vozidlo nebylo nalezeno.' }, { status: 404 });
 
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-
-    if (!file || file.size === 0) {
-      return NextResponse.json({ error: 'Vyberte platný obrázek vozidla ke nahrání.' }, { status: 400 });
-    }
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const fileName = file.name || `vozidlo-${id}.jpg`;
-    const photoId = `vehicle-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-
-    await prisma.photo.create({
-      data: {
-        id: photoId,
-        fileName,
-        mimeType: file.type || 'image/jpeg',
-        content: new Uint8Array(buffer),
-        url: `/api/photos/${photoId}/file`,
-        type: 'BEFORE_INSTALLATION',
-      },
-    });
-
+    const validated = await validatePhotoFile(formData.get('file'));
+    const file = validated!.file;
+    const photoId = `vehicle-${randomUUID()}`;
+    const fileName = `${Date.now()}-${safePhotoFileName(file.name, `vozidlo-${id}.jpg`)}`;
+    stored = await storeTenantPhoto({ organizationId, photoId, fileName, file });
     const photoUrl = `/api/photos/${photoId}/file`;
-    await prisma.vehicle.update({
-      where: { id },
-      data: { photoUrl },
+    const previousPhotoId = photoIdFromUrl(vehicle.photoUrl);
+
+    const previousPhoto = await prisma.$transaction(async (tx) => {
+      await tx.photo.create({
+        data: {
+          id: photoId,
+          fileName,
+          mimeType: validated!.mimeType,
+          size: stored!.bytes.byteLength,
+          content: stored!.storageProvider === 'DATABASE' ? Buffer.from(stored!.bytes) : undefined,
+          driveFileId: stored!.driveFileId,
+          storageProvider: stored!.storageProvider,
+          storageKey: stored!.storageKey,
+          contentChecksum: stored!.contentChecksum,
+          url: photoUrl,
+          type: 'CHECK',
+          note: `Fotografie vozidla ${id}`,
+          capturedByWorkerUserId: auth.id,
+          capturedByWorkerName: auth.name || auth.email,
+        },
+      });
+      await tx.vehicle.update({ where: { id }, data: { photoUrl } });
+      if (!previousPhotoId || previousPhotoId === photoId) return null;
+      const old = await tx.photo.findUnique({ where: { id: previousPhotoId }, select: { id: true, driveFileId: true, storageProvider: true } });
+      if (old) await tx.photo.delete({ where: { id: old.id } });
+      return old;
     });
 
-    return NextResponse.json({ photoUrl });
+    if (previousPhoto) await deleteStoredPhoto(previousPhoto).catch((error) => console.error('[vehicles/photo] Úklid staré fotografie selhal', error));
+    return NextResponse.json({ photoUrl, storageWarning: stored.warning });
   } catch (error) {
-    console.error('Vehicle photo upload error:', error);
+    if (stored) await deleteStoredPhoto(stored).catch(() => undefined);
+    if (error instanceof PhotoValidationError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    console.error('[vehicles/photo] Nahrání fotografie selhalo', error);
     return NextResponse.json({ error: 'Nahrání fotografie vozidla selhalo.' }, { status: 500 });
   }
 }

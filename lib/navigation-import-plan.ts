@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { NavigationImportReport, NavigationImportRow } from './navigation-import';
 
 export type PlannedNavigation = {
@@ -58,6 +59,12 @@ function hash(value: string) {
     current = Math.imul(current, 16777619);
   }
   return (current >>> 0).toString(16).padStart(8, '0');
+}
+
+function planHash(reports: NavigationImportReport[]) {
+  // Cover every parsed field, not only derived source keys. Dates, notes and
+  // photo references can affect committed records even when identity is stable.
+  return createHash('sha256').update(JSON.stringify(reports)).digest('hex');
 }
 
 function cityFromSheet(sheetName: string) {
@@ -226,13 +233,10 @@ export function buildNavigationImportPlan(reports: NavigationImportReport[]): Na
   }));
 
   const clients = new Set(rows.map((row) => normalizeClientName(row.clientName)).filter(Boolean));
-  const planHash = hash(carriers.flatMap((carrier) => [
-    carrier.sourceKey,
-    ...carrier.navigations.map((navigation) => navigation.sourceKey),
-  ]).sort().join('|'));
+  const verifiedPlanHash = planHash(reports);
 
   return {
-    planHash,
+    planHash: verifiedPlanHash,
     carriers,
     stats: {
       sourceRows: reports.reduce((sum, report) => sum + report.totalRows, 0),

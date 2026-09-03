@@ -6,7 +6,8 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
 import { VehicleReservationModal } from '@/components/VehicleReservationModal';
 import { ReservationStatusActions } from '@/components/ReservationStatusActions';
-import { Calendar, User, Car, Truck, Clock } from 'lucide-react';
+import { Prisma, type ReservationStatus } from '@prisma/client';
+import { canAssignReservationToOthers, derivedVehicleStatus } from '@/lib/vehicle-reservations';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,11 +24,15 @@ export default async function VehicleReservationsPage({ searchParams }: { search
   const vehicleIdFilter = clean(params.vehicleId);
   const statusFilter = clean(params.status);
 
-  const where: any = {};
+  const where: Prisma.VehicleReservationWhereInput = {};
   if (vehicleIdFilter) where.vehicleId = vehicleIdFilter;
-  if (statusFilter) where.status = statusFilter;
+  const reservationStatuses: ReservationStatus[] = ['RESERVED', 'ACTIVE', 'FINISHED', 'CANCELLED'];
+  if (statusFilter && reservationStatuses.includes(statusFilter as ReservationStatus)) where.status = statusFilter as ReservationStatus;
 
-  const [reservations, vehicles, employees] = await Promise.all([
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const [reservations, storedVehicles, employees] = await Promise.all([
     prisma.vehicleReservation.findMany({
       where,
       include: { vehicle: true, employee: true },
@@ -37,13 +42,36 @@ export default async function VehicleReservationsPage({ searchParams }: { search
     prisma.vehicle.findMany({
       where: { status: { not: 'OUT_OF_SERVICE' } },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, type: true, registrationNumber: true, status: true },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        registrationNumber: true,
+        status: true,
+        reservations: {
+          where: {
+            OR: [
+              { status: 'ACTIVE' },
+              { status: 'RESERVED', dateFrom: { lte: today }, dateTo: { gte: today } },
+            ],
+          },
+          select: { status: true, dateFrom: true, dateTo: true },
+        },
+      },
     }),
     prisma.employee.findMany({
+      where: canAssignReservationToOthers(user.role)
+        ? { isActive: true }
+        : user.employee?.id ? { id: user.employee.id, isActive: true } : { id: '__none__' },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       select: { id: true, firstName: true, lastName: true },
     }),
   ]);
+
+  const vehicles = storedVehicles.map((vehicle) => ({
+    ...vehicle,
+    status: derivedVehicleStatus(vehicle.status, vehicle.reservations, today),
+  }));
 
   const activeReservationsCount = reservations.filter((r) => ['RESERVED', 'ACTIVE'].includes(r.status)).length;
   const finishedReservationsCount = reservations.filter((r) => r.status === 'FINISHED').length;

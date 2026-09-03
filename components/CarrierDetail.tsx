@@ -13,6 +13,7 @@ import { QrCodeGeneratorModal } from './qr/QrCodeGeneratorModal';
 import { useOfferBasket } from '@/context/OfferBasketContext';
 import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType, MOBILE_PHOTO_DAMAGE_LABELS } from '@/lib/mobile-photo-damage';
+import { apiResponseMessage, prepareImageForUpload, validateImageFile } from '@/lib/client-image-upload';
 
 function getCarrierBadgeMeta(type: Carrier['type']) {
   switch (type) {
@@ -128,10 +129,15 @@ export function CarrierDetail({
       ? { latitude: carrier.latitude, longitude: carrier.longitude }
       : null;
 
-  const totalPhotosCount = new Set([
+  const initialPhotosCount = new Set([
     ...carrier.photos.map((p) => p.id),
     ...carrier.surfaces.flatMap((s) => (s.photos || []).map((p) => p.id)),
   ]).size;
+  const [totalPhotosCount, setTotalPhotosCount] = useState(initialPhotosCount);
+
+  useEffect(() => {
+    setTotalPhotosCount(initialPhotosCount);
+  }, [initialPhotosCount]);
 
   const [showQrModal, setShowQrModal] = useState(false);
 
@@ -155,42 +161,52 @@ export function CarrierDetail({
   const [manualDamageNote, setManualDamageNote] = useState('');
   const [manualDamageFile, setManualDamageFile] = useState<File | null>(null);
   const [submittingManualDamage, setSubmittingManualDamage] = useState(false);
+  const [manualDamageError, setManualDamageError] = useState('');
 
   const handleManualDamageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmittingManualDamage(true);
+    setManualDamageError('');
     try {
       const damageLabel = MOBILE_PHOTO_DAMAGE_LABELS[manualDamageType] || manualDamageType;
       const formattedNote = `[ZÁVADA: ${damageLabel}] ${manualDamageNote.trim()}`;
       const updatedNote = [formattedNote, carrier.note || ''].filter(Boolean).join(' | ').slice(0, 500);
 
       if (manualDamageFile) {
+        const validationError = validateImageFile(manualDamageFile);
+        if (validationError) throw new Error(validationError);
+        const preparedFile = await prepareImageForUpload(manualDamageFile);
         const fd = new FormData();
-        fd.append('file', manualDamageFile);
+        fd.append('file', preparedFile);
         fd.append('carrierId', carrier.id);
         if (manualDamageSurfaceId) fd.append('surfaceId', manualDamageSurfaceId);
         fd.append('purpose', 'DAMAGE');
         fd.append('damageType', manualDamageType);
-        fd.append('latitude', String(carrier.latitude ?? 0));
-        fd.append('longitude', String(carrier.longitude ?? 0));
         fd.append('note', manualDamageNote.trim() || damageLabel);
 
-        await fetch('/api/mobile-photos/upload', {
+        const response = await fetch('/api/mobile-photos/upload', {
           method: 'POST',
           body: fd,
         });
+        if (!response.ok) {
+          throw new Error(await apiResponseMessage(response, 'Fotografii závady se nepodařilo uložit.'));
+        }
       } else {
-        await fetch(`/api/carriers/${carrier.id}`, {
+        const response = await fetch(`/api/carriers/${carrier.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ note: updatedNote }),
         });
+        if (!response.ok) {
+          throw new Error(await apiResponseMessage(response, 'Hlášení závady se nepodařilo uložit.'));
+        }
       }
 
       setShowReportDamageModal(false);
       window.location.reload();
     } catch (err) {
       console.error('Failed to submit damage report:', err);
+      setManualDamageError(err instanceof Error ? err.message : 'Hlášení závady se nepodařilo uložit.');
     } finally {
       setSubmittingManualDamage(false);
     }
@@ -500,7 +516,13 @@ export function CarrierDetail({
       )}
 
       <div id="photo-gallery" className="scroll-mt-6">
-        <PhotoGallery carrierId={carrier.id} carrierPhotos={carrier.photos} surfaces={carrier.surfaces} canEdit={canEdit} />
+        <PhotoGallery
+          carrierId={carrier.id}
+          carrierPhotos={carrier.photos}
+          surfaces={carrier.surfaces}
+          canEdit={canEdit}
+          onPhotoCountChange={setTotalPhotosCount}
+        />
       </div>
 
       <section id="surfaces" className="scroll-mt-6">
@@ -656,11 +678,29 @@ export function CarrierDetail({
                 </label>
                 <input
                   type="file"
-                  accept="image/*"
-                  onChange={(e) => setManualDamageFile(e.target.files?.[0] || null)}
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    const validationError = file ? validateImageFile(file) : null;
+                    if (validationError) {
+                      e.target.value = '';
+                      setManualDamageFile(null);
+                      setManualDamageError(validationError);
+                      return;
+                    }
+                    setManualDamageFile(file);
+                    setManualDamageError('');
+                  }}
                   className="w-full rounded-xl border border-slate-700 bg-slate-950 p-2 text-xs text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-rose-900/60 file:text-rose-200 hover:file:bg-rose-800"
                 />
+                <p className="mt-1 text-[11px] text-slate-400">JPEG, PNG nebo WebP. Velké fotografie se před odesláním automaticky zmenší.</p>
               </div>
+
+              {manualDamageError && (
+                <p className="rounded-xl border border-rose-500/40 bg-rose-950/60 p-3 font-semibold text-rose-200" role="alert">
+                  {manualDamageError}
+                </p>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
                 <button

@@ -8,6 +8,8 @@ export const runtime = 'nodejs';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireApiAccess('dashboard');
+    if (isApiDenied(auth)) return auth;
     const id = (await params).id;
     const body = await request.json().catch(() => null);
     if (!body) {
@@ -22,17 +24,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     // Authorization
-    const auth = await requireApiAccess(photo.employeeId ? 'employees' : 'carriers');
-    if (isApiDenied(auth)) return auth;
-
     if (photo.employeeId && auth.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Fotografii zaměstnance může měnit pouze administrátor.' }, { status: 403 });
     }
+    const canMutate = auth.role === 'ADMIN' || auth.role === 'MANAGER' || photo.capturedByWorkerUserId === auth.id;
+    if (!photo.employeeId && !canMutate) return NextResponse.json({ error: 'Tuto fotografii nemáte oprávnění měnit.' }, { status: 403 });
 
     const { isPrimary, isClientVisible, sortOrder, note } = body;
 
     const dataToUpdate: Prisma.PhotoUpdateInput = {};
-    if (note !== undefined) dataToUpdate.note = note ? String(note) : null;
+    if (note !== undefined) dataToUpdate.note = note ? String(note).trim().slice(0, 1000) : null;
     if (isClientVisible !== undefined) dataToUpdate.isClientVisible = !!isClientVisible;
 
     await prisma.$transaction(async (tx) => {
@@ -68,7 +69,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
 
       // 2. Handle sortOrder changes safely
-      if (typeof sortOrder === 'number' && sortOrder >= 0 && sortOrder !== photo.sortOrder) {
+      if (Number.isInteger(sortOrder) && sortOrder >= 0 && sortOrder !== photo.sortOrder) {
         const allPhotos = await tx.photo.findMany({
           where: {
             carrierId: photo.carrierId,
@@ -112,25 +113,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const auth = await requireApiAccess('dashboard');
+    if (isApiDenied(auth)) return auth;
     const id = (await params).id;
     const photo = await prisma.photo.findUnique({
       where: { id },
-      select: { id: true, driveFileId: true, storageProvider: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true },
+      select: { id: true, driveFileId: true, storageProvider: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true, capturedByWorkerUserId: true },
     });
     if (!photo) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
 
     // Authorization checks
-    const auth = await requireApiAccess(photo.employeeId ? 'employees' : 'carriers');
-    if (isApiDenied(auth)) return auth;
-
     if (photo.employeeId && auth.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Fotografii zaměstnance může odstranit pouze administrátor.' }, { status: 403 });
     }
-
-    // Skip Google Drive deletion for carrier / surface photos as requested
-    if (photo.employeeId) {
-      await deleteStoredPhoto(photo);
-    }
+    const canMutate = auth.role === 'ADMIN' || auth.role === 'MANAGER' || photo.capturedByWorkerUserId === auth.id;
+    if (!photo.employeeId && !canMutate) return NextResponse.json({ error: 'Tuto fotografii nemáte oprávnění odstranit.' }, { status: 403 });
 
     await prisma.$transaction(async (tx) => {
       // Re-elect primary photo if the deleted one was primary
@@ -172,7 +169,15 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
       }
     });
 
-    return NextResponse.json({ ok: true });
+    let storageCleanupPending = false;
+    try {
+      await deleteStoredPhoto(photo);
+    } catch (cleanupError) {
+      storageCleanupPending = true;
+      console.error('[photos/delete] Databázový záznam byl odstraněn, úklid externího souboru selhal', cleanupError);
+    }
+
+    return NextResponse.json({ ok: true, storageCleanupPending });
   } catch (error) {
     console.error('Photo delete failed:', error);
     return NextResponse.json({ error: 'Fotografii se nepodařilo odstranit.' }, { status: 502 });

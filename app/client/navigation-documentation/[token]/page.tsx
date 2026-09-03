@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation';
 import { PublicNavigationClientView } from '@/components/navigation-documentation/PublicNavigationClientView';
 import { hashToken, buildSnapshotItem, SnapshotItemData } from '@/lib/navigation-documentation';
 import { prisma } from '@/lib/db';
+import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
+import { isClientApprovedPhoto, isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +30,10 @@ export default async function PublicNavigationDocumentationPage({
   }
 
   const tokenHash = hashToken(token);
+  const owner = await enterPublicNavigationReportTenant(tokenHash);
+  if (!owner) notFound();
 
-  const report = await prisma.navigationDocumentationReport.findUnique({
+  const report = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.navigationDocumentationReport.findUnique({
     where: { publicTokenHash: tokenHash },
     include: {
       client: { select: { name: true, logoFileName: true } },
@@ -39,83 +44,43 @@ export default async function PublicNavigationDocumentationPage({
         include: {
           navigationPoint: {
             include: {
-              installedPhoto: true,
-              carrier: {
-                include: {
-                  photos: {
-                    where: { isPrivate: false },
-                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                  },
-                  surfaces: {
-                    include: {
-                      photos: {
-                        where: { isPrivate: false },
-                        orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                      },
-                    },
-                  },
-                },
-              },
+              carrier: true,
             },
           },
-          carrier: {
-            include: {
-              photos: {
-                where: { isPrivate: false },
-                orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-              },
-              surfaces: {
-                include: {
-                  photos: {
-                    where: { isPrivate: false },
-                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                  },
-                },
-              },
-            },
-          },
+          carrier: true,
           selectedPhoto: true,
         },
         orderBy: { sortOrder: 'asc' },
       },
     },
-  });
+  }));
 
-  if (!report || report.status === 'ARCHIVED') {
+  if (!report || !isPublicNavigationReportStatus(report.status)) {
     notFound();
   }
 
-  if (report.tokenExpiresAt && new Date() > report.tokenExpiresAt) {
+  if (!report.tokenExpiresAt || new Date() > report.tokenExpiresAt) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-6 text-center text-slate-800">
         <h1 className="text-2xl font-bold">Platnost odkazu vypršela</h1>
         <p className="mt-2 text-sm text-slate-600 max-w-md">
-          Platnost tohoto přístupového odkazu pro fotodokumentaci vypršela ({new Date(report.tokenExpiresAt).toLocaleDateString('cs-CZ')}). Vyžádejte si prosím novou fotodokumentaci.
+          Tento přístupový odkaz již není platný. Vyžádejte si prosím nový odkaz na fotodokumentaci.
         </p>
       </div>
     );
   }
 
   const items: SnapshotItemData[] = report.items.map((item) => {
-    const effectiveCarrier = item.carrier || (item.navigationPoint as any)?.carrier;
-    const availablePhotos = [
-      ...(effectiveCarrier?.photos || []),
-      ...((effectiveCarrier?.surfaces || []).flatMap((s: any) => s.photos || [])),
-    ].sort((a: any, b: any) => {
-      if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
-      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-    });
+    const effectiveCarrier = item.carrier || item.navigationPoint?.carrier;
+    const photoId = isClientApprovedPhoto(item.selectedPhoto) ? item.selectedPhotoId : null;
 
-    const photoId = item.selectedPhotoId || availablePhotos[0]?.id || (item.navigationPoint as any)?.installedPhotoId;
+    const snapshot = item.snapshot as { direction?: unknown } | null;
+    const snapshotDirection = typeof snapshot?.direction === 'string' ? snapshot.direction : null;
 
     const direction =
-      (item as any).customDirection ||
+      snapshotDirection ||
       item.navigationPoint?.orientation ||
-      (effectiveCarrier?.surfaces?.[0] as any)?.directionDescription ||
-      (effectiveCarrier?.surfaces?.[0] as any)?.orientation ||
       item.navigationPoint?.variant ||
-      (item.snapshot as any)?.direction ||
       'Obousměrný (A/B)';
 
     let baseItem: SnapshotItemData;
@@ -131,7 +96,7 @@ export default async function PublicNavigationDocumentationPage({
         customDirection: direction,
         navigationPoint: item.navigationPoint,
         carrier: effectiveCarrier,
-        selectedPhoto: item.selectedPhoto || (photoId ? { id: photoId, url: '', createdAt: new Date() } : null),
+        selectedPhoto: photoId && item.selectedPhoto ? item.selectedPhoto : null,
       });
     }
 

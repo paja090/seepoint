@@ -11,7 +11,8 @@ import { StatCard } from '@/components/ui';
 import { prisma } from '@/lib/db';
 import { dateOnly, money, StatusPill, statusLabel } from '@/lib/internal-format';
 import { requirePageAccess } from '@/lib/page-auth';
-import { AccessDenied, canAccess, canViewSensitiveEmployeeData, roleLabel } from '@/lib/rbac';
+import { AccessDenied, canAccess, canViewSensitiveEmployeeData, roleLabel, roles, type AppRole } from '@/lib/rbac';
+import { effectiveOrganizationRole } from '@/lib/account-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,11 @@ const rateLabels: Record<string, string> = { HOURLY: 'Hodinová', TASK: 'Úkolov
 
 function normalizePositions(values: string[], fallback: string | null) {
   return [...new Set((values.length ? values : fallback ? [fallback] : []).flatMap((value) => value.split(',')).map((value) => value.trim()).filter(Boolean))];
+}
+
+function normalizeRoles(value: unknown): AppRole[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((role): role is AppRole => typeof role === 'string' && roles.includes(role as AppRole));
 }
 
 export default async function EmployeeDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +38,12 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       assignedTasks: { orderBy: [{ scheduledDate: 'desc' }, { dueDate: 'desc' }], take: 20, include: { carrier: true, vehicle: true } },
       settlements: { orderBy: { periodFrom: 'desc' }, take: 20, include: { items: true } },
       vehicleReservations: { orderBy: { dateFrom: 'desc' }, take: 20, include: { vehicle: true } },
-      user: true,
+      user: {
+        include: {
+          organizationMemberships: { where: { organizationId: user.organizationId! } },
+          _count: { select: { organizationMemberships: true } },
+        },
+      },
       rates: { orderBy: { validFrom: 'desc' } },
       billingProfile: true,
       photos: { where: { type: 'EMPLOYEE_PROFILE' }, orderBy: { createdAt: 'desc' }, take: 1 },
@@ -48,6 +59,11 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const openTasks = employee.assignedTasks.filter((task) => task.status === 'TODO' || task.status === 'IN_PROGRESS').length;
   const latestSettlement = employee.settlements[0] ?? null;
   const canManage = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const accountMembership = employee.user?.organizationMemberships[0] ?? null;
+  const effectiveAccountRole = accountMembership ? effectiveOrganizationRole(accountMembership.role, accountMembership.roles) : null;
+  const accountRole = effectiveAccountRole === 'OWNER' ? 'ADMIN' : effectiveAccountRole ?? employee.role;
+  const accountRoles = accountMembership?.roles.map((role) => role === 'OWNER' ? 'ADMIN' : role) ?? employee.roles;
+  const accountStatus = employee.user ? (accountMembership?.isActive === false ? 'SUSPENDED' : employee.user.status) : null;
 
   return (
     <AppShell>
@@ -106,7 +122,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
         <section className="card"><h2 className="text-xl font-bold">Rychlý souhrn</h2><p className="border-b border-slate-100 py-3 text-sm"><b>{employee.assignedTasks.length}</b> načtených úkolů</p><p className="border-b border-slate-100 py-3 text-sm"><b>{employee.settlements.length}</b> vyúčtování</p><p className="py-3 text-sm"><b>{employee.vehicleReservations.length}</b> rezervací vozidel</p></section>
       </div>
 
-      {canManage && <AccountAdmin employeeId={employee.id} status={employee.user?.status ?? null} role={employee.user?.role ?? employee.role} rolesList={(employee.user?.roles as any) || (employee.roles as any) || []} lastLoginAt={employee.user?.lastLoginAt?.toISOString() ?? null} canSetAdmin={user.role === 'ADMIN'} />}
+      {canManage && <AccountAdmin employeeId={employee.id} status={accountStatus} role={accountRole} rolesList={normalizeRoles(accountRoles)} lastLoginAt={employee.user?.lastLoginAt?.toISOString() ?? null} canSetAdmin={user.role === 'ADMIN'} canResetPassword={!employee.user || employee.user._count.organizationMemberships <= 1 || user.platformRole === 'SUPER_ADMIN'} protectedOwner={effectiveAccountRole === 'OWNER' && user.platformRole !== 'SUPER_ADMIN'} />}
       {canManage && <EmployeeEditForm employee={{ id: employee.id, firstName: employee.firstName, lastName: employee.lastName, email: employee.email, phone: employee.phone, positions, note: employee.note, isActive: employee.isActive }} />}
       <div id="rates" className="scroll-mt-6"><EmployeeRates employeeId={employee.id} editable={user.role === 'ADMIN'} rates={employee.rates.map((rate) => ({ id: rate.id, name: rate.name, type: rate.type, amount: rate.amount.toString(), currency: rate.currency, unit: rate.unit, workType: rate.workType, validFrom: rate.validFrom.toISOString().slice(0, 10), validTo: rate.validTo?.toISOString().slice(0, 10) ?? null, isActive: rate.isActive }))} /></div>
       {user.role === 'ADMIN' && <div id="billing" className="scroll-mt-6"><EmployeeBillingForm employeeId={employee.id} profile={employee.billingProfile} /></div>}

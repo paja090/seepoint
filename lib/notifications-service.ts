@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import type { AppRole } from '@/lib/rbac';
+import { canAccess, type AppRole } from '@/lib/rbac';
 import { requireTenantContext } from '@/lib/tenant-context';
 
 export type SystemNotificationItem = {
@@ -9,10 +9,9 @@ export type SystemNotificationItem = {
     | 'UNASSIGNED_WORKER'
     | 'PENDING_INVOICE'
     | 'EXPIRING_CONTRACT'
-    | 'MY_TASK_TODAY'
+    | 'OPEN_WORK_TASK'
     | 'VEHICLE_FAULT'
     | 'LOW_STOCK'
-    | 'UNRETURNED_TOOL'
     | 'CITY_GALLERY_PERMIT_EXPIRING';
   title: string;
   message: string;
@@ -22,7 +21,7 @@ export type SystemNotificationItem = {
   metadata?: Record<string, unknown>;
 };
 
-export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId?: string): Promise<{
+export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId?: string, options: { includeAi?: boolean } = {}): Promise<{
   totalCount: number;
   highCount: number;
   notifications: SystemNotificationItem[];
@@ -43,7 +42,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
 
       const employee = user?.employees[0];
       if (employee?.id) {
-        const myTasksToday = await prisma.workTask.findMany({
+        const openTasks = await prisma.workTask.findMany({
           where: {
             assignedToEmployeeId: employee.id,
             status: { in: ['TODO', 'IN_PROGRESS'] },
@@ -52,12 +51,14 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
           take: 10,
         });
 
-        myTasksToday.forEach((task) => {
+        openTasks.forEach((task) => {
           notifications.push({
             id: `my-task-${task.id}`,
-            type: 'MY_TASK_TODAY',
+            type: 'OPEN_WORK_TASK',
             title: `📋 Váš úkol: ${task.title}`,
-            message: `Máte naplánovaný montážní úkol ${task.scheduledDate ? `na ${new Date(task.scheduledDate).toLocaleDateString('cs-CZ')}` : 'na dnešek'}.`,
+            message: task.scheduledDate
+              ? `Montážní úkol je naplánovaný na ${new Date(task.scheduledDate).toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague' })}.`
+              : 'Montážní úkol zatím nemá naplánované datum.',
             severity: 'HIGH',
             link: `/my-tasks`,
             createdAt: now.toISOString(),
@@ -165,13 +166,13 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   }
 
   // 4. WAREHOUSE: Low Stock Items Alert (< minQuantity)
-  const lowStockWarehouseItems = await prisma.warehouseItem.findMany({
+  const lowStockWarehouseItems = canAccess(userRole, 'warehouse') ? await prisma.warehouseItem.findMany({
     where: {
       minQuantity: { not: null },
     },
     select: { id: true, name: true, unit: true, quantityInStock: true, minQuantity: true, location: true },
     take: 25,
-  });
+  }) : [];
 
   const criticalItems = lowStockWarehouseItems.filter(
     (item) => item.minQuantity !== null && Number(item.quantityInStock) < Number(item.minQuantity)
@@ -189,43 +190,19 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
     });
   });
 
-  // 5. WAREHOUSE: Long-standing Unreturned Borrowed Tools (> 48h)
-  const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-  const unreturnedMovements = await prisma.warehouseMovement.findMany({
-    where: {
-      type: 'ISSUE',
-      createdAt: { lte: twoDaysAgo },
-      item: { category: 'RETURNABLE' },
-    },
-    include: { item: true },
-    orderBy: { createdAt: 'asc' },
-    take: 15,
-  });
-
-  unreturnedMovements.forEach((m) => {
-    if (m.item) {
-      notifications.push({
-        id: `unreturned-tool-${m.id}`,
-        type: 'UNRETURNED_TOOL',
-        title: `🛠️ Dlouho nevrácené nářadí: ${m.item.name}`,
-        message: `${m.performedByName || m.assignedEmployeeName || 'Pracovník'} má vybrané nářadí ${m.item.name} (${Number(m.quantity)} ${m.item.unit}) již od ${new Date(m.createdAt).toLocaleDateString('cs-CZ')}. Nezapomeňte vrátit do skladu!`,
-        severity: 'MEDIUM',
-        link: `/warehouse`,
-        createdAt: now.toISOString(),
-      });
-    }
-  });
+  // A warehouse ISSUE row is only a historical movement, not an active loan.
+  // Do not emit "unreturned" alerts until loans and their returns are linked persistently.
 
   // 6. CITY GALLERY: Permit Expiration Alerts (within 30 days)
   const thirtyDaysInFuture = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const expiringPermitProjects = await prisma.cityGalleryProject.findMany({
+  const expiringPermitProjects = canAccess(userRole, 'cityGallery') ? await prisma.cityGalleryProject.findMany({
     where: {
       permitValidTo: { lte: thirtyDaysInFuture, gte: now },
       status: { in: ['ACTIVE', 'PLANNED', 'DRAFT'] },
     },
     select: { id: true, title: true, city: true, locality: true, permitValidTo: true, frameCount: true },
     take: 15,
-  });
+  }) : [];
 
   expiringPermitProjects.forEach((p) => {
     if (p.permitValidTo) {
@@ -245,32 +222,24 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   const highCount = notifications.filter((n) => n.severity === 'HIGH').length;
 
   let aiSummary: string | null = null;
-  if (notifications.length > 0) {
+  if (options.includeAi && notifications.length > 0) {
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (apiKey) {
         const notifText = notifications.map((n) => `- [${n.severity}] ${n.title}: ${n.message}`).join('\n');
         const systemPrompt = `Jsi AI Asistent vedení firmy SeePoint. Zde je seznam aktuálních notifikací a varování:\n${notifText}\n\nVytvoř 1 STRUČNÝ, PŘEHLEDNÝ A EFEKTIVNÍ SOUHRN v češtině (max 200 znaků) jako "AI Souhrn pro vedoucího", který vypíchne nejakutnější problémy (např. končící zábory měst, vypršení smluv, nevyřízené úkoly s důvody). Vrať ČISTÝ TEXT bez jakýchkoliv markdown značek.`;
 
-        for (const model of ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-flash-latest']) {
-          try {
-            const res = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }),
-              }
-            );
-
-            if (res.ok) {
-              const data = await res.json();
-              aiSummary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
-              if (aiSummary) break;
-            }
-          } catch (e) {
-            console.error(`Error in notifications AI summary with ${model}:`, e);
-          }
+        const configuredModel = process.env.GEMINI_TEXT_MODEL?.trim();
+        const model = configuredModel && /^[A-Za-z0-9._-]+$/.test(configuredModel) ? configuredModel : 'gemini-2.5-flash';
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          aiSummary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 300) || null;
         }
       }
     } catch (err) {

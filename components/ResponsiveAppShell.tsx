@@ -8,11 +8,9 @@ import {
   X,
   Camera,
   LayoutDashboard,
-  Map,
   Route,
   LogOut,
   MessageSquare,
-  UserRound,
   PhoneCall,
   Package,
   Sparkles,
@@ -34,27 +32,6 @@ import { OfferBasketBar } from './offers/OfferBasketBar';
 export type NavItem = [string, string, AppNavIcon, string];
 export type NavGroup = { label: string; items: NavItem[] };
 
-const pageTitles: Array<[string, string]> = [
-  ['/dashboard', 'Dashboard'],
-  ['/map', 'Mapa nosičů'],
-  ['/carriers', 'Evidence nosičů'],
-  ['/occupancy', 'Obsazenost ploch'],
-  ['/clients', 'Klienti'],
-  ['/offers', 'Nabídky'],
-  ['/employees', 'Zaměstnanci'],
-  ['/tasks', 'Úkoly'],
-  ['/my-tasks', 'Moje úkoly'],
-  ['/settlements', 'Vyúčtování'],
-  ['/my-settlements', 'Moje vyúčtování'],
-  ['/vehicles', 'Vozidla a vozíky'],
-  ['/work/route', 'Pracovní výjezd'],
-  ['/work', 'Plán práce'],
-  ['/chat', 'Týmový Chat'],
-  ['/vacations', 'Dovolená & Volno'],
-  ['/import', 'Import dat'],
-  ['/settings', 'Nastavení'],
-];
-
 export function ResponsiveAppShell({
   children,
   user,
@@ -62,15 +39,13 @@ export function ResponsiveAppShell({
   visibleGroups,
 }: {
   children: React.ReactNode;
-  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; avatarUrl?: string | null; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> };
+  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; avatarUrl?: string | null; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> };
   employees?: Array<{ id: string; firstName: string; lastName: string; position: string | null }>;
   visibleGroups: NavGroup[];
 }) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isAiTaskModalOpen, setIsAiTaskModalOpen] = useState(false);
   const pathname = usePathname();
-
-  const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
 
   // Close mobile drawer when route changes
   useEffect(() => {
@@ -197,7 +172,8 @@ export function ResponsiveAppShell({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-xs font-bold text-slate-200 group-hover:text-emerald-400 transition">{user.name}</p>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase">{roleLabel(user.role)}</p>
+                  <p className="text-[10px] font-medium text-slate-400">Aktivní role: {roleLabel(user.role)}</p>
+                  <p className="text-[10px] font-medium text-slate-500">Členství: {user.organizationRoleLabel}</p>
                 </div>
               </Link>
               <button
@@ -210,6 +186,11 @@ export function ResponsiveAppShell({
             </div>
 
             <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-2">
+              {user.isPlatformSuperAdmin && (
+                <p className="rounded-lg border border-purple-700/60 bg-purple-950/60 px-2 py-1 text-center text-[10px] font-bold text-purple-200">
+                  Platforma: Superadmin
+                </p>
+              )}
               <div className="lg:hidden flex justify-center">
                 <WeatherClockWidget compact />
               </div>

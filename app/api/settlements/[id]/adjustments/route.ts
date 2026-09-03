@@ -14,7 +14,7 @@ export async function POST(
   const { id } = await params;
 
   let body: {
-    amount?: number;
+    amount?: string | number;
     description?: string;
     reason?: string;
     category?: string;
@@ -28,7 +28,7 @@ export async function POST(
 
   const { amount, description, reason, category } = body;
 
-  if (amount === undefined || !description || !reason) {
+  if (amount === undefined || typeof description !== 'string' || typeof reason !== 'string') {
     return NextResponse.json({ error: 'Chybí povinné údaje pro korekci.' }, { status: 400 });
   }
 

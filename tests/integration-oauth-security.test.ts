@@ -68,3 +68,21 @@ test('Google Drive connection rejects inherited broad scopes', () => {
   ]), /širší oprávnění/);
   assert.throws(() => assertGoogleTokenScopes('GOOGLE_DRIVE', ['openid']), /drive\.file/);
 });
+
+test('tenant Google Drive connection is the primary runtime credential and reports refresh health', () => {
+  const oauth = readFileSync(new URL('../lib/integrations/google-oauth.ts', import.meta.url), 'utf8');
+  const drive = readFileSync(new URL('../lib/google-drive.ts', import.meta.url), 'utf8');
+  const settings = readFileSync(new URL('../components/GoogleIntegrationCard.tsx', import.meta.url), 'utf8');
+  const imagesApi = readFileSync(new URL('../app/api/google-drive/images/route.ts', import.meta.url), 'utf8');
+  assert.match(drive, /connectedGoogleAccessToken\('GOOGLE_DRIVE'\)/);
+  assert.ok(drive.indexOf("connectedGoogleAccessToken('GOOGLE_DRIVE')") < drive.indexOf('GOOGLE_DRIVE_REFRESH_TOKEN'));
+  assert.match(oauth, /credentialsEncrypted/);
+  assert.match(oauth, /status: 'CONNECTED'/);
+  assert.match(oauth, /status: 'ERROR'/);
+  assert.match(oauth, /nemá obnovovací token/);
+  assert.match(oauth, /lastCheckedAt: new Date\(\)/);
+  assert.match(settings, /Vyžaduje ověření/);
+  assert.match(settings, /Znovu připojit Google Drive/);
+  assert.match(imagesApi, /runWithTenantContext\(/);
+  assert.match(imagesApi, /organizationId: auth\.organizationId/);
+});

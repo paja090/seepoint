@@ -1,6 +1,6 @@
 'use client';
 
-import { Camera, LogOut, MessageSquare, PhoneCall, Search, UserRound } from 'lucide-react';
+import { LogOut, MessageSquare, PhoneCall, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
@@ -30,7 +30,7 @@ const pageTitles: Array<[string, string]> = [
   ['/settings', 'Nastavení'],
 ];
 
-export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
+export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
   const pathname = usePathname();
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
@@ -62,7 +62,8 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
 
         <div className="hidden text-right sm:block">
           <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-          <p className="text-xs text-slate-500">{roleLabel(user.role)}</p>
+          <p className="text-xs text-slate-500">Aktivní: {roleLabel(user.role)}</p>
+          {user.isPlatformSuperAdmin && <p className="text-[10px] font-semibold text-purple-700">Platforma: Superadmin</p>}
         </div>
 
         <NotificationBellCenter />

@@ -18,7 +18,10 @@ const globalForTenant = globalThis as typeof globalThis & {
 };
 
 const storage = globalForTenant.__seepointTenantStorage ?? new AsyncLocalStorage<TenantContext>();
-if (process.env.NODE_ENV !== 'production') globalForTenant.__seepointTenantStorage = storage;
+// Serverless production bundles can load this module through more than one chunk.
+// All chunks must share the same storage instance or authenticated tenant context
+// can disappear between the API layer and a service transaction.
+globalForTenant.__seepointTenantStorage = storage;
 
 export function getTenantContext() {
   return storage.getStore() ?? null;
@@ -44,4 +47,3 @@ export function assertOrganizationId(value: unknown, expected: string) {
     throw new TenantContextError('A request attempted to override the active organization.');
   }
 }
-

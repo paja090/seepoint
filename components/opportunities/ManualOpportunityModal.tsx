@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Sparkles, X, Link, Text, Check, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkles, X, Link, Text, AlertCircle } from 'lucide-react';
 import type { OpportunityEventType } from '@prisma/client';
 
 export function ManualOpportunityModal({
@@ -32,7 +32,18 @@ export function ManualOpportunityModal({
     sourceUrl: string;
     sourceTitle: string;
     suggestedMediaTypes?: string[];
+    isRelevant: boolean;
+    relevanceReason?: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -82,15 +93,21 @@ export function ManualOpportunityModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="opportunity-modal-title"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl"
+      >
         {/* Header */}
         <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-400" />
-            <h2 className="text-lg font-black text-white">+ Nová AI obchodní příležitost</h2>
+            <h2 id="opportunity-modal-title" className="text-lg font-black text-white">+ Nová AI obchodní příležitost</h2>
           </div>
           <button
             type="button"
+            aria-label="Zavřít dialog nové příležitosti"
             className="rounded-xl p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white"
             onClick={onClose}
           >
@@ -101,7 +118,7 @@ export function ManualOpportunityModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {error && (
-            <div className="rounded-2xl border border-rose-800/80 bg-rose-950/80 p-3.5 text-xs text-rose-200 flex items-center gap-2">
+            <div role="alert" className="rounded-2xl border border-rose-800/80 bg-rose-950/80 p-3.5 text-xs text-rose-200 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
@@ -130,10 +147,12 @@ export function ManualOpportunityModal({
 
               {mode === 'prompt' ? (
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                  <label htmlFor="opportunity-input-text" className="block text-xs font-bold text-slate-300 mb-1">
                     Vložte text zprávy, článek nebo poznámku od obchodníka
                   </label>
                   <textarea
+                    id="opportunity-input-text"
+                    autoFocus
                     className="input min-h-32 w-full text-xs text-white"
                     placeholder="Např. Nová prodejna Kaufland se otevírá v Ostravě-Porubě v říjnu 2026..."
                     value={inputText}
@@ -142,10 +161,11 @@ export function ManualOpportunityModal({
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
+                  <label htmlFor="opportunity-input-url" className="block text-xs font-bold text-slate-300 mb-1">
                     URL odkaz na web nebo tiskovou zprávu
                   </label>
                   <input
+                    id="opportunity-input-url"
                     type="url"
                     className="input w-full text-xs text-white"
                     placeholder="https://ostrava.cz/clanek-nova-pobocka..."
@@ -172,6 +192,12 @@ export function ManualOpportunityModal({
                     AI Výsledek analýzy
                   </span>
                   <span className="text-xs text-purple-400 font-bold">{parsedData.eventType}</span>
+                </div>
+
+                <div className={`rounded-xl border p-3 text-xs ${parsedData.isRelevant ? 'border-amber-700 bg-amber-950/50 text-amber-100' : 'border-rose-700 bg-rose-950/50 text-rose-100'}`}>
+                  <strong>{parsedData.isRelevant ? 'AI označila signál jako relevantní návrh.' : 'AI signál nevyhodnotila jako dostatečně relevantní.'}</strong>{' '}
+                  {parsedData.relevanceReason || 'Výsledek vždy před uložením ověřte ve zdroji.'}
+                  <div className="mt-1 font-semibold">AI výsledek není ověřený fakt a do radaru se uloží až vaším potvrzením.</div>
                 </div>
 
                 <div className="space-y-2 text-xs">
@@ -241,7 +267,7 @@ export function ManualOpportunityModal({
                   onClick={handleConfirmSave}
                   className="btn-primary flex-1 py-2.5 text-xs font-bold"
                 >
-                  {loading ? 'Ukládám…' : '✅ Uložit do Obchodního radaru'}
+                  {loading ? 'Ukládám…' : parsedData.isRelevant ? '✅ Po ověření uložit do radaru' : '⚠️ Uložit i přes upozornění'}
                 </button>
               </div>
             </div>

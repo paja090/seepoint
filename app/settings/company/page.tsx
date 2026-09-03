@@ -7,10 +7,11 @@ import { notFound } from 'next/navigation';
 
 export default async function CompanySettingsPage() {
   const { organizationId } = await requireOrganizationRole('ADMIN');
-  const organization = await platformPrisma.organization.findUnique({ where: { id: organizationId } });
+  const [organization, fullUsage] = await Promise.all([
+    platformPrisma.organization.findUnique({ where: { id: organizationId } }),
+    getOrganizationFullUsageReport(organizationId),
+  ]);
   if (!organization) notFound();
-
-  const fullUsage = await getOrganizationFullUsageReport(organizationId);
 
   return (
     <AppShell>
@@ -78,9 +79,9 @@ export default async function CompanySettingsPage() {
             Object.fromEntries(
               Object.entries(organization).map(([key, value]) => [
                 key,
-                value instanceof Date ? value.toISOString() : value,
+                value instanceof Date ? value.toISOString() : typeof value === 'object' && value !== null ? String(value) : value,
               ])
-            ) as Record<string, string | null>
+            ) as Record<string, string | number | null>
           }
         />
       </div>

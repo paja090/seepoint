@@ -1,30 +1,31 @@
 import { prisma } from '@/lib/db';
-import { ClientStatus, ClientType, ClientSource, Prisma } from '@prisma/client';
+import { ClientStatus, ClientType, ClientSource, ClientPricingSegment, Prisma } from '@prisma/client';
 import { normalizeClientName } from './domain';
 
 export type CreateClientInput = {
   name: string;
-  tradingName?: string;
-  companyId?: string;
-  dic?: string;
-  billingStreet?: string;
-  billingCity?: string;
-  billingZip?: string;
-  billingCountry?: string;
-  shippingStreet?: string;
-  shippingCity?: string;
-  shippingZip?: string;
-  shippingCountry?: string;
-  website?: string;
-  contactPerson?: string;
-  email?: string;
-  phone?: string;
+  tradingName?: string | null;
+  companyId?: string | null;
+  dic?: string | null;
+  billingStreet?: string | null;
+  billingCity?: string | null;
+  billingZip?: string | null;
+  billingCountry?: string | null;
+  shippingStreet?: string | null;
+  shippingCity?: string | null;
+  shippingZip?: string | null;
+  shippingCountry?: string | null;
+  website?: string | null;
+  contactPerson?: string | null;
+  email?: string | null;
+  phone?: string | null;
   status?: ClientStatus;
   clientType?: ClientType;
+  pricingSegment?: ClientPricingSegment;
   source?: ClientSource;
-  assignedUserId?: string;
-  rating?: string;
-  note?: string;
+  assignedUserId?: string | null;
+  rating?: string | null;
+  note?: string | null;
 };
 
 export type UpdateClientInput = Partial<CreateClientInput>;
@@ -68,11 +69,16 @@ export async function findDuplicateClients(companyId?: string, name?: string, em
   });
 }
 
-export async function createClient(input: CreateClientInput, actorUserId: string, actorEmail: string) {
+export async function createClient(input: CreateClientInput, actorUserId: string, actorEmail: string, actorOrganizationId: string) {
   const name = input.name.trim().replace(/\s+/g, ' ');
   const normalizedName = normalizeClientName(name);
 
   return prisma.$transaction(async (tx) => {
+  if (input.assignedUserId && !await tx.organizationMember.count({
+    where: { organizationId: actorOrganizationId, userId: input.assignedUserId, isActive: true },
+  })) {
+    throw new Error('INVALID_ASSIGNEE');
+  }
   const existing = await tx.client.findFirst({
     where: { normalizedName },
   });
@@ -101,6 +107,7 @@ export async function createClient(input: CreateClientInput, actorUserId: string
       phone: input.phone?.trim() || null,
       status: input.status || 'ACTIVE',
       clientType: input.clientType || 'DIRECT_CLIENT',
+      pricingSegment: input.pricingSegment || 'COMMERCIAL',
       source: input.source || 'WEBSITE',
       assignedUserId: input.assignedUserId || null,
       rating: input.rating?.trim() || null,
@@ -110,10 +117,10 @@ export async function createClient(input: CreateClientInput, actorUserId: string
   });
 
   // If initial contact person details exist, create primary ClientContact
-  if (input.contactPerson || input.email || input.phone) {
-    const parts = (input.contactPerson || 'Zástupce').trim().split(' ');
-    const firstName = parts[0] || 'Zástupce';
-    const lastName = parts.slice(1).join(' ') || 'Firmy';
+  if (input.contactPerson?.trim().includes(' ')) {
+    const parts = input.contactPerson.trim().split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ');
 
     await tx.clientContact.create({
       data: {
@@ -149,8 +156,8 @@ export async function getClientProfile(clientId: string) {
     where: { id: clientId },
     include: {
       assignedUser: { select: { id: true, name: true, email: true, role: true } },
-      contacts: { orderBy: [{ isPrimary: 'desc' }, { lastName: 'asc' }] },
-      branches: { orderBy: { name: 'asc' }, include: { contactPerson: true } },
+      contacts: { where: { active: true }, orderBy: [{ isPrimary: 'desc' }, { lastName: 'asc' }] },
+      branches: { where: { active: true }, orderBy: { name: 'asc' }, include: { contactPerson: true } },
       offers: {
         orderBy: { createdAt: 'desc' },
         include: { createdByUser: { select: { name: true } } },

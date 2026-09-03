@@ -956,12 +956,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
-                  <span className="font-black text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">McDonald's</span>
+                  <span className="font-black text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">McDonald&apos;s</span>
                   <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
                 </div>
                 <div className="space-y-0.5 text-white">
                   <p className="text-xs font-bold flex items-center justify-between">
-                    <span>📍 McDonald's – Navigace k provozovně (1,4 km)</span>
+                    <span>📍 McDonald&apos;s – Navigace k provozovně (1,4 km)</span>
                     <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
                   </p>
                   <p className="text-[11px] text-slate-300 font-medium">Černá matná deska Dibond s logem a vzdáleností na sloupu veřejného osvětlení (VO).</p>

@@ -167,6 +167,8 @@ export type NavigationOrderDetail = {
     id: string;
     dateFrom: string;
     dateTo: string;
+    dateFromLabel: string;
+    dateToLabel: string;
     amount: number;
     status: ClientInvoiceStatus;
     invoiceId?: string | null;

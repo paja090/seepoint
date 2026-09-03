@@ -1,8 +1,10 @@
-import test, { describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { ALLOWED_STATUS_TRANSITIONS } from '../lib/navigation/workflow-service.ts';
 import { canAccess, type AppRole } from '../lib/rbac.ts';
 import { canManageOfferRole, canConvertOfferRole, canAccessOffer } from '../lib/offers/domain.ts';
+import { canInvoiceNavigationOrderRole } from '../lib/navigation/permissions.ts';
+import { readFileSync } from 'node:fs';
 
 describe('Modul NAVIGACE - Workflow a RBAC Testy', () => {
   it('ověřuje povolené přechody stavového automatu zakázky', () => {
@@ -53,5 +55,19 @@ describe('Modul NAVIGACE - Workflow a RBAC Testy', () => {
     assert.equal(canAccessOffer(salesUser, 'usr-sales-2'), false);
     // Admin vidí jakoukoliv nabídku
     assert.equal(canAccessOffer(adminUser, 'usr-sales-2'), true);
+  });
+
+  it('fakturaci navigace chrání role, stav, Decimal výpočet a idempotence odeslání', () => {
+    assert.equal(canInvoiceNavigationOrderRole('SALES'), false);
+    assert.equal(canInvoiceNavigationOrderRole('ACCOUNTANT'), true);
+    assert.equal(canInvoiceNavigationOrderRole('MANAGER'), true);
+    assert.equal(canInvoiceNavigationOrderRole('ADMIN'), true);
+
+    const route = readFileSync(new URL('../app/api/navigation/orders/[id]/invoice/route.ts', import.meta.url), 'utf8');
+    assert.match(route, /order\.status !== 'PRIPRAVENO_K_FAKTURACI'/);
+    assert.match(route, /invoice && invoice\.status !== 'ISSUED'/);
+    assert.match(route, /emailDelivery\.status === 'skipped'/);
+    assert.match(route, /new Prisma\.Decimal\(0\)/);
+    assert.doesNotMatch(route, /Math\.round\(subtotal \* 0\.21/);
   });
 });

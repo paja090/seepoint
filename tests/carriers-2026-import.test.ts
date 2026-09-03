@@ -29,6 +29,10 @@ function state(): ExistingState {
   return { carriers: [], clients: [], prices: [] };
 }
 
+function deterministicPlan(source: ParsedWorkbook, existing: ExistingState) {
+  return buildImportPlan(source, existing, 'local', '2026-01-01', { asOfDate: '2026-07-18' });
+}
+
 function existingCarrier(overrides: Partial<ExistingState['carriers'][number]> = {}): ExistingState['carriers'][number] {
   return {
     id: 'db-carrier', code: 'PL-1', name: 'Lavička 1', type: 'PROMO_BENCH', city: 'Ostrava', locality: null,
@@ -65,7 +69,7 @@ test('stejná kampaň různých klientů se nesloučí', () => assert.equal(merg
 test('kampaň bez klienta nevytvoří Client a je v reportu', () => {
   const source = carrier();
   source.surfaces[0].campaigns = [campaign('Kampaň', 8)];
-  const plan = buildImportPlan(workbook([source]), state(), 'local');
+  const plan = deterministicPlan(workbook([source]), state());
   assert.equal(plan.clients.create.length, 0);
   assert.equal(plan.occupancies[0].action, 'NEW_OCCUPANCY');
   assert.equal(plan.occupancies[0].clientResolutionStatus, 'UNRESOLVED');
@@ -78,7 +82,7 @@ test('existující jednoznačné mapování kampaně propojí klienta', () => {
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'old', clientId: 'client-1', clientName: 'Klient', campaignName: 'Známá', dateFrom: new Date('2025-01-01Z'), dateTo: new Date('2025-01-31Z'), status: 'FINISHED' });
   const existing = state(); existing.carriers = [current]; existing.clients = [{ id: 'client-1', name: 'Klient', normalizedName: 'klient', companyId: null, externalCode: null }];
-  const plan = buildImportPlan(workbook([source]), existing, 'local');
+  const plan = deterministicPlan(workbook([source]), existing);
   assert.equal(plan.occupancies[0].clientId, 'client-1');
   assert.equal(plan.stats.createdClients, 0);
 });
@@ -86,7 +90,7 @@ test('existující jednoznačné mapování kampaně propojí klienta', () => {
 test('klient ze samostatného pole se páruje, ale nevytváří z kampaně', () => {
   const source = carrier(); source.surfaces[0].campaigns = [campaign('Akce', 8, 'Objednavatel s.r.o.')];
   const existing = state(); existing.clients = [{ id: 'client-explicit', name: 'Objednavatel s.r.o.', normalizedName: 'objednavatel sro', companyId: null, externalCode: null }];
-  const plan = buildImportPlan(workbook([source]), existing, 'local');
+  const plan = deterministicPlan(workbook([source]), existing);
   assert.equal(plan.occupancies[0].clientId, 'client-explicit');
   assert.equal(plan.clients.create.length, 0);
 });
@@ -98,26 +102,26 @@ test('klient se může bezpečně propojit přes existující číslo objednávk
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'old-order', clientId: 'client-order', clientName: 'Klient objednávky', campaignName: 'Jiná akce', externalOrderReference: 'OBJ-1254', dateFrom: new Date('2025-01-01Z'), dateTo: new Date('2025-01-31Z'), status: 'FINISHED' });
   const existing = state(); existing.carriers = [current]; existing.clients = [{ id: 'client-order', name: 'Klient objednávky', normalizedName: 'klient objednavky', companyId: null, externalCode: null }];
-  assert.equal(buildImportPlan(workbook([source]), existing, 'local').occupancies[0].clientId, 'client-order');
+  assert.equal(deterministicPlan(workbook([source]), existing).occupancies[0].clientId, 'client-order');
 });
 
 test('existující nosič se aktualizuje bez operace s fotkami', () => {
   const existing = state(); existing.carriers = [existingCarrier({ city: 'Havířov', photoCount: 9 })];
-  const plan = buildImportPlan(workbook(), existing, 'local');
+  const plan = deterministicPlan(workbook(), existing);
   assert.equal(plan.carriers[0].action, 'UPDATE');
   assert.equal(plan.carriers[0].existingId, 'db-carrier');
   assert.ok(!plan.carriers[0].changes.some(({ field }) => field.toLowerCase().includes('photo')));
 });
 
 test('nový nosič je NEW a přesný kód zabrání duplicitě', () => {
-  assert.equal(buildImportPlan(workbook(), state(), 'local').carriers[0].action, 'NEW');
+  assert.equal(deterministicPlan(workbook(), state()).carriers[0].action, 'NEW');
   const existing = state(); existing.carriers = [existingCarrier()];
-  assert.notEqual(buildImportPlan(workbook(), existing, 'local').carriers[0].action, 'NEW');
+  assert.notEqual(deterministicPlan(workbook(), existing).carriers[0].action, 'NEW');
 });
 
 test('více kandidátů vytvoří AMBIGUOUS_MATCH', () => {
   const existing = state(); existing.carriers = [existingCarrier(), existingCarrier({ id: 'db-carrier-2' })];
-  assert.equal(buildImportPlan(workbook(), existing, 'local').carriers[0].action, 'AMBIGUOUS_MATCH');
+  assert.equal(deterministicPlan(workbook(), existing).carriers[0].action, 'AMBIGUOUS_MATCH');
 });
 
 test('kolize obsazenosti nepřepíše ruční historii', () => {
@@ -125,7 +129,7 @@ test('kolize obsazenosti nepřepíše ruční historii', () => {
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'manual', clientId: null, clientName: 'Ruční', campaignName: 'Jiná', dateFrom: new Date('2026-08-01Z'), dateTo: new Date('2026-08-31Z'), status: 'RESERVED' });
   const existing = state(); existing.carriers = [current];
-  assert.equal(buildImportPlan(workbook([source]), existing, 'local').occupancies[0].action, 'OCCUPANCY_CONFLICT');
+  assert.equal(deterministicPlan(workbook([source]), existing).occupancies[0].action, 'OCCUPANCY_CONFLICT');
 });
 
 test('opakovaný import identické obsazenosti je UNCHANGED', () => {
@@ -133,14 +137,14 @@ test('opakovaný import identické obsazenosti je UNCHANGED', () => {
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'same', clientId: null, clientName: 'NEVYŘEŠENÝ KLIENT', campaignName: 'Stejná', dateFrom: new Date('2026-08-01T00:00:00Z'), dateTo: new Date('2026-08-31T23:59:59Z'), status: 'RESERVED' });
   const existing = state(); existing.carriers = [current];
-  assert.equal(buildImportPlan(workbook([source]), existing, 'local').occupancies[0].action, 'UNCHANGED');
+  assert.equal(deterministicPlan(workbook([source]), existing).occupancies[0].action, 'UNCHANGED');
 });
 
 test('chybějící dříve importovaný nosič se pouze reportuje', () => {
   const existing = state(); existing.carriers = [existingCarrier({ id: 'missing', code: 'PL-9' })];
-  assert.equal(buildImportPlan(workbook([]), existing, 'local').missingInNewSource.length, 0);
+  assert.equal(deterministicPlan(workbook([]), existing).missingInNewSource.length, 0);
   const other = carrier({ code: 'PL-1' });
-  const plan = buildImportPlan(workbook([other]), existing, 'local');
+  const plan = deterministicPlan(workbook([other]), existing);
   assert.equal(plan.missingInNewSource[0].id, 'missing');
 });
 
@@ -148,7 +152,7 @@ test('změna ceny vytvoří novou historickou verzi', () => {
   const source = workbook([]);
   source.prices = [{ identityKey: 'PRICE:x:1:1', name: 'X', rentalMonths: 1, minQuantity: 1, rentalPrice: '100.00', productionPrice: '20.00', totalPrice: '120.00', currency: 'CZK', sourceSheet: 'CENÍK 2026', sourceRow: 5 }];
   const existing = state(); existing.prices = [{ id: 'price', identityKey: 'PRICE:x:1:1', versionKey: 'old', rentalPrice: '90.00', productionPrice: '20.00', totalPrice: '110.00', validFrom: new Date('2025-01-01Z'), validTo: null, isActive: true }];
-  assert.equal(buildImportPlan(source, existing, 'local').prices[0].action, 'CHANGED_PRICE');
+  assert.equal(deterministicPlan(source, existing).prices[0].action, 'CHANGED_PRICE');
 });
 
 test('manual conflict includes origin, classification and fingerprint', () => {
@@ -156,7 +160,7 @@ test('manual conflict includes origin, classification and fingerprint', () => {
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'manual-detail', clientId: null, clientName: 'Manual', campaignName: 'Other', dateFrom: new Date('2026-08-01Z'), dateTo: new Date('2026-08-31Z'), status: 'RESERVED' });
   const existing = state(); existing.carriers = [current];
-  const conflict = buildImportPlan(workbook([source]), existing, 'local').occupancies[0].conflict;
+  const conflict = deterministicPlan(workbook([source]), existing).occupancies[0].conflict;
   assert.equal(conflict?.classification, 'MANUAL_RECORD_CONFLICT');
   assert.equal(conflict?.existingRecordOrigin, 'MANUAL');
   assert.equal(conflict?.recordFingerprint.length, 64);
@@ -167,7 +171,7 @@ test('previous import extension is distinguished from manual history', () => {
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'prior', clientId: null, clientName: 'X', campaignName: 'Imported', dateFrom: new Date('2026-08-01Z'), dateTo: new Date('2026-08-31Z'), status: 'RESERVED', sourceSystem: 'CARRIERS_2026', sourceKey: 'prior-key' });
   const existing = state(); existing.carriers = [current];
-  const conflict = buildImportPlan(workbook([source]), existing, 'local').occupancies[0].conflict;
+  const conflict = deterministicPlan(workbook([source]), existing).occupancies[0].conflict;
   assert.equal(conflict?.classification, 'PREVIOUS_IMPORT_UPDATE');
   assert.equal(conflict?.underlyingClassification, 'SAME_CAMPAIGN_EXTENSION');
   assert.equal(conflict?.recommendedAction, 'MERGE_OR_EXTEND');
@@ -175,7 +179,7 @@ test('previous import extension is distinguished from manual history', () => {
 
 test('normalization and import metadata are not material updates', () => {
   const existing = state(); existing.carriers = [existingCarrier({ city: '  Ostrava  ', sourceSystem: null, sourceSheet: null, sourceRow: null, sourceKey: null })];
-  const item = buildImportPlan(workbook(), existing, 'local').carriers[0];
+  const item = deterministicPlan(workbook(), existing).carriers[0];
   assert.equal(item.action, 'UNCHANGED');
   assert.equal(item.updateClass, 'NORMALIZATION_ONLY');
   assert.ok(item.normalizationChanges?.length);
@@ -184,7 +188,7 @@ test('normalization and import metadata are not material updates', () => {
 
 test('new surface has an auditable reason', () => {
   const existing = state(); existing.carriers = [existingCarrier({ surfaces: [] })];
-  const surface = buildImportPlan(workbook(), existing, 'local').surfaces[0];
+  const surface = deterministicPlan(workbook(), existing).surfaces[0];
   assert.equal(surface.action, 'NEW');
   assert.equal(surface.reason, 'NO_MATCHING_SURFACE_ON_EXISTING_CARRIER');
 });
@@ -202,7 +206,7 @@ test('resolution validation rejects stale hashes, duplicate ids and unsafe actio
   const current = existingCarrier();
   current.surfaces[0].occupancies.push({ id: 'manual-resolution', clientId: null, clientName: 'Manual', campaignName: 'Old', dateFrom: new Date('2026-08-01Z'), dateTo: new Date('2026-08-31Z'), status: 'RESERVED' });
   const existing = state(); existing.carriers = [current];
-  const plan = buildImportPlan(workbook([source]), existing, 'local');
+  const plan = deterministicPlan(workbook([source]), existing);
   const row = { ...plan.resolution.rows[0], selectedAction: 'USE_IMPORT' as const, sourceFileHash: 'stale' };
   const path = join(tmpdir(), `carriers-resolution-${process.pid}-${Date.now()}.csv`);
   await writeResolutionCsv([row, row], path);

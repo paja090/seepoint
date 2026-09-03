@@ -1,9 +1,9 @@
 import { OrganizationRole, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
-import { canAssignRole, canManageTarget, wouldRemoveLastActiveAdmin } from '@/lib/account-policy';
+import { canAssignOrganizationRole, canManageOrganizationMember, effectiveOrganizationRole, wouldRemoveLastActiveOrganizationAdmin } from '@/lib/account-policy';
 import { audit } from '@/lib/audit';
 import { getCurrentUser, hashPassword, issueUserToken } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { platformPrisma, prisma } from '@/lib/db';
 import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
@@ -15,14 +15,19 @@ type AccountInput = { action?: 'enableAccess' | 'invite' | 'setTemporaryPassword
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const actor = await getCurrentUser();
   if (!actor || !['ADMIN', 'MANAGER'].includes(actor.role)) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  const actorMembershipRole = actor.membership ? effectiveOrganizationRole(actor.membership.role, actor.membership.roles) : null;
+  if (!actorMembershipRole || !['OWNER', 'ADMIN', 'MANAGER'].includes(actorMembershipRole)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat členy této organizace.' }, { status: 403 });
   const body = await request.json().catch(() => null) as AccountInput | null;
   const { id } = await params;
-  const employee = await prisma.employee.findUnique({ where: { id }, include: { user: true } });
+  const employee = await prisma.employee.findUnique({
+    where: { id },
+    include: { user: { include: { organizationMemberships: { where: { organizationId: actor.organizationId! } } } } },
+  });
   if (!employee || !body?.action) return NextResponse.json({ error: 'Zaměstnanec nebo akce nebyli nalezeni.' }, { status: 404 });
 
   if (body.action === 'enableAccess' && !employee.user) {
     if (!employee.email) return NextResponse.json({ error: 'Pro přístup do aplikace musí mít zaměstnanec e-mail.' }, { status: 400 });
-    if (!canAssignRole(actor.role, employee.role)) return NextResponse.json({ error: 'Manažer nemůže vytvořit administrátorský účet.' }, { status: 403 });
+    if (!canAssignOrganizationRole(actorMembershipRole, employee.role as OrganizationRole)) return NextResponse.json({ error: 'Tuto roli nemůžete v organizaci přiřadit.' }, { status: 403 });
     const normalizedEmail = normalizeAuthEmail(employee.email);
     const existing = await prisma.user.findFirst({
       where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
@@ -30,7 +35,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
     if (existing) {
       if (existing.employees[0]) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
-      if (actor.role !== 'ADMIN' && existing.role === 'ADMIN') return NextResponse.json({ error: 'Administrátorský účet může propojit pouze administrátor.' }, { status: 403 });
       await prisma.$transaction([
         prisma.employee.update({ where: { id: employee.id }, data: { userId: existing.id, email: normalizedEmail, role: employee.role, roles: employee.roles } }),
         prisma.organizationMember.upsert({
@@ -61,8 +65,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
     try {
       const token = await issueUserToken(user.id, 'ACTIVATION', 48); const url = getAppUrl(request, `/activate/${token}`);
-      await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);
-      return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
+      const delivery = await sendActivationEmail(user.email, url); await audit('ACCOUNT_CREATED', user.id, actor.id);
+      const exposeActivationUrl = process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV !== 'production';
+      return NextResponse.json({
+        ok: true,
+        ...(delivery.status === 'skipped' ? { warning: 'Preview: účet byl vytvořen, ale aktivační e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.' } : {}),
+        ...(exposeActivationUrl ? { activationUrl: url } : {}),
+      });
     } catch (error) {
       console.error('Employee access was enabled, but invitation failed', error instanceof Error ? error.message : 'unknown error');
       return NextResponse.json({ ok: true, warning: 'Přístup byl povolen, ale pozvánku se nepodařilo odeslat. Použijte akci Odeslat novou pozvánku.' });
@@ -71,7 +80,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const target = employee.user;
   if (!target) return NextResponse.json({ error: 'Zaměstnanec nemá uživatelský účet.' }, { status: 404 });
-  if (actor.id !== target.id && !canManageTarget(actor.role, target.role)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat tento účet.' }, { status: 403 });
+  const targetMembership = target.organizationMemberships[0];
+  if (!targetMembership) return NextResponse.json({ error: 'Účet není členem této organizace.' }, { status: 409 });
+  const targetMembershipRole = effectiveOrganizationRole(targetMembership.role, targetMembership.roles);
+  if (actor.id !== target.id && !canManageOrganizationMember(actorMembershipRole, targetMembershipRole)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat tohoto člena organizace.' }, { status: 403 });
+  if (targetMembershipRole === 'OWNER' && ['suspend', 'role'].includes(body.action) && actor.platformRole !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Účet vlastníka organizace nelze pozastavit ani změnit z karty zaměstnance.' }, { status: 409 });
+  }
 
   if (body.action === 'invite') {
     const limited = await enforceRateLimit(request, hashRateLimitIdentity(target.id), rateLimitPolicies.resendInvitation);
@@ -79,11 +94,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (target.status !== 'INVITED') return NextResponse.json({ error: 'Novou pozvánku lze poslat pouze účtu ve stavu INVITED.' }, { status: 400 });
     ensureEmailConfigured();
     const token = await issueUserToken(target.id, 'ACTIVATION', 48); const url = getAppUrl(request, `/activate/${token}`);
-    await sendActivationEmail(target.email, url); await audit('INVITATION_RESENT', target.id, actor.id);
-    return NextResponse.json({ ok: true, ...(process.env.NODE_ENV !== 'production' ? { activationUrl: url } : {}) });
+    const delivery = await sendActivationEmail(target.email, url);
+    if (delivery.status === 'sent') await audit('INVITATION_RESENT', target.id, actor.id);
+    const exposeActivationUrl = process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV !== 'production';
+    return NextResponse.json({
+      ok: true,
+      ...(delivery.status === 'skipped' ? { warning: 'Preview: nová pozvánka byla připravena, ale e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.' } : {}),
+      ...(exposeActivationUrl ? { activationUrl: url } : {}),
+    });
   }
 
   if (body.action === 'setTemporaryPassword') {
+    const membershipCount = await platformPrisma.organizationMember.count({ where: { userId: target.id } });
+    if (membershipCount > 1 && actor.platformRole !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Tento účet používá více organizací. Globální heslo si musí změnit uživatel, případně platformní administrátor.' }, { status: 409 });
+    }
     const validationError = temporaryPasswordError(body.temporaryPassword ?? '', body.temporaryPasswordConfirmation ?? '');
     if (validationError) {
       console.info('[employees/account] Temporary password rejected', {
@@ -105,6 +130,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         },
       });
       await transaction.employee.update({ where: { id }, data: { isActive: true } });
+      await transaction.organizationMember.update({
+        where: { organizationId_userId: { organizationId: actor.organizationId!, userId: target.id } },
+        data: { isActive: true },
+      });
       await transaction.userToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } });
       await transaction.userAuditLog.create({
         data: {
@@ -120,21 +149,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (body.action === 'suspend' || body.action === 'role') {
-    const primaryRole = body.role || target.role;
-    const rolesArray = body.roles && body.roles.length ? body.roles : Array.from(new Set([primaryRole, ...(target.roles || [])]));
+    const currentPrimaryRole = targetMembership.role === 'OWNER' ? Role.ADMIN : targetMembership.role as Role;
+    const primaryRole = body.role || currentPrimaryRole;
+    const submittedRoles = body.roles?.filter((role): role is Role => Object.values(Role).includes(role));
+    const membershipRoles = targetMembership.roles.map((role) => role === 'OWNER' ? Role.ADMIN : role as Role);
+    const rolesArray = submittedRoles?.length ? Array.from(new Set([primaryRole, ...submittedRoles])) : Array.from(new Set([primaryRole, ...membershipRoles]));
+    if (!Object.values(Role).includes(primaryRole)) return NextResponse.json({ error: 'Neplatná role.' }, { status: 400 });
+    if (body.action === 'role' && !canAssignOrganizationRole(actorMembershipRole, primaryRole as OrganizationRole)) return NextResponse.json({ error: 'Tuto roli nemůžete přiřadit.' }, { status: 403 });
+    if (body.action === 'role' && rolesArray.some((role) => !canAssignOrganizationRole(actorMembershipRole, role as OrganizationRole))) return NextResponse.json({ error: 'Jednu z vybraných rolí nemůžete přiřadit.' }, { status: 403 });
     try {
       await prisma.$transaction(async (transaction) => {
         const activeAdminCount = await transaction.organizationMember.count({
-          where: { organizationId: actor.organizationId!, isActive: true, role: { in: ['OWNER', 'ADMIN'] } },
+          where: { organizationId: actor.organizationId!, isActive: true, OR: [{ role: { in: ['OWNER', 'ADMIN'] } }, { roles: { hasSome: ['OWNER', 'ADMIN'] } }] },
         });
-        if (wouldRemoveLastActiveAdmin({ targetRole: target.role, nextRole: primaryRole, suspending: body.action === 'suspend', activeAdminCount })) throw new Error('LAST_ADMIN');
+        if (wouldRemoveLastActiveOrganizationAdmin({ targetRole: targetMembershipRole, nextRole: primaryRole as OrganizationRole, suspending: body.action === 'suspend', activeAdminCount })) throw new Error('LAST_ADMIN');
         if (body.action === 'suspend') {
           await transaction.organizationMember.update({
             where: { organizationId_userId: { organizationId: actor.organizationId!, userId: target.id } },
             data: { isActive: false },
           });
           await transaction.userSession.deleteMany({ where: { userId: target.id, activeOrganizationId: actor.organizationId! } });
-          await transaction.userToken.updateMany({ where: { userId: target.id, usedAt: null }, data: { usedAt: new Date() } });
         } else {
           await Promise.all([
             transaction.organizationMember.update({
@@ -149,7 +183,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       if (error instanceof Error && error.message === 'LAST_ADMIN') return NextResponse.json({ error: 'Posledního aktivního administrátora nelze deaktivovat ani zbavit role.' }, { status: 409 });
       throw error;
     }
-    await audit(body.action === 'suspend' ? 'ACCOUNT_SUSPENDED' : 'ROLE_CHANGED', target.id, actor.id, body.action === 'role' ? { from: target.role, to: primaryRole, roles: rolesArray } : undefined);
+    await audit(body.action === 'suspend' ? 'ACCOUNT_SUSPENDED' : 'ROLE_CHANGED', target.id, actor.id, body.action === 'role' ? { from: targetMembershipRole, to: primaryRole, roles: rolesArray } : undefined);
     return NextResponse.json({ ok: true });
   }
 

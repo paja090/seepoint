@@ -22,7 +22,28 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.platformPrisma = plat
 
 // Application code must use this guarded client. The unguarded platform client is
 // reserved for authentication, platform administration and the first public-token lookup.
-export const prisma = (platformPrisma.$extends(tenantPrismaExtension) as unknown) as PrismaClient & Record<string, any>;
+export const prisma = platformPrisma.$extends(tenantPrismaExtension) as unknown as PrismaClient;
+
+const photoMetadataSelect = {
+  id: true,
+  carrierId: true,
+  surfaceId: true,
+  url: true,
+  type: true,
+  note: true,
+  sortOrder: true,
+  isPrimary: true,
+  isClientVisible: true,
+  driveFileId: true,
+  fileName: true,
+  mimeType: true,
+  size: true,
+  createdAt: true,
+  capturedLatitude: true,
+  capturedLongitude: true,
+  capturedAccuracyMeters: true,
+  capturedByWorkerName: true,
+} satisfies Prisma.PhotoSelect;
 
 export const carrierInclude = {
   surfaces: {
@@ -33,6 +54,7 @@ export const carrierInclude = {
         where: {
           type: { not: 'EXPENSE_RECEIPT' },
         },
+        select: photoMetadataSelect,
       },
     },
     orderBy: { name: 'asc' },
@@ -41,8 +63,37 @@ export const carrierInclude = {
     where: {
       type: { not: 'EXPENSE_RECEIPT' },
     },
+    select: photoMetadataSelect,
   },
 } satisfies Prisma.AdvertisingCarrierInclude;
+
+function carrierOverviewInclude(asOf: Date, mapOnly = false) {
+  return {
+    surfaces: {
+      include: {
+        currentClient: true,
+        occupancies: {
+          where: {
+            status: { in: ['OCCUPIED', 'RESERVED'] as const },
+            dateTo: { gte: asOf },
+          },
+          orderBy: { dateFrom: 'asc' as const },
+        },
+        photos: {
+          where: { type: { not: 'EXPENSE_RECEIPT' as const } },
+          select: photoMetadataSelect,
+          ...(mapOnly ? { take: 1 } : {}),
+        },
+      },
+      orderBy: { name: 'asc' as const },
+    },
+    photos: {
+      where: { type: { not: 'EXPENSE_RECEIPT' as const } },
+      select: photoMetadataSelect,
+      ...(mapOnly ? { take: 1 } : {}),
+    },
+  } satisfies Prisma.AdvertisingCarrierInclude;
+}
 
 type CarrierRow = Prisma.AdvertisingCarrierGetPayload<{ include: typeof carrierInclude }>;
 type OccupancyRow = Prisma.OccupancyGetPayload<Record<string, never>>;
@@ -76,6 +127,9 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
     mimeType: photo.mimeType ?? undefined,
     size: photo.size ?? undefined,
     createdAt: photo.createdAt?.toISOString(),
+    capturedLatitude: photo.capturedLatitude ?? undefined,
+    capturedLongitude: photo.capturedLongitude ?? undefined,
+    capturedAccuracyMeters: photo.capturedAccuracyMeters ?? undefined,
     capturedByWorkerName: photo.capturedByWorkerName ?? undefined,
   });
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -381,12 +435,13 @@ async function getCarrierCounts(where: Prisma.AdvertisingCarrierWhereInput) {
 }
 
 export async function getCarriersPage(filters: CarrierFilters = {}) {
-  const pageSize = Math.min(Math.max(filters.pageSize ?? 500, 1), 2000);
+  const pageSize = Math.min(Math.max(filters.pageSize ?? 100, 1), 250);
   const page = Math.max(filters.page ?? 1, 1);
   const where = buildCarrierWhere(filters);
+  const overviewInclude = carrierOverviewInclude(new Date());
   const [{ total, missingGpsCount, archivedCount }, rows] = await Promise.all([
     getCarrierCounts(where),
-    prisma.advertisingCarrier.findMany({ where, include: carrierInclude, orderBy: [{ city: 'asc' }, { name: 'asc' }], skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.advertisingCarrier.findMany({ where, include: overviewInclude, orderBy: [{ city: 'asc' }, { name: 'asc' }], skip: (page - 1) * pageSize, take: pageSize }),
   ]);
   const carriers = rows.map(serializeCarrier);
   return { carriers, meta: { total, returned: carriers.length, limit: pageSize, page, pageSize, hasMore: page * pageSize < total, missingGpsCount, archivedCount } satisfies CarrierResultMeta };
@@ -398,9 +453,10 @@ export async function getMapCarriers(filters: CarrierFilters = {}) {
   const limit = Math.min(Math.max(filters.pageSize ?? 2000, 1), 5000);
   const where = buildCarrierWhere({ ...filters, archived: filters.archived ?? 'active' });
   const mapWhere: Prisma.AdvertisingCarrierWhereInput = { ...where, AND: [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { latitude: { not: null }, longitude: { not: null } }] };
+  const overviewInclude = carrierOverviewInclude(new Date(), true);
   const [{ total, missingGpsCount, archivedCount }, rows] = await Promise.all([
     getCarrierCounts(where),
-    prisma.advertisingCarrier.findMany({ where: mapWhere, include: carrierInclude, orderBy: [{ city: 'asc' }, { name: 'asc' }], take: limit }),
+    prisma.advertisingCarrier.findMany({ where: mapWhere, include: overviewInclude, orderBy: [{ city: 'asc' }, { name: 'asc' }], take: limit }),
   ]);
   const carriers = rows.map(serializeCarrier);
   return { carriers, meta: { total, returned: carriers.length, limit, page: 1, pageSize: limit, hasMore: carriers.length >= limit && carriers.length < total - missingGpsCount, missingGpsCount, archivedCount } satisfies CarrierResultMeta };

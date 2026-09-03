@@ -2,15 +2,22 @@ import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
 import { VacationPlannerClient } from '@/components/vacations/VacationPlannerClient';
+import { canManageAbsences, canViewAbsenceNote } from '@/lib/absences';
 
 export const dynamic = 'force-dynamic';
 
 export default async function VacationsPage() {
   const user = await requirePageAccess('team');
+  const canManage = canManageAbsences(user.role);
+  const ownEmployeeId = user.employee?.id ?? null;
+  const oldestVisibleDate = new Date();
+  oldestVisibleDate.setUTCFullYear(oldestVisibleDate.getUTCFullYear() - 1);
 
   const [employees, rawAbsences] = await Promise.all([
     prisma.employee.findMany({
-      where: { isActive: true },
+      where: canManage
+        ? { isActive: true }
+        : ownEmployeeId ? { id: ownEmployeeId, isActive: true } : { id: '__none__' },
       select: {
         id: true,
         firstName: true,
@@ -21,6 +28,15 @@ export default async function VacationsPage() {
       orderBy: { lastName: 'asc' },
     }),
     prisma.employeeAbsence.findMany({
+      where: {
+        dateTo: { gte: oldestVisibleDate },
+        ...(canManage ? {} : {
+          OR: [
+            { status: 'APPROVED' as const },
+            ...(ownEmployeeId ? [{ employeeId: ownEmployeeId }] : []),
+          ],
+        }),
+      },
       include: {
         employee: {
           select: {
@@ -32,7 +48,8 @@ export default async function VacationsPage() {
           },
         },
       },
-      orderBy: { dateFrom: 'asc' },
+      orderBy: [{ dateFrom: 'asc' }, { createdAt: 'asc' }],
+      take: 500,
     }),
   ]);
 
@@ -44,7 +61,7 @@ export default async function VacationsPage() {
     type: a.type,
     dateFrom: a.dateFrom.toISOString(),
     dateTo: a.dateTo.toISOString(),
-    note: a.note || null,
+    note: canViewAbsenceNote(user.role, ownEmployeeId, a.employeeId) ? a.note || null : null,
     status: a.status,
   }));
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Camera,
   MapPin,
@@ -16,12 +17,11 @@ import {
   Compass,
   ExternalLink,
   Plus,
-  Sparkles,
 } from 'lucide-react';
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType } from '@/lib/mobile-photo-damage';
 import { MobileCreateCarrierModal } from '@/components/navigation/MobileCreateCarrierModal';
 
-type NearbyCarrier = {
+export type NearbyCarrier = {
   id: string;
   code: string;
   name: string;
@@ -88,6 +88,8 @@ export function MobilePhotoFieldAppView() {
 
   // Carriers State
   const [carriers, setCarriers] = useState<NearbyCarrier[]>([]);
+  const [totalCarriers, setTotalCarriers] = useState(0);
+  const [carriersLimited, setCarriersLimited] = useState(false);
   const [loadingCarriers, setLoadingCarriers] = useState(false);
   const [radiusKm, setRadiusKm] = useState(2.0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,6 +126,8 @@ export function MobilePhotoFieldAppView() {
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const createPreviewUrlRef = useRef<string | null>(null);
+  const carriersRequestRef = useRef(0);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearPreview = () => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
@@ -144,6 +148,7 @@ export function MobilePhotoFieldAppView() {
   useEffect(() => () => {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     if (createPreviewUrlRef.current) URL.revokeObjectURL(createPreviewUrlRef.current);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   }, []);
 
   const handleCreateFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,6 +174,7 @@ export function MobilePhotoFieldAppView() {
   const handleCreateCarrierSuccess = (newCarrier: NearbyCarrier, message: string) => {
     setCreateSuccessAlert(message);
     setCarriers((prev) => [newCarrier, ...prev.filter((c) => c.id !== newCarrier.id)]);
+    setTotalCarriers((prev) => prev + 1);
     setSelectedCarrier(newCarrier);
     setSelectedSurfaceId(newCarrier.surfaces[0]?.id || null);
     clearCreatePreview();
@@ -187,7 +193,7 @@ export function MobilePhotoFieldAppView() {
     if (!navigator.geolocation) {
       setGpsError('Geolokace není podporována vaším prohlížečem.');
       setLocating(false);
-      fetchCarriers(null, null, radiusKm);
+      fetchCarriers(null, null, radiusKm, searchQuery);
       return;
     }
 
@@ -198,19 +204,20 @@ export function MobilePhotoFieldAppView() {
         const accuracy = pos.coords.accuracy;
         setCoords({ lat, lng, accuracy });
         setLocating(false);
-        fetchCarriers(lat, lng, radiusKm);
+        fetchCarriers(lat, lng, radiusKm, searchQuery);
       },
       (err) => {
         console.warn('GPS Error:', err);
-        setGpsError('Nepodařilo se získat vašu přesnou polohu. Zobrazují se všechna nosná místa.');
+        setGpsError('Nepodařilo se získat vaši přesnou polohu. Zobrazuje se omezený seznam; pro přesnější výběr použijte hledání.');
         setLocating(false);
-        fetchCarriers(null, null, radiusKm);
+        fetchCarriers(null, null, radiusKm, searchQuery);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const fetchCarriers = async (lat: number | null, lng: number | null, radius: number) => {
+  const fetchCarriers = async (lat: number | null, lng: number | null, radius: number, query = '') => {
+    const requestId = ++carriersRequestRef.current;
     setLoadingCarriers(true);
     try {
       const params = new URLSearchParams();
@@ -219,29 +226,40 @@ export function MobilePhotoFieldAppView() {
         params.set('lng', String(lng));
         params.set('radius', String(radius));
       }
+      const trimmedQuery = query.trim();
+      if (trimmedQuery) params.set('q', trimmedQuery);
       const res = await fetch(`/api/mobile-photos/nearby?${params.toString()}`);
       const data = await res.json();
-      if (res.ok && data.carriers) {
+      if (requestId === carriersRequestRef.current && res.ok && Array.isArray(data.carriers)) {
         setCarriers(data.carriers);
-        if (selectedCarrier) {
-          const updated = data.carriers.find((c: NearbyCarrier) => c.id === selectedCarrier.id);
-          if (updated) setSelectedCarrier(updated);
-        }
+        setTotalCarriers(typeof data.total === 'number' ? data.total : data.carriers.length);
+        setCarriersLimited(Boolean(data.limited));
+        setSelectedCarrier((current) => {
+          if (!current) return current;
+          return data.carriers.find((carrier: NearbyCarrier) => carrier.id === current.id) || current;
+        });
       }
     } catch (err) {
       console.error('Fetch carriers error:', err);
     } finally {
-      setLoadingCarriers(false);
+      if (requestId === carriersRequestRef.current) setLoadingCarriers(false);
     }
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm, value);
+    }, 300);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
-          throw new Error('Vybraný soubor není podporovaná fotografie.');
-        }
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) throw new Error('INVALID_IMAGE');
+        if (!file.size || file.size > 4 * 1024 * 1024) throw new Error('PHOTO_TOO_LARGE');
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
         const nextPreviewUrl = URL.createObjectURL(file);
         previewUrlRef.current = nextPreviewUrl;
@@ -252,20 +270,23 @@ export function MobilePhotoFieldAppView() {
       } catch (error) {
         console.error('[mobile-photos/camera]', error);
         clearPreview();
-        setUploadErrorMsg('Fotografii se nepodařilo načíst z fotoaparátu. Zkuste ji pořídit znovu.');
+        setUploadErrorMsg(error instanceof Error && error.message === 'PHOTO_TOO_LARGE'
+          ? 'Fotografie je příliš velká. Maximální velikost je 4 MB.'
+          : 'Použijte fotografii ve formátu JPEG, PNG nebo WebP.');
       }
     }
   };
 
   const handleUploadPhoto = async () => {
     if (!photoFile || !selectedCarrier) return;
+    if (!coords) {
+      setUploadErrorMsg('Před uložením fotografie je nutné získat aktuální GPS polohu zařízení.');
+      requestLocation();
+      return;
+    }
     setUploading(true);
     setUploadSuccessMsg(null);
     setUploadErrorMsg(null);
-
-    const lat = coords?.lat ?? selectedCarrier.latitude ?? 0;
-    const lng = coords?.lng ?? selectedCarrier.longitude ?? 0;
-    const accuracy = coords?.accuracy ?? 50;
 
     try {
       const fd = new FormData();
@@ -277,9 +298,10 @@ export function MobilePhotoFieldAppView() {
       if (purpose === 'DAMAGE') {
         fd.append('damageType', damageType);
       }
-      fd.append('latitude', String(lat));
-      fd.append('longitude', String(lng));
-      fd.append('accuracyMeters', String(accuracy));
+      fd.append('latitude', String(coords.lat));
+      fd.append('longitude', String(coords.lng));
+      fd.append('accuracyMeters', String(coords.accuracy));
+      fd.append('requireGps', 'true');
       fd.append('note', photoNote.trim() || 'Mobilní fotodokumentace v terénu');
 
       const uploadUrl = new URL('/api/mobile-photos/upload', window.location.origin);
@@ -296,6 +318,7 @@ export function MobilePhotoFieldAppView() {
           GPS_REQUIRED: 'Před uložením fotografie je nutné získat GPS polohu.',
           DATABASE_ERROR: 'Fotografii se nepodařilo zapsat do databáze. Zkuste akci zopakovat.',
           INVALID_IMAGE: 'Formát fotografie není podporován.',
+          PHOTO_TOO_LARGE: 'Fotografie je příliš velká. Maximální velikost je 4 MB.',
           DAMAGE_TYPE_REQUIRED: 'Vyberte typ závady.',
         };
         throw new Error(messages[data.code || ''] || 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
@@ -315,7 +338,7 @@ export function MobilePhotoFieldAppView() {
       setPhotoNote('');
 
       // Refresh list
-      fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm);
+      fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm, searchQuery);
     } catch (err: unknown) {
       console.error('[mobile-photos/upload]', err);
       setUploadErrorMsg(err instanceof Error && err.message ? err.message : 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
@@ -334,7 +357,7 @@ export function MobilePhotoFieldAppView() {
       if (!res.ok) throw new Error();
       setClientMismatch(null);
       setUploadSuccessMsg('Přiřazení fotografie k ploše bylo potvrzeno.');
-      await fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm);
+      await fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm, searchQuery);
     } catch (error) {
       console.error('[mobile-photos/confirm]', error);
       setUploadErrorMsg('Přiřazení fotografie se nepodařilo potvrdit. Zkuste akci zopakovat.');
@@ -392,7 +415,7 @@ export function MobilePhotoFieldAppView() {
       setGpsUpdateSuccessMsg(`📍 GPS poloha nosiče byla v systému úspěšně zpřesněna! (${pendingNewGps.lat.toFixed(5)}, ${pendingNewGps.lng.toFixed(5)})`);
       setSelectedCarrier((prev) => prev ? { ...prev, latitude: pendingNewGps.lat, longitude: pendingNewGps.lng } : null);
       setPendingNewGps(null);
-      fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm);
+      fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, radiusKm, searchQuery);
     } catch (err: unknown) {
       setGpsUpdateErrorMsg(err instanceof Error ? err.message : 'Došlo k chybě při ukládání GPS polohy.');
     } finally {
@@ -400,11 +423,7 @@ export function MobilePhotoFieldAppView() {
     }
   };
 
-  const filteredCarriers = carriers.filter((c) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q) || (c.city && c.city.toLowerCase().includes(q));
-  });
+  const filteredCarriers = carriers;
 
   return (
     <div className="mx-auto max-w-lg space-y-4 pb-16">
@@ -473,7 +492,7 @@ export function MobilePhotoFieldAppView() {
         </div>
 
         {/* Quick Switcher Banner to Location Survey */}
-        <a
+        <Link
           href="/mobile-surveys"
           className="mt-3 flex items-center justify-between rounded-2xl bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 p-3 text-xs font-bold text-white border border-sky-700/50 shadow-md hover:border-sky-400 active:scale-[0.99] transition group"
         >
@@ -487,10 +506,10 @@ export function MobilePhotoFieldAppView() {
             </div>
           </div>
           <ChevronRight size={18} className="text-sky-300 group-hover:translate-x-1 transition" />
-        </a>
+        </Link>
 
         {/* Quick Banner to Field Route Optimizer */}
-        <a
+        <Link
           href="/work/route"
           className="mt-2.5 flex items-center justify-between rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 p-3 text-xs font-bold text-white border border-emerald-700/50 shadow-md hover:border-emerald-400 active:scale-[0.99] transition group"
         >
@@ -504,7 +523,7 @@ export function MobilePhotoFieldAppView() {
             </div>
           </div>
           <ChevronRight size={18} className="text-emerald-300 group-hover:translate-x-1 transition" />
-        </a>
+        </Link>
       </div>
 
       {/* Global Success Alert after Creating Carrier */}
@@ -531,7 +550,7 @@ export function MobilePhotoFieldAppView() {
             type="text"
             placeholder="Hledat kód nebo město..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 shadow-sm focus:border-slate-400 focus:outline-none"
           />
         </div>
@@ -540,7 +559,7 @@ export function MobilePhotoFieldAppView() {
           onChange={(e) => {
             const r = parseFloat(e.target.value);
             setRadiusKm(r);
-            fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, r);
+            fetchCarriers(coords?.lat ?? null, coords?.lng ?? null, r, searchQuery);
           }}
           className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 shadow-sm focus:outline-none"
         >
@@ -555,10 +574,16 @@ export function MobilePhotoFieldAppView() {
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-black uppercase tracking-wider text-slate-500">
-            Nosiče v okolí ({filteredCarriers.length})
+            Nosiče v okolí ({filteredCarriers.length}{totalCarriers > filteredCarriers.length ? ` z ${totalCarriers}` : ''})
           </h2>
           {loadingCarriers && <span className="text-xs text-slate-400 font-medium flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Načítám...</span>}
         </div>
+
+        {carriersLimited && !loadingCarriers && (
+          <p className="px-1 text-xs font-medium text-slate-500">
+            Zobrazeno prvních {filteredCarriers.length} výsledků. Pro přesnější výběr použijte hledání.
+          </p>
+        )}
 
         {filteredCarriers.length === 0 && !loadingCarriers && (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-3">
@@ -921,8 +946,8 @@ export function MobilePhotoFieldAppView() {
               <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 max-h-44">
                 <Image src={previewUrl} alt="Náhled pořízené fotografie" width={560} height={352} unoptimized className="w-full object-cover max-h-44" />
                 <div className="absolute top-2 right-2 flex gap-1">
-                  <span className="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] font-bold text-emerald-400 backdrop-blur border border-slate-700 flex items-center gap-1">
-                    <Compass size={11} /> GPS Razítko zapsáno
+                  <span className={`rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] font-bold backdrop-blur border border-slate-700 flex items-center gap-1 ${coords ? 'text-emerald-400' : 'text-amber-300'}`}>
+                    <Compass size={11} /> {coords ? 'GPS razítko připraveno' : 'GPS zatím není dostupná'}
                   </span>
                 </div>
               </div>
@@ -946,7 +971,7 @@ export function MobilePhotoFieldAppView() {
                   onClick={handleUploadPhoto}
                   disabled={uploading}
                   className={`flex-2 flex items-center justify-center gap-2 rounded-xl py-3 text-xs font-black text-slate-950 transition disabled:opacity-50 ${
-                    purpose === 'DAMAGE' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
+                    !coords ? 'bg-amber-400 hover:bg-amber-300' : purpose === 'DAMAGE' ? 'bg-rose-500 hover:bg-rose-400' : 'bg-emerald-500 hover:bg-emerald-400'
                   }`}
                 >
                   {uploading ? (
@@ -956,6 +981,8 @@ export function MobilePhotoFieldAppView() {
                   )}
                   {uploading
                     ? 'Ukládám…'
+                    : !coords
+                    ? 'Nejprve načíst GPS'
                     : purpose === 'DAMAGE'
                     ? '🚨 Nahlásit Závadu do Chatu'
                     : 'Uložit fotku s GPS'}

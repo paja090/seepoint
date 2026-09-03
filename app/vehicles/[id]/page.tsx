@@ -5,12 +5,25 @@ import { prisma, ensureVehicleSchema } from '@/lib/db';
 import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
-import { UserCheck, FileText, AlertTriangle, ShieldCheck, Wrench, CalendarPlus } from 'lucide-react';
+import { UserCheck, AlertTriangle, CalendarPlus } from 'lucide-react';
 import { VehiclePhotoUploader } from '@/components/VehiclePhotoUploader';
 import { VehicleEditModal } from '@/components/VehicleEditModal';
 import { VehicleServiceManager } from '@/components/VehicleServiceManager';
+import { derivedVehicleStatus } from '@/lib/vehicle-reservations';
 
 export const dynamic = 'force-dynamic';
+
+function deadlineTone(value: Date | null | undefined, today: Date) {
+  if (!value) return 'text-slate-900';
+  const diffDays = Math.ceil((value.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays < 0) return 'text-rose-700';
+  if (diffDays <= 30) return 'text-amber-700';
+  return 'text-slate-900';
+}
+
+function isPastDeadline(value: Date | null | undefined, today: Date) {
+  return Boolean(value && value.getTime() < today.getTime());
+}
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePageAccess('vehicles');
@@ -18,18 +31,33 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   await ensureVehicleSchema();
 
   const { id } = await params;
-  const vehicle = await prisma.vehicle.findUnique({
-    where: { id },
-    include: {
-      reservations: { include: { employee: true }, orderBy: { dateFrom: 'desc' }, take: 20 },
-      serviceRecords: { orderBy: { date: 'desc' }, take: 50 },
-      workTasks: { include: { assignedTo: true }, orderBy: { scheduledDate: 'desc' }, take: 20 },
-      fuelExpenses: { include: { employee: true }, orderBy: { createdAt: 'desc' }, take: 30 },
-    },
-  });
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const [vehicle, currentReservations] = await Promise.all([
+    prisma.vehicle.findUnique({
+      where: { id },
+      include: {
+        reservations: { include: { employee: true }, orderBy: { dateFrom: 'desc' }, take: 20 },
+        serviceRecords: { orderBy: { date: 'desc' }, take: 50 },
+        workTasks: { include: { assignedTo: true }, orderBy: { scheduledDate: 'desc' }, take: 20 },
+        fuelExpenses: { include: { employee: true }, orderBy: { createdAt: 'desc' }, take: 30 },
+      },
+    }),
+    prisma.vehicleReservation.findMany({
+      where: {
+        vehicleId: id,
+        OR: [
+          { status: 'ACTIVE' },
+          { status: 'RESERVED', dateFrom: { lte: today }, dateTo: { gte: today } },
+        ],
+      },
+      select: { status: true, dateFrom: true, dateTo: true },
+    }),
+  ]);
   if (!vehicle) notFound();
 
   const totalFuelCost = vehicle.fuelExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
+  const effectiveStatus = derivedVehicleStatus(vehicle.status, currentReservations, today);
 
   return (
     <AppShell>
@@ -112,7 +140,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             <dl className="grid gap-4 text-xs sm:grid-cols-3">
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Stav vozidla</dt>
-                <dd className="mt-1"><StatusPill value={vehicle.status} /></dd>
+                <dd className="mt-1"><StatusPill value={effectiveStatus} /></dd>
               </div>
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Zodpovědná osoba / Řidič</dt>
@@ -127,15 +155,21 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               </div>
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">STK platná do</dt>
-                <dd className="mt-1 font-extrabold text-slate-900">{dateOnly(vehicle.technicalInspectionUntil)}</dd>
+                <dd className={`mt-1 font-extrabold ${deadlineTone(vehicle.technicalInspectionUntil, today)}`}>
+                  {dateOnly(vehicle.technicalInspectionUntil)} {isPastDeadline(vehicle.technicalInspectionUntil, today) && '🚨 Prošlé'}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pojištění do</dt>
-                <dd className="mt-1 font-bold text-slate-900">{dateOnly(vehicle.insuranceUntil)}</dd>
+                <dd className={`mt-1 font-bold ${deadlineTone(vehicle.insuranceUntil, today)}`}>
+                  {dateOnly(vehicle.insuranceUntil)} {isPastDeadline(vehicle.insuranceUntil, today) && '🚨 Prošlé'}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Dálniční známka do</dt>
-                <dd className="mt-1 font-bold text-emerald-800">{dateOnly(vehicle.highwayPassUntil)}</dd>
+                <dd className={`mt-1 font-bold ${deadlineTone(vehicle.highwayPassUntil, today)}`}>
+                  {dateOnly(vehicle.highwayPassUntil)} {isPastDeadline(vehicle.highwayPassUntil, today) && '🚨 Prošlé'}
+                </dd>
               </div>
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Pneumatiky & Rozměr</dt>

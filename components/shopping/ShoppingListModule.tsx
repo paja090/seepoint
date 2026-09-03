@@ -11,24 +11,19 @@ import {
   Camera,
   Trash2,
   X,
-  Calendar,
-  Info,
   Search,
-  Filter as FilterIcon,
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
   Package,
   User,
-  Tag,
   Receipt,
   MoreVertical,
-  Check,
   AlertCircle,
   Clock,
   Briefcase,
   Store,
-  ArrowRight,
+  type LucideProps,
 } from 'lucide-react';
 
 export type ShoppingPriority = 'NORMAL' | 'THIS_WEEK' | 'URGENT';
@@ -75,15 +70,39 @@ export type CrmOrderOption = {
   orderNumber: string;
 };
 
+type ShoppingOptionsResponse = {
+  employees?: unknown;
+  orders?: unknown;
+};
+
+function isEmployeeOption(value: unknown): value is EmployeeOption {
+  if (!value || typeof value !== 'object') return false;
+  const employee = value as Record<string, unknown>;
+  return typeof employee.id === 'string' && typeof employee.firstName === 'string' && typeof employee.lastName === 'string';
+}
+
+function isCrmOrderOption(value: unknown): value is CrmOrderOption {
+  if (!value || typeof value !== 'object') return false;
+  const order = value as Record<string, unknown>;
+  return typeof order.id === 'string' && typeof order.title === 'string' && typeof order.orderNumber === 'string';
+}
+
+async function shoppingApiError(response: Response, fallback: string) {
+  const data = await response.json().catch(() => null) as { error?: unknown } | null;
+  return typeof data?.error === 'string' && data.error.trim() ? data.error : fallback;
+}
+
 export function ShoppingListModule({
-  currentUserId,
+  currentEmployeeId,
   currentUserName,
+  canEdit = true,
   initialCategory = 'ALL',
   isEmbeddedModal = false,
   onCloseModal,
 }: {
-  currentUserId?: string;
+  currentEmployeeId?: string;
   currentUserName?: string;
+  canEdit?: boolean;
   initialCategory?: string;
   isEmbeddedModal?: boolean;
   onCloseModal?: () => void;
@@ -92,6 +111,7 @@ export function ShoppingListModule({
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [orders, setOrders] = useState<CrmOrderOption[]>([]);
+  const [optionsError, setOptionsError] = useState('');
 
   // Filtering states
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>(initialCategory);
@@ -131,6 +151,7 @@ export function ShoppingListModule({
   const [receiptItem, setReceiptItem] = useState<ShoppingItem | null>(null);
   const [pricePaidInput, setPricePaidInput] = useState('');
   const [receiptSubmitting, setReceiptSubmitting] = useState(false);
+  const [receiptError, setReceiptError] = useState('');
 
   // Image preview modal
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -162,25 +183,21 @@ export function ShoppingListModule({
   };
 
   const fetchOptions = async () => {
+    setOptionsError('');
     try {
-      const [empRes, orderRes] = await Promise.all([
-        fetch('/api/employees').catch(() => null),
-        fetch('/api/crm/orders').catch(() => null),
-      ]);
-      if (empRes && empRes.ok) {
-        const empData = await empRes.json();
-        if (Array.isArray(empData)) {
-          setEmployees(empData.map((e: any) => ({ id: e.id, firstName: e.firstName, lastName: e.lastName })));
-        }
+      const response = await fetch('/api/shopping-items/options');
+      if (!response.ok) {
+        throw new Error(await shoppingApiError(response, 'Zaměstnance a zakázky se nepodařilo načíst.'));
       }
-      if (orderRes && orderRes.ok) {
-        const orderData = await orderRes.json();
-        if (Array.isArray(orderData)) {
-          setOrders(orderData.map((o: any) => ({ id: o.id, title: o.title, orderNumber: o.orderNumber })));
-        }
+      const data = await response.json() as ShoppingOptionsResponse;
+      if (!Array.isArray(data.employees) || !Array.isArray(data.orders)) {
+        throw new Error('Server vrátil neplatná data formuláře.');
       }
+      setEmployees(data.employees.filter(isEmployeeOption).map(({ id, firstName, lastName }) => ({ id, firstName, lastName })));
+      setOrders(data.orders.filter(isCrmOrderOption).map(({ id, title, orderNumber }) => ({ id, title, orderNumber })));
     } catch (e) {
       console.error('Failed to load filter options:', e);
+      setOptionsError(e instanceof Error ? e.message : 'Zaměstnance a zakázky se nepodařilo načíst.');
     }
   };
 
@@ -242,26 +259,35 @@ export function ShoppingListModule({
     const file = e.target.files?.[0];
     if (!file) return;
     try {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) {
+        throw new Error('Vyberte fotografii ve formátu JPEG, PNG nebo WebP.');
+      }
+      if (file.size > 12 * 1024 * 1024) {
+        throw new Error('Fotografie může mít před zmenšením nejvýše 12 MB.');
+      }
       const compressed = await compressImage(file);
       if (isReceipt && receiptItem) {
         setReceiptSubmitting(true);
+        setReceiptError('');
         const res = await fetch(`/api/shopping-items/${receiptItem.id}/toggle`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isPurchased: true, receiptUrl: compressed, pricePaid: pricePaidInput }),
         });
-        if (res.ok) {
-          const updated = await res.json();
-          setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-          setReceiptItem(updated);
-        }
+        if (!res.ok) throw new Error(await shoppingApiError(res, 'Účtenku se nepodařilo uložit.'));
+        const updated = await res.json();
+        setItems((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+        setReceiptItem(updated);
       } else {
         setFormImageUrl(compressed);
       }
     } catch (err) {
-      alert('Fotku se nepodařilo zpracovat.');
+      const message = err instanceof Error ? err.message : 'Fotku se nepodařilo zpracovat.';
+      if (isReceipt) setReceiptError(message);
+      else setFormError(message);
     } finally {
       setReceiptSubmitting(false);
+      e.currentTarget.value = '';
     }
   };
 
@@ -361,8 +387,8 @@ export function ShoppingListModule({
         setItems((prev) => [created, ...prev]);
       }
       setShowFormModal(false);
-    } catch (err: any) {
-      setFormError(err.message || 'Nastala chyba při ukládání.');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Nastala chyba při ukládání.');
     } finally {
       setFormSubmitting(false);
     }
@@ -381,15 +407,16 @@ export function ShoppingListModule({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isPurchased: nextPurchased }),
       });
-      if (!res.ok) throw new Error('Failed toggle');
+      if (!res.ok) throw new Error(await shoppingApiError(res, 'Stav položky se nepodařilo změnit.'));
       const updated = await res.json();
       setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
       if (selectedDetailItem?.id === item.id) {
         setSelectedDetailItem(updated);
       }
-    } catch (err) {
+    } catch (error) {
       // Rollback on error
-      fetchItems();
+      await fetchItems();
+      alert(error instanceof Error ? error.message : 'Stav položky se nepodařilo změnit.');
     }
   };
 
@@ -397,13 +424,12 @@ export function ShoppingListModule({
   const handleDeleteItem = async (id: string) => {
     try {
       const res = await fetch(`/api/shopping-items/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setItems((prev) => prev.filter((i) => i.id !== id));
-        if (selectedDetailItem?.id === id) setSelectedDetailItem(null);
-        setDeletingItemId(null);
-      }
-    } catch (err) {
-      alert('Smazání se nepodařilo.');
+      if (!res.ok) throw new Error(await shoppingApiError(res, 'Smazání se nepodařilo.'));
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      if (selectedDetailItem?.id === id) setSelectedDetailItem(null);
+      setDeletingItemId(null);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Smazání se nepodařilo.');
     }
   };
 
@@ -437,14 +463,14 @@ export function ShoppingListModule({
     const missingCount = unpurchased.length;
     const urgentCount = unpurchased.filter((i) => i.priority === 'URGENT').length;
     const assignedToMeCount = unpurchased.filter(
-      (i) => (currentUserId && i.assignedEmployeeId === currentUserId) || (currentUserName && i.assignedEmployeeName?.toLowerCase().includes(currentUserName.toLowerCase()))
+      (i) => (currentEmployeeId && i.assignedEmployeeId === currentEmployeeId) || (currentUserName && i.assignedEmployeeName?.toLowerCase() === currentUserName.toLowerCase())
     ).length;
     const purchased14DaysCount = items.filter(
       (i) => i.isPurchased && i.purchasedAt && new Date(i.purchasedAt).getTime() >= fourteenDaysAgo
     ).length;
 
     return { missingCount, urgentCount, assignedToMeCount, purchased14DaysCount };
-  }, [items, currentUserId, currentUserName, fourteenDaysAgo]);
+  }, [items, currentEmployeeId, currentUserName, fourteenDaysAgo]);
 
   // Derived Filtered Lists
   const filteredItems = useMemo(() => {
@@ -457,7 +483,7 @@ export function ShoppingListModule({
 
       // Filter modal / dropdown filters
       if (priorityFilter !== 'ALL' && item.priority !== priorityFilter) return false;
-      if (assignmentFilter === 'MINE' && currentUserId && item.assignedEmployeeId !== currentUserId) return false;
+      if (assignmentFilter === 'MINE' && currentEmployeeId && item.assignedEmployeeId !== currentEmployeeId) return false;
       if (assignmentFilter === 'UNASSIGNED' && item.assignedEmployeeId) return false;
       if (assignmentFilter !== 'ALL' && assignmentFilter !== 'MINE' && assignmentFilter !== 'UNASSIGNED' && item.assignedEmployeeId !== assignmentFilter) return false;
       if (storeFilter !== 'ALL' && item.store?.toLowerCase() !== storeFilter.toLowerCase()) return false;
@@ -473,7 +499,7 @@ export function ShoppingListModule({
       }
       return true;
     });
-  }, [items, activeCategoryTab, priorityFilter, assignmentFilter, storeFilter, searchQuery, currentUserId]);
+  }, [items, activeCategoryTab, priorityFilter, assignmentFilter, storeFilter, searchQuery, currentEmployeeId]);
 
   // Grouped active items
   const activeOfficeItems = useMemo(() => filteredItems.filter((i) => !i.isPurchased && i.category === 'OFFICE'), [filteredItems]);
@@ -559,6 +585,7 @@ export function ShoppingListModule({
               <button
                 type="button"
                 onClick={onCloseModal}
+                aria-label="Zavřít nákupní seznam"
                 className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition"
                 title="Zavřít"
               >
@@ -697,7 +724,7 @@ export function ShoppingListModule({
               className="w-full pl-10 pr-4 py-3 rounded-2xl bg-[#151F32] border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500/80 transition"
             />
             {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+              <button type="button" onClick={() => setSearchQuery('')} aria-label="Vymazat hledání" className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
                 <X size={16} />
               </button>
             )}
@@ -723,6 +750,7 @@ export function ShoppingListModule({
           <button
             type="button"
             onClick={() => openAddForm()}
+            disabled={!canEdit}
             className="px-5 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-sm font-black shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition cursor-pointer active:scale-[0.98]"
           >
             <Plus size={20} className="stroke-[3]" />
@@ -744,7 +772,7 @@ export function ShoppingListModule({
                   {activeOfficeItems.length} položky
                 </span>
               </div>
-              <button type="button" className="text-blue-400 hover:text-blue-200">
+              <button type="button" aria-label={officeCollapsed ? 'Rozbalit kancelářské nákupy' : 'Sbalit kancelářské nákupy'} className="text-blue-400 hover:text-blue-200">
                 {officeCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
               </button>
             </div>
@@ -754,7 +782,7 @@ export function ShoppingListModule({
                 {activeOfficeItems.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
                     <CheckCircle2 size={24} className="text-slate-600" />
-                    <span>V nabídce kanceláře nic nechybí 🎉</span>
+                    <span>{loading ? 'Načítám nákupní seznam…' : 'V nabídce kanceláře nic nechybí 🎉'}</span>
                   </div>
                 ) : (
                   activeOfficeItems.map((item) => (
@@ -764,6 +792,7 @@ export function ShoppingListModule({
                       onToggle={togglePurchased}
                       onSelectDetail={setSelectedDetailItem}
                       renderPriorityBadge={renderPriorityBadge}
+                      canEdit={canEdit}
                     />
                   ))
                 )}
@@ -771,6 +800,7 @@ export function ShoppingListModule({
                   <button
                     type="button"
                     onClick={() => openAddForm('OFFICE')}
+                    disabled={!canEdit}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-400 hover:text-blue-300 transition"
                   >
                     <Plus size={14} /> Přidat položku do této kategorie
@@ -795,7 +825,7 @@ export function ShoppingListModule({
                   {activeWorkshopItems.length} položky
                 </span>
               </div>
-              <button type="button" className="text-emerald-400 hover:text-emerald-200">
+              <button type="button" aria-label={workshopCollapsed ? 'Rozbalit dílenské nákupy' : 'Sbalit dílenské nákupy'} className="text-emerald-400 hover:text-emerald-200">
                 {workshopCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
               </button>
             </div>
@@ -805,7 +835,7 @@ export function ShoppingListModule({
                 {activeWorkshopItems.length === 0 ? (
                   <div className="p-6 text-center text-xs text-slate-500 flex flex-col items-center gap-2">
                     <CheckCircle2 size={24} className="text-slate-600" />
-                    <span>V dílně a výrobě nic nechybí 🎉</span>
+                    <span>{loading ? 'Načítám nákupní seznam…' : 'V dílně a výrobě nic nechybí 🎉'}</span>
                   </div>
                 ) : (
                   activeWorkshopItems.map((item) => (
@@ -815,6 +845,7 @@ export function ShoppingListModule({
                       onToggle={togglePurchased}
                       onSelectDetail={setSelectedDetailItem}
                       renderPriorityBadge={renderPriorityBadge}
+                      canEdit={canEdit}
                     />
                   ))
                 )}
@@ -822,6 +853,7 @@ export function ShoppingListModule({
                   <button
                     type="button"
                     onClick={() => openAddForm('WORKSHOP')}
+                    disabled={!canEdit}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition"
                   >
                     <Plus size={14} /> Přidat položku do této kategorie
@@ -846,7 +878,7 @@ export function ShoppingListModule({
                   {purchasedHistoryItems.length}
                 </span>
               </div>
-              <button type="button" className="text-orange-400 hover:text-orange-200">
+              <button type="button" aria-label={historyCollapsed ? 'Rozbalit historii nákupů' : 'Sbalit historii nákupů'} className="text-orange-400 hover:text-orange-200">
                 {historyCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
               </button>
             </div>
@@ -862,6 +894,8 @@ export function ShoppingListModule({
                     <div className="flex items-center gap-3 min-w-0">
                       <button
                         type="button"
+                        disabled={!canEdit}
+                        aria-label={`Vrátit mezi chybějící: ${item.title}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           togglePurchased(item);
@@ -907,9 +941,11 @@ export function ShoppingListModule({
 
                       <button
                         type="button"
+                        disabled={!canEdit}
                         onClick={(e) => {
                           e.stopPropagation();
                           setReceiptItem(item);
+                          setReceiptError('');
                           setPricePaidInput(item.pricePaid ? String(item.pricePaid) : '');
                         }}
                         className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 transition ${
@@ -953,6 +989,7 @@ export function ShoppingListModule({
               <button
                 type="button"
                 onClick={() => setShowFormModal(false)}
+                aria-label="Zavřít formulář položky"
                 className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
               >
                 <X size={20} />
@@ -962,6 +999,12 @@ export function ShoppingListModule({
             {formError && (
               <div className="mb-4 p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-semibold flex items-center gap-2">
                 <AlertCircle size={16} /> {formError}
+              </div>
+            )}
+
+            {optionsError && (
+              <div className="mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle size={16} /> {optionsError}
               </div>
             )}
 
@@ -1098,7 +1141,7 @@ export function ShoppingListModule({
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Foto položky</label>
                 <div className="flex items-center gap-3">
-                  <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoSelect(e)} className="hidden" />
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handlePhotoSelect(e)} className="hidden" />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -1109,7 +1152,7 @@ export function ShoppingListModule({
                   {formImageUrl && (
                     <div className="relative">
                       <img src={formImageUrl} alt="" className="w-12 h-12 rounded-xl object-cover border border-slate-700" />
-                      <button type="button" onClick={() => setFormImageUrl('')} className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5">
+                      <button type="button" onClick={() => setFormImageUrl('')} aria-label="Odebrat fotografii položky" className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-0.5">
                         <X size={12} />
                       </button>
                     </div>
@@ -1144,7 +1187,7 @@ export function ShoppingListModule({
           <div className="w-full max-w-lg bg-[#151F32] rounded-t-3xl sm:rounded-3xl border border-slate-800 shadow-2xl p-5 sm:p-6 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-400">Detail položky</h3>
-              <button type="button" onClick={() => setSelectedDetailItem(null)} className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800">
+              <button type="button" onClick={() => setSelectedDetailItem(null)} aria-label="Zavřít detail položky" className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800">
                 <X size={20} />
               </button>
             </div>
@@ -1234,7 +1277,7 @@ export function ShoppingListModule({
             </div>
 
             {/* Actions Menu */}
-            <div className="space-y-2 pt-2 border-t border-slate-800">
+            {canEdit ? <div className="space-y-2 pt-2 border-t border-slate-800">
               <h4 className="text-2xs font-bold uppercase tracking-wider text-slate-500">Akce</h4>
 
               <button
@@ -1268,6 +1311,7 @@ export function ShoppingListModule({
                   type="button"
                   onClick={() => {
                     setReceiptItem(selectedDetailItem);
+                    setReceiptError('');
                     setSelectedDetailItem(null);
                   }}
                   className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition"
@@ -1293,7 +1337,7 @@ export function ShoppingListModule({
                   <Trash2 size={16} /> Smazat položku
                 </button>
               )}
-            </div>
+            </div> : <p className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 text-xs text-slate-400">Máte přístup pouze pro čtení.</p>}
           </div>
         </div>
       )}
@@ -1306,7 +1350,7 @@ export function ShoppingListModule({
               <h3 className="text-base font-black text-white flex items-center gap-2">
                 <SlidersHorizontal size={18} /> Filtrovat položky
               </h3>
-              <button type="button" onClick={() => setShowFilterModal(false)} className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800">
+              <button type="button" onClick={() => setShowFilterModal(false)} aria-label="Zavřít filtry" className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800">
                 <X size={20} />
               </button>
             </div>
@@ -1401,7 +1445,7 @@ export function ShoppingListModule({
               <h3 className="text-sm font-black text-white flex items-center gap-2">
                 <Receipt size={18} className="text-emerald-400" /> Účtenka & Cena nákupu
               </h3>
-              <button type="button" onClick={() => setReceiptItem(null)} className="p-1 text-slate-400 hover:text-white rounded-lg">
+              <button type="button" onClick={() => setReceiptItem(null)} aria-label="Zavřít cenu a účtenku" className="p-1 text-slate-400 hover:text-white rounded-lg">
                 <X size={18} />
               </button>
             </div>
@@ -1411,6 +1455,8 @@ export function ShoppingListModule({
               <input
                 type="number"
                 step="0.01"
+                min="0"
+                max="100000000"
                 value={pricePaidInput}
                 onChange={(e) => setPricePaidInput(e.target.value)}
                 placeholder="Např. 998"
@@ -1420,7 +1466,7 @@ export function ShoppingListModule({
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Foto účtenky</label>
-              <input ref={receiptFileInputRef} type="file" accept="image/*" capture="environment" onChange={(e) => handlePhotoSelect(e, true)} className="hidden" />
+              <input ref={receiptFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handlePhotoSelect(e, true)} className="hidden" />
               <button
                 type="button"
                 onClick={() => receiptFileInputRef.current?.click()}
@@ -1439,6 +1485,7 @@ export function ShoppingListModule({
                   />
                 </div>
               )}
+              {receiptError && <p className="mt-2 text-xs font-semibold text-rose-300" role="alert">{receiptError}</p>}
             </div>
 
             <div className="pt-2 flex items-center justify-end gap-2">
@@ -1446,17 +1493,22 @@ export function ShoppingListModule({
                 type="button"
                 onClick={async () => {
                   setReceiptSubmitting(true);
-                  const res = await fetch(`/api/shopping-items/${receiptItem.id}/toggle`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ isPurchased: true, pricePaid: pricePaidInput }),
-                  });
-                  if (res.ok) {
+                  setReceiptError('');
+                  try {
+                    const res = await fetch(`/api/shopping-items/${receiptItem.id}/toggle`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ isPurchased: true, pricePaid: pricePaidInput }),
+                    });
+                    if (!res.ok) throw new Error(await shoppingApiError(res, 'Cenu a účtenku se nepodařilo uložit.'));
                     const updated = await res.json();
                     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+                    setReceiptItem(null);
+                  } catch (error) {
+                    setReceiptError(error instanceof Error ? error.message : 'Cenu a účtenku se nepodařilo uložit.');
+                  } finally {
+                    setReceiptSubmitting(false);
                   }
-                  setReceiptSubmitting(false);
-                  setReceiptItem(null);
                 }}
                 disabled={receiptSubmitting}
                 className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black"
@@ -1473,7 +1525,7 @@ export function ShoppingListModule({
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
           <div className="relative max-w-2xl max-h-[90vh]">
             <img src={previewImage} alt="" className="rounded-2xl max-w-full max-h-[85vh] object-contain shadow-2xl" />
-            <button type="button" onClick={() => setPreviewImage(null)} className="absolute top-2 right-2 p-2 bg-black/60 text-white rounded-full">
+            <button type="button" onClick={() => setPreviewImage(null)} aria-label="Zavřít náhled fotografie" className="absolute top-2 right-2 p-2 bg-black/60 text-white rounded-full">
               <X size={20} />
             </button>
           </div>
@@ -1490,11 +1542,13 @@ function ShoppingItemRow({
   onToggle,
   onSelectDetail,
   renderPriorityBadge,
+  canEdit,
 }: {
   item: ShoppingItem;
   onToggle: (item: ShoppingItem) => void;
   onSelectDetail: (item: ShoppingItem) => void;
   renderPriorityBadge: (p: ShoppingPriority) => React.ReactNode;
+  canEdit: boolean;
 }) {
   return (
     <div
@@ -1504,6 +1558,8 @@ function ShoppingItemRow({
       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
         <button
           type="button"
+          disabled={!canEdit}
+          aria-label={`${item.isPurchased ? 'Vrátit mezi chybějící' : 'Označit jako koupené'}: ${item.title}`}
           onClick={(e) => {
             e.stopPropagation();
             onToggle(item);
@@ -1566,6 +1622,7 @@ function ShoppingItemRow({
         <div className="hidden sm:block text-xs font-black text-slate-200 min-w-[36px]">{item.quantity || '1 ks'}</div>
         <button
           type="button"
+          aria-label={`Zobrazit detail: ${item.title}`}
           onClick={(e) => {
             e.stopPropagation();
             onSelectDetail(item);
@@ -1579,6 +1636,6 @@ function ShoppingItemRow({
   );
 }
 
-function ClipboardListIcon(props: any) {
+function ClipboardListIcon(props: LucideProps) {
   return <ShoppingBag {...props} />;
 }

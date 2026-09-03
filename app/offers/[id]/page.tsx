@@ -135,8 +135,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           offerId={offer.id!}
           status={offer.status}
           isNoPriceConcept={Boolean(offer.isNoPriceConcept)}
-          hasPublicLink={Boolean(offer.hasPublicLink || offer.publishedAt || offer.publicToken)}
-          publicToken={offer.publicToken}
+          hasPublicLink={Boolean(offer.hasPublicLink || offer.publishedAt)}
           navigationProposalMode={(offer.navigation as unknown as { proposalMode?: string } | null)?.proposalMode}
           navigationSelectionSubmitted={(offer.navigation as unknown as { selectionSubmitted?: boolean } | null)?.selectionSubmitted}
         />

@@ -12,8 +12,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const carrierId = (await params).id;
     const surfaces = await listCarrierSurfaces(carrierId);
     return NextResponse.json({ success: true, surfaces });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Chyba při načítání ploch nosiče' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Chyba při načítání ploch nosiče' }, { status: 500 });
   }
 }
 
@@ -41,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     return NextResponse.json({ success: true, surface });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Chyba při vytváření reklamní plochy' }, { status: 400 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Chyba při vytváření reklamní plochy' }, { status: 400 });
   }
 }

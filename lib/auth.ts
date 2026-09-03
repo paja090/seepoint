@@ -71,9 +71,10 @@ export async function getCurrentUser() {
     : null;
   if (employee?.isActive === false) return null;
 
-  if (membership) {
+  const activeOrgId = membership?.organizationId || session.activeOrganizationId;
+  if (activeOrgId) {
     enterTenantContext({
-      organizationId: membership.organizationId,
+      organizationId: activeOrgId,
       userId: user.id,
       source: 'session',
     });

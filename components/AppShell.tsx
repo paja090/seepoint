@@ -1,4 +1,4 @@
-import { canAccess, type AppSection } from '@/lib/rbac';
+import { canAccess, roleLabel, type AppSection } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
@@ -130,6 +130,8 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         email: user.email || '',
         role: user.role,
         allowedRoles: user.allowedRoles || [user.role],
+        organizationRoleLabel: user.membership?.role === 'OWNER' ? 'Vlastník organizace' : roleLabel(user.primaryRole),
+        isPlatformSuperAdmin: user.platformRole === 'SUPER_ADMIN',
         avatarUrl,
         organizationId: user.organizationId!,
         organizations: user.memberships.map((membership) => ({

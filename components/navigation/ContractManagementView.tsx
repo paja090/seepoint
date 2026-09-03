@@ -1,316 +1,170 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Phone, Mail, ShieldAlert } from 'lucide-react';
+import { FileText, Mail, Pencil, Phone, Plus, ShieldAlert } from 'lucide-react';
+import { deriveNavigationContractDisplay } from '@/lib/navigation/contract-policy';
 
 type ClientOption = { id: string; name: string };
-
 type ContractItem = {
-  id: string;
-  contractNumber: string;
-  contractType: string;
-  clientId: string;
-  client: { id: string; name: string };
-  agencyName?: string | null;
-  responsiblePerson?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  startDate: string;
-  endDate: string;
-  monthlyPrice?: number | null;
-  totalPrice?: number | null;
-  status: string;
-  autoRenews: boolean;
-  alertDaysBefore: number;
-  note?: string | null;
+  id: string; contractNumber: string; contractType: string; clientId: string;
+  client: { id: string; name: string }; agencyName?: string | null; responsiblePerson?: string | null;
+  phone?: string | null; email?: string | null; offerId?: string | null; navigationOrderId?: string | null;
+  startDate: string; endDate: string; monthlyPrice?: number | null; totalPrice?: number | null;
+  status: string; autoRenews: boolean; alertDaysBefore: number; note?: string | null;
 };
 
-export function ContractManagementView({
-  initialContracts,
-  clients,
-}: {
-  initialContracts: ContractItem[];
-  clients: ClientOption[];
+const toneClasses: Record<string, string> = {
+  slate: 'border-slate-200 bg-slate-100 text-slate-700', sky: 'border-sky-200 bg-sky-100 text-sky-800',
+  rose: 'border-rose-200 bg-rose-100 text-rose-800', amber: 'border-amber-300 bg-amber-100 text-amber-900',
+  emerald: 'border-emerald-200 bg-emerald-100 text-emerald-900', violet: 'border-violet-200 bg-violet-100 text-violet-800',
+};
+
+const dateValue = (value: string) => value.slice(0, 10);
+const moneyValue = (value?: number | null) => value === null || value === undefined ? '' : String(value);
+
+export function ContractManagementView({ initialContracts, total, clients, currentDate }: {
+  initialContracts: ContractItem[]; total: number; clients: ClientOption[]; currentDate: string;
 }) {
   const router = useRouter();
+  const now = new Date(currentDate);
+  const initialEnd = new Date(now);
+  initialEnd.setUTCFullYear(initialEnd.getUTCFullYear() + 1);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-
-  // Form states
-  const [contractNumber, setContractNumber] = useState(`SML-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [contractNumber, setContractNumber] = useState('');
   const [contractType, setContractType] = useState('RENTAL');
   const [clientId, setClientId] = useState(clients[0]?.id || '');
   const [agencyName, setAgencyName] = useState('');
   const [responsiblePerson, setResponsiblePerson] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [offerId, setOfferId] = useState<string | null>(null);
+  const [navigationOrderId, setNavigationOrderId] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState(now.toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(initialEnd.toISOString().slice(0, 10));
   const [monthlyPrice, setMonthlyPrice] = useState('1500');
+  const [totalPrice, setTotalPrice] = useState('');
+  const [status, setStatus] = useState('ACTIVE');
+  const [autoRenews, setAutoRenews] = useState(false);
   const [alertDaysBefore, setAlertDaysBefore] = useState('30');
   const [note, setNote] = useState('');
 
-  const now = new Date();
+  useEffect(() => {
+    if (!showModal) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && !saving) setShowModal(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [showModal, saving]);
 
-  // Highlight expiring contracts
-  const expiringContracts = initialContracts.filter((c) => {
-    const end = new Date(c.endDate);
-    const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays <= (c.alertDaysBefore || 30);
+  const expiringContracts = initialContracts.filter((contract) => {
+    const display = deriveNavigationContractDisplay(contract.status, contract.startDate, contract.endDate, contract.alertDaysBefore, now);
+    return display.code === 'EXPIRING' || display.code === 'EXPIRED';
   });
 
-  async function handleCreateContract(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setMessage('');
-    try {
-      const res = await fetch('/api/navigation/contracts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contractNumber,
-          contractType,
-          clientId,
-          agencyName,
-          responsiblePerson,
-          phone,
-          email,
-          startDate,
-          endDate,
-          monthlyPrice: parseFloat(monthlyPrice) || 0,
-          alertDaysBefore: parseInt(alertDaysBefore, 10) || 30,
-          note,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Vytvoření smlouvy selhalo');
-      setShowModal(false);
-      router.refresh();
-    } catch (err: unknown) {
-      setMessage(err instanceof Error ? err.message : 'Chyba uložení smlouvy');
-    } finally {
-      setSaving(false);
-    }
+  function openNew() {
+    const suffix = globalThis.crypto?.randomUUID().slice(0, 6).toUpperCase() || String(Date.now()).slice(-6);
+    setEditingId(null); setContractNumber(`NAV-${now.getUTCFullYear()}-${suffix}`); setContractType('RENTAL');
+    setClientId(clients[0]?.id || ''); setAgencyName(''); setResponsiblePerson(''); setPhone(''); setEmail('');
+    setOfferId(null); setNavigationOrderId(null); setStartDate(now.toISOString().slice(0, 10));
+    setEndDate(initialEnd.toISOString().slice(0, 10)); setMonthlyPrice('1500'); setTotalPrice(''); setStatus('ACTIVE');
+    setAutoRenews(false); setAlertDaysBefore('30'); setNote(''); setMessage(''); setShowModal(true);
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Expiration Alert Banner */}
-      {expiringContracts.length > 0 && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-xs space-y-3">
-          <div className="flex items-center gap-2 text-amber-950 font-black text-sm uppercase tracking-wider">
-            <ShieldAlert className="text-amber-600" size={18} />
-            <span>⚠️ Upozornění: {expiringContracts.length} smluv vyprší během 30 dní!</span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {expiringContracts.map((c) => {
-              const days = Math.ceil((new Date(c.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              return (
-                <div key={c.id} className="rounded-xl border border-amber-200 bg-white p-3 text-xs space-y-1 shadow-2xs">
-                  <div className="flex justify-between font-bold text-slate-900">
-                    <span>Smlouva #{c.contractNumber}</span>
-                    <span className={days < 0 ? 'text-rose-600 font-black' : 'text-amber-600 font-black'}>
-                      {days < 0 ? 'Vypršela' : `Za ${days} dní`}
-                    </span>
-                  </div>
-                  <div className="text-slate-600 font-semibold">{c.client.name}</div>
-                  <div className="text-[11px] text-slate-500">
-                    Odpovědný: {c.responsiblePerson || '—'} • Tel: {c.phone || '—'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+  function openEdit(contract: ContractItem) {
+    setEditingId(contract.id); setContractNumber(contract.contractNumber); setContractType(contract.contractType);
+    setClientId(contract.clientId); setAgencyName(contract.agencyName || ''); setResponsiblePerson(contract.responsiblePerson || '');
+    setPhone(contract.phone || ''); setEmail(contract.email || ''); setOfferId(contract.offerId || null);
+    setNavigationOrderId(contract.navigationOrderId || null); setStartDate(dateValue(contract.startDate)); setEndDate(dateValue(contract.endDate));
+    setMonthlyPrice(moneyValue(contract.monthlyPrice)); setTotalPrice(moneyValue(contract.totalPrice)); setStatus(contract.status);
+    setAutoRenews(contract.autoRenews); setAlertDaysBefore(String(contract.alertDaysBefore)); setNote(contract.note || '');
+    setMessage(''); setShowModal(true);
+  }
 
-      {/* Main Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-sm font-bold text-slate-700">
-          Celkem smluv v evidenci: <span className="text-sky-700 font-black">{initialContracts.length}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-black text-white hover:bg-sky-500 transition shadow-xs cursor-pointer"
-        >
-          <Plus size={16} /> Nová smlouva
-        </button>
+  async function saveContract(event: React.FormEvent) {
+    event.preventDefault(); setSaving(true); setMessage('');
+    try {
+      const response = await fetch(editingId ? `/api/navigation/contracts/${editingId}` : '/api/navigation/contracts', {
+        method: editingId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractNumber, contractType, clientId, agencyName, responsiblePerson, phone, email, offerId,
+          navigationOrderId, startDate, endDate, monthlyPrice: monthlyPrice === '' ? null : Number(monthlyPrice),
+          totalPrice: totalPrice === '' ? null : Number(totalPrice), status, autoRenews,
+          alertDaysBefore: Number(alertDaysBefore), note,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Uložení smlouvy selhalo.');
+      setShowModal(false); router.refresh();
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Smlouvu se nepodařilo uložit.');
+    } finally { setSaving(false); }
+  }
+
+  return <div className="space-y-6">
+    {expiringContracts.length > 0 ? <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-xs">
+      <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wider text-amber-950">
+        <ShieldAlert className="text-amber-600" size={18} /><span>{expiringContracts.length} smluv vyžaduje pozornost</span>
       </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{expiringContracts.map((contract) => {
+        const display = deriveNavigationContractDisplay(contract.status, contract.startDate, contract.endDate, contract.alertDaysBefore, now);
+        return <div key={contract.id} className="space-y-1 rounded-xl border border-amber-200 bg-white p-3 text-xs shadow-2xs">
+          <div className="flex justify-between gap-2 font-bold text-slate-900"><span>#{contract.contractNumber}</span><span className="text-amber-700">{display.label}</span></div>
+          <div className="font-semibold text-slate-600">{contract.client.name}</div>
+        </div>;
+      })}</div>
+    </div> : null}
 
-      {/* Contracts Table */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <table className="w-full text-left text-xs text-slate-700">
-          <thead className="bg-slate-900 text-white font-bold text-[11px] uppercase tracking-wider">
-            <tr>
-              <th className="p-3.5">Číslo smlouvy</th>
-              <th className="p-3.5">Klient / Provozovna</th>
-              <th className="p-3.5">Typ smlouvy</th>
-              <th className="p-3.5">Platnost (Od – Do)</th>
-              <th className="p-3.5">Měsíční nájemné</th>
-              <th className="p-3.5">Odpovědná osoba / Kontaktní údaje</th>
-              <th className="p-3.5">Stav</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 font-medium">
-            {initialContracts.map((c) => {
-              const end = new Date(c.endDate);
-              const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              const isExpiring = daysLeft <= (c.alertDaysBefore || 30) && daysLeft >= 0;
-              const isExpired = daysLeft < 0;
-
-              return (
-                <tr key={c.id} className="hover:bg-slate-50 transition">
-                  <td className="p-3.5 font-mono font-bold text-sky-950">#{c.contractNumber}</td>
-                  <td className="p-3.5 font-bold text-slate-900">
-                    {c.client.name}
-                    {c.agencyName && <div className="text-[10px] text-slate-500 font-normal">Agentura: {c.agencyName}</div>}
-                  </td>
-                  <td className="p-3.5">
-                    <span className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-extrabold uppercase text-slate-700">
-                      {c.contractType}
-                    </span>
-                  </td>
-                  <td className="p-3.5">
-                    <div className="font-semibold text-slate-800">
-                      {new Date(c.startDate).toLocaleDateString('cs-CZ')} – {new Date(c.endDate).toLocaleDateString('cs-CZ')}
-                    </div>
-                  </td>
-                  <td className="p-3.5 font-bold text-slate-900">
-                    {c.monthlyPrice ? `${Math.round(c.monthlyPrice).toLocaleString('cs-CZ')} Kč / měs.` : '—'}
-                  </td>
-                  <td className="p-3.5 space-y-0.5 text-[11px]">
-                    {c.responsiblePerson && <div className="font-bold text-slate-900">{c.responsiblePerson}</div>}
-                    {c.phone && <div className="text-slate-600 flex items-center gap-1"><Phone size={11} /> {c.phone}</div>}
-                    {c.email && <div className="text-slate-600 flex items-center gap-1"><Mail size={11} /> {c.email}</div>}
-                  </td>
-                  <td className="p-3.5">
-                    {isExpired ? (
-                      <span className="rounded-xl bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-800 border border-rose-200">
-                        Vypršela
-                      </span>
-                    ) : isExpiring ? (
-                      <span className="rounded-xl bg-amber-100 px-2.5 py-1 text-[10px] font-black text-amber-900 border border-amber-300">
-                        Končí за {daysLeft} dní
-                      </span>
-                    ) : (
-                      <span className="rounded-xl bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-900 border border-emerald-200">
-                        Aktivní
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-
-            {initialContracts.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
-                  Zatím nebyla evidována žádná smlouva. Klikněte na &quot;Nová smlouva&quot; pro přidání.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* New Contract Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <FileText size={18} className="text-sky-600" /> Nová smlouva navigační reklamy
-              </h3>
-              <button type="button" className="text-slate-400 hover:text-slate-700 font-bold" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-
-            <form onSubmit={handleCreateContract} className="space-y-3 text-xs">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Číslo smlouvy</label>
-                  <input className="input w-full" value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} required />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Typ smlouvy</label>
-                  <select className="input w-full" value={contractType} onChange={(e) => setContractType(e.target.value)}>
-                    <option value="RENTAL">Smlouva o nájmu (RENTAL)</option>
-                    <option value="PRODUCTION">Smlouva o výrobě (PRODUCTION)</option>
-                    <option value="SERVICE">Servisní smlouva (SERVICE)</option>
-                    <option value="MASTER">Rámcová smlouva (MASTER)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Klient</label>
-                <select className="input w-full" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Agentura (volitelné)</label>
-                  <input className="input w-full" placeholder="Např. Media Agency s.r.o." value={agencyName} onChange={(e) => setAgencyName(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Odpovědná osoba</label>
-                  <input className="input w-full" placeholder="Jméno a příjmení" value={responsiblePerson} onChange={(e) => setResponsiblePerson(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Telefon</label>
-                  <input className="input w-full" placeholder="+420 777 123 456" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">E-mail</label>
-                  <input className="input w-full" type="email" placeholder="jan.novak@firma.cz" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-4">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Datum začátku</label>
-                  <input className="input w-full" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Datum konce</label>
-                  <input className="input w-full" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Měsíční nájem (Kč)</label>
-                  <input className="input w-full" type="number" value={monthlyPrice} onChange={(e) => setMonthlyPrice(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Upozornit dní předem</label>
-                  <input className="input w-full" type="number" value={alertDaysBefore} onChange={(e) => setAlertDaysBefore(e.target.value)} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Poznámka ke smlouvě</label>
-                <input className="input w-full" placeholder="Interní poznámka..." value={note} onChange={(e) => setNote(e.target.value)} />
-              </div>
-
-              {message && <p className="text-xs font-bold text-rose-600">{message}</p>}
-
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
-                <button type="button" className="btn btn-secondary text-xs" onClick={() => setShowModal(false)}>Zrušit</button>
-                <button type="submit" disabled={saving} className="btn btn-primary text-xs">
-                  {saving ? 'Ukládám…' : 'Uložit smlouvu'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="text-sm font-bold text-slate-700">Celkem smluv: <span className="font-black text-sky-700">{total}</span>{total > initialContracts.length ? ` (zobrazeno ${initialContracts.length})` : ''}</div>
+      <button type="button" onClick={openNew} disabled={clients.length === 0} className="btn btn-primary inline-flex items-center gap-2 text-xs"><Plus size={16}/> Nová smlouva</button>
     </div>
-  );
+    {clients.length === 0 ? <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Nejprve vytvořte aktivního klienta.</p> : null}
+
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <table className="w-full min-w-[980px] text-left text-xs text-slate-700">
+        <thead className="bg-slate-900 text-[11px] font-bold uppercase tracking-wider text-white"><tr>
+          <th className="p-3.5">Číslo</th><th className="p-3.5">Klient</th><th className="p-3.5">Typ</th><th className="p-3.5">Platnost</th>
+          <th className="p-3.5">Cena</th><th className="p-3.5">Kontakt</th><th className="p-3.5">Stav</th><th className="p-3.5"><span className="sr-only">Akce</span></th>
+        </tr></thead>
+        <tbody className="divide-y divide-slate-100 font-medium">{initialContracts.map((contract) => {
+          const display = deriveNavigationContractDisplay(contract.status, contract.startDate, contract.endDate, contract.alertDaysBefore, now);
+          return <tr key={contract.id} className="transition hover:bg-slate-50">
+            <td className="p-3.5 font-mono font-bold text-sky-950">#{contract.contractNumber}</td>
+            <td className="p-3.5 font-bold text-slate-900">{contract.client.name}{contract.agencyName ? <div className="text-[10px] font-normal text-slate-500">Agentura: {contract.agencyName}</div> : null}</td>
+            <td className="p-3.5"><span className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-extrabold uppercase">{contract.contractType}</span></td>
+            <td className="p-3.5 font-semibold text-slate-800">{new Date(contract.startDate).toLocaleDateString('cs-CZ')} – {new Date(contract.endDate).toLocaleDateString('cs-CZ')}</td>
+            <td className="p-3.5 font-bold text-slate-900">{contract.monthlyPrice !== null && contract.monthlyPrice !== undefined ? `${Math.round(contract.monthlyPrice).toLocaleString('cs-CZ')} Kč / měs.` : '—'}</td>
+            <td className="space-y-0.5 p-3.5 text-[11px]">{contract.responsiblePerson ? <div className="font-bold text-slate-900">{contract.responsiblePerson}</div> : null}{contract.phone ? <div className="flex items-center gap-1"><Phone size={11}/>{contract.phone}</div> : null}{contract.email ? <div className="flex items-center gap-1"><Mail size={11}/>{contract.email}</div> : null}</td>
+            <td className="p-3.5"><span className={`rounded-xl border px-2.5 py-1 text-[10px] font-black ${toneClasses[display.tone]}`}>{display.label}</span></td>
+            <td className="p-3.5"><button type="button" onClick={() => openEdit(contract)} className="btn btn-secondary inline-flex items-center gap-1 text-xs" aria-label={`Upravit smlouvu ${contract.contractNumber}`}><Pencil size={14}/> Upravit</button></td>
+          </tr>;
+        })}{initialContracts.length === 0 ? <tr><td colSpan={8} className="p-8 text-center font-medium text-slate-400">Zatím nebyla evidována žádná smlouva.</td></tr> : null}</tbody>
+      </table>
+    </div>
+
+    {showModal ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs" onMouseDown={(event) => { if (event.currentTarget === event.target && !saving) setShowModal(false); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="contract-dialog-title" className="max-h-[92vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3"><h3 id="contract-dialog-title" className="flex items-center gap-2 text-base font-bold text-slate-900"><FileText size={18} className="text-sky-600"/>{editingId ? 'Upravit smlouvu' : 'Nová smlouva'}</h3><button type="button" aria-label="Zavřít dialog" className="font-bold text-slate-400 hover:text-slate-700" onClick={() => setShowModal(false)}>✕</button></div>
+        <form onSubmit={saveContract} className="space-y-3 text-xs">
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="Číslo smlouvy" id="contract-number"><input id="contract-number" autoFocus className="input w-full" value={contractNumber} onChange={(e) => setContractNumber(e.target.value)} required maxLength={80}/></Field><Field label="Typ smlouvy" id="contract-type"><select id="contract-type" className="input w-full" value={contractType} onChange={(e) => setContractType(e.target.value)}><option value="RENTAL">Nájemní</option><option value="PRODUCTION">Výrobní</option><option value="SERVICE">Servisní</option><option value="MASTER">Rámcová</option></select></Field></div>
+          <Field label="Klient" id="contract-client"><select id="contract-client" className="input w-full" value={clientId} onChange={(e) => setClientId(e.target.value)} required>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="Agentura" id="contract-agency"><input id="contract-agency" className="input w-full" value={agencyName} onChange={(e) => setAgencyName(e.target.value)} maxLength={200}/></Field><Field label="Odpovědná osoba" id="contract-person"><input id="contract-person" className="input w-full" value={responsiblePerson} onChange={(e) => setResponsiblePerson(e.target.value)} maxLength={160}/></Field></div>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="Telefon" id="contract-phone"><input id="contract-phone" className="input w-full" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40}/></Field><Field label="E-mail" id="contract-email"><input id="contract-email" className="input w-full" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254}/></Field></div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Field label="Začátek" id="contract-start"><input id="contract-start" className="input w-full" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required/></Field><Field label="Konec" id="contract-end"><input id="contract-end" className="input w-full" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required/></Field><Field label="Měsíčně (Kč)" id="contract-monthly"><input id="contract-monthly" className="input w-full" type="number" min="0" step="0.01" value={monthlyPrice} onChange={(e) => setMonthlyPrice(e.target.value)}/></Field><Field label="Celkem (Kč)" id="contract-total"><input id="contract-total" className="input w-full" type="number" min="0" step="0.01" value={totalPrice} onChange={(e) => setTotalPrice(e.target.value)}/></Field></div>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="Stav" id="contract-status"><select id="contract-status" className="input w-full" value={status} onChange={(e) => setStatus(e.target.value)}><option value="DRAFT">Návrh</option><option value="ACTIVE">Aktivní</option><option value="EXPIRING">Končí</option><option value="EXPIRED">Vypršela</option><option value="TERMINATED">Ukončená</option></select></Field><Field label="Upozornit dní předem" id="contract-alert"><input id="contract-alert" className="input w-full" type="number" min="0" max="3650" value={alertDaysBefore} onChange={(e) => setAlertDaysBefore(e.target.value)} required/></Field></div>
+          <Field label="Poznámka" id="contract-note"><textarea id="contract-note" className="input min-h-20 w-full" value={note} onChange={(e) => setNote(e.target.value)} maxLength={4000}/></Field>
+          <label className="flex cursor-pointer items-center gap-2 font-bold text-slate-700"><input type="checkbox" checked={autoRenews} onChange={(e) => setAutoRenews(e.target.checked)}/> Automaticky se prodlužuje</label>
+          {message ? <p role="alert" className="text-xs font-bold text-rose-600">{message}</p> : null}
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3"><button type="button" className="btn btn-secondary text-xs" onClick={() => setShowModal(false)} disabled={saving}>Zrušit</button><button type="submit" disabled={saving || !clientId} className="btn btn-primary text-xs">{saving ? 'Ukládám…' : editingId ? 'Uložit změny' : 'Uložit smlouvu'}</button></div>
+        </form>
+      </div>
+    </div> : null}
+  </div>;
+}
+
+function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
+  return <div><label htmlFor={id} className="mb-1 block font-bold text-slate-700">{label}</label>{children}</div>;
 }

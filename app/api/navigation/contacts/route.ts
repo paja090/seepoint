@@ -1,34 +1,35 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { createNavigationContactPerson, listNavigationContactPersons } from '@/lib/navigation/contract-service';
+import { NavigationContractValidationError, parseNavigationContactFilters, parseNavigationContactInput } from '@/lib/navigation/contract-policy';
 
 export const dynamic = 'force-dynamic';
 
+function failure(error: unknown, fallback: string) {
+  if (error instanceof NavigationContractValidationError) return NextResponse.json({ error: error.message }, { status: error.status });
+  console.error(fallback, error);
+  return NextResponse.json({ error: fallback }, { status: 500 });
+}
+
 export async function GET(req: Request) {
   try {
-    const userOrRes = await requireApiAccess('navigationProjects');
-    if (isApiDenied(userOrRes)) return userOrRes;
-
-    const { searchParams } = new URL(req.url);
-    const clientId = searchParams.get('clientId');
-    if (!clientId) return NextResponse.json({ error: 'Chybí clientId' }, { status: 400 });
-
-    const contacts = await listNavigationContactPersons(clientId);
-    return NextResponse.json({ success: true, contacts });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Chyba při načítání kontaktů' }, { status: 500 });
+    const user = await requireApiAccess('navigationContacts');
+    if (isApiDenied(user)) return user;
+    const result = await listNavigationContactPersons(user, parseNavigationContactFilters(new URL(req.url).searchParams));
+    return NextResponse.json({ success: true, contacts: result.items, total: result.total });
+  } catch (error: unknown) {
+    return failure(error, 'Kontakty se nepodařilo načíst.');
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const userOrRes = await requireApiAccess('navigationProjects');
-    if (isApiDenied(userOrRes)) return userOrRes;
-
-    const body = await req.json();
-    const contact = await createNavigationContactPerson(body);
-    return NextResponse.json({ success: true, contact });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Chyba při vytváření kontaktu' }, { status: 400 });
+    const user = await requireApiAccess('navigationContacts');
+    if (isApiDenied(user)) return user;
+    const data = parseNavigationContactInput(await req.json().catch(() => null));
+    const contact = await createNavigationContactPerson(user, data);
+    return NextResponse.json({ success: true, contact }, { status: 201 });
+  } catch (error: unknown) {
+    return failure(error, 'Kontakt se nepodařilo vytvořit.');
   }
 }

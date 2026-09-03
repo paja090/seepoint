@@ -1,8 +1,83 @@
 import 'server-only';
+import crypto from 'node:crypto';
 import { formatCzechBusinessSalutation } from '@/lib/czech-salutation';
+import { isValidEmailAddress, isValidEmailIdempotencyKey, skippedEmailEnvironment } from '@/lib/email-policy';
+
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+};
+
+export type EmailDeliveryResult =
+  | { status: 'sent'; provider: 'resend' | 'webhook' | 'gmail'; messageId?: string }
+  | { status: 'skipped'; provider: 'preview' | 'development' };
+
+const EMAIL_TIMEOUT_MS = 15_000;
+function skippedEmailProvider(): 'preview' | 'development' | null {
+  return skippedEmailEnvironment(process.env);
+}
+
+function validateEmailAddress(value: string, label = 'E-mail') {
+  if (!isValidEmailAddress(value)) {
+    throw new Error(`${label} nemá platný formát.`);
+  }
+}
+
+function validateEmailInput(input: { to: string; bcc?: string[]; subject: string; html: string; idempotencyKey?: string }) {
+  validateEmailAddress(input.to, 'E-mail příjemce');
+  input.bcc?.forEach((address) => validateEmailAddress(address, 'E-mail skryté kopie'));
+  if (!input.subject.trim() || input.subject.length > 200 || /[\r\n]/.test(input.subject)) {
+    throw new Error('Předmět e-mailu musí mít 1 až 200 znaků a nesmí obsahovat nový řádek.');
+  }
+  if (!input.html || Buffer.byteLength(input.html, 'utf8') > 500_000) {
+    throw new Error('Obsah e-mailu je prázdný nebo příliš velký.');
+  }
+  if (input.idempotencyKey && !isValidEmailIdempotencyKey(input.idempotencyKey)) {
+    throw new Error('Interní klíč e-mailu nemá platný formát.');
+  }
+}
+
+type GoogleMailCredentials = {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+};
+
+function googleMailCredentials(): GoogleMailCredentials | null {
+  const dedicated = {
+    clientId: process.env.GOOGLE_GMAIL_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_GMAIL_CLIENT_SECRET,
+    refreshToken: process.env.GOOGLE_GMAIL_REFRESH_TOKEN,
+  };
+  if (dedicated.clientId && dedicated.clientSecret && dedicated.refreshToken) {
+    return {
+      clientId: dedicated.clientId,
+      clientSecret: dedicated.clientSecret,
+      refreshToken: dedicated.refreshToken,
+    };
+  }
+
+  if (process.env.GOOGLE_GMAIL_SEND_ENABLED === 'true') {
+    const legacy = {
+      clientId: process.env.GOOGLE_DRIVE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+      refreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
+    };
+    if (legacy.clientId && legacy.clientSecret && legacy.refreshToken) {
+      return {
+        clientId: legacy.clientId,
+        clientSecret: legacy.clientSecret,
+        refreshToken: legacy.refreshToken,
+      };
+    }
+  }
+  return null;
+}
 
 export function ensureEmailConfigured() {
-  const googleConfigured = Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET && process.env.GOOGLE_DRIVE_REFRESH_TOKEN);
+  if (skippedEmailProvider()) return;
+  const googleConfigured = Boolean(googleMailCredentials());
   if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY && !process.env.EMAIL_WEBHOOK_URL && !googleConfigured) {
     throw new Error('Odesílání e-mailů není nakonfigurováno.');
   }
@@ -18,18 +93,16 @@ export async function sendTransactionalEmail(input: {
   subject: string;
   message: string;
   template: string;
-}) {
-  if (process.env.NODE_ENV !== 'production') {
-    console.info(`[DEV] E-mail "${input.subject}" pro ${input.to}`);
-    return;
-  }
+  attachments?: EmailAttachment[];
+  idempotencyKey?: string;
+}): Promise<EmailDeliveryResult> {
 
   const html = input.message
     .split(/\r?\n/)
     .map((line) => line ? `<p>${escapeHtml(line)}</p>` : '<br>')
     .join('');
 
-  await sendEmail({
+  return sendEmail({
     to: input.to,
     subject: input.subject,
     html: `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#1e293b;max-width:680px">${html}</div>`,
@@ -38,6 +111,8 @@ export async function sendTransactionalEmail(input: {
       subject: input.subject,
       message: input.message,
     },
+    attachments: input.attachments,
+    idempotencyKey: input.idempotencyKey,
   });
 }
 
@@ -56,7 +131,8 @@ export async function sendOfferEmail(input: {
   salespersonPhone?: string | null;
   salespersonRole?: string | null;
   salespersonPhotoUrl?: string | null;
-}) {
+  idempotencyKey?: string;
+}): Promise<EmailDeliveryResult> {
   const subject = input.subject?.trim() || `Nabídka SeePOINT – ${input.campaignName}`;
   const safeSalutation = escapeHtml(formatCzechBusinessSalutation(input.contactName));
   const safeCampaign = escapeHtml(input.campaignName);
@@ -85,7 +161,7 @@ export async function sendOfferEmail(input: {
     new Set([input.salespersonEmail, process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean))
   );
 
-  await sendEmail({
+  return sendEmail({
     to: input.to,
     bcc: bccEmails,
     subject,
@@ -117,6 +193,7 @@ export async function sendOfferEmail(input: {
       message: input.clientMessage || '',
       offerUrl: input.publicUrl,
     },
+    idempotencyKey: input.idempotencyKey,
   });
 }
 
@@ -125,80 +202,111 @@ async function sendEmail(input: {
   bcc?: string | string[];
   subject: string;
   html: string;
-  webhookBody: Record<string, string>;
-}) {
-  ensureEmailConfigured();
+  webhookBody: Record<string, unknown>;
+  attachments?: EmailAttachment[];
+  idempotencyKey?: string;
+}): Promise<EmailDeliveryResult> {
+  const attachments = input.attachments ?? [];
+  const attachmentBytes = attachments.reduce((sum, attachment) => sum + attachment.content.byteLength, 0);
+  if (attachmentBytes > 20 * 1024 * 1024) throw new Error('Přílohy e-mailu překračují bezpečný limit 20 MB.');
+  for (const attachment of attachments) {
+    if (!attachment.filename || attachment.filename.length > 180 || /[\r\n]/.test(attachment.filename)) {
+      throw new Error('Název přílohy není platný.');
+    }
+    if (!/^[\w.+-]+\/[\w.+-]+$/.test(attachment.contentType)) {
+      throw new Error('Typ přílohy není platný.');
+    }
+  }
   const defaultFrom = 'SeePOINT <info@seepoint.cz>';
   const from = process.env.EMAIL_FROM || defaultFrom;
+  if (from.length > 320 || /[\r\n]/.test(from)) throw new Error('Adresa odesílatele není platná.');
   const bccList = Array.isArray(input.bcc)
     ? input.bcc.filter(Boolean)
     : input.bcc
     ? [input.bcc]
     : [process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean);
+  validateEmailInput({ to: input.to, bcc: bccList, subject: input.subject, html: input.html, idempotencyKey: input.idempotencyKey });
 
-  let resendFailure: string | undefined;
+  const skippedProvider = skippedEmailProvider();
+  if (skippedProvider) {
+    console.info(`[email] Delivery skipped in ${skippedProvider} environment`, { template: input.webhookBody.template });
+    return { status: 'skipped', provider: skippedProvider };
+  }
+  ensureEmailConfigured();
+
   if (process.env.RESEND_API_KEY) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         'content-type': 'application/json',
+        ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {}),
       },
+      signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
       body: JSON.stringify({
         from,
         to: [input.to],
         ...(bccList.length > 0 ? { bcc: bccList } : {}),
         subject: input.subject,
         html: input.html,
+        ...(attachments.length > 0 ? { attachments: attachments.map((attachment) => ({ filename: attachment.filename, content: attachment.content.toString('base64') })) } : {}),
       }),
     });
     if (!response.ok) {
       const result = await response.json().catch(() => null) as { message?: string } | null;
-      resendFailure = `E-mail se nepodařilo odeslat přes Resend: ${result?.message ?? response.statusText}`;
-      console.warn('[email] Resend rejected the message; trying another configured provider', {
+      console.warn('[email] Resend rejected the message', {
         status: response.status,
         message: result?.message ?? response.statusText,
       });
-    } else {
-      return;
+      throw new Error('E-mail se nepodařilo odeslat. Zkuste to prosím znovu.');
     }
+    const result = await response.json().catch(() => null) as { id?: string } | null;
+    return { status: 'sent', provider: 'resend', messageId: result?.id };
   }
 
   if (process.env.EMAIL_WEBHOOK_URL) {
-    const response = await fetch(process.env.EMAIL_WEBHOOK_URL, {
+    const webhookUrl = new URL(process.env.EMAIL_WEBHOOK_URL);
+    if (webhookUrl.protocol !== 'https:') throw new Error('E-mailový webhook musí používat HTTPS.');
+    const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${process.env.EMAIL_WEBHOOK_SECRET ?? ''}`,
       },
-      body: JSON.stringify({ to: input.to, bcc: bccList, ...input.webhookBody }),
+      signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
+      body: JSON.stringify({
+        to: input.to,
+        bcc: bccList,
+        ...input.webhookBody,
+        ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(attachments.length > 0 ? { attachments: attachments.map((attachment) => ({ filename: attachment.filename, contentType: attachment.contentType, contentBase64: attachment.content.toString('base64') })) } : {}),
+      }),
     });
     if (!response.ok) throw new Error('E-mail se nepodařilo odeslat přes webhook.');
-    return;
+    const result = await response.json().catch(() => null) as { id?: string; messageId?: string } | null;
+    return { status: 'sent', provider: 'webhook', messageId: result?.messageId || result?.id };
   }
 
-  const googleConfigured = Boolean(
-    process.env.GOOGLE_DRIVE_CLIENT_ID &&
-    process.env.GOOGLE_DRIVE_CLIENT_SECRET &&
-    process.env.GOOGLE_DRIVE_REFRESH_TOKEN
-  );
-  if (!googleConfigured) {
-    throw new Error(resendFailure ?? 'Odesílání e-mailů není nakonfigurováno.');
+  const googleCredentials = googleMailCredentials();
+  if (!googleCredentials) {
+    throw new Error('Odesílání e-mailů není nakonfigurováno.');
   }
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET!,
-      refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN!,
+      client_id: googleCredentials.clientId,
+      client_secret: googleCredentials.clientSecret,
+      refresh_token: googleCredentials.refreshToken,
       grant_type: 'refresh_token',
     }),
   });
   const tokenData = await tokenResponse.json() as { access_token?: string; error_description?: string };
   if (!tokenResponse.ok || !tokenData.access_token) {
-    throw new Error(`Google OAuth pro e-mail selhal: ${tokenData.error_description || tokenResponse.statusText}`);
+    console.warn('[email] Google OAuth failed', { status: tokenResponse.status, message: tokenData.error_description || tokenResponse.statusText });
+    throw new Error('E-mailovou službu se nepodařilo ověřit.');
   }
 
   const mimeLines = [
@@ -206,31 +314,56 @@ async function sendEmail(input: {
     `To: ${input.to}`,
     ...(bccList.length > 0 ? [`Bcc: ${bccList.join(', ')}`] : []),
     `Subject: =?UTF-8?B?${Buffer.from(input.subject).toString('base64')}?=`,
+    ...(input.idempotencyKey ? [`X-SeePoint-Idempotency-Key: ${input.idempotencyKey}`] : []),
     'MIME-Version: 1.0',
-    'Content-Type: text/html; charset=UTF-8',
-    '',
-    input.html,
   ];
+  if (attachments.length === 0) {
+    mimeLines.push('Content-Type: text/html; charset=UTF-8', '', input.html);
+  } else {
+    const boundary = `seepoint-${crypto.randomUUID()}`;
+    mimeLines.push(
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(input.html).toString('base64'),
+    );
+    for (const attachment of attachments) {
+      const safeFilename = attachment.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const base64 = attachment.content.toString('base64').replace(/.{1,76}/g, '$&\r\n').trim();
+      mimeLines.push(
+        `--${boundary}`,
+        `Content-Type: ${attachment.contentType}; name="${safeFilename}"`,
+        `Content-Disposition: attachment; filename="${safeFilename}"`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        base64,
+      );
+    }
+    mimeLines.push(`--${boundary}--`);
+  }
   const mime = mimeLines.join('\r\n');
   const raw = Buffer.from(mime).toString('base64url');
   const gmailResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
     method: 'POST',
     headers: { authorization: `Bearer ${tokenData.access_token}`, 'content-type': 'application/json' },
+    signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
     body: JSON.stringify({ raw }),
   });
   if (!gmailResponse.ok) {
     const result = await gmailResponse.json().catch(() => null) as { error?: { message?: string } } | null;
-    throw new Error(`E-mail se nepodařilo odeslat přes Gmail: ${result?.error?.message || gmailResponse.statusText}`);
+    console.warn('[email] Gmail rejected the message', { status: gmailResponse.status, message: result?.error?.message || gmailResponse.statusText });
+    throw new Error('E-mail se nepodařilo odeslat. Zkuste to prosím znovu.');
   }
+  const gmailResult = await gmailResponse.json().catch(() => null) as { id?: string } | null;
+  return { status: 'sent', provider: 'gmail', messageId: gmailResult?.id };
 }
 
-export async function sendActivationEmail(email: string, url: string) {
-  if (process.env.NODE_ENV !== 'production') {
-    console.info(`[DEV] Aktivační URL pro ${email}: ${url}`);
-    return;
-  }
+export async function sendActivationEmail(email: string, url: string): Promise<EmailDeliveryResult> {
   const safeUrl = escapeHtml(url);
-  await sendEmail({
+  return sendEmail({
     to: email,
     subject: 'Aktivace účtu SeePoint',
     html: `<h1>Vítejte v SeePoint</h1><p>Pro nastavení hesla a aktivaci účtu použijte následující odkaz:</p><p><a href="${safeUrl}">Aktivovat účet</a></p><p>Pokud jste účet neočekávali, tento e-mail ignorujte.</p>`,
@@ -238,13 +371,9 @@ export async function sendActivationEmail(email: string, url: string) {
   });
 }
 
-export async function sendPasswordResetEmail(email: string, url: string) {
-  if (process.env.NODE_ENV !== 'production') {
-    console.info(`[DEV] URL pro obnovu hesla ${email}: ${url}`);
-    return;
-  }
+export async function sendPasswordResetEmail(email: string, url: string): Promise<EmailDeliveryResult> {
   const safeUrl = escapeHtml(url);
-  await sendEmail({
+  return sendEmail({
     to: email,
     subject: 'Obnovení hesla SeePoint',
     html: `<h1>Obnovení hesla</h1><p>Pro nastavení nového hesla použijte následující odkaz:</p><p><a href="${safeUrl}">Nastavit nové heslo</a></p><p>Pokud jste o změnu nežádali, tento e-mail ignorujte.</p>`,

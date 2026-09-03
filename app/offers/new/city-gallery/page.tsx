@@ -5,8 +5,9 @@ import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NewCityGalleryOfferPage() {
+export default async function NewCityGalleryOfferPage({ searchParams }: { searchParams: Promise<{ projectId?: string }> }) {
   await requirePageAccess('offers');
-  const options = await getSpecializedOfferOptions();
-  return <AppShell><CityGalleryOfferForm {...options} /> </AppShell>;
+  const [options, params] = await Promise.all([getSpecializedOfferOptions(), searchParams]);
+  const initialProjectId = options.projects.some((project) => project.id === params.projectId) ? params.projectId : undefined;
+  return <AppShell><CityGalleryOfferForm {...options} initialProjectId={initialProjectId} /> </AppShell>;
 }

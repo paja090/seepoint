@@ -134,10 +134,10 @@ export async function PUT(
     }
 
     return NextResponse.json({ candidate: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating candidate point:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při úpravě kandidátního místa.' },
+      { error: error instanceof Error ? error.message : 'Chyba při úpravě kandidátního místa.' },
       { status: 500 }
     );
   }
@@ -160,10 +160,10 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting candidate point:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při mazání kandidátního místa.' },
+      { error: error instanceof Error ? error.message : 'Chyba při mazání kandidátního místa.' },
       { status: 500 }
     );
   }

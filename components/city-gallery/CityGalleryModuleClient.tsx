@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   GalleryHorizontalEnd,
   Plus,
-  Package,
   CheckCircle2,
   AlertTriangle,
   Clock,
@@ -13,16 +12,10 @@ import {
   Calendar,
   Settings,
   FileText,
-  User,
-  ExternalLink,
   Search,
   Sparkles,
-  Layers,
   Phone,
-  HelpCircle,
   X,
-  Truck,
-  Building2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -58,14 +51,16 @@ export type FleetData = {
 };
 
 export function CityGalleryModuleClient({
+  canManageFleet,
   initialProjects,
   initialFleet,
 }: {
+  canManageFleet: boolean;
   initialProjects: CityGalleryProjectData[];
   initialFleet: FleetData;
 }) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [projects, setProjects] = useState<CityGalleryProjectData[]>(initialProjects);
   const [fleet, setFleet] = useState<FleetData>(initialFleet);
   const [activeTab, setActiveTab] = useState<'exhibitions' | 'permits' | 'timeline' | 'map'>('exhibitions');
@@ -77,6 +72,8 @@ export function CityGalleryModuleClient({
   const [isFleetModalOpen, setIsFleetModalOpen] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [statusProjectId, setStatusProjectId] = useState<string | null>(null);
 
   // Form states for new project
   const [formTitle, setFormTitle] = useState('');
@@ -84,8 +81,8 @@ export function CityGalleryModuleClient({
   const [formLocality, setFormLocality] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formFrameCount, setFormFrameCount] = useState(6);
-  const [formStatus, setFormStatus] = useState<'DRAFT' | 'PLANNED' | 'ACTIVE'>('ACTIVE');
-  const [formPermitStatus, setFormPermitStatus] = useState('APPROVED');
+  const [formStatus, setFormStatus] = useState<'DRAFT' | 'PLANNED' | 'ACTIVE'>('DRAFT');
+  const [formPermitStatus, setFormPermitStatus] = useState('SUBMITTED');
   const [formPermitNumber, setFormPermitNumber] = useState('');
   const [formPermitValidFrom, setFormPermitValidFrom] = useState('');
   const [formPermitValidTo, setFormPermitValidTo] = useState('');
@@ -99,7 +96,7 @@ export function CityGalleryModuleClient({
   const [newMaintenanceCount, setNewMaintenanceCount] = useState(fleet.maintenanceCount);
 
   // Filter unique cities
-  const cities = Array.from(new Set(projects.map((p) => p.city).filter(Boolean))) as string[];
+  const cities = Array.from(new Set(projects.filter((p) => p.status !== 'ARCHIVED').map((p) => p.city).filter(Boolean))) as string[];
 
   const filteredProjects = projects.filter((p) => {
     const matchesCity = selectedCity === 'ALL' || p.city === selectedCity;
@@ -157,8 +154,8 @@ export function CityGalleryModuleClient({
       setIsNewModalOpen(false);
       resetForm();
       refreshData();
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err: unknown) {
+      setModalError(err instanceof Error ? err.message : 'Projekt se nepodařilo uložit.');
     } finally {
       setModalLoading(false);
     }
@@ -184,10 +181,30 @@ export function CityGalleryModuleClient({
 
       setIsFleetModalOpen(false);
       refreshData();
-    } catch (err: any) {
-      setModalError(err.message);
+    } catch (err: unknown) {
+      setModalError(err instanceof Error ? err.message : 'Fond nosičů se nepodařilo uložit.');
     } finally {
       setModalLoading(false);
+    }
+  }
+
+  async function handleStatusChange(project: CityGalleryProjectData, status: CityGalleryProjectData['status']) {
+    if (status === 'ARCHIVED' && !window.confirm(`Opravdu archivovat projekt „${project.title}“?`)) return;
+    setStatusProjectId(project.id);
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/city-gallery/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error || 'Stav projektu se nepodařilo změnit.');
+      await refreshData();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Stav projektu se nepodařilo změnit.');
+    } finally {
+      setStatusProjectId(null);
     }
   }
 
@@ -198,7 +215,9 @@ export function CityGalleryModuleClient({
         const data = await res.json();
         if (data.projects) setProjects(data.projects);
         if (data.fleet) setFleet(data.fleet);
-      } catch (e) {}
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : 'Data Galerie venku se nepodařilo obnovit.');
+      }
       router.refresh();
     });
   }
@@ -209,8 +228,8 @@ export function CityGalleryModuleClient({
     setFormLocality('');
     setFormAddress('');
     setFormFrameCount(6);
-    setFormStatus('ACTIVE');
-    setFormPermitStatus('APPROVED');
+    setFormStatus('DRAFT');
+    setFormPermitStatus('SUBMITTED');
     setFormPermitNumber('');
     setFormPermitValidFrom('');
     setFormPermitValidTo('');
@@ -245,14 +264,16 @@ export function CityGalleryModuleClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setIsFleetModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition shadow-sm"
-            >
-              <Settings size={15} />
-              <span>Správa fondu nosičů</span>
-            </button>
+            {canManageFleet ? (
+              <button
+                type="button"
+                onClick={() => setIsFleetModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition shadow-sm"
+              >
+                <Settings size={15} />
+                <span>Správa fondu nosičů</span>
+              </button>
+            ) : null}
 
             <button
               type="button"
@@ -300,6 +321,12 @@ export function CityGalleryModuleClient({
           </div>
         </div>
       </div>
+
+      {actionError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-800" role="alert">
+          {actionError}
+        </div>
+      ) : null}
 
       {/* Expiring Permits Warning Banner */}
       {expiringProjects.length > 0 && (
@@ -362,7 +389,7 @@ export function CityGalleryModuleClient({
             }`}
           >
             <Calendar size={16} />
-            <span>Kapacita & Časová osa</span>
+            <span>Kapacita projektů</span>
           </button>
 
           <button
@@ -373,7 +400,7 @@ export function CityGalleryModuleClient({
             }`}
           >
             <MapPin size={16} />
-            <span>Mapa po ČR</span>
+            <span>Aktivní města</span>
           </button>
         </div>
 
@@ -416,9 +443,10 @@ export function CityGalleryModuleClient({
             </div>
           ) : (
             filteredProjects.map((p) => {
-              const isExpiring =
-                p.permitValidTo &&
-                Math.ceil((new Date(p.permitValidTo).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) <= 30;
+              const permitDays = p.permitValidTo
+                ? Math.ceil((new Date(p.permitValidTo).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                : null;
+              const isExpiring = permitDays !== null && permitDays >= 0 && permitDays <= 30;
 
               return (
                 <div
@@ -439,10 +467,22 @@ export function CityGalleryModuleClient({
                             ? 'bg-emerald-100 text-emerald-800'
                             : p.status === 'PLANNED'
                             ? 'bg-blue-100 text-blue-800'
+                            : p.status === 'COMPLETED'
+                            ? 'bg-violet-100 text-violet-800'
+                            : p.status === 'ARCHIVED'
+                            ? 'bg-slate-200 text-slate-500'
                             : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {p.status === 'ACTIVE' ? 'Aktivní v ulicích' : p.status === 'PLANNED' ? 'Plánováno' : 'Koncept'}
+                        {p.status === 'ACTIVE'
+                          ? 'Aktivní v ulicích'
+                          : p.status === 'PLANNED'
+                          ? 'Plánováno'
+                          : p.status === 'COMPLETED'
+                          ? 'Dokončeno'
+                          : p.status === 'ARCHIVED'
+                          ? 'Archivováno'
+                          : 'Koncept'}
                       </span>
                     </div>
 
@@ -479,7 +519,15 @@ export function CityGalleryModuleClient({
                               : 'bg-amber-50 text-amber-700'
                           }`}
                         >
-                          {p.permitValidTo ? `Platné do ${new Date(p.permitValidTo).toLocaleDateString('cs-CZ')}` : 'Schvaluje se'}
+                          {p.permitStatus === 'APPROVED' && p.permitValidTo
+                            ? `Platné do ${new Date(p.permitValidTo).toLocaleDateString('cs-CZ')}`
+                            : p.permitStatus === 'APPROVED'
+                            ? 'Schváleno bez data'
+                            : p.permitStatus === 'REJECTED'
+                            ? 'Zamítnuto'
+                            : p.permitStatus === 'EXPIRED'
+                            ? 'Propadlé'
+                            : 'V řízení'}
                         </span>
                       </div>
                     </div>
@@ -487,12 +535,34 @@ export function CityGalleryModuleClient({
 
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <Link
-                      href={`/offers/new/city-gallery`}
+                      href={`/offers/new/city-gallery?projectId=${encodeURIComponent(p.id)}`}
                       className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
                     >
                       <FileText size={14} />
                       <span>Nabídka ({p._count?.offers ?? 0})</span>
                     </Link>
+
+                    {p.status !== 'ARCHIVED' ? (
+                      <select
+                        aria-label={`Změnit stav projektu ${p.title}`}
+                        className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                        disabled={statusProjectId === p.id}
+                        onChange={(event) => {
+                          const value = event.target.value as CityGalleryProjectData['status'];
+                          event.target.value = '';
+                          if (value) void handleStatusChange(p, value);
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="" disabled>{statusProjectId === p.id ? 'Ukládám…' : 'Změnit stav'}</option>
+                        {p.status === 'DRAFT' ? <option value="PLANNED">Označit jako plánovaný</option> : null}
+                        {p.status === 'PLANNED' ? <option value="ACTIVE">Aktivovat v ulicích</option> : null}
+                        {p.status === 'ACTIVE' ? <option value="PLANNED">Vrátit do plánování</option> : null}
+                        {p.status === 'ACTIVE' ? <option value="COMPLETED">Dokončit a uvolnit nosiče</option> : null}
+                        {p.status !== 'COMPLETED' ? <option value="ARCHIVED">Archivovat</option> : null}
+                        {p.status === 'COMPLETED' ? <option value="ARCHIVED">Archivovat</option> : null}
+                      </select>
+                    ) : null}
 
                     <a
                       href={`https://galerievenku.cz`}
@@ -501,7 +571,7 @@ export function CityGalleryModuleClient({
                       className="inline-flex items-center gap-1 rounded-xl bg-fuchsia-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-fuchsia-500 transition"
                     >
                       <Sparkles size={14} />
-                      <span>QR Náhled ↗</span>
+                      <span>Web galerie ↗</span>
                     </a>
                   </div>
                 </div>
@@ -562,7 +632,11 @@ export function CityGalleryModuleClient({
                         )}
                       </td>
                       <td className="py-3.5 px-4">
-                        {diffDays !== null && diffDays <= 14 ? (
+                        {diffDays !== null && diffDays < 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[10px] font-black text-rose-800">
+                            🚨 Povolení propadlo
+                          </span>
+                        ) : diffDays !== null && diffDays <= 14 ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[10px] font-black text-rose-800">
                             🚨 Končí za {diffDays} dní!
                           </span>
@@ -592,9 +666,9 @@ export function CityGalleryModuleClient({
             <div>
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <Calendar size={18} className="text-fuchsia-600" />
-                <span>Časová osa alokace nosičů City Gallery</span>
+                <span>Alokace nosičů City Gallery</span>
               </h3>
-              <p className="text-xs text-slate-500">Ganttův přehled obsazenosti nosičů po měsících</p>
+              <p className="text-xs text-slate-500">Podíl plánovaných a aktivních projektů na celkovém fyzickém fondu</p>
             </div>
             <span className="text-xs font-black text-fuchsia-700 bg-fuchsia-50 px-3 py-1 rounded-full border border-fuchsia-200">
               Celkem {fleet.totalFleet} ks nosičů
@@ -602,17 +676,17 @@ export function CityGalleryModuleClient({
           </div>
 
           <div className="space-y-3 pt-2">
-            {projects.map((p) => (
+            {projects.filter((project) => project.status === 'PLANNED' || project.status === 'ACTIVE').map((p) => (
               <div key={p.id} className="rounded-xl border border-slate-200 p-3.5 bg-slate-50/50 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-900">{p.title} ({p.city})</span>
                   <span className="font-black text-fuchsia-700">{p.frameCount} ks nosičů</span>
                 </div>
-                {/* Visual timeline bar */}
+                {/* Share of the physical fleet allocated to this project. */}
                 <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex">
                   <div
                     className={`h-full ${p.status === 'ACTIVE' ? 'bg-gradient-to-r from-fuchsia-500 to-emerald-500' : 'bg-slate-400'}`}
-                    style={{ width: `${Math.min(100, Math.max(20, p.frameCount * 4))}%` }}
+                    style={{ width: `${Math.min(100, fleet.totalFleet > 0 ? (p.frameCount / fleet.totalFleet) * 100 : 0)}%` }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
@@ -628,15 +702,15 @@ export function CityGalleryModuleClient({
       {/* TAB 4: CITIES MAP */}
       {activeTab === 'map' && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs text-center space-y-4">
-          <MapPin size={36} className="mx-auto text-fuchsia-600 animate-bounce" />
-          <h3 className="font-bold text-slate-900 text-base">Mapa nosičů Galerie VENKU po celé ČR</h3>
+          <MapPin size={36} className="mx-auto text-fuchsia-600" />
+          <h3 className="font-bold text-slate-900 text-base">Přehled aktivních výstav podle měst</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Zobrazení všech aktivních stanovišť nosičů City Gallery v České republice (Ostrava, Praha, Brno, Olomouc, Plzeň...).
+            Souhrn měst, ve kterých jsou právě aktivně alokované nosiče Galerie VENKU.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-3 pt-4 max-w-3xl mx-auto">
-            {cities.map((city) => {
-              const cityProjects = projects.filter((p) => p.city === city);
+            {cities.filter((city) => projects.some((project) => project.city === city && project.status === 'ACTIVE')).map((city) => {
+              const cityProjects = projects.filter((p) => p.city === city && p.status === 'ACTIVE');
               const cityFrames = cityProjects.reduce((acc, p) => acc + p.frameCount, 0);
 
               return (
@@ -656,16 +730,16 @@ export function CityGalleryModuleClient({
       {/* MODAL: CREATE NEW PROJECT */}
       {isNewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="card w-full max-w-lg bg-white shadow-2xl rounded-3xl p-6 relative max-h-[90vh] overflow-y-auto space-y-4">
+          <div aria-labelledby="new-city-gallery-title" aria-modal="true" className="card w-full max-w-lg bg-white shadow-2xl rounded-3xl p-6 relative max-h-[90vh] overflow-y-auto space-y-4" role="dialog">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2" id="new-city-gallery-title">
                   <Plus className="h-5 w-5 text-fuchsia-600" />
                   <span>Nová výstava / Výjezd Galerie VENKU</span>
                 </h3>
                 <p className="text-xs text-slate-500">Zadejte lokalitu, zábor prostranství a alokaci nosičů</p>
               </div>
-              <button onClick={() => setIsNewModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+              <button aria-label="Zavřít formulář nového projektu" onClick={() => setIsNewModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100" type="button">
                 <X size={20} />
               </button>
             </div>
@@ -719,7 +793,7 @@ export function CityGalleryModuleClient({
                   <input
                     type="number"
                     min={1}
-                    max={fleet.totalFleet}
+                    max={formStatus === 'ACTIVE' ? fleet.availableFrames : fleet.totalFleet}
                     required
                     value={formFrameCount}
                     onChange={(e) => setFormFrameCount(Number(e.target.value))}
@@ -732,7 +806,10 @@ export function CityGalleryModuleClient({
                   <label className="font-bold text-slate-700 block mb-1">Stav výpravy</label>
                   <select
                     value={formStatus}
-                    onChange={(e: any) => setFormStatus(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'DRAFT' || value === 'PLANNED' || value === 'ACTIVE') setFormStatus(value);
+                    }}
                     className="input h-10 text-xs w-full"
                   >
                     <option value="ACTIVE">Aktivní v ulicích</option>
@@ -744,6 +821,22 @@ export function CityGalleryModuleClient({
 
               <div className="border-t border-slate-100 pt-3 space-y-2">
                 <span className="font-black text-slate-900 block text-xs">📜 Úřední zábor & Povolení města:</span>
+                <div>
+                  <label className="font-semibold text-slate-600 block mb-1">Stav povolení</label>
+                  <select
+                    className="input h-9 text-xs w-full"
+                    onChange={(event) => setFormPermitStatus(event.target.value)}
+                    value={formPermitStatus}
+                  >
+                    <option value="SUBMITTED">Podáno / v řízení</option>
+                    <option value="APPROVED">Schváleno</option>
+                    <option value="REJECTED">Zamítnuto</option>
+                    <option value="EXPIRED">Propadlé</option>
+                  </select>
+                  {formStatus === 'ACTIVE' ? (
+                    <span className="mt-1 block text-[10px] text-amber-700">Aktivace vyžaduje schválené povolení a vyplněná data platnosti.</span>
+                  ) : null}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="font-semibold text-slate-600 block mb-1">Číslo jednací záboru</label>
@@ -836,16 +929,16 @@ export function CityGalleryModuleClient({
       {/* MODAL: FLEET SETTINGS */}
       {isFleetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="card w-full max-w-md bg-white shadow-2xl rounded-3xl p-6 relative space-y-4">
+          <div aria-labelledby="city-gallery-fleet-title" aria-modal="true" className="card w-full max-w-md bg-white shadow-2xl rounded-3xl p-6 relative space-y-4" role="dialog">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2" id="city-gallery-fleet-title">
                   <Settings className="h-5 w-5 text-fuchsia-600" />
                   <span>Správa celkového fondu nosičů</span>
                 </h3>
                 <p className="text-xs text-slate-500">Úprava celkového počtu nosičů City Gallery Galerie VENKU</p>
               </div>
-              <button onClick={() => setIsFleetModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+              <button aria-label="Zavřít správu fondu nosičů" onClick={() => setIsFleetModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100" type="button">
                 <X size={20} />
               </button>
             </div>
@@ -861,7 +954,7 @@ export function CityGalleryModuleClient({
                 <label className="font-bold text-slate-700 block mb-1">Celkový počet nosičů City Gallery (ks) *</label>
                 <input
                   type="number"
-                  min={1}
+                  min={fleet.occupiedFrames + newMaintenanceCount}
                   required
                   value={newTotalFleet}
                   onChange={(e) => setNewTotalFleet(Number(e.target.value))}
@@ -877,6 +970,7 @@ export function CityGalleryModuleClient({
                 <input
                   type="number"
                   min={0}
+                  max={newTotalFleet - fleet.occupiedFrames}
                   required
                   value={newMaintenanceCount}
                   onChange={(e) => setNewMaintenanceCount(Number(e.target.value))}

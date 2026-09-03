@@ -3,7 +3,22 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { canAccess } from '@/lib/rbac';
 import { resolveWorkEntryRate } from '@/lib/work-entry-rates';
-import { Prisma, RateType, WorkType, WorkEntryStatus, RateSource } from '@prisma/client';
+import { Prisma, RateSource } from '@prisma/client';
+import {
+  assertCalculatedAmountFits,
+  parseDateOnly,
+  parseId,
+  parseMoney,
+  parseNote,
+  parseQuantity,
+  parseRateType,
+  parseReason,
+  parseUnit,
+  parseWorkEntryStatus,
+  parseWorkType,
+  WORK_ENTRY_PAGE_LIMIT,
+  WorkEntryValidationError,
+} from '@/lib/work-entry-policy';
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -30,8 +45,28 @@ export async function GET(request: Request) {
 
   const where: Prisma.WorkEntryWhereInput = {};
 
+  try {
+    if (status) where.status = parseWorkEntryStatus(status);
+    if (workOrderId) where.workOrderId = parseId(workOrderId, 'Zakázka');
+    if (workType) where.workType = parseWorkType(workType);
+    if (dateFrom || dateTo) {
+      const from = dateFrom ? parseDateOnly(dateFrom, 'Datum od') : undefined;
+      const to = dateTo ? parseDateOnly(dateTo, 'Datum do') : undefined;
+      if (from && to && from > to) throw new WorkEntryValidationError('Datum od nesmí být později než datum do.');
+      where.workDate = { gte: from, lte: to ? new Date(to.getTime() + 86_400_000 - 1) : undefined };
+    }
+  } catch (error) {
+    if (error instanceof WorkEntryValidationError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
+
   if (hasGlobalAccess) {
-    if (employeeId) where.employeeId = employeeId;
+    if (employeeId) {
+      try { where.employeeId = parseId(employeeId, 'Pracovník'); }
+      catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : 'Pracovník není platný.' }, { status: 400 });
+      }
+    }
   } else {
     // Restrict employee to their own records
     const employee = await prisma.employee.findFirst({
@@ -43,20 +78,6 @@ export async function GET(request: Request) {
     where.employeeId = employee.id;
   }
 
-  if (status) where.status = status as WorkEntryStatus;
-  if (workOrderId) where.workOrderId = workOrderId;
-  if (workType) where.workType = workType as WorkType;
-
-  if (dateFrom || dateTo) {
-    where.workDate = {};
-    if (dateFrom) where.workDate.gte = new Date(dateFrom);
-    if (dateTo) {
-      const toDate = new Date(dateTo);
-      toDate.setHours(23, 59, 59, 999);
-      where.workDate.lte = toDate;
-    }
-  }
-
   const entries = await prisma.workEntry.findMany({
     where,
     include: {
@@ -66,6 +87,7 @@ export async function GET(request: Request) {
       client: true,
     },
     orderBy: { workDate: 'desc' },
+    take: WORK_ENTRY_PAGE_LIMIT,
   });
 
   // Map Decimal values to strings for JSON safety
@@ -86,7 +108,7 @@ export async function POST(request: Request) {
   }
 
   const input = await request.json().catch(() => null);
-  if (!input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
   }
 
@@ -110,11 +132,39 @@ export async function POST(request: Request) {
   }
 
   const isManagerOrAdmin = user.role === 'ADMIN' || user.role === 'MANAGER';
+  if (!canAccess(user.role, 'workEntries') && !canAccess(user.role, 'myWorkEntries')) {
+    return NextResponse.json({ error: 'Nemáte oprávnění vytvářet výkazy práce.' }, { status: 403 });
+  }
+
+  let cleanEmployeeId: string;
+  let cleanWorkTaskId: string;
+  let dateObj: Date;
+  let cleanWorkType: ReturnType<typeof parseWorkType>;
+  let cleanRemunerationMethod: ReturnType<typeof parseRateType>;
+  let qtyDecimal: Prisma.Decimal;
+  let cleanUnit: string | undefined;
+  let cleanNote: string | undefined;
+  let cleanAdditionalReason: string | undefined;
+  let cleanManualRate: Prisma.Decimal | null = null;
+  try {
+    cleanEmployeeId = parseId(employeeId, 'Pracovník');
+    cleanWorkTaskId = parseId(workTaskId, 'Úkol');
+    dateObj = parseDateOnly(workDate, 'Datum práce');
+    cleanWorkType = parseWorkType(workType);
+    cleanRemunerationMethod = parseRateType(remunerationMethod);
+    qtyDecimal = parseQuantity(quantity);
+    cleanUnit = parseUnit(unit);
+    cleanNote = parseNote(note);
+    cleanAdditionalReason = parseReason(additionalEntryReason, 'Důvod dodatečného zápisu');
+    if (manualRate !== undefined && manualRate !== null && manualRate !== '') cleanManualRate = parseMoney(manualRate, 'Ruční sazba');
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Neplatná data výkazu.' }, { status: 400 });
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Validate employee
-      const targetEmployee = await tx.employee.findUnique({ where: { id: employeeId } });
+      const targetEmployee = await tx.employee.findUnique({ where: { id: cleanEmployeeId } });
       if (!targetEmployee) {
         throw new Error('Zaměstnanec nebyl nalezen.');
       }
@@ -126,7 +176,7 @@ export async function POST(request: Request) {
 
       // 2. Validate WorkTask and WorkOrder
       const workTask = await tx.workTask.findUnique({
-        where: { id: workTaskId },
+        where: { id: cleanWorkTaskId },
         include: { workOrder: true }
       });
       if (!workTask) {
@@ -139,7 +189,7 @@ export async function POST(request: Request) {
 
       // WORKER and TECHNICIAN validation
       if (!isManagerOrAdmin) {
-        if (workTask.assignedToEmployeeId !== employeeId) {
+        if (workTask.assignedToEmployeeId !== cleanEmployeeId) {
           throw new Error('Tento úkol není přiřazen vám.');
         }
         if (workTask.status !== 'DONE') {
@@ -147,49 +197,25 @@ export async function POST(request: Request) {
         }
       }
 
-      // 3. Decimal Quantity Parsing without JS floats
-      let qtyDecimal: Prisma.Decimal;
-      const qtyStr = String(quantity).trim();
-      if (qtyStr.includes(':')) {
-        const parts = qtyStr.split(':');
-        if (parts.length !== 2) throw new Error('Neplatný formát množství.');
-        const hrs = parseInt(parts[0], 10);
-        const mins = parseInt(parts[1], 10);
-        if (isNaN(hrs) || isNaN(mins) || mins < 0 || mins >= 60 || hrs < 0) {
-          throw new Error('Neplatný formát času.');
-        }
-        const hrsDec = new Prisma.Decimal(hrs);
-        const minsDec = new Prisma.Decimal(mins).div(60);
-        qtyDecimal = hrsDec.add(minsDec);
-      } else {
-        const normalized = qtyStr.replace(',', '.');
-        qtyDecimal = new Prisma.Decimal(normalized);
-      }
-      if (qtyDecimal.lte(0)) {
-        throw new Error('Množství musí být kladné číslo.');
-      }
-
       // Remuneration Rules
-      let finalUnit = unit || 'ks';
-      if (remunerationMethod === 'HOURLY') {
+      let finalQuantity = qtyDecimal;
+      let finalUnit = cleanUnit || 'ks';
+      if (cleanRemunerationMethod === 'HOURLY') {
         finalUnit = 'hod';
-      } else if (remunerationMethod === 'FIXED') {
-        qtyDecimal = new Prisma.Decimal(1);
+      } else if (cleanRemunerationMethod === 'FIXED') {
+        finalQuantity = new Prisma.Decimal(1);
         finalUnit = 'ks';
       }
 
       // 4. Duplicate prevention INSIDE the transaction
-      const dateObj = new Date(workDate);
       const startOfDay = new Date(dateObj);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(dateObj);
-      endOfDay.setHours(23, 59, 59, 999);
+      const endOfDay = new Date(dateObj.getTime() + 86_400_000 - 1);
 
       const existingDuplicate = await tx.workEntry.findFirst({
         where: {
-          workTaskId,
-          employeeId,
-          workType: workType as WorkType,
+          workTaskId: cleanWorkTaskId,
+          employeeId: cleanEmployeeId,
+          workType: cleanWorkType,
           workDate: {
             gte: startOfDay,
             lte: endOfDay,
@@ -198,7 +224,7 @@ export async function POST(request: Request) {
       });
 
       if (existingDuplicate) {
-        const canBypass = isManagerOrAdmin && allowAdditionalEntry === true && String(additionalEntryReason || '').trim().length > 0;
+        const canBypass = isManagerOrAdmin && allowAdditionalEntry === true && Boolean(cleanAdditionalReason);
         if (!canBypass) {
           if (isManagerOrAdmin) {
             throw new Error('DUPLICATE_CHECK_FAILED_MANAGER');
@@ -213,58 +239,54 @@ export async function POST(request: Request) {
       let finalSource: RateSource | null = null;
 
       const resolved = await resolveWorkEntryRate({
-        employeeId,
-        workType: workType as WorkType,
+        employeeId: cleanEmployeeId,
+        workType: cleanWorkType,
         workDate: dateObj,
-        remunerationMethod: remunerationMethod as RateType,
+        remunerationMethod: cleanRemunerationMethod,
         workOrderId,
       }, tx);
 
-      if (manualRate !== undefined && manualRate !== null) {
+      if (cleanManualRate) {
         if (!isManagerOrAdmin) {
           throw new Error('Pouze manažer nebo administrátor může zadat sazbu ručně.');
         }
         if (resolved) {
-          if (manualOverride !== true || !String(note || '').trim()) {
+          if (manualOverride !== true || !cleanNote) {
             throw new Error('RUČNÍ_PŘEPSÁNÍ_VYŽADOVÁNO');
           }
         }
-        try {
-          finalRate = new Prisma.Decimal(String(manualRate).replace(',', '.'));
-          if (finalRate.lt(0)) throw new Error();
-          finalSource = 'MANUAL';
-        } catch {
-          throw new Error('Neplatná hodnota ruční sazby.');
-        }
+        finalRate = cleanManualRate;
+        finalSource = 'MANUAL';
       } else {
         if (resolved) {
           finalRate = resolved.amount;
           finalSource = resolved.source;
-          if (remunerationMethod === 'TASK' && resolved.unit) {
+          if (cleanRemunerationMethod === 'TASK' && resolved.unit) {
             finalUnit = resolved.unit;
           }
         }
       }
 
-      const calculatedAmount = finalRate ? qtyDecimal.mul(finalRate) : new Prisma.Decimal(0);
+      assertCalculatedAmountFits(finalQuantity, finalRate);
+      const calculatedAmount = finalRate ? finalQuantity.mul(finalRate) : new Prisma.Decimal(0);
 
-      const finalNote = allowAdditionalEntry && additionalEntryReason
-        ? `[Dodatečný zápis: ${additionalEntryReason}] ${note || ''}`.trim()
-        : note;
+      const finalNote = allowAdditionalEntry && cleanAdditionalReason
+        ? `[Dodatečný zápis: ${cleanAdditionalReason}] ${cleanNote || ''}`.trim()
+        : cleanNote;
 
       const finalCreationSource = isManagerOrAdmin ? 'MANUAL' : 'AUTOMATIC';
 
       const entry = await tx.workEntry.create({
         data: {
-          employeeId,
+          employeeId: cleanEmployeeId,
           workDate: dateObj,
-          workTaskId,
+          workTaskId: cleanWorkTaskId,
           workOrderId,
           clientId,
           clientName,
-          workType: workType as WorkType,
-          remunerationMethod: remunerationMethod as RateType,
-          quantity: qtyDecimal,
+          workType: cleanWorkType,
+          remunerationMethod: cleanRemunerationMethod,
+          quantity: finalQuantity,
           unit: finalUnit,
           appliedUnitRate: finalRate,
           calculatedAmount,
@@ -300,6 +322,10 @@ export async function POST(request: Request) {
         message: 'Pro přepsání automatické sazby musíte zaškrtnout souhlas a vyplnit důvod v poznámce.',
       }, { status: 400 });
     }
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    if (err instanceof WorkEntryValidationError || !('code' in (err as Error & { code?: string }))) {
+      return NextResponse.json({ error: err.message || 'Neplatná data výkazu.' }, { status: 400 });
+    }
+    console.error('Create work entry failed', error);
+    return NextResponse.json({ error: 'Záznam práce se nepodařilo vytvořit.' }, { status: 500 });
   }
 }

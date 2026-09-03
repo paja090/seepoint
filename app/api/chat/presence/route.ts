@@ -1,13 +1,11 @@
-import { getCurrentUser } from '@/lib/auth';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { roleLabel } from '@/lib/rbac';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
-  }
+  const user = await requireApiAccess('team');
+  if (isApiDenied(user)) return user;
 
   const activeUsers = await prisma.organizationMember.findMany({
     where: {
@@ -35,13 +33,12 @@ export async function GET() {
         },
       },
     },
+    orderBy: { user: { lastLoginAt: 'desc' } },
     take: 30,
   });
 
   return NextResponse.json(
-    activeUsers
-      .sort((left, right) => (right.user.lastLoginAt?.getTime() ?? 0) - (left.user.lastLoginAt?.getTime() ?? 0))
-      .map((membership) => {
+    activeUsers.map((membership) => {
         const employee = membership.user.employees[0];
         return {
           id: membership.user.id,

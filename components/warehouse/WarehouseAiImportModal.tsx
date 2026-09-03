@@ -30,6 +30,11 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) {
+      setError('Fotka musí být JPEG, PNG nebo WebP a může mít nejvýše 3 MB.');
+      return;
+    }
+
     setPhotoPreview(URL.createObjectURL(file));
     setLoading(true);
     setError(null);
@@ -59,7 +64,7 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
     reader.readAsDataURL(file);
   }
 
-  function updateItem(index: number, field: keyof ProposedItem, value: any) {
+  function updateItem<K extends keyof ProposedItem>(index: number, field: K, value: ProposedItem[K]) {
     setProposedItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -173,7 +178,7 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
                   <span className="text-[10px] text-purple-700">AI sama rozpozná názvy, počty i typy materiálu</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     capture="environment"
                     className="hidden"
                     onChange={handlePhotoUpload}
@@ -231,7 +236,10 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
                           <select
                             className="input mt-0.5 w-full text-[11px] font-bold"
                             value={item.category}
-                            onChange={(e) => updateItem(idx, 'category', e.target.value)}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === 'CONSUMABLE' || value === 'RETURNABLE') updateItem(idx, 'category', value);
+                            }}
                           >
                             <option value="CONSUMABLE">📦 Spotřební materiál</option>
                             <option value="RETURNABLE">🔨 Vratné nářadí</option>
@@ -245,7 +253,7 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
                             step="0.1"
                             className="input mt-0.5 w-full text-[11px] font-bold"
                             value={item.quantityInStock}
-                            onChange={(e) => updateItem(idx, 'quantityInStock', e.target.value)}
+                            onChange={(e) => updateItem(idx, 'quantityInStock', Number(e.target.value))}
                           />
                         </label>
 

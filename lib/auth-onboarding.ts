@@ -2,6 +2,11 @@ export function normalizeAuthEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+export function isValidAuthEmail(value: string) {
+  const normalized = normalizeAuthEmail(value);
+  return normalized.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
 export function passwordsMatch(password: string, confirmation: string) {
   return password.length > 0 && password === confirmation;
 }

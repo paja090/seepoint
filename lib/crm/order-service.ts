@@ -19,6 +19,13 @@ export type CreateCrmOrderInput = {
   internalNote?: string;
 };
 
+export class CrmOrderConversionError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'CrmOrderConversionError';
+  }
+}
+
 export async function convertOfferToCrmOrder(offerId: string, actorUserId: string, actorEmail: string) {
   return prisma.$transaction(async (tx) => {
     // Serializes order-number allocation and makes repeated conversions idempotent.
@@ -31,8 +38,11 @@ export async function convertOfferToCrmOrder(offerId: string, actorUserId: strin
         crmOrder: true,
       },
     });
-    if (!offer) throw new Error('Nabídka nebyla nalezena.');
+    if (!offer) throw new CrmOrderConversionError('Nabídka nebyla nalezena.', 404);
     if (offer.crmOrder) return offer.crmOrder;
+    if (offer.status !== 'ACCEPTED') {
+      throw new CrmOrderConversionError('Na zakázku lze převést pouze přijatou nabídku.', 409);
+    }
 
     const year = new Date().getFullYear();
     const latestOrder = await tx.crmOrder.findFirst({
@@ -74,10 +84,6 @@ export async function convertOfferToCrmOrder(offerId: string, actorUserId: strin
       });
     }
 
-    await tx.offer.update({
-      where: { id: offerId },
-      data: { status: 'ACCEPTED', acceptedAt: offer.acceptedAt || new Date() },
-    });
     await tx.crmAuditLog.create({
       data: {
         userId: actorUserId,

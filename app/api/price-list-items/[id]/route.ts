@@ -20,17 +20,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const name = body.name !== undefined ? String(body.name || '').trim() : existing.name;
-    const carrierType = body.carrierType !== undefined ? (body.carrierType as CarrierType | null) : existing.carrierType;
-    const mediaType = body.mediaType !== undefined ? (body.mediaType as MediaType | null) : existing.mediaType;
-    const rentalMonths = body.rentalMonths !== undefined ? Math.max(1, parseInt(body.rentalMonths) || 1) : existing.rentalMonths;
-    const minQuantity = body.minQuantity !== undefined ? Math.max(1, parseInt(body.minQuantity) || 1) : existing.minQuantity;
-    const rentalPrice = body.rentalPrice !== undefined ? parseFloat(body.rentalPrice) || 0 : existing.rentalPrice.toNumber();
-    const productionPrice = body.productionPrice !== undefined ? parseFloat(body.productionPrice) || 0 : existing.productionPrice.toNumber();
+    if (!name) return NextResponse.json({ error: 'Název ceníkové položky je povinný.' }, { status: 400 });
+    const carrierTypeInput = body.carrierType !== undefined ? body.carrierType : existing.carrierType;
+    const mediaTypeInput = body.mediaType !== undefined ? body.mediaType : existing.mediaType;
+    const carrierType = carrierTypeInput === null || carrierTypeInput === '' ? null : String(carrierTypeInput);
+    const mediaType = mediaTypeInput === null || mediaTypeInput === '' ? null : String(mediaTypeInput);
+    if (carrierType && !Object.values(CarrierType).includes(carrierType as CarrierType)) {
+      return NextResponse.json({ error: 'Neplatný typ nosiče.' }, { status: 400 });
+    }
+    if (mediaType && !Object.values(MediaType).includes(mediaType as MediaType)) {
+      return NextResponse.json({ error: 'Neplatný typ média.' }, { status: 400 });
+    }
+    const rentalMonths = body.rentalMonths !== undefined ? Number(body.rentalMonths) : existing.rentalMonths;
+    const minQuantity = body.minQuantity !== undefined ? Number(body.minQuantity) : existing.minQuantity;
+    const rentalPrice = body.rentalPrice !== undefined ? Number(body.rentalPrice) : existing.rentalPrice.toNumber();
+    const productionPrice = body.productionPrice !== undefined ? Number(body.productionPrice) : existing.productionPrice.toNumber();
+    if (!Number.isInteger(rentalMonths) || rentalMonths < 1 || !Number.isInteger(minQuantity) || minQuantity < 1) {
+      return NextResponse.json({ error: 'Doba pronájmu a minimální množství musí být kladná celá čísla.' }, { status: 400 });
+    }
+    if (!Number.isFinite(rentalPrice) || rentalPrice < 0 || !Number.isFinite(productionPrice) || productionPrice < 0) {
+      return NextResponse.json({ error: 'Ceny musí být platná nezáporná čísla.' }, { status: 400 });
+    }
     const totalPrice = rentalPrice + productionPrice;
     
     const validFromDate = body.validFrom ? new Date(body.validFrom) : existing.validFrom;
-    const isActive = body.isActive !== undefined ? Boolean(body.isActive) : existing.isActive;
+    if (Number.isNaN(validFromDate.getTime())) return NextResponse.json({ error: 'Neplatné datum zahájení platnosti.' }, { status: 400 });
+    if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
+      return NextResponse.json({ error: 'Příznak aktivity musí být boolean.' }, { status: 400 });
+    }
+    const isActive = body.isActive !== undefined ? body.isActive : existing.isActive;
     const validTo = body.validTo !== undefined ? (body.validTo ? new Date(body.validTo) : null) : existing.validTo;
+    if (validTo && (Number.isNaN(validTo.getTime()) || validTo < validFromDate)) {
+      return NextResponse.json({ error: 'Konec platnosti musí být platné datum po začátku platnosti.' }, { status: 400 });
+    }
 
     const identityKey = `PRICE:${name.toLowerCase().replace(/\s+/g, '_')}:${rentalMonths}:${minQuantity}`;
     const versionKey = createHash('sha256')
@@ -43,8 +65,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         name,
         identityKey,
         versionKey,
-        carrierType,
-        mediaType,
+        carrierType: carrierType as CarrierType | null,
+        mediaType: mediaType as MediaType | null,
         rentalMonths,
         minQuantity,
         rentalPrice,
@@ -65,7 +87,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           code,
           category: 'PRINT',
           label,
-          mediaType,
+          mediaType: mediaType as MediaType,
           calculation: 'PER_SURFACE',
           unit: 'ks',
           unitPrice: productionPrice,
@@ -74,7 +96,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         },
         update: {
           label,
-          mediaType,
+          mediaType: mediaType as MediaType,
           unitPrice: productionPrice,
           defaultSelected: true,
           active: true,

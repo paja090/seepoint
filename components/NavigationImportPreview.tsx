@@ -218,7 +218,7 @@ export function NavigationImportPreview() {
                     <td className="py-2 pr-3">{row.sourcePosition || '—'}<br /><span className="text-slate-500">{row.directionDescription}</span></td>
                     <td className="py-2 pr-3">{row.structureCode || '—'}</td>
                     <td className="py-2 pr-3">{row.street || '—'}<br /><span className="text-slate-500">{row.cadastralArea}</span></td>
-                    <td className="py-2 pr-3">{row.clientName}</td>
+                    <td className="py-2 pr-3">{row.clientName || '—'}</td>
                     <td className="py-2 pr-3">
                       {row.latitude !== undefined && row.longitude !== undefined
                         ? `${row.latitude}, ${row.longitude}`

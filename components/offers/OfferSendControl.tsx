@@ -26,11 +26,12 @@ export function OfferSendControl({ offerId, canSend, emailPreview, initialMessag
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: emailSubject, clientMessage: emailMessage }),
       });
-      const data = await response.json() as { error?: string; path?: string };
+      const data = await response.json() as { error?: string; path?: string; deliveryStatus?: 'sent' | 'skipped'; message?: string };
       if (!response.ok) throw new Error(data.error || 'Nabídku se nepodařilo odeslat.');
       if (!data.path) throw new Error('Klientský odkaz se nepodařilo vytvořit.');
       sent = true;
       setPublicUrl(`${window.location.origin}${data.path}`);
+      if (data.deliveryStatus === 'skipped') setMessage(data.message || 'Preview: e-mail nebyl odeslán.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Nabídku se nepodařilo odeslat.');
     } finally {
@@ -78,7 +79,7 @@ export function OfferSendControl({ offerId, canSend, emailPreview, initialMessag
       )}
       {publicUrl && <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Veřejný klientský odkaz</p><a className="mt-1 block break-all text-sm text-sky-800 underline" href={publicUrl} rel="noreferrer" target="_blank">{publicUrl}</a><button className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sky-800" onClick={() => void navigator.clipboard.writeText(publicUrl)} type="button"><Copy aria-hidden="true" size={15} />Kopírovat odkaz</button></div>}
       <p className="mt-3 text-center text-xs text-slate-400">Odkaz obsahuje bezpečný token a lze jej kdykoli vygenerovat znovu.</p>
-      {message && <p className="mt-3 text-sm text-red-700" role="alert">{message}</p>}
+      {message && <p className="mt-3 text-sm text-amber-700" role="status">{message}</p>}
       {previewOpen ? <OfferEmailPreviewDialog data={emailPreview} message={emailMessage} onClose={() => setPreviewOpen(false)} onMessageChange={setEmailMessage} onSubjectChange={setEmailSubject} subject={emailSubject} /> : null}
     </section>
   );

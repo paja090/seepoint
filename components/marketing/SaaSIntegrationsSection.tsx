@@ -6,7 +6,7 @@ export function SaaSIntegrationsSection() {
   const activeIntegrations = [
     { title: 'Google Maps Engine', desc: 'Satelitní a silniční mapy, geokódování tras a bodů VO', icon: Map, color: 'text-emerald-400' },
     { title: 'Google Drive & Cloud', desc: 'Ukládání fotografií z terénu a klientských dokumentů', icon: HardDrive, color: 'text-sky-400' },
-    { title: 'Excel & CSV Import/Export', desc: 'Obousměrný import a export databází nosičů a klientů', icon: FileSpreadsheet, color: 'text-purple-400' },
+    { title: 'CSV / TSV Import', desc: 'Kontrolovaný import nosičů a navigací s náhledem před zápisem', icon: FileSpreadsheet, color: 'text-purple-400' },
     { title: 'SeePoint AI Engine', desc: 'Inteligentní analýza spádovosti, tras a vyhlášek měst', icon: Sparkles, color: 'text-purple-300' },
   ];
 

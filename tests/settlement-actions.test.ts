@@ -315,6 +315,15 @@ test('Etapa 2: addManualAdjustment - nelze přidat do uzamčeného vyúčtován�
   );
 });
 
+test('Etapa 2: addManualAdjustment odmítne neplatnou finanční přesnost, kategorii a prázdný popis', async () => {
+  const actor = { id: 'usr-manager', email: 'manager@seepoint.cz', role: 'MANAGER' };
+  const base = { settlementId: 'set-1', description: 'Oprava', reason: 'Platný důvod' };
+  await assert.rejects(() => addManualAdjustment({ ...base, amount: 'NaN' }, actor, {} as any), /platné číslo/);
+  await assert.rejects(() => addManualAdjustment({ ...base, amount: '10.123' }, actor, {} as any), /2 desetinnými/);
+  await assert.rejects(() => addManualAdjustment({ ...base, amount: '10', category: 'HACK' }, actor, {} as any), /Kategorie/);
+  await assert.rejects(() => addManualAdjustment({ ...base, amount: '10', description: '   ' }, actor, {} as any), /Popis korekce je povinný/);
+});
+
 test('Etapa 2: rejectWorkExpense - zamítnutí s validací důvodu', async () => {
   const mockExpense = {
     id: 'exp-1',

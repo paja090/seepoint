@@ -162,10 +162,10 @@ export async function POST(
     }
 
     return NextResponse.json({ candidate });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating survey candidate point:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při vytváření kandidátního místa.' },
+      { error: error instanceof Error ? error.message : 'Chyba při vytváření kandidátního místa.' },
       { status: 500 }
     );
   }

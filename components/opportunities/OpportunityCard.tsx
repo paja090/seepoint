@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, MapPin, Calendar, Building2, Flame, Sparkles, FilePlus, UserCheck, CheckCircle, Ban, ChevronDown, Check } from 'lucide-react';
+import { ExternalLink, MapPin, Calendar, Building2, Sparkles, UserCheck, Ban, ChevronDown, Check } from 'lucide-react';
 import type { OpportunityEventType, OpportunityStatus } from '@prisma/client';
 import type { OpportunityScoreReason } from '@/lib/opportunities/types';
 
@@ -107,7 +107,6 @@ export function OpportunityCard({
   onUpdateStatus: (id: string, status: OpportunityStatus, dismissedReason?: string) => void;
 }) {
   const [showReasons, setShowReasons] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   const scoreBadge = getScoreBadge(item.opportunityScore);
   const eventMeta = eventTypeLabels[item.eventType] || eventTypeLabels.OTHER;
@@ -145,6 +144,12 @@ export function OpportunityCard({
               <span>Mimo CRM</span>
             </span>
           )}
+
+          {item.status === 'NEW' ? (
+            <span className="inline-flex items-center gap-1 rounded-lg border border-amber-800/60 bg-amber-950/70 px-2 py-0.5 text-[11px] font-bold text-amber-200">
+              AI návrh – před použitím ověřit
+            </span>
+          ) : null}
         </div>
 
         <span className="text-[11px] font-semibold text-slate-400">
@@ -263,25 +268,25 @@ export function OpportunityCard({
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition"
             >
               <Building2 className="w-3.5 h-3.5" />
-              <span>Přidat do CRM (ARES)</span>
+              <span>Přidat / propojit s CRM</span>
             </button>
           )}
 
           {/* Mark as Contacted */}
-          {item.status !== 'CONTACTED' && item.status !== 'PROPOSAL_CREATED' && (
+          {['NEW', 'REVIEWED', 'CONTACT_PLANNED'].includes(item.status) ? (
             <button
               type="button"
               onClick={() => onUpdateStatus(item.id, 'CONTACTED')}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition"
             >
               <UserCheck className="w-3.5 h-3.5 text-sky-400" />
-              <span>Kontaktováno</span>
+              <span>Označit jako kontaktováno</span>
             </button>
-          )}
+          ) : null}
         </div>
 
         {/* Ignore / Dismiss Action */}
-        {item.status !== 'DISMISSED' && (
+        {!['DISMISSED', 'CONVERTED'].includes(item.status) ? (
           <button
             type="button"
             onClick={() => onUpdateStatus(item.id, 'DISMISSED', 'Není v současné době relevantní')}
@@ -290,7 +295,7 @@ export function OpportunityCard({
             <Ban className="w-3.5 h-3.5" />
             <span>Ignorovat</span>
           </button>
-        )}
+        ) : null}
       </div>
     </article>
   );

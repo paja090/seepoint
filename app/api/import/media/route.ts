@@ -111,6 +111,7 @@ function surfaceNames(row: MediaImportRow) {
 
 export async function POST(request: Request) {
   const auth = await requireApiAccess('import'); if (isApiDenied(auth)) return auth;
+  let commitStarted = false;
   try {
     const body = await request.json() as ImportRequest;
     const sources = readSources(body.sources);
@@ -134,6 +135,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Importní klíč není správný.' }, { status: 403 });
     }
 
+    commitStarted = true;
     const result = await prisma.$transaction(async (transaction) => {
       const batch = await transaction.importBatch.create({
         data: {
@@ -144,6 +146,8 @@ export async function POST(request: Request) {
           validRows: plan.stats.importableRows,
           skippedRows: plan.stats.blockedRows,
           errorRows: plan.stats.warnings,
+          createdById: auth.id,
+          environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'unknown',
           startedAt: new Date(),
           mapping: jsonValue({
             planHash: plan.planHash,
@@ -250,8 +254,8 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Media inventory import failed', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Import se nepodařilo zpracovat.' },
-      { status: 400 },
+      { error: commitStarted ? 'Zápis importu se nepodařil. Data nebyla potvrzena jako dokončená.' : error instanceof Error ? error.message : 'Import se nepodařilo zpracovat.' },
+      { status: commitStarted ? 500 : 400 },
     );
   }
 }

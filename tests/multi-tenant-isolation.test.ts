@@ -55,8 +55,15 @@ test('dashboard counts and aggregates are scoped to the active organization', ()
 
 test('public offers resolve tenant only by an opaque token and never by offer id fallback', () => {
   const service = readFileSync(new URL('../lib/offers/service.ts', import.meta.url), 'utf8');
-  assert.match(service, /enterPublicOfferTenant\(tokenHash\)/);
-  assert.doesNotMatch(service, /where:\s*\{\s*id:\s*token\s*\}/);
+  assert.match(service, /if \(!isPlausiblePublicOfferToken\(cleanToken\)\)/);
+  assert.match(service, /const tokenHash = hashPublicOfferToken\(cleanToken\)/);
+  assert.match(service, /findUnique\(\{\s*where: \{ publicTokenHash: tokenHash \}/);
+  assert.match(service, /enterTenantContext\(\{ organizationId: row\.organizationId, source: 'public-token' \}\)/);
+  assert.doesNotMatch(service, /\{ id: cleanToken \}/);
+  assert.doesNotMatch(service, /publicTokenHash: cleanToken/);
+  assert.doesNotMatch(service, /publicTokenHash: \{ startsWith:/);
+  assert.doesNotMatch(service, /token: id, path: `\/offer\/\$\{id\}`/);
+  assert.ok((service.match(/createPublicOfferToken\(\)/g) ?? []).length >= 2);
 });
 
 test('all declared tenant models receive create ownership and reject client overrides', () => {
@@ -65,4 +72,3 @@ test('all declared tenant models receive create ownership and reject client over
   assert.equal((create.data as Record<string, unknown>).organizationId, orgA);
   assert.throws(() => scoped('Offer', 'create', { data: { title: 'B', organizationId: orgB } }), /override the active organization/);
 });
-

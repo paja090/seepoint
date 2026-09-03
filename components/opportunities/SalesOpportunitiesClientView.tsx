@@ -18,9 +18,11 @@ const initialFilters: FilterState = {
 
 export function SalesOpportunitiesClientView({
   clients = [],
+  canAutoDiscover = false,
   initialOpportunityData,
 }: {
   clients?: ClientOption[];
+  canAutoDiscover?: boolean;
   initialOpportunityData?: {
     items: OpportunityItem[];
     total: number;
@@ -47,6 +49,7 @@ export function SalesOpportunitiesClientView({
   const [loading, setLoading] = useState(false);
   const [isAutoDiscovering, setIsAutoDiscovering] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
   // Copilot integration state
   const [copilotModalOpen, setCopilotModalOpen] = useState(false);
@@ -73,13 +76,13 @@ export function SalesOpportunitiesClientView({
       if (filters.minScore) query.set('minScore', filters.minScore);
 
       const res = await fetch(`/api/sales/opportunities?${query.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
-        if (data.stats) setStats(data.stats);
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Příležitosti se nepodařilo načíst.');
+      setItems(data.items || []);
+      if (data.stats) setStats(data.stats);
     } catch (err) {
       console.error('Failed to reload opportunities', err);
+      setFeedback({ kind: 'error', message: err instanceof Error ? err.message : 'Příležitosti se nepodařilo načíst.' });
     } finally {
       setLoading(false);
     }
@@ -98,34 +101,38 @@ export function SalesOpportunitiesClientView({
   };
 
   const handleUpdateStatus = async (id: string, status: string, dismissedReason?: string) => {
-    if (status === 'DISMISSED' && !filters.status) {
-      setItems((prev) => prev.filter((item) => item.id !== id));
-    }
+    setFeedback(null);
     try {
       const res = await fetch(`/api/sales/opportunities/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, dismissedReason }),
       });
-      if (res.ok) {
-        fetchOpportunities();
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Stav příležitosti se nepodařilo změnit.');
+      await fetchOpportunities();
+      setFeedback({ kind: 'success', message: 'Stav příležitosti byl uložen.' });
     } catch (err) {
       console.error('Failed to update status', err);
+      setFeedback({ kind: 'error', message: err instanceof Error ? err.message : 'Stav příležitosti se nepodařilo změnit.' });
     }
   };
 
   const handleLinkCrm = async (item: OpportunityItem) => {
+    if (!window.confirm(`Propojit „${item.companyName}“ s existujícím klientem, nebo vytvořit nový lead v CRM?`)) return;
+    setFeedback(null);
     try {
       const res = await fetch(`/api/sales/opportunities/${item.id}/link-crm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      if (res.ok) {
-        fetchOpportunities();
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Propojení s CRM se nepodařilo.');
+      await fetchOpportunities();
+      setFeedback({ kind: 'success', message: 'Příležitost je bezpečně propojena s CRM.' });
     } catch (err) {
       console.error('Failed to link CRM', err);
+      setFeedback({ kind: 'error', message: err instanceof Error ? err.message : 'Propojení s CRM se nepodařilo.' });
     }
   };
 
@@ -150,17 +157,23 @@ export function SalesOpportunitiesClientView({
   };
 
   const handleAutoDiscover = async () => {
+    if (!window.confirm('Spustit AI hledání? Zpracuje nejvýše 5 aktuálních článků a může vytvořit nové neověřené návrhy příležitostí.')) return;
+    setFeedback(null);
     setIsAutoDiscovering(true);
     try {
       const res = await fetch('/api/sales/opportunities/auto-discover', {
         method: 'POST',
       });
-      const data = await res.json();
-      if (res.ok) {
-        await fetchOpportunities();
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Automatické vyhledávání selhalo.');
+      await fetchOpportunities();
+      setFeedback({
+        kind: 'success',
+        message: `AI zpracovala ${data.processed || 0} článků, přidala ${data.addedCount || 0} návrhů a rozpoznala ${data.duplicateCount || 0} duplicit.`,
+      });
     } catch (err) {
       console.error('Auto discover failed', err);
+      setFeedback({ kind: 'error', message: err instanceof Error ? err.message : 'Automatické vyhledávání selhalo.' });
     } finally {
       setIsAutoDiscovering(false);
     }
@@ -174,7 +187,21 @@ export function SalesOpportunitiesClientView({
         onOpenManualModal={() => setManualModalOpen(true)}
         onAutoDiscover={handleAutoDiscover}
         isAutoDiscovering={isAutoDiscovering}
+        canAutoDiscover={canAutoDiscover}
       />
+
+      {feedback ? (
+        <div
+          role={feedback.kind === 'error' ? 'alert' : 'status'}
+          className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+            feedback.kind === 'error'
+              ? 'border-rose-800/70 bg-rose-950/60 text-rose-200'
+              : 'border-emerald-800/70 bg-emerald-950/60 text-emerald-200'
+          }`}
+        >
+          {feedback.message}
+        </div>
+      ) : null}
 
       {/* Filter Bar */}
       <OpportunityFiltersBar

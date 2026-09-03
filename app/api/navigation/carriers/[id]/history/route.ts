@@ -12,8 +12,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const carrierId = (await params).id;
     const history = await getCarrierHistoryTimeline(carrierId);
     return NextResponse.json({ success: true, history });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Chyba při načítání historie nosiče' }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Chyba při načítání historie nosiče' }, { status: 500 });
   }
 }
 
@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     return NextResponse.json({ success: true, historyItem });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Chyba při zápisu do historie nosiče' }, { status: 400 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Chyba při zápisu do historie nosiče' }, { status: 400 });
   }
 }

@@ -53,10 +53,10 @@ export async function POST(
     });
 
     return NextResponse.json({ candidate });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error supervising candidate point:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při provádění supervize.' },
+      { error: error instanceof Error ? error.message : 'Chyba při provádění supervize.' },
       { status: 500 }
     );
   }

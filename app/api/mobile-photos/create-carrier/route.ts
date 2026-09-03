@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
-import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
-import { uploadPhotoToGoogleDrive } from '@/lib/google-drive';
 import { logCarrierHistoryEvent } from '@/lib/navigation/carrier-history-service';
-import { getCurrentUser } from '@/lib/auth';
 import { normalizeClientName } from '@/lib/navigation-import-plan';
 import {
-  normalizeImageMimeType,
   parseRequiredCoordinates,
   runPostSaveTasks,
   stablePhotoUrl,
-  storeMobilePhoto,
 } from '@/lib/mobile-photo-upload';
-import { enterTenantContext, getTenantContext } from '@/lib/tenant-context';
-import { tenantStorageKey } from '@/lib/storage/tenant-storage-key';
+import { enterTenantContext } from '@/lib/tenant-context';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { PhotoValidationError, validatePhotoFile } from '@/lib/photo-validation';
+import { deleteStoredPhoto, storeTenantPhoto } from '@/lib/storage/photo-storage';
+import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 import type { CarrierType, MountingType, MediaType } from '@prisma/client';
 
 export const runtime = 'nodejs';
@@ -52,18 +50,20 @@ function mapCarrierTypeToMediaType(carrierType: string): MediaType {
   }
 }
 
+const allowedCarrierTypes = new Set([
+  'BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BANNER', 'FACADE', 'LED_SCREEN', 'PROMO_BENCH',
+  'PROMO_HORIZON', 'CITY_POSTER', 'NAVIGATION', 'PROMO_TOWER', 'PROMO_MINITOWER', 'OTHER',
+]);
+const allowedMountingTypes = new Set(['LIGHT_POLE', 'POLE', 'COLUMN', 'TRACTION', 'OTHER', 'UNKNOWN']);
+
 export async function POST(req: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return jsonError('UNAUTHORIZED', 'Pro tuto akci musíte být přihlášeni.', 401);
-    }
-
-    let organizationId: string | undefined = user.organizationId || user.membership?.organizationId || undefined;
-    if (!organizationId) {
-      const currentTenant = getTenantContext();
-      organizationId = currentTenant?.organizationId || undefined;
-    }
+    const auth = await requireApiAccess('navigationProjects');
+    if (isApiDenied(auth)) return auth;
+    const user = auth;
+    const limited = await enforcePhotoUploadRateLimit(req, user);
+    if (limited) return limited;
+    const organizationId = user.organizationId || user.membership?.organizationId;
 
     if (!organizationId) {
       return jsonError('TENANT_REQUIRED', 'Nebyla nalezena organizace pro uložení nosiče.', 400);
@@ -76,30 +76,29 @@ export async function POST(req: Request) {
     });
 
     const formData = await req.formData();
-    const file = formData.get('file');
-    const name = String(formData.get('name') || '').trim();
-    let code = String(formData.get('code') || '').trim().toUpperCase();
+    const validatedPhoto = await validatePhotoFile(formData.get('file'));
+    const file = validatedPhoto!.file;
+    const mimeType = validatedPhoto!.mimeType;
+    const name = String(formData.get('name') || '').trim().slice(0, 160);
+    let code = String(formData.get('code') || '').trim().toUpperCase().slice(0, 80);
     const type = (String(formData.get('type') || 'BILLBOARD') as CarrierType);
     const mountingType = (String(formData.get('mountingType') || 'UNKNOWN') as MountingType);
-    const city = String(formData.get('city') || 'Praha').trim();
-    const street = String(formData.get('street') || '').trim() || null;
-    const locality = String(formData.get('locality') || '').trim() || null;
-    const note = String(formData.get('note') || '').trim() || null;
+    const city = String(formData.get('city') || 'Praha').trim().slice(0, 120);
+    const street = String(formData.get('street') || '').trim().slice(0, 160) || null;
+    const locality = String(formData.get('locality') || '').trim().slice(0, 160) || null;
+    const note = String(formData.get('note') || '').trim().slice(0, 1000) || null;
     const parsedSurfacesCount = parseInt(String(formData.get('surfacesCount') || '1'), 10);
     const surfacesCount = [1, 2, 3, 4].includes(parsedSurfacesCount) ? parsedSurfacesCount : 1;
-    const surfaceSize = String(formData.get('surfaceSize') || '').trim() || null;
+    const surfaceSize = String(formData.get('surfaceSize') || '').trim().slice(0, 80) || null;
     const clientId = String(formData.get('clientId') || '').trim() || null;
-    const newClientName = String(formData.get('newClientName') || '').trim() || null;
+    const newClientName = String(formData.get('newClientName') || '').trim().slice(0, 160) || null;
 
-    if (!(file instanceof File)) {
-      return jsonError('INVALID_UPLOAD', 'Chybí soubor fotografie.', 400);
-    }
-    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
-      return jsonError('INVALID_IMAGE', 'Vybraný soubor není podporovaná fotografie.', 415);
-    }
     if (!name) {
       return jsonError('NAME_REQUIRED', 'Zadejte název nové reklamní plochy / nosiče.', 400);
     }
+    if (!city) return jsonError('CITY_REQUIRED', 'Zadejte město nebo obec.', 400);
+    if (!allowedCarrierTypes.has(type)) return jsonError('INVALID_CARRIER_TYPE', 'Vyberte platný typ nosiče.', 400);
+    if (!allowedMountingTypes.has(mountingType)) return jsonError('INVALID_MOUNTING_TYPE', 'Vyberte platný typ montáže.', 400);
 
     const coordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
     if (!coordinates) {
@@ -134,6 +133,10 @@ export async function POST(req: Request) {
 
     // Resolve or create Client
     let targetClientId: string | null = clientId;
+    if (targetClientId) {
+      const targetClient = await prisma.client.findUnique({ where: { id: targetClientId }, select: { id: true } });
+      if (!targetClient) return jsonError('CLIENT_NOT_FOUND', 'Vybraný klient nebyl nalezen.', 404);
+    }
     if (!targetClientId && newClientName) {
       const normalized = normalizeClientName(newClientName);
       let existingClient = await prisma.client.findFirst({
@@ -165,15 +168,11 @@ export async function POST(req: Request) {
 
     // Store Photo
     const photoId = `photo-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const mimeType = normalizeImageMimeType(file);
-    const extension = mimeType === 'image/heic' ? 'heic' : mimeType === 'image/heif' ? 'heif' : mimeType.split('/')[1] || 'jpg';
+    const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
     const safeCode = code.replace(/[^a-zA-Z0-9_-]/g, '_');
     const fileName = `NEW_${safeCode}_${new Date().toISOString().slice(0, 10)}_${photoId.slice(-8)}.${extension}`;
-    const stored = await storeMobilePhoto(file, fileName, photoId, uploadPhotoToGoogleDrive);
+    const stored = await storeTenantPhoto({ organizationId, photoId, fileName, file });
     const photoUrl = stablePhotoUrl(photoId);
-    const storageProvider = stored.storageProvider === 'LOCAL' ? 'DATABASE' : stored.storageProvider;
-    const storageKey = tenantStorageKey({ organizationId, resource: 'photos', resourceId: photoId, fileName });
-    const contentChecksum = createHash('sha256').update(stored.bytes).digest('hex');
 
     const mediaType = mapCarrierTypeToMediaType(type);
 
@@ -240,16 +239,16 @@ export async function POST(req: Request) {
           surfaceId: createdSurfaces[0]?.id || null,
           url: photoUrl,
           driveFileId: stored.driveFileId,
-          content: stored.storageProvider === 'LOCAL' ? Buffer.from(stored.bytes) : undefined,
-          storageKey,
-          contentChecksum,
+          content: stored.storageProvider === 'DATABASE' ? Buffer.from(stored.bytes) : undefined,
+          storageKey: stored.storageKey,
+          contentChecksum: stored.contentChecksum,
           fileName,
           mimeType,
           size: stored.bytes.byteLength,
           type: 'CARRIER',
           note: `Založení nového nosiče v terénu: ${name}`,
           isClientVisible: false,
-          storageProvider,
+          storageProvider: stored.storageProvider,
           capturedLatitude: coordinates.lat,
           capturedLongitude: coordinates.lng,
           capturedAccuracyMeters: accuracy,
@@ -260,7 +259,10 @@ export async function POST(req: Request) {
       });
 
       return { carrier, surfaces: createdSurfaces, photo };
-    });
+      }).catch(async (error) => {
+      await deleteStoredPhoto(stored).catch((cleanupError) => console.error('[mobile-photos/create-carrier] Úklid souboru po chybě DB selhal', cleanupError));
+      throw error;
+      });
 
     // History Log
     const historyTask = () =>
@@ -312,12 +314,12 @@ export async function POST(req: Request) {
           },
         ],
       },
-      warnings: [...(stored.driveWarning ? ['google-drive'] : []), ...warnings],
+      warnings: [...(stored.warning ? [stored.warning] : []), ...warnings],
       message: `Nová reklamní plocha "${result.carrier.name}" (${result.carrier.code}) byla úspěšně vytvořena a uložena do databáze!`,
     });
   } catch (error: unknown) {
     console.error('[mobile-photos/create-carrier]', error);
-    const msg = error instanceof Error ? error.message : 'Nepodařilo se vytvořit novou reklamní plochu.';
-    return jsonError('CREATE_ERROR', msg, 500);
+    if (error instanceof PhotoValidationError) return jsonError(error.code, error.message, error.status);
+    return jsonError('CREATE_ERROR', 'Nepodařilo se vytvořit novou reklamní plochu.', 500);
   }
 }

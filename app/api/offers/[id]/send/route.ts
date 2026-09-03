@@ -4,10 +4,14 @@ import { sendOfferEmail } from '@/lib/email';
 import { prisma } from '@/lib/db';
 import { offerErrorResponse } from '@/lib/offers/http';
 import { prepareOfferDelivery, transitionOffer } from '@/lib/offers/service';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('offers');
   if (isApiDenied(auth)) return auth;
+  const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${auth.organizationId}:${auth.id}`), rateLimitPolicies.transactionalEmail);
+  if (limited) return limited;
   try {
     const id = (await params).id;
     const body = await request.json().catch(() => ({})) as { subject?: unknown; clientMessage?: unknown };
@@ -45,7 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const salespersonName = employee
       ? `${employee.firstName} ${employee.lastName}`
       : salesperson?.name || auth.name;
-    await sendOfferEmail({
+    const emailDelivery = await sendOfferEmail({
       to: recipient,
       subject: subject || undefined,
       contactName: delivery.offer.contactPerson || delivery.offer.client.contactPerson || delivery.offer.client.name,
@@ -62,7 +66,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       salespersonPhotoUrl: employee?.photos[0]
         ? new URL(`/api/proposals/${encodeURIComponent(delivery.token)}/salesperson-photo`, request.url).toString()
         : null,
+      idempotencyKey: `offer/${id}/${delivery.offer.sentAt ? new Date(delivery.offer.sentAt).getTime() : 'first'}`,
     });
+    if (emailDelivery.status === 'skipped') {
+      return NextResponse.json({
+        path: delivery.path,
+        deliveryStatus: 'skipped',
+        message: 'Preview: klientský odkaz byl vytvořen, ale e-mail nebyl odeslán a nabídka nebyla označena jako odeslaná.',
+      }, { status: 202 });
+    }
     if (delivery.offer.status === 'DRAFT') {
       await transitionOffer(auth, id, 'SENT');
     } else {
@@ -86,7 +98,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         },
       });
     }
-    return NextResponse.json({ path: delivery.path });
+    return NextResponse.json({ path: delivery.path, deliveryStatus: 'sent' });
   } catch (error) {
     return offerErrorResponse(error);
   }

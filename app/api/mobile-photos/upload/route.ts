@@ -1,21 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/db';
-import { uploadPhotoToGoogleDrive } from '@/lib/google-drive';
 import { analyzeCarrierPhotoWithAI } from '@/lib/ai-carrier-recognition';
 import { logCarrierHistoryEvent } from '@/lib/navigation/carrier-history-service';
-import { getCurrentUser } from '@/lib/auth';
 import {
-  normalizeImageMimeType,
   parseRequiredCoordinates,
   runPostSaveTasks,
   runWithRetry,
   stablePhotoUrl,
-  storeMobilePhoto,
 } from '@/lib/mobile-photo-upload';
 import { MOBILE_PHOTO_DAMAGE_LABELS, isMobilePhotoDamageType } from '@/lib/mobile-photo-damage';
-import { enterTenantContext, getTenantContext } from '@/lib/tenant-context';
-import { tenantStorageKey } from '@/lib/storage/tenant-storage-key';
+import { enterTenantContext } from '@/lib/tenant-context';
+import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { PhotoValidationError, validatePhotoFile } from '@/lib/photo-validation';
+import { deleteStoredPhoto, storeTenantPhoto } from '@/lib/storage/photo-storage';
+import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -28,48 +26,46 @@ const purposeLabels: Record<string, string> = {
   INSPECTION: 'Pravidelná kontrola / údržba', MOTIF_CHANGE: 'Výměna motivu / přelep',
 };
 
+const allowedSides = new Set(['SIDE_A', 'SIDE_B', 'BOTH']);
+const allowedPurposes = new Set(Object.keys(purposeLabels));
+
 function jsonError(code: string, error: string, status: number) {
   return NextResponse.json({ success: false, code, error }, { status });
 }
 
 export async function POST(req: Request) {
   try {
-    const user = await getCurrentUser();
-
-    let organizationId: string | undefined = user?.organizationId || user?.membership?.organizationId || undefined;
-    if (!organizationId) {
-      const currentTenant = getTenantContext();
-      organizationId = currentTenant?.organizationId || undefined;
-    }
-
-    if (organizationId) {
-      enterTenantContext({
-        organizationId,
-        userId: user?.id,
-        source: 'session',
-      });
-    }
+    const auth = await requireApiAccess('navigationProjects');
+    if (isApiDenied(auth)) return auth;
+    const user = auth;
+    const limited = await enforcePhotoUploadRateLimit(req, user);
+    if (limited) return limited;
+    const organizationId = user.organizationId || user.membership?.organizationId;
+    if (!organizationId) return jsonError('TENANT_REQUIRED', 'Nebyla nalezena organizace pro uložení fotografie.', 400);
+    enterTenantContext({ organizationId, userId: user.id, source: 'session' });
 
     const formData = await req.formData();
-    const file = formData.get('file');
+    const validatedPhoto = await validatePhotoFile(formData.get('file'));
+    const file = validatedPhoto!.file;
+    const mimeType = validatedPhoto!.mimeType;
     const carrierId = formData.get('carrierId');
     const surfaceId = formData.get('surfaceId');
     const side = String(formData.get('side') || 'SIDE_A');
     const purpose = String(formData.get('purpose') || 'CLIENT_REPORT');
+    const requestedType = String(formData.get('type') || '').trim().toUpperCase();
+    const isSurveyUpload = requestedType === 'SURVEY';
     const damageType = formData.get('damageType') ? String(formData.get('damageType')) : null;
-    const rawNote = String(formData.get('note') || '').trim();
+    const rawNote = String(formData.get('note') || '').trim().slice(0, 1000);
 
-    if (!(file instanceof File)) {
-      return jsonError('INVALID_UPLOAD', 'Chybí soubor fotografie.', 400);
-    }
-    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
-      return jsonError('INVALID_IMAGE', 'Vybraný soubor není podporovaná fotografie.', 415);
-    }
+    if (requestedType && !isSurveyUpload) return jsonError('INVALID_PHOTO_TYPE', 'Tento typ fotografie nelze tímto endpointem uložit.', 400);
+    if (!allowedSides.has(side)) return jsonError('INVALID_SIDE', 'Vyberte platnou stranu nosiče.', 400);
+    if (!allowedPurposes.has(purpose)) return jsonError('INVALID_PURPOSE', 'Vyberte platný účel fotografie.', 400);
     if (purpose === 'DAMAGE' && (!damageType || !isMobilePhotoDamageType(damageType))) {
       return jsonError('DAMAGE_TYPE_REQUIRED', 'Vyberte typ závady.', 400);
     }
 
     const validCarrierId = typeof carrierId === 'string' && carrierId.trim() ? carrierId.trim() : null;
+    if (!isSurveyUpload && !validCarrierId) return jsonError('CARRIER_REQUIRED', 'Vyberte nosič, ke kterému fotografie patří.', 400);
 
     const carrier = validCarrierId
       ? await prisma.advertisingCarrier.findUnique({
@@ -78,14 +74,14 @@ export async function POST(req: Request) {
         })
       : null;
 
+    if (validCarrierId && !carrier) return jsonError('CARRIER_NOT_FOUND', 'Vybraný nosič nebyl nalezen.', 404);
+
     const clientCoordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
-    const coordinates = clientCoordinates || {
-      lat: carrier?.latitude ?? 0,
-      lng: carrier?.longitude ?? 0,
-    };
+    const requiresGps = String(formData.get('requireGps') || '') === 'true';
+    if (requiresGps && !clientCoordinates) return jsonError('GPS_REQUIRED', 'Před uložením fotografie je nutná GPS poloha zařízení.', 400);
 
     const accuracyValue = Number(formData.get('accuracyMeters'));
-    const accuracy = Number.isFinite(accuracyValue) && accuracyValue >= 0 ? accuracyValue : null;
+    const accuracy = clientCoordinates && Number.isFinite(accuracyValue) && accuracyValue >= 0 ? accuracyValue : null;
 
     const requestedSurfaceId = typeof surfaceId === 'string' && surfaceId ? surfaceId : null;
     const now = new Date();
@@ -96,6 +92,7 @@ export async function POST(req: Request) {
             orderBy: { dateFrom: 'desc' }, take: 1, select: { clientName: true, client: { select: { name: true } } } },
         } })
       : null;
+    if (requestedSurfaceId && !surface) return jsonError('SURFACE_NOT_FOUND', 'Vybraná plocha nepatří k nosiči.', 400);
 
     const workerUserId = user?.id || 'MOBILE_WORKER';
     const workerName = user?.employee
@@ -111,15 +108,11 @@ export async function POST(req: Request) {
     ].filter(Boolean).join(' | ');
 
     const photoId = `photo-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const mimeType = normalizeImageMimeType(file);
-    const extension = mimeType === 'image/heic' ? 'heic' : mimeType === 'image/heif' ? 'heif' : mimeType.split('/')[1] || 'jpg';
+    const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.split('/')[1];
     const safeCode = carrier ? carrier.code.replace(/[^a-zA-Z0-9_-]/g, '_') : 'SURVEY';
     const fileName = `PHOTO_${safeCode}_${new Date().toISOString().slice(0, 10)}_${photoId.slice(-8)}.${extension}`;
-    const stored = await storeMobilePhoto(file, fileName, photoId, uploadPhotoToGoogleDrive);
+    const stored = await storeTenantPhoto({ organizationId, photoId, fileName, file });
     const photoUrl = stablePhotoUrl(photoId);
-    const storageProvider = stored.storageProvider === 'LOCAL' ? 'DATABASE' : stored.storageProvider;
-    const storageKey = tenantStorageKey({ organizationId: organizationId || 'default', resource: 'photos', resourceId: photoId, fileName });
-    const contentChecksum = createHash('sha256').update(stored.bytes).digest('hex');
 
     let photo;
     try {
@@ -130,18 +123,20 @@ export async function POST(req: Request) {
           surfaceId: surface?.id || null,
           url: photoUrl,
           driveFileId: stored.driveFileId,
-          content: stored.storageProvider === 'LOCAL' ? Buffer.from(stored.bytes) : undefined,
-          storageKey,
-          contentChecksum,
-          fileName, mimeType, size: stored.bytes.byteLength, type: purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
-          note: photoNote, isClientVisible: purpose === 'CLIENT_REPORT', storageProvider,
-          capturedLatitude: coordinates.lat, capturedLongitude: coordinates.lng, capturedAccuracyMeters: accuracy,
+          content: stored.storageProvider === 'DATABASE' ? Buffer.from(stored.bytes) : undefined,
+          storageKey: stored.storageKey,
+          contentChecksum: stored.contentChecksum,
+          fileName, mimeType, size: stored.bytes.byteLength,
+          type: isSurveyUpload ? 'SURVEY' : purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
+          note: photoNote, isClientVisible: !isSurveyUpload && purpose === 'CLIENT_REPORT', storageProvider: stored.storageProvider,
+          capturedLatitude: clientCoordinates?.lat ?? null, capturedLongitude: clientCoordinates?.lng ?? null, capturedAccuracyMeters: accuracy,
           capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName,
-          aiStatus: (purpose === 'DAMAGE' || !carrier) ? 'SKIPPED' : 'PENDING',
+          aiStatus: (isSurveyUpload || purpose === 'DAMAGE' || !carrier) ? 'SKIPPED' : 'PENDING',
         },
       });
     } catch (error) {
       console.error('[mobile-photos/upload] DB zápis fotografie selhal', error);
+      await deleteStoredPhoto(stored).catch((cleanupError) => console.error('[mobile-photos/upload] Úklid souboru po chybě DB selhal', cleanupError));
       return jsonError('DATABASE_ERROR', 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.', 500);
     }
 
@@ -161,7 +156,7 @@ export async function POST(req: Request) {
     const historyTask = () => logCarrierHistoryEvent({
       carrierId: carrier.id, surfaceId: surface?.id || null, eventType: purpose === 'DAMAGE' ? 'REPAIR' : 'SERVICE',
       title: purpose === 'DAMAGE' ? `ZÁVADA: ${damageText || 'Poškozeno'}` : 'Mobilní fotodokumentace z terénu',
-      description: `${photoNote}. GPS: ${coordinates.lat}, ${coordinates.lng}.`, performedBy: workerName, photoUrl,
+      description: `${photoNote}${clientCoordinates ? `. GPS: ${clientCoordinates.lat}, ${clientCoordinates.lng}.` : '.'}`, performedBy: workerName, photoUrl,
     });
     const chatTask = async () => {
       if (purpose !== 'DAMAGE') return;
@@ -215,8 +210,9 @@ export async function POST(req: Request) {
       success: true,
       photo: { id: photo.id, url: photo.url, fileName: photo.fileName, storageProvider: photo.storageProvider,
         capturedLatitude: photo.capturedLatitude, capturedLongitude: photo.capturedLongitude,
+        capturedAccuracyMeters: photo.capturedAccuracyMeters,
         capturedByWorkerName: photo.capturedByWorkerName, createdAt: photo.createdAt },
-      warnings: [...(stored.driveWarning ? ['google-drive'] : []), ...warnings],
+      warnings: [...(stored.warning ? [stored.warning] : []), ...warnings],
       chatSent: purpose !== 'DAMAGE' || !warnings.includes('chat'),
       clientMismatch: clientMismatch ? {
         photoId: photo.id, expectedSurfaceId: surface?.id || null, expectedClient,
@@ -230,6 +226,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('[mobile-photos/upload]', error);
+    if (error instanceof PhotoValidationError) return jsonError(error.code, error.message, error.status);
     return jsonError('UPLOAD_ERROR', 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.', 500);
   }
 }

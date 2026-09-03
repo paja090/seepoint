@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Package, Plus, X, Loader2, Edit3, Building2, MapPin } from 'lucide-react';
+import { Package, Plus, X, Loader2, Edit3 } from 'lucide-react';
 
 interface WarehouseItemData {
   id?: string;
@@ -58,7 +58,7 @@ export function WarehouseItemModal({ item }: { item?: WarehouseItemData }) {
           code: code.trim() || undefined,
           category,
           unit,
-          quantityInStock: Number(quantityInStock) || 0,
+          ...(!isEdit ? { quantityInStock: Number(quantityInStock) || 0 } : {}),
           minQuantity: minQuantity ? Number(minQuantity) : null,
           unitPrice: unitPrice ? Number(unitPrice) : null,
           location: location.trim() || undefined,
@@ -158,7 +158,10 @@ export function WarehouseItemModal({ item }: { item?: WarehouseItemData }) {
                   <select
                     className="input mt-1 w-full text-xs font-normal"
                     value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'CONSUMABLE' || value === 'RETURNABLE') setCategory(value);
+                    }}
                   >
                     <option value="CONSUMABLE">📦 Spotřební materiál (Odečítá se)</option>
                     <option value="RETURNABLE">🔨 Vratné nářadí / Vybavení (Vrací se)</option>
@@ -189,10 +192,12 @@ export function WarehouseItemModal({ item }: { item?: WarehouseItemData }) {
                     type="number"
                     step="0.01"
                     required
+                    disabled={Boolean(item)}
                     className="input mt-1 w-full text-xs font-normal"
                     value={quantityInStock}
                     onChange={(e) => setQuantityInStock(e.target.value)}
                   />
+                  {item && <span className="mt-1 block text-[10px] font-medium text-slate-500">Stav změňte evidovaným příjmem, výdejem nebo inventurou.</span>}
                 </label>
 
                 <label className="font-bold text-slate-700">

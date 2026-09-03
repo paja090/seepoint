@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 import { platformPrisma } from '@/lib/db';
 import { requireOrganizationRole } from '@/lib/organization';
-
-const editableFields = [
-  'name', 'companyId', 'vatId', 'street', 'city', 'postalCode', 'country',
-  'email', 'phone', 'website', 'logoUrl', 'primaryColor', 'secondaryColor',
-  'emailSignature', 'defaultCurrency', 'bankAccount', 'iban', 'swift',
-] as const;
+import { normalizeCompanySettingsUpdate } from '@/lib/company-settings-policy';
+import type { Prisma } from '@prisma/client';
 
 export async function GET() {
   try {
@@ -20,23 +16,27 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  let organizationId: string;
   try {
-    const { organizationId } = await requireOrganizationRole('ADMIN');
-    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-    if (!body) return NextResponse.json({ error: 'Neplatná data.' }, { status: 400 });
-    const data: Record<string, string | null> = {};
-    for (const field of editableFields) {
-      if (body[field] === undefined) continue;
-      if (typeof body[field] !== 'string') return NextResponse.json({ error: `Pole ${field} musí být text.` }, { status: 400 });
-      const value = body[field].trim();
-      data[field] = value || null;
-    }
-    if (typeof data.name === 'string' && data.name.length < 2) return NextResponse.json({ error: 'Název firmy je příliš krátký.' }, { status: 400 });
-    if (data.country === null) data.country = 'CZ';
-    if (data.defaultCurrency === null) data.defaultCurrency = 'CZK';
+    ({ organizationId } = await requireOrganizationRole('ADMIN'));
+  } catch {
+    return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body) return NextResponse.json({ error: 'Neplatná data.' }, { status: 400 });
+
+  let data;
+  try {
+    data = normalizeCompanySettingsUpdate(body);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Neplatná data.' }, { status: 400 });
+  }
+
+  try {
     const now = new Date();
     const [organization] = await platformPrisma.$transaction([
-      platformPrisma.organization.update({ where: { id: organizationId }, data }),
+      platformPrisma.organization.update({ where: { id: organizationId }, data: data as Prisma.OrganizationUpdateInput }),
       platformPrisma.organizationOnboarding.upsert({
         where: { organizationId },
         create: { organizationId, companyCompletedAt: now, settingsCompletedAt: now, currentStep: 'INVENTORY' },
@@ -44,7 +44,8 @@ export async function PATCH(request: Request) {
       }),
     ]);
     return NextResponse.json({ ok: true, organization });
-  } catch {
-    return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  } catch (error) {
+    console.error('[settings/company] Update failed', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'Firemní údaje se nepodařilo uložit.' }, { status: 500 });
   }
 }

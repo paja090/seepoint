@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, Check, Mail, Send, X, Eye, Edit3, Columns, ExternalLink } from 'lucide-react';
 
 export function NavigationEmailModal({
@@ -17,15 +17,13 @@ export function NavigationEmailModal({
   clientName: string;
   clientEmail?: string | null;
   periodTitle: string;
-  token?: string;
+  token: string;
   itemsCount: number;
   onClose: () => void;
   onSent: () => void;
 }) {
   const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://seepoint.vercel.app';
-  const defaultLink = token
-    ? `${origin}/client/navigation-documentation/${token}`
-    : `${origin}/client/navigation-documentation/demo-token`;
+  const defaultLink = `${origin}/client/navigation-documentation/${token}`;
 
   const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split');
   const [recipientEmail, setRecipientEmail] = useState(initialClientEmail || '');
@@ -43,12 +41,18 @@ export function NavigationEmailModal({
   const [sending, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   function copyLink() {
-    if (token) {
-      navigator.clipboard.writeText(defaultLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    navigator.clipboard.writeText(defaultLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleSend() {
@@ -73,14 +77,16 @@ export function NavigationEmailModal({
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json() as { error?: string; message?: string; delivered?: boolean };
       if (!response.ok) {
         setFeedback({ ok: false, message: data.error || 'E-mail se nepodařilo odeslat.' });
       } else {
         setFeedback({ ok: true, message: data.message || 'E-mail byl úspěšně odeslán.' });
-        setTimeout(() => {
-          onSent();
-        }, 1500);
+        if (data.delivered !== false) {
+          setTimeout(() => {
+            onSent();
+          }, 1500);
+        }
       }
     } catch {
       setFeedback({ ok: false, message: 'Chyba při komunikaci se serverem.' });
@@ -91,7 +97,7 @@ export function NavigationEmailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-xs">
-      <div className="relative flex max-h-[94vh] w-full max-w-6xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-200">
+      <div aria-modal="true" role="dialog" aria-labelledby="navigation-email-title" className="relative flex max-h-[94vh] w-full max-w-6xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-200">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4 gap-3">
           <div className="flex items-center gap-3">
@@ -99,7 +105,7 @@ export function NavigationEmailModal({
               <Mail size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">E-mail s fotodokumentací pro klienta</h2>
+              <h2 id="navigation-email-title" className="text-base font-bold text-slate-900">E-mail s fotodokumentací pro klienta</h2>
               <p className="text-xs text-slate-500">{clientName} · {periodTitle} ({itemsCount} nosičů)</p>
             </div>
           </div>
@@ -138,6 +144,7 @@ export function NavigationEmailModal({
 
             <button
               onClick={onClose}
+              aria-label="Zavřít dialog"
               className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               type="button"
             >
@@ -223,7 +230,7 @@ export function NavigationEmailModal({
                   />
                 </div>
 
-                {token && (
+                <div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">Přístupový odkaz pro klienta</label>
                     <div className="flex items-center justify-between rounded-xl bg-white border border-slate-200 px-3.5 py-2.5 text-xs">
@@ -238,7 +245,7 @@ export function NavigationEmailModal({
                       </button>
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             )}
 

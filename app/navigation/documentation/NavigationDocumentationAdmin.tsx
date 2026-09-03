@@ -29,7 +29,6 @@ export type ReportRow = {
   publishedAt?: string | null;
   sentAt?: string | null;
   createdAt: string;
-  publicTokenHash?: string | null;
   tokenExpiresAt?: string | null;
   client: { id: string; name: string; email?: string | null };
   offer?: { id: string; campaignName: string | null; title: string } | null;
@@ -51,7 +50,6 @@ export function NavigationDocumentationAdmin({
   const [filterQuarter, setFilterQuarter] = useState('');
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterCity, setFilterCity] = useState('');
 
   // Create Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -189,6 +187,7 @@ export function NavigationDocumentationAdmin({
 
   async function handlePublish() {
     if (!activeReportId) return;
+    setSaveFeedback(null);
     try {
       const response = await fetch(`/api/navigation/documentation/${activeReportId}/publish`, {
         method: 'POST',
@@ -199,15 +198,24 @@ export function NavigationDocumentationAdmin({
         setCurrentToken(data.token);
         loadReportDetail(activeReportId);
         setReports((curr) => curr.map((r) => (r.id === activeReportId ? { ...r, status: 'PUBLISHED' } : r)));
+        setSaveFeedback({ ok: true, message: 'Report byl publikován a odkaz je připravený pro klienta.' });
+      } else {
+        const warningText = Array.isArray(data.warnings) ? data.warnings.map((warning: { message?: string }) => warning.message).filter(Boolean).join(' ') : '';
+        setSaveFeedback({ ok: false, message: warningText || data.error || 'Report se nepodařilo publikovat.' });
       }
     } catch {
-      /* error */
+      setSaveFeedback({ ok: false, message: 'Chyba při komunikaci se serverem.' });
     }
   }
 
   async function handleOpenEmailModal() {
-    if (!activeReportId) return;
+    if (!activeReportId || !reportDetail) return;
+    if (reportDetail.report.status !== 'PUBLISHED' && reportDetail.report.status !== 'SENT') {
+      setSaveFeedback({ ok: false, message: 'Nejprve report zkontrolujte a publikujte. Teprve potom lze vytvořit klientský odkaz a odeslat e-mail.' });
+      return;
+    }
     setLoadingToken(true);
+    setSaveFeedback(null);
 
     try {
       const response = await fetch(`/api/navigation/documentation/${activeReportId}/token`, {
@@ -219,15 +227,14 @@ export function NavigationDocumentationAdmin({
       if (response.ok && data.token) {
         setCurrentToken(data.token);
         setPublishResult({ publicUrl: data.publicUrl, token: data.token });
-        setReports((curr) =>
-          curr.map((r) => (r.id === activeReportId && r.status === 'DRAFT' ? { ...r, status: 'PUBLISHED' } : r)),
-        );
+        setShowEmailModal(true);
+      } else {
+        setSaveFeedback({ ok: false, message: data.error || 'Klientský odkaz se nepodařilo připravit.' });
       }
     } catch {
-      /* ignore */
+      setSaveFeedback({ ok: false, message: 'Chyba při komunikaci se serverem.' });
     } finally {
       setLoadingToken(false);
-      setShowEmailModal(true);
     }
   }
 
@@ -323,7 +330,7 @@ export function NavigationDocumentationAdmin({
       </section>
 
       {/* Main Grid: Report List (left) + Active Detail (right) */}
-      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[340px_minmax(0,1fr)]">
         {/* Reports List */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b bg-slate-50/70 px-4 py-3">
@@ -399,6 +406,7 @@ export function NavigationDocumentationAdmin({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handlePublish}
+                    disabled={reportDetail.report.status === 'ARCHIVED'}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
                     type="button"
                   >
@@ -407,7 +415,7 @@ export function NavigationDocumentationAdmin({
 
                   <button
                     onClick={handleOpenEmailModal}
-                    disabled={loadingToken}
+                    disabled={loadingToken || (reportDetail.report.status !== 'PUBLISHED' && reportDetail.report.status !== 'SENT')}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-50"
                     type="button"
                   >
@@ -606,13 +614,13 @@ export function NavigationDocumentationAdmin({
       )}
 
       {/* Email Composer Modal */}
-      {showEmailModal && reportDetail && (
+      {showEmailModal && reportDetail && currentToken && (
         <NavigationEmailModal
           reportId={reportDetail.report.id}
           clientName={reportDetail.report.client.name}
           clientEmail={reportDetail.report.client.email}
           periodTitle={`${reportDetail.report.quarter}. čtvrtletí ${reportDetail.report.year}`}
-          token={currentToken || publishResult?.token || undefined}
+          token={currentToken}
           itemsCount={reportDetail.items.filter((i) => i.isVisible).length}
           onClose={() => setShowEmailModal(false)}
           onSent={() => {

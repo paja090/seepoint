@@ -99,7 +99,7 @@ export function calculateOpportunityScore(input: ScoreInput): {
     const count = input.carrierCountInCity || 1;
     const bonus = count >= 10 ? 15 : count >= 3 ? 10 : 5;
     score += bonus;
-    reasons.push({ factor: 'NETWORK_DENSITY', points: bonus, reason: `SeePOINT má v městu ${input.city} ${count}+ dostupných reklamních nosičů.` });
+    reasons.push({ factor: 'NETWORK_DENSITY', points: bonus, reason: `SeePOINT eviduje ve městě ${input.city} ${count}+ aktivních reklamních nosičů; konkrétní dostupnost je nutné ověřit pro termín kampaně.` });
   }
 
   // 5. Multi-Media Fit Bonus

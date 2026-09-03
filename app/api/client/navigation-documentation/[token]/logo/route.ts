@@ -4,6 +4,7 @@ import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
+import { isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
 
 export const runtime = 'nodejs';
 
@@ -35,11 +36,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       },
     }));
 
-    if (!report || report.status === 'ARCHIVED') {
+    if (!report || !isPublicNavigationReportStatus(report.status)) {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
-    if (report.tokenExpiresAt && new Date() > report.tokenExpiresAt) {
+    if (!report.tokenExpiresAt || new Date() > report.tokenExpiresAt) {
       return NextResponse.json({ error: 'Platnost odkazu vypršela.' }, { status: 410 });
     }
 

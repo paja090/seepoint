@@ -196,8 +196,15 @@ function parseTowers(text: string) {
 
 export function parseMediaImport(kind: MediaImportKind, text: string): MediaImportReport {
   if (!text.trim()) throw new Error('Vložte data včetně hlavičky.');
-  if (kind === 'CITY_POSTER') return parseCityPosters(text);
-  if (kind === 'PROMO_BENCH') return parsePromoBenches(text);
-  if (kind === 'PROMO_HORIZON') return parsePromoHorizons(text);
-  return parseTowers(text);
+  const parsed = kind === 'CITY_POSTER'
+    ? parseCityPosters(text)
+    : kind === 'PROMO_BENCH'
+      ? parsePromoBenches(text)
+      : kind === 'PROMO_HORIZON'
+        ? parsePromoHorizons(text)
+        : parseTowers(text);
+  if (!parsed.rows.length) {
+    throw new Error('Nebyl nalezen žádný podporovaný datový řádek. Mediální list musí být vložen jako TSV se sloupci oddělenými tabulátorem.');
+  }
+  return parsed;
 }

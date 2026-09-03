@@ -1,21 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
-import { WarehouseItemCategory } from '@prisma/client';
+import { WarehouseItemCategory, type Prisma } from '@prisma/client';
+import { canAccess, canManageWarehouseCatalog } from '@/lib/rbac';
+import { WarehouseInputError, warehouseCategory, warehouseNumber, warehouseText } from '@/lib/warehouse-validation';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
+  if (!canAccess(user.role, 'warehouse')) return NextResponse.json({ error: 'Nemáte oprávnění ke skladu.' }, { status: 403 });
 
   await ensureWarehouseSchema();
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q')?.trim();
   const category = searchParams.get('category') as WarehouseItemCategory | null;
   const lowStock = searchParams.get('lowStock') === 'true';
+  if (q && q.length > 200) return NextResponse.json({ error: 'Hledaný text je příliš dlouhý.' }, { status: 400 });
+  if (category && !Object.values(WarehouseItemCategory).includes(category)) {
+    return NextResponse.json({ error: 'Neplatná kategorie skladové položky.' }, { status: 400 });
+  }
 
-  const where: any = {};
+  const where: Prisma.WarehouseItemWhereInput = {};
   if (q) {
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
@@ -55,35 +62,55 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
+  if (!canManageWarehouseCatalog(user.role)) {
+    return NextResponse.json({ error: 'Skladové položky může spravovat pouze administrátor nebo manažer.' }, { status: 403 });
+  }
 
   await ensureWarehouseSchema();
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Neplatný požadavek.' }, { status: 400 });
     const { name, code, category, unit, quantityInStock, minQuantity, unitPrice, location, supplierName, supplierContact, note } = body;
-
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return NextResponse.json({ error: 'Zadejte název položky.' }, { status: 400 });
-    }
-
-    const item = await prisma.warehouseItem.create({
-      data: {
-        name: name.trim(),
-        code: code ? String(code).trim() : null,
-        category: category || 'CONSUMABLE',
-        unit: unit || 'ks',
-        quantityInStock: quantityInStock !== undefined && quantityInStock !== null ? Number(quantityInStock) : 0,
-        minQuantity: minQuantity !== undefined && minQuantity !== null && minQuantity !== '' ? Number(minQuantity) : null,
-        unitPrice: unitPrice !== undefined && unitPrice !== null && unitPrice !== '' ? Number(unitPrice) : null,
-        location: location ? String(location).trim() : null,
-        supplierName: supplierName ? String(supplierName).trim() : null,
-        supplierContact: supplierContact ? String(supplierContact).trim() : null,
-        note: note ? String(note).trim() : null,
-      },
+    const initialQuantity = quantityInStock === undefined || quantityInStock === null || quantityInStock === ''
+      ? 0
+      : warehouseNumber(quantityInStock, 'Počáteční stav', { allowZero: true });
+    const performedByName = user.employee
+      ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
+      : user.name || user.email;
+    const item = await prisma.$transaction(async (tx) => {
+      const created = await tx.warehouseItem.create({
+        data: {
+          name: warehouseText(name, 'Název položky', 200, true)!,
+          code: warehouseText(code, 'Kód položky', 100),
+          category: warehouseCategory(category),
+          unit: warehouseText(unit ?? 'ks', 'Jednotka', 30, true)!,
+          quantityInStock: initialQuantity,
+          minQuantity: warehouseNumber(minQuantity, 'Minimální zásoba', { optional: true, allowZero: true }),
+          unitPrice: warehouseNumber(unitPrice, 'Jednotková cena', { optional: true, allowZero: true }),
+          location: warehouseText(location, 'Umístění', 200),
+          supplierName: warehouseText(supplierName, 'Dodavatel', 200),
+          supplierContact: warehouseText(supplierContact, 'Kontakt dodavatele', 300),
+          note: warehouseText(note, 'Poznámka', 2000),
+        },
+      });
+      if (initialQuantity > 0) {
+        await tx.warehouseMovement.create({
+          data: {
+            itemId: created.id,
+            type: 'RECEIPT',
+            quantity: initialQuantity,
+            performedByName,
+            note: 'Počáteční stav při založení skladové položky',
+          },
+        });
+      }
+      return created;
     });
 
     return NextResponse.json(item);
   } catch (error) {
+    if (error instanceof WarehouseInputError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error('Create warehouse item error:', error);
     return NextResponse.json({ error: 'Vytvoření položky selhalo.' }, { status: 500 });
   }

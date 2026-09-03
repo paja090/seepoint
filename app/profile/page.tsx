@@ -95,9 +95,21 @@ export default async function ProfilePage() {
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight">{fullName}</h1>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-0.5 text-xs font-extrabold text-emerald-300 border border-emerald-400/30">
                   <ShieldCheck size={14} />
-                  {roleLabel(user.role)}
+                  Aktivní role: {roleLabel(user.role)}
                 </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-3 py-0.5 text-xs font-extrabold text-sky-200 border border-sky-400/30">
+                  Členství: {user.membership?.role === 'OWNER' ? 'Vlastník organizace' : roleLabel(user.primaryRole)}
+                </span>
+                {user.platformRole === 'SUPER_ADMIN' && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/20 px-3 py-0.5 text-xs font-extrabold text-purple-200 border border-purple-400/30">
+                    Platforma: Superadmin
+                  </span>
+                )}
               </div>
+
+              <p className="max-w-3xl text-xs leading-relaxed text-slate-400">
+                Aktivní role mění pouze aktuální pohled a dostupné moduly. Nemění vaše členství v organizaci ani platformové oprávnění.
+              </p>
 
               <p className="text-sm font-medium text-slate-300 flex items-center justify-center md:justify-start gap-2">
                 <Briefcase size={16} className="text-sky-400" />

@@ -157,7 +157,10 @@ export function WarehouseMovementModal({
                 <select
                   className="input mt-1 w-full text-xs font-normal"
                   value={type}
-                  onChange={(e) => setType(e.target.value as any)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'RECEIPT' || value === 'ISSUE' || value === 'RETURN') setType(value);
+                  }}
                 >
                   <option value="ISSUE">📤 Výdej montážníkovi / Na zakázku</option>
 

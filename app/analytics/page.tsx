@@ -2,22 +2,11 @@ import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
 import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard';
+import { deriveAnalyticsSurfaceState } from '@/lib/analytics-finance';
 
 export const dynamic = 'force-dynamic';
 
-const defaultRates: Record<string, number> = {
-  NAVIGATION: 1000,
-  NAVIGATION_SIGN: 1000,
-  PROMO_BENCH: 1500,
-  CITY_POSTER: 2500,
-  CITYLIGHT: 2500,
-  PROMO_TOWER: 2500,
-  PROMO_HORIZON: 2200,
-  BILLBOARD: 3500,
-  BIGBOARD: 8000,
-  LED_SCREEN: 12000,
-  OTHER: 2000,
-};
+const analyticsDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague' });
 
 export default async function AnalyticsPage() {
   await requirePageAccess('clients');
@@ -45,14 +34,13 @@ export default async function AnalyticsPage() {
         name: true,
         mediaType: true,
         status: true,
-        price: true,
-        currentClientId: true,
-        contractId: true,
         contract: {
           select: {
             id: true,
             monthlyPrice: true,
             status: true,
+            startDate: true,
+            endDate: true,
           },
         },
         carrierId: true,
@@ -77,6 +65,8 @@ export default async function AnalyticsPage() {
     prisma.occupancy.findMany({
       where: {
         status: { in: ['OCCUPIED', 'RESERVED'] },
+        dateFrom: { lte: now },
+        dateTo: { gte: now },
       },
       select: {
         id: true,
@@ -93,62 +83,56 @@ export default async function AnalyticsPage() {
   ]);
 
   // Aggregate stats by Carrier Type
-  const typeMap: Record<string, { count: number; occupiedCount: number; revenue: number }> = {};
-  const cityMap: Record<string, { carrierCount: number; surfaceCount: number; occupiedCount: number; revenue: number }> = {};
+  const typeMap: Record<string, { count: number; occupiedCount: number; knownMonthlyRent: number }> = {};
+  const cityMap: Record<string, { carrierCount: number; surfaceCount: number; occupiedCount: number; knownMonthlyRent: number }> = {};
 
-  let totalRevenue = 0;
-  let totalSurfacesCount = surfaces.length;
+  let knownMonthlyRent = 0;
+  const totalSurfacesCount = surfaces.length;
   let occupiedSurfacesCount = 0;
+  let pricedOccupiedSurfaces = 0;
 
   surfaces.forEach((surface) => {
-    // Surface is occupied if explicitly set as OCCUPIED/RESERVED, linked to a contract/client, or has active occupancy
-    const isOccupied =
-      surface.status === 'OCCUPIED' ||
-      surface.status === 'RESERVED' ||
-      Boolean(surface.currentClientId) ||
-      Boolean(surface.contractId) ||
-      surface.occupancies.length > 0;
-
-    // Monthly rental price logic (excl. 1-time setup/manufacturing fees)
-    let monthlyRentPrice = 0;
-    if (isOccupied) {
-      if (surface.contract?.monthlyPrice && Number(surface.contract.monthlyPrice) > 0) {
-        monthlyRentPrice = Number(surface.contract.monthlyPrice);
-      } else if (surface.occupancies[0]?.price && Number(surface.occupancies[0].price) > 0) {
-        monthlyRentPrice = Number(surface.occupancies[0].price);
-      } else if (surface.price && Number(surface.price) > 0) {
-        monthlyRentPrice = Number(surface.price);
-      } else {
-        const typeKey = surface.carrier.type || surface.mediaType || 'OTHER';
-        monthlyRentPrice = defaultRates[typeKey] || defaultRates[surface.mediaType] || 1000;
-      }
-    }
+    const financialState = deriveAnalyticsSurfaceState({
+      surfaceStatus: surface.status,
+      contract: surface.contract ? {
+        status: surface.contract.status,
+        startDate: surface.contract.startDate,
+        endDate: surface.contract.endDate,
+        monthlyPrice: surface.contract.monthlyPrice ? Number(surface.contract.monthlyPrice) : null,
+      } : null,
+      occupancies: surface.occupancies.map((item) => ({ status: item.status, price: item.price ? Number(item.price) : null })),
+      asOf: now,
+    });
+    const { isOccupied, monthlyRent } = financialState;
 
     if (isOccupied) {
       occupiedSurfacesCount++;
-      totalRevenue += monthlyRentPrice;
+      if (monthlyRent !== null) {
+        knownMonthlyRent += monthlyRent;
+        pricedOccupiedSurfaces++;
+      }
     }
 
     // By Carrier Type
     const typeKey = surface.carrier.type || 'OTHER';
     if (!typeMap[typeKey]) {
-      typeMap[typeKey] = { count: 0, occupiedCount: 0, revenue: 0 };
+      typeMap[typeKey] = { count: 0, occupiedCount: 0, knownMonthlyRent: 0 };
     }
     typeMap[typeKey].count++;
     if (isOccupied) {
       typeMap[typeKey].occupiedCount++;
-      typeMap[typeKey].revenue += monthlyRentPrice;
+      typeMap[typeKey].knownMonthlyRent += monthlyRent ?? 0;
     }
 
     // By City
     const cityKey = surface.carrier.city || 'Nespecifikováno';
     if (!cityMap[cityKey]) {
-      cityMap[cityKey] = { carrierCount: 0, surfaceCount: 0, occupiedCount: 0, revenue: 0 };
+      cityMap[cityKey] = { carrierCount: 0, surfaceCount: 0, occupiedCount: 0, knownMonthlyRent: 0 };
     }
     cityMap[cityKey].surfaceCount++;
     if (isOccupied) {
       cityMap[cityKey].occupiedCount++;
-      cityMap[cityKey].revenue += monthlyRentPrice;
+      cityMap[cityKey].knownMonthlyRent += monthlyRent ?? 0;
     }
   });
 
@@ -156,7 +140,7 @@ export default async function AnalyticsPage() {
   carriers.forEach((c) => {
     const cityKey = c.city || 'Nespecifikováno';
     if (!cityMap[cityKey]) {
-      cityMap[cityKey] = { carrierCount: 0, surfaceCount: 0, occupiedCount: 0, revenue: 0 };
+      cityMap[cityKey] = { carrierCount: 0, surfaceCount: 0, occupiedCount: 0, knownMonthlyRent: 0 };
     }
     cityMap[cityKey].carrierCount++;
   });
@@ -168,9 +152,9 @@ export default async function AnalyticsPage() {
       surfaceCount: data.surfaceCount,
       occupiedCount: data.occupiedCount,
       occupancyRate: data.surfaceCount > 0 ? Math.round((data.occupiedCount / data.surfaceCount) * 100) : 0,
-      revenue: data.revenue,
+      knownMonthlyRent: data.knownMonthlyRent,
     }))
-    .sort((a, b) => b.revenue - a.revenue)
+    .sort((a, b) => b.knownMonthlyRent - a.knownMonthlyRent)
     .slice(0, 12);
 
   const typeList = Object.entries(typeMap).map(([type, data]) => ({
@@ -178,22 +162,24 @@ export default async function AnalyticsPage() {
     surfaceCount: data.count,
     occupiedCount: data.occupiedCount,
     occupancyRate: data.count > 0 ? Math.round((data.occupiedCount / data.count) * 100) : 0,
-    revenue: data.revenue,
+    knownMonthlyRent: data.knownMonthlyRent,
   }));
 
   const overallOccupancyRate = totalSurfacesCount > 0 ? Math.round((occupiedSurfacesCount / totalSurfacesCount) * 100) : 0;
-  const avgPricePerSurface = occupiedSurfacesCount > 0 ? Math.round(totalRevenue / occupiedSurfacesCount) : 0;
+  const avgKnownRentPerSurface = pricedOccupiedSurfaces > 0 ? Math.round(knownMonthlyRent / pricedOccupiedSurfaces) : 0;
 
   return (
     <AppShell>
       <AnalyticsDashboard
         metrics={{
-          totalRevenue,
+          knownMonthlyRent,
           totalCarriers: carriers.length,
           totalSurfaces: totalSurfacesCount,
           occupiedSurfaces: occupiedSurfacesCount,
           overallOccupancyRate,
-          avgPricePerSurface,
+          pricedOccupiedSurfaces,
+          unpricedOccupiedSurfaces: occupiedSurfacesCount - pricedOccupiedSurfaces,
+          avgKnownRentPerSurface,
         }}
         typeList={typeList}
         cityList={cityList}
@@ -203,8 +189,8 @@ export default async function AnalyticsPage() {
           campaignName: o.campaignName || 'Kampaň',
           status: o.status,
           price: o.price ? Number(o.price) : 0,
-          dateFrom: o.dateFrom.toISOString(),
-          dateTo: o.dateTo.toISOString(),
+          dateFromLabel: analyticsDateFormatter.format(o.dateFrom),
+          dateToLabel: analyticsDateFormatter.format(o.dateTo),
         }))}
       />
     </AppShell>

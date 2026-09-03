@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, generateSecureToken } from '@/lib/navigation-documentation';
+import { buildSnapshotItem, generateSecureToken, runPrePublishChecks } from '@/lib/navigation-documentation';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -10,8 +10,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   try {
-    const report = await prisma.navigationDocumentationReport.findUnique({
-      where: { id },
+    const report = await prisma.navigationDocumentationReport.findFirst({
+      where: { id, organizationId: auth.organizationId },
       include: {
         client: true,
         items: {
@@ -29,65 +29,62 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
-    let token: string | undefined;
-    let hash = report.publicTokenHash;
-
-    if (!hash) {
-      const generated = generateSecureToken();
-      token = generated.token;
-      hash = generated.hash;
-    } else {
-      const generated = generateSecureToken();
-      token = generated.token;
-      hash = generated.hash;
+    if (report.status === 'ARCHIVED') {
+      return NextResponse.json({ error: 'Archivovaný report nelze publikovat.' }, { status: 409 });
     }
+
+    const warnings = runPrePublishChecks(report.client.email, report.items, report.periodFrom);
+    const blockers = warnings.filter((warning) =>
+      warning.type === 'EMPTY_REPORT' || warning.type === 'MISSING_PHOTO' || warning.type === 'UNAPPROVED_PHOTO',
+    );
+    if (blockers.length > 0) {
+      return NextResponse.json({ error: 'Report nesplňuje podmínky pro publikování.', warnings }, { status: 422 });
+    }
+
+    const { token, hash } = generateSecureToken();
 
     // Freeze snapshot for each item
-    for (const item of report.items) {
-      if (item.isVisible === false) continue;
-
-      const snapshotData = buildSnapshotItem({
-        id: item.id,
-        clientNote: item.clientNote,
-        navigationPoint: item.navigationPoint,
-        carrier: item.carrier,
-        selectedPhoto: item.selectedPhoto,
-      });
-
-      await prisma.navigationDocumentationItem.update({
-        where: { id: item.id },
-        data: {
-          snapshot: snapshotData as unknown as object,
-        },
-      });
-    }
-
     const publishedAt = new Date();
     const tokenExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const updated = await prisma.$transaction(async (tx) => {
+      for (const item of report.items) {
+        if (!item.isVisible) continue;
+        const snapshotData = buildSnapshotItem({
+          id: item.id,
+          clientNote: item.clientNote,
+          navigationPoint: item.navigationPoint,
+          carrier: item.carrier,
+          selectedPhoto: item.selectedPhoto,
+        });
+        await tx.navigationDocumentationItem.update({
+          where: { id: item.id, organizationId: auth.organizationId },
+          data: { snapshot: snapshotData as unknown as object },
+        });
+      }
 
-    const updated = await prisma.navigationDocumentationReport.update({
-      where: { id },
-      data: {
-        status: 'PUBLISHED',
-        publishedAt,
-        publicTokenHash: hash,
-        tokenExpiresAt,
-        auditLogs: {
-          create: {
-            actorUserId: auth.id,
-            action: 'PUBLISHED',
-            tokenExpiresAt,
-            message: `Report byl publikován se zmrazeným snapshotem dat a vygenerovaným přístupovým tokenem.`,
+      return tx.navigationDocumentationReport.update({
+        where: { id, organizationId: auth.organizationId },
+        data: {
+          status: 'PUBLISHED',
+          publishedAt,
+          sentAt: null,
+          publicTokenHash: hash,
+          tokenExpiresAt,
+          auditLogs: {
+            create: {
+              organizationId: auth.organizationId,
+              actorUserId: auth.id,
+              action: 'PUBLISHED',
+              tokenExpiresAt,
+              message: 'Report byl publikován se zmrazeným snapshotem dat a novým přístupovým odkazem.',
+            },
           },
         },
-      },
-      include: {
-        client: true,
-        items: true,
-      },
-    });
+        include: { client: true, items: true },
+      });
+    }, { isolationLevel: 'Serializable' });
 
-    const publicUrl = token ? `/client/navigation-documentation/${token}` : undefined;
+    const publicUrl = `/client/navigation-documentation/${token}`;
 
     return NextResponse.json({
       report: updated,
@@ -95,7 +92,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       publicUrl,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Chyba při publikování reportu.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error('[navigation/documentation/publish] Publishing failed', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'Report se nepodařilo publikovat.' }, { status: 500 });
   }
 }

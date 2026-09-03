@@ -5,7 +5,8 @@ import { prisma, ensureVehicleSchema } from '@/lib/db';
 import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
-import { AlertTriangle, Car, Truck, FileText, UserCheck, ShieldCheck, Wrench, ShieldAlert } from 'lucide-react';
+import { derivedVehicleStatus } from '@/lib/vehicle-reservations';
+import { AlertTriangle, UserCheck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,32 +35,70 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
     ];
   }
   if (type && vehicleTypes.includes(type as typeof vehicleTypes[number])) where.type = type as typeof vehicleTypes[number];
-  if (status && vehicleStatuses.includes(status as typeof vehicleStatuses[number])) where.status = status as typeof vehicleStatuses[number];
+  const statusFilter = status && vehicleStatuses.includes(status as typeof vehicleStatuses[number])
+    ? status as typeof vehicleStatuses[number]
+    : undefined;
 
-  const vehicles = await prisma.vehicle.findMany({
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const storedVehicles = await prisma.vehicle.findMany({
     where,
     include: {
       fuelExpenses: true,
+      reservations: {
+        where: {
+          OR: [
+            { status: 'ACTIVE' },
+            { status: 'RESERVED', dateFrom: { lte: today }, dateTo: { gte: today } },
+          ],
+        },
+        select: { status: true, dateFrom: true, dateTo: true },
+      },
       _count: { select: { reservations: true, serviceRecords: true, workTasks: true } },
     },
     orderBy: [{ status: 'asc' }, { name: 'asc' }],
     take: 500,
   });
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const effectiveVehicles = storedVehicles
+    .map((vehicle) => ({ ...vehicle, status: derivedVehicleStatus(vehicle.status, vehicle.reservations, today) }))
+    .sort((left, right) => left.status.localeCompare(right.status) || left.name.localeCompare(right.name, 'cs'));
+  const vehicles = effectiveVehicles.filter((vehicle) => !statusFilter || vehicle.status === statusFilter);
 
-  // Compute STK & Highway Pass alerts
-  const stkAlerts = vehicles.filter((v) => {
-    if (!v.technicalInspectionUntil) return false;
-    const stkDate = new Date(v.technicalInspectionUntil);
-    const diffDays = Math.ceil((stkDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays <= 30;
-  });
+  const complianceAlerts: Array<{
+    vehicleId: string;
+    vehicleName: string;
+    registrationNumber: string | null;
+    label: string;
+    date: Date;
+    diffDays: number;
+  }> = [];
+  for (const vehicle of effectiveVehicles) {
+    const deadlines = [
+      ['STK', vehicle.technicalInspectionUntil],
+      ['Pojištění', vehicle.insuranceUntil],
+      ['Dálniční známka', vehicle.highwayPassUntil],
+    ] as const;
+    for (const [label, rawDate] of deadlines) {
+      if (!rawDate) continue;
+      const date = new Date(rawDate);
+      const diffDays = Math.ceil((date.getTime() - today.getTime()) / 86_400_000);
+      if (diffDays <= 30) complianceAlerts.push({
+        vehicleId: vehicle.id,
+        vehicleName: vehicle.name,
+        registrationNumber: vehicle.registrationNumber,
+        label,
+        date,
+        diffDays,
+      });
+    }
+  }
+  complianceAlerts.sort((left, right) => left.diffDays - right.diffDays);
 
-  const activeVehiclesCount = vehicles.filter((v) => v.status !== 'OUT_OF_SERVICE').length;
-  const trailersCount = vehicles.filter((v) => v.type === 'TRAILER').length;
-  const vansCount = vehicles.filter((v) => v.type === 'VAN').length;
+  const activeVehiclesCount = effectiveVehicles.filter((v) => v.status !== 'OUT_OF_SERVICE').length;
+  const trailersCount = effectiveVehicles.filter((v) => v.type === 'TRAILER').length;
+  const vansCount = effectiveVehicles.filter((v) => v.type === 'VAN').length;
 
   return (
     <AppShell>
@@ -99,34 +138,33 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
           <span className="text-[10px] text-emerald-700 font-semibold">Renault Master, Trafic, H1</span>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-2xs">
-          <span className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Upozornění STK</span>
-          <p className="mt-1 text-2xl font-black text-amber-950">{stkAlerts.length}</p>
-          <span className="text-[10px] text-amber-700 font-semibold">vyžaduje kontrolu do 30 dní</span>
+          <span className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Doklady k řešení</span>
+          <p className="mt-1 text-2xl font-black text-amber-950">{complianceAlerts.length}</p>
+          <span className="text-[10px] text-amber-700 font-semibold">STK, pojištění nebo dálniční známka</span>
         </div>
       </div>
 
-      {/* STK ALERT BANNER */}
-      {stkAlerts.length > 0 && (
+      {/* Vehicle document and validity alerts */}
+      {complianceAlerts.length > 0 && (
         <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-xs space-y-2">
           <div className="flex items-center gap-2 text-amber-950 font-black text-sm">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-            <span>⚠️ Upozornění na vypršení STK ({stkAlerts.length} vozidel)</span>
+            <span>⚠️ Provozní doklady a platnosti k řešení ({complianceAlerts.length})</span>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-semibold">
-            {stkAlerts.map((v) => {
-              const stkDate = new Date(v.technicalInspectionUntil!);
-              const diffDays = Math.ceil((stkDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-              const isExpired = diffDays < 0;
+            {complianceAlerts.map((alert) => {
+              const isExpired = alert.diffDays < 0;
               return (
-                <span
-                  key={v.id}
+                <Link
+                  href={`/vehicles/${alert.vehicleId}`}
+                  key={`${alert.vehicleId}-${alert.label}`}
                   className={`rounded-xl px-3 py-1 border font-bold flex items-center gap-1.5 ${
                     isExpired ? 'bg-rose-100 text-rose-950 border-rose-300' : 'bg-amber-100 text-amber-950 border-amber-300'
                   }`}
                 >
-                  <span>{v.name} ({v.registrationNumber ?? 'Bez SPZ'}):</span>
-                  <strong>{isExpired ? `🚨 Prošlá (${Math.abs(diffDays)} dní po termínu)` : `⚠️ Za ${diffDays} dní (${stkDate.toLocaleDateString('cs-CZ')})`}</strong>
-                </span>
+                  <span>{alert.vehicleName} ({alert.registrationNumber ?? 'Bez SPZ'}) · {alert.label}:</span>
+                  <strong>{isExpired ? `🚨 Prošlé (${Math.abs(alert.diffDays)} dní po termínu)` : `⚠️ Za ${alert.diffDays} dní (${alert.date.toLocaleDateString('cs-CZ')})`}</strong>
+                </Link>
               );
             })}
           </div>
@@ -187,7 +225,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                 <th className="py-3 px-3">SPZ / VIN / Vlastník</th>
                 <th className="py-3 px-3">Zodpovědná osoba</th>
                 <th className="py-3 px-3">Pneu & VTP</th>
-                <th className="py-3 px-3">Dálnička & STK</th>
+                <th className="py-3 px-3">Doklady & termíny</th>
                 <th className="py-3 px-3">Poznámky & Závady</th>
                 <th className="py-3 px-4 text-right">Akce</th>
               </tr>
@@ -197,7 +235,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                 let stkBadge = null;
                 if (vehicle.technicalInspectionUntil) {
                   const stkDate = new Date(vehicle.technicalInspectionUntil);
-                  const diffDays = Math.ceil((stkDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                  const diffDays = Math.ceil((stkDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                   if (diffDays < 0) {
                     stkBadge = <span className="rounded-md bg-rose-100 text-rose-900 px-1.5 py-0.5 text-[10px] font-black uppercase border border-rose-200">🚨 Prošlá</span>;
                   } else if (diffDays <= 30) {
@@ -295,7 +333,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                       )}
                     </td>
 
-                    {/* Highway pass & STK */}
+                    {/* Vehicle documents and deadlines */}
                     <td className="py-3 px-3">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1">
@@ -303,8 +341,13 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
                           <span className="font-bold text-slate-900">{dateOnly(vehicle.technicalInspectionUntil)}</span>
                           {stkBadge}
                         </div>
+                        {vehicle.insuranceUntil && (
+                          <div className={`text-[11px] font-bold ${new Date(vehicle.insuranceUntil) < today ? 'text-rose-800' : 'text-sky-800'}`}>
+                            🛡️ Pojištění do: {dateOnly(vehicle.insuranceUntil)}
+                          </div>
+                        )}
                         {vehicle.highwayPassUntil && (
-                          <div className="text-[11px] text-emerald-800 font-bold">
+                          <div className={`text-[11px] font-bold ${new Date(vehicle.highwayPassUntil) < today ? 'text-rose-800' : 'text-emerald-800'}`}>
                             🎫 Dálniční do: {dateOnly(vehicle.highwayPassUntil)}
                           </div>
                         )}

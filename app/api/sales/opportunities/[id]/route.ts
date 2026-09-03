@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { getOpportunityById, updateOpportunityStatus } from '@/lib/opportunities/service';
-import type { OpportunityStatus } from '@prisma/client';
+import { OpportunityValidationError, parseOpportunityStatusInput } from '@/lib/opportunities/policy';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params;
-    const item = await getOpportunityById(id);
+    const item = await getOpportunityById(id, user.organizationId);
     if (!item) {
       return NextResponse.json({ error: 'Příležitost nebyla nalezena.' }, { status: 404 });
     }
@@ -28,18 +28,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     const { id } = await params;
-    const body = await request.json();
-    const status = body.status as OpportunityStatus | undefined;
-    const dismissedReason = typeof body.dismissedReason === 'string' ? body.dismissedReason : undefined;
-    const assignedToUserId = typeof body.assignedToUserId === 'string' ? body.assignedToUserId : undefined;
-
-    if (!status) {
-      return NextResponse.json({ error: 'Chybí nový stav příležitosti.' }, { status: 400 });
-    }
-
-    const updated = await updateOpportunityStatus(id, status, dismissedReason, assignedToUserId);
+    const { status, dismissedReason, assignedToUserId } = parseOpportunityStatusInput(await request.json().catch(() => null));
+    const updated = await updateOpportunityStatus(id, status, user.organizationId, dismissedReason, assignedToUserId);
     return NextResponse.json({ item: updated });
   } catch (error) {
+    if (error instanceof OpportunityValidationError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('Failed to update opportunity', error);
     return NextResponse.json({ error: 'Stav příležitosti se nepodařilo upravit.' }, { status: 500 });
   }

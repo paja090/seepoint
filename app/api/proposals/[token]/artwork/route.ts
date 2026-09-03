@@ -6,6 +6,7 @@ import { OfferValidationError } from '@/lib/offers/domain';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { sendTransactionalEmail } from '@/lib/email';
+import { canUploadNavigationArtworkForState } from '@/lib/offers/navigation-artwork-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,8 +32,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     if (!offer.navigationOffer) {
       return NextResponse.json({ error: 'Nabídka nebyla nalezena' }, { status: 404 });
     }
-    if (['REJECTED', 'ARCHIVED'].includes(offer.status)) {
-      throw new OfferValidationError('K této nabídce již nelze nahrávat grafické podklady.');
+    if (!canUploadNavigationArtworkForState({
+      offerType: offer.offerType,
+      status: offer.status,
+      proposalMode: offer.navigationOffer.proposalMode,
+    })) {
+      throw new OfferValidationError('Grafické podklady lze nahrát až po přijetí cenové navigační nabídky.');
     }
 
     // Save client uploaded artwork to navigation offer

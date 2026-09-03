@@ -1,82 +1,92 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { PhotoValidationError, safePhotoFileName, validatePhotoFile } from '@/lib/photo-validation';
+import { deleteStoredPhoto, storeTenantPhoto } from '@/lib/storage/photo-storage';
+import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
+function validatedExternalPhotoUrl(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user || !user.employee) {
-    return NextResponse.json({ error: 'Nejste přihlášeni nebo nemáte zaměstnanecký profil.' }, { status: 401 });
-  }
+  if (!user || !user.employee) return NextResponse.json({ error: 'Nejste přihlášeni nebo nemáte zaměstnanecký profil.' }, { status: 401 });
+  const limited = await enforcePhotoUploadRateLimit(request, user);
+  if (limited) return limited;
+  const organizationId = user.organizationId || user.membership?.organizationId;
+  if (!organizationId) return NextResponse.json({ error: 'Nebyla nalezena organizace pro uložení fotografie.' }, { status: 400 });
 
+  let stored: Awaited<ReturnType<typeof storeTenantPhoto>> | undefined;
   try {
-    const contentType = request.headers.get('content-type') || '';
-    let photoUrl: string | null = null;
-    let fileName = `profile-${user.employee.id}.jpg`;
-    let fileBuffer: Buffer | null = null;
-    let mimeType = 'image/jpeg';
-
-    if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData();
-      const file = formData.get('file') as File | null;
-      const urlInput = formData.get('photoUrl') as string | null;
-
-      if (file && file.size > 0) {
-        const bytes = await file.arrayBuffer();
-        fileBuffer = Buffer.from(bytes);
-        mimeType = file.type || 'image/jpeg';
-        fileName = file.name || fileName;
-      } else if (urlInput?.trim()) {
-        photoUrl = urlInput.trim();
-      }
-    } else {
-      const body = (await request.json().catch(() => null)) as { photoUrl?: string; imageBase64?: string } | null;
-      if (body?.photoUrl?.trim()) {
-        photoUrl = body.photoUrl.trim();
-      } else if (body?.imageBase64?.trim()) {
-        const base64Data = body.imageBase64.replace(/^data:image\/\w+;base64,/, '');
-        fileBuffer = Buffer.from(base64Data, 'base64');
-      }
+    if (!(request.headers.get('content-type') || '').includes('multipart/form-data')) {
+      return NextResponse.json({ error: 'Použijte formulář pro nahrání fotografie.' }, { status: 415 });
     }
 
-    const photoId = `avatar-${user.employee.id}-${Date.now()}`;
+    const formData = await request.formData();
+    const fileValue = formData.get('file');
+    const urlInput = String(formData.get('photoUrl') || '').trim();
+    if (fileValue instanceof File && fileValue.size > 0 && urlInput) {
+      return NextResponse.json({ error: 'Vyberte soubor, nebo zadejte URL adresu, ne obojí současně.' }, { status: 400 });
+    }
 
-    if (fileBuffer) {
+    const photoId = `avatar-${user.employee.id}-${randomUUID()}`;
+    let photoUrl: string;
+    let fileName: string | null = null;
+    let mimeType: string | null = null;
+    let size: number | null = null;
+
+    if (fileValue instanceof File && fileValue.size > 0) {
+      const validated = await validatePhotoFile(fileValue);
+      fileName = `${Date.now()}-${safePhotoFileName(validated!.file.name, 'profil.jpg')}`;
+      mimeType = validated!.mimeType;
+      stored = await storeTenantPhoto({ organizationId, photoId, fileName, file: validated!.file });
+      size = stored.bytes.byteLength;
       photoUrl = `/api/photos/${photoId}/file`;
+    } else {
+      const externalUrl = validatedExternalPhotoUrl(urlInput);
+      if (!externalUrl) return NextResponse.json({ error: 'Zadejte platnou HTTPS adresu fotografie.' }, { status: 400 });
+      photoUrl = externalUrl;
     }
 
-    if (!photoUrl) {
-      return NextResponse.json({ error: 'Vyberte fotografii nebo zadejte její platnou URL adresu.' }, { status: 400 });
-    }
-
-    // Deactivate previous primary photos for this employee
-    await prisma.photo.updateMany({
-      where: { employeeId: user.employee.id },
-      data: { isPrimary: false },
+    const photo = await prisma.$transaction(async (tx) => {
+      await tx.photo.updateMany({ where: { employeeId: user.employee!.id }, data: { isPrimary: false } });
+      return tx.photo.create({
+        data: {
+          id: photoId,
+          employeeId: user.employee!.id,
+          url: photoUrl,
+          fileName,
+          mimeType,
+          size,
+          content: stored?.storageProvider === 'DATABASE' ? Buffer.from(stored.bytes) : undefined,
+          driveFileId: stored?.driveFileId,
+          storageProvider: stored?.storageProvider || 'EXTERNAL_URL',
+          storageKey: stored?.storageKey,
+          contentChecksum: stored?.contentChecksum,
+          isPrimary: true,
+          type: 'EMPLOYEE_PROFILE',
+          note: 'Profilová fotografie uživatele',
+          capturedByWorkerUserId: user.id,
+          capturedByWorkerName: `${user.employee!.firstName} ${user.employee!.lastName}`,
+        },
+      });
     });
 
-    // Save photo
-    const photo = await prisma.photo.create({
-      data: {
-        id: photoId,
-        employeeId: user.employee.id,
-        url: photoUrl,
-        fileName,
-        mimeType,
-        size: fileBuffer?.byteLength ?? null,
-        content: fileBuffer ? new Uint8Array(fileBuffer) : undefined,
-        isPrimary: true,
-        type: 'CARRIER',
-        note: 'Profilová fotografie uživatele',
-        capturedByWorkerUserId: user.id,
-        capturedByWorkerName: `${user.employee.firstName} ${user.employee.lastName}`,
-      },
-    });
-
-    return NextResponse.json({ ok: true, photoUrl: photo.url });
-  } catch (err) {
-    console.error('Error uploading profile photo:', err);
+    return NextResponse.json({ ok: true, photoUrl: photo.url, storageWarning: stored?.warning || null });
+  } catch (error) {
+    if (stored) await deleteStoredPhoto(stored).catch(() => undefined);
+    if (error instanceof PhotoValidationError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    console.error('[profile/photo] Uložení profilové fotografie selhalo', error);
     return NextResponse.json({ error: 'Chyba při ukládání profilové fotografie.' }, { status: 500 });
   }
 }

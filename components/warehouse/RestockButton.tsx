@@ -9,21 +9,23 @@ export function RestockButton({ itemId, itemName }: { itemId: string; itemName: 
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleRestock() {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/warehouse/items/${itemId}/restock`, {
         method: 'POST',
       });
-      if (res.ok) {
-        setAdded(true);
-        startTransition(() => {
-          router.refresh();
-        });
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Přidání do Nákupů selhalo.');
+      setAdded(true);
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (e) {
-      console.error(e);
+      setError(e instanceof Error ? e.message : 'Přidání do Nákupů selhalo.');
     } finally {
       setLoading(false);
     }
@@ -36,6 +38,10 @@ export function RestockButton({ itemId, itemName }: { itemId: string; itemName: 
         <span>Přidáno do Nákupů</span>
       </span>
     );
+  }
+
+  if (error) {
+    return <span className="text-[11px] font-bold text-rose-700" title={error}>Přidání selhalo</span>;
   }
 
   return (

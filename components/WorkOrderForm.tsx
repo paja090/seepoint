@@ -579,7 +579,7 @@ export function WorkOrderForm({
 
             {pdfFileName && (
               <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                ✓ PDF soubor "{pdfFileName}" byl úspěšně nahraný.
+                ✓ PDF soubor „{pdfFileName}“ byl úspěšně nahraný.
               </span>
             )}
           </div>

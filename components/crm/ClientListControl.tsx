@@ -59,7 +59,7 @@ export function AddClientModalButton() {
         if (d.phone) setPhone(d.phone);
         if (d.contactPerson) setContactPerson(d.contactPerson);
 
-        setAiSuccessMsg(`Údaje pro "${d.name}" byly předvyplněny z ARES & AI!`);
+        setAiSuccessMsg(`Návrh pro „${d.name}“ byl předvyplněn. Před uložením údaje zkontrolujte.`);
       }
     } catch {
       alert('Chyba komunikace se serverem.');
@@ -122,7 +122,7 @@ export function AddClientModalButton() {
             <div className="rounded-2xl border border-sky-200 bg-gradient-to-r from-sky-50 to-indigo-50/50 p-3 space-y-2">
               <div className="flex items-center gap-2 text-xs font-black text-sky-950">
                 <Sparkles size={16} className="text-sky-600 shrink-0" />
-                <span>✨ AI & ARES Rychlé Předvyplnění (Podle IČO nebo názvu)</span>
+                <span>ARES & AI předvyplnění k ruční kontrole</span>
               </div>
               <div className="flex items-center gap-2">
                 <input

@@ -4,6 +4,8 @@ import { createOpportunity } from '../lib/opportunities/service';
 const prisma = new PrismaClient();
 
 async function main() {
+  const organization = await prisma.organization.findFirst({ select: { id: true } });
+  if (!organization) throw new Error('No organization found for sample opportunity.');
   const result = await createOpportunity({
     companyName: 'Primark Ostrava',
     eventType: 'STORE_OPENING',
@@ -16,7 +18,7 @@ async function main() {
     sourceUrl: 'https://patriotmagazin.cz/primark-otevire-v-ostrave-v-oc-karolina',
     sourceTitle: 'Patriot Magazín — Primark míří do Ostravy',
     suggestedMediaTypes: ['CITY_POSTER', 'PROMO_BENCH', 'NAVIGATION_SIGN'],
-  });
+  }, organization.id);
 
   console.log('Seeded sample opportunity:', result);
 }

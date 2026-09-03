@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Table, TableHead, TableHeaderCell, TableCell, EmptyState, Button } from '@/components/ui';
 import { OfferRecordItem, ClientProfileData } from '@/lib/crm/types';
 
-export function ClientOffersTab({ client }: { client: ClientProfileData }) {
+export function ClientOffersTab({ client, canConvert }: { client: ClientProfileData; canConvert: boolean }) {
   const router = useRouter();
   const offers = client.offers || [];
   const [convertingId, setConvertingId] = useState<string | null>(null);
@@ -75,7 +75,7 @@ export function ClientOffersTab({ client }: { client: ClientProfileData }) {
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <a href={`/offers/${offer.id}`} className="table-action">Zobrazit</a>
-                    {(offer.status === 'APPROVED' || offer.status === 'ACCEPTED' || offer.status === 'SENT') && (
+                    {canConvert && offer.status === 'ACCEPTED' && (
                       <Button
                         size="sm"
                         onClick={() => handleConvert(offer.id)}

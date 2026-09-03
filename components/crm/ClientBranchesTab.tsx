@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Table, TableHead, TableHeaderCell, TableCell, EmptyState, Button } from '@/components/ui';
+import { Table, TableHead, TableHeaderCell, TableCell, Button } from '@/components/ui';
 import { ClientBranchItem, ClientProfileData } from '@/lib/crm/types';
-import { Edit3, Trash2, Plus, MapPin, Store, Sparkles } from 'lucide-react';
+import { Edit3, Trash2, Plus, MapPin, Store } from 'lucide-react';
 
 export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
   const router = useRouter();
@@ -84,7 +84,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
   };
 
   const handleDelete = async (branchId: string, branchName: string) => {
-    if (!confirm(`Opravdu chcete smazat pobočku "${branchName}"?`)) return;
+    if (!confirm(`Opravdu chcete archivovat pobočku "${branchName}"? Pobočka zmizí z aktivního seznamu, ale historie zůstane zachována.`)) return;
     try {
       const res = await fetch(`/api/crm/clients/${client.id}/branches/${branchId}`, {
         method: 'DELETE',
@@ -140,7 +140,7 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
               <TableHeaderCell>Ulice a číslo popisné</TableHeaderCell>
               <TableHeaderCell>Město / PSČ</TableHeaderCell>
               <TableHeaderCell>Poznámka</TableHeaderCell>
-              <TableHeaderCell>Akce (Úprava / Smazání)</TableHeaderCell>
+              <TableHeaderCell>Akce (Úprava / Archivace)</TableHeaderCell>
             </tr>
           </TableHead>
           <tbody>
@@ -178,10 +178,10 @@ export function ClientBranchesTab({ client }: { client: ClientProfileData }) {
                     <button
                       onClick={() => handleDelete(b.id, b.name)}
                       className="px-2.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-900 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
-                      title="Odstranit pobočku"
+                      title="Archivovat pobočku"
                     >
                       <Trash2 size={13} className="text-rose-700" />
-                      <span>Smazat</span>
+                      <span>Archivovat</span>
                     </button>
                   </div>
                 </TableCell>

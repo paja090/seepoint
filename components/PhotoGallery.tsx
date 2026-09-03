@@ -49,16 +49,33 @@ function buildUniqueGalleryPhotos(carrierPhotos: Photo[] = [], surfaces: Surface
   return Array.from(photoMap.values()).sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0));
 }
 
+function formatPhotoDate(value?: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('cs-CZ', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Europe/Prague',
+  }).format(date);
+}
+
+function hasCapturedCoordinates(photo: Photo): photo is Photo & { capturedLatitude: number; capturedLongitude: number } {
+  return Number.isFinite(photo.capturedLatitude) && Number.isFinite(photo.capturedLongitude);
+}
+
 export function PhotoGallery({
   carrierId,
   carrierPhotos = [],
   surfaces = [],
   canEdit = false,
+  onPhotoCountChange,
 }: {
   carrierId: string;
   carrierPhotos: Photo[];
   surfaces: Surface[];
   canEdit?: boolean;
+  onPhotoCountChange?: (count: number) => void;
 }) {
   const initialPhotos = buildUniqueGalleryPhotos(carrierPhotos, surfaces);
 
@@ -75,6 +92,7 @@ export function PhotoGallery({
   const [driveFiles, setDriveFiles] = useState<GoogleDriveFile[]>([]);
   const [loadingDrive, setLoadingDrive] = useState(false);
   const [driveError, setDriveError] = useState('');
+  const [driveNextPageToken, setDriveNextPageToken] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [linkClientVisible, setLinkClientVisible] = useState(false);
@@ -89,6 +107,10 @@ export function PhotoGallery({
   useEffect(() => {
     setPhotos(buildUniqueGalleryPhotos(carrierPhotos, surfaces));
   }, [carrierPhotos, surfaces]);
+
+  useEffect(() => {
+    onPhotoCountChange?.(photos.length);
+  }, [onPhotoCountChange, photos.length]);
 
   // Lightbox handlers
   const closeLightbox = useCallback(() => {
@@ -194,11 +216,34 @@ export function PhotoGallery({
     setSelectedFileIds(new Set());
     try {
       const res = await fetch('/api/google-drive/images');
-      const data = await res.json();
+      const data = await res.json() as { files?: GoogleDriveFile[]; nextPageToken?: string | null; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Nepodařilo se načíst soubory.');
-      setDriveFiles(data);
+      setDriveFiles(data.files ?? []);
+      setDriveNextPageToken(data.nextPageToken ?? null);
     } catch (err: unknown) {
       setDriveError(err instanceof Error ? err.message : 'Nepodařilo se načíst soubory.');
+    } finally {
+      setLoadingDrive(false);
+    }
+  }
+
+  async function loadMoreDriveFiles() {
+    if (!driveNextPageToken || loadingDrive) return;
+    setLoadingDrive(true);
+    setDriveError('');
+    try {
+      const params = new URLSearchParams({ pageToken: driveNextPageToken });
+      const response = await fetch(`/api/google-drive/images?${params}`);
+      const data = await response.json() as { files?: GoogleDriveFile[]; nextPageToken?: string | null; error?: string };
+      if (!response.ok) throw new Error(data.error ?? 'Další soubory se nepodařilo načíst.');
+      setDriveFiles((current) => {
+        const byId = new Map(current.map((file) => [file.id, file]));
+        for (const file of data.files ?? []) byId.set(file.id, file);
+        return Array.from(byId.values());
+      });
+      setDriveNextPageToken(data.nextPageToken ?? null);
+    } catch (error) {
+      setDriveError(error instanceof Error ? error.message : 'Další soubory se nepodařilo načíst.');
     } finally {
       setLoadingDrive(false);
     }
@@ -368,7 +413,14 @@ export function PhotoGallery({
 
       {photos.length ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {photos.map((photo, index) => (
+          {photos.map((photo, index) => {
+            const capturedAt = formatPhotoDate(photo.createdAt);
+            const hasGps = hasCapturedCoordinates(photo);
+            const mapUrl = hasGps
+              ? `https://www.google.com/maps?q=${encodeURIComponent(`${photo.capturedLatitude},${photo.capturedLongitude}`)}`
+              : null;
+
+            return (
             <div key={photo.id} className="relative group rounded-2xl border overflow-hidden bg-white shadow-sm hover:shadow transition-shadow flex flex-col justify-between">
               {/* Photo Area */}
               <div className="relative aspect-video w-full bg-slate-100 cursor-pointer overflow-hidden" onClick={(e) => openLightbox(index, e)}>
@@ -398,6 +450,23 @@ export function PhotoGallery({
                     <span className="text-slate-500 font-medium">{photo.type}</span>
                   </div>
                   {photo.note && <p className="mt-1 text-slate-600 italic">“{photo.note}”</p>}
+                  {(capturedAt || photo.capturedByWorkerName || hasGps) && (
+                    <dl className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-slate-600">
+                      {capturedAt && <div><dt className="inline font-semibold">Pořízeno: </dt><dd className="inline">{capturedAt}</dd></div>}
+                      {photo.capturedByWorkerName && <div><dt className="inline font-semibold">Autor: </dt><dd className="inline">{photo.capturedByWorkerName}</dd></div>}
+                      {hasGps && mapUrl && (
+                        <div>
+                          <dt className="inline font-semibold">GPS: </dt>
+                          <dd className="inline">
+                            <a className="text-blue-700 underline decoration-blue-300 underline-offset-2 hover:text-blue-900" href={mapUrl} target="_blank" rel="noopener noreferrer">
+                              {photo.capturedLatitude.toFixed(6)}, {photo.capturedLongitude.toFixed(6)}
+                            </a>
+                            {Number.isFinite(photo.capturedAccuracyMeters) && ` (±${Math.round(photo.capturedAccuracyMeters!)} m)`}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  )}
                 </div>
 
                 {canEdit && (
@@ -458,7 +527,8 @@ export function PhotoGallery({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="text-sm text-slate-500 bg-slate-50 p-4 rounded-xl text-center">Tento nosič nemá žádné fotografie.</p>
@@ -518,8 +588,9 @@ export function PhotoGallery({
               ) : filteredDriveFiles.length === 0 ? (
                 <p className="text-sm text-slate-500 text-center py-12">Ve složce nebyly nalezeny žádné podporované obrázky.</p>
               ) : (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {filteredDriveFiles.map((file) => {
+                <div className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {filteredDriveFiles.map((file) => {
                     const isSelected = selectedFileIds.has(file.id);
                     const formattedSize = file.size
                       ? `${(file.size / 1024).toFixed(1)} KB`
@@ -568,7 +639,18 @@ export function PhotoGallery({
                         </div>
                       </div>
                     );
-                  })}
+                    })}
+                  </div>
+                  {driveNextPageToken && (
+                    <button
+                      type="button"
+                      className="mx-auto block rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      disabled={loadingDrive}
+                      onClick={loadMoreDriveFiles}
+                    >
+                      {loadingDrive ? 'Načítám…' : 'Načíst dalších 100'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

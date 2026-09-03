@@ -54,7 +54,7 @@ interface SalesDashboardProps {
     count: number;
     occupiedCount: number;
     occupancyPercent: number;
-    estimatedRevenue: number;
+    knownMonthlyRent: number;
   }>;
 }
 
@@ -370,7 +370,7 @@ export function SalesDashboard({
 
                 <div className="mt-2 flex items-center justify-between text-xs text-slate-500 font-medium">
                   <span>{media.occupiedCount} obsazeno ({media.occupancyPercent}%)</span>
-                  <span>Tržba: {media.estimatedRevenue.toLocaleString('cs-CZ')} Kč/m</span>
+                  <span>Evidované nájemné: {media.knownMonthlyRent.toLocaleString('cs-CZ')} Kč/m</span>
                 </div>
               </div>
             );

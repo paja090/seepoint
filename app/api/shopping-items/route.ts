@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { ShoppingPriority, type Prisma } from '@prisma/client';
+import { canEditShoppingList } from '@/lib/rbac';
+import {
+  SHOPPING_CATEGORIES,
+  SHOPPING_PRIORITIES,
+  shoppingCategory,
+  shoppingImage,
+  shoppingOptionalText,
+  shoppingPriority,
+  shoppingRequestBody,
+  shoppingRequiredText,
+  shoppingValidationResponse,
+} from '@/lib/shopping-validation';
 
 export async function GET(request: Request) {
   const auth = await requireApiAccess('team');
@@ -14,7 +27,10 @@ export async function GET(request: Request) {
   const store = searchParams.get('store');
   const q = searchParams.get('q')?.trim();
 
-  const where: any = {};
+  const where: Prisma.CompanyShoppingItemWhereInput = {};
+  if (category && category !== 'ALL' && !(SHOPPING_CATEGORIES as readonly string[]).includes(category)) {
+    return NextResponse.json({ error: 'Kategorie filtru není platná.' }, { status: 400 });
+  }
   if (category && category !== 'ALL') {
     where.category = category;
   }
@@ -23,8 +39,11 @@ export async function GET(request: Request) {
   } else if (isPurchased === 'false') {
     where.isPurchased = false;
   }
-  if (priority && ['NORMAL', 'THIS_WEEK', 'URGENT'].includes(priority)) {
-    where.priority = priority;
+  if (priority && priority !== 'ALL' && !(SHOPPING_PRIORITIES as readonly string[]).includes(priority)) {
+    return NextResponse.json({ error: 'Priorita filtru není platná.' }, { status: 400 });
+  }
+  if (priority && priority !== 'ALL') {
+    where.priority = priority as ShoppingPriority;
   }
   if (assignedEmployeeId) {
     if (assignedEmployeeId === 'UNASSIGNED') {
@@ -37,6 +56,9 @@ export async function GET(request: Request) {
     where.store = { equals: store, mode: 'insensitive' };
   }
 
+  if (q && q.length > 100) {
+    return NextResponse.json({ error: 'Hledaný text může mít nejvýše 100 znaků.' }, { status: 400 });
+  }
   if (q) {
     where.OR = [
       { title: { contains: q, mode: 'insensitive' } },
@@ -61,6 +83,7 @@ export async function GET(request: Request) {
         },
       },
       orderBy: [{ isPurchased: 'asc' }, { priority: 'desc' }, { createdAt: 'desc' }],
+      take: 500,
     });
 
     return NextResponse.json(items);
@@ -76,23 +99,21 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireApiAccess('team');
   if (isApiDenied(auth)) return auth;
+  if (!canEditShoppingList(auth.role)) {
+    return NextResponse.json({ error: 'Tato role může nákupní seznam pouze zobrazit.' }, { status: 403 });
+  }
 
   try {
-    const body = await request.json().catch(() => null);
-    if (!body || !body.title || !body.title.trim()) {
-      return NextResponse.json(
-        { error: 'Zadejte název položky k nákupu.' },
-        { status: 400 }
-      );
-    }
-
-    const category = ['OFFICE', 'WORKSHOP'].includes(body.category)
-      ? body.category
-      : 'WORKSHOP';
-
-    const priority = ['NORMAL', 'THIS_WEEK', 'URGENT'].includes(body.priority)
-      ? body.priority
-      : 'NORMAL';
+    const body = shoppingRequestBody(await request.json().catch(() => null));
+    const title = shoppingRequiredText(body.title, 'Název položky', 200);
+    const category = shoppingCategory(body.category, 'WORKSHOP');
+    const priority = shoppingPriority(body.priority, 'NORMAL');
+    const quantity = shoppingOptionalText(body.quantity, 'Množství', 50);
+    const unit = shoppingOptionalText(body.unit, 'Jednotka', 20);
+    const store = shoppingOptionalText(body.store, 'Obchod', 120);
+    const note = shoppingOptionalText(body.note, 'Poznámka', 2_000);
+    const imageUrl = shoppingImage(body.imageUrl, 'Fotografie položky');
+    const receiptUrl = shoppingImage(body.receiptUrl, 'Fotografie účtenky');
 
     const userName = (
       auth.employee
@@ -100,8 +121,8 @@ export async function POST(request: Request) {
         : auth.name || auth.email || 'Člen týmu'
     ).trim() || 'Člen týmu';
 
-    let assignedEmployeeName = body.assignedEmployeeName?.trim() || null;
-    let assignedEmployeeId = body.assignedEmployeeId ? String(body.assignedEmployeeId).trim() : null;
+    let assignedEmployeeName: string | null = null;
+    const assignedEmployeeId = shoppingOptionalText(body.assignedEmployeeId, 'ID zaměstnance', 64);
     if (assignedEmployeeId) {
       const emp = await prisma.employee.findUnique({
         where: { id: assignedEmployeeId },
@@ -110,33 +131,32 @@ export async function POST(request: Request) {
       if (emp) {
         assignedEmployeeName = `${emp.firstName} ${emp.lastName}`.trim();
       } else {
-        assignedEmployeeId = null;
-        assignedEmployeeName = null;
+        return NextResponse.json({ error: 'Vybraný zaměstnanec nebyl nalezen.' }, { status: 400 });
       }
     }
 
-    let crmOrderId = body.crmOrderId ? String(body.crmOrderId).trim() : null;
+    const crmOrderId = shoppingOptionalText(body.crmOrderId, 'ID zakázky', 64);
     if (crmOrderId) {
       const orderExists = await prisma.crmOrder.findUnique({
         where: { id: crmOrderId },
         select: { id: true },
       });
       if (!orderExists) {
-        crmOrderId = null;
+        return NextResponse.json({ error: 'Vybraná zakázka nebyla nalezena.' }, { status: 400 });
       }
     }
 
     const newItem = await prisma.companyShoppingItem.create({
       data: {
-        title: body.title.trim(),
+        title,
         category,
-        quantity: body.quantity?.trim() || null,
-        unit: body.unit?.trim() || null,
-        store: body.store?.trim() || null,
+        quantity,
+        unit,
+        store,
         priority,
-        note: body.note?.trim() || null,
-        imageUrl: body.imageUrl?.trim() || null,
-        receiptUrl: body.receiptUrl?.trim() || null,
+        note,
+        imageUrl,
+        receiptUrl,
         assignedEmployeeId,
         assignedEmployeeName,
         crmOrderId,
@@ -155,11 +175,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newItem);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const validationError = shoppingValidationResponse(error);
+    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
     console.error('Failed to create shopping item:', error);
-    const detail = error?.message ? `: ${error.message}` : '';
     return NextResponse.json(
-      { error: `Položku se nepodařilo přidat do nákupního seznamu${detail}` },
+      { error: 'Položku se nepodařilo přidat do nákupního seznamu.' },
       { status: 500 }
     );
   }

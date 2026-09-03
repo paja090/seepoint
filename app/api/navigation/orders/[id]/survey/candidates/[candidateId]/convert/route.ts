@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +46,7 @@ export async function POST(
       );
     }
 
-    const result = await prisma.$transaction(async (tx: any) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const sitePhoto = candidate.photos[0];
 
       const navPoint = await tx.navigationPoint.create({
@@ -87,10 +88,10 @@ export async function POST(
       navigationPoint: result.navPoint,
       candidate: result.candidate,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error converting candidate point to NavigationPoint:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při převodu kandidáta do nabídky.' },
+      { error: error instanceof Error ? error.message : 'Chyba při převodu kandidáta do nabídky.' },
       { status: 500 }
     );
   }

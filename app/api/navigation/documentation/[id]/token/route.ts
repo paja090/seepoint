@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { generateSecureToken } from '@/lib/navigation-documentation';
+import {
+  isPublicNavigationReportStatus,
+  NavigationDocumentationValidationError,
+  parseTokenExpiry,
+} from '@/lib/navigation-documentation-policy';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -12,15 +17,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const body = await request.json();
     const action = String(body.action || 'regenerate');
+    if (action !== 'regenerate' && action !== 'revoke') {
+      return NextResponse.json({ error: 'Neplatná operace s odkazem.' }, { status: 400 });
+    }
 
-    const report = await prisma.navigationDocumentationReport.findUnique({ where: { id } });
+    const report = await prisma.navigationDocumentationReport.findFirst({ where: { id, organizationId: auth.organizationId } });
     if (!report) {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
+    if (!isPublicNavigationReportStatus(report.status)) {
+      return NextResponse.json({ error: 'Odkaz lze spravovat až po publikování reportu.' }, { status: 409 });
+    }
+
     if (action === 'revoke') {
       const updated = await prisma.navigationDocumentationReport.update({
-        where: { id },
+        where: { id, organizationId: auth.organizationId },
         data: {
           publicTokenHash: null,
           tokenExpiresAt: new Date(),
@@ -38,10 +50,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const { token, hash } = generateSecureToken();
-    const tokenExpiresAt = body.tokenExpiresAt ? new Date(body.tokenExpiresAt) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const tokenExpiresAt = parseTokenExpiry(body.tokenExpiresAt);
 
     const updated = await prisma.navigationDocumentationReport.update({
-      where: { id },
+      where: { id, organizationId: auth.organizationId },
       data: {
         publicTokenHash: hash,
         tokenExpiresAt,
@@ -65,7 +77,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       report: updated,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Chyba při správě tokenu.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (error instanceof NavigationDocumentationValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    console.error('[navigation/documentation/token] Token operation failed', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'Chyba při správě odkazu.' }, { status: 500 });
   }
 }

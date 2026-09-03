@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  normalizeImageMimeType,
   parseRequiredCoordinates,
   runPostSaveTasks,
   runWithRetry,
   stablePhotoUrl,
-  storeMobilePhoto,
 } from '../lib/mobile-photo-upload.ts';
 import {
   MOBILE_PHOTO_DAMAGE_LABELS,
@@ -15,22 +13,8 @@ import {
 } from '../lib/mobile-photo-damage.ts';
 import { isSurfaceDetailClientCurrent } from '../lib/mobile-photo-nearby.ts';
 
-test('mobile upload: successful Google Drive upload keeps a stable internal URL', async () => {
-  const file = new File([new Uint8Array([1, 2, 3])], 'camera.jpg', { type: 'image/jpeg' });
-  const stored = await storeMobilePhoto(file, 'photo.jpg', 'photo-safe_1', async () => ({ id: 'drive-1' }));
-  assert.equal(stored.storageProvider, 'GOOGLE_DRIVE');
-  assert.equal(stored.driveFileId, 'drive-1');
-  assert.equal(stored.driveWarning, false);
+test('mobile upload: saved photos use a stable internal URL', () => {
   assert.equal(stablePhotoUrl('photo-safe_1'), '/api/photos/photo-safe_1/file');
-});
-
-test('mobile upload: Google Drive failure retains binary DB fallback', async () => {
-  const file = new File([new Uint8Array([4, 5, 6])], 'camera.jpg', { type: 'image/jpeg' });
-  const stored = await storeMobilePhoto(file, 'photo.jpg', 'photo-2', async () => { throw new Error('drive unavailable'); });
-  assert.equal(stored.storageProvider, 'LOCAL');
-  assert.equal(stored.driveFileId, null);
-  assert.equal(stored.driveWarning, true);
-  assert.deepEqual([...stored.bytes], [4, 5, 6]);
 });
 
 test('mobile upload: missing or invalid GPS is rejected', () => {
@@ -74,22 +58,6 @@ test('mobile upload: persistent chat failure is still isolated from saved photo'
   ]);
   assert.equal(attempts, 2);
   assert.deepEqual(warnings, ['chat']);
-});
-
-test('mobile upload: iOS HEIC/JPEG files with missing or specific MIME remain accepted', () => {
-  assert.equal(normalizeImageMimeType(new File(['heic'], 'IMG_0001.HEIC')), 'image/heic');
-  assert.equal(normalizeImageMimeType(new File(['heif'], 'IMG_0002.HEIF', { type: 'image/heif' })), 'image/heif');
-  assert.equal(normalizeImageMimeType(new File(['jpeg'], 'image.jpg', { type: 'image/jpeg' })), 'image/jpeg');
-});
-
-test('mobile upload: iOS HEIC without a declared MIME is normalized before Drive upload', async () => {
-  let uploadedMime = '';
-  const file = new File(['heic'], 'IMG_0003.HEIC');
-  await storeMobilePhoto(file, 'photo.heic', 'photo-ios', async (uploaded) => {
-    uploadedMime = uploaded.type;
-    return { id: 'drive-ios' };
-  });
-  assert.equal(uploadedMime, 'image/heic');
 });
 
 test('mobile upload: invalid photo ids cannot become URLs', () => {

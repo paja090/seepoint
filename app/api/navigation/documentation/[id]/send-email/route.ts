@@ -2,28 +2,31 @@ import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { sendTransactionalEmail } from '@/lib/email';
+import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
+import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import {
+  isPublicNavigationReportStatus,
+  NavigationDocumentationValidationError,
+  parseRecipientEmail,
+  parseRequiredText,
+} from '@/lib/navigation-documentation-policy';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
   if (isApiDenied(auth)) return auth;
+  const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${auth.organizationId}:${auth.id}`), rateLimitPolicies.transactionalEmail);
+  if (limited) return limited;
 
   const { id } = await params;
 
   try {
     const body = await request.json();
-    const recipientEmail = String(body.recipientEmail || '').trim();
-    const subject = String(body.subject || '').trim();
-    const message = String(body.message || '').trim();
+    const recipientEmail = parseRecipientEmail(body.recipientEmail);
+    const subject = parseRequiredText(body.subject, 'Předmět e-mailu', 200);
+    const message = parseRequiredText(body.message, 'Text e-mailu', 20_000);
 
-    if (!recipientEmail) {
-      return NextResponse.json({ error: 'Zadejte e-mail příjemce.' }, { status: 400 });
-    }
-    if (!subject || !message) {
-      return NextResponse.json({ error: 'Předmět a text e-mailu jsou povinné.' }, { status: 400 });
-    }
-
-    const report = await prisma.navigationDocumentationReport.findUnique({
-      where: { id },
+    const report = await prisma.navigationDocumentationReport.findFirst({
+      where: { id, organizationId: auth.organizationId },
       include: { client: true },
     });
 
@@ -31,17 +34,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
-    await sendTransactionalEmail({
+    if (!isPublicNavigationReportStatus(report.status) || !report.publicTokenHash) {
+      return NextResponse.json({ error: 'Report musí být před odesláním publikovaný.' }, { status: 409 });
+    }
+    if (!report.tokenExpiresAt || report.tokenExpiresAt <= new Date()) {
+      return NextResponse.json({ error: 'Veřejný odkaz není platný. Vygenerujte nový odkaz.' }, { status: 409 });
+    }
+
+    const delivery = await sendTransactionalEmail({
       to: recipientEmail,
       subject,
       message,
       template: 'navigation-documentation',
+      idempotencyKey: `navigation-documentation/${report.id}/${report.updatedAt.getTime()}`,
     });
+
+    if (delivery.status === 'skipped') {
+      return NextResponse.json({
+        success: true,
+        delivered: false,
+        message: 'Preview: e-mail nebyl odeslán a report nebyl označen jako odeslaný.',
+        report,
+      }, { status: 202 });
+    }
 
     const sentAt = new Date();
 
     const updated = await prisma.navigationDocumentationReport.update({
-      where: { id },
+      where: { id, organizationId: auth.organizationId },
       data: {
         status: report.status === 'ARCHIVED' ? 'ARCHIVED' : 'SENT',
         sentAt,
@@ -63,11 +83,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({
       success: true,
+      delivered: true,
       message: `E-mail byl úspěšně odeslán a zaznamenán v auditu.`,
       report: updated,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Chyba při odesílání e-mailu.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (error instanceof NavigationDocumentationValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    console.error('[navigation/documentation/email] Delivery failed', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'E-mail se nepodařilo odeslat. Zkuste to prosím znovu.' }, { status: 500 });
   }
 }

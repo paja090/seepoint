@@ -5,19 +5,10 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { ManagerDashboard } from '@/components/dashboard/ManagerDashboard';
 import { WorkerDashboard } from '@/components/dashboard/WorkerDashboard';
 import { SalesDashboard } from '@/components/dashboard/SalesDashboard';
+import { deriveAnalyticsSurfaceState } from '@/lib/analytics-finance';
+import { derivedVehicleStatus } from '@/lib/vehicle-reservations';
 
 export const dynamic = 'force-dynamic';
-
-const defaultRates: Record<string, number> = {
-  NAVIGATION_SIGN: 1800,
-  PROMO_BENCH: 2500,
-  CITY_POSTER: 3200,
-  PROMO_HORIZON: 2200,
-  PROMO_TOWER: 3500,
-  BILLBOARD: 4500,
-  CITYLIGHT: 5000,
-  OTHER: 2000,
-};
 
 export default async function Dashboard() {
   const user = await requirePageAccess('dashboard');
@@ -25,7 +16,8 @@ export default async function Dashboard() {
   const isWorkerOrTech = role === 'WORKER' || role === 'TECHNICIAN';
   const isSales = role === 'SALES';
 
-  const today = new Date();
+  const now = new Date();
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
 
   const in7 = new Date(today); in7.setDate(today.getDate() + 7);
@@ -60,9 +52,11 @@ export default async function Dashboard() {
       prisma.vehicleReservation.findFirst({
         where: {
           employeeId: user.employee?.id || 'none',
+          status: { in: ['RESERVED', 'ACTIVE'] },
           dateTo: { gte: today },
         },
         include: { vehicle: true },
+        orderBy: { dateFrom: 'asc' },
       }),
     ]);
 
@@ -88,7 +82,7 @@ export default async function Dashboard() {
             id: vehicles.vehicle.id,
             name: vehicles.vehicle.name,
             registrationNumber: vehicles.vehicle.registrationNumber,
-            status: vehicles.vehicle.status,
+            status: derivedVehicleStatus(vehicles.vehicle.status, [vehicles], today),
           } : null}
           upcomingTasks={upcomingTasks}
         />
@@ -101,45 +95,24 @@ export default async function Dashboard() {
   const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
 
   const [
-    totalCarriers,
-    activeCarriers,
-    archivedCarriers,
-    missingGps,
     surfaces,
-    activeOccupancies,
     allYearOccupancies,
     ending30,
     waitingOffers,
-    missingGpsRows,
     activeOffersList,
   ] = await Promise.all([
-    prisma.advertisingCarrier.count(),
-    prisma.advertisingCarrier.count({ where: { archivedAt: null, status: 'ACTIVE' } }),
-    prisma.advertisingCarrier.count({ where: { archivedAt: { not: null } } }),
-    prisma.advertisingCarrier.count({ where: { archivedAt: null, OR: [{ gpsStatus: 'MISSING' }, { latitude: null }, { longitude: null }] } }),
     prisma.advertisingSurface.findMany({
-      where: { carrier: { archivedAt: null } },
+      where: { status: { not: 'OUT_OF_SERVICE' }, carrier: { archivedAt: null, status: 'ACTIVE' } },
       select: {
         id: true,
         mediaType: true,
-        price: true,
-        carrier: { select: { city: true } },
-      },
-    }),
-    prisma.occupancy.findMany({
-      where: {
-        status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
-        dateTo: { gte: today },
-      },
-      include: {
-        surface: {
-          select: {
-            id: true,
-            mediaType: true,
-            price: true,
-            carrier: { select: { city: true } },
-          },
+        status: true,
+        contract: { select: { status: true, startDate: true, endDate: true, monthlyPrice: true } },
+        occupancies: {
+          where: { status: { in: ['OCCUPIED', 'RESERVED'] }, dateFrom: { lte: now }, dateTo: { gte: now } },
+          select: { status: true, price: true },
         },
+        carrier: { select: { city: true } },
       },
     }),
     prisma.occupancy.findMany({
@@ -157,12 +130,6 @@ export default async function Dashboard() {
       take: 15,
     }),
     prisma.offer.count({ where: { status: 'SENT' } }),
-    prisma.advertisingCarrier.findMany({
-      where: { archivedAt: null, OR: [{ gpsStatus: 'MISSING' }, { latitude: null }, { longitude: null }] },
-      orderBy: [{ city: 'asc' }, { code: 'asc' }],
-      take: 8,
-      select: { id: true, code: true, name: true, city: true, street: true, address: true },
-    }),
     prisma.offer.findMany({
       where: { status: { in: ['DRAFT', 'SENT'] } },
       include: { client: true },
@@ -171,36 +138,26 @@ export default async function Dashboard() {
     }),
   ]);
 
-  // Exact Distinct Occupied Surfaces (including Navigation continuous monthly rentals)
-  const occupiedSurfaceIds = new Set(activeOccupancies.map((o) => o.surfaceId));
-  surfaces.forEach((s) => {
-    if (s.mediaType === 'NAVIGATION_SIGN' && s.price && Number(s.price) > 0) {
-      occupiedSurfaceIds.add(s.id);
-    }
-  });
+  const financialStateBySurface = new Map(surfaces.map((surface) => [surface.id, deriveAnalyticsSurfaceState({
+    surfaceStatus: surface.status,
+    contract: surface.contract ? {
+      status: surface.contract.status,
+      startDate: surface.contract.startDate,
+      endDate: surface.contract.endDate,
+      monthlyPrice: surface.contract.monthlyPrice ? Number(surface.contract.monthlyPrice) : null,
+    } : null,
+    occupancies: surface.occupancies.map((item) => ({ status: item.status, price: item.price ? Number(item.price) : null })),
+    asOf: now,
+  })]));
+  const occupiedSurfaceIds = new Set(surfaces.filter((surface) => financialStateBySurface.get(surface.id)?.isOccupied).map((surface) => surface.id));
 
   const totalSurfaces = surfaces.length;
   const occupiedSurfaces = occupiedSurfaceIds.size;
   const availableSurfaces = Math.max(0, totalSurfaces - occupiedSurfaces);
-  const reservedSurfaces = activeOccupancies.filter((o) => o.status === 'RESERVED').length;
-
-  // Real MRR & ARR calculation (including Navigation continuous monthly contracts)
-  let mrrAmount = activeOccupancies.reduce((acc, curr) => {
-    const val = curr.price
-      ? Number(curr.price)
-      : (curr.surface?.price ? Number(curr.surface.price) : (defaultRates[curr.surface?.mediaType] || 2000));
-    return acc + val;
-  }, 0);
-
-  surfaces.forEach((s) => {
-    if (s.mediaType === 'NAVIGATION_SIGN' && s.price && Number(s.price) > 0) {
-      if (!activeOccupancies.some((occ) => occ.surfaceId === s.id)) {
-        mrrAmount += Number(s.price);
-      }
-    }
-  });
-
-  const arrAmount = mrrAmount * 12;
+  const knownMonthlyRent = surfaces.reduce((sum, surface) => sum + (financialStateBySurface.get(surface.id)?.monthlyRent ?? 0), 0);
+  const pricedOccupiedSurfaces = surfaces.filter((surface) => financialStateBySurface.get(surface.id)?.hasExplicitPrice).length;
+  const unpricedOccupiedSurfaces = occupiedSurfaces - pricedOccupiedSurfaces;
+  const annualizedKnownRent = knownMonthlyRent * 12;
   const occupancyPercent = totalSurfaces > 0 ? Math.round((occupiedSurfaces / totalSurfaces) * 100) : 0;
   const ending7 = ending30.filter((item) => new Date(item.dateTo) <= in7);
 
@@ -236,23 +193,21 @@ export default async function Dashboard() {
     .slice(0, 5);
 
   // REAL Media Type Breakdown
-  const mediaMap = new Map<string, { count: number; occupiedSet: Set<string>; revenue: number }>();
+  const mediaMap = new Map<string, { count: number; occupiedSet: Set<string>; knownMonthlyRent: number }>();
   surfaces.forEach((s) => {
     if (!mediaMap.has(s.mediaType)) {
-      mediaMap.set(s.mediaType, { count: 0, occupiedSet: new Set(), revenue: 0 });
+      mediaMap.set(s.mediaType, { count: 0, occupiedSet: new Set(), knownMonthlyRent: 0 });
     }
     mediaMap.get(s.mediaType)!.count += 1;
   });
 
-  activeOccupancies.forEach((occ) => {
-    const mt = occ.surface.mediaType;
+  surfaces.forEach((surface) => {
+    const mt = surface.mediaType;
     if (mediaMap.has(mt)) {
       const item = mediaMap.get(mt)!;
-      item.occupiedSet.add(occ.surfaceId);
-      const val = occ.price
-        ? Number(occ.price)
-        : (occ.surface?.price ? Number(occ.surface.price) : (defaultRates[mt] || 2000));
-      item.revenue += val;
+      const state = financialStateBySurface.get(surface.id)!;
+      if (state.isOccupied) item.occupiedSet.add(surface.id);
+      item.knownMonthlyRent += state.monthlyRent ?? 0;
     }
   });
 
@@ -262,8 +217,8 @@ export default async function Dashboard() {
     count: data.count,
     occupiedCount: data.occupiedSet.size,
     occupancyPercent: data.count > 0 ? Math.round((data.occupiedSet.size / data.count) * 100) : 0,
-    estimatedRevenue: data.revenue,
-  })).sort((a, b) => b.estimatedRevenue - a.estimatedRevenue).slice(0, 5);
+    knownMonthlyRent: data.knownMonthlyRent,
+  })).sort((a, b) => b.knownMonthlyRent - a.knownMonthlyRent).slice(0, 5);
 
   if (isSales) {
     const salesFirstName = user.employee?.firstName
@@ -312,22 +267,17 @@ export default async function Dashboard() {
   return (
     <AppShell>
       <ManagerDashboard
-        totalCarriers={totalCarriers}
-        activeCarriers={activeCarriers}
-        archivedCarriers={archivedCarriers}
-        missingGps={missingGps}
         totalSurfaces={totalSurfaces}
         availableSurfaces={availableSurfaces}
         occupiedSurfaces={occupiedSurfaces}
-        reservedSurfaces={reservedSurfaces}
-        mrrAmount={mrrAmount}
-        arrAmount={arrAmount}
+        knownMonthlyRent={knownMonthlyRent}
+        annualizedKnownRent={annualizedKnownRent}
+        pricedOccupiedSurfaces={pricedOccupiedSurfaces}
+        unpricedOccupiedSurfaces={unpricedOccupiedSurfaces}
         occupancyPercent={occupancyPercent}
         waitingOffers={waitingOffers}
         seasonalityData={seasonalityData}
         ending7={ending7}
-        ending30={ending30}
-        missingGpsRows={missingGpsRows}
         mediaBreakdown={mediaBreakdown}
         topCities={topCities}
       />

@@ -7,10 +7,14 @@ export function CompanyShoppingListModal({
   isOpen,
   onClose,
   currentUserName,
+  currentEmployeeId,
+  canEdit,
 }: {
   isOpen: boolean;
   onClose: () => void;
   currentUserName: string;
+  currentEmployeeId?: string;
+  canEdit: boolean;
 }) {
   if (!isOpen) return null;
 
@@ -20,6 +24,8 @@ export function CompanyShoppingListModal({
         <div className="overflow-y-auto p-4 sm:p-6 flex-1">
           <ShoppingListModule
             currentUserName={currentUserName}
+            currentEmployeeId={currentEmployeeId}
+            canEdit={canEdit}
             isEmbeddedModal={true}
             onCloseModal={onClose}
           />

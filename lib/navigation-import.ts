@@ -2,6 +2,7 @@ export type NavigationImportIssueCode =
   | 'MISSING_GPS'
   | 'MISSING_STREET'
   | 'MISSING_STRUCTURE'
+  | 'MISSING_CLIENT'
   | 'MISSING_PHOTO'
   | 'STATUS_REVIEW';
 
@@ -238,6 +239,7 @@ export function parseNavigationImport(text: string, sheetName: string): Navigati
     if (!hasGps) issues.push({ code: 'MISSING_GPS', message: 'Navigace nemá platné GPS.' });
     if (!street) issues.push({ code: 'MISSING_STREET', message: 'Chybí ulice.' });
     if (!structureCode) issues.push({ code: 'MISSING_STRUCTURE', message: 'Chybí číslo nebo typ sloupu.' });
+    if (!clientName) issues.push({ code: 'MISSING_CLIENT', message: 'Chybí koncový zákazník.' });
     if (!photoReferences.length) issues.push({ code: 'MISSING_PHOTO', message: 'Chybí odkaz nebo název fotografie.' });
     if (/deinstal|demont|odstran|není|chybi|chybí/i.test(note)) {
       issues.push({ code: 'STATUS_REVIEW', message: 'Provozní stav vyžaduje kontrolu.' });
@@ -252,7 +254,9 @@ export function parseNavigationImport(text: string, sheetName: string): Navigati
       directionDescription: directionDescription || undefined,
       rawMediaType: rawMediaType || undefined,
       mediaType: 'NAVIGATION_SIGN',
-      clientName: clientName || 'NEURČENÝ KLIENT',
+      // An unresolved customer must remain unresolved. Creating one shared
+      // placeholder client would incorrectly mark unrelated surfaces occupied.
+      clientName,
       dateFrom: valueAt(rawRow, columns.dateFrom) || undefined,
       dateTo: valueAt(rawRow, columns.dateTo) || undefined,
       cadastralArea: valueAt(rawRow, columns.cadastralArea) || undefined,

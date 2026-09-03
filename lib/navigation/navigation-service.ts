@@ -11,6 +11,8 @@ import {
 import { nextCrmOrderNumber } from '../crm/domain.ts';
 import { requireTenantContext } from '../tenant-context.ts';
 
+const navigationPeriodDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'UTC' });
+
 export class NavigationServiceError extends Error {
   code: string;
 
@@ -643,6 +645,8 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
       id: bp.id,
       dateFrom: bp.dateFrom.toISOString(),
       dateTo: bp.dateTo.toISOString(),
+      dateFromLabel: navigationPeriodDateFormatter.format(bp.dateFrom),
+      dateToLabel: navigationPeriodDateFormatter.format(bp.dateTo),
       amount: Number(bp.amount),
       status: bp.status,
       invoiceId: bp.invoiceId,
@@ -654,10 +658,14 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
 
 export type StoredInstallationPhoto = {
   id: string;
-  driveFileId: string;
+  driveFileId: string | null;
   fileName: string;
   mimeType: string;
   size: number;
+  storageProvider: string;
+  storageKey: string;
+  contentChecksum: string;
+  content?: Uint8Array;
   type: Extract<PhotoType, 'BEFORE_INSTALLATION' | 'AFTER_INSTALLATION'>;
   note?: string;
 };
@@ -774,6 +782,10 @@ export async function attachPointInstallationPhotos(
           id: stored.id || randomUUID(),
           url: `/api/photos/${stored.id}/file`,
           driveFileId: stored.driveFileId,
+          storageProvider: stored.storageProvider,
+          storageKey: stored.storageKey,
+          contentChecksum: stored.contentChecksum,
+          content: stored.storageProvider === 'DATABASE' && stored.content ? Buffer.from(stored.content) : undefined,
           fileName: stored.fileName,
           mimeType: stored.mimeType,
           size: stored.size,
@@ -782,7 +794,6 @@ export async function attachPointInstallationPhotos(
           surfaceId: surface.id,
           note: stored.note || (stored.type === 'BEFORE_INSTALLATION' ? 'Stav před montáží' : 'Stav po montáži'),
           isClientVisible: stored.type === 'AFTER_INSTALLATION',
-          storageProvider: 'GOOGLE_DRIVE',
           capturedByWorkerUserId: capturedBy.userId,
           capturedByWorkerName: capturedBy.userName,
         },

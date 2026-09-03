@@ -158,11 +158,11 @@ export function MediaImportPreview() {
                 </span>
               </div>
               <label className="mt-3 block text-xs font-medium">
-                TSV, CSV nebo TXT soubor
+                TSV nebo tabulátorem oddělený TXT soubor
                 <input
                   className="input mt-1"
                   type="file"
-                  accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values"
+                  accept=".tsv,.txt,text/tab-separated-values,text/plain"
                   onChange={(event) => void readFile(source.kind, event.target.files?.[0])}
                 />
               </label>

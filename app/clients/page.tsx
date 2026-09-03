@@ -18,6 +18,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   await requirePageAccess('clients');
   const params = await searchParams;
   const q = clean(params.q);
+  const requestedPage = Number.parseInt(clean(params.page) || '1', 10);
+  const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const pageSize = 100;
   const where: Prisma.ClientWhereInput = { active: true };
   if (q) where.OR = [
     { name: { contains: q, mode: 'insensitive' } },
@@ -27,14 +30,21 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     { companyId: { contains: q, mode: 'insensitive' } },
   ];
 
-  const clients = await prisma.client.findMany({
-    where,
-    orderBy: { name: 'asc' },
-    include: {
-      assignedUser: { select: { name: true } },
-      _count: { select: { occupancies: true, offers: true, crmOrders: true, invoices: true } },
-    },
-  });
+  const [clients, total] = await Promise.all([
+    prisma.client.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        assignedUser: { select: { name: true } },
+        _count: { select: { occupancies: true, offers: true, crmOrders: true, invoices: true } },
+      },
+    }),
+    prisma.client.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const querySuffix = q ? `&q=${encodeURIComponent(q)}` : '';
 
   return (
     <AppShell>
@@ -49,7 +59,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           <label className="flex-1 text-sm font-medium">Vyhledat klienta<input className="input mt-1" name="q" defaultValue={q ?? ''} placeholder="Název, kontakt, e-mail nebo IČO" /></label>
           <Button type="submit">Hledat</Button>
           <Button href="/clients" variant="secondary">Vymazat</Button>
-          <span className="text-sm text-slate-500 md:ml-auto">Nalezeno: <strong className="text-slate-950">{clients.length}</strong></span>
+          <span className="text-sm text-slate-500 md:ml-auto">Nalezeno: <strong className="text-slate-950">{total}</strong></span>
         </form>
       </FilterBar>
 
@@ -117,6 +127,18 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           </Table>
         )}
       </section>
+
+      {totalPages > 1 && (
+        <nav className="flex items-center justify-between gap-3" aria-label="Stránkování klientů">
+          <Button href={page > 1 ? `/clients?page=${page - 1}${querySuffix}` : undefined} variant="secondary" disabled={page <= 1}>
+            ← Předchozí
+          </Button>
+          <span className="text-sm text-slate-600">Strana <strong>{Math.min(page, totalPages)}</strong> z <strong>{totalPages}</strong></span>
+          <Button href={page < totalPages ? `/clients?page=${page + 1}${querySuffix}` : undefined} variant="secondary" disabled={page >= totalPages}>
+            Další →
+          </Button>
+        </nav>
+      )}
     </AppShell>
   );
 }

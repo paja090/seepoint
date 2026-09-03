@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -167,7 +168,10 @@ export async function GET(
       return NextResponse.json({ error: 'Projekt průzkumu nebo nabídka nebyla nalezena.' }, { status: 404 });
     }
 
-    let nearbyCarriers: Array<any> = [];
+    type NearbyCarrier = Prisma.AdvertisingCarrierGetPayload<{
+      include: { surfaces: { include: { occupancies: true } } };
+    }> & { distanceKm: number };
+    let nearbyCarriers: NearbyCarrier[] = [];
     if (order.targetLatitude && order.targetLongitude) {
       const allCarriers = await prisma.advertisingCarrier.findMany({
         where: {
@@ -190,20 +194,20 @@ export async function GET(
       });
 
       nearbyCarriers = allCarriers
-        .map((c: any) => {
-          const latDiff = (c.latitude! - order.targetLatitude) * 111.32;
+        .map((carrier) => {
+          const latDiff = (carrier.latitude! - order.targetLatitude) * 111.32;
           const lngDiff =
-            (c.longitude! - order.targetLongitude) *
+            (carrier.longitude! - order.targetLongitude) *
             111.32 *
             Math.cos((order.targetLatitude * Math.PI) / 180);
           const distanceKm = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
           return {
-            ...c,
+            ...carrier,
             distanceKm: Math.round(distanceKm * 100) / 100,
           };
         })
-        .filter((c: any) => c.distanceKm <= 10.0)
-        .sort((a: any, b: any) => a.distanceKm - b.distanceKm)
+        .filter((carrier) => carrier.distanceKm <= 10.0)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
         .slice(0, 50);
     }
 
@@ -226,10 +230,10 @@ export async function GET(
         nearbyCarriers,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching survey detail:', error);
     return NextResponse.json(
-      { error: error.message || 'Chyba při načítání detailu průzkumu.' },
+      { error: error instanceof Error ? error.message : 'Chyba při načítání detailu průzkumu.' },
       { status: 500 }
     );
   }
