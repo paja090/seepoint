@@ -493,6 +493,7 @@ model Organization {
   iban                String?
   swift               String?
   plan                OrganizationPlan   @default(START)
+  enabledModules      Json?
   subscriptionStatus  SubscriptionStatus @default(TRIAL)
   trialEndsAt         DateTime?
   isActive            Boolean            @default(true)

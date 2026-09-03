@@ -11,6 +11,7 @@ const SELF_PATH = 'scripts/check-tenant-security.mjs';
 const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/admin/organizations/[id]/page.tsx', 5],
   ['app/admin/organizations/page.tsx', 3],
+  ['app/api/admin/organizations/[id]/modules/route.ts', 3],
   ['app/api/admin/organizations/[id]/route.ts', 3],
   ['app/api/admin/organizations/route.ts', 5],
   ['app/api/auth/login/route.ts', 2],

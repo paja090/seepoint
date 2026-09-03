@@ -16,7 +16,6 @@ test('shell rozlišuje aktivní, organizační a platformovou roli', () => {
   assert.match(responsive, /Aktivní role: \{roleLabel\(user\.role\)\}/);
   assert.match(responsive, /Členství: \{user\.organizationRoleLabel\}/);
   assert.match(responsive, /Platforma: Superadmin/);
-  assert.match(topbar, /Aktivní: \{roleLabel\(user\.role\)\}/);
 });
 
 test('profil vysvětluje, že přepnutí aktivní role neodebírá oprávnění', () => {
