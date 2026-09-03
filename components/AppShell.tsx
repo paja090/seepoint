@@ -100,7 +100,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
     })
     .filter((group) => group.items.length > 0);
 
-  if (user.platformRole === 'SUPER_ADMIN') {
+  if (user.role === 'ADMIN' && user.platformRole === 'SUPER_ADMIN') {
     visibleGroups.push({
       label: '🛡️ Platforma SeePoint',
       items: [
@@ -108,7 +108,7 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         ['/onboarding', 'Onboarding agentury', 'userRound', 'settings'],
       ],
     });
-  } else if (user.membership?.role === 'OWNER' || user.membership?.role === 'ADMIN' || user.membership?.roles.includes('ADMIN')) {
+  } else if (user.role === 'ADMIN' && (user.membership?.role === 'OWNER' || user.membership?.roles.includes('ADMIN'))) {
     const settingsGroup = visibleGroups.find((group) => group.label === '⚙️ Správa & Nastavení');
     settingsGroup?.items.push(['/onboarding', 'Onboarding agentury', 'userRound', 'settings']);
   }
