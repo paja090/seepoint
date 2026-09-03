@@ -3,6 +3,7 @@ import { platformPrisma } from '@/lib/db';
 import { requireSuperAdmin } from '@/lib/organization';
 import { notFound } from 'next/navigation';
 import { OrganizationStatusButton } from '@/components/OrganizationStatusButton';
+import { OrganizationModulesCard } from '@/components/OrganizationModulesCard';
 import { getOrganizationFullUsageReport } from '@/lib/organization-usage';
 import Link from 'next/link';
 
@@ -136,6 +137,13 @@ export default async function OrganizationAdminDetail({ params }: { params: Prom
             </div>
           </div>
         </div>
+
+        {/* Active Modules & Features Management Card */}
+        <OrganizationModulesCard
+          organizationId={organization.id}
+          initialPlan={organization.plan}
+          initialEnabledModules={organization.enabledModules}
+        />
 
         {/* Members List */}
         <div className="card">

@@ -64,10 +64,19 @@ const navGroups: NavGroup[] = [
   },
 ];
 
+import { isModuleEnabled, getModuleIdForPath } from '@/lib/organization-modules';
+
 export async function AppShell({ children, allowPasswordChange = false }: { children: React.ReactNode; allowPasswordChange?: boolean }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
+
+  const activeOrg = user.organizationId
+    ? await prisma.organization.findUnique({
+        where: { id: user.organizationId },
+        select: { plan: true, enabledModules: true },
+      })
+    : null;
 
   // Filter groups and eliminate duplicate links within each role's view
   const seenHrefs = new Set<string>();
@@ -76,6 +85,13 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
     .map((group) => {
       const groupItems = group.items.filter(([href, , , section]) => {
         if (!canAccess(user.role, section as AppSection)) return false;
+        // Check organization-level module feature flag (Superadmin retains access)
+        if (user.platformRole !== 'SUPER_ADMIN' && activeOrg) {
+          const modId = getModuleIdForPath(href);
+          if (modId && !isModuleEnabled(activeOrg, modId)) {
+            return false;
+          }
+        }
         // Don't show duplicate links
         if (seenHrefs.has(href)) return false;
         seenHrefs.add(href);
