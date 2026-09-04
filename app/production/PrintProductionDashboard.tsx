@@ -1,11 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { PlusCircle, Image as ImageIcon, Printer, Truck, Package, Clock, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Image as ImageIcon, Printer, Truck, Package, Clock, CheckCircle2, X } from 'lucide-react';
 import Link from 'next/link';
+import { createPrintJob } from './actions';
+import { useRouter } from 'next/navigation';
 
 export function PrintProductionDashboard() {
   const [activeTab, setActiveTab] = useState<'kanban' | 'list'>('kanban');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
 
   return (
     <div className="space-y-6">
@@ -73,7 +78,10 @@ export function PrintProductionDashboard() {
           </button>
         </div>
 
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors w-full sm:w-auto justify-center shadow-sm">
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors w-full sm:w-auto justify-center shadow-sm"
+        >
           <PlusCircle className="w-4 h-4" />
           Nová tisková zakázka
         </button>
@@ -183,6 +191,81 @@ export function PrintProductionDashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-8 text-center text-gray-500">
             Tabulkové zobrazení bude brzy přidáno.
+          </div>
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h3 className="text-xl font-bold text-gray-900">Nová tisková zakázka</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form action={async (formData) => {
+              setIsSubmitting(true);
+              try {
+                await createPrintJob({
+                  title: formData.get('title') as string,
+                  clientName: formData.get('clientName') as string,
+                  formatType: formData.get('formatType') as any,
+                  materialType: formData.get('materialType') as any,
+                  quantity: parseInt(formData.get('quantity') as string) || 1,
+                  sparesQuantity: parseInt(formData.get('sparesQuantity') as string) || 0,
+                });
+                setIsModalOpen(false);
+                router.refresh();
+              } catch (e) {
+                alert('Chyba při vytváření zakázky');
+              } finally {
+                setIsSubmitting(false);
+              }
+            }} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Název kampaně</label>
+                <input type="text" name="title" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Jméno klienta</label>
+                <input type="text" name="clientName" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Formát</label>
+                  <select name="formatType" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="EUROBILLBOARD">Eurobillboard</option>
+                    <option value="BIGBOARD">Bigboard</option>
+                    <option value="CITYLIGHT">Citylight</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Materiál</label>
+                  <select name="materialType" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="BLUEBACK_120G">Blueback 120g</option>
+                    <option value="PVC_BANNER_450G">PVC Banner 450g</option>
+                    <option value="CITYLIGHT_150G">Citylight 150g</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Počet kusů</label>
+                  <input type="number" name="quantity" defaultValue={1} min={1} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Rezerva</label>
+                  <input type="number" name="sparesQuantity" defaultValue={0} min={0} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+              </div>
+              <div className="pt-4 border-t border-gray-100 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors">Zrušit</button>
+                <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-white bg-blue-600 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                  {isSubmitting ? 'Vytvářím...' : 'Vytvořit zakázku'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
