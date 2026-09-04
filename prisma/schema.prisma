@@ -3379,6 +3379,9 @@ enum PrintFormatType {
   CLP
   BANNER
   STICKER
+  BENCH
+  CITY_POSTER
+  TOWER
   OTHER
 }
 

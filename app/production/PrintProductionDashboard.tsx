@@ -6,11 +6,14 @@ import Link from 'next/link';
 import { createPrintJob } from './actions';
 import { useRouter } from 'next/navigation';
 
-export function PrintProductionDashboard() {
+export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
   const [activeTab, setActiveTab] = useState<'kanban' | 'list'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+
+  const [selectedOfferId, setSelectedOfferId] = useState('');
+  const selectedOffer = offers.find(o => o.id === selectedOfferId);
 
   return (
     <div className="space-y-6">
@@ -207,13 +210,17 @@ export function PrintProductionDashboard() {
             <form action={async (formData) => {
               setIsSubmitting(true);
               try {
+                const oId = formData.get('offerId') as string;
+                const targetOffer = offers.find(o => o.id === oId);
                 await createPrintJob({
                   title: formData.get('title') as string,
-                  clientName: formData.get('clientName') as string,
+                  offerId: oId || undefined,
+                  clientId: targetOffer?.client?.id || undefined, // use clientId if found
                   formatType: formData.get('formatType') as any,
                   materialType: formData.get('materialType') as any,
                   quantity: parseInt(formData.get('quantity') as string) || 1,
                   sparesQuantity: parseInt(formData.get('sparesQuantity') as string) || 0,
+                  status: 'PREPARATION',
                 });
                 setIsModalOpen(false);
                 router.refresh();
@@ -223,29 +230,47 @@ export function PrintProductionDashboard() {
                 setIsSubmitting(false);
               }
             }} className="p-6 space-y-4">
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Název kampaně</label>
-                <input type="text" name="title" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Přiřadit k existující zakázce / kampani</label>
+                <select 
+                  name="offerId" 
+                  value={selectedOfferId}
+                  onChange={(e) => setSelectedOfferId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="">-- Bez napojení na zakázku --</option>
+                  {offers.map(o => (
+                    <option key={o.id} value={o.id}>{o.campaignName || o.title} ({o.client?.name || 'Bez klienta'})</option>
+                  ))}
+                </select>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Jméno klienta</label>
-                <input type="text" name="clientName" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Název tiskového motivu</label>
+                <input type="text" name="title" defaultValue={selectedOffer?.campaignName || selectedOffer?.title || ''} required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Formát</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Formát / Nosič</label>
                   <select name="formatType" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="EUROBILLBOARD">Eurobillboard</option>
-                    <option value="BIGBOARD">Bigboard</option>
-                    <option value="CITYLIGHT">Citylight</option>
+                    <option value="EUROBILLBOARD">Eurobillboard (5,1 × 2,4m)</option>
+                    <option value="BIGBOARD">Bigboard (9,6 × 3,6m)</option>
+                    <option value="CITYLIGHT">Citylight (118,5 × 175cm)</option>
+                    <option value="BENCH">Lavička (city/street)</option>
+                    <option value="CITY_POSTER">City poster</option>
+                    <option value="TOWER">Tower</option>
+                    <option value="OTHER">Jiné / Vlastní formát</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Materiál</label>
                   <select name="materialType" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="BLUEBACK_120G">Blueback 120g</option>
-                    <option value="PVC_BANNER_450G">PVC Banner 450g</option>
-                    <option value="CITYLIGHT_150G">Citylight 150g</option>
+                    <option value="BLUEBACK_120G">Blueback (Papír)</option>
+                    <option value="PVC_BANNER_450G">PVC Banner</option>
+                    <option value="CITYLIGHT_150G">Citylight Papír</option>
+                    <option value="SELF_ADHESIVE_FOIL">Samolepící fólie</option>
+                    <option value="OTHER">Jiné</option>
                   </select>
                 </div>
               </div>

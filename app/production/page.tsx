@@ -1,11 +1,19 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { PrintProductionDashboard } from './PrintProductionDashboard';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ProductionPage() {
   const user = await requirePageAccess('printProduction');
+
+  const offers = await prisma.offer.findMany({
+    where: { organizationId: user.organizationId! },
+    select: { id: true, title: true, campaignName: true, client: { select: { id: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: 50
+  });
 
   return (
     <AppShell>
@@ -22,7 +30,7 @@ export default async function ProductionPage() {
           </div>
         </div>
 
-        <PrintProductionDashboard />
+        <PrintProductionDashboard offers={offers} />
       </div>
     </AppShell>
   );
