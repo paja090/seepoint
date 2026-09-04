@@ -25,6 +25,7 @@ import {
   ShoppingBag,
   UserRound,
   Users,
+  Printer,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -53,7 +54,8 @@ export type AppNavIcon =
   | 'settings'
   | 'shoppingBag'
   | 'userRound'
-  | 'users';
+  | 'users'
+  | 'printer';
 
 const icons = {
   badgeDollarSign: BadgeDollarSign,
@@ -80,6 +82,7 @@ const icons = {
   shoppingBag: ShoppingBag,
   userRound: UserRound,
   users: Users,
+  printer: Printer,
 } satisfies Record<AppNavIcon, React.ComponentType<{ size?: number }>>;
 
 type AppNavLinkProps = {
