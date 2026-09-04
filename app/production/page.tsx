@@ -15,6 +15,11 @@ export default async function ProductionPage() {
     take: 50
   });
 
+  const jobs = await prisma.printProductionJob.findMany({
+    where: { organizationId: user.organizationId! },
+    orderBy: { createdAt: 'desc' },
+  });
+
   return (
     <AppShell>
       <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -30,7 +35,7 @@ export default async function ProductionPage() {
           </div>
         </div>
 
-        <PrintProductionDashboard offers={offers} />
+        <PrintProductionDashboard offers={offers} jobs={jobs} />
       </div>
     </AppShell>
   );

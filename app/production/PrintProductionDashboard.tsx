@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { createPrintJob } from './actions';
 import { useRouter } from 'next/navigation';
 
-export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
+export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: any[], jobs?: any[] }) {
   const [activeTab, setActiveTab] = useState<'kanban' | 'list'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -14,6 +14,55 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
 
   const [selectedOfferId, setSelectedOfferId] = useState('');
   const selectedOffer = offers.find(o => o.id === selectedOfferId);
+
+  const getDeadlineColor = (date: Date) => {
+    if (!date) return 'text-gray-500';
+    const now = new Date();
+    const deadline = new Date(date);
+    const diff = deadline.getTime() - now.getTime();
+    if (diff < 0) return 'text-red-600 font-bold'; // Overdue
+    if (diff < 2 * 24 * 60 * 60 * 1000) return 'text-orange-500 font-bold'; // Next 48h
+    return 'text-gray-500';
+  };
+
+  const renderJobCard = (job: any, bgColor: string, accentColor: string) => (
+    <div key={job.id} className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group border-l-4 border-l-${accentColor}`}>
+      <div className="flex justify-between items-start mb-2">
+        <span className={`text-xs font-semibold bg-${bgColor} text-${accentColor} px-2 py-1 rounded`}>{job.formatType}</span>
+        <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">{job.quantity} + {job.sparesQuantity} ks</span>
+      </div>
+      <h4 className="font-medium text-gray-900 leading-tight group-hover:text-blue-700 transition-colors">{job.title}</h4>
+      <p className="text-sm text-gray-500 mt-1">{job.clientName || 'Neznámý klient'}</p>
+      
+      <div className="mt-4 flex flex-col gap-2">
+        {job.deliveryDeadline && (
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span className={`flex items-center gap-1 ${getDeadlineColor(job.deliveryDeadline)}`}>
+              <Clock className="w-3 h-3" /> Termín: {new Date(job.deliveryDeadline).toLocaleDateString('cs-CZ')}
+            </span>
+          </div>
+        )}
+        
+        {job.status === 'PREPARATION' && !job.artworkUrl && (
+          <span className="flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full text-xs w-max mt-1"><ImageIcon className="w-3 h-3" /> Chybí tisková data</span>
+        )}
+        {job.status === 'PREPARATION' && job.artworkUrl && (
+          <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs w-max mt-1"><CheckCircle2 className="w-3 h-3" /> Data nahrána</span>
+        )}
+
+        {job.status === 'CLIENT_APPROVAL' && (
+          <Link href={`/production/approve/${job.clientApprovalToken}`} target="_blank" className="text-xs text-center block w-full py-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded border border-gray-200 font-medium mt-1">
+            🔍 Otevřít portál pro klienta
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+
+  const prepJobs = jobs.filter(j => j.status === 'PREPARATION');
+  const approvalJobs = jobs.filter(j => j.status === 'CLIENT_APPROVAL');
+  const printJobs = jobs.filter(j => j.status === 'IN_PRINT');
+  const deliveredJobs = jobs.filter(j => j.status === 'DELIVERED_TO_WAREHOUSE');
 
   return (
     <div className="space-y-6">
@@ -97,22 +146,11 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200/60 flex flex-col h-[600px]">
             <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-              Příprava grafiky (5)
+              Příprava grafiky ({prepJobs.length})
             </h3>
             <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-              {/* Card Template */}
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-1 rounded">EUROBILLBOARD</span>
-                  <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">10 + 2 ks</span>
-                </div>
-                <h4 className="font-medium text-gray-900 leading-tight group-hover:text-blue-700 transition-colors">Podzimní kampaň 2026</h4>
-                <p className="text-sm text-gray-500 mt-1">Alza.cz a.s.</p>
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Dodat do: 15.10.</span>
-                  <span className="flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full"><ImageIcon className="w-3 h-3" /> Chybí data</span>
-                </div>
-              </div>
+              {prepJobs.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Žádné zakázky</p>}
+              {prepJobs.map(j => renderJobCard(j, 'blue-50', 'blue-700'))}
             </div>
           </div>
 
@@ -120,26 +158,11 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200/60 flex flex-col h-[600px]">
             <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-              Ke schválení klientem (7)
+              Ke schválení klientem ({approvalJobs.length})
             </h3>
             <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-               {/* Demo Card */}
-               <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group border-l-4 border-l-yellow-400">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-1 rounded">PVC BANNER</span>
-                  <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">3 ks</span>
-                </div>
-                <h4 className="font-medium text-gray-900 leading-tight group-hover:text-blue-700 transition-colors">Nová pobočka Plzeň</h4>
-                <p className="text-sm text-gray-500 mt-1">Kaufland ČR v.o.s.</p>
-                <div className="mt-4 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Dodat do: 20.10.</span>
-                  </div>
-                  <Link href={`/production/approve/demo-token-123`} target="_blank" className="text-xs text-center block w-full py-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded border border-gray-200 font-medium">
-                    🔍 Otevřít portál schvalování
-                  </Link>
-                </div>
-              </div>
+              {approvalJobs.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Žádné zakázky</p>}
+              {approvalJobs.map(j => renderJobCard(j, 'gray-100', 'yellow-500'))}
             </div>
           </div>
 
@@ -147,22 +170,11 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200/60 flex flex-col h-[600px]">
             <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-              V tisku u tiskárny (8)
+              V tisku u tiskárny ({printJobs.length})
             </h3>
             <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-               {/* Demo Card */}
-               <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group border-l-4 border-l-blue-500">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-1 rounded">BIGBOARD</span>
-                  <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">1 + 0 ks</span>
-                </div>
-                <h4 className="font-medium text-gray-900 leading-tight group-hover:text-blue-700 transition-colors">Vánoce 2026</h4>
-                <p className="text-sm text-gray-500 mt-1">Mall.cz</p>
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                  <span className="flex items-center gap-1 text-orange-600 font-medium"><Truck className="w-3 h-3" /> Dnes!</span>
-                  <span className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" /> Schváleno</span>
-                </div>
-              </div>
+              {printJobs.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Žádné zakázky</p>}
+              {printJobs.map(j => renderJobCard(j, 'blue-50', 'blue-600'))}
             </div>
           </div>
 
@@ -170,21 +182,11 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200/60 flex flex-col h-[600px]">
             <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-400"></span>
-              Naskladněno / Výlep (45)
+              Naskladněno / Výlep ({deliveredJobs.length})
             </h3>
             <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-               {/* Demo Card */}
-               <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 opacity-75 hover:opacity-100 transition-opacity cursor-pointer border-l-4 border-l-green-500">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded">CITYLIGHT</span>
-                  <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">50 + 5 ks</span>
-                </div>
-                <h4 className="font-medium text-gray-900 leading-tight line-through decoration-gray-300">Představení nového modelu</h4>
-                <p className="text-sm text-gray-500 mt-1">Škoda Auto</p>
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                  <span className="flex items-center gap-1 text-green-700 font-medium bg-green-50 px-2 py-1 rounded"><Package className="w-3 h-3" /> Na skladu: Regál A4</span>
-                </div>
-              </div>
+              {deliveredJobs.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Žádné zakázky</p>}
+              {deliveredJobs.map(j => renderJobCard(j, 'gray-100', 'green-600'))}
             </div>
           </div>
         </div>
@@ -220,6 +222,7 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
                   materialType: formData.get('materialType') as any,
                   quantity: parseInt(formData.get('quantity') as string) || 1,
                   sparesQuantity: parseInt(formData.get('sparesQuantity') as string) || 0,
+                  deliveryDeadline: formData.get('deliveryDeadline') ? new Date(formData.get('deliveryDeadline') as string) : undefined,
                   artworkUrl: formData.get('artworkUrl') as string || undefined,
                   status: 'PREPARATION',
                 });
@@ -285,9 +288,15 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
                   <input type="number" name="sparesQuantity" defaultValue={0} min={0} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Odkaz na grafiku (WeTransfer, Google Drive...)</label>
-                <input type="url" name="artworkUrl" placeholder="https://" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1"><Clock className="w-4 h-4 text-orange-500" /> Termín dodání (Tisk)</label>
+                  <input type="date" name="deliveryDeadline" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Odkaz na grafiku (WeTransfer)</label>
+                  <input type="url" name="artworkUrl" placeholder="https://" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
               </div>
               <div className="pt-4 border-t border-gray-100 flex justify-end gap-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors">Zrušit</button>
