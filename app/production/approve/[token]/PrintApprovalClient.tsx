@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 export function PrintApprovalClient({ job, token }: { job: any; token: string }) {
   const [approverName, setApproverName] = useState('');
   const [note, setNote] = useState('');
+  const [artworkUrl, setArtworkUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isApproved, setIsApproved] = useState(job.status !== 'CLIENT_APPROVAL' && job.status !== 'PREPARATION');
   const router = useRouter();
@@ -15,13 +16,18 @@ export function PrintApprovalClient({ job, token }: { job: any; token: string })
   const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!approverName.trim()) return;
+    
+    // Require artwork if it was missing initially
+    if (!job.artworkUrl && !artworkUrl.trim()) {
+      alert('Prosím, vložte odkaz na tisková data.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       if (token !== 'demo-token-123') {
-        await approvePrintJobByClient(token, approverName, note);
+        await approvePrintJobByClient(token, approverName, note, artworkUrl);
       } else {
-        // Simulate network delay for demo
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       setIsApproved(true);
@@ -92,12 +98,17 @@ export function PrintApprovalClient({ job, token }: { job: any; token: string })
                <img src={job.artworkUrl} alt="Náhled grafiky" className="object-cover w-full h-full" />
              </div>
            ) : (
-             <div className="w-full aspect-[2/1] bg-white rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 text-gray-400">
-               <FileImage className="w-16 h-16 mb-4 text-gray-300" />
-               <p className="font-medium text-gray-500">Náhled grafiky není k dispozici</p>
-               <button className="mt-4 flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-4 py-2 rounded-md">
-                 <Upload className="w-4 h-4" /> Klient dodá svá data
-               </button>
+             <div className="w-full p-6 bg-white rounded-xl flex flex-col border-2 border-dashed border-gray-300 text-gray-500">
+               <div className="flex justify-center mb-4"><FileImage className="w-12 h-12 text-gray-300" /></div>
+               <h4 className="font-medium text-center text-gray-700 mb-2">Tisková data zatím chybí</h4>
+               <p className="text-sm text-center mb-4">Vložte odkaz na cloudové úložiště (WeTransfer, Google Drive, Úschovna) se soubory pro tisk.</p>
+               <input
+                 type="url"
+                 placeholder="https://we.tl/..."
+                 value={artworkUrl}
+                 onChange={(e) => setArtworkUrl(e.target.value)}
+                 className="w-full px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+               />
              </div>
            )}
 

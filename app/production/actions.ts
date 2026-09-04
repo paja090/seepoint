@@ -95,15 +95,21 @@ export async function getPrintJobByToken(token: string) {
   return { ...job, organization };
 }
 
-export async function approvePrintJobByClient(token: string, approverName: string, note?: string) {
+export async function approvePrintJobByClient(token: string, approverName: string, note?: string, artworkUrl?: string) {
+  const dataToUpdate: any = {
+    status: 'IN_PRINT',
+    clientApprovedAt: new Date(),
+    clientApprovedBy: approverName,
+    clientApprovalNote: note,
+  };
+  
+  if (artworkUrl) {
+    dataToUpdate.artworkUrl = artworkUrl;
+  }
+
   const job = await prisma.printProductionJob.update({
     where: { clientApprovalToken: token },
-    data: {
-      status: 'IN_PRINT', // or whatever status follows approval
-      clientApprovedAt: new Date(),
-      clientApprovedBy: approverName,
-      clientApprovalNote: note,
-    },
+    data: dataToUpdate,
   });
 
   return job;
