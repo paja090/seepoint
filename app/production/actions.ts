@@ -43,6 +43,7 @@ export async function createPrintJob(data: {
   sparesQuantity: number;
   deliveryDeadline?: Date;
   status: PrintProductionStatus;
+  artworkUrl?: string;
 }) {
   const user = await getCurrentUser();
   if (!user || !user.organizationId) {

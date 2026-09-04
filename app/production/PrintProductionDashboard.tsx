@@ -220,6 +220,7 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
                   materialType: formData.get('materialType') as any,
                   quantity: parseInt(formData.get('quantity') as string) || 1,
                   sparesQuantity: parseInt(formData.get('sparesQuantity') as string) || 0,
+                  artworkUrl: formData.get('artworkUrl') as string || undefined,
                   status: 'PREPARATION',
                 });
                 setIsModalOpen(false);
@@ -283,6 +284,10 @@ export function PrintProductionDashboard({ offers = [] }: { offers?: any[] }) {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Rezerva</label>
                   <input type="number" name="sparesQuantity" defaultValue={0} min={0} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Odkaz na grafiku (WeTransfer, Google Drive...)</label>
+                <input type="url" name="artworkUrl" placeholder="https://" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div className="pt-4 border-t border-gray-100 flex justify-end gap-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors">Zrušit</button>
