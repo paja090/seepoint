@@ -141,6 +141,13 @@ export const SYSTEM_MODULES: SystemModule[] = [
     routes: ['/work', '/work-entries', '/my-work-entries'],
   },
   {
+    id: 'printProduction',
+    name: 'Výroba, Tisk & Grafika',
+    description: 'Správa tiskových dat, portál pro schvalování klientem a Kanban nástěnka tisku',
+    category: 'operations',
+    routes: ['/production'],
+  },
+  {
     id: 'tasks',
     name: 'Správa všech úkolů',
     description: 'Globální dispečink úkolů pro manažery a zadávání úkolů celému týmu',
