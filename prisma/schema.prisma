@@ -852,6 +852,7 @@ model Client {
   crmOrders                      CrmOrder[]
   contracts                      ClientContract[]
   invoices                       ClientInvoice[]
+  printProductionJobs            PrintProductionJob[]
   communications                 ClientCommunication[]
   crmTasks                       CrmTask[]
   documents                      ClientDocument[]
@@ -1344,6 +1345,7 @@ model Offer {
   crmOrder                       CrmOrder?
   navigationContracts            NavigationContract[]
   salesOpportunities             SalesOpportunity[]
+  printProductionJobs            PrintProductionJob[]
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -3354,4 +3356,66 @@ model AIUsageLog {
   @@index([organizationId, createdAt])
   @@index([organizationId, feature])
   @@index([userId])
+}
+
+enum PrintProductionStatus {
+  PREPARATION
+  CLIENT_APPROVAL
+  IN_PRINT
+  DELIVERED_TO_WAREHOUSE
+}
+
+enum PrintMaterialType {
+  BLUEBACK_120G
+  PVC_BANNER_510G
+  CITYLIGHT_PAPER
+  SELF_ADHESIVE_FOIL
+  OTHER
+}
+
+enum PrintFormatType {
+  EUROBILLBOARD
+  BIGBOARD
+  CLP
+  BANNER
+  STICKER
+  OTHER
+}
+
+model PrintProductionJob {
+  id             String @id @default(cuid())
+  organizationId String @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+
+  title        String
+  campaignName String?
+  offerId      String?
+  clientId     String?
+
+  status       PrintProductionStatus @default(PREPARATION)
+  formatType   PrintFormatType       @default(EUROBILLBOARD)
+  materialType PrintMaterialType     @default(BLUEBACK_120G)
+
+  quantity       Int @default(1)
+  sparesQuantity Int @default(0)
+
+  deliveryDeadline DateTime?
+  deliveredAt      DateTime?
+
+  clientApprovalToken String?   @unique
+  clientApprovedAt    DateTime?
+  clientApprovedBy    String?
+  clientApprovalNote  String?
+
+  artworkUrl    String?
+  printOrderUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  offer  Offer?  @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([offerId])
+  @@index([clientId])
 }

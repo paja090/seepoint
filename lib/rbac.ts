@@ -37,7 +37,8 @@ export type AppSection =
   | 'import'
   | 'settings'
   | 'workEntries'
-  | 'myWorkEntries';
+  | 'myWorkEntries'
+  | 'printProduction';
 
 const permissions: Record<AppRole, AppSection[]> = {
   ADMIN: [
@@ -66,6 +67,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'settings',
     'workEntries',
     'myWorkEntries',
+    'printProduction',
   ],
   MANAGER: [
     'dashboard',
@@ -91,6 +93,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'warehouse',
     'workEntries',
     'myWorkEntries',
+    'printProduction',
   ],
   SALES: [
     'dashboard',
@@ -111,6 +114,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'myTasks',
     'myWorkEntries',
     'team',
+    'printProduction',
   ],
   TECHNICIAN: [
     'dashboard',
@@ -126,6 +130,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'navigationProjects',
     'navigationDocumentation',
     'team',
+    'printProduction',
   ],
   WORKER: [
     'dashboard',

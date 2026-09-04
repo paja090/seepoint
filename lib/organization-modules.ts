@@ -169,6 +169,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     badge: 'AI Vision',
     routes: ['/warehouse'],
   },
+  {
+    id: 'printProduction',
+    name: 'Výroba, Tisk & Grafická data',
+    description: 'Schvalování grafiky s klienty, objednávky do tiskáren a sledování doručení materiálů na sklad',
+    category: 'operations',
+    badge: 'Novinka',
+    routes: ['/production'],
+  },
 
   // Management
   {
@@ -220,6 +228,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'settlements',
     'vehicles',
     'warehouse',
+    'printProduction',
     'employees',
     'import',
   ],
@@ -245,6 +254,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'settlements',
     'vehicles',
     'warehouse',
+    'printProduction',
     'employees',
     'import',
   ],
