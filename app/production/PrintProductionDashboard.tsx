@@ -50,8 +50,8 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
           <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs w-max mt-1"><CheckCircle2 className="w-3 h-3" /> Data nahrána</span>
         )}
 
-        {job.status === 'CLIENT_APPROVAL' && (
-          <Link href={`/production/approve/${job.clientApprovalToken}`} target="_blank" className="text-xs text-center block w-full py-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded border border-gray-200 font-medium mt-1">
+        {job.status === 'CLIENT_APPROVAL' && job.offer?.publicTokenHash && (
+          <Link href={`/p/${job.offer.publicTokenHash}`} target="_blank" className="text-xs text-center block w-full py-1.5 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded border border-gray-200 font-medium mt-1">
             🔍 Otevřít portál pro klienta
           </Link>
         )}

@@ -106,6 +106,13 @@ export type OfferView = {
   packageSelections?: Array<{ id: string; packageId?: string | null; packageName: string; selectionMode: string; standardPrice?: string | null; packagePrice?: string | null }>;
   events?: Array<{ id: string; type: string; fromStatus?: string | null; toStatus?: string | null; actorName?: string | null; actorEmail?: string | null; message?: string | null; createdAt: string }>;
   converted?: boolean;
+  printJob?: {
+    id: string;
+    status: string;
+    artworkUrl?: string | null;
+    clientApprovedAt?: string | null;
+    clientApprovalToken?: string | null;
+  } | null;
 };
 
 export type OfferClientOption = { id: string; name: string; logoUrl?: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };

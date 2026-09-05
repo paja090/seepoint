@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { OfferView, OfferItemView } from '@/lib/offers/view-model';
 import { CampaignLiveMap } from './CampaignLiveMap';
+import { PrintApprovalModule } from './PrintApprovalModule';
 import {
   MapPin,
   Calendar,
@@ -23,7 +24,7 @@ interface Props {
   publicToken?: string;
 }
 
-export function CampaignLivePortalView({ offer }: Props) {
+export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const [selectedPhoto, setSelectedPhoto] = useState<{
     url: string;
     title: string;
@@ -140,6 +141,15 @@ export function CampaignLivePortalView({ offer }: Props) {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 space-y-8">
+        
+        {offer.printJob && (
+          <PrintApprovalModule 
+            printJob={offer.printJob} 
+            token={publicToken}
+            clientName={clientName} 
+          />
+        )}
+
         {/* Campaign Hero Banner */}
         <div className="card bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-purple-900/50 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-purple-800/60 pb-6">

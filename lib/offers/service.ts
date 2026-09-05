@@ -59,6 +59,7 @@ const offerInclude = {
       }
     }
   },
+  printProductionJobs: true,
   items: {
     include: {
       surface: {
@@ -307,6 +308,13 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       createdAt: event.createdAt.toISOString(),
     })),
     converted: publicView ? undefined : row.occupancies.length > 0,
+    printJob: row.printProductionJobs && row.printProductionJobs.length > 0 ? {
+      id: row.printProductionJobs[0].id,
+      status: row.printProductionJobs[0].status,
+      artworkUrl: row.printProductionJobs[0].artworkUrl,
+      clientApprovedAt: row.printProductionJobs[0].clientApprovedAt?.toISOString() || null,
+      clientApprovalToken: publicView ? row.printProductionJobs[0].clientApprovalToken : undefined,
+    } : null,
   };
   return publicView ? stripPublicOfferSecrets(serialized) : serialized;
 }
