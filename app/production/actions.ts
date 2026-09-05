@@ -76,6 +76,29 @@ export async function updatePrintJobStatus(id: string, status: PrintProductionSt
     data: { status },
   });
 
+  // [Sync] Automatically update related CrmRealizations if delivered to warehouse
+  if (status === 'DELIVERED_TO_WAREHOUSE' && job.offerId) {
+    // 1. Find the CrmOrder for this Offer
+    const crmOrder = await prisma.crmOrder.findFirst({
+      where: { offerId: job.offerId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+
+    if (crmOrder) {
+      // 2. Update all pending realizations to 'PRODUCED' so technicians can start installing them
+      await prisma.crmRealization.updateMany({
+        where: {
+          crmOrderId: crmOrder.id,
+          status: 'WAITING_FOR_PRODUCTION',
+          organizationId: user.organizationId,
+        },
+        data: {
+          status: 'PRODUCED',
+        },
+      });
+    }
+  }
+
   revalidatePath('/production');
   return job;
 }

@@ -30,6 +30,7 @@ export function CampaignLivePortalView({ offer }: Props) {
     carrierCode: string;
     address: string;
     format: string;
+    isInstallation?: boolean;
   } | null>(null);
 
   const [copied, setCopied] = useState(false);
@@ -241,7 +242,9 @@ export function CampaignLivePortalView({ offer }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {items.map((item, idx) => {
               const carrier = item.surface.carrier;
-              const photo = item.surface.photos?.[0]?.url || '/placeholder-carrier.jpg';
+              const photoObj = item.surface.photos?.[0];
+              const photo = photoObj?.url || '/placeholder-carrier.jpg';
+              const isInstalled = (photoObj as any)?.isInstallation;
               const carrierTitle = carrier.name || carrier.address || `Plocha #${idx + 1}`;
               const format = item.surface.mediaType || 'Billboard';
               const locationStr = `${carrier.street ? `${carrier.street}, ` : ''}${carrier.city || ''}`;
@@ -252,18 +255,18 @@ export function CampaignLivePortalView({ offer }: Props) {
                   className="card group bg-white border border-slate-200/90 rounded-3xl overflow-hidden hover:shadow-lg hover:border-purple-300 transition flex flex-col justify-between"
                 >
                   <div className="relative aspect-16/10 overflow-hidden bg-slate-950">
+                    {isInstalled && (
+                      <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/90 backdrop-blur-md text-[11px] font-extrabold text-white border border-emerald-400">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>Nainstalováno</span>
+                      </div>
+                    )}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photo}
                       alt={carrierTitle}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
-
-                    {/* Badge */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-[11px] font-extrabold text-emerald-400 border border-emerald-500/40">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      <span>Vylepeno</span>
-                    </div>
 
                     {/* Pin Number */}
                     <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-purple-700 text-white font-black text-xs flex items-center justify-center shadow-md border-2 border-white">
@@ -277,9 +280,10 @@ export function CampaignLivePortalView({ offer }: Props) {
                         setSelectedPhoto({
                           url: photo,
                           title: carrierTitle,
-                          carrierCode: carrier.code || `ID-${idx + 1}`,
                           address: locationStr,
-                          format,
+                          carrierCode: carrier.code || 'Neznámý',
+                          format: format,
+                          isInstallation: isInstalled,
                         })
                       }
                       className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
@@ -380,10 +384,17 @@ export function CampaignLivePortalView({ offer }: Props) {
           <div className="relative max-w-4xl w-full bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between text-white">
               <div>
-                <span className="text-xs font-bold text-purple-400 uppercase tracking-wide">
-                  {selectedPhoto.carrierCode} · {selectedPhoto.format}
-                </span>
-                <h3 className="font-bold text-base">{selectedPhoto.title}</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-bold text-purple-400 uppercase tracking-wide">
+                    {selectedPhoto.carrierCode} • {selectedPhoto.format}
+                  </span>
+                  {selectedPhoto.isInstallation && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase border border-emerald-500/30">
+                      Nainstalováno
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-base leading-tight">{selectedPhoto.title}</h3>
                 <p className="text-xs text-slate-400">{selectedPhoto.address}</p>
               </div>
 

@@ -50,6 +50,15 @@ const offerInclude = {
   client: true,
   createdByUser: { select: { id: true, name: true, email: true, role: true } },
   updatedByUser: { select: { id: true, name: true } },
+  crmOrder: {
+    include: {
+      realizations: {
+        include: {
+          photos: true
+        }
+      }
+    }
+  },
   items: {
     include: {
       surface: {
@@ -136,7 +145,11 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       phone: row.contactPhone ?? row.client.phone,
     },
     items: row.items.map((item) => {
-      const photos = [...item.surface.photos, ...item.surface.carrier.photos]
+      const installationPhotos = ((row as any).crmOrder?.realizations || [])
+        .filter((r: any) => r.surfaceId === item.surfaceId)
+        .flatMap((r: any) => (r.photos || []).map((p: any) => ({ ...p, isInstallation: true })));
+
+      const photos = [...installationPhotos, ...item.surface.photos, ...item.surface.carrier.photos]
           .filter((photo) => !publicView || photo.isClientVisible)
         .filter((photo, index, all) => all.findIndex((candidate) => candidate.id === photo.id) === index)
         .map((photo) => ({
@@ -145,6 +158,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           note: photo.note,
           isPrimary: photo.isPrimary,
           isClientVisible: photo.isClientVisible,
+          isInstallation: (photo as any).isInstallation || false,
         }));
       return {
         id: publicView ? undefined : item.id,
@@ -960,7 +974,8 @@ export async function getPublicPhoto(token: string, photoId: string) {
       offer.items.some(
         (item) =>
           item.surface.photos.some((photo) => photo.id === photoId) ||
-          item.surface.carrier.photos.some((photo) => photo.id === photoId)
+          item.surface.carrier.photos.some((photo) => photo.id === photoId) ||
+          ((offer as any).crmOrder?.realizations || []).some((r: any) => r.surfaceId === item.surfaceId && r.photos?.some((p: any) => p.id === photoId))
       ) ||
       (offer.navigationOffer?.points.some(
         (point) =>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { PlusCircle, Image as ImageIcon, Printer, Truck, Package, Clock, CheckCircle2, X } from 'lucide-react';
 import Link from 'next/link';
-import { createPrintJob } from './actions';
+import { createPrintJob, updatePrintJobStatus } from './actions';
 import { useRouter } from 'next/navigation';
 
 export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: any[], jobs?: any[] }) {
@@ -55,6 +55,18 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
             🔍 Otevřít portál pro klienta
           </Link>
         )}
+
+        <div className="pt-2 mt-2 border-t border-gray-100 flex gap-1 justify-end">
+          {job.status === 'PREPARATION' && (
+            <button onClick={() => updatePrintJobStatus(job.id, 'CLIENT_APPROVAL')} className="text-xs px-2 py-1 bg-yellow-50 text-yellow-600 hover:bg-yellow-100 rounded-md transition font-medium">Poslat ke schválení</button>
+          )}
+          {job.status === 'CLIENT_APPROVAL' && (
+            <button onClick={() => updatePrintJobStatus(job.id, 'IN_PRINT')} className="text-xs px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition font-medium">Zahájit tisk</button>
+          )}
+          {job.status === 'IN_PRINT' && (
+            <button onClick={() => updatePrintJobStatus(job.id, 'DELIVERED_TO_WAREHOUSE')} className="text-xs px-2 py-1 bg-green-50 text-green-600 hover:bg-green-100 rounded-md transition font-medium">Naskladnit (Výlep)</button>
+          )}
+        </div>
       </div>
     </div>
   );
