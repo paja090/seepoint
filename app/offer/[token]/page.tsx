@@ -78,7 +78,7 @@ export default async function PublicOfferPage({ params, searchParams }: { params
   }
 
   if ((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept) {
-    return <CampaignConceptPublicView offer={offer} />;
+    return <CampaignConceptPublicView offer={offer} publicToken={token} />;
   }
 
   if (offer.offerType === 'NAVIGATION' || offer.offerType === 'CITY_GALLERY') {

@@ -19,9 +19,12 @@ const mediaLabels: Record<string, { label: string; icon: string; desc: string }>
 
 type ItemType = OfferView['items'][number];
 
-export function CampaignConceptPublicView({ offer }: { offer: OfferView }) {
+export function CampaignConceptPublicView({ offer, publicToken }: { offer: OfferView; publicToken?: string }) {
   const [activeTab, setActiveTab] = useState<'strategy' | 'map' | 'phases'>('strategy');
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestForm, setRequestForm] = useState({ name: '', email: '', message: 'Mám zájem o zpracování cenové nabídky na tento koncept.' });
   const brandName = offer.branding?.name || 'SeePOINT';
   const brandEmail = offer.branding?.email || 'info@seepoint.cz';
   const brandPhone = offer.branding?.phone || '+420 778 089 099';
@@ -61,15 +64,44 @@ export function CampaignConceptPublicView({ offer }: { offer: OfferView }) {
     return acc;
   }, {});
 
+  const handleRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!publicToken || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/proposals/${publicToken}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'question',
+          name: requestForm.name,
+          email: requestForm.email,
+          message: requestForm.message,
+        })
+      });
+      if (!res.ok) throw new Error('Chyba při odesílání.');
+      alert('Požadavek byl úspěšně odeslán obchodníkovi. Budeme Vás brzy kontaktovat.');
+      setShowRequestModal(false);
+    } catch (err) {
+      alert('Něco se pokazilo. Zkuste prosím raději kontaktovat obchodníka napřímo e-mailem.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased pb-16">
       {/* Top Brand Bar */}
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-4 sm:px-6 py-3.5 shadow-lg">
         <div className="mx-auto max-w-6xl flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {offer.branding?.logoUrl
-              ? <img alt={brandName} className="h-8 max-w-44 object-contain" src={offer.branding.logoUrl} />
-              : <span className="font-black text-xl text-white tracking-tight">{brandName}</span>}
+            {offer.branding?.logoUrl ? (
+              <img alt={brandName} className="h-8 max-w-44 object-contain" src={offer.branding.logoUrl} />
+            ) : offer.client?.logoUrl ? (
+              <img alt={`Logo ${offer.client.name}`} className="h-8 max-w-44 object-contain" src={offer.client.logoUrl} />
+            ) : (
+              <img alt="SeePOINT" className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
+            )}
             <span className="hidden sm:inline-block h-4 w-px bg-slate-800" />
             <span className="hidden sm:inline-block text-xs font-bold text-slate-400">
               Nezávazný koncept OOH kampaně
@@ -393,13 +425,24 @@ export function CampaignConceptPublicView({ offer }: { offer: OfferView }) {
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <a
-            href={`mailto:${brandEmail}?subject=Zájem%20o%20nacenění%20kampaně`}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:bg-slate-100 transition transform active:scale-95"
-            >
-              <Mail className="w-4 h-4 text-purple-600" />
-              <span>Chci zpracovat cenovou nabídku</span>
-            </a>
+            {publicToken ? (
+              <button
+                type="button"
+                onClick={() => setShowRequestModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:bg-slate-100 transition transform active:scale-95 cursor-pointer"
+              >
+                <Mail className="w-4 h-4 text-purple-600" />
+                <span>Chci zpracovat cenovou nabídku</span>
+              </button>
+            ) : (
+              <a
+                href={`mailto:${brandEmail}?subject=Zájem%20o%20nacenění%20kampaně`}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:bg-slate-100 transition transform active:scale-95"
+              >
+                <Mail className="w-4 h-4 text-purple-600" />
+                <span>Chci zpracovat cenovou nabídku</span>
+              </a>
+            )}
 
             <a
               href={`tel:${brandPhone.replace(/\s/g, '')}`}
@@ -411,6 +454,38 @@ export function CampaignConceptPublicView({ offer }: { offer: OfferView }) {
           </div>
         </section>
       </main>
+
+      {/* Request Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-900">Zpracování nabídky</h3>
+              <button onClick={() => setShowRequestModal(false)} className="text-slate-400 hover:text-slate-600 transition">✕</button>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">Máte zájem o tento koncept? Nechte nám kontakt a obchodník SeePOINT Vám připraví přesnou cenovou kalkulaci.</p>
+            
+            <form onSubmit={handleRequestSubmit} className="space-y-4 text-slate-900">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Jméno a příjmení *</label>
+                <input required type="text" value={requestForm.name} onChange={e => setRequestForm(prev => ({...prev, name: e.target.value}))} className="w-full border border-slate-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">E-mail *</label>
+                <input required type="email" value={requestForm.email} onChange={e => setRequestForm(prev => ({...prev, email: e.target.value}))} className="w-full border border-slate-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Poznámka / Dotaz</label>
+                <textarea rows={3} value={requestForm.message} onChange={e => setRequestForm(prev => ({...prev, message: e.target.value}))} className="w-full border border-slate-300 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none resize-none" />
+              </div>
+              
+              <button disabled={isSubmitting} type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm py-3 rounded-xl transition shadow-md disabled:opacity-50 mt-2">
+                {isSubmitting ? 'Odesílám...' : 'Odeslat žádost'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Photo Lightbox */}
       {activePhoto && (
