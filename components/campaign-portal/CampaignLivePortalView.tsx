@@ -67,8 +67,35 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
 
   // Calculate metrics
   const totalCarriers = items.length;
-  const verifiedCount = items.filter((item) => (item.surface.photos?.length ?? 0) > 0).length || totalCarriers;
+  const verifiedCount = items.filter((item) => (item.surface.photos?.length ?? 0) > 0).length;
   const estimatedImpressions = totalCarriers * 35000;
+
+  // Determine Live Status
+  let liveStatus = 'Příprava zakázky';
+  let liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+  let liveStatusDot = 'bg-sky-400';
+
+  if (offer.printJob) {
+    if (['PENDING_GRAPHICS', 'PENDING_INTERNAL_REVIEW', 'PENDING_CLIENT_APPROVAL'].includes(offer.printJob.status)) {
+      liveStatus = 'Čeká na grafická data';
+      liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      liveStatusDot = 'bg-amber-400';
+    } else if (['APPROVED_FOR_PRINT', 'IN_PRINT'].includes(offer.printJob.status)) {
+      liveStatus = 'Ve výrobě (Tiskne se)';
+      liveStatusColor = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+      liveStatusDot = 'bg-blue-400 animate-pulse';
+    } else if (offer.printJob.status === 'DELIVERED_TO_WAREHOUSE') {
+      liveStatus = 'Naskladněno / K výlepu';
+      liveStatusColor = 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+      liveStatusDot = 'bg-purple-400';
+    }
+  }
+
+  if (verifiedCount > 0) {
+    liveStatus = 'Kampaň aktivní v terénu';
+    liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+    liveStatusDot = 'bg-emerald-400 animate-pulse';
+  }
 
   function handleShare() {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -104,15 +131,16 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
       <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3.5 shadow-2xs print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            {branding?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={branding.logoUrl} alt={agencyName} className="h-8 object-contain shrink-0" />
-            ) : (
-              <span className="text-sm font-black tracking-tight text-purple-700 bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-200 shrink-0">
-                {agencyName}
-              </span>
-            )}
-            <span className="text-slate-300 hidden sm:inline">/</span>
+            <div className="flex items-center gap-4">
+              {branding?.logoUrl ? (
+                <img alt={agencyName} className="h-8 max-w-44 object-contain" src={branding.logoUrl} />
+              ) : offer.client?.logoUrl ? (
+                <img alt={`Logo ${offer.client.name}`} className="h-8 max-w-44 object-contain" src={offer.client.logoUrl} />
+              ) : (
+                <img alt="SeePOINT" className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
+              )}
+            </div>
+            <div className="h-4 w-px bg-slate-300" />
             <span className="text-xs font-bold text-slate-600 truncate hidden sm:inline">
               Klientský Portál Kampaně
             </span>
@@ -142,22 +170,29 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 space-y-8">
         
-        {offer.printJob && (
-          <PrintApprovalModule 
-            printJob={offer.printJob} 
-            token={publicToken}
-            clientName={clientName} 
-          />
-        )}
+        {/* Upload Graphics & Print Approval (Rendered right at the top) */}
+        {offer.printJob && publicToken ? (
+          <PrintApprovalModule printJob={offer.printJob} token={publicToken} clientName={clientName} />
+        ) : publicToken ? (
+          <div className="rounded-2xl border-2 border-purple-100 bg-white shadow-xl shadow-purple-900/5 p-6 sm:p-8">
+            <h2 className="text-lg font-black text-purple-950 flex items-center gap-2">
+              <Printer className="w-5 h-5 text-purple-600" />
+              Příprava grafiky a tisku
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 font-medium">
+              Obchodník právě zpracovává Vaši zakázku do produkce. Jakmile bude spuštěna výroba, objeví se zde možnost nahrát tisková data (např. odkaz na WeTransfer) a schválit je pro tisk.
+            </p>
+          </div>
+        ) : null}
 
         {/* Campaign Hero Banner */}
         <div className="card bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-purple-900/50 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-purple-800/60 pb-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Kampaň aktivní v terénu
+                <span className={`px-3 py-1 rounded-full text-xs font-extrabold flex items-center gap-1.5 border ${liveStatusColor}`}>
+                  <span className={`w-2 h-2 rounded-full ${liveStatusDot}`} />
+                  {liveStatus}
                 </span>
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-900/60 text-purple-200 border border-purple-700/50">
                   {startDateStr} – {endDateStr}
@@ -193,10 +228,12 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             <div className="p-4 rounded-2xl bg-slate-900/70 border border-purple-800/40 space-y-1">
               <span className="text-emerald-300 font-bold uppercase text-[10px] flex items-center gap-1">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                Stav vylepu
+                Stav výlepu
               </span>
               <div className="text-2xl font-black text-emerald-400">{verifiedCount} / {totalCarriers}</div>
-              <span className="text-[11px] text-emerald-300/80 block">100% vylepeno & ověřeno</span>
+              <span className="text-[11px] text-emerald-300/80 block">
+                {verifiedCount === totalCarriers && totalCarriers > 0 ? '100% vylepeno & ověřeno' : verifiedCount === 0 ? 'Čeká na instalaci' : 'Probíhá instalace'}
+              </span>
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-900/70 border border-purple-800/40 space-y-1">
