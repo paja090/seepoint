@@ -45,6 +45,40 @@ export async function GET(req: Request) {
           { city: { contains: query, mode: 'insensitive' } },
           { street: { contains: query, mode: 'insensitive' } },
           { address: { contains: query, mode: 'insensitive' } },
+          {
+            surfaces: {
+              some: {
+                OR: [
+                  { name: { contains: query, mode: 'insensitive' } },
+                  { currentClient: { name: { contains: query, mode: 'insensitive' } } },
+                  {
+                    occupancies: {
+                      some: {
+                        OR: [
+                          { campaignName: { contains: query, mode: 'insensitive' } },
+                          { clientName: { contains: query, mode: 'insensitive' } },
+                          { client: { name: { contains: query, mode: 'insensitive' } } },
+                        ],
+                      },
+                    },
+                  },
+                  {
+                    offerItems: {
+                      some: {
+                        offer: {
+                          OR: [
+                            { campaignName: { contains: query, mode: 'insensitive' } },
+                            { title: { contains: query, mode: 'insensitive' } },
+                            { client: { name: { contains: query, mode: 'insensitive' } } },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
         ],
       } : {}),
     };
@@ -79,6 +113,21 @@ export async function GET(req: Request) {
                   client: { select: { id: true, name: true } }, offer: { select: { id: true, campaignName: true, title: true } },
                 },
               },
+              offerItems: {
+                where: { offer: { status: { in: ['ACCEPTED', 'SENT'] } } },
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+                select: {
+                  offer: {
+                    select: {
+                      id: true,
+                      campaignName: true,
+                      title: true,
+                      client: { select: { id: true, name: true } },
+                    },
+                  },
+                },
+              },
               photos: { orderBy: { createdAt: 'desc' }, take: 1, select: {
                 id: true, url: true, storageProvider: true, capturedLatitude: true, capturedLongitude: true,
                 capturedByWorkerName: true, createdAt: true, aiStatus: true, aiConfidence: true,
@@ -100,6 +149,8 @@ export async function GET(req: Request) {
       const carrierLatestPhoto = carrier.photos[0]?.url || null;
       const surfaces = carrier.surfaces.map((surface) => {
         const occupancy = surface.occupancies[0] || null;
+        const offerItem = surface.offerItems?.[0] || null;
+        const offer = offerItem?.offer || null;
         const safelyResolved = occupancy?.clientResolutionStatus !== 'UNRESOLVED';
         const clientName = occupancy?.client?.name || occupancy?.clientName || null;
         // The carrier detail currently allows assigning a client without changing
@@ -113,19 +164,26 @@ export async function GET(req: Request) {
         }, now);
         const currentClient = occupancy && safelyResolved && clientName
           ? { id: occupancy.client?.id || null, name: clientName }
-          : detailClientIsCurrent && surface.currentClient
-            ? surface.currentClient
+          : offer?.client
+            ? { id: offer.client.id || null, name: offer.client.name }
+            : detailClientIsCurrent && surface.currentClient
+              ? surface.currentClient
+              : null;
+
+        const currentCampaign = occupancy
+          ? { id: occupancy.offer?.id || occupancy.id, name: occupancy.campaignName || occupancy.offer?.campaignName || occupancy.offer?.title || 'Kampaň nezjištěna' }
+          : offer
+            ? { id: offer.id, name: offer.campaignName || offer.title || 'Kampaň' }
             : null;
+
         return {
           id: surface.id,
           name: surface.name,
           side: surfaceSide(surface),
-          status: occupancy?.status || surface.status,
+          status: occupancy?.status || (offer ? 'RESERVED' : surface.status),
           currentClient,
-          clientSource: occupancy ? 'OCCUPANCY' : currentClient ? 'SURFACE_DETAIL' : null,
-          currentCampaign: occupancy
-            ? { id: occupancy.offer?.id || occupancy.id, name: occupancy.campaignName || occupancy.offer?.campaignName || occupancy.offer?.title || 'Kampaň nezjištěna' }
-            : null,
+          clientSource: occupancy ? 'OCCUPANCY' : offer ? 'OFFER' : currentClient ? 'SURFACE_DETAIL' : null,
+          currentCampaign,
           occupiedFrom: occupancy?.dateFrom.toISOString() || null,
           occupiedUntil: occupancy?.dateTo.toISOString() || null,
           latestPhotoUrl: surface.photos[0]?.url || carrierLatestPhoto || surface.artworkUrl || null,
