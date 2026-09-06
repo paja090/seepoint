@@ -127,7 +127,7 @@ export async function POST(req: Request) {
           storageKey: stored.storageKey,
           contentChecksum: stored.contentChecksum,
           fileName, mimeType, size: stored.bytes.byteLength,
-          type: isSurveyUpload ? 'SURVEY' : purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
+          type: isSurveyUpload ? 'SURVEY' : purpose === 'DAMAGE' ? 'DAMAGE' : purpose === 'CLIENT_REPORT' ? 'INSTALLATION' : 'CARRIER',
           note: photoNote, isClientVisible: !isSurveyUpload && purpose === 'CLIENT_REPORT', storageProvider: stored.storageProvider,
           capturedLatitude: clientCoordinates?.lat ?? null, capturedLongitude: clientCoordinates?.lng ?? null, capturedAccuracyMeters: accuracy,
           capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName,

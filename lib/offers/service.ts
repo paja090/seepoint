@@ -160,7 +160,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           note: photo.note,
           isPrimary: photo.isPrimary,
           isClientVisible: photo.isClientVisible,
-          isInstallation: (photo as any).isInstallation || false,
+          isInstallation: (photo as any).isInstallation || ['INSTALLATION', 'AFTER_INSTALLATION'].includes((photo as any).type) || false,
         }));
       return {
         id: publicView ? undefined : item.id,
