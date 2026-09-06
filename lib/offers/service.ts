@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
@@ -315,6 +316,19 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       clientApprovedAt: row.printProductionJobs[0].clientApprovedAt?.toISOString() || null,
       clientApprovalToken: publicView ? row.printProductionJobs[0].clientApprovalToken : undefined,
     } : null,
+    realizationSummary: (() => {
+      const realizations = (row as any).crmOrder?.realizations || [];
+      if (realizations.length === 0) return null;
+      const installedStatuses = ['INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
+      const photographedStatuses = ['PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
+      const completedStatuses = ['COMPLETED'];
+      return {
+        total: realizations.length,
+        installed: realizations.filter((r: any) => installedStatuses.includes(r.status)).length,
+        photographed: realizations.filter((r: any) => photographedStatuses.includes(r.status)).length,
+        completed: realizations.filter((r: any) => completedStatuses.includes(r.status)).length,
+      };
+    })(),
   };
   return publicView ? stripPublicOfferSecrets(serialized) : serialized;
 }
@@ -928,6 +942,24 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
         id: row.createdByUser.id,
         email: row.createdByUser.email,
       });
+    }
+
+    // Auto-create PrintProductionJob in PREPARATION when standard media offer is accepted (Varianta A)
+    if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA') {
+      const existingPrintJob = await tx.printProductionJob.findFirst({ where: { offerId: row.id } });
+      if (!existingPrintJob) {
+        await tx.printProductionJob.create({
+          data: {
+            organizationId: row.organizationId,
+            offerId: row.id,
+            clientId: row.clientId,
+            title: row.campaignName ?? row.title,
+            campaignName: row.campaignName ?? row.title,
+            status: 'PREPARATION',
+            clientApprovalToken: randomBytes(32).toString('hex'),
+          },
+        });
+      }
     }
 
     return { row, status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };

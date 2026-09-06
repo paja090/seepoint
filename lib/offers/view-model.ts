@@ -1,4 +1,4 @@
-export type OfferPhotoView = { id: string; url: string; note?: string | null; isPrimary: boolean; isClientVisible?: boolean };
+export type OfferPhotoView = { id: string; url: string; note?: string | null; isPrimary: boolean; isClientVisible?: boolean; isInstallation?: boolean };
 export type OfferItemView = {
   id?: string;
   surfaceId?: string;
@@ -112,6 +112,12 @@ export type OfferView = {
     artworkUrl?: string | null;
     clientApprovedAt?: string | null;
     clientApprovalToken?: string | null;
+  } | null;
+  realizationSummary?: {
+    total: number;
+    installed: number;
+    photographed: number;
+    completed: number;
   } | null;
 };
 
