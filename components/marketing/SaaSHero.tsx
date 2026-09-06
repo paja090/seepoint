@@ -19,11 +19,11 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
             {/* Eyebrow Pill */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-purple-800/60 shadow-lg text-slate-200">
               <span className="flex size-2 rounded-full bg-purple-500 animate-ping" />
-              <span className="text-[11px] font-black tracking-widest uppercase text-purple-300">
+              <span className="text-xs font-black tracking-wider uppercase text-purple-300">
                 SEEPOINT OS
               </span>
               <span className="h-3 w-px bg-slate-800" />
-              <span className="text-xs font-bold text-slate-300">
+              <span className="text-xs sm:text-sm font-bold text-slate-200">
                 SaaS pro venkovní reklamu
               </span>
             </div>
@@ -42,7 +42,7 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
             </p>
 
             {/* Excel Lead Magnet Pill */}
-            <div className="p-3.5 rounded-2xl bg-purple-950/80 border border-purple-700 text-purple-200 text-xs font-bold flex items-center gap-2.5 shadow-xl">
+            <div className="p-3.5 rounded-2xl bg-purple-950/80 border border-purple-700 text-purple-200 text-xs sm:text-sm font-bold flex items-center gap-2.5 shadow-xl">
               <span className="text-lg">📊</span>
               <span>Pošlete nám Excel s 20 nosiči – zdarma vám připravíme ukázkovou živou mapu a klientskou nabídku.</span>
             </div>
@@ -64,7 +64,7 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
               <a
                 href="#produkt"
                 onClick={() => trackSaaSEvent('product_demo_clicked', { source: 'hero' })}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-extrabold text-xs border border-slate-700/80 shadow-lg transition"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-extrabold text-sm border border-slate-700/80 shadow-lg transition"
               >
                 <span>Prohlédnout platformu</span>
                 <ArrowRight className="w-4 h-4 text-purple-400" />
@@ -72,18 +72,18 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
             </div>
 
             {/* 3 Micro-Benefits Strip */}
-            <div className="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-bold text-slate-300">
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-purple-750 transition">
+            <div className="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs sm:text-sm font-bold text-slate-200">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-purple-750 transition">
                 <MapPin className="w-4 h-4 text-purple-400 shrink-0" />
-                <span className="text-[11px] leading-tight">Přehledná mapa všech nosičů</span>
+                <span className="leading-snug">Přehledná mapa všech nosičů</span>
               </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-emerald-750 transition">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-emerald-750 transition">
                 <BarChart3 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-[11px] leading-tight">Lepší přehled o volných kapacitách</span>
+                <span className="leading-snug">Přehled o volných kapacitách</span>
               </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-sky-750 transition">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-sky-750 transition">
                 <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0" />
-                <span className="text-[11px] leading-tight">Přehled ochranných pásem a pravidel</span>
+                <span className="leading-snug">Ochranná pásma a pravidla</span>
               </div>
             </div>
           </div>
@@ -104,14 +104,14 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
 
                 {/* Floating Micro-Badges on top of visual */}
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 text-[11px]">
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md shadow-lg">
-                    <Laptop className="w-3.5 h-3.5 text-purple-400" />
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-950/90 text-slate-100 border border-slate-700 backdrop-blur-md shadow-lg">
+                    <Laptop className="w-4 h-4 text-purple-400" />
                     <span className="font-bold">Webový dispečink</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-950/85 text-slate-200 border border-slate-800 backdrop-blur-md shadow-lg">
-                    <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-950/90 text-slate-100 border border-slate-700 backdrop-blur-md shadow-lg">
+                    <Smartphone className="w-4 h-4 text-emerald-400" />
                     <span className="font-bold">Mobilní aplikace montážníka</span>
                   </div>
                 </div>
@@ -122,32 +122,32 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
         {/* Key Pillars Strip with Animated Count-Ups */}
         <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-5xl mx-auto">
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-purple-700/60 transition group">
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-purple-700/60 transition group">
             <div className="text-purple-400 font-black text-2xl group-hover:scale-105 transition">
               <AnimatedCounter target={800} suffix="+" />
             </div>
-            <div className="text-xs font-semibold text-slate-400">Spravovaných nosičů</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-300">Spravovaných nosičů</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-indigo-700/60 transition group">
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-indigo-700/60 transition group">
             <div className="text-indigo-400 font-black text-2xl group-hover:scale-105 transition">
               <AnimatedCounter target={100} suffix=" %" />
             </div>
-            <div className="text-xs font-semibold text-slate-400">Kontrola nad nabídkami</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-300">Kontrola nad nabídkami</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-sky-700/60 transition group">
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-sky-700/60 transition group">
             <div className="text-sky-400 font-black text-2xl group-hover:scale-105 transition">
               <AnimatedCounter target={57} prefix="-" suffix=" %*" />
             </div>
-            <div className="text-xs font-semibold text-slate-400">Optimalizované trasy výjezdů</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-300">Optimalizované trasy výjezdů</div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-emerald-700/60 transition group">
+          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-emerald-700/60 transition group">
             <div className="text-emerald-400 font-black text-2xl group-hover:scale-105 transition">
               <AnimatedCounter target={60} prefix="Do " suffix=" s" />
             </div>
-            <div className="text-xs font-semibold text-slate-400">AI Sestavení nabídky</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-300">AI Sestavení nabídky</div>
           </div>
         </div>
       </div>

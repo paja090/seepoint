@@ -22,10 +22,10 @@ export function SaaSNetworkSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
                 <Share2 className="w-5 h-5" />
               </div>
               <div>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-950 text-blue-300 border border-blue-800">
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-blue-950 text-blue-300 border border-blue-800">
                   Připravujeme
                 </span>
-                <h3 className="text-xl sm:text-2xl font-black text-white mt-1">
+                <h3 className="text-xl sm:text-2xl font-black text-white mt-1.5">
                   Jedna nabídka. Vlastní i partnerské plochy.
                 </h3>
               </div>
@@ -34,10 +34,10 @@ export function SaaSNetworkSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
             <button
               type="button"
               onClick={handleNotifyMe}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg transition cursor-pointer self-start sm:self-auto"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg transition cursor-pointer self-start sm:self-auto"
             >
               <span>Chci vědět o spuštění</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
@@ -45,18 +45,18 @@ export function SaaSNetworkSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
             Do budoucna chceme umožnit OOH provozovatelům bezpečně sdílet vybrané volné kapacity a vytvářet meziměstské kampaně z jednoho systému.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
-              <strong className="text-white block font-bold">1. Kontrola nad nosiči</strong>
-              <span className="text-slate-400 text-[11px]">Sami si určíte, které plochy a za jakou cenu nabídnete do sítě.</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 text-sm">
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <strong className="text-white block font-bold text-sm">1. Kontrola nad nosiči</strong>
+              <span className="text-slate-300 text-xs leading-relaxed block">Sami si určíte, které plochy a za jakou cenu nabídnete do sítě.</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
-              <strong className="text-white block font-bold">2. Žádné sdílení klientů</strong>
-              <span className="text-slate-400 text-[11px]">Vaši klienti zůstávají výhradně vaši. Partneři vidí pouze zakázku na instalaci.</span>
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <strong className="text-white block font-bold text-sm">2. Žádné sdílení klientů</strong>
+              <span className="text-slate-300 text-xs leading-relaxed block">Vaši klienti zůstávají výhradně vaši. Partneři vidí pouze zakázku na instalaci.</span>
             </div>
-            <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
-              <strong className="text-white block font-bold">3. Kampaně po celé ČR</strong>
-              <span className="text-slate-400 text-[11px]">Možnost nabídnout klientovi plochy v dalších městech bez budování vlastních sloupů.</span>
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
+              <strong className="text-white block font-bold text-sm">3. Kampaně po celé ČR</strong>
+              <span className="text-slate-300 text-xs leading-relaxed block">Možnost nabídnout klientovi plochy v dalších městech bez budování vlastních sloupů.</span>
             </div>
           </div>
         </div>

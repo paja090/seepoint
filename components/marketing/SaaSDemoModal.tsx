@@ -65,22 +65,22 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
         {/* Modal Header */}
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-950 text-purple-300 text-[11px] font-black uppercase tracking-wider border border-purple-800">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-950 text-purple-300 text-xs font-black uppercase tracking-wider border border-purple-800">
             <Sparkles className="w-3.5 h-3.5" />
             <span>SEEPOINT OS DEMO & VIZUALIZACE ZDARMA</span>
           </div>
           <h3 className="text-2xl font-black text-white tracking-tight">Domluvit ukázku & Vizualizace z Excelu zdarma</h3>
-          <p className="text-xs text-slate-400 font-medium">
+          <p className="text-sm text-slate-300 font-medium">
             Projdeme s vámi SeePoint OS a zašleme vám **živou interaktivní mapu i klientskou nabídku z vašich vlastních nosičů zdarma**.
           </p>
         </div>
 
         {/* Free Excel Visualization Banner */}
-        <div className="rounded-2xl border border-purple-800/80 bg-gradient-to-r from-purple-950/90 to-indigo-950/90 p-3.5 flex items-start gap-3 shadow-lg">
-          <span className="text-xl">📊</span>
-          <div className="space-y-0.5">
-            <h4 className="text-xs font-bold text-purple-200">Vyzkoušejte SeePoint OS na vašich vlastních datech</h4>
-            <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
+        <div className="rounded-2xl border border-purple-800/80 bg-gradient-to-r from-purple-950/90 to-indigo-950/90 p-4 flex items-start gap-3.5 shadow-lg">
+          <span className="text-2xl">📊</span>
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-purple-200">Vyzkoušejte SeePoint OS na vašich vlastních datech</h4>
+            <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
               Pošlete nám váš Excel např. s 20 nosiči. Do 24 hodin vám zdarma vygenerujeme interaktivní mapu sítě i ukázkovou nabídku pod vaší vlastní značkou!
             </p>
           </div>
@@ -91,11 +91,11 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           <div className="rounded-2xl border border-emerald-800 bg-emerald-950/80 p-6 text-center space-y-3">
             <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
             <h4 className="font-black text-lg text-white">Žádost byla odeslána!</h4>
-            <p className="text-xs text-emerald-200 font-medium leading-relaxed">{successMessage}</p>
+            <p className="text-sm text-emerald-200 font-medium leading-relaxed">{successMessage}</p>
             <button
               type="button"
               onClick={onClose}
-              className="mt-4 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+              className="mt-4 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm"
             >
               Zavřít okno
             </button>
@@ -103,14 +103,14 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {errorMessage && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-950 border border-rose-800 text-rose-200 text-xs font-bold">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-950 border border-rose-800 text-rose-200 text-xs sm:text-sm font-bold">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-300">Jméno a příjmení *</label>
+              <label className="block text-sm font-bold text-slate-200">Jméno a příjmení *</label>
               <input
                 type="text"
                 required
@@ -119,32 +119,32 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   if (!name) trackSaaSEvent('demo_form_started');
                   setName(e.target.value);
                 }}
-                className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs font-medium focus:border-purple-600 focus:outline-none"
+                className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-sm font-medium focus:border-purple-600 focus:outline-none"
                 placeholder="Jan Novák"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300">Firemní e-mail *</label>
+                <label className="block text-sm font-bold text-slate-200">Firemní e-mail *</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs font-medium focus:border-purple-600 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-sm font-medium focus:border-purple-600 focus:outline-none"
                   placeholder="jan@reklamka.cz"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300">Firma / Agentura *</label>
+                <label className="block text-sm font-bold text-slate-200">Firma / Agentura *</label>
                 <input
                   type="text"
                   required
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs font-medium focus:border-purple-600 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-sm font-medium focus:border-purple-600 focus:outline-none"
                   placeholder="Moje Reklamka s.r.o."
                 />
               </div>
@@ -152,22 +152,22 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300">Telefonní číslo</label>
+                <label className="block text-sm font-bold text-slate-200">Telefonní číslo</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs font-medium focus:border-purple-600 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-sm font-medium focus:border-purple-600 focus:outline-none"
                   placeholder="+420 777 000 000"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300">Počet reklamních ploch</label>
+                <label className="block text-sm font-bold text-slate-200">Počet reklamních ploch</label>
                 <select
                   value={surfaceCount}
                   onChange={(e) => setSurfaceCount(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-xs font-medium focus:border-purple-600 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 text-white text-sm font-medium focus:border-purple-600 focus:outline-none"
                 >
                   <option value="">Vyberte počet nosičů...</option>
                   <option value="Do 50 nosičů">Do 50 nosičů</option>

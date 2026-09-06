@@ -50,11 +50,11 @@ export function SaaSHeader({
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="font-black text-xl tracking-tight text-white">SeePoint</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-purple-950 text-purple-300 border border-purple-800/80">
+              <span className="px-2 py-0.5 rounded-full text-xs font-black tracking-wider uppercase bg-purple-950 text-purple-300 border border-purple-800/80">
                 OS
               </span>
             </div>
-            <span className="text-[10px] font-medium text-slate-400 -mt-0.5">Operační systém pro outdoor</span>
+            <span className="text-xs font-semibold text-slate-300 -mt-0.5">Operační systém pro outdoor</span>
           </div>
         </Link>
 
@@ -64,7 +64,7 @@ export function SaaSHeader({
             <a
               key={item.label}
               href={item.href}
-              className="px-4 py-2 rounded-full text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/80 transition"
+              className="px-4 py-2 rounded-full text-sm font-bold text-slate-200 hover:text-white hover:bg-slate-800/80 transition"
               onClick={() => {
                 if (item.href === '#ai') trackSaaSEvent('ai_section_viewed');
                 if (item.href === '#cenik') trackSaaSEvent('pricing_viewed');
@@ -80,15 +80,15 @@ export function SaaSHeader({
           {isLoggedIn ? (
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs border border-slate-700 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-sm border border-slate-700 transition"
             >
-              <User className="w-3.5 h-3.5 text-purple-400" />
+              <User className="w-4 h-4 text-purple-400" />
               <span>Přejít do aplikace</span>
             </Link>
           ) : (
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 font-bold text-sm border border-slate-750 transition"
             >
               <span>Přihlásit se</span>
             </Link>
@@ -100,9 +100,9 @@ export function SaaSHeader({
               trackSaaSEvent('demo_cta_clicked', { source: 'header' });
               onOpenDemoModal();
             }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg transition transform active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-sm shadow-lg transition transform active:scale-95 cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-purple-200 animate-pulse" />
+            <Sparkles className="w-4 h-4 text-purple-200 animate-pulse" />
             <span>Domluvit ukázku</span>
           </button>
         </div>

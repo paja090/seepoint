@@ -53,7 +53,7 @@ export function SaaSFinalCta({ onOpenDemoModal }: { onOpenDemoModal: () => void 
           </button>
         </div>
 
-        <div className="pt-4 flex items-center justify-center gap-2 text-xs text-slate-400 font-semibold">
+        <div className="pt-4 flex items-center justify-center gap-2 text-sm text-slate-300 font-semibold">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
           <span>Bezplatná příprava · Bez závazků · Pomoc s převodem tabulek</span>
         </div>

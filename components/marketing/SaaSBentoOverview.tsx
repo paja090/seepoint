@@ -39,7 +39,7 @@ export function SaaSBentoOverview() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
+          <span className="text-xs font-black uppercase tracking-wider text-purple-400">
             PŘÍNOSY PRO VÁŠ PROVOZ
           </span>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
@@ -64,13 +64,13 @@ export function SaaSBentoOverview() {
                     <div className={`p-3 rounded-2xl border ${b.color}`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-900 text-slate-300 border border-slate-750">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase bg-slate-900 text-slate-300 border border-slate-750">
                       {b.badge}
                     </span>
                   </div>
 
                   <h3 className="text-lg font-black text-white">{b.title}</h3>
-                  <p className="text-xs text-slate-400 font-medium leading-relaxed">{b.desc}</p>
+                  <p className="text-sm text-slate-300 font-medium leading-relaxed">{b.desc}</p>
                 </div>
               </div>
             );

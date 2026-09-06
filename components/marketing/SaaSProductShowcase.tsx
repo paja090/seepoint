@@ -204,13 +204,13 @@ export function SaaSProductShowcase() {
               <span className="size-3 rounded-full bg-rose-500/80" />
               <span className="size-3 rounded-full bg-amber-500/80" />
               <span className="size-3 rounded-full bg-emerald-500/80" />
-              <span className="ml-2 text-xs font-bold text-slate-400 font-mono">
+              <span className="ml-2 text-xs font-bold text-slate-300 font-mono">
                 os.seepoint.cz / {getTabPath()}
               </span>
             </div>
 
             <div className="hidden sm:flex items-center gap-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Interaktivní ukázka SeePoint OS
               </span>
@@ -225,16 +225,16 @@ export function SaaSProductShowcase() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
                   <div>
                     <h3 className="text-lg font-black text-white">Živá interaktivní mapa nosičů</h3>
-                    <p className="text-xs text-slate-400 font-medium">
+                    <p className="text-sm text-slate-300 font-medium">
                       Vyzkoušejte si kliknout na nosiče na mapě, prohlédnout detaily, obsazenost a chráněné památkové zóny.
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-200">
+                    <span className="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold bg-slate-800 text-slate-200">
                       Všechny typy médií (6)
                     </span>
-                    <span className="px-3 py-1 rounded-lg text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    <span className="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                       ● Volné nosiče
                     </span>
                   </div>
@@ -253,7 +253,7 @@ export function SaaSProductShowcase() {
                     <h3 className="text-lg font-black text-white">
                       {inventorySubTab === 'catalog' ? 'Katalog reklamních nosičů a ploch' : 'Plánovač obsazenosti nosičů'}
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm text-slate-300">
                       {inventorySubTab === 'catalog'
                         ? 'Přehledná evidence nosičů s GPS, technickými rozměry a fotografiemi'
                         : 'Kalendářní přehled volných, rezervovaných a obsazených kapacit'}
@@ -264,10 +264,10 @@ export function SaaSProductShowcase() {
                     <button
                       type="button"
                       onClick={() => setInventorySubTab('catalog')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
                         inventorySubTab === 'catalog'
                           ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-slate-400 hover:text-white'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       Katalog nosičů
@@ -275,10 +275,10 @@ export function SaaSProductShowcase() {
                     <button
                       type="button"
                       onClick={() => setInventorySubTab('occupancy')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
                         inventorySubTab === 'occupancy'
                           ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-slate-400 hover:text-white'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       Kalendář obsazenosti
@@ -288,8 +288,8 @@ export function SaaSProductShowcase() {
 
                 {inventorySubTab === 'catalog' ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs text-slate-300 font-medium">
-                      <thead className="bg-slate-900 text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800">
+                    <table className="w-full text-left text-sm text-slate-200 font-medium">
+                      <thead className="bg-slate-900 text-slate-300 uppercase font-bold tracking-wider border-b border-slate-800 text-xs">
                         <tr>
                           <th className="p-3">Kód</th>
                           <th className="p-3">Název a adresa</th>
@@ -306,7 +306,7 @@ export function SaaSProductShowcase() {
                           <td className="p-3">City Poster (CLP)</td>
                           <td className="p-3">Ostrava centrum</td>
                           <td className="p-3">
-                            <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                               Aktivní · Výborný
                             </span>
                           </td>
@@ -318,7 +318,7 @@ export function SaaSProductShowcase() {
                           <td className="p-3">Promo Tower</td>
                           <td className="p-3">Ostrava jih</td>
                           <td className="p-3">
-                            <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                               Aktivní · Kompletní
                             </span>
                           </td>
@@ -330,7 +330,7 @@ export function SaaSProductShowcase() {
                           <td className="p-3">Navigační tabule</td>
                           <td className="p-3">Opava</td>
                           <td className="p-3">
-                            <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                               Povoleno městem
                             </span>
                           </td>
@@ -341,7 +341,7 @@ export function SaaSProductShowcase() {
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-3">
-                    <div className="grid grid-cols-6 gap-2 text-center text-xs font-bold text-slate-400 border-b border-slate-800 pb-2">
+                    <div className="grid grid-cols-6 gap-2 text-center text-xs sm:text-sm font-bold text-slate-300 border-b border-slate-800 pb-2">
                       <div>Nosič</div>
                       <div>Září</div>
                       <div>Říjen</div>
@@ -350,22 +350,22 @@ export function SaaSProductShowcase() {
                       <div>Leden</div>
                     </div>
 
-                    <div className="grid grid-cols-6 gap-2 items-center text-xs p-2 rounded bg-slate-900/80">
+                    <div className="grid grid-cols-6 gap-2 items-center text-xs sm:text-sm p-2 rounded bg-slate-900/80">
                       <div className="font-bold text-white">Tower Místecká</div>
                       <div className="p-2 rounded bg-emerald-950 text-emerald-300 text-center font-bold">Obsazeno (KFC)</div>
                       <div className="p-2 rounded bg-emerald-950 text-emerald-300 text-center font-bold">Obsazeno (KFC)</div>
                       <div className="p-2 rounded bg-amber-950 text-amber-300 text-center font-bold">Rezervace</div>
-                      <div className="p-2 rounded bg-slate-800 text-slate-400 text-center">Volno</div>
-                      <div className="p-2 rounded bg-slate-800 text-slate-400 text-center">Volno</div>
+                      <div className="p-2 rounded bg-slate-800 text-slate-300 text-center">Volno</div>
+                      <div className="p-2 rounded bg-slate-800 text-slate-300 text-center">Volno</div>
                     </div>
 
-                    <div className="grid grid-cols-6 gap-2 items-center text-xs p-2 rounded bg-slate-900/80">
+                    <div className="grid grid-cols-6 gap-2 items-center text-xs sm:text-sm p-2 rounded bg-slate-900/80">
                       <div className="font-bold text-white">CLP 28. října</div>
                       <div className="p-2 rounded bg-emerald-950 text-emerald-300 text-center font-bold">Obsazeno (Primark)</div>
                       <div className="p-2 rounded bg-emerald-950 text-emerald-300 text-center font-bold">Obsazeno (Primark)</div>
                       <div className="p-2 rounded bg-emerald-950 text-emerald-300 text-center font-bold">Obsazeno (Primark)</div>
                       <div className="p-2 rounded bg-emerald-950 text-emerald-300 text-center font-bold">Obsazeno (Vánoce)</div>
-                      <div className="p-2 rounded bg-slate-800 text-slate-400 text-center">Volno</div>
+                      <div className="p-2 rounded bg-slate-800 text-slate-300 text-center">Volno</div>
                     </div>
                   </div>
                 )}
@@ -378,9 +378,9 @@ export function SaaSProductShowcase() {
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div>
                     <h3 className="text-lg font-black text-white">Interaktivní klientské nabídky</h3>
-                    <p className="text-xs text-slate-400">Digitální nabídka pro klienta s mapou a fotkami bez nutnosti zdlouhavého skládání PDF</p>
+                    <p className="text-sm text-slate-300">Digitální nabídka pro klienta s mapou a fotkami bez nutnosti zdlouhavého skládání PDF</p>
                   </div>
-                  <span className="px-3 py-1 rounded-lg text-xs font-bold bg-purple-950 text-purple-300 border border-purple-800">
+                  <span className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold bg-purple-950 text-purple-300 border border-purple-800">
                     🌐 Veřejný klientský odkaz
                   </span>
                 </div>
@@ -388,30 +388,30 @@ export function SaaSProductShowcase() {
                 <div className="rounded-2xl border border-purple-800/80 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 p-5 space-y-4 shadow-xl">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
+                      <span className="px-3 py-1 rounded text-xs font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
                         Vzorová nabídka
                       </span>
-                      <h4 className="text-base font-bold text-white mt-1">Koncept OOH kampaně – Primark Ostrava</h4>
-                      <p className="text-xs text-slate-400">12 vybraných prémiových nosičů v okolí prodejny</p>
+                      <h4 className="text-base sm:text-lg font-bold text-white mt-1.5">Koncept OOH kampaně – Primark Ostrava</h4>
+                      <p className="text-sm text-slate-300">12 vybraných prémiových nosičů v okolí prodejny</p>
                     </div>
 
-                    <span className="px-3 py-1 rounded-xl text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    <span className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
                       Klient si může vybrat nosiče online
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block">Lokalita kampaně</span>
-                      <strong className="text-white">Centrum + OC Nová Karolina</strong>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-300 block text-xs">Lokalita kampaně</span>
+                      <strong className="text-white text-sm">Centrum + OC Nová Karolina</strong>
                     </div>
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block">Skladba nosičů</span>
-                      <strong className="text-white">Tower (4s) + 6x CLP + 2x Lavička</strong>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-300 block text-xs">Skladba nosičů</span>
+                      <strong className="text-white text-sm">Tower (4s) + 6x CLP + 2x Lavička</strong>
                     </div>
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block">Interaktivní schválení</span>
-                      <strong className="text-emerald-400">1-klik schválení klientem</strong>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-300 block text-xs">Interaktivní schválení</span>
+                      <strong className="text-emerald-400 text-sm">1-klik schválení klientem</strong>
                     </div>
                   </div>
                 </div>
@@ -427,7 +427,7 @@ export function SaaSProductShowcase() {
                       <Navigation className="w-5 h-5 text-emerald-400" />
                       <span>Plánovač tras montáží a výjezdů v terénu</span>
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm text-slate-300">
                       Montážník má na daný den více výjezdů. Podívejte se, jak systém seřadí zastávky do logické trasy.
                     </p>
                   </div>
@@ -436,7 +436,7 @@ export function SaaSProductShowcase() {
                     type="button"
                     onClick={handleSimulateRoute}
                     disabled={optimizing}
-                    className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-2"
+                    className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm shadow-lg transition transform active:scale-95 cursor-pointer flex items-center gap-2"
                   >
                     {optimizing ? (
                       <>
@@ -455,12 +455,12 @@ export function SaaSProductShowcase() {
                 {/* Route Result Comparison Box */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
                       Původní neoptimalizovaná trasa (modelový příklad)
                     </span>
                     <div className="text-2xl font-black text-rose-400">42.8 km · 110 min</div>
-                    <p className="text-xs text-slate-400">Náhodné pořadí zakázek dle data zadání (křížení po městě).</p>
-                    <div className="text-xs text-slate-500 font-mono space-y-1 pt-2 border-t border-slate-900">
+                    <p className="text-sm text-slate-300">Náhodné pořadí zakázek dle data zadání (křížení po městě).</p>
+                    <div className="text-xs sm:text-sm text-slate-300 font-mono space-y-1 pt-2 border-t border-slate-900">
                       <div>1. Poruba → 2. Havířov → 3. Centrum → 4. Vítkovice</div>
                     </div>
                   </div>
@@ -473,20 +473,20 @@ export function SaaSProductShowcase() {
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">
                         Optimalizováno SeePoint trasováním
                       </span>
                       {routeOptimized && (
-                        <span className="px-2 py-0.5 rounded bg-emerald-900 text-emerald-200 text-[10px] font-black">
+                        <span className="px-2.5 py-0.5 rounded bg-emerald-900 text-emerald-200 text-xs font-black">
                           Modelová úspora: -57 % km
                         </span>
                       )}
                     </div>
                     <div className="text-2xl font-black text-emerald-400">18.4 km · 45 min</div>
-                    <p className="text-xs text-slate-300">
+                    <p className="text-sm text-slate-200">
                       Seřazeno podle nejkratší trasy s 1-klik otevřením do Google Maps / Waze.
                     </p>
-                    <div className="text-xs text-emerald-300 font-mono space-y-1 pt-2 border-t border-emerald-900/60">
+                    <div className="text-xs sm:text-sm text-emerald-300 font-mono space-y-1 pt-2 border-t border-emerald-900/60">
                       <div>1. Poruba → 2. Vítkovice → 3. Centrum → 4. Havířov</div>
                     </div>
                   </div>
@@ -498,16 +498,15 @@ export function SaaSProductShowcase() {
             {activeTab === 'ai' && (
               <div className="space-y-5">
                 {/* Inner Subtab Toggle */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
                   <div>
-                    <h3 className="text-lg font-black text-white flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-purple-400" />
-                      <span>{aiSubTab === 'offers' ? 'AI Generátor nabídek' : 'AI Sklad & Účtenky z mobilu'}</span>
+                    <h3 className="text-lg font-black text-white">
+                      {aiSubTab === 'offers' ? 'AI Asistent pro kampaňové nabídky' : 'AI Vytěžování účtenek a skladu'}
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm text-slate-300">
                       {aiSubTab === 'offers'
-                        ? 'Generování klientských konceptů podle textového zadání'
-                        : 'Vytěžování fotografií účtenek za pohonné hmoty a materiál'}
+                        ? 'Zadání parametrů kampaně v přirozeném jazyce – AI vybere vhodné volné nosiče.'
+                        : 'Vyfoťte účtenku z benzinky nebo regál v dílně – AI rozpozná položky a zaeviduje je.'}
                     </p>
                   </div>
 
@@ -515,66 +514,46 @@ export function SaaSProductShowcase() {
                     <button
                       type="button"
                       onClick={() => setAiSubTab('offers')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
                         aiSubTab === 'offers'
                           ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-slate-400 hover:text-white'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
-                      AI Nabídky
+                      🤖 AI Nabídky
                     </button>
                     <button
                       type="button"
                       onClick={() => setAiSubTab('warehouse')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
                         aiSubTab === 'warehouse'
                           ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-slate-400 hover:text-white'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
-                      AI Sklad & Účtenky
+                      📷 AI Účtenky & Sklad
                     </button>
                   </div>
                 </div>
 
                 {aiSubTab === 'offers' ? (
                   <div className="space-y-4">
-                    {/* Preset Prompt Buttons */}
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="text"
+                        value={aiClientInput}
+                        onChange={(e) => setAiClientInput(e.target.value)}
+                        placeholder="Např. Potraviny, Ostrava, 40 000 Kč..."
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-purple-600"
+                      />
                       <button
                         type="button"
-                        onClick={() => handleSimulateAiOffer('Autoservis Ostrava')}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                          selectedAiPrompt === 'Autoservis Ostrava'
-                            ? 'bg-purple-600 text-white border-purple-400 shadow-lg'
-                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
-                        }`}
+                        onClick={handleRunAiOffer}
+                        disabled={isGeneratingAiOffer}
+                        className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
                       >
-                        🚗 Kampaň pro Autoservis (Ostrava)
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSimulateAiOffer('Restaurace & Fast Food')}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                          selectedAiPrompt === 'Restaurace & Fast Food'
-                            ? 'bg-purple-600 text-white border-purple-400 shadow-lg'
-                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
-                        }`}
-                      >
-                        🍔 Navigační cedule pro Restauraci (D1)
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSimulateAiOffer('Městský Festival')}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
-                          selectedAiPrompt === 'Městský Festival'
-                            ? 'bg-purple-600 text-white border-purple-400 shadow-lg'
-                            : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'
-                        }`}
-                      >
-                        🎪 Letní Festival (Havířov)
+                        <Sparkles className="w-4 h-4" />
+                        <span>Sestavit AI návrh</span>
                       </button>
                     </div>
 
@@ -589,27 +568,27 @@ export function SaaSProductShowcase() {
                         <div className="p-5 rounded-2xl bg-gradient-to-r from-purple-950/70 via-slate-950 to-indigo-950/70 border border-purple-700/80 space-y-4 shadow-xl">
                           <div className="flex items-center justify-between border-b border-purple-800/60 pb-3">
                             <div>
-                              <span className="text-[10px] font-black uppercase text-purple-300 tracking-wider">
+                              <span className="text-xs font-black uppercase text-purple-300 tracking-wider">
                                 AI Vygenerovaná kampaň
                               </span>
-                              <h4 className="text-base font-black text-white">{generatedAiResult.client}</h4>
+                              <h4 className="text-base sm:text-lg font-black text-white">{generatedAiResult.client}</h4>
                             </div>
-                            <span className="px-3 py-1 rounded-xl text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            <span className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
                               {generatedAiResult.budget}
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-300 leading-relaxed font-medium">{generatedAiResult.summary}</p>
+                          <p className="text-sm text-slate-200 leading-relaxed font-medium">{generatedAiResult.summary}</p>
 
                           <div className="space-y-1.5 pt-1">
-                            <span className="text-[11px] font-bold text-slate-400 block uppercase">
+                            <span className="text-xs font-bold text-slate-300 block uppercase">
                               Doporučené nosiče ze sítě:
                             </span>
                             <div className="flex flex-wrap gap-2">
                               {generatedAiResult.carriers.map((c, i) => (
                                 <span
                                   key={i}
-                                  className="px-3 py-1 rounded-lg bg-slate-900 text-xs font-bold text-purple-200 border border-purple-800/80"
+                                  className="px-3 py-1.5 rounded-lg bg-slate-900 text-xs sm:text-sm font-bold text-purple-200 border border-purple-800/80"
                                 >
                                   📍 {c}
                                 </span>
@@ -626,10 +605,10 @@ export function SaaSProductShowcase() {
                       <button
                         type="button"
                         onClick={() => setSelectedReceipt('fuel')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
                           selectedReceipt === 'fuel'
                             ? 'bg-amber-600 text-white border-amber-400'
-                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                            : 'bg-slate-900 text-slate-300 border-slate-800'
                         }`}
                       >
                         ⛽ Účtenka za palivo
@@ -637,10 +616,10 @@ export function SaaSProductShowcase() {
                       <button
                         type="button"
                         onClick={() => setSelectedReceipt('tools')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
                           selectedReceipt === 'tools'
                             ? 'bg-amber-600 text-white border-amber-400'
-                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                            : 'bg-slate-900 text-slate-300 border-slate-800'
                         }`}
                       >
                         📦 Nářadí & Regál dílny
@@ -653,32 +632,32 @@ export function SaaSProductShowcase() {
                         <>
                           <div className="flex items-center justify-between border-b border-amber-800/60 pb-3">
                             <div>
-                              <span className="text-[10px] font-black uppercase text-amber-300">
+                              <span className="text-xs font-black uppercase text-amber-300">
                                 Vytěženo z fotografie účtenky
                               </span>
-                              <h4 className="text-base font-black text-white">ORLEN Benzina – Ostrava Rudná</h4>
+                              <h4 className="text-base sm:text-lg font-black text-white">ORLEN Benzina – Ostrava Rudná</h4>
                             </div>
-                            <span className="px-3 py-1 rounded-xl text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
+                            <span className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black bg-emerald-950 text-emerald-300 border border-emerald-800">
                               1 450,50 Kč
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                              <span className="text-slate-400 block">Palivo</span>
-                              <strong className="text-white">Diesel (Efecta)</strong>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                              <span className="text-slate-300 block text-xs">Palivo</span>
+                              <strong className="text-white text-sm">Diesel (Efecta)</strong>
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                              <span className="text-slate-400 block">Objem</span>
-                              <strong className="text-white">38,50 litrů</strong>
+                            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                              <span className="text-slate-300 block text-xs">Objem</span>
+                              <strong className="text-white text-sm">38,50 litrů</strong>
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                              <span className="text-slate-400 block">Tachometr</span>
-                              <strong className="text-white">184 250 km</strong>
+                            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                              <span className="text-slate-300 block text-xs">Tachometr</span>
+                              <strong className="text-white text-sm">184 250 km</strong>
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                              <span className="text-slate-400 block">Stav</span>
-                              <strong className="text-emerald-400">Přiřazeno k vozidlu montážníka</strong>
+                            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                              <span className="text-slate-300 block text-xs">Stav</span>
+                              <strong className="text-emerald-400 text-sm">Přiřazeno k vozidlu</strong>
                             </div>
                           </div>
                         </>
@@ -686,31 +665,31 @@ export function SaaSProductShowcase() {
                         <>
                           <div className="flex items-center justify-between border-b border-amber-800/60 pb-3">
                             <div>
-                              <span className="text-[10px] font-black uppercase text-amber-300">
+                              <span className="text-xs font-black uppercase text-amber-300">
                                 AI Detekce materiálu v dílně
                               </span>
-                              <h4 className="text-base font-black text-white">Rozpoznané položky z fotky regálu</h4>
+                              <h4 className="text-base sm:text-lg font-black text-white">Rozpoznané položky z fotky regálu</h4>
                             </div>
-                            <span className="px-3 py-1 rounded-xl text-xs font-black bg-amber-950 text-amber-300 border border-amber-800">
+                            <span className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-black bg-amber-950 text-amber-300 border border-amber-800">
                               4 položky detekovány
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
                               <div>
-                                <strong className="text-white block">Stahovací pásky černé 500mm</strong>
-                                <span className="text-slate-400">Regál B2 - Spojovací materiál</span>
+                                <strong className="text-white block text-sm">Stahovací pásky černé 500mm</strong>
+                                <span className="text-slate-300 text-xs">Regál B2 - Spojovací materiál</span>
                               </div>
-                              <span className="font-bold text-amber-400">5 balení (500 ks)</span>
+                              <span className="font-bold text-amber-400 text-sm">5 balení (500 ks)</span>
                             </div>
 
-                            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
                               <div>
-                                <strong className="text-white block">Aku vrtačka DeWalt 18V</strong>
-                                <span className="text-slate-400">Regál A1 - Vratné nářadí</span>
+                                <strong className="text-white block text-sm">Aku vrtačka DeWalt 18V</strong>
+                                <span className="text-slate-300 text-xs">Regál A1 - Vratné nářadí</span>
                               </div>
-                              <span className="font-bold text-emerald-400">2 sady</span>
+                              <span className="font-bold text-emerald-400 text-sm">2 sady</span>
                             </div>
                           </div>
                         </>

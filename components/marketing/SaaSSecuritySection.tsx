@@ -30,7 +30,7 @@ export function SaaSSecuritySection() {
     <section className="py-16 bg-slate-900/30 border-t border-slate-850 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
+          <span className="text-xs font-black uppercase tracking-wider text-purple-400">
             DŮVĚRA & ZABEZPEČENÍ
           </span>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
@@ -49,8 +49,8 @@ export function SaaSSecuritySection() {
                 <div className="size-10 rounded-2xl bg-purple-950 text-purple-300 border border-purple-800 flex items-center justify-center font-black">
                   <Icon className="w-5 h-5" />
                 </div>
-                <h3 className="text-sm font-bold text-white">{sec.title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{sec.desc}</p>
+                <h3 className="text-base font-bold text-white">{sec.title}</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">{sec.desc}</p>
               </div>
             );
           })}

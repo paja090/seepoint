@@ -111,13 +111,13 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
                   </div>
 
                   <div className="space-y-1.5">
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-950/90 text-purple-300 border border-purple-800">
+                    <span className="px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-950/90 text-purple-300 border border-purple-800">
                       Ukázka v reálném provozu
                     </span>
                     <h3 className="text-lg sm:text-2xl font-black text-white">
                       Podívejte se, jak SeePoint funguje v praxi
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-300 font-medium">
+                    <p className="text-sm text-slate-300 font-medium">
                       Krátké video představující kompletní flow od výběru nosiče na mapě přes klientský odkaz až po fotodokumentaci montážníka.
                     </p>
                   </div>
@@ -128,7 +128,7 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
                       trackSaaSEvent('product_video_cta_clicked', { source: 'video_placeholder' });
                       onOpenDemoModal();
                     }}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg transition cursor-pointer"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg transition cursor-pointer"
                   >
                     <span>Domluvit živou ukázku systému</span>
                   </button>
@@ -143,9 +143,9 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-purple-400">
               <MapPin className="w-4 h-4" />
-              <strong className="text-xs font-black text-white">1. Mapa a obsazenost</strong>
+              <strong className="text-sm font-black text-white">1. Mapa a obsazenost</strong>
             </div>
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
               Filtrování volných nosičů v reálném čase, památkové zóny a detailní technické parametry plochy.
             </p>
           </div>
@@ -153,9 +153,9 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-indigo-400">
               <FileText className="w-4 h-4" />
-              <strong className="text-xs font-black text-white">2. Nabídka klientovi</strong>
+              <strong className="text-sm font-black text-white">2. Nabídka klientovi</strong>
             </div>
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
               Vygenerování reprezentativní prezentace s fotografiemi a veřejným klientským odkazem do 60 sekund.
             </p>
           </div>
@@ -163,9 +163,9 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-emerald-400">
               <Camera className="w-4 h-4" />
-              <strong className="text-xs font-black text-white">3. Realizace a fotodokumentace</strong>
+              <strong className="text-sm font-black text-white">3. Realizace a fotodokumentace</strong>
             </div>
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
               Automatické předání zakázky do mobilu montážníka, GPS navigace a okamžité nahrání hotové instalace.
             </p>
           </div>

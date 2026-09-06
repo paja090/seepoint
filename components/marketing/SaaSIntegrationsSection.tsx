@@ -21,7 +21,7 @@ export function SaaSIntegrationsSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
+          <span className="text-xs font-black uppercase tracking-wider text-purple-400">
             INTEGRACE & ROZHRANÍ
           </span>
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
@@ -42,12 +42,12 @@ export function SaaSIntegrationsSection() {
                   <div className="size-10 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center font-black">
                     <IconComp className={`w-5 h-5 ${ig.color}`} />
                   </div>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                     Aktivní
                   </span>
                 </div>
-                <h3 className="text-sm font-bold text-white">{ig.title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{ig.desc}</p>
+                <h3 className="text-base font-bold text-white">{ig.title}</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">{ig.desc}</p>
               </div>
             );
           })}
@@ -57,16 +57,16 @@ export function SaaSIntegrationsSection() {
         <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-amber-400" />
-            <h3 className="text-xs font-bold text-amber-200 uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wider">
               Plánované integrace (Připravujeme)
             </h3>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {upcomingIntegrations.map((up) => (
-              <div key={up.title} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-0.5">
-                <strong className="text-xs font-bold text-slate-200 block">{up.title}</strong>
-                <span className="text-[11px] text-slate-400">{up.desc}</span>
+              <div key={up.title} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+                <strong className="text-sm font-bold text-slate-100 block">{up.title}</strong>
+                <span className="text-xs text-slate-300 block">{up.desc}</span>
               </div>
             ))}
           </div>

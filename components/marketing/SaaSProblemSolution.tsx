@@ -67,11 +67,11 @@ export function SaaSProblemSolution() {
                     ✕
                   </div>
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-400">STARÝ ZPŮSOB PRÁCE</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-rose-400">STARÝ ZPŮSOB PRÁCE</span>
                     <h3 className="text-xl font-black text-white">Rozdrobené tabulky & chaty</h3>
                   </div>
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-rose-950/80 text-rose-300 border border-rose-900">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-950/80 text-rose-300 border border-rose-900">
                   Ztráta času
                 </span>
               </div>
@@ -80,12 +80,12 @@ export function SaaSProblemSolution() {
                 {comparisonList.map((item, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-2xl bg-rose-950/15 border border-rose-900/30 flex items-start gap-3 space-y-0.5"
+                    className="p-3.5 rounded-2xl bg-rose-950/20 border border-rose-900/40 flex items-start gap-3 space-y-0.5"
                   >
                     <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-xs font-bold text-slate-200 block">{item.title}</strong>
-                      <span className="text-[11px] font-medium text-rose-200/80 leading-relaxed">{item.old}</span>
+                      <strong className="text-sm font-bold text-slate-100 block">{item.title}</strong>
+                      <span className="text-xs sm:text-sm font-medium text-rose-200 leading-relaxed">{item.old}</span>
                     </div>
                   </div>
                 ))}
@@ -93,14 +93,14 @@ export function SaaSProblemSolution() {
             </div>
 
             <div className="pt-4 border-t border-rose-950/80 text-center">
-              <span className="text-xs text-slate-400 font-semibold">❌ Výsledek: Zmatky v týmu, pomalé nabídky a zbytečné náklady</span>
+              <span className="text-xs sm:text-sm text-slate-300 font-semibold">❌ Výsledek: Zmatky v týmu, pomalé nabídky a zbytečné náklady</span>
             </div>
           </div>
 
           {/* RIGHT: NEW WAY (SEEPOINT OS) */}
           <div className="lg:col-span-6 rounded-3xl border-2 border-purple-500/80 bg-gradient-to-b from-purple-950/50 via-slate-950 to-indigo-950/40 p-6 sm:p-8 space-y-6 shadow-2xl ring-2 ring-purple-500/20 flex flex-col justify-between relative">
             {/* Top Recommended Tag */}
-            <span className="absolute -top-3.5 right-6 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
+            <span className="absolute -top-3.5 right-6 px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
               ✨ SEEPOINT OS 2.0
             </span>
 
@@ -111,11 +111,11 @@ export function SaaSProblemSolution() {
                     ✓
                   </div>
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-300">MODERNÍ STANDARD OOH</span>
+                    <span className="text-xs font-black uppercase tracking-wider text-purple-300">MODERNÍ STANDARD OOH</span>
                     <h3 className="text-xl font-black text-white">Vše v jednom systému</h3>
                   </div>
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
                   Rychlost & Růst
                 </span>
               </div>
@@ -129,11 +129,11 @@ export function SaaSProblemSolution() {
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                       <div>
-                        <strong className="text-xs font-bold text-white block">{item.title}</strong>
-                        <span className="text-[11px] font-medium text-purple-200/90 leading-relaxed">{item.new}</span>
+                        <strong className="text-sm font-bold text-white block">{item.title}</strong>
+                        <span className="text-xs sm:text-sm font-medium text-purple-100 leading-relaxed">{item.new}</span>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-slate-900 text-emerald-300 border border-slate-750 shrink-0">
+                    <span className="px-2.5 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-slate-900 text-emerald-300 border border-slate-750 shrink-0">
                       {item.metric}
                     </span>
                   </div>
@@ -142,7 +142,7 @@ export function SaaSProblemSolution() {
             </div>
 
             <div className="pt-4 border-t border-purple-900/60 text-center">
-              <span className="text-xs text-purple-200 font-bold">✨ Výsledek: Více prodaných ploch, klidný tým a spokojenější klienti</span>
+              <span className="text-xs sm:text-sm text-purple-200 font-bold">✨ Výsledek: Více prodaných ploch, klidný tým a spokojenější klienti</span>
             </div>
           </div>
         </div>

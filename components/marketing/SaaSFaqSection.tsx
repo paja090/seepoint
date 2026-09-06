@@ -46,7 +46,7 @@ export function SaaSFaqSection() {
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
         <div className="text-center space-y-3">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
+          <span className="text-xs font-black uppercase tracking-wider text-purple-400">
             ČASTÉ DOTAZY A ODPOVĚDI
           </span>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
@@ -75,7 +75,7 @@ export function SaaSFaqSection() {
                   onClick={() => setOpenIndex(isOpen ? null : index)}
                   className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 cursor-pointer"
                 >
-                  <strong className="text-sm sm:text-base font-bold text-white">{faq.q}</strong>
+                  <strong className="text-base sm:text-lg font-bold text-white">{faq.q}</strong>
                   <ChevronDown
                     className={`w-5 h-5 text-purple-400 shrink-0 transition-transform duration-200 ${
                       isOpen ? 'rotate-180' : ''
@@ -84,7 +84,7 @@ export function SaaSFaqSection() {
                 </button>
 
                 {isOpen && (
-                  <div className="px-5 pb-6 sm:px-6 sm:pb-6 text-xs sm:text-sm text-slate-300 font-medium leading-relaxed border-t border-slate-800/60 pt-4">
+                  <div className="px-5 pb-6 sm:px-6 sm:pb-6 text-sm sm:text-base text-slate-200 font-medium leading-relaxed border-t border-slate-800/60 pt-4">
                     {faq.a}
                   </div>
                 )}

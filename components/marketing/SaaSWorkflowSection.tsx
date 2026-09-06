@@ -51,7 +51,7 @@ export function SaaSWorkflowSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
+          <span className="text-xs font-black uppercase tracking-wider text-purple-400">
             KOMPLETNÍ WORKFLOW PROCES
           </span>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
@@ -76,17 +76,17 @@ export function SaaSWorkflowSection() {
                     <div className={`size-11 rounded-2xl border ${st.color} flex items-center justify-center font-black shadow-md`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <span className="text-xs font-mono text-slate-500 font-bold">{st.num}</span>
+                    <span className="text-xs font-mono text-purple-300 font-bold">{st.num}</span>
                   </div>
 
                   <div>
                     <h3 className="text-base font-black text-white">{st.title}</h3>
-                    <p className="text-xs text-slate-400 font-medium leading-relaxed mt-1">{st.desc}</p>
+                    <p className="text-sm text-slate-300 font-medium leading-relaxed mt-1">{st.desc}</p>
                   </div>
                 </div>
 
                 <div className="pt-3 border-t border-slate-850">
-                  <span className="text-[11px] font-bold text-slate-400 block leading-tight">{st.details}</span>
+                  <span className="text-xs font-bold text-slate-300 block leading-normal">{st.details}</span>
                 </div>
               </div>
             );
@@ -107,11 +107,11 @@ export function SaaSWorkflowSection() {
                 </div>
                 <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono font-bold text-purple-400">{st.num}</span>
+                    <span className="text-xs font-mono font-bold text-purple-400">{st.num}</span>
                     <strong className="text-sm font-bold text-white">{st.title}</strong>
                   </div>
-                  <p className="text-xs text-slate-400 leading-snug">{st.desc}</p>
-                  <span className="text-[10px] text-slate-400 font-semibold block pt-0.5">{st.details}</span>
+                  <p className="text-sm text-slate-300 leading-snug">{st.desc}</p>
+                  <span className="text-xs text-slate-300 font-semibold block pt-0.5">{st.details}</span>
                 </div>
               </div>
             );

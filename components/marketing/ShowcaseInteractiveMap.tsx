@@ -216,21 +216,21 @@ function ShowcaseLeafletMapInner() {
       </div>
 
       {/* Map Legend Overlay */}
-      <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-20 bg-slate-950/90 p-3 rounded-xl border border-slate-800/90 backdrop-blur-md shadow-2xl text-[11px] font-bold text-slate-300 space-y-1.5">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-1.5">
-          <span className="text-[11px] uppercase tracking-wider font-black text-purple-400">Živá síť nosičů na mapě (36 nosičů v 7 městech)</span>
-          <span className="text-[11px] text-emerald-400 font-extrabold flex items-center gap-1">
+      <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-20 bg-slate-950/95 p-3.5 rounded-xl border border-slate-800 backdrop-blur-md shadow-2xl text-xs font-bold text-slate-200 space-y-2">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-1.5">
+          <span className="text-xs uppercase tracking-wider font-black text-purple-300">Živá síť nosičů na mapě (36 nosičů v 7 městech)</span>
+          <span className="text-xs text-emerald-400 font-extrabold flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
             27 volných
           </span>
         </div>
-        <div className="flex items-center gap-2.5 flex-wrap pt-0.5 text-[11px]">
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-purple-500" /> Promo Tower (7)</span>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-sky-400" /> City Poster (9)</span>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-indigo-500" /> Billboard & Bigboard (9)</span>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-emerald-500" /> Lavičky (6)</span>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-orange-500" /> Navigace VO (5)</span>
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-950/60 border border-rose-900/60 text-rose-300"><span className="size-2 rounded-full bg-rose-500" /> Regulované zóny (12)</span>
+        <div className="flex items-center gap-2.5 flex-wrap pt-0.5 text-xs">
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-purple-500" /> Promo Tower (7)</span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-sky-400" /> City Poster (9)</span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-indigo-500" /> Billboard & Bigboard (9)</span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-emerald-500" /> Lavičky (6)</span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800"><span className="size-2 rounded-full bg-orange-500" /> Navigace VO (5)</span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-950/60 border border-rose-900/60 text-rose-300"><span className="size-2 rounded-full bg-rose-500" /> Regulované zóny (12)</span>
         </div>
       </div>
     </div>

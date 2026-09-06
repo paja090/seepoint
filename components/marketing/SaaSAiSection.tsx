@@ -35,14 +35,14 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                 <div className="size-12 rounded-2xl bg-purple-950 text-purple-300 border border-purple-700 flex items-center justify-center font-black">
                   <Radar className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
                   BETA
                 </span>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-white">AI Sales Radar</h3>
-                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                <p className="text-sm text-slate-300 font-medium leading-relaxed">
                   Vyhledává otevírané pobočky, stavební projekty a akce v regionu a propojuje je s vaší sítí nosičů.
                 </p>
               </div>
@@ -50,12 +50,12 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
 
             {/* Visual Box */}
             <div className="rounded-2xl border border-purple-800/60 bg-slate-950 p-4 space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-bold">
+              <div className="flex items-center justify-between text-xs font-bold">
                 <span className="text-purple-300">NOVÁ PŘÍLEŽITOST</span>
                 <span className="text-emerald-400">VYSOKÝ POTENCIÁL</span>
               </div>
-              <h4 className="font-bold text-xs text-white">Nová pobočka v Ostrava-Poruba</h4>
-              <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800">
+              <h4 className="font-bold text-sm text-white">Nová pobočka v Ostrava-Poruba</h4>
+              <div className="pt-2 flex items-center justify-between text-xs sm:text-sm border-t border-slate-800">
                 <span className="text-slate-300">Vhodné plochy: 12</span>
                 <span className="text-purple-300 font-bold">Příležitost →</span>
               </div>
@@ -69,22 +69,22 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                 <div className="size-12 rounded-2xl bg-indigo-950 text-indigo-300 border border-indigo-700 flex items-center justify-center font-black">
                   <FileSpreadsheet className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
                   AKTIVNÍ
                 </span>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-white">AI Generátor Nabídek</h3>
-                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                <p className="text-sm text-slate-300 font-medium leading-relaxed">
                   Zadejte přání klienta slovem. AI vybere křižovatky, zkontroluje vyhlášku a vytvoří klientský koncept bez cen.
                 </p>
               </div>
             </div>
 
             {/* Visual Box */}
-            <div className="rounded-2xl border border-indigo-800/60 bg-slate-950 p-4 space-y-2 font-mono text-[11px]">
-              <div className="text-slate-400">Prompt: „Ostrava, rozpočet 100 tis.“</div>
+            <div className="rounded-2xl border border-indigo-800/60 bg-slate-950 p-4 space-y-2 font-mono text-xs">
+              <div className="text-slate-300">Prompt: „Ostrava, rozpočet 100 tis.“</div>
               <div className="text-emerald-400 font-bold">✓ Vyhláška MPZ... OK</div>
               <div className="pt-2 text-indigo-300 font-bold border-t border-slate-800">Doporučeno: 12 nosičů</div>
             </div>
@@ -97,27 +97,27 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                 <div className="size-12 rounded-2xl bg-emerald-950 text-emerald-300 border border-emerald-700 flex items-center justify-center font-black">
                   <Zap className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
                   AKTIVNÍ
                 </span>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-white">AI Sklad & Nákupy</h3>
-                <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                <p className="text-sm text-slate-300 font-medium leading-relaxed">
                   Montážník vyfotí mobilní účtenku za palivo či materiál. AI automaticky vytěží dodavatele, DPH a zaeviduje nákup.
                 </p>
               </div>
             </div>
 
             {/* Visual Box */}
-            <div className="rounded-2xl border border-emerald-800/60 bg-slate-950 p-4 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Účtenka z mobilu</span>
+            <div className="rounded-2xl border border-emerald-800/60 bg-slate-950 p-4 space-y-2 text-xs sm:text-sm">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-300">Účtenka z mobilu</span>
                 <span className="text-emerald-400 font-bold">VYTĚŽENO AI</span>
               </div>
-              <div className="text-[11px] font-mono text-emerald-300 font-bold">Barvy & Svorky: 2 450 Kč</div>
-              <div className="text-[10px] text-slate-400">Zaevidováno do zakázky & skladu</div>
+              <div className="text-xs sm:text-sm font-mono text-emerald-300 font-bold">Barvy & Svorky: 2 450 Kč</div>
+              <div className="text-xs text-slate-300">Zaevidováno do zakázky & skladu</div>
             </div>
           </div>
 
@@ -128,26 +128,26 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                 <div className="size-12 rounded-2xl bg-slate-800 text-slate-300 border border-slate-700 flex items-center justify-center font-black">
                   <Camera className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-950 text-amber-300 border border-amber-800">
+                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-amber-950 text-amber-300 border border-amber-800">
                   PŘIPRAVUJEME
                 </span>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-xl font-black text-white">AI Fotodokumentace</h3>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                <p className="text-sm text-slate-300 font-medium leading-relaxed">
                   Montér v terénu vyfotí instalovaný plakát. AI ověří správný nosič, motiv reklamy a čitelnost polepu.
                 </p>
               </div>
             </div>
 
             {/* Visual Box */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2 text-xs">
-              <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">Fotka z montáže</span>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-2 text-xs sm:text-sm">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-300">Fotka z montáže</span>
                 <span className="text-amber-400 font-bold">Koncept AI</span>
               </div>
-              <div className="text-[10px] text-slate-300">✓ Kontrola čitelnosti & GPS</div>
+              <div className="text-xs text-slate-300">✓ Kontrola čitelnosti & GPS</div>
             </div>
           </div>
         </div>

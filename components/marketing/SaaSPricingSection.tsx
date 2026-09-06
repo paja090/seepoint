@@ -76,12 +76,12 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
             Všechny tarify zahrnují mapové podklady, aktualizace a bezpečný cloudový hosting bez skrytých poplatků.
           </p>
 
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-slate-300">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-emerald-300">
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-4 text-sm font-bold text-slate-300">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-emerald-300">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>Nezávazná ukázka a vyzkoušení</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300">
               <span>Bez platební karty předem</span>
             </div>
           </div>
@@ -99,7 +99,7 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
               }`}
             >
               {plan.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
                   {plan.badge}
                 </span>
               )}
@@ -108,42 +108,42 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-black text-white">{plan.name}</h3>
                   {!plan.highlight && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-slate-400 border border-slate-800">
+                    <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-slate-900 text-slate-300 border border-slate-800">
                       {plan.badge}
                     </span>
                   )}
                 </div>
 
-                <p className="text-xs text-slate-400 leading-relaxed min-h-[36px]">{plan.desc}</p>
+                <p className="text-sm text-slate-300 leading-relaxed min-h-[40px]">{plan.desc}</p>
 
                 <div className="pt-2 border-t border-slate-800">
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-black text-white font-mono">{plan.price}</span>
-                    <span className="text-xs font-semibold text-slate-400">{plan.period}</span>
+                    <span className="text-sm font-semibold text-slate-300">{plan.period}</span>
                   </div>
                 </div>
 
                 {/* Key Facts Summary */}
-                <div className="space-y-2.5 pt-2 text-xs">
+                <div className="space-y-2.5 pt-2 text-sm">
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-200 font-bold">{plan.carriers}</span>
+                    <span className="text-slate-100 font-bold">{plan.carriers}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-300 font-medium">{plan.users}</span>
+                    <span className="text-slate-200 font-medium">{plan.users}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-300 font-medium">{plan.modules}</span>
+                    <span className="text-slate-200 font-medium">{plan.modules}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-300 font-medium">AI: <strong className="text-white">{plan.ai}</strong></span>
+                    <span className="text-slate-200 font-medium">AI: <strong className="text-white">{plan.ai}</strong></span>
                   </div>
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <span className="text-slate-300 font-medium">{plan.support}</span>
+                    <span className="text-slate-200 font-medium">{plan.support}</span>
                   </div>
                 </div>
               </div>
@@ -155,7 +155,7 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
                     trackSaaSEvent('demo_cta_clicked', { source: `pricing_${plan.name}` });
                     onOpenDemoModal();
                   }}
-                  className={`w-full py-3 rounded-2xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 ${
+                  className={`w-full py-3 rounded-2xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 ${
                     plan.highlight
                       ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-xl'
                       : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700'

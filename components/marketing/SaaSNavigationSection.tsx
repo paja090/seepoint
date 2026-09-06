@@ -35,34 +35,34 @@ export function SaaSNavigationSection({ onOpenDemoModal }: { onOpenDemoModal: ()
                   <Compass className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-orange-400">SPECIALIZOVANÝ MODUL</span>
+                  <span className="text-xs font-black uppercase tracking-wider text-orange-400">SPECIALIZOVANÝ MODUL</span>
                   <h3 className="text-lg font-black text-white">Navigační reklama VO</h3>
                 </div>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-orange-950 text-orange-300 border border-orange-800">
+              <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-orange-950 text-orange-300 border border-orange-800">
                 Povolení & Mapy
               </span>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-sm">
               <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
                 <div className="flex items-center justify-between font-bold text-white">
                   <span>Cílová prodejna: Kaufland Ostrava</span>
                   <span className="text-orange-400">3 navigační body</span>
                 </div>
-                <p className="text-slate-400 text-[11px]">
+                <p className="text-slate-300 text-xs font-medium">
                   Příjezdové trasy zahuštěné na vytížených městských křižovatkách a sjezdech.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">Ochranná pásma</span>
-                  <strong className="text-emerald-400 text-xs">✓ Auto-kontrola zón</strong>
+                  <span className="text-slate-300 block text-xs">Ochranná pásma</span>
+                  <strong className="text-emerald-400 text-sm font-bold">✓ Auto-kontrola zón</strong>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px]">Klientský odkaz</span>
-                  <strong className="text-orange-300 text-xs">✓ Online schválení</strong>
+                  <span className="text-slate-300 block text-xs">Klientský odkaz</span>
+                  <strong className="text-orange-300 text-sm font-bold">✓ Online schválení</strong>
                 </div>
               </div>
             </div>
@@ -70,7 +70,7 @@ export function SaaSNavigationSection({ onOpenDemoModal }: { onOpenDemoModal: ()
 
           {/* Right Explanation Text */}
           <div className="lg:col-span-7 space-y-5">
-            <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">
+            <span className="text-xs font-black uppercase tracking-wider text-orange-400">
               SMĚROVÉ TABULE A NAVIGACE
             </span>
             <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
@@ -85,9 +85,9 @@ export function SaaSNavigationSection({ onOpenDemoModal }: { onOpenDemoModal: ()
                 <div key={b.title} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
-                    <strong className="text-xs font-bold text-white">{b.title}</strong>
+                    <strong className="text-sm font-bold text-white">{b.title}</strong>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-snug pl-6">{b.desc}</p>
+                  <p className="text-xs text-slate-300 leading-snug pl-6">{b.desc}</p>
                 </div>
               ))}
             </div>
@@ -95,7 +95,7 @@ export function SaaSNavigationSection({ onOpenDemoModal }: { onOpenDemoModal: ()
             <div className="pt-2">
               <a
                 href="#produkt"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs shadow-xl transition cursor-pointer"
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-sm shadow-xl transition cursor-pointer"
               >
                 <span>Vyzkoušet na interaktivní mapě</span>
                 <ArrowRight className="w-4 h-4" />
