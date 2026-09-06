@@ -24,7 +24,7 @@ import {
   type OfferInput,
   type OfferStatusValue,
 } from './domain';
-import { createPublicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
+import { createPublicOfferToken, getDeterministicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
 import type { OfferView } from './view-model';
 import { offerReadinessChecks, type OfferConflictView } from './workflow';
 
@@ -130,6 +130,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     taxAmount: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.taxAmount),
     totalWithTax: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.totalWithTax ?? row.totalPrice),
     hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash),
+    portalToken: publicView ? undefined : (row.publicTokenHash ? getDeterministicOfferToken(row.id) : undefined),
     publishedAt: row.publishedAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     acceptedAt: row.acceptedAt?.toISOString() ?? null,
@@ -797,10 +798,12 @@ export async function publishOffer(user: CurrentUser, id: string) {
     }
     const newStatus = existing.status === 'DRAFT' ? 'SENT' : existing.status;
     const isFirstPublish = !existing.publishedAt;
+    const effectiveToken = getDeterministicOfferToken(id);
+    const effectiveTokenHash = hashPublicOfferToken(effectiveToken);
     return tx.offer.update({
       where: { id },
       data: {
-        publicTokenHash: publicToken.hash,
+        publicTokenHash: effectiveTokenHash,
         publishedAt: existing.publishedAt || new Date(),
         status: newStatus,
         updatedByUserId: user.id,
@@ -809,7 +812,8 @@ export async function publishOffer(user: CurrentUser, id: string) {
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: publicToken.token, path: `/offer/${publicToken.token}` };
+  const token = getDeterministicOfferToken(id);
+  return { offer: serializeOffer(row), token, path: `/offer/${token}` };
 }
 
 export async function prepareOfferDelivery(user: CurrentUser, id: string, emailDraft?: { clientMessage?: string }) {
@@ -823,10 +827,12 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
     const conflicts = existing.offerType === 'STANDARD_MEDIA' ? await findConflicts(tx, existing.items) : [];
     assertOfferReady(existing, conflicts);
     const isFirstPublish = !existing.publishedAt;
+    const effectiveToken = getDeterministicOfferToken(id);
+    const effectiveTokenHash = hashPublicOfferToken(effectiveToken);
     return tx.offer.update({
       where: { id },
       data: {
-        publicTokenHash: publicToken.hash,
+        publicTokenHash: effectiveTokenHash,
         publishedAt: existing.publishedAt || new Date(),
         clientMessage: emailDraft?.clientMessage ?? existing.clientMessage,
         updatedByUserId: user.id,
@@ -835,7 +841,8 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
       include: offerInclude,
     });
   });
-  return { offer: serializeOffer(row), token: publicToken.token, path: `/offer/${publicToken.token}` };
+  const token = getDeterministicOfferToken(id);
+  return { offer: serializeOffer(row), token, path: `/offer/${token}` };
 }
 
 export async function getPublicRow(token: string) {

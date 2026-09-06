@@ -23,6 +23,7 @@ type OfferActionsProps = {
   navigationSelectionSubmitted?: boolean;
   isNoPriceConcept?: boolean;
   hasPublicLink?: boolean;
+  portalToken?: string;
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
@@ -38,18 +39,20 @@ export function OfferActions({
   navigationSelectionSubmitted,
   isNoPriceConcept,
   hasPublicLink,
+  portalToken,
 }: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
   const [customToken, setCustomToken] = useState<string | null>(null);
 
-  const linkExists = Boolean(hasPublicLink || customToken);
-  const persistentPublicUrl = customToken && typeof window !== 'undefined'
-    ? `${window.location.origin}/offer/${customToken}`
+  const effectiveToken = customToken || portalToken || null;
+  const linkExists = Boolean(hasPublicLink || effectiveToken);
+  const persistentPublicUrl = effectiveToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/offer/${effectiveToken}`
     : null;
-  const persistentCampaignUrl = customToken && typeof window !== 'undefined'
-    ? `${window.location.origin}/campaign/${customToken}`
+  const persistentCampaignUrl = effectiveToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/campaign/${effectiveToken}`
     : null;
 
   async function action(name: string, body?: unknown) {
@@ -171,15 +174,17 @@ export function OfferActions({
                 )}
               </>
             ) : null}
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => void action('publish')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Link2 size={13} />
-              {linkExists ? 'Obnovit bezpečný odkaz' : 'Vytvořit bezpečný odkaz'}
-            </button>
+            {!persistentPublicUrl && (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => void action('publish')}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Link2 size={13} />
+                Vytvořit bezpečný odkaz
+              </button>
+            )}
           </div>
         </div>
 
