@@ -126,7 +126,7 @@ export async function analyzeCarrierPhotoWithAI(data: {
   expectedClient?: string | null;
 }) {
   try {
-    const prompt = `Jsi AI inspektor venkovní reklamy a navigačních nosičů pro firmu SeePOINT (billboardy, City Postery, navigační cedule).
+    const prompt = `Jsi AI inspektor venkovní reklamy a nosičů (billboardy, citylighty, navigační tabule, bannery).
 Analyzuj přiloženou fotografii nosiče z terénu. Očekávaný kód nosiče: "${data.expectedCarrierCode || 'neznámý'}".
 Očekávaný klient na motivu: "${data.expectedClient || 'neznámý'}".
 
@@ -142,9 +142,19 @@ Odpověz v JSON formátu s klíči:
 
     const geminiResult = await callGeminiVision(prompt, data.imageUrl).catch(() => null);
 
-    const confidence = geminiResult?.confidence ?? (data.expectedCarrierCode ? 0.95 : 0.80);
-    const labels = geminiResult?.labels ?? ['reklamní nosič', 'venkovní reklama', 'zkontrolováno'];
-    const suggestedCode = geminiResult?.suggestedCode || data.expectedCarrierCode || 'VO-AI-DETECTED';
+    if (!geminiResult || typeof geminiResult.confidence !== 'number') {
+      if (data.photoId) {
+        await prisma.photo.update({
+          where: { id: data.photoId },
+          data: { aiStatus: 'FAILED' },
+        }).catch(() => null);
+      }
+      return { photoId: data.photoId, aiStatus: 'FAILED' as const };
+    }
+
+    const confidence = geminiResult.confidence;
+    const labels = Array.isArray(geminiResult.labels) ? geminiResult.labels : ['reklamní nosič'];
+    const suggestedCode = geminiResult.suggestedCode || data.expectedCarrierCode;
 
     // Safely update DB if photo exists
     if (data.photoId) {
@@ -168,8 +178,8 @@ Odpověz v JSON formátu s klíči:
       aiSuggestedCarrierCode: suggestedCode,
       aiConfidence: confidence,
       aiLabels: labels,
-      detectedClient: geminiResult?.detectedClient || null,
-      summary: geminiResult?.summary || 'Fotografie byla úspěšně zpracována a zkontrolována AI.',
+      detectedClient: geminiResult.detectedClient || null,
+      summary: geminiResult.summary || 'Fotografie byla úspěšně zpracována a zkontrolována AI.',
     };
   } catch (err) {
     console.error('AI carrier analysis error:', err);
@@ -181,7 +191,7 @@ Odpověz v JSON formátu s klíči:
  * 2. AI Fuel Receipt OCR & Parser
  */
 export async function parseFuelReceiptWithGemini(imageUrlBase64: string): Promise<GeminiFuelReceipt> {
-  const prompt = `Jsi AI účetní asistent SeePOINT. Analyzuj přiloženou účtenku za pohonné hmoty (benzínka Orlen, Shell, MOL, OMV, EuroOil atd.) nebo snímek účtenky s dopsanými km.
+  const prompt = `Jsi asistent pro vytěžování účtenek firemních vozidel a nákupů pohonných hmot. Analyzuj přiloženou účtenku za pohonné hmoty (benzínka Orlen, Shell, MOL, OMV, EuroOil atd.) nebo snímek účtenky s dopsanými km.
 
 Vrať JSON objekt s přesně těmito poli:
 {
@@ -208,15 +218,7 @@ Vrať JSON objekt s přesně těmito poli:
     };
   }
 
-  // Fallback heuristics if API key not present yet
-  return {
-    vendor: 'Čerpací stanice',
-    amountCzk: 1250,
-    liters: 32.5,
-    fuelType: 'Diesel',
-    date: new Date().toISOString().slice(0, 10),
-    summary: 'Účtenka načtena v režimu rozpoznávání SeePOINT.',
-  };
+  throw new Error('Nepodařilo se vytěžit data z účtenky pomocí AI.');
 }
 
 export type GeminiWarehousePhotoItem = {

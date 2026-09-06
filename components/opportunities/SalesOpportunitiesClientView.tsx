@@ -5,6 +5,7 @@ import { SalesOpportunitiesHeader } from './SalesOpportunitiesHeader';
 import { OpportunityFiltersBar, FilterState } from './OpportunityFiltersBar';
 import { OpportunityCard, OpportunityItem } from './OpportunityCard';
 import { ManualOpportunityModal } from './ManualOpportunityModal';
+import { RadarSettingsModal } from './RadarSettingsModal';
 import { AiOfferGeneratorModal, ClientOption } from '@/components/offers/AiOfferGeneratorModal';
 import { RefreshCw, Radar } from 'lucide-react';
 
@@ -49,6 +50,7 @@ export function SalesOpportunitiesClientView({
   const [loading, setLoading] = useState(false);
   const [isAutoDiscovering, setIsAutoDiscovering] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
 
   // Copilot integration state
@@ -138,18 +140,19 @@ export function SalesOpportunitiesClientView({
 
   const handlePrepareProposal = (item: OpportunityItem) => {
     const suggestedMedia = Array.isArray(item.suggestedMediaTypes) ? item.suggestedMediaTypes[0] : '';
+    const cityName = item.city || '';
     const fullTargetAddress = item.address
-      ? (item.address.toLowerCase().includes(item.city.toLowerCase()) ? item.address : `${item.address}, ${item.city}`)
-      : item.city;
+      ? (cityName && item.address.toLowerCase().includes(cityName.toLowerCase()) ? item.address : `${item.address}${cityName ? `, ${cityName}` : ''}`)
+      : (cityName || undefined);
 
     setCopilotPreFill({
       clientId: item.clientId || undefined,
       clientName: item.companyName,
-      city: item.city,
+      city: item.city || undefined,
       prompt: `Nezávazný koncept kampaně k události: ${item.title}. ${item.summary}`,
       mediaType: suggestedMedia || 'CITY_POSTER',
       targetName: item.companyName,
-      targetAddress: fullTargetAddress,
+      targetAddress: fullTargetAddress || undefined,
       opportunityId: item.id,
       isNoPriceConcept: true,
     });
@@ -186,6 +189,7 @@ export function SalesOpportunitiesClientView({
         stats={stats}
         onOpenManualModal={() => setManualModalOpen(true)}
         onAutoDiscover={handleAutoDiscover}
+        onOpenSettings={() => setSettingsModalOpen(true)}
         isAutoDiscovering={isAutoDiscovering}
         canAutoDiscover={canAutoDiscover}
       />
@@ -243,6 +247,13 @@ export function SalesOpportunitiesClientView({
         isOpen={manualModalOpen}
         onClose={() => setManualModalOpen(false)}
         onSuccess={() => fetchOpportunities()}
+      />
+
+      {/* Radar Profile Settings Modal */}
+      <RadarSettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        onSaved={() => fetchOpportunities()}
       />
 
       {/* AI Offer Generator Modal */}

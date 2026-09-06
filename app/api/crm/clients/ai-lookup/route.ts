@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     } | null = null;
 
     if (apiKey) {
-      const prompt = `Jsi CRM asistent české reklamní agentury SeePoint. Uživatel chce založit nového klienta do CRM podle zadání: "${searchKeyword}".
+      const prompt = `Jsi asistent pro firemní CRM systém v oblasti venkovní reklamy. Uživatel chce založit nového klienta do CRM podle zadání: "${searchKeyword}".
 
 ARES rejstřík kandidáti:
 ${candidatesSummaryStr || 'Žádní kandidáti v ARES nenalezeni'}

@@ -25,8 +25,8 @@ export function ManualOpportunityModal({
     eventType: OpportunityEventType;
     title: string;
     summary: string;
-    city: string;
-    region?: string;
+    city?: string | null;
+    region?: string | null;
     address?: string;
     eventDate?: string;
     sourceUrl: string;
@@ -236,7 +236,7 @@ export function ManualOpportunityModal({
                       <input
                         type="text"
                         className="input mt-1 text-xs py-1.5 w-full"
-                        value={parsedData.city}
+                        value={parsedData.city || ''}
                         onChange={(e) => setParsedData({ ...parsedData, city: e.target.value })}
                       />
                     </div>

@@ -14,12 +14,14 @@ export function SalesOpportunitiesHeader({
   stats,
   onOpenManualModal,
   onAutoDiscover,
+  onOpenSettings,
   isAutoDiscovering,
   canAutoDiscover,
 }: {
   stats: Stats;
   onOpenManualModal: () => void;
   onAutoDiscover: () => void;
+  onOpenSettings?: () => void;
   isAutoDiscovering?: boolean;
   canAutoDiscover: boolean;
 }) {
@@ -30,17 +32,27 @@ export function SalesOpportunitiesHeader({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-950/80 text-purple-300 border border-purple-800/60 mb-2">
             <Radar className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-            <span>AI Business Intelligence</span>
+            <span>AI OOH Business Intelligence</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
             <span>AI Obchodní radar</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
-            „Firmy a události, kde SeePoint právě teď vidí obchodní příležitost.“
+            „Firmy a události s vysokým potenciálem pro venkovní reklamu (OOH).“
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {canAutoDiscover && onOpenSettings ? (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition active:scale-95"
+            >
+              <span>⚙️ Nastavení radaru</span>
+            </button>
+          ) : null}
+
           {canAutoDiscover ? (
             <button
               type="button"
@@ -49,7 +61,7 @@ export function SalesOpportunitiesHeader({
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50"
             >
               <Sparkles className={`w-4 h-4 text-purple-300 ${isAutoDiscovering ? 'animate-spin' : ''}`} />
-              <span>{isAutoDiscovering ? 'AI prohledává MS kraj…' : '🤖 Spustit AI Hledání v MS kraji'}</span>
+              <span>{isAutoDiscovering ? 'AI prohledává signály…' : '🤖 Spustit AI Hledání'}</span>
             </button>
           ) : null}
 

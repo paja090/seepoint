@@ -638,6 +638,7 @@ model User {
   assignedCandidatePoints        NavigationCandidatePoint[]      @relation("CandidateAssignedTo")
   supervisionCandidatePoints     NavigationCandidatePoint[]      @relation("CandidateSupervisionBy")
   assignedOpportunities          SalesOpportunity[]              @relation("OpportunityAssignedUser")
+  radarFeedbacks                 RadarFeedback[]                 @relation("RadarFeedbackUser")
 }
 
 model UserSession {
@@ -1363,7 +1364,7 @@ model SalesOpportunity {
   eventType               OpportunityEventType @default(NEW_BRANCH)
   title                   String
   summary                 String
-  city                    String
+  city                    String?
   region                  String?
   address                 String?
   latitude                Float?
@@ -1375,26 +1376,111 @@ model SalesOpportunity {
   sourcePublishedAt       DateTime?
   opportunityScore        Int                  @default(50)
   scoreReasons            Json?
+  scoreTrigger            Int?
+  scoreCustomerFit        Int?
+  scoreTiming             Int?
+  scoreGeo                Int?
+  scoreMediaFit           Int?
+  scoreEvidence           Int?
   suggestedMediaTypes     Json?
   suggestedCampaignPhases Json?
   status                  OpportunityStatus    @default(NEW)
   clientId                String?
   createdOfferId          String?
   assignedToUserId        String?
+  radarSignalId           String?
   dismissedReason         String?
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
 
-  client       Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  createdOffer Offer?  @relation(fields: [createdOfferId], references: [id], onDelete: SetNull)
-  assignedTo   User?   @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdOffer Offer?        @relation(fields: [createdOfferId], references: [id], onDelete: SetNull)
+  assignedTo   User?         @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  radarSignal  RadarSignal?  @relation(fields: [radarSignalId], references: [id], onDelete: SetNull)
+  feedbacks    RadarFeedback[]
 
   @@index([status, opportunityScore])
   @@index([city, region])
   @@index([clientId])
   @@index([createdOfferId])
   @@index([assignedToUserId])
+  @@index([radarSignalId])
   @@index([companyName, eventType])
+  @@index([organizationId])
+}
+
+model OrganizationRadarProfile {
+  id                  String   @id @default(cuid())
+  organizationId      String   @unique
+  enabled             Boolean  @default(true)
+  targetRegions       String[] @default([])
+  targetCities        String[] @default([])
+  focusEventTypes     String[] @default([])
+  preferredMediaTypes String[] @default([])
+  customKeywords      String[] @default([])
+  customRssSources    String[] @default([])
+  minScoreThreshold   Int      @default(40)
+  scoringWeights      Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  runs RadarRun[]
+
+  @@index([organizationId])
+}
+
+model RadarSignal {
+  id                      String             @id @default(cuid())
+  organizationId          String             @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  sourceUrl               String
+  sourceTitle             String
+  sourcePublishedAt       DateTime?
+  rawText                 String?            @db.Text
+  status                  String             @default("NEW")
+  parsedData              Json?
+  discoveredOpportunityId String?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  opportunities           SalesOpportunity[]
+
+  @@unique([organizationId, sourceUrl])
+  @@index([organizationId, status])
+}
+
+model RadarRun {
+  id                   String                    @id @default(cuid())
+  organizationId       String                    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  profileId            String?
+  triggerType          String                    @default("MANUAL")
+  startedAt            DateTime                  @default(now())
+  finishedAt           DateTime?
+  status               String                    @default("RUNNING")
+  signalsFound         Int                       @default(0)
+  signalsProcessed     Int                       @default(0)
+  opportunitiesCreated Int                       @default(0)
+  duplicatesCount      Int                       @default(0)
+  errorsCount          Int                       @default(0)
+  summaryLog           Json?
+
+  profile              OrganizationRadarProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, startedAt])
+}
+
+model RadarFeedback {
+  id             String           @id @default(cuid())
+  organizationId String           @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  opportunityId  String
+  userId         String
+  verdict        String
+  comment        String?
+  createdAt      DateTime         @default(now())
+
+  opportunity    SalesOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  user           User             @relation("RadarFeedbackUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId])
   @@index([organizationId])
 }
 

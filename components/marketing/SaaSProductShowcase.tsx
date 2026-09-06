@@ -541,14 +541,14 @@ export function SaaSProductShowcase() {
                     <div className="flex flex-col sm:flex-row gap-3">
                       <input
                         type="text"
-                        value={aiClientInput}
-                        onChange={(e) => setAiClientInput(e.target.value)}
+                        value={selectedAiPrompt}
+                        onChange={(e) => setSelectedAiPrompt(e.target.value)}
                         placeholder="Např. Potraviny, Ostrava, 40 000 Kč..."
                         className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-purple-600"
                       />
                       <button
                         type="button"
-                        onClick={handleRunAiOffer}
+                        onClick={() => handleSimulateAiOffer(selectedAiPrompt)}
                         disabled={isGeneratingAiOffer}
                         className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition cursor-pointer flex items-center justify-center gap-2"
                       >
