@@ -379,9 +379,20 @@ enum CandidatePermitStatus {
 
 enum ImportStatus {
   DRAFT
+  UPLOADED
+  ANALYZING
+  MAPPING_REQUIRED
+  READY_FOR_DRY_RUN
+  DRY_RUN_COMPLETE
+  REVIEW_REQUIRED
+  READY_TO_IMPORT
+  IMPORTING
   VALIDATED
   IMPORTED
+  COMPLETED
+  COMPLETED_WITH_WARNINGS
   FAILED
+  CANCELLED
 }
 
 enum WorkOrderStatus {
@@ -1990,6 +2001,30 @@ model Photo {
   @@index([organizationId, storageProvider])
 }
 
+model ImportProfile {
+  id               String        @id @default(cuid())
+  organizationId   String        @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  name             String
+  description      String?
+  fingerprint      String?
+  sheetAliases     Json?
+  columnMappings   Json
+  transformations  Json?
+  mediaTypeAliases Json?
+  matchingRules    Json?
+  dateRules        Json?
+  isDefault        Boolean       @default(false)
+  lastUsedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  batches          ImportBatch[]
+
+  @@index([organizationId])
+  @@index([organizationId, fingerprint])
+  @@index([organizationId, isDefault])
+}
+
 model ImportBatch {
   id             String       @id @default(cuid())
   organizationId String       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
@@ -2003,25 +2038,34 @@ model ImportBatch {
   errorRows      Int          @default(0)
   mapping        Json?
   fileHash       String?
+  fileSizeBytes  Int?
+  mimeType       String?
   reportPath     String?
   environment    String?
   createdById    String?
+  profileId      String?
+  dryRunStats    Json?
+  conflictStats  Json?
   startedAt      DateTime?
   finishedAt     DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  profile        ImportProfile?       @relation(fields: [profileId], references: [id], onDelete: SetNull)
   createdBy      User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
   carriers       AdvertisingCarrier[]
   surfaces       AdvertisingSurface[]
   occupancies    Occupancy[]
   priceListItems PriceListItem[]
   errors         ImportRowError[]
+  sheets         ImportBatchSheet[]
+  rows           ImportRow[]
 
   @@index([createdById])
   @@index([status, createdAt])
   @@index([fileHash])
   @@index([organizationId])
+  @@index([profileId])
 }
 
 model PriceListItem {
@@ -2070,6 +2114,58 @@ model ImportRowError {
 
   batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
+  @@index([batchId, rowNumber])
+  @@index([organizationId])
+}
+
+model ImportBatchSheet {
+  id             String   @id @default(cuid())
+  organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  batchId        String
+  sheetIndex     Int
+  name           String
+  classification String   @default("UNKNOWN")
+  confidence     Float    @default(0.0)
+  totalRows      Int      @default(0)
+  totalColumns   Int      @default(0)
+  headers        Json
+  sampleRows     Json
+  columnMappings Json?
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  batch          ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rows           ImportRow[]
+
+  @@unique([batchId, name])
+  @@index([batchId, sheetIndex])
+  @@index([organizationId])
+}
+
+model ImportRow {
+  id              String            @id @default(cuid())
+  organizationId  String            @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  batchId         String
+  sheetId         String?
+  rowNumber       Int
+  rawData         Json
+  mappedData      Json?
+  targetEntity    String?
+  action          String            @default("PENDING")
+  diff            Json?
+  conflictDetails Json?
+  resolution      String?
+  targetEntityId  String?
+  issues          Json?
+  importedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  batch           ImportBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sheet           ImportBatchSheet? @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+
+  @@index([batchId, action])
   @@index([batchId, rowNumber])
   @@index([organizationId])
 }
