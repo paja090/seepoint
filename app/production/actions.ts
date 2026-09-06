@@ -119,15 +119,22 @@ export async function getPrintJobByToken(token: string) {
 }
 
 export async function approvePrintJobByClient(token: string, approverName: string, note?: string, artworkUrl?: string) {
-  const dataToUpdate: any = {
+  if (!token || typeof token !== 'string' || token.length < 10) {
+    throw new Error('Neplatný schvalovací token. Kontaktujte obchodníka.');
+  }
+  if (!approverName || typeof approverName !== 'string' || !approverName.trim()) {
+    throw new Error('Jméno schvalovatele je povinné.');
+  }
+
+  const dataToUpdate: Record<string, unknown> = {
     status: 'IN_PRINT',
     clientApprovedAt: new Date(),
-    clientApprovedBy: approverName,
-    clientApprovalNote: note,
+    clientApprovedBy: approverName.trim(),
+    clientApprovalNote: note?.trim() || null,
   };
   
-  if (artworkUrl) {
-    dataToUpdate.artworkUrl = artworkUrl;
+  if (artworkUrl && artworkUrl.trim()) {
+    dataToUpdate.artworkUrl = artworkUrl.trim();
   }
 
   const job = await prisma.printProductionJob.update({
@@ -135,5 +142,6 @@ export async function approvePrintJobByClient(token: string, approverName: strin
     data: dataToUpdate,
   });
 
+  revalidatePath('/production');
   return job;
 }

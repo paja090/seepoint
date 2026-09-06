@@ -32,7 +32,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
         <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">{job.quantity} + {job.sparesQuantity} ks</span>
       </div>
       <h4 className="font-medium text-gray-900 leading-tight group-hover:text-blue-700 transition-colors">{job.title}</h4>
-      <p className="text-sm text-gray-500 mt-1">{job.clientName || 'Neznámý klient'}</p>
+      <p className="text-sm text-gray-500 mt-1">{job.client?.name || job.clientName || 'Neznámý klient'}</p>
       
       <div className="mt-4 flex flex-col gap-2">
         {job.deliveryDeadline && (

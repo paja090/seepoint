@@ -18,7 +18,8 @@ export default async function ProductionPage() {
   const jobs = await prisma.printProductionJob.findMany({
     where: { organizationId: user.organizationId! },
     include: {
-      offer: { select: { publicTokenHash: true } }
+      offer: { select: { publicTokenHash: true } },
+      client: { select: { name: true } },
     },
     orderBy: { createdAt: 'desc' },
   });

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, FileImage, Printer, Clock, AlertCircle } from 'lucide-react';
-import { approvePrintJobByClient } from '@/app/production/actions';
+import { approvePrintJobByClient } from '@/app/production/public-actions';
 
 export function PrintApprovalModule({ 
   printJob, 
