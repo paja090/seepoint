@@ -78,7 +78,7 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
             <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600"><CheckCircle2 aria-hidden size={28} /></div>
             <h2 className="text-lg font-semibold text-slate-900" id="offer-dialog-title">Odesláno</h2>
             <p className="text-sm leading-6 text-slate-600">{result.message}</p>
-            <button className="mt-2 min-h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white cursor-pointer" onClick={onClose} type="button">Zavřít</button>
+            <button className="mt-2 min-h-11 rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white cursor-pointer" onClick={() => { onClose(); if (action === 'approve') window.location.reload(); }} type="button">Zavřít</button>
           </div>
         ) : (
           <form onSubmit={submit}>

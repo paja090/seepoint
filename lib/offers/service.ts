@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
@@ -50,6 +51,16 @@ const offerInclude = {
   client: true,
   createdByUser: { select: { id: true, name: true, email: true, role: true } },
   updatedByUser: { select: { id: true, name: true } },
+  crmOrder: {
+    include: {
+      realizations: {
+        include: {
+          photos: true
+        }
+      }
+    }
+  },
+  printProductionJobs: true,
   items: {
     include: {
       surface: {
@@ -136,7 +147,11 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       phone: row.contactPhone ?? row.client.phone,
     },
     items: row.items.map((item) => {
-      const photos = [...item.surface.photos, ...item.surface.carrier.photos]
+      const installationPhotos = ((row as any).crmOrder?.realizations || [])
+        .filter((r: any) => r.surfaceId === item.surfaceId)
+        .flatMap((r: any) => (r.photos || []).map((p: any) => ({ ...p, isInstallation: true })));
+
+      const photos = [...installationPhotos, ...item.surface.photos, ...item.surface.carrier.photos]
           .filter((photo) => !publicView || photo.isClientVisible)
         .filter((photo, index, all) => all.findIndex((candidate) => candidate.id === photo.id) === index)
         .map((photo) => ({
@@ -145,6 +160,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           note: photo.note,
           isPrimary: photo.isPrimary,
           isClientVisible: photo.isClientVisible,
+          isInstallation: (photo as any).isInstallation || false,
         }));
       return {
         id: publicView ? undefined : item.id,
@@ -293,6 +309,26 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       createdAt: event.createdAt.toISOString(),
     })),
     converted: publicView ? undefined : row.occupancies.length > 0,
+    printJob: row.printProductionJobs && row.printProductionJobs.length > 0 ? {
+      id: row.printProductionJobs[0].id,
+      status: row.printProductionJobs[0].status,
+      artworkUrl: row.printProductionJobs[0].artworkUrl,
+      clientApprovedAt: row.printProductionJobs[0].clientApprovedAt?.toISOString() || null,
+      clientApprovalToken: publicView ? row.printProductionJobs[0].clientApprovalToken : undefined,
+    } : null,
+    realizationSummary: (() => {
+      const realizations = (row as any).crmOrder?.realizations || [];
+      if (realizations.length === 0) return null;
+      const installedStatuses = ['INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
+      const photographedStatuses = ['PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
+      const completedStatuses = ['COMPLETED'];
+      return {
+        total: realizations.length,
+        installed: realizations.filter((r: any) => installedStatuses.includes(r.status)).length,
+        photographed: realizations.filter((r: any) => photographedStatuses.includes(r.status)).length,
+        completed: realizations.filter((r: any) => completedStatuses.includes(r.status)).length,
+      };
+    })(),
   };
   return publicView ? stripPublicOfferSecrets(serialized) : serialized;
 }
@@ -871,7 +907,8 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     if (!target) throw new OfferValidationError('Akce není podporována.');
     if (body.consent !== true) throw new OfferValidationError('Pro přijetí nebo odmítnutí potvrďte oprávnění jednat za klienta.');
     if (target === 'ACCEPTED' && isPastValidity(row.validUntil)) throw new OfferValidationError('Platnost nabídky skončila. Kontaktujte obchodníka SeePOINT.', 'INVALID_STATUS_TRANSITION');
-    assertOfferTransition(row.status as OfferStatusValue, target);
+    const effectiveFromStatus = (row.status === 'DRAFT' && (target === 'ACCEPTED' || target === 'REJECTED')) ? 'SENT' : (row.status as OfferStatusValue);
+    assertOfferTransition(effectiveFromStatus, target);
     const now = new Date();
     await tx.offer.update({
       where: { id: row.id },
@@ -906,6 +943,24 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
         id: row.createdByUser.id,
         email: row.createdByUser.email,
       });
+    }
+
+    // Auto-create PrintProductionJob in PREPARATION when standard media offer is accepted (Varianta A)
+    if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA') {
+      const existingPrintJob = await tx.printProductionJob.findFirst({ where: { offerId: row.id } });
+      if (!existingPrintJob) {
+        await tx.printProductionJob.create({
+          data: {
+            organizationId: row.organizationId,
+            offerId: row.id,
+            clientId: row.clientId,
+            title: row.campaignName ?? row.title,
+            campaignName: row.campaignName ?? row.title,
+            status: 'PREPARATION',
+            clientApprovalToken: randomBytes(32).toString('hex'),
+          },
+        });
+      }
     }
 
     return { row, status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
@@ -960,7 +1015,8 @@ export async function getPublicPhoto(token: string, photoId: string) {
       offer.items.some(
         (item) =>
           item.surface.photos.some((photo) => photo.id === photoId) ||
-          item.surface.carrier.photos.some((photo) => photo.id === photoId)
+          item.surface.carrier.photos.some((photo) => photo.id === photoId) ||
+          ((offer as any).crmOrder?.realizations || []).some((r: any) => r.surfaceId === item.surfaceId && r.photos?.some((p: any) => p.id === photoId))
       ) ||
       (offer.navigationOffer?.points.some(
         (point) =>

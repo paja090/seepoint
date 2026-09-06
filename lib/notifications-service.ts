@@ -12,7 +12,8 @@ export type SystemNotificationItem = {
     | 'OPEN_WORK_TASK'
     | 'VEHICLE_FAULT'
     | 'LOW_STOCK'
-    | 'CITY_GALLERY_PERMIT_EXPIRING';
+    | 'CITY_GALLERY_PERMIT_EXPIRING'
+    | 'PRINT_APPROVED';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -96,6 +97,28 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
 
   // 3. MANAGER & ADMIN: System Operational Alerts (Overdue, Unassigned, Invoices)
   if (userRole === 'ADMIN' || userRole === 'MANAGER') {
+    // Check Client Approved Print Jobs
+    const recentlyApprovedPrints = await prisma.printProductionJob.findMany({
+      where: {
+        status: 'IN_PRINT',
+        clientApprovedAt: { gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) },
+      },
+      select: { id: true, title: true, clientApprovedBy: true, clientApprovedAt: true },
+      take: 10,
+    });
+
+    recentlyApprovedPrints.forEach((job) => {
+      notifications.push({
+        id: `print-approval-${job.id}`,
+        type: 'PRINT_APPROVED',
+        title: `🖨️ Klient schválil data: ${job.title}`,
+        message: `Zakázku schválil ${job.clientApprovedBy || 'klient'} v ${job.clientApprovedAt ? new Date(job.clientApprovedAt).toLocaleTimeString('cs-CZ') : 'nedávno'}. Můžete zahájit tisk.`,
+        severity: 'MEDIUM',
+        link: `/production`,
+        createdAt: now.toISOString(),
+      });
+    });
+
     // Check Overdue Work Tasks
     const overdueWorkOrders = await prisma.workOrder.findMany({
       where: {

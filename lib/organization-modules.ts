@@ -141,6 +141,13 @@ export const SYSTEM_MODULES: SystemModule[] = [
     routes: ['/work', '/work-entries', '/my-work-entries'],
   },
   {
+    id: 'printProduction',
+    name: 'Výroba, Tisk & Grafika',
+    description: 'Správa tiskových dat, portál pro schvalování klientem a Kanban nástěnka tisku',
+    category: 'operations',
+    routes: ['/production'],
+  },
+  {
     id: 'tasks',
     name: 'Správa všech úkolů',
     description: 'Globální dispečink úkolů pro manažery a zadávání úkolů celému týmu',
@@ -168,6 +175,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     category: 'operations',
     badge: 'AI Vision',
     routes: ['/warehouse'],
+  },
+  {
+    id: 'printProduction',
+    name: 'Výroba, Tisk & Grafická data',
+    description: 'Schvalování grafiky s klienty, objednávky do tiskáren a sledování doručení materiálů na sklad',
+    category: 'operations',
+    badge: 'Novinka',
+    routes: ['/production'],
   },
 
   // Management
@@ -220,6 +235,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'settlements',
     'vehicles',
     'warehouse',
+    'printProduction',
     'employees',
     'import',
   ],
@@ -245,6 +261,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'settlements',
     'vehicles',
     'warehouse',
+    'printProduction',
     'employees',
     'import',
   ],

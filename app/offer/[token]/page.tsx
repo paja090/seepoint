@@ -7,6 +7,7 @@ import { toProposalOffer } from '@/lib/offers/presentation';
 import { getPublicOffer } from '@/lib/offers/service';
 import type { OfferView } from '@/lib/offers/view-model';
 import { CampaignConceptPublicView } from '@/components/offers/CampaignConceptPublicView';
+import { CampaignLivePortalView } from '@/components/campaign-portal/CampaignLivePortalView';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   }
 }
 
-export default async function PublicOfferPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function PublicOfferPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ view?: string }> }) {
   const { token } = await params;
   let offer: OfferView | null = null;
 
@@ -77,7 +78,7 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
   }
 
   if ((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept) {
-    return <CampaignConceptPublicView offer={offer} />;
+    return <CampaignConceptPublicView offer={offer} publicToken={token} />;
   }
 
   if (offer.offerType === 'NAVIGATION' || offer.offerType === 'CITY_GALLERY') {
@@ -118,6 +119,11 @@ export default async function PublicOfferPage({ params }: { params: Promise<{ to
         </div>
       </div>
     );
+  }
+
+  const search = await searchParams;
+  if (['ACCEPTED', 'CONVERTED'].includes(offer.status) && search.view !== 'proposal') {
+    return <CampaignLivePortalView offer={offer} publicToken={token} />;
   }
 
   return <OfferProposal branding={offer.branding} offer={toProposalOffer(offer)} token={token} />;
