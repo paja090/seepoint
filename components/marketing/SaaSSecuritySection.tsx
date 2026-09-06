@@ -1,40 +1,59 @@
 'use client';
 
-import { ShieldCheck, Lock, UserCheck, History, Server } from 'lucide-react';
+import { ShieldCheck, UserCheck, Lock, History } from 'lucide-react';
 
 export function SaaSSecuritySection() {
   const securityFeatures = [
-    { title: 'Řízení přístupových rolí (RBAC)', desc: '8 úrovní oprávnění (Vlastník, Admin, Obchodník, Montážník, Účetní, Prohlížeč).' },
-    { title: 'Zabezpečené relace & šifrování', desc: 'Moderní HTTPS šifrování, chráněné session cookies a bezpečné resetování hesel.' },
-    { title: 'Auditní protokol aktivit', desc: 'Detailní historie o vytvoření nabídek, změnách ceníků a úpravách rezervací.' },
-    { title: 'Izolace organizací (Multi-tenancy)', desc: 'Striktní oddělení firemních databází a nosičů mezi subjekty (Součást SaaS verze).' },
+    {
+      icon: UserCheck,
+      title: 'Řízení přístupů',
+      desc: 'Přístupové role pro vlastníka, administrátora, obchodníka, montážníka i účetní.',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Oddělení organizací',
+      desc: 'Důsledná izolace dat a nosičů mezi firmami v rámci multi-tenant architektury.',
+    },
+    {
+      icon: History,
+      title: 'Audit změn',
+      desc: 'Přehledná historie rezervací nosičů, úprav ceníků a schvalování nabídek.',
+    },
+    {
+      icon: Lock,
+      title: 'Šifrovaná komunikace',
+      desc: 'Zabezpečený přenos dat přes HTTPS a chráněné uživatelské relace.',
+    },
   ];
 
   return (
-    <section className="py-20 bg-slate-900/40 border-t border-slate-800 relative">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+    <section className="py-16 bg-slate-900/30 border-t border-slate-850 relative">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         <div className="text-center space-y-3 max-w-3xl mx-auto">
           <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
-            BEZPEČNOST A ROLENÍ PŘÍSTUPY
+            DŮVĚRA & ZABEZPEČENÍ
           </span>
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             Vaše obchodní data pod kontrolou.
           </h2>
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-            SeePoint OS chrání vaše ceníky, obchodní případy a zákaznická data pokročilým systémem uživatelských rolí.
+            SeePoint OS chrání vaše ceníky, klienty a interní data osvědčenými bezpečnostními principy.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {securityFeatures.map((sec) => (
-            <div key={sec.title} className="p-6 rounded-3xl bg-slate-950 border border-slate-800 space-y-3 shadow-lg">
-              <div className="size-10 rounded-2xl bg-purple-950 text-purple-300 border border-purple-800 flex items-center justify-center font-black">
-                <ShieldCheck className="w-5 h-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {securityFeatures.map((sec) => {
+            const Icon = sec.icon;
+            return (
+              <div key={sec.title} className="p-5 rounded-3xl bg-slate-950 border border-slate-800 space-y-2.5 shadow-lg">
+                <div className="size-10 rounded-2xl bg-purple-950 text-purple-300 border border-purple-800 flex items-center justify-center font-black">
+                  <Icon className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-white">{sec.title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{sec.desc}</p>
               </div>
-              <h3 className="text-base font-bold text-white">{sec.title}</h3>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">{sec.desc}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

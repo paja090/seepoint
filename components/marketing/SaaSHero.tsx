@@ -38,13 +38,13 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
             {/* Subtitle */}
             <p className="text-base sm:text-lg text-slate-300 font-medium leading-relaxed">
-              Chytrý systém pro správu venkovní reklamy, který šetří čas, zvyšuje obsazenost a přináší přehled o celém vašem portfoliu.
+              Mapa, obsazenost, klienti, nabídky, realizace a práce v terénu. V jednom systému vytvořeném přímo pro venkovní reklamu.
             </p>
 
             {/* Excel Lead Magnet Pill */}
-            <div className="p-3 rounded-2xl bg-purple-950/70 border border-purple-800/80 text-purple-200 text-xs font-bold flex items-center gap-2.5 shadow-lg">
-              <span className="text-base">📊</span>
-              <span>Pošlete nám váš Excel s 20 nosiči – zdarma vám do 24h vygenerujeme živou mapu sítě i nabídku!</span>
+            <div className="p-3.5 rounded-2xl bg-purple-950/80 border border-purple-700 text-purple-200 text-xs font-bold flex items-center gap-2.5 shadow-xl">
+              <span className="text-lg">📊</span>
+              <span>Pošlete nám Excel s 20 nosiči – zdarma vám připravíme ukázkovou živou mapu a klientskou nabídku.</span>
             </div>
 
             {/* CTA Buttons */}
@@ -79,11 +79,11 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
               </div>
               <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-emerald-750 transition">
                 <BarChart3 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-[11px] leading-tight">Vytíží obsazenost až o 15 %</span>
+                <span className="text-[11px] leading-tight">Lepší přehled o volných kapacitách</span>
               </div>
               <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-sky-750 transition">
-                <Clock className="w-4 h-4 text-sky-400 shrink-0" />
-                <span className="text-[11px] leading-tight">Úspora času a méně chyb</span>
+                <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0" />
+                <span className="text-[11px] leading-tight">Přehled ochranných pásem a pravidel</span>
               </div>
             </div>
           </div>
@@ -138,14 +138,14 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-sky-700/60 transition group">
             <div className="text-sky-400 font-black text-2xl group-hover:scale-105 transition">
-              <AnimatedCounter target={57} prefix="-" suffix=" %" />
+              <AnimatedCounter target={57} prefix="-" suffix=" %*" />
             </div>
-            <div className="text-xs font-semibold text-slate-400">Kilometrů na výjezdech</div>
+            <div className="text-xs font-semibold text-slate-400">Optimalizované trasy výjezdů</div>
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 text-center space-y-1 hover:border-emerald-700/60 transition group">
             <div className="text-emerald-400 font-black text-2xl group-hover:scale-105 transition">
-              <AnimatedCounter target={60} suffix=" s" />
+              <AnimatedCounter target={60} prefix="Do " suffix=" s" />
             </div>
             <div className="text-xs font-semibold text-slate-400">AI Sestavení nabídky</div>
           </div>

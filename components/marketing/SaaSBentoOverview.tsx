@@ -1,116 +1,80 @@
 'use client';
 
-import { Layers, MapPin, CalendarCheck, Users, FileText, CheckCircle2, Sparkles, Compass, ShieldCheck } from 'lucide-react';
+import { MapPin, Zap, CheckCircle2, Users } from 'lucide-react';
 
 export function SaaSBentoOverview() {
+  const benefits = [
+    {
+      icon: MapPin,
+      title: 'Přehled o celé síti',
+      desc: 'Okamžitý stav všech ploch, obsazenosti, termínů a revizí na interaktivní mapě bez hledání v tabulkách.',
+      badge: 'Živá evidence',
+      color: 'text-purple-400 border-purple-800/60 bg-purple-950/40',
+    },
+    {
+      icon: Zap,
+      title: 'Rychlejší nabídky',
+      desc: 'Vytvoření klientské prezentace s fotkami, mapou a veřejným odkazem pro schválení do jedné minuty.',
+      badge: 'Do 60 sekund',
+      color: 'text-indigo-400 border-indigo-800/60 bg-indigo-950/40',
+    },
+    {
+      icon: CheckCircle2,
+      title: 'Kontrola realizace',
+      desc: 'Předání zakázky přímo do mobilu montážníka, GPS navigace ke sloupu a fotodokumentace v reálném čase.',
+      badge: 'Mobilní terén',
+      color: 'text-emerald-400 border-emerald-800/60 bg-emerald-950/40',
+    },
+    {
+      icon: Users,
+      title: 'Jedna data pro celý tým',
+      desc: 'Obchodníci, dispečink, montážníci i účtárna vidí stejné a vždy aktuální informace bez chaosu ve zprávách.',
+      badge: '1 systém',
+      color: 'text-sky-400 border-sky-800/60 bg-sky-950/40',
+    },
+  ];
+
   return (
-    <section className="py-24 relative" id="reseni">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+    <section className="py-16 bg-slate-900/40 border-y border-slate-850" id="reseni">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
           <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
-            PRÉMIOVÝ BENTO OVERVIEW
+            PŘÍNOSY PRO VÁŠ PROVOZ
           </span>
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            Celá reklamní společnost v jednom systému.
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+            Celá reklamní firma v jednom spolehlivém systému.
           </h2>
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-            Každá část SeePoint OS byla navržena pro maximální rychlost obchodníka, přehled manažera i přesnost montážního týmu v terénu.
+            Navrženo pro rychlost obchodníka, přehled vedení i bezchybnou práci realizačního týmu v terénu.
           </p>
         </div>
 
-        {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {/* Card 1: Inventory (Large 2 cols) */}
-          <div className="md:col-span-2 rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 p-6 sm:p-8 space-y-4 shadow-xl hover:border-purple-800/80 transition">
-            <div className="size-12 rounded-2xl bg-purple-950 text-purple-300 border border-purple-800 flex items-center justify-center font-black">
-              <Layers className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-black text-white">INVENTORY — Evidence sítě nosičů</h3>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Billboardy, citypostery, lavičky, towery, CLV i navigační systémy. Každý nosič má svou kartu s přesnou GPS, rozměry, fotografiemi a technickým stavem.
-            </p>
-            <div className="pt-2 flex flex-wrap gap-2 text-xs font-bold text-slate-300">
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800">✓ GPS lokace</span>
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800">✓ Fotogalerie</span>
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800">✓ Typy nosičů</span>
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-slate-800">✓ Technický stav</span>
-            </div>
-          </div>
+        {/* 4 Compact Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {benefits.map((b) => {
+            const Icon = b.icon;
+            return (
+              <div
+                key={b.title}
+                className="rounded-3xl border border-slate-800 bg-slate-950 p-6 space-y-4 shadow-xl hover:border-slate-700 transition flex flex-col justify-between"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className={`p-3 rounded-2xl border ${b.color}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-900 text-slate-300 border border-slate-750">
+                      {b.badge}
+                    </span>
+                  </div>
 
-          {/* Card 2: Interactive Map */}
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-xl hover:border-purple-800/80 transition">
-            <div className="size-12 rounded-2xl bg-indigo-950 text-indigo-300 border border-indigo-800 flex items-center justify-center font-black">
-              <MapPin className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-black text-white">MAPA — Živá síť</h3>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
-              Zobrazte celou síť reklamních ploch na interaktivní mapě s filtry podle měst, cen i aktuální dostupnosti.
-            </p>
-            <div className="pt-2 text-xs font-bold text-indigo-300">
-              Okamžitá vizualizace →
-            </div>
-          </div>
-
-          {/* Card 3: Occupancy */}
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-xl hover:border-purple-800/80 transition">
-            <div className="size-12 rounded-2xl bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center justify-center font-black">
-              <CalendarCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-black text-white">OBSAZENOST — Kalendář</h3>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
-              Přesně víte, co je volné dnes i za půl roku. Režimy: Volné, Rezervované, Obsazené bez nutnosti obvolávat kolegy.
-            </p>
-            <div className="pt-2 flex gap-1.5 text-[10px] font-black">
-              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300">VOLNÉ</span>
-              <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300">REZERVOVANÉ</span>
-              <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300">OBSAZENÉ</span>
-            </div>
-          </div>
-
-          {/* Card 4: CRM */}
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-xl hover:border-purple-800/80 transition">
-            <div className="size-12 rounded-2xl bg-sky-950 text-sky-300 border border-sky-800 flex items-center justify-center font-black">
-              <Users className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-black text-white">CRM — Klienti</h3>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
-              Kartotéka klientů, kontaktních osob, poboček a kompletní historie schválených kampaní na 1 kliknutí.
-            </p>
-            <div className="pt-2 text-xs font-bold text-sky-300">
-              Historie & Kontakty →
-            </div>
-          </div>
-
-          {/* Card 5: Offers (Large 2 cols) */}
-          <div className="md:col-span-2 rounded-3xl border border-purple-800/80 bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-900 p-6 sm:p-8 space-y-4 shadow-2xl hover:border-purple-700 transition">
-            <div className="size-12 rounded-2xl bg-purple-950 text-purple-200 border border-purple-700 flex items-center justify-center font-black">
-              <FileText className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-black text-white">NABÍDKY — Generátor klientských konceptů</h3>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Připravte reprezentativní nabídku během několika minut. Obsahuje vybrané nosiče, fotky, mapu, kalkulaci i online klientský odkaz `/offer/[token]`. Podporuje i nezávazné koncepty bez cen!
-            </p>
-            <div className="pt-2 flex flex-wrap gap-2 text-xs font-bold text-purple-200">
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-purple-800/80">✓ Klientský odkaz</span>
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-purple-800/80">✓ Koncepty bez cen</span>
-              <span className="px-3 py-1 rounded-xl bg-slate-950 border border-purple-800/80">✓ PDF & Print</span>
-            </div>
-          </div>
-
-          {/* Card 6: Realization */}
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-xl hover:border-purple-800/80 transition">
-            <div className="size-12 rounded-2xl bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center justify-center font-black">
-              <CheckCircle2 className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-black text-white">REALIZACE — Workflow</h3>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
-              Řízení zakázky od výroby tisků, přes plánování montážníků až po finální klientskou fotodokumentaci.
-            </p>
-            <div className="pt-2 text-xs font-bold text-emerald-400">
-              Terénní montáže →
-            </div>
-          </div>
+                  <h3 className="text-lg font-black text-white">{b.title}</h3>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">{b.desc}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

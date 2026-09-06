@@ -67,11 +67,11 @@ export function SaaSProductOrigin() {
 
               <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-slate-400 font-medium block">Dostupnost aplikace</span>
-                  <strong className="text-2xl font-black text-indigo-400">99.8 % SLA</strong>
+                  <span className="text-xs text-slate-400 font-medium block">Vývoj a podpora</span>
+                  <strong className="text-2xl font-black text-indigo-400">Přímý kontakt</strong>
                 </div>
                 <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  Cloud provoz
+                  Český tým
                 </span>
               </div>
             </div>

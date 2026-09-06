@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'SeePoint OS | Operační systém pro venkovní reklamu',
   description:
-    'SeePoint OS propojuje reklamní plochy, klienty, nabídky, kampaně, realizace, fotodokumentaci a AI v jednom systému pro správu venkovní reklamu.',
+    'SeePoint OS propojuje reklamní plochy, klienty, nabídky, kampaně, realizace, fotodokumentaci a AI v jednom systému pro správu venkovní reklamy.',
   keywords: [
     'SeePoint OS',
     'outdoor reklama',
@@ -21,17 +21,26 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'SeePoint OS | Operační systém pro venkovní reklamu',
     description:
-      'Od první obchodní příležitosti až po hotovou kampaň. V jednom systému.',
+      'SeePoint OS propojuje reklamní plochy, klienty, nabídky, kampaně, realizace, fotodokumentaci a AI v jednom systému pro správu venkovní reklamy.',
     url: 'https://os.seepoint.cz',
     siteName: 'SeePoint OS',
     locale: 'cs_CZ',
     type: 'website',
+    images: [
+      {
+        url: '/images/hero_showcase.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'SeePoint OS – Operační systém pro venkovní reklamu',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'SeePoint OS | Operační systém pro venkovní reklamu',
     description:
-      'Reklamní plochy, klienti, nabídky, kampaně, realizace a AI v jednom systému.',
+      'SeePoint OS propojuje reklamní plochy, klienty, nabídky, kampaně, realizace, fotodokumentaci a AI v jednom systému pro správu venkovní reklamy.',
+    images: ['/images/hero_showcase.jpg'],
   },
 };
 

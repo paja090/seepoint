@@ -5,34 +5,34 @@ import { XCircle, CheckCircle2, ArrowRight, Sparkles, Zap, Clock, ShieldCheck, M
 export function SaaSProblemSolution() {
   const comparisonList = [
     {
-      title: 'Evidence sítě nosičů',
-      old: '15 verzí tabulek Excelu, duplicity a nejasný stav',
-      new: '1 živá interaktivní mapa synchronizovaná pro celý tým',
+      title: 'Evidence sítě a obsazenost',
+      old: '15 verzí tabulek v Excelu, duplicity a nejasný stav volných ploch',
+      new: 'Jedna živá evidence sítě a synchronizovaný kalendář obsazenosti',
       metric: '100% přehled',
     },
     {
       title: 'Tvorba nabídek klientům',
-      old: '3 dny ručního hledání fotek v Google Drive a PDF',
-      new: 'AI generátor sestaví online nabídku za 60 sekund',
+      old: 'Ruční hledání fotek na Disku a skládání PDF několik hodin',
+      new: 'Klientská nabídka s interaktivní mapou a fotkami do 60 sekund',
       metric: 'Do 60 sekund',
     },
     {
-      title: 'Montáže a terén',
-      old: 'Ztracené fotky ve WhatsAppu a papírové zakázky',
-      new: 'Mobilní aplikace: GPS navigace ke sloupu a foto z mobilu',
+      title: 'Práce v terénu a realizace',
+      old: 'Ztracené fotky ve WhatsAppu, papírové zakázky a nejasné adresy',
+      new: 'Mobilní aplikace pro montážníky s GPS navigací a fotodokumentací',
       metric: 'Mobilní appka',
     },
     {
-      title: 'Trasy a výjezdy',
-      old: 'Křižování města bez plánu a zbytečné přeplatky paliva',
-      new: 'AI Optimalizátor tras: zkrátí trasu o 57 %',
-      metric: '-57 % kilometrů',
+      title: 'Plánování výjezdů a tras',
+      old: 'Křižování města bez plánu a zbytečně najeté kilometry',
+      new: 'Optimalizované pořadí výjezdů a logické trasování montáží',
+      metric: 'Efektivní trasy',
     },
     {
-      title: 'Památkové zóny a vyhlášky',
-      old: 'Riziko pokut od města kvůli neznalosti hranic zón',
-      new: 'Automatické vrstvy ochranných pásem přímo v mapě',
-      metric: '0 pokut',
+      title: 'Předpisy a ochranná pásma',
+      old: 'Riziko chyb a sankcí kvůli neznalosti hranic zón a vyhlášek',
+      new: 'Přehled ochranných pásem a městských pravidel přímo v mapě',
+      metric: 'Soulad s pravidly',
     },
   ];
 
@@ -49,10 +49,10 @@ export function SaaSProblemSolution() {
             <span>TRANSFORMACE VAŠEHO PROVOZU</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            Proč přejít z Excelu na SeePoint OS?
+            Z Excelu, složek a WhatsAppu do jednoho systému.
           </h2>
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-            Podívejte se na rozdíl mezi roztříštěným provozem a jediným spolehlivým systémem.
+            Podívejte se na rozdíl mezi roztříštěným provozem v tabulkách a jediným přehledným systémem pro venkovní reklamu.
           </p>
         </div>
 

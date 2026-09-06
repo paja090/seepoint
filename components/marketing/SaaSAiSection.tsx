@@ -35,8 +35,8 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                 <div className="size-12 rounded-2xl bg-purple-950 text-purple-300 border border-purple-700 flex items-center justify-center font-black">
                   <Radar className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
-                  Živý modul
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
+                  BETA
                 </span>
               </div>
 
@@ -57,7 +57,7 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
               <h4 className="font-bold text-xs text-white">Nová pobočka v Ostrava-Poruba</h4>
               <div className="pt-2 flex items-center justify-between text-xs border-t border-slate-800">
                 <span className="text-slate-300">Vhodné plochy: 12</span>
-                <span className="text-purple-300 font-bold">Nabídka →</span>
+                <span className="text-purple-300 font-bold">Příležitost →</span>
               </div>
             </div>
           </div>
@@ -69,8 +69,8 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                 <div className="size-12 rounded-2xl bg-indigo-950 text-indigo-300 border border-indigo-700 flex items-center justify-center font-black">
                   <FileSpreadsheet className="w-6 h-6" />
                 </div>
-                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">
-                  Živý modul
+                <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  AKTIVNÍ
                 </span>
               </div>
 
@@ -98,7 +98,7 @@ export function SaaSAiSection({ onOpenDemoModal }: { onOpenDemoModal: () => void
                   <Zap className="w-6 h-6" />
                 </div>
                 <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800">
-                  Živý modul
+                  AKTIVNÍ
                 </span>
               </div>
 

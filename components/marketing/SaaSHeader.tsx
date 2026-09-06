@@ -25,8 +25,8 @@ export function SaaSHeader({
 
   const navItems = [
     { label: 'Produkt', href: '#produkt' },
-    { label: 'AI Funkce', href: '#ai' },
-    { label: 'B2B Network', href: '#network' },
+    { label: 'Jak to funguje', href: '#workflow' },
+    { label: 'AI', href: '#ai' },
     { label: 'Ceník', href: '#cenik' },
     { label: 'FAQ', href: '#faq' },
   ];
@@ -149,7 +149,7 @@ export function SaaSHeader({
                 href="/login"
                 className="w-full text-center py-3 rounded-2xl bg-slate-900 text-slate-300 font-bold text-sm border border-slate-800"
               >
-                Přihlásit se
+                Přihlásit se do SeePoint OS
               </Link>
             )}
 

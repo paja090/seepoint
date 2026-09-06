@@ -1,12 +1,12 @@
 'use client';
 
-import { Map, HardDrive, FileSpreadsheet, Sparkles, CheckCircle2, Clock } from 'lucide-react';
+import { Map, HardDrive, FileSpreadsheet, Sparkles, Clock } from 'lucide-react';
 
 export function SaaSIntegrationsSection() {
   const activeIntegrations = [
     { title: 'Google Maps Engine', desc: 'Satelitní a silniční mapy, geokódování tras a bodů VO', icon: Map, color: 'text-emerald-400' },
     { title: 'Google Drive & Cloud', desc: 'Ukládání fotografií z terénu a klientských dokumentů', icon: HardDrive, color: 'text-sky-400' },
-    { title: 'CSV / TSV Import', desc: 'Kontrolovaný import nosičů a navigací s náhledem před zápisem', icon: FileSpreadsheet, color: 'text-purple-400' },
+    { title: 'CSV / TSV Import', desc: 'Bezpečný asistovaný import nosičů s kontrolou před zápisem', icon: FileSpreadsheet, color: 'text-purple-400' },
     { title: 'SeePoint AI Engine', desc: 'Inteligentní analýza spádovosti, tras a vyhlášek měst', icon: Sparkles, color: 'text-purple-300' },
   ];
 
@@ -17,14 +17,14 @@ export function SaaSIntegrationsSection() {
   ];
 
   return (
-    <section className="py-20 border-t border-slate-800 relative">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-12">
+    <section className="py-16 border-t border-slate-850 relative">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
           <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
             INTEGRACE & ROZHRANÍ
           </span>
-          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
             Zapadne do vašeho současného workflow.
           </h2>
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
@@ -33,11 +33,11 @@ export function SaaSIntegrationsSection() {
         </div>
 
         {/* Active Integrations Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {activeIntegrations.map((ig) => {
             const IconComp = ig.icon;
             return (
-              <div key={ig.title} className="p-6 rounded-3xl bg-slate-950 border border-slate-800 space-y-3 shadow-lg">
+              <div key={ig.title} className="p-5 rounded-3xl bg-slate-950 border border-slate-800 space-y-2.5 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div className="size-10 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center font-black">
                     <IconComp className={`w-5 h-5 ${ig.color}`} />
@@ -46,27 +46,27 @@ export function SaaSIntegrationsSection() {
                     Aktivní
                   </span>
                 </div>
-                <h3 className="text-base font-bold text-white">{ig.title}</h3>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">{ig.desc}</p>
+                <h3 className="text-sm font-bold text-white">{ig.title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{ig.desc}</p>
               </div>
             );
           })}
         </div>
 
         {/* Upcoming Integrations Strip */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-950 p-6 space-y-4">
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-amber-400" />
-            <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-amber-200 uppercase tracking-wider">
               Plánované integrace (Připravujeme)
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {upcomingIntegrations.map((up) => (
-              <div key={up.title} className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-1">
+              <div key={up.title} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-0.5">
                 <strong className="text-xs font-bold text-slate-200 block">{up.title}</strong>
-                <span className="text-[11px] font-medium text-slate-400">{up.desc}</span>
+                <span className="text-[11px] text-slate-400">{up.desc}</span>
               </div>
             ))}
           </div>

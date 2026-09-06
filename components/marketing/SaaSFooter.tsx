@@ -19,7 +19,7 @@ export function SaaSFooter({ onOpenDemoModal }: { onOpenDemoModal: () => void })
             </div>
 
             <p className="text-slate-400 text-xs leading-relaxed max-w-sm font-medium">
-              SeePoint OS je operační systém pro venkovní reklamu. Propojuje reklamní nosiče, klientech, nabídky, kampaně, realizace a AI na jedné platformě.
+              SeePoint OS je operační systém pro venkovní reklamu. Propojuje reklamní nosiče, klienty, nabídky, kampaně, realizace a AI na jedné platformě.
             </p>
 
             <div className="pt-2 text-[11px] text-slate-500 font-mono">
@@ -67,7 +67,7 @@ export function SaaSFooter({ onOpenDemoModal }: { onOpenDemoModal: () => void })
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-medium text-slate-500">
           <div>
-            SeePoint OS · Software vytvořený pro moderní správu venkovní reklamu.
+            SeePoint OS · Software vytvořený pro moderní správu venkovní reklamy.
           </div>
 
           <div className="flex items-center gap-6">
