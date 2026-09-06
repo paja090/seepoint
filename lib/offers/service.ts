@@ -907,7 +907,8 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     if (!target) throw new OfferValidationError('Akce není podporována.');
     if (body.consent !== true) throw new OfferValidationError('Pro přijetí nebo odmítnutí potvrďte oprávnění jednat za klienta.');
     if (target === 'ACCEPTED' && isPastValidity(row.validUntil)) throw new OfferValidationError('Platnost nabídky skončila. Kontaktujte obchodníka SeePOINT.', 'INVALID_STATUS_TRANSITION');
-    assertOfferTransition(row.status as OfferStatusValue, target);
+    const effectiveFromStatus = (row.status === 'DRAFT' && (target === 'ACCEPTED' || target === 'REJECTED')) ? 'SENT' : (row.status as OfferStatusValue);
+    assertOfferTransition(effectiveFromStatus, target);
     const now = new Date();
     await tx.offer.update({
       where: { id: row.id },

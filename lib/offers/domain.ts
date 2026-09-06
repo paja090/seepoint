@@ -261,7 +261,7 @@ export function recoverFixedDiscount(
 }
 
 const TRANSITIONS: Record<OfferStatusValue, OfferStatusValue[]> = {
-  DRAFT: ['SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'],
+  DRAFT: ['SENT', 'EXPIRED'],
   SENT: ['ACCEPTED', 'REJECTED', 'EXPIRED'],
   ACCEPTED: [],
   REJECTED: [],
