@@ -28,6 +28,12 @@ export async function GET(
         installerUser: {
           select: { id: true, name: true, email: true },
         },
+        points: {
+          include: {
+            sitePhoto: true,
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
         surveyRoutes: {
           orderBy: { routeOrder: 'asc' },
         },
@@ -98,6 +104,7 @@ export async function GET(
         const offerPoints = await prisma.navigationPoint.findMany({
           where: { navigationOfferId: nav.id },
           include: { sitePhoto: true },
+          orderBy: { sortOrder: 'asc' },
         });
 
         const pointIds = offerPoints.map((p) => p.id);
@@ -132,7 +139,15 @@ export async function GET(
             latitude: p.latitude,
             longitude: p.longitude,
             address: p.address,
-            placementType: p.navigationType || 'Směrová tabule',
+            placementType: p.navigationType || 'NAVIGATION',
+            arrowDirection: p.arrowDirectionEnum || p.arrowDirection || 'STRAIGHT',
+            approachDirection: p.orientation || p.signOrientation || null,
+            pillarNumber: p.pillarNumber || null,
+            pillarType: p.pillarType || null,
+            distanceValue: p.distanceValue != null ? Number(p.distanceValue) : (p.calculatedDistanceMeters ? Math.round(p.calculatedDistanceMeters / 100) / 10 : null),
+            distanceUnit: p.distanceUnit || 'km',
+            variant: p.variant || null,
+            internalNote: p.internalNote || null,
             ownershipType: 'SEEPOINT',
             visibilityTowardTarget: 'GOOD',
             permitStatus: 'GRANTED',
@@ -211,6 +226,45 @@ export async function GET(
         .slice(0, 50);
     }
 
+    const convertedIds = new Set(order.candidatePoints.map((c) => c.convertedNavigationPointId).filter(Boolean));
+    const extraPointsFromOrder = (order.points || [])
+      .filter((p) => !convertedIds.has(p.id))
+      .map((p) => ({
+        id: p.id,
+        label: p.label,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        address: p.address,
+        placementType: p.navigationType || 'NAVIGATION',
+        approachDirection: p.orientation || p.signOrientation || null,
+        arrowDirection: p.arrowDirectionEnum || p.arrowDirection || 'STRAIGHT',
+        distanceValue: p.distanceValue != null ? Number(p.distanceValue) : (p.calculatedDistanceMeters ? Math.round(p.calculatedDistanceMeters / 100) / 10 : null),
+        distanceUnit: p.distanceUnit || 'km',
+        pillarNumber: p.pillarNumber || null,
+        pillarType: p.pillarType || null,
+        ownershipType: 'SEEPOINT',
+        ownerName: null,
+        visibilityTowardTarget: 'GOOD',
+        permitStatus: 'GRANTED',
+        internalNote: p.internalNote || null,
+        surveyStatus: 'COMPLETED',
+        supervisionStatus: 'APPROVED',
+        supervisionNote: null,
+        rejectionReason: null,
+        surveyRouteId: null,
+        surveyRoute: null,
+        carrierId: p.carrierId || null,
+        surfaceId: p.surfaceId || null,
+        carrier: null,
+        convertedNavigationPointId: p.id,
+        convertedNavigationPoint: { id: p.id, label: p.label, status: p.status },
+        photos: p.sitePhoto ? [{ id: p.sitePhoto.id, url: p.sitePhoto.url || `/api/photos/${p.sitePhoto.id}/file`, createdAt: p.createdAt.toISOString() }] : [],
+        createdByUser: null,
+        createdAt: p.createdAt.toISOString(),
+      }));
+
+    const combinedCandidatePoints = [...order.candidatePoints, ...extraPointsFromOrder];
+
     return NextResponse.json({
       survey: {
         id: order.id,
@@ -226,7 +280,7 @@ export async function GET(
         status: order.status,
         blockStatus: order.blockStatus,
         surveyRoutes: order.surveyRoutes,
-        candidatePoints: order.candidatePoints,
+        candidatePoints: combinedCandidatePoints,
         nearbyCarriers,
       },
     });

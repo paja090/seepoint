@@ -34,6 +34,8 @@ export async function PUT(
       visibilityTowardTarget,
       permitStatus,
       internalNote,
+      pillarNumber,
+      pillarType,
       carrierId,
       surfaceId,
       surveyStatus,
@@ -42,27 +44,94 @@ export async function PUT(
 
     const existingCandidate = await prisma.navigationCandidatePoint.findUnique({
       where: { id: candidateId },
+      include: {
+        navigationOrder: {
+          include: {
+            crmOrder: {
+              include: {
+                offer: {
+                  include: {
+                    navigationOffer: {
+                      include: {
+                        points: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!existingCandidate) {
       const existingOfferPoint = await prisma.navigationPoint.findUnique({
         where: { id: candidateId },
+        include: {
+          navigationOffer: {
+            include: {
+              offer: {
+                include: {
+                  crmOrder: {
+                    include: {
+                      navigationOrder: {
+                        include: {
+                          points: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          navigationOrder: {
+            include: {
+              crmOrder: {
+                include: {
+                  offer: {
+                    include: {
+                      navigationOffer: {
+                        include: {
+                          points: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       if (existingOfferPoint) {
+        const pointUpdateData: Record<string, any> = {
+          ...(label && { label: label.trim() }),
+          ...(latitude && { latitude: parseFloat(latitude) }),
+          ...(longitude && { longitude: parseFloat(longitude) }),
+          ...(address !== undefined && { address: address?.trim() || null }),
+          ...(placementType && { navigationType: placementType }),
+          ...(arrowDirection && {
+            arrowDirectionEnum: arrowDirection,
+            arrowDirection: arrowDirection,
+          }),
+          ...(approachDirection !== undefined && {
+            orientation: approachDirection?.trim() || null,
+            signOrientation: approachDirection?.trim() || null,
+          }),
+          ...(pillarNumber !== undefined && { pillarNumber: pillarNumber?.trim() || null }),
+          ...(pillarType !== undefined && { pillarType: pillarType?.trim() || null }),
+          ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
+        };
+
         const updatedPoint = await prisma.navigationPoint.update({
           where: { id: candidateId },
-          data: {
-            ...(label && { label: label.trim() }),
-            ...(latitude && { latitude: parseFloat(latitude) }),
-            ...(longitude && { longitude: parseFloat(longitude) }),
-            ...(address !== undefined && { address: address?.trim() || null }),
-            ...(placementType && { navigationType: placementType }),
-            ...(arrowDirection && { arrowDirectionEnum: arrowDirection }),
-            ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
-          },
+          data: pointUpdateData,
         });
 
+        let firstPhotoId: string | null = null;
         if (Array.isArray(photoIds) && photoIds.length > 0) {
           await prisma.photo.updateMany({
             where: { id: { in: photoIds } },
@@ -73,9 +142,44 @@ export async function PUT(
           });
           const firstPhoto = await prisma.photo.findFirst({ where: { id: { in: photoIds } } });
           if (firstPhoto) {
+            firstPhotoId = firstPhoto.id;
             await prisma.navigationPoint.update({
               where: { id: updatedPoint.id },
               data: { sitePhotoId: firstPhoto.id },
+            });
+          }
+        }
+
+        // Bidirectional sync: if this was an offer point, sync to linked order point if any
+        if (existingOfferPoint.navigationOffer?.offer?.crmOrder?.navigationOrder) {
+          const linkedNavOrder = existingOfferPoint.navigationOffer.offer.crmOrder.navigationOrder;
+          const matchingOrderPoint = linkedNavOrder.points.find(
+            (p) => p.sortOrder === existingOfferPoint.sortOrder || p.label === existingOfferPoint.label
+          );
+          if (matchingOrderPoint) {
+            await prisma.navigationPoint.update({
+              where: { id: matchingOrderPoint.id },
+              data: {
+                ...pointUpdateData,
+                ...(firstPhotoId && { sitePhotoId: firstPhotoId }),
+              },
+            });
+          }
+        }
+
+        // Bidirectional sync: if this was an order point, sync back to original offer point!
+        if (existingOfferPoint.navigationOrder?.crmOrder?.offer?.navigationOffer) {
+          const linkedNavOffer = existingOfferPoint.navigationOrder.crmOrder.offer.navigationOffer;
+          const matchingOfferPoint = linkedNavOffer.points.find(
+            (p) => p.sortOrder === existingOfferPoint.sortOrder || p.label === existingOfferPoint.label
+          );
+          if (matchingOfferPoint) {
+            await prisma.navigationPoint.update({
+              where: { id: matchingOfferPoint.id },
+              data: {
+                ...pointUpdateData,
+                ...(firstPhotoId && { sitePhotoId: firstPhotoId }),
+              },
             });
           }
         }
@@ -88,6 +192,8 @@ export async function PUT(
             longitude: updatedPoint.longitude,
             address: updatedPoint.address,
             placementType: updatedPoint.navigationType,
+            arrowDirection: updatedPoint.arrowDirectionEnum || updatedPoint.arrowDirection,
+            pillarNumber: updatedPoint.pillarNumber,
             supervisionStatus: 'APPROVED',
             createdAt: updatedPoint.createdAt,
           },
@@ -122,6 +228,7 @@ export async function PUT(
       },
     });
 
+    let uploadedFirstPhotoId: string | null = null;
     if (Array.isArray(photoIds) && photoIds.length > 0) {
       await prisma.photo.updateMany({
         where: { id: { in: photoIds } },
@@ -131,6 +238,64 @@ export async function PUT(
           type: 'SURVEY',
         },
       });
+      const firstPhoto = await prisma.photo.findFirst({ where: { id: { in: photoIds } } });
+      if (firstPhoto) uploadedFirstPhotoId = firstPhoto.id;
+    }
+
+    // Sync candidate point changes to converted NavigationPoint if already converted
+    if (existingCandidate.convertedNavigationPointId) {
+      await prisma.navigationPoint.update({
+        where: { id: existingCandidate.convertedNavigationPointId },
+        data: {
+          ...(label && { label: label.trim() }),
+          ...(latitude && { latitude: parseFloat(latitude) }),
+          ...(longitude && { longitude: parseFloat(longitude) }),
+          ...(address !== undefined && { address: address?.trim() || null }),
+          ...(arrowDirection && {
+            arrowDirectionEnum: arrowDirection,
+            arrowDirection: arrowDirection,
+          }),
+          ...(approachDirection !== undefined && {
+            orientation: approachDirection?.trim() || null,
+            signOrientation: approachDirection?.trim() || null,
+          }),
+          ...(pillarNumber !== undefined && { pillarNumber: pillarNumber?.trim() || null }),
+          ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
+          ...(uploadedFirstPhotoId && { sitePhotoId: uploadedFirstPhotoId }),
+        },
+      });
+    }
+
+    // Also sync to offer's NavigationPoint if this candidate's navigationOrder originated from an offer
+    const offerPoints = existingCandidate.navigationOrder?.crmOrder?.offer?.navigationOffer?.points;
+    if (offerPoints && offerPoints.length > 0) {
+      const matchingOfferPoint = offerPoints.find(
+        (p) =>
+          p.id === existingCandidate.convertedNavigationPointId ||
+          p.label.toLowerCase() === (existingCandidate.label || '').toLowerCase()
+      );
+      if (matchingOfferPoint) {
+        await prisma.navigationPoint.update({
+          where: { id: matchingOfferPoint.id },
+          data: {
+            ...(label && { label: label.trim() }),
+            ...(latitude && { latitude: parseFloat(latitude) }),
+            ...(longitude && { longitude: parseFloat(longitude) }),
+            ...(address !== undefined && { address: address?.trim() || null }),
+            ...(arrowDirection && {
+              arrowDirectionEnum: arrowDirection,
+              arrowDirection: arrowDirection,
+            }),
+            ...(approachDirection !== undefined && {
+              orientation: approachDirection?.trim() || null,
+              signOrientation: approachDirection?.trim() || null,
+            }),
+            ...(pillarNumber !== undefined && { pillarNumber: pillarNumber?.trim() || null }),
+            ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
+            ...(uploadedFirstPhotoId && { sitePhotoId: uploadedFirstPhotoId }),
+          },
+        });
+      }
     }
 
     return NextResponse.json({ candidate: updated });

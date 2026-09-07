@@ -14,6 +14,13 @@ import {
   RefreshCw,
   Search,
   ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpLeft,
+  ArrowUpRight,
+  RotateCcw,
+  RotateCw,
+  Car,
   Store,
   Navigation as NavIcon,
   ShieldCheck,
@@ -40,6 +47,9 @@ export type CandidatePointItem = {
   placementType: string;
   approachDirection?: string | null;
   arrowDirection?: string | null;
+  pillarNumber?: string | null;
+  pillarType?: string | null;
+  variant?: string | null;
   distanceValue?: number | null;
   distanceUnit?: string | null;
   ownershipType: string;
@@ -61,6 +71,39 @@ export type CandidatePointItem = {
   createdByUser?: { id: string; name: string } | null;
   createdAt: string;
 };
+
+export function formatSurveyArrowBadge(arrow?: string | null) {
+  const a = (arrow || 'STRAIGHT').toUpperCase();
+  switch (a) {
+    case 'LEFT':
+      return { label: 'VLEVO', icon: '←', color: 'bg-sky-50 text-sky-800 border-sky-300' };
+    case 'RIGHT':
+      return { label: 'VPRAVO', icon: '→', color: 'bg-sky-50 text-sky-800 border-sky-300' };
+    case 'SLANTED_LEFT':
+      return { label: 'ŠIKMO VLEVO', icon: '↖', color: 'bg-sky-50 text-sky-800 border-sky-300' };
+    case 'SLANTED_RIGHT':
+      return { label: 'ŠIKMO VPRAVO', icon: '↗', color: 'bg-sky-50 text-sky-800 border-sky-300' };
+    case 'U_TURN':
+      return { label: 'DO PROTISMĚRU', icon: '↩', color: 'bg-amber-50 text-amber-800 border-amber-300' };
+    case 'ROUNDABOUT_1':
+      return { label: 'KRUH. OBJ. – 1. VÝJEZD', icon: '🔄 1.', color: 'bg-indigo-50 text-indigo-800 border-indigo-300' };
+    case 'ROUNDABOUT_2':
+      return { label: 'KRUH. OBJ. – 2. VÝJEZD', icon: '🔄 2.', color: 'bg-indigo-50 text-indigo-800 border-indigo-300' };
+    case 'ROUNDABOUT_3':
+      return { label: 'KRUH. OBJ. – 3. VÝJEZD', icon: '🔄 3.', color: 'bg-indigo-50 text-indigo-800 border-indigo-300' };
+    case 'ROUNDABOUT_4':
+      return { label: 'KRUH. OBJ. – 4. VÝJEZD', icon: '🔄 4.', color: 'bg-indigo-50 text-indigo-800 border-indigo-300' };
+    case 'ROUNDABOUT_5':
+      return { label: 'KRUH. OBJ. – 5. VÝJEZD', icon: '🔄 5.', color: 'bg-indigo-50 text-indigo-800 border-indigo-300' };
+    case 'ROUNDABOUT':
+      return { label: 'KRUHOVÝ OBJEZD', icon: '🔄', color: 'bg-indigo-50 text-indigo-800 border-indigo-300' };
+    case 'TWO_WAY':
+      return { label: 'OBOUSMĚRNÝ', icon: '↔', color: 'bg-purple-50 text-purple-800 border-purple-300' };
+    case 'STRAIGHT':
+    default:
+      return { label: 'PŘÍMO', icon: '↑', color: 'bg-slate-100 text-slate-800 border-slate-300' };
+  }
+}
 
 export type SurveyDetailData = {
   id: string;
@@ -129,12 +172,18 @@ export function MobileSurveyFieldView({
   const [formPlacementType, setFormPlacementType] = useState('NAVIGATION');
   const [formApproachDirection, setFormApproachDirection] = useState('');
   const [formArrowDirection, setFormArrowDirection] = useState('STRAIGHT');
+  const [formPillarNumber, setFormPillarNumber] = useState('');
   const [formVisibility, setFormVisibility] = useState<'GOOD' | 'NEEDS_CHECK' | 'POOR'>('GOOD');
   const [formOwnership, setFormOwnership] = useState('UNKNOWN');
   const [formPermit, setFormPermit] = useState('UNKNOWN');
   const [formNote, setFormNote] = useState('');
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
   const [selectedSurfaceId, setSelectedSurfaceId] = useState<string | null>(null);
+
+  const openNavigation = (lat: number, lng: number) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   // Photo Capture State
   const [photosToUpload, setPhotosToUpload] = useState<Array<{ file: File; preview: string }>>([]);
@@ -216,6 +265,7 @@ export function MobileSurveyFieldView({
       setFormPlacementType(existing.placementType || 'NAVIGATION');
       setFormApproachDirection(existing.approachDirection || '');
       setFormArrowDirection(existing.arrowDirection || 'STRAIGHT');
+      setFormPillarNumber(existing.pillarNumber || '');
       setFormVisibility(existing.visibilityTowardTarget || 'GOOD');
       setFormOwnership(existing.ownershipType || 'UNKNOWN');
       setFormPermit(existing.permitStatus || 'UNKNOWN');
@@ -235,6 +285,7 @@ export function MobileSurveyFieldView({
       setFormPlacementType('NAVIGATION');
       setFormApproachDirection('');
       setFormArrowDirection('STRAIGHT');
+      setFormPillarNumber('');
       setFormVisibility('GOOD');
       setFormOwnership('UNKNOWN');
       setFormPermit('UNKNOWN');
@@ -316,6 +367,7 @@ export function MobileSurveyFieldView({
           placementType: formPlacementType,
           approachDirection: formApproachDirection,
           arrowDirection: formArrowDirection,
+          pillarNumber: formPillarNumber || null,
           visibilityTowardTarget: formVisibility,
           ownershipType: formOwnership,
           permitStatus: formPermit,
@@ -468,6 +520,64 @@ export function MobileSurveyFieldView({
             </div>
           </div>
 
+          {/* Quick point strip below map */}
+          {data.candidatePoints.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-xs font-black text-slate-700 block px-1">
+                Body pro tuto zakázku ({data.candidatePoints.length}) – rychlá navigace:
+              </span>
+              <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
+                {data.candidatePoints.map((c) => {
+                  const arrowInfo = formatSurveyArrowBadge(c.arrowDirection);
+                  return (
+                    <div
+                      key={c.id}
+                      className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm min-w-[240px] sm:min-w-[270px] shrink-0 space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="min-w-0 space-y-0.5">
+                          <h5 className="font-extrabold text-xs text-slate-900 truncate">{c.label}</h5>
+                          <p className="text-[11px] text-slate-500 font-mono flex items-center gap-1">
+                            <MapPin size={10} className="text-sky-500 shrink-0" />
+                            <span>{c.latitude.toFixed(4)}, {c.longitude.toFixed(4)}</span>
+                          </p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-md border font-black text-[10px] shrink-0 ${arrowInfo.color}`}>
+                          {arrowInfo.icon}
+                        </span>
+                      </div>
+
+                      {c.pillarNumber && (
+                        <span className="inline-block bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-black text-[10px]">
+                          💡 Sloup: {c.pillarNumber}
+                        </span>
+                      )}
+
+                      <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => openNavigation(c.latitude, c.longitude)}
+                          className="flex-1 flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-1.5 px-2.5 rounded-xl text-[11px] shadow-sm active:scale-95 transition cursor-pointer"
+                        >
+                          <NavIcon size={11} />
+                          <span>Navigovat</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAddModal(c)}
+                          className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                          title="Upravit"
+                        >
+                          <Edit3 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => handleOpenAddModal()}
             className="hidden sm:flex w-full items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 text-slate-950 font-black p-4 rounded-2xl shadow-lg border border-emerald-300 active:scale-95 transition text-sm tracking-wide"
@@ -488,66 +598,109 @@ export function MobileSurveyFieldView({
               </button>
             </div>
           ) : (
-            data.candidatePoints.map((c) => (
-              <div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-extrabold text-sm text-slate-900 truncate">{c.label}</h4>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        c.supervisionStatus === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                        c.supervisionStatus === 'NEEDS_RECHECK' ? 'bg-amber-100 text-amber-800' :
-                        c.supervisionStatus === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
-                        'bg-sky-100 text-sky-800'
-                      }`}>
-                        {c.supervisionStatus === 'APPROVED' ? '✓ SCHVÁLENO' :
-                         c.supervisionStatus === 'NEEDS_RECHECK' ? '↻ K PROVĚŘENÍ' :
-                         c.supervisionStatus === 'REJECTED' ? '✕ ZAMÍTNUTO' :
-                         '⏳ ČEKÁ NA SUPERVIZI'}
-                      </span>
+            data.candidatePoints.map((c) => {
+              const arrowInfo = formatSurveyArrowBadge(c.arrowDirection);
+              return (
+                <div key={c.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-extrabold text-sm text-slate-900 truncate">{c.label}</h4>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          c.supervisionStatus === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
+                          c.supervisionStatus === 'NEEDS_RECHECK' ? 'bg-amber-100 text-amber-800' :
+                          c.supervisionStatus === 'REJECTED' ? 'bg-rose-100 text-rose-800' :
+                          'bg-sky-100 text-sky-800'
+                        }`}>
+                          {c.supervisionStatus === 'APPROVED' ? '✓ SCHVÁLENO' :
+                           c.supervisionStatus === 'NEEDS_RECHECK' ? '↻ K PROVĚŘENÍ' :
+                           c.supervisionStatus === 'REJECTED' ? '✕ ZAMÍTNUTO' :
+                           '⏳ ČEKÁ NA SUPERVIZI'}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-500 flex items-center gap-1 font-mono">
+                        <MapPin size={12} className="text-sky-500" />
+                        <span>{c.latitude.toFixed(5)}, {c.longitude.toFixed(5)}</span>
+                        {c.distanceValue != null && <span className="font-bold text-slate-700">({c.distanceValue} km od cíle)</span>}
+                      </p>
                     </div>
 
-                    <p className="text-xs text-slate-500 flex items-center gap-1 font-mono">
-                      <MapPin size={12} className="text-sky-500" />
-                      <span>{c.latitude.toFixed(5)}, {c.longitude.toFixed(5)}</span>
-                      {c.distanceValue && <span className="font-bold text-slate-700">({c.distanceValue} km od cíle)</span>}
-                    </p>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openNavigation(c.latitude, c.longitude)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-sm active:scale-95 transition cursor-pointer"
+                        title="Spustit navigaci k bodu v Google Mapách"
+                      >
+                        <NavIcon size={12} className="shrink-0" />
+                        <span>Navigovat</span>
+                      </button>
+                      <a
+                        href={`https://mapy.cz/zakladni?q=${c.latitude},${c.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center justify-center"
+                        title="Otevřít v Mapy.cz"
+                      >
+                        🗺️
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAddModal(c)}
+                        className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold shrink-0 cursor-pointer"
+                        title="Upravit polohu a informace"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+                    </div>
                   </div>
 
-                  <button onClick={() => handleOpenAddModal(c)} className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold shrink-0">
-                    <Edit3 size={15} />
-                  </button>
-                </div>
-
-                {/* Properties Pills */}
-                <div className="flex flex-wrap gap-1.5 text-[11px] font-bold text-slate-600">
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-md">Trasa: {c.surveyRoute?.name || 'Bez trasy'}</span>
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-md">Typ: {c.placementType}</span>
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-md">Šipka: {c.arrowDirection || 'ROVNĚ'}</span>
-                  <span className={`px-2 py-0.5 rounded-md ${
-                    c.visibilityTowardTarget === 'GOOD' ? 'bg-emerald-50 text-emerald-700' :
-                    c.visibilityTowardTarget === 'NEEDS_CHECK' ? 'bg-amber-50 text-amber-700' :
-                    'bg-rose-50 text-rose-700'
-                  }`}>
-                    {c.visibilityTowardTarget === 'GOOD' ? '✅ Viditelné' : c.visibilityTowardTarget === 'NEEDS_CHECK' ? '⚠️ Nutno prověřit' : '❌ Nevhodné'}
-                  </span>
-                </div>
-
-                {/* Photos Strip */}
-                {c.photos.length > 0 && (
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                    {c.photos.map((p) => {
-                      const photoSrc = p.url || `/api/photos/${p.id}/file`;
-                      return (
-                        <div key={p.id} className="relative size-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
-                          <Image src={photoSrc} alt={c.label} fill unoptimized className="object-cover" />
-                        </div>
-                      );
-                    })}
+                  {/* Properties Pills */}
+                  <div className="flex flex-wrap gap-1.5 text-[11px] font-bold text-slate-600">
+                    {c.pillarNumber && (
+                      <span className="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-md font-black flex items-center gap-1">
+                        <span>💡 Sloup:</span>
+                        <strong>{c.pillarNumber}</strong>
+                      </span>
+                    )}
+                    <span className={`px-2.5 py-0.5 rounded-md border font-black flex items-center gap-1 ${arrowInfo.color}`}>
+                      <span>Šipka:</span>
+                      <span>{arrowInfo.icon}</span>
+                      <span>{arrowInfo.label}</span>
+                    </span>
+                    {c.approachDirection && (
+                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
+                        Příjezd: {c.approachDirection}
+                      </span>
+                    )}
+                    <span className="bg-slate-100 px-2 py-0.5 rounded-md">Trasa: {c.surveyRoute?.name || 'Bez trasy'}</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded-md">Typ: {c.placementType}</span>
+                    <span className={`px-2 py-0.5 rounded-md ${
+                      c.visibilityTowardTarget === 'GOOD' ? 'bg-emerald-50 text-emerald-700' :
+                      c.visibilityTowardTarget === 'NEEDS_CHECK' ? 'bg-amber-50 text-amber-700' :
+                      'bg-rose-50 text-rose-700'
+                    }`}>
+                      {c.visibilityTowardTarget === 'GOOD' ? '✅ Viditelné' : c.visibilityTowardTarget === 'NEEDS_CHECK' ? '⚠️ Nutno prověřit' : '❌ Nevhodné'}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))
+
+                  {/* Photos Strip */}
+                  {c.photos.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {c.photos.map((p) => {
+                        const photoSrc = p.url || `/api/photos/${p.id}/file`;
+                        return (
+                          <div key={p.id} className="relative size-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                            <Image src={photoSrc} alt={c.label} fill unoptimized className="object-cover" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -593,7 +746,7 @@ export function MobileSurveyFieldView({
                   type="button"
                   onClick={handleGetLocation}
                   disabled={locating}
-                  className="flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-xl transition"
+                  className="flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded-xl transition cursor-pointer"
                 >
                   <RefreshCw size={12} className={locating ? 'animate-spin' : ''} />
                   <span>{locating ? 'Získávám GPS...' : 'Získat moji GPS'}</span>
@@ -610,7 +763,29 @@ export function MobileSurveyFieldView({
                   LAT: {formLat.toFixed(6)}, LNG: {formLng.toFixed(6)}
                 </div>
               ) : (
-                <p className="text-xs text-amber-700 font-semibold italic">Zatiaľ nezískaná GPS. Kliknite na tlačítko hore.</p>
+                <p className="text-xs text-amber-700 font-semibold italic">Zatím nezískána GPS. Klikněte na tlačítko nahoře.</p>
+              )}
+
+              {formLat && formLng && (
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => openNavigation(formLat, formLng)}
+                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-black text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 py-1.5 px-3 rounded-xl transition cursor-pointer"
+                  >
+                    <NavIcon size={12} />
+                    <span>🚗 Spustit navigaci k tomuto místu</span>
+                  </button>
+                  <a
+                    href={`https://mapy.cz/zakladni?q=${formLat},${formLng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold transition flex items-center justify-center shrink-0"
+                    title="Otevřít v Mapy.cz"
+                  >
+                    🗺️ Mapy.cz
+                  </a>
+                </div>
               )}
             </div>
 
@@ -782,30 +957,76 @@ export function MobileSurveyFieldView({
                 </label>
               </div>
 
+              {/* Číslo sloupu / VO lampy */}
+              <label className="text-xs font-bold text-slate-700 block">
+                Číslo sloupu / VO lampy (přesné umístění v terénu)
+                <input
+                  type="text"
+                  value={formPillarNumber}
+                  onChange={(e) => setFormPillarNumber(e.target.value)}
+                  placeholder="Např. VO 45/2 nebo Trolejový sloup č. 14"
+                  className="input text-xs mt-1 font-bold border-amber-300 focus:border-amber-500"
+                />
+              </label>
+
               {/* Arrow Choice */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 block">Doporučená orientace šipky</label>
-                <div className="grid grid-cols-5 gap-1.5">
+                <label className="text-xs font-bold text-slate-700 block">Doporučená orientace směrové šipky</label>
+                
+                {/* Standard Arrows */}
+                <div className="grid grid-cols-6 gap-1.5">
                   {[
-                    { id: 'LEFT', icon: '←' },
-                    { id: 'STRAIGHT', icon: '↑' },
-                    { id: 'RIGHT', icon: '→' },
-                    { id: 'SLANTED_LEFT', icon: '↖' },
-                    { id: 'SLANTED_RIGHT', icon: '↗' },
+                    { id: 'LEFT', icon: '←', label: 'Vlevo' },
+                    { id: 'STRAIGHT', icon: '↑', label: 'Rovně' },
+                    { id: 'RIGHT', icon: '→', label: 'Vpravo' },
+                    { id: 'SLANTED_LEFT', icon: '↖', label: 'Šikmo L' },
+                    { id: 'SLANTED_RIGHT', icon: '↗', label: 'Šikmo P' },
+                    { id: 'U_TURN', icon: '↩', label: 'Otočení' },
                   ].map((arr) => (
                     <button
                       key={arr.id}
                       type="button"
                       onClick={() => setFormArrowDirection(arr.id)}
-                      className={`p-2.5 rounded-xl font-black text-lg border transition ${
+                      className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center border transition cursor-pointer ${
                         formArrowDirection === arr.id
-                          ? 'bg-sky-600 text-white border-sky-700 shadow-md'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
+                          ? 'bg-sky-600 text-white border-sky-700 shadow-md font-black'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200 font-bold'
                       }`}
+                      title={arr.label}
                     >
-                      {arr.icon}
+                      <span className="text-base font-black">{arr.icon}</span>
+                      <span className="text-[10px] leading-tight">{arr.label}</span>
                     </button>
                   ))}
+                </div>
+
+                {/* Roundabout Arrows */}
+                <div className="pt-1 space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 block">Kruhové objezdy (výjezdy):</span>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[
+                      { id: 'ROUNDABOUT_1', icon: '🔄', label: '1. výjezd' },
+                      { id: 'ROUNDABOUT_2', icon: '🔄', label: '2. výjezd' },
+                      { id: 'ROUNDABOUT_3', icon: '🔄', label: '3. výjezd' },
+                      { id: 'ROUNDABOUT_4', icon: '🔄', label: '4. výjezd' },
+                      { id: 'ROUNDABOUT', icon: '🔄', label: 'Obecně' },
+                    ].map((arr) => (
+                      <button
+                        key={arr.id}
+                        type="button"
+                        onClick={() => setFormArrowDirection(arr.id)}
+                        className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center border transition cursor-pointer ${
+                          formArrowDirection === arr.id
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-md font-black'
+                            : 'bg-indigo-50/70 text-indigo-950 hover:bg-indigo-100 border-indigo-200 font-bold'
+                        }`}
+                        title={`Kruhový objezd – ${arr.label}`}
+                      >
+                        <span className="text-sm font-black">{arr.icon}</span>
+                        <span className="text-[10px] leading-tight font-black">{arr.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
