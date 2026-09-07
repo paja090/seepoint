@@ -21,7 +21,7 @@ export async function logAIUsage({
   organizationId,
   userId,
   feature,
-  modelName = 'gemini-2.5-flash',
+  modelName = 'gemini-3.6-flash',
   promptTokens = 0,
   outputTokens = 0,
   imageCount = 0,

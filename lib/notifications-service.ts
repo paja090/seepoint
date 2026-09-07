@@ -253,16 +253,25 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
         const systemPrompt = `Jsi AI Asistent vedení firmy SeePoint. Zde je seznam aktuálních notifikací a varování:\n${notifText}\n\nVytvoř 1 STRUČNÝ, PŘEHLEDNÝ A EFEKTIVNÍ SOUHRN v češtině (max 200 znaků) jako "AI Souhrn pro vedoucího", který vypíchne nejakutnější problémy (např. končící zábory měst, vypršení smluv, nevyřízené úkoly s důvody). Vrať ČISTÝ TEXT bez jakýchkoliv markdown značek.`;
 
         const configuredModel = process.env.GEMINI_TEXT_MODEL?.trim();
-        const model = configuredModel && /^[A-Za-z0-9._-]+$/.test(configuredModel) ? configuredModel : 'gemini-2.5-flash';
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          aiSummary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 300) || null;
+        const modelsToTry = configuredModel && /^[A-Za-z0-9._-]+$/.test(configuredModel)
+          ? [configuredModel]
+          : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+        for (const model of modelsToTry) {
+          try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+              body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] }),
+              signal: AbortSignal.timeout(15_000),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              aiSummary = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().slice(0, 300) || null;
+              if (aiSummary) break;
+            }
+          } catch {
+            // try next model
+          }
         }
       }
     } catch (err) {
