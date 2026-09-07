@@ -34,6 +34,8 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const batchLimit = Math.min(Math.max(Number(body?.limit) || 15, 5), 25);
+  const startTime = Date.now();
+  const TIME_BUDGET_MS = 28_000; // 28s budget to safely return within Vercel execution window
 
   const run = await prisma.radarRun.create({
     data: {
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
       console.error('Live search grounding error (continuing with RSS)', err);
     }
 
-    // 2. Targeted RSS Feeds Discovery
+    // 2. Targeted RSS Feeds Discovery (collect signals into DB)
     const { rawFound, uniqueSignals } = await collectSignalsForProfile(profile, user.organizationId);
 
     // Prioritize unprocessed signals
@@ -110,57 +112,65 @@ export async function POST(request: Request) {
     const remainingSlots = Math.max(batchLimit - addedCount, 5);
     const signalsToProcess = unanalyzedSignals.slice(0, remainingSlots);
 
-    for (const signal of signalsToProcess) {
-      try {
-        const parsed = await parseOpportunityFromAiInput(
-          signal.sourceTitle,
-          signal.sourceUrl,
-          profile
-        );
-
-        if (!parsed.isRelevant) {
-          ignoredCount++;
-          await prisma.radarSignal.updateMany({
-            where: { id: signal.id, organizationId: user.organizationId },
-            data: { status: 'IGNORED', parsedData: parsed as unknown as object },
-          });
-          continue;
+    // Only process additional RSS signals if time budget permits and more items needed
+    if (addedCount < 8 && Date.now() - startTime < TIME_BUDGET_MS) {
+      for (const signal of signalsToProcess) {
+        if (Date.now() - startTime > TIME_BUDGET_MS) {
+          console.log('Time budget reached, stopping RSS parsing early');
+          break;
         }
 
-        const result = await createOpportunity({
-          companyName: parsed.companyName,
-          companyId: parsed.companyId,
-          website: parsed.website,
-          eventType: parsed.eventType,
-          title: parsed.title,
-          summary: parsed.summary,
-          city: parsed.city,
-          region: parsed.region,
-          address: parsed.address,
-          eventDate: parsed.eventDate,
-          sourceUrl: signal.sourceUrl,
-          sourceTitle: signal.sourceTitle,
-          sourcePublishedAt: signal.sourcePublishedAt || new Date(),
-          suggestedMediaTypes: parsed.suggestedMediaTypes,
-          radarSignalId: signal.id,
-        }, user.organizationId);
+        try {
+          const parsed = await parseOpportunityFromAiInput(
+            signal.sourceTitle,
+            signal.sourceUrl,
+            profile
+          );
 
-        if (result.created) {
-          addedCount++;
+          if (!parsed.isRelevant) {
+            ignoredCount++;
+            await prisma.radarSignal.updateMany({
+              where: { id: signal.id, organizationId: user.organizationId },
+              data: { status: 'IGNORED', parsedData: parsed as unknown as object },
+            });
+            continue;
+          }
+
+          const result = await createOpportunity({
+            companyName: parsed.companyName,
+            companyId: parsed.companyId,
+            website: parsed.website,
+            eventType: parsed.eventType,
+            title: parsed.title,
+            summary: parsed.summary,
+            city: parsed.city,
+            region: parsed.region,
+            address: parsed.address,
+            eventDate: parsed.eventDate,
+            sourceUrl: signal.sourceUrl,
+            sourceTitle: signal.sourceTitle,
+            sourcePublishedAt: signal.sourcePublishedAt || new Date(),
+            suggestedMediaTypes: parsed.suggestedMediaTypes,
+            radarSignalId: signal.id,
+          }, user.organizationId);
+
+          if (result.created) {
+            addedCount++;
+            await prisma.radarSignal.updateMany({
+              where: { id: signal.id, organizationId: user.organizationId },
+              data: { status: 'PROCESSED', discoveredOpportunityId: result.opportunity?.id },
+            }).catch(() => null);
+          } else {
+            duplicateCount++;
+          }
+        } catch (err) {
+          errorsCount++;
+          console.error('Failed processing RSS signal for opportunity', signal.sourceTitle, err);
           await prisma.radarSignal.updateMany({
             where: { id: signal.id, organizationId: user.organizationId },
-            data: { status: 'PROCESSED', discoveredOpportunityId: result.opportunity?.id },
+            data: { status: 'FAILED' },
           }).catch(() => null);
-        } else {
-          duplicateCount++;
         }
-      } catch (err) {
-        errorsCount++;
-        console.error('Failed processing RSS signal for opportunity', signal.sourceTitle, err);
-        await prisma.radarSignal.updateMany({
-          where: { id: signal.id, organizationId: user.organizationId },
-          data: { status: 'FAILED' },
-        }).catch(() => null);
       }
     }
 
