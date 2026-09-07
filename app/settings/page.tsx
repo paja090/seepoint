@@ -28,6 +28,16 @@ export default async function Settings() {
         <p>Google Maps API: <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code></p>
         <p>Databáze: <code>DATABASE_URL</code> pro PostgreSQL.</p>
         <p>Fotky: lokálně v <code>public/uploads</code>, připraveno pro výměnu za S3/GCS storage adapter.</p>
+      </div>
+
+      <div className="card mt-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">✉️ Firemní e-mail & Domény</h2>
+          <p className="text-sm text-slate-600 mt-1">Nastavení odesílací domény pro nabídky a notifikace s ověřením SPF a DKIM.</p>
+        </div>
+        <a href="/settings/email" className="button button-primary text-sm font-bold">
+          Spravovat e-maily →
+        </a>
       </div>      {priceError ? (
         <section className="card mt-6">
           <h2 className="mb-4 text-xl font-semibold">Ceník nosičů</h2>

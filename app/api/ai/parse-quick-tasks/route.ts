@@ -1,6 +1,7 @@
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { logAIUsage } from '@/lib/ai-usage';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,6 +111,19 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
         } catch (e) {
           console.error(`Error querying Gemini model ${modelName}:`, e);
         }
+      }
+
+      if (parsedTasks && parsedTasks.length > 0 && actor.organizationId) {
+        void logAIUsage({
+          organizationId: actor.organizationId,
+          userId: actor.id,
+          feature: 'ASSISTANT',
+          modelName: 'gemini-3.6-flash',
+          promptTokens: 400,
+          outputTokens: 200,
+          costEstimateUsd: 0.001,
+          metadata: { action: 'quick-tasks-parse', taskCount: parsedTasks.length },
+        });
       }
     }
 

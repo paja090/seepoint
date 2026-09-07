@@ -2,6 +2,8 @@ import 'server-only';
 import crypto from 'node:crypto';
 import { formatCzechBusinessSalutation } from '@/lib/czech-salutation';
 import { isValidEmailAddress, isValidEmailIdempotencyKey, skippedEmailEnvironment } from '@/lib/email-policy';
+import { prisma } from '@/lib/db';
+import { decryptTenantCredential } from '@/lib/email-encryption';
 
 export type EmailAttachment = {
   filename: string;
@@ -132,6 +134,8 @@ export async function sendOfferEmail(input: {
   salespersonRole?: string | null;
   salespersonPhotoUrl?: string | null;
   idempotencyKey?: string;
+  organizationId?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<EmailDeliveryResult> {
   const subject = input.subject?.trim() || `Nabídka SeePOINT – ${input.campaignName}`;
   const safeSalutation = escapeHtml(formatCzechBusinessSalutation(input.contactName));
@@ -194,6 +198,41 @@ export async function sendOfferEmail(input: {
       offerUrl: input.publicUrl,
     },
     idempotencyKey: input.idempotencyKey,
+    organizationId: input.organizationId,
+    metadata: input.metadata,
+  });
+}
+
+export async function sendTenantTestEmail(input: {
+  organizationId: string;
+  to: string;
+  senderName: string;
+  fromEmail: string;
+  replyTo?: string;
+}): Promise<EmailDeliveryResult> {
+  const safeName = escapeHtml(input.senderName);
+  const safeFrom = escapeHtml(input.fromEmail);
+  const safeReplyTo = input.replyTo ? escapeHtml(input.replyTo) : safeFrom;
+
+  return sendEmail({
+    to: input.to,
+    subject: `Testovací e-mail – ${input.senderName} (Seepoint OS)`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:580px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px">
+        <h2 style="margin-top:0;color:#059669">✓ Testovací e-mail byl úspěšně odeslán</h2>
+        <p>Tento e-mail potvrzuje, že firemní doména a odesílací infrastruktura v Seepoint OS jsou správně nakonfigurovány a ověřeny.</p>
+        <table style="width:100%;font-size:13px;margin:20px 0;border-collapse:collapse">
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 0;color:#64748b">Odesílatel:</td><td style="padding:6px 0;font-weight:bold">${safeName} &lt;${safeFrom}&gt;</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 0;color:#64748b">Odpovědět komu (Reply-To):</td><td style="padding:6px 0;font-weight:bold">${safeReplyTo}</td></tr>
+          <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 0;color:#64748b">Příjemce:</td><td style="padding:6px 0;font-weight:bold">${escapeHtml(input.to)}</td></tr>
+          <tr><td style="padding:6px 0;color:#64748b">Datum:</td><td style="padding:6px 0">${new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })}</td></tr>
+        </table>
+        <p style="font-size:12px;color:#94a3b8;margin-bottom:0">Odesláno prostřednictvím Seepoint OS & Resend Multi-Tenant API.</p>
+      </div>
+    `,
+    webhookBody: { template: 'test' },
+    organizationId: input.organizationId,
+    metadata: { isTest: true },
   });
 }
 
@@ -205,6 +244,8 @@ async function sendEmail(input: {
   webhookBody: Record<string, unknown>;
   attachments?: EmailAttachment[];
   idempotencyKey?: string;
+  organizationId?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<EmailDeliveryResult> {
   const attachments = input.attachments ?? [];
   const attachmentBytes = attachments.reduce((sum, attachment) => sum + attachment.content.byteLength, 0);
@@ -217,8 +258,36 @@ async function sendEmail(input: {
       throw new Error('Typ přílohy není platný.');
     }
   }
+
   const defaultFrom = 'SeePOINT <info@seepoint.cz>';
-  const from = process.env.EMAIL_FROM || defaultFrom;
+  let from = process.env.EMAIL_FROM || defaultFrom;
+  let replyTo: string | undefined = undefined;
+  let resendApiKey = process.env.RESEND_API_KEY;
+
+  if (input.organizationId) {
+    try {
+      const emailSettings = await prisma.organizationEmailSettings.findUnique({
+        where: { organizationId: input.organizationId },
+      });
+
+      if (emailSettings && emailSettings.status === 'VERIFIED') {
+        from = `${emailSettings.senderName} <${emailSettings.fromEmail}>`;
+        if (emailSettings.replyTo) {
+          replyTo = emailSettings.replyTo;
+        }
+        if (emailSettings.encryptedSendingApiKey) {
+          try {
+            resendApiKey = decryptTenantCredential(emailSettings.encryptedSendingApiKey);
+          } catch (err) {
+            console.warn('[email] Failed decrypting tenant sending key, using management key:', err);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[email] Error loading tenant email settings:', err);
+    }
+  }
+
   if (from.length > 320 || /[\r\n]/.test(from)) throw new Error('Adresa odesílatele není platná.');
   const bccList = Array.isArray(input.bcc)
     ? input.bcc.filter(Boolean)
@@ -234,11 +303,11 @@ async function sendEmail(input: {
   }
   ensureEmailConfigured();
 
-  if (process.env.RESEND_API_KEY) {
+  if (resendApiKey) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        authorization: `Bearer ${resendApiKey}`,
         'content-type': 'application/json',
         ...(input.idempotencyKey ? { 'Idempotency-Key': input.idempotencyKey } : {}),
       },
@@ -246,6 +315,7 @@ async function sendEmail(input: {
       body: JSON.stringify({
         from,
         to: [input.to],
+        ...(replyTo ? { reply_to: replyTo } : {}),
         ...(bccList.length > 0 ? { bcc: bccList } : {}),
         subject: input.subject,
         html: input.html,
@@ -261,7 +331,24 @@ async function sendEmail(input: {
       throw new Error('E-mail se nepodařilo odeslat. Zkuste to prosím znovu.');
     }
     const result = await response.json().catch(() => null) as { id?: string } | null;
-    return { status: 'sent', provider: 'resend', messageId: result?.id };
+    const messageId = result?.id;
+
+    if (input.organizationId) {
+      void prisma.emailLog.create({
+        data: {
+          organizationId: input.organizationId,
+          providerMessageId: messageId || null,
+          recipient: input.to,
+          from,
+          subject: input.subject,
+          template: String(input.webhookBody?.template || 'general'),
+          status: 'SENT',
+          metadata: (input.metadata as object) || null,
+        },
+      }).catch((logErr) => console.warn('[email] Failed recording EmailLog:', logErr));
+    }
+
+    return { status: 'sent', provider: 'resend', messageId };
   }
 
   if (process.env.EMAIL_WEBHOOK_URL) {

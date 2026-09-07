@@ -9,6 +9,8 @@ const SELF_PATH = 'scripts/check-tenant-security.mjs';
 // Every bypass is intentionally explicit. A legitimate change must update this
 // baseline in the same reviewed pull request instead of silently widening access.
 const PLATFORM_PRISMA_BASELINE = new Map([
+  // Signed provider webhook: ownership lookup only; mutations enter the resolved tenant.
+  ['app/api/webhooks/resend/route.ts', 3],
   ['app/admin/organizations/[id]/page.tsx', 5],
   ['app/admin/organizations/page.tsx', 3],
   ['app/api/admin/organizations/[id]/modules/route.ts', 3],
@@ -84,6 +86,8 @@ const API_ROUTE_EXCEPTIONS = new Set([
   'app/api/proposals/[token]/route.ts',
   'app/api/proposals/[token]/salesperson-photo/route.ts',
   'app/api/proposals/[token]/selection/route.ts',
+  // Public Resend webhook receiver verifies Svix cryptographic signature
+  'app/api/webhooks/resend/route.ts',
 ]);
 
 const DIRECT_GUARD_PATTERN = /\b(?:requireApiAccess|getCurrentUser|requireOrganization|requireOrganizationMember|requireOrganizationRole|requireSuperAdmin|enterTenantContext|requireTenantContext)\s*\(/;

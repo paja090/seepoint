@@ -37,3 +37,7 @@ No production database migration or deployment is performed during local impleme
 ## Updated main audit — 39fb532
 
 The shared checkout was advanced by other work. Hardening was restored from its preserved stash into `.worktrees/saas-hardening-current`, branch `codex/saas-hardening-current`, based on current origin/main 39fb532. No carrier-type-model stash was applied. New main already contains universal import, updated Gemini model selection, navigation/mobile survey synchronization and CRM AI-result persistence. These changes are retained, not reimplemented. Seven new tenant models were detected by the regression gate: OrganizationRadarProfile, RadarSignal, RadarRun, RadarFeedback, ImportProfile, ImportBatchSheet and ImportRow. They are added to the central reviewed registry; new import/radar entrypoints receive module guards. Earlier build/test results are superseded by verification in this worktree.
+
+## Kontrola aktuálního main 09adb77
+
+Zahrnuty nové Resend konfigurace a delivery webhook, cron obchodního radaru, AI limity a notifikace. OrganizationEmailSettings a EmailLog jsou tenant-owned. Ruční cron je omezen na aktivní organizaci a salesRadar; globální běh vyžaduje CRON_SECRET. Profil se načítá v tenant contextu. Webhook nejprve ověřuje podpis, pak rozpozná vlastníka přes platform klienta a zapisuje tenant-aware klientem. Opětovné použití Resend domény vyžaduje providerDomainId již vlastněné organizací. Unikátní indexy brání konkurenčnímu dvojímu přiřazení. Notifikace respektují vypnutý modul.

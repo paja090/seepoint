@@ -7,6 +7,8 @@ export type RawRssArticle = {
   link: string;
   pubDate?: string;
   description?: string;
+  publisher?: string;
+  publisherUrl?: string;
 };
 
 /**
@@ -15,12 +17,12 @@ export type RawRssArticle = {
 export function buildDynamicRssQueries(profile: OrganizationRadarProfileData): string[] {
   const locations: string[] = [];
   if (profile.targetCities.length > 0) {
-    locations.push(...profile.targetCities.slice(0, 3));
+    locations.push(...profile.targetCities.slice(0, 4));
   }
-  if (profile.targetRegions.length > 0 && locations.length < 3) {
+  if (profile.targetRegions.length > 0 && locations.length < 4) {
     for (const r of profile.targetRegions) {
       if (!locations.includes(r)) locations.push(r);
-      if (locations.length >= 3) break;
+      if (locations.length >= 4) break;
     }
   }
   if (locations.length === 0) {
@@ -29,9 +31,9 @@ export function buildDynamicRssQueries(profile: OrganizationRadarProfileData): s
 
   const queries: string[] = [];
   const baseActions = [
-    'otevření prodejny pobočky provozovny',
-    'nová pobočka expanze retail park',
-    'koncert festival veletrh sportovní akce',
+    '"nová prodejna" OR "nová pobočka" OR "otevření prodejny"',
+    '"retail park" OR "nákupní centrum" OR expanze',
+    'festival OR koncert OR veletrh OR výstava',
   ];
 
   for (const loc of locations) {
@@ -41,12 +43,12 @@ export function buildDynamicRssQueries(profile: OrganizationRadarProfileData): s
   }
 
   if (profile.customKeywords.length > 0) {
-    for (const kw of profile.customKeywords.slice(0, 2)) {
-      queries.push(`${locations[0] || ''} ${kw}`.trim());
+    for (const kw of profile.customKeywords.slice(0, 3)) {
+      queries.push(`${locations[0] || ''} "${kw}"`.trim());
     }
   }
 
-  return queries.slice(0, 5);
+  return queries.slice(0, 10);
 }
 
 export async function fetchRssArticles(rssUrl: string): Promise<RawRssArticle[]> {
@@ -60,17 +62,20 @@ export async function fetchRssArticles(rssUrl: string): Promise<RawRssArticle[]>
     if (contentLength > 1_000_000) return [];
     const xmlText = (await res.text()).slice(0, 1_000_000);
     const items = xmlText.match(/<item>[\s\S]*?<\/item>/gi) || [];
-    return items.slice(0, 15).flatMap((itemXml) => {
+    return items.slice(0, 25).flatMap((itemXml) => {
       const titleMatch = itemXml.match(/<title>(.*?)<\/title>/i);
       const linkMatch = itemXml.match(/<link>(.*?)<\/link>/i);
       const pubDateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/i);
       const descMatch = itemXml.match(/<description>(.*?)<\/description>/i);
+      const sourceMatch = itemXml.match(/<source\s+url="([^"]+)">([^<]+)<\/source>/i);
       if (!titleMatch?.[1] || !linkMatch?.[1]) return [];
       return [{
         title: titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/gi, '$1').trim(),
         link: linkMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/gi, '$1').trim(),
         pubDate: pubDateMatch?.[1],
         description: descMatch?.[1]?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        publisher: sourceMatch?.[2]?.trim(),
+        publisherUrl: sourceMatch?.[1]?.trim(),
       }];
     });
   } catch {
@@ -96,7 +101,7 @@ export async function collectSignalsForProfile(
     rssUrls.push(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=cs&gl=CZ&ceid=CZ:cs`);
   }
 
-  const fetchedGroups = await Promise.all(rssUrls.slice(0, 6).map(fetchRssArticles));
+  const fetchedGroups = await Promise.all(rssUrls.slice(0, 10).map(fetchRssArticles));
   const rawArticles = fetchedGroups.flat();
 
   const oldestAllowed = Date.now() - 45 * 24 * 60 * 60_000;
@@ -111,31 +116,44 @@ export async function collectSignalsForProfile(
     (art, idx, all) => all.findIndex((cand) => cand.title === art.title || cand.link === art.link) === idx
   );
 
-  const persistedSignals = [];
-  for (const art of uniqueArticles.slice(0, 15)) {
+  const toUpsert = uniqueArticles.slice(0, 30).map((art) => {
     const pubDate = art.pubDate ? new Date(art.pubDate) : null;
-    const signal = await prisma.radarSignal.upsert({
-      where: {
-        organizationId_sourceUrl: {
-          organizationId,
-          sourceUrl: art.link,
-        },
-      },
-      create: {
-        organizationId,
-        sourceUrl: art.link,
-        sourceTitle: art.title,
-        sourcePublishedAt: pubDate && Number.isFinite(pubDate.getTime()) ? pubDate : null,
-        rawText: art.description || null,
-        status: 'NEW',
-      },
-      update: {},
+    const cleanTitle = art.publisher ? `${art.title} - ${art.publisher}` : art.title;
+    return {
+      organizationId,
+      sourceUrl: art.link,
+      sourceTitle: cleanTitle,
+      sourcePublishedAt: pubDate && Number.isFinite(pubDate.getTime()) ? pubDate : null,
+      rawText: art.description || null,
+      status: 'NEW',
+    };
+  });
+
+  if (toUpsert.length > 0) {
+    await prisma.radarSignal.createMany({
+      data: toUpsert,
+      skipDuplicates: true,
     });
-    persistedSignals.push(signal);
   }
+
+  const persistedSignals = await prisma.radarSignal.findMany({
+    where: {
+      organizationId,
+      sourceUrl: { in: toUpsert.map((t) => t.sourceUrl) },
+    },
+    take: 30,
+  });
+
+  // Prioritize NEW unprocessed signals first
+  const sortedSignals = persistedSignals.sort((a, b) => {
+    if (a.status === 'NEW' && b.status !== 'NEW') return -1;
+    if (a.status !== 'NEW' && b.status === 'NEW') return 1;
+    return 0;
+  });
 
   return {
     rawFound: rawArticles.length,
-    uniqueSignals: persistedSignals,
+    uniqueSignals: sortedSignals,
   };
 }
+

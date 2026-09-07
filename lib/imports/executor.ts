@@ -257,7 +257,7 @@ export async function commitImportBatch(
             if (mapped.address) updateData.address = String(mapped.address);
             if (mapped.city) updateData.city = String(mapped.city);
             if (carrierType !== 'OTHER') updateData.type = carrierType;
-            if (resolution === 'USE_IMPORT' && typeof mapped.latitude === 'number') {
+            if (resolution === 'USE_IMPORT' && typeof mapped.latitude === 'number' && typeof mapped.longitude === 'number') {
               updateData.latitude = mapped.latitude;
               updateData.longitude = mapped.longitude;
             }

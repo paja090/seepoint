@@ -30,3 +30,9 @@ Print approval uses the permanent portal credential plus a job ID restricted to 
 8. Monitor errors. Roll back app only if compatible with new credentials; the old application cannot recover encrypted random credentials and overwrites hashes on publish. Therefore do not roll back token-writing code after new links have been issued. Prefer forward fix or suspend publication temporarily. Do not roll back/drop additive columns or restore a stale DB over new business data.
 
 No production migration, backfill, secret rotation, email delivery or deployment is performed by the local hardening task.
+
+## Doplnění pro main 09adb77
+
+Migrace `20260908210000_email_domain_ownership` přidává unikátní indexy domain a providerDomainId na OrganizationEmailSettings. Musí běžet až po `20260907210000_multi_tenant_resend_email_system` z main. Před nasazením zkontrolujte duplicity; při konfliktu migrace bezpečně selže. Nic nemaže ani automaticky nepřevádí mezi organizacemi. Doména zaregistrovaná u poskytovatele bez vlastnictví zaznamenaného v SeePoint vyžaduje správcovské ověření a řízené přiřazení; nelze ji převzít zadáním jejího jména.
+
+Testovací databáze je samostatná Neon větev `codex-saas-hardening-20260907`; její přístupové údaje nejsou v Gitu. E2E fixtures vytváří `e2e/seed.ts` při explicitním `E2E_ALLOW_TEST_TENANT=true` a shodě hostname s `E2E_DATABASE_HOST`. Hesla a tokeny ukládá pouze do ignorovaného `.env.e2e.local`. `e2e/database-check.ts` prověřuje skutečné databázové transakce. Produkční e-mailové klíče nebyly k testům použity.

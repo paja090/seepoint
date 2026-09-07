@@ -520,8 +520,10 @@ model Organization {
   members      OrganizationMember[]
   invitations  OrganizationInvitation[]
   onboarding   OrganizationOnboarding?
-  integrations IntegrationConnection[]
-  aiUsageLogs  AIUsageLog[]
+  integrations  IntegrationConnection[]
+  aiUsageLogs   AIUsageLog[]
+  emailSettings OrganizationEmailSettings?
+  emailLogs     EmailLog[]
 
   @@index([isActive])
   @@index([plan])
@@ -3613,3 +3615,66 @@ model PrintProductionJob {
   @@index([offerId])
   @@index([clientId])
 }
+
+enum EmailDomainStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+enum EmailLogStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  DELIVERY_DELAYED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+model OrganizationEmailSettings {
+  id                     String            @id @default(cuid())
+  organizationId         String            @unique
+  domain                 String            @unique
+  senderName             String
+  fromEmail              String
+  replyTo                String?
+  providerDomainId       String?           @unique
+  status                 EmailDomainStatus @default(NOT_STARTED)
+  dnsRecords             Json?
+  encryptedSendingApiKey String?           @db.Text
+  lastVerifiedAt         DateTime?
+  lastTestedAt           DateTime?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([domain])
+  @@index([providerDomainId])
+}
+
+model EmailLog {
+  id                String         @id @default(cuid())
+  organizationId    String
+  providerMessageId String?        @unique
+  recipient         String
+  from              String
+  subject           String
+  template          String         @default("general")
+  status            EmailLogStatus @default(SENT)
+  error             String?
+  metadata          Json?
+  sentAt            DateTime       @default(now())
+  deliveredAt       DateTime?
+  updatedAt         DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, sentAt])
+  @@index([providerMessageId])
+  @@index([status])
+}
+
