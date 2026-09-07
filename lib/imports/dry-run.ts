@@ -174,8 +174,11 @@ export async function executeDryRun(
 
     if (classification === 'CLIENTS') {
       targetEntity = 'CLIENT';
-      const clientName = String(mappedData.name || '');
+      const clientName = String(mappedData.name || mappedData.clientName || '');
       const ico = mappedData.companyId ? String(mappedData.companyId) : undefined;
+      if (!mappedData.name && clientName) {
+        mappedData.name = clientName;
+      }
 
       if (!clientName) {
         action = 'ERROR';
@@ -206,13 +209,21 @@ export async function executeDryRun(
       }
     } else if (classification === 'PRICES') {
       targetEntity = 'PRICE';
-      const priceName = String(mappedData.name || '');
+      const priceName = String(mappedData.name || mappedData.carrierType || mappedData.mediaType || mappedData.code || '');
+      if (!mappedData.name && priceName) {
+        mappedData.name = priceName;
+      }
+      if (mappedData.price !== undefined && mappedData.rentalPrice === undefined) {
+        mappedData.rentalPrice = mappedData.price;
+      }
+
       if (!priceName) {
         action = 'ERROR';
         issues.push({ code: 'MISSING_PRICE_NAME', message: 'Chybí název položky ceníku.', severity: 'error' });
         errorCount++;
       } else {
         action = 'CREATE';
+        targetIdentifier = priceName;
         createCount++;
         entityStats.prices.create++;
       }
@@ -220,11 +231,11 @@ export async function executeDryRun(
       targetEntity = 'OCCUPANCY';
       const code = mappedData.carrierCode ? String(mappedData.carrierCode) : '';
       if (!code) {
-        action = 'ERROR';
-        issues.push({ code: 'MISSING_OCCUPANCY_TARGET', message: 'Chybí kód plochy.', severity: 'error' });
-        errorCount++;
+        action = 'SKIP';
+        skipCount++;
       } else {
         action = 'CREATE';
+        targetIdentifier = `${code} (${mappedData.clientName || mappedData.campaignName || 'Obsazenost'})`;
         createCount++;
         entityStats.occupancies.create++;
       }
@@ -232,18 +243,19 @@ export async function executeDryRun(
       // Default: CARRIER & SURFACE
       targetEntity = 'CARRIER';
       const carrierCode = mappedData.carrierCode ? String(mappedData.carrierCode) : '';
-      const city = mappedData.city ? String(mappedData.city) : '';
+      let city = mappedData.city ? String(mappedData.city) : '';
       const lat = typeof mappedData.latitude === 'number' ? mappedData.latitude : undefined;
       const lon = typeof mappedData.longitude === 'number' ? mappedData.longitude : undefined;
 
       if (!carrierCode && !mappedData.name && !lat) {
         action = 'SKIP';
         skipCount++;
-      } else if (!city) {
-        action = 'ERROR';
-        issues.push({ code: 'MISSING_CITY', message: 'Chybí město/obec nosiče.', severity: 'error' });
-        errorCount++;
       } else {
+        if (!city) {
+          city = 'Nespecifikováno';
+          mappedData.city = city;
+        }
+
         const match = matchCarrier(
           {
             carrierCode,

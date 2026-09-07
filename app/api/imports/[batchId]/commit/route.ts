@@ -34,7 +34,8 @@ export async function POST(
 
   try {
     const body = await request.json().catch(() => ({}));
-    if (body.confirmation !== 'IMPORTOVAT') {
+    const conf = String(body.confirmation || '').trim().toUpperCase();
+    if (conf !== 'IMPORTOVAT') {
       return NextResponse.json(
         { error: 'Pro provedení importu zadejte textové potvrzení „IMPORTOVAT“.' },
         { status: 400 }

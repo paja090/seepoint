@@ -190,8 +190,9 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
   // --- Step 6: Commit Import ---
   const handleCommit = async () => {
     if (!batchId) return;
-    if (confirmationText !== 'IMPORTOVAT') {
-      setError('Pro spuštění importu zadejte přesný text „IMPORTOVAT“.');
+    const cleanConf = confirmationText.trim().toUpperCase();
+    if (cleanConf !== 'IMPORTOVAT') {
+      setError('Pro spuštění importu zadejte text „IMPORTOVAT“.');
       return;
     }
 
@@ -203,7 +204,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          confirmation: confirmationText,
+          confirmation: cleanConf,
           resolutions,
           saveProfileAs: saveProfileAs.trim() || undefined,
         }),
@@ -627,7 +628,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
           </div>
 
           {/* Stats KPI grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-1 shadow-sm">
               <span className="text-slate-500 block font-medium">Celkem řádků</span>
               <strong className="text-2xl font-black text-slate-950">{dryRunStats.totalRows}</strong>
@@ -652,6 +653,12 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
               <span className="text-purple-800 block font-bold">Ke kontrole</span>
               <strong className="text-2xl font-black text-purple-700">{dryRunStats.needsReviewCount}</strong>
             </div>
+            {dryRunStats.errorCount > 0 && (
+              <div className="rounded-2xl border border-rose-300 bg-rose-50/80 p-4 space-y-1 shadow-sm">
+                <span className="text-rose-800 block font-bold">Chyby řádků</span>
+                <strong className="text-2xl font-black text-rose-700">{dryRunStats.errorCount}</strong>
+              </div>
+            )}
           </div>
 
           {/* Sample Rows / Conflicts View */}
@@ -670,11 +677,13 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                     className={`rounded-xl border p-4 text-xs space-y-2.5 transition ${
                       row.action === 'CONFLICT'
                         ? 'border-amber-300 bg-amber-50/60'
-                        : row.action === 'CREATE'
-                          ? 'border-emerald-200 bg-emerald-50/40'
-                          : row.action === 'UPDATE'
-                            ? 'border-sky-200 bg-sky-50/40'
-                            : 'border-slate-200 bg-slate-50/70'
+                        : row.action === 'ERROR'
+                          ? 'border-rose-300 bg-rose-50/60'
+                          : row.action === 'CREATE'
+                            ? 'border-emerald-200 bg-emerald-50/40'
+                            : row.action === 'UPDATE'
+                              ? 'border-sky-200 bg-sky-50/40'
+                              : 'border-slate-200 bg-slate-50/70'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -688,16 +697,30 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                         className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase ${
                           row.action === 'CONFLICT'
                             ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                            : row.action === 'CREATE'
-                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                              : row.action === 'UPDATE'
-                                ? 'bg-sky-100 text-sky-900 border border-sky-300'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            : row.action === 'ERROR'
+                              ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                              : row.action === 'CREATE'
+                                ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                : row.action === 'UPDATE'
+                                  ? 'bg-sky-100 text-sky-900 border border-sky-300'
+                                  : 'bg-slate-100 text-slate-700 border border-slate-200'
                         }`}
                       >
                         {row.action}
                       </span>
                     </div>
+
+                    {/* Issues display if action is ERROR or has issues */}
+                    {row.issues && row.issues.length > 0 && (
+                      <div className="bg-rose-50/90 rounded-lg border border-rose-200 p-2.5 text-xs text-rose-800 space-y-1">
+                        {row.issues.map((iss: any, i: number) => (
+                          <div key={i} className="flex items-center gap-1.5 font-semibold">
+                            <span>⚠️</span>
+                            <span>{iss.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Diff display */}
                     {row.diff && row.diff.length > 0 && (
@@ -785,9 +808,18 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                  Pro potvrzení zadejte text „IMPORTOVAT“
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Pro potvrzení zadejte text „IMPORTOVAT“
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmationText('IMPORTOVAT')}
+                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 underline cursor-pointer"
+                  >
+                    Vložit text
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={confirmationText}
@@ -802,7 +834,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
               <button
                 type="button"
                 onClick={handleCommit}
-                disabled={committing || confirmationText !== 'IMPORTOVAT'}
+                disabled={committing || confirmationText.trim().toUpperCase() !== 'IMPORTOVAT'}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-md transition disabled:opacity-50 cursor-pointer"
               >
                 {committing ? (

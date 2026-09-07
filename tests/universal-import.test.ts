@@ -198,3 +198,15 @@ test('12. parseCarrierType a parseMediaType normalizují české názvy na valid
   assert.equal(parseMediaType('Citylight (CLV)'), 'CITYLIGHT');
   assert.equal(parseMediaType('Navigační směrovka'), 'NAVIGATION_SIGN');
 });
+
+test('13. resilientní mapování rozpozná clientName a ceníkové názvy bez chyb', () => {
+  const matchClientCol = ruleBasedColumnMatch('Název inzerenta', []);
+  assert.equal(matchClientCol?.targetField, 'clientName');
+
+  const matchRentCol = ruleBasedColumnMatch('Základní měsíční nájem (Kč)', []);
+  assert.equal(matchRentCol?.targetField, 'rentalPrice');
+
+  const matchFormatCol = ruleBasedColumnMatch('Kód formátu', []);
+  assert.ok(['carrierCode', 'code'].includes(matchFormatCol?.targetField || ''));
+});
+

@@ -92,8 +92,9 @@ export async function commitImportBatch(
         const mapped = (row.mappedData || {}) as Record<string, any>;
 
         if (row.targetEntity === 'CLIENT') {
-          if (action === 'CREATE' && mapped.name) {
-            const norm = normalizeText(mapped.name);
+          const clientName = mapped.name || mapped.clientName;
+          if (action === 'CREATE' && clientName) {
+            const norm = normalizeText(clientName);
             const client = await tx.client.upsert({
               where: {
                 organizationId_normalizedName: {
@@ -103,18 +104,21 @@ export async function commitImportBatch(
               },
               create: {
                 organizationId,
-                name: String(mapped.name),
+                name: String(clientName),
                 normalizedName: norm,
                 companyId: mapped.companyId ? String(mapped.companyId) : null,
                 dic: mapped.dic ? String(mapped.dic) : null,
-                billingCity: mapped.billingCity ? String(mapped.billingCity) : null,
-                billingStreet: mapped.billingStreet ? String(mapped.billingStreet) : null,
+                billingCity: mapped.billingCity || mapped.city ? String(mapped.billingCity || mapped.city) : null,
+                billingStreet: mapped.billingStreet || mapped.address ? String(mapped.billingStreet || mapped.address) : null,
                 contactPerson: mapped.contactPerson ? String(mapped.contactPerson) : null,
                 email: mapped.email ? String(mapped.email) : null,
                 phone: mapped.phone ? String(mapped.phone) : null,
               },
               update: {
                 companyId: mapped.companyId ? String(mapped.companyId) : undefined,
+                contactPerson: mapped.contactPerson ? String(mapped.contactPerson) : undefined,
+                email: mapped.email ? String(mapped.email) : undefined,
+                phone: mapped.phone ? String(mapped.phone) : undefined,
               },
             });
             createdClientsCount++;
@@ -124,17 +128,19 @@ export async function commitImportBatch(
             });
           }
         } else if (row.targetEntity === 'PRICE') {
-          if (action === 'CREATE' && mapped.name && mapped.rentalPrice) {
+          const priceName = String(mapped.name || mapped.carrierType || mapped.mediaType || mapped.code || `Položka ${row.rowNumber}`);
+          const rentPrice = mapped.rentalPrice != null ? Number(mapped.rentalPrice) : (mapped.price != null ? Number(mapped.price) : 0);
+          if (action === 'CREATE' && priceName) {
             const versionKey = `IMPORT_${batchId}_${row.rowNumber}`;
             const priceItem = await tx.priceListItem.create({
               data: {
                 organizationId,
-                identityKey: `PRICE_${normalizeCode(mapped.name)}`,
+                identityKey: `PRICE_${normalizeCode(priceName)}`,
                 versionKey,
-                name: String(mapped.name),
-                rentalPrice: mapped.rentalPrice,
+                name: priceName,
+                rentalPrice: rentPrice,
                 productionPrice: mapped.productionPrice || 0,
-                totalPrice: Number(mapped.rentalPrice) + Number(mapped.productionPrice || 0),
+                totalPrice: Number(rentPrice) + Number(mapped.productionPrice || 0),
                 validFrom: mapped.validFrom ? new Date(mapped.validFrom) : new Date(),
                 sourceSheet: row.sheetId,
                 sourceRow: row.rowNumber,
@@ -146,6 +152,40 @@ export async function commitImportBatch(
               where: { id: row.id },
               data: { importedAt: new Date(), targetEntityId: priceItem.id },
             });
+          }
+        } else if (row.targetEntity === 'OCCUPANCY') {
+          const rawCode = mapped.carrierCode ? String(mapped.carrierCode) : '';
+          if (rawCode) {
+            const code = normalizeCode(rawCode);
+            const carrier = await tx.advertisingCarrier.findFirst({
+              where: { organizationId, code },
+              include: { surfaces: true },
+            });
+
+            if (carrier && carrier.surfaces.length > 0) {
+              const surface = carrier.surfaces[0];
+              const dateFrom = mapped.dateFrom ? new Date(mapped.dateFrom) : new Date();
+              const dateTo = mapped.dateTo ? new Date(mapped.dateTo) : new Date(Date.now() + 30 * 24 * 3600 * 1000);
+              const clientName = mapped.clientName ? String(mapped.clientName) : 'Nespecifikovaný inzerent';
+              const campaignName = mapped.campaignName ? String(mapped.campaignName) : 'Kampaň';
+
+              await tx.occupancy.create({
+                data: {
+                  organizationId,
+                  surfaceId: surface.id,
+                  clientName,
+                  campaignName,
+                  dateFrom,
+                  dateTo,
+                  status: 'RESERVED',
+                  note: mapped.status ? `Stav z importu: ${mapped.status}` : null,
+                },
+              });
+              await tx.importRow.update({
+                where: { id: row.id },
+                data: { importedAt: new Date() },
+              });
+            }
           }
         } else {
           // CARRIER & SURFACE
@@ -160,8 +200,11 @@ export async function commitImportBatch(
           const surfaceNote = [lightingNote, mapped.note ? String(mapped.note) : null].filter(Boolean).join(', ') || null;
 
           if (action === 'CREATE') {
-            const createdCarrier = await tx.advertisingCarrier.create({
-              data: {
+            const createdCarrier = await tx.advertisingCarrier.upsert({
+              where: {
+                organizationId_code: { organizationId, code },
+              },
+              create: {
                 organizationId,
                 code,
                 name: mapped.name ? String(mapped.name) : code,
@@ -180,15 +223,24 @@ export async function commitImportBatch(
                 surfaces: {
                   create: {
                     organizationId,
-                    name: mapped.surfaceName ? String(mapped.surfaceName) : 'Celý nosič',
+                    name: mapped.surfaceName ? String(mapped.surfaceName) : (mapped.sidePosition ? `Strana ${mapped.sidePosition}` : 'Celý nosič'),
                     mediaType,
                     size: surfaceSize,
                     price: surfacePrice,
                     note: surfaceNote,
-                    sourceKey: `IMPORT:${organizationId}:SURFACE:${code}:1`,
+                    sourceKey: `IMPORT:${organizationId}:SURFACE:${code}:${mapped.sidePosition || '1'}`,
                     importBatchId: batch.id,
                   },
                 },
+              },
+              update: {
+                name: mapped.name ? String(mapped.name) : undefined,
+                city: mapped.city ? String(mapped.city) : undefined,
+                street: mapped.street ? String(mapped.street) : undefined,
+                address: mapped.address ? String(mapped.address) : undefined,
+                locality: mapped.locality ? String(mapped.locality) : undefined,
+                type: carrierType !== 'OTHER' ? carrierType : undefined,
+                importBatchId: batch.id,
               },
             });
             createdCarriersCount++;
