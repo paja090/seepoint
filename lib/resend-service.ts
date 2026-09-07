@@ -28,7 +28,7 @@ export type ResendApiKeyResponse = {
 };
 
 function getManagementApiKey(): string {
-  const key = process.env.RESEND_API_KEY?.trim();
+  const key = process.env.RESEND_API_KEY?.trim().replace(/^["']|["']$/g, '');
   if (!key) {
     throw new Error('Chybí RESEND_API_KEY. Nastavte jej v systémových proměnných prostředí.');
   }
@@ -48,6 +48,7 @@ function formatResendError(rawMessage: string): string {
 /**
  * Registers a new custom domain in Resend.
  * Returns the domain details including DNS records (SPF, DKIM, MX).
+ * If the domain already exists in the Resend account, seamlessly loads and returns its records.
  */
 export async function registerResendDomain(domain: string): Promise<ResendDomainResponse> {
   const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -68,6 +69,25 @@ export async function registerResendDomain(domain: string): Promise<ResendDomain
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // If domain has already been registered in this Resend account, fetch it from existing domains!
+    if (/registered already/i.test(data?.message || '') || /already exists/i.test(data?.message || '')) {
+      try {
+        const listRes = await fetch(`${RESEND_API_BASE}/domains`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        const listData = await listRes.json().catch(() => ({}));
+        const existing = (listData?.data as ResendDomainResponse[] | undefined)?.find(
+          (d) => d.name.toLowerCase() === cleanDomain
+        );
+        if (existing) {
+          return await getResendDomain(existing.id);
+        }
+      } catch (lookupErr) {
+        console.warn('[resend] Fallback lookup for existing domain failed:', lookupErr);
+      }
+    }
+
     const message = formatResendError(data?.message || res.statusText);
     console.error('[resend] Domain creation failed:', { status: res.status, message });
     throw new Error(`Registrace domény v Resend selhala: ${message}`);
