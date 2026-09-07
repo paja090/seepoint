@@ -4,7 +4,7 @@ import { CrmOrderConversionError, convertOfferToCrmOrder } from '@/lib/crm/order
 import { canConvertOfferRole } from '@/lib/offers/domain';
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'crm');
   if (isApiDenied(authResult)) return authResult;
   const user = authResult;
   if (!canConvertOfferRole(user.role)) {

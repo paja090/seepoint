@@ -1,4 +1,4 @@
-import { platformPrisma } from './db';
+import { prisma } from './db';
 
 export type AIFeatureType = 'OFFER_GENERATOR' | 'SALES_RADAR' | 'PHOTO_ANALYSIS' | 'ASSISTANT';
 
@@ -29,7 +29,7 @@ export async function logAIUsage({
   metadata,
 }: LogAIUsageInput) {
   try {
-    const db = platformPrisma as unknown as {
+    const db = prisma as unknown as {
       aIUsageLog?: {
         create: (args: Record<string, unknown>) => Promise<{ id: string }>;
       };
@@ -65,7 +65,7 @@ export async function getOrganizationAIUsage(organizationId: string) {
   const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
   try {
-    const db = platformPrisma as unknown as {
+    const db = prisma as unknown as {
       aIUsageLog?: {
         aggregate: (args: Record<string, unknown>) => Promise<{
           _count: { _all: number };

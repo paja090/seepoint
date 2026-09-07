@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import type { OfferView } from '@/lib/offers/view-model';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, FileImage, Printer, Clock, AlertCircle } from 'lucide-react';
 import { approvePrintJobByClient } from '@/app/production/public-actions';
@@ -10,7 +11,7 @@ export function PrintApprovalModule({
   token,
   clientName
 }: { 
-  printJob: any; 
+  printJob: OfferView['printJob']; 
   token?: string;
   clientName: string;
 }) {
@@ -25,15 +26,16 @@ export function PrintApprovalModule({
   // Akce pro odeslani do tisku
   const handleApprove = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !printJob.clientApprovalToken) return;
+    if (!token || !printJob.id) return;
     
     startTransition(async () => {
       try {
         await approvePrintJobByClient(
-          printJob.clientApprovalToken,
+          token,
           approverName,
           note,
-          artworkUrl
+          artworkUrl,
+          printJob.id
         );
         router.refresh(); // Obnovit UI
       } catch (err) {
@@ -43,7 +45,7 @@ export function PrintApprovalModule({
   };
 
   // State 1: Čeká na data (PREPARATION nebo CLIENT_APPROVAL)
-  if (printJob.status === 'PREPARATION' || printJob.status === 'CLIENT_APPROVAL') {
+  if (printJob.status === 'CLIENT_APPROVAL') {
     return (
       <div className="card bg-white border-2 border-purple-500/50 rounded-3xl overflow-hidden shadow-xl mb-8">
         <div className="bg-purple-50 border-b border-purple-100 p-6 sm:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

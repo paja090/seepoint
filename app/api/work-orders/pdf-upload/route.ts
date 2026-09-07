@@ -1,11 +1,12 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('work');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   }

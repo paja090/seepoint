@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requirePageAccess } from '@/lib/page-auth';
 import { canViewAllSettlements, AccessDenied } from '@/lib/rbac';
 import { AppShell } from '@/components/AppShell';
 import { SettlementDetailManager } from '@/components/SettlementDetailManager';
@@ -8,7 +8,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 
 export default async function SettlementDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requirePageAccess('settlements');
   if (!user) {
     return (
       <AppShell>

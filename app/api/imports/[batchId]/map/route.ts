@@ -11,7 +11,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ batchId: string }> }
 ) {
-  const auth = await requireApiAccess('import');
+  const auth = await requireApiAccess('import', 'import');
   if (isApiDenied(auth)) return auth;
 
   let organizationId: string;
@@ -49,7 +49,7 @@ export async function POST(
         where: { id: item.sheetId, batchId: batch.id, organizationId },
         data: {
           classification: item.classification,
-          columnMappings: item.columnMappings as any,
+          columnMappings: item.columnMappings,
           status: 'MAPPED',
         },
       });

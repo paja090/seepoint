@@ -1,12 +1,13 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { deleteManualAdjustment } from '@/lib/settlement-actions';
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ adjustmentId: string }> }
 ) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('settlements');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }

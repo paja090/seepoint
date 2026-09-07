@@ -19,7 +19,7 @@ export const maxDuration = 60;
  * calculates geospatial & network scoring, and logs into RadarRun.
  */
 export async function POST(request: Request) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
   if (!['ADMIN', 'MANAGER'].includes(user.role)) return NextResponse.json({ error: 'Automatické hledání může spustit pouze administrátor nebo manažer.' }, { status: 403 });
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.opportunityDiscovery);

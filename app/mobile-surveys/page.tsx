@@ -25,7 +25,7 @@ export default async function MobileSurveysPage({
 }: {
   searchParams: Promise<{ search?: string; filter?: string }>;
 }) {
-  await requirePageAccess('navigationProjects');
+  await requirePageAccess('navigationProjects', 'mobileSurveys');
   const user = await getCurrentUser();
   const { search = '', filter = 'all' } = await searchParams;
 

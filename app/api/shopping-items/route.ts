@@ -16,7 +16,7 @@ import {
 } from '@/lib/shopping-validation';
 
 export async function GET(request: Request) {
-  const auth = await requireApiAccess('team');
+  const auth = await requireApiAccess('team', 'shopping');
   if (isApiDenied(auth)) return auth;
 
   const { searchParams } = new URL(request.url);
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireApiAccess('team');
+  const auth = await requireApiAccess('team', 'shopping');
   if (isApiDenied(auth)) return auth;
   if (!canEditShoppingList(auth.role)) {
     return NextResponse.json({ error: 'Tato role může nákupní seznam pouze zobrazit.' }, { status: 403 });

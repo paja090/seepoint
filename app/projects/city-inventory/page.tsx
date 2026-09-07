@@ -20,7 +20,7 @@ const carrierPreviewSelect = {
 } as const;
 
 export default async function CityInventoryProjectsPage() {
-  const user = await requirePageAccess('carriers');
+  const user = await requirePageAccess('carriers', 'cityInventory');
   if (!user.organizationId) throw new Error('Není vybraná aktivní organizace.');
 
   const where = { organizationId: user.organizationId, archivedAt: null } as const;

@@ -1,12 +1,12 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await getCurrentUser();
+    const actor=await requireApiAccess('myTasks', 'myTasks');if(isApiDenied(actor))return actor;
     if (!actor) return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
 
     const { id } = await params;
@@ -62,7 +62,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await getCurrentUser();
+    const actor=await requireApiAccess('myTasks', 'myTasks');if(isApiDenied(actor))return actor;
     if (!actor || (actor.role !== 'ADMIN' && actor.role !== 'MANAGER')) {
       return NextResponse.json({ error: 'Nemáte oprávnění k mazání úkolu.' }, { status: 403 });
     }

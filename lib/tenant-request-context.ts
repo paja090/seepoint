@@ -37,7 +37,7 @@ const resolveSessionTenant = cache(async (token: string): Promise<TenantContext 
     (item) => item.organizationId === session.activeOrganizationId,
   ) ?? session.user.organizationMemberships[0];
 
-  const orgId = membership?.organizationId || session.activeOrganizationId;
+  const orgId = membership?.organizationId;
 
   return orgId
     ? { organizationId: orgId, userId: session.userId, source: 'session' }

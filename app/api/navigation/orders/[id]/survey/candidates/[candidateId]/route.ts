@@ -1,6 +1,7 @@
+import type { Prisma } from '@prisma/client';
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; candidateId: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await requireApiAccess('navigationProjects');
+  if (isApiDenied(currentUser)) return currentUser;
     if (!currentUser) {
       return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
     }
@@ -107,7 +109,7 @@ export async function PUT(
       });
 
       if (existingOfferPoint) {
-        const pointUpdateData: Record<string, any> = {
+        const pointUpdateData: Prisma.NavigationPointUncheckedUpdateInput = {
           ...(label && { label: label.trim() }),
           ...(latitude && { latitude: parseFloat(latitude) }),
           ...(longitude && { longitude: parseFloat(longitude) }),
@@ -313,7 +315,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; candidateId: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await requireApiAccess('navigationProjects');
+  if (isApiDenied(currentUser)) return currentUser;
     if (!currentUser) {
       return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
     }

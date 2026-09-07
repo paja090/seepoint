@@ -106,7 +106,7 @@ export async function saveOrUpdateProfile(
       data: {
         fingerprint: data.fingerprint,
         sheetAliases: data.sheetAliases,
-        columnMappings: data.columnMappings as any,
+        columnMappings: data.columnMappings,
         mediaTypeAliases: data.mediaTypeAliases || {},
         lastUsedAt: new Date(),
       },
@@ -119,7 +119,7 @@ export async function saveOrUpdateProfile(
       name: data.profileName,
       fingerprint: data.fingerprint,
       sheetAliases: data.sheetAliases,
-      columnMappings: data.columnMappings as any,
+      columnMappings: data.columnMappings,
       mediaTypeAliases: data.mediaTypeAliases || {},
       lastUsedAt: new Date(),
       isDefault: true,

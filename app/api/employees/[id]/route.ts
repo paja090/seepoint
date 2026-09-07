@@ -1,7 +1,7 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { OrganizationRole, Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { canManageOrganizationMember, effectiveOrganizationRole, wouldRemoveLastActiveOrganizationAdmin } from '@/lib/account-policy';
-import { getCurrentUser } from '@/lib/auth';
 import { isValidAuthEmail, normalizeAuthEmail } from '@/lib/auth-onboarding';
 import { prisma } from '@/lib/db';
 
@@ -10,7 +10,8 @@ function text(input: Record<string, unknown>, key: string) {
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const actor = await getCurrentUser();
+  const actor = await requireApiAccess('employees');
+  if (isApiDenied(actor)) return actor;
   if (!actor || !['ADMIN', 'MANAGER'].includes(actor.role) || !actor.organizationId || !actor.membership) {
     return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
   }
@@ -84,7 +85,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const actor = await getCurrentUser();
+  const actor = await requireApiAccess('employees');
+  if (isApiDenied(actor)) return actor;
   if (!actor || !['ADMIN', 'MANAGER'].includes(actor.role) || !actor.organizationId || !actor.membership) {
     return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
   }

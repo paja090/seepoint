@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
 import { WarehouseInputError, validateWarehouseImage, warehouseNumber, warehouseText } from '@/lib/warehouse-validation';
@@ -9,7 +9,8 @@ import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('warehouse');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   if (!canAccess(user.role, 'warehouse')) return NextResponse.json({ error: 'Nemáte oprávnění ke skladu.' }, { status: 403 });
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.warehouseAi);

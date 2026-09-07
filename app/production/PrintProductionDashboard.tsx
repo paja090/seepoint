@@ -1,12 +1,16 @@
 'use client';
 
+import type { PrintProductionJob } from '@prisma/client';
+import { productionKpis } from '@/lib/production/production-policy';
 import { useState } from 'react';
 import { PlusCircle, Image as ImageIcon, Printer, Truck, Package, Clock, CheckCircle2, X } from 'lucide-react';
 import Link from 'next/link';
 import { createPrintJob, updatePrintJobStatus } from './actions';
 import { useRouter } from 'next/navigation';
 
-export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: any[], jobs?: any[] }) {
+type DashboardJob = PrintProductionJob & { client: { name: string } | null; offer: { portalToken: string | null } | null };
+type DashboardOffer = { id: string; title: string; campaignName: string | null; client: { id: string; name: string } };
+export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: DashboardOffer[], jobs?: DashboardJob[] }) {
   const [activeTab, setActiveTab] = useState<'kanban' | 'list'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,14 +29,14 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
     return 'text-gray-500';
   };
 
-  const renderJobCard = (job: any, bgColor: string, accentColor: string) => (
+  const renderJobCard = (job: DashboardJob, bgColor: string, accentColor: string) => (
     <div key={job.id} className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group border-l-4 border-l-${accentColor}`}>
       <div className="flex justify-between items-start mb-2">
         <span className={`text-xs font-semibold bg-${bgColor} text-${accentColor} px-2 py-1 rounded`}>{job.formatType}</span>
         <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">{job.quantity} + {job.sparesQuantity} ks</span>
       </div>
       <h4 className="font-medium text-gray-900 leading-tight group-hover:text-blue-700 transition-colors">{job.title}</h4>
-      <p className="text-sm text-gray-500 mt-1">{job.client?.name || job.clientName || 'Neznámý klient'}</p>
+      <p className="text-sm text-gray-500 mt-1">{job.client?.name || 'Neznámý klient'}</p>
       
       <div className="mt-4 flex flex-col gap-2">
         {job.deliveryDeadline && (
@@ -50,9 +54,9 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
           <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full text-xs w-max mt-1"><CheckCircle2 className="w-3 h-3" /> Data nahrána</span>
         )}
 
-        {job.offer?.publicTokenHash && (
+        {job.offer?.portalToken && (
           <Link
-            href={`/p/${job.offer.publicTokenHash}`}
+            href={`/p/${job.offer.portalToken}`}
             target="_blank"
             className="text-xs text-center block w-full py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded border border-purple-200 font-semibold mt-1 transition"
           >
@@ -75,6 +79,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
     </div>
   );
 
+  const kpis = productionKpis(jobs);
   const prepJobs = jobs.filter(j => j.status === 'PREPARATION');
   const approvalJobs = jobs.filter(j => j.status === 'CLIENT_APPROVAL');
   const printJobs = jobs.filter(j => j.status === 'IN_PRINT');
@@ -87,7 +92,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500">Čeká na grafiku / schválení</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">12</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{kpis.preparation + kpis.approval}</p>
           </div>
           <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center text-purple-600">
             <ImageIcon className="w-6 h-6" />
@@ -97,7 +102,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500">V tisku u tiskárny</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">8</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{kpis.printing}</p>
           </div>
           <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
             <Printer className="w-6 h-6" />
@@ -107,7 +112,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500">Očekávané doručení &lt; 48h</p>
-            <p className="text-2xl font-bold text-orange-600 mt-1">3</p>
+            <p className="text-2xl font-bold text-orange-600 mt-1">{kpis.dueSoon}</p>
           </div>
           <div className="w-12 h-12 bg-orange-50 rounded-lg flex items-center justify-center text-orange-500">
             <Truck className="w-6 h-6" />
@@ -117,7 +122,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-500">Naskladněno / K výlepu</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">45</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">{kpis.delivered}</p>
           </div>
           <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center text-green-600">
             <Package className="w-6 h-6" />
@@ -234,8 +239,8 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
                   title: formData.get('title') as string,
                   offerId: oId || undefined,
                   clientId: targetOffer?.client?.id || undefined, // use clientId if found
-                  formatType: formData.get('formatType') as any,
-                  materialType: formData.get('materialType') as any,
+                  formatType: formData.get('formatType'),
+                  materialType: formData.get('materialType'),
                   quantity: parseInt(formData.get('quantity') as string) || 1,
                   sparesQuantity: parseInt(formData.get('sparesQuantity') as string) || 0,
                   deliveryDeadline: formData.get('deliveryDeadline') ? new Date(formData.get('deliveryDeadline') as string) : undefined,
@@ -276,7 +281,7 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
                   <select name="formatType" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value="EUROBILLBOARD">Eurobillboard (5,1 × 2,4m)</option>
                     <option value="BIGBOARD">Bigboard (9,6 × 3,6m)</option>
-                    <option value="CITYLIGHT">Citylight (118,5 × 175cm)</option>
+                    <option value="CLP">Citylight (118,5 × 175cm)</option>
                     <option value="BENCH">Lavička (city/street)</option>
                     <option value="CITY_POSTER">City poster</option>
                     <option value="TOWER">Tower</option>
@@ -287,8 +292,8 @@ export function PrintProductionDashboard({ offers = [], jobs = [] }: { offers?: 
                   <label className="block text-sm font-medium text-gray-700 mb-1">Materiál</label>
                   <select name="materialType" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value="BLUEBACK_120G">Blueback (Papír)</option>
-                    <option value="PVC_BANNER_450G">PVC Banner</option>
-                    <option value="CITYLIGHT_150G">Citylight Papír</option>
+                    <option value="PVC_BANNER_510G">PVC Banner</option>
+                    <option value="CITYLIGHT_PAPER">Citylight Papír</option>
                     <option value="SELF_ADHESIVE_FOIL">Samolepící fólie</option>
                     <option value="OTHER">Jiné</option>
                   </select>

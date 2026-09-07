@@ -85,7 +85,6 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const totalCarriers = items.length;
   const installedItems = items.filter((item) => (item.surface.photos ?? []).some((p) => p.isInstallation === true));
   const verifiedCount = installedItems.length;
-  const estimatedImpressions = totalCarriers * 35000;
 
   let liveStatus = 'Priprava zakazky';
   let liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
@@ -263,8 +262,8 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             </div>
             <div className="p-4 rounded-2xl bg-slate-900/70 border border-purple-800/40 space-y-1">
               <span className="text-sky-300 font-bold uppercase text-[10px] flex items-center gap-1"><Eye className="h-3.5 w-3.5 text-sky-400" />Odhadovany zasah</span>
-              <div className="text-2xl font-black text-white">~ {(estimatedImpressions / 1000).toFixed(0)}k</div>
-              <span className="text-[11px] text-slate-400 block">Kontaktu za mesic</span>
+              <div className="text-2xl font-black text-white">Nedostupný</div>
+              <span className="text-[11px] text-slate-400 block">Odhadovaný zásah není pro tuto kampaň dostupný.</span>
             </div>
             <div className="p-4 rounded-2xl bg-slate-900/70 border border-purple-800/40 space-y-1">
               <span className="text-amber-300 font-bold uppercase text-[10px] flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-amber-400" />Delka kampane</span>

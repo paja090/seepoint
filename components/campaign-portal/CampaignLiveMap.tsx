@@ -1,5 +1,6 @@
 'use client';
 
+import type { Map as LeafletMap } from 'leaflet';
 import { useEffect, useRef } from 'react';
 import type { OfferItemView } from '@/lib/offers/view-model';
 
@@ -10,7 +11,7 @@ interface Props {
 
 export function CampaignLiveMap({ items, onSelectCarrier }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
 
   const pointsWithGps = items.filter(
     (item) =>
@@ -49,7 +50,7 @@ export function CampaignLiveMap({ items, onSelectCarrier }: Props) {
       // Default center fallback: Ostrava
       let centerLat = 49.8209;
       let centerLng = 18.2625;
-      let zoom = 12;
+      const zoom = 12;
 
       if (pointsWithGps.length > 0) {
         const avgLat = pointsWithGps.reduce((sum, p) => sum + p.surface.carrier.latitude!, 0) / pointsWithGps.length;

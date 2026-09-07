@@ -1,3 +1,4 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { OrganizationRole, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { canAssignOrganizationRole, canManageOrganizationMember, effectiveOrganizationRole, wouldRemoveLastActiveOrganizationAdmin } from '@/lib/account-policy';
@@ -13,7 +14,8 @@ import { getAppUrl } from '@/lib/app-url';
 type AccountInput = { action?: 'enableAccess' | 'invite' | 'setTemporaryPassword' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[]; temporaryPassword?: string; temporaryPasswordConfirmation?: string };
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const actor = await getCurrentUser();
+  const actor = await requireApiAccess('employees');
+  if (isApiDenied(actor)) return actor;
   if (!actor || !['ADMIN', 'MANAGER'].includes(actor.role)) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
   const actorMembershipRole = actor.membership ? effectiveOrganizationRole(actor.membership.role, actor.membership.roles) : null;
   if (!actorMembershipRole || !['OWNER', 'ADMIN', 'MANAGER'].includes(actorMembershipRole)) return NextResponse.json({ error: 'Nemáte oprávnění spravovat členy této organizace.' }, { status: 403 });

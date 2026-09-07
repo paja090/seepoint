@@ -8,7 +8,7 @@ import { OpportunityValidationError } from '@/lib/opportunities/policy';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {

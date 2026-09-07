@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ const PREFERRED_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5
 
 export async function POST(request: Request) {
   try {
-    const actor = await getCurrentUser();
+    const actor=await requireApiAccess('myTasks', 'myTasks');if(isApiDenied(actor))return actor;
     if (!actor) {
       return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
     }

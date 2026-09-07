@@ -19,7 +19,7 @@ export const runtime = 'nodejs';
  * 2. Managed Batch Import (body.signals): Normalizes, deduplicates, scores, and saves passed signals.
  */
 export async function POST(request: Request) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
   if (!['ADMIN', 'MANAGER'].includes(user.role)) return NextResponse.json({ error: 'Import radaru může spustit pouze administrátor nebo manažer.' }, { status: 403 });
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.opportunityDiscovery);

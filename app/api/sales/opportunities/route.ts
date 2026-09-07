@@ -6,7 +6,7 @@ import { OpportunityValidationError, parseOpportunityCreateInput, parseOpportuni
 export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {

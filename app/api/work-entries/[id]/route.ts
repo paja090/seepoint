@@ -1,6 +1,6 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 import { resolveWorkEntryRate } from '@/lib/work-entry-rates';
 import { canAccess } from '@/lib/rbac';
 import { Prisma } from '@prisma/client';
@@ -17,7 +17,8 @@ import {
 } from '@/lib/work-entry-policy';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('workEntries');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }
@@ -55,7 +56,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('workEntries');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }

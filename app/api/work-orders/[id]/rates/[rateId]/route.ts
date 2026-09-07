@@ -1,6 +1,6 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 import { parseRateInput } from '@/lib/worker-rates';
 import { intervalsOverlap } from '@/lib/rate-intervals';
 import { Prisma, RateType, WorkType } from '@prisma/client';
@@ -31,7 +31,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; rateId: string }> }
 ) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('work');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }
@@ -100,7 +101,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string; rateId: string }> }
 ) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('work');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }

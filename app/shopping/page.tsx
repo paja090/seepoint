@@ -10,7 +10,7 @@ export default async function ShoppingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requirePageAccess('team');
+  const user = await requirePageAccess('team', 'shopping');
   const params = await searchParams;
   const category = (Array.isArray(params.category) ? params.category[0] : params.category) || 'ALL';
 

@@ -176,14 +176,7 @@ export const SYSTEM_MODULES: SystemModule[] = [
     badge: 'AI Vision',
     routes: ['/warehouse'],
   },
-  {
-    id: 'printProduction',
-    name: 'Výroba, Tisk & Grafická data',
-    description: 'Schvalování grafiky s klienty, objednávky do tiskáren a sledování doručení materiálů na sklad',
-    category: 'operations',
-    badge: 'Novinka',
-    routes: ['/production'],
-  },
+
 
   // Management
   {
@@ -273,7 +266,7 @@ export function getOrganizationEnabledModules(
   organization?: { plan?: string | null; enabledModules?: unknown } | null
 ): Record<string, boolean> {
   const plan = organization?.plan?.toUpperCase() || 'START';
-  const defaultModules = new Set(PLAN_MODULE_PRESETS[plan] || PLAN_MODULE_PRESETS.PRO);
+  const defaultModules = new Set(PLAN_MODULE_PRESETS[plan] || PLAN_MODULE_PRESETS.START);
 
   const result: Record<string, boolean> = {};
   SYSTEM_MODULES.forEach((mod) => {
@@ -296,16 +289,13 @@ export function isModuleEnabled(
   organization: { plan?: string | null; enabledModules?: unknown } | null | undefined,
   moduleId: string
 ): boolean {
-  if (!organization) return true;
+  if (!organization) return false;
   const enabledMap = getOrganizationEnabledModules(organization);
-  return enabledMap[moduleId] ?? true;
+  return enabledMap[moduleId] ?? false;
 }
 
 export function getModuleIdForPath(pathname: string): string | null {
-  for (const mod of SYSTEM_MODULES) {
-    if (mod.routes.some((route) => pathname === route || pathname.startsWith(route + '/'))) {
-      return mod.id;
-    }
-  }
-  return null;
+  return SYSTEM_MODULES.flatMap(mod => mod.routes.map(route => ({ route, id: mod.id })))
+    .sort((a, b) => b.route.length - a.route.length)
+    .find(({ route }) => pathname === route || pathname.startsWith(route + '/'))?.id ?? null;
 }

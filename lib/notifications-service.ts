@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db';
 import { canAccess, type AppRole } from '@/lib/rbac';
+import { isModuleEnabled } from '@/lib/organization-modules';
+import { vehicleDeadlines } from '@/lib/vehicle-deadlines';
 import { requireTenantContext } from '@/lib/tenant-context';
 
 export type SystemNotificationItem = {
@@ -13,7 +15,8 @@ export type SystemNotificationItem = {
     | 'VEHICLE_FAULT'
     | 'LOW_STOCK'
     | 'CITY_GALLERY_PERMIT_EXPIRING'
-    | 'PRINT_APPROVED';
+    | 'PRINT_APPROVED'
+    | 'VEHICLE_DEADLINE';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -28,12 +31,31 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   notifications: SystemNotificationItem[];
   aiSummary?: string | null;
 }> {
+  const { organizationId } = requireTenantContext();
+  const organization = await prisma.organization.findUnique({ where: { id: organizationId } });
+  const enabled = (moduleId: string) => Boolean(organization?.isActive && isModuleEnabled(organization, moduleId));
   const notifications: SystemNotificationItem[] = [];
   const now = new Date();
   const next48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  if (enabled('vehicles') && canAccess(userRole, 'vehicles')) {
+    const limit = new Date(+now + 30 * 86400000);
+    const vehicles = await prisma.vehicle.findMany({
+      where: { status: { not: 'OUT_OF_SERVICE' }, OR: [
+        { technicalInspectionUntil: { lte: limit } }, { insuranceUntil: { lte: limit } }, { highwayPassUntil: { lte: limit } },
+      ] },
+      select: { id: true, name: true, technicalInspectionUntil: true, insuranceUntil: true, highwayPassUntil: true }, take: 50,
+    });
+    for (const vehicle of vehicles) for (const due of vehicleDeadlines(vehicle, now)) notifications.push({
+      id: 'vehicle-deadline-' + vehicle.id + '-' + due.label, type: 'VEHICLE_DEADLINE',
+      title: due.label + ': ' + vehicle.name,
+      message: (due.overdue ? 'Platnost skončila ' : 'Platnost končí ') + due.date.toLocaleDateString('cs-CZ') + '.',
+      severity: due.overdue ? 'HIGH' : 'MEDIUM', link: '/vehicles/' + vehicle.id, createdAt: now.toISOString(),
+    });
+  }
+
 
   // 1. WORKER & TECHNICIAN: Personal Tasks & Route Alerts
-  if (userRole === 'WORKER' || userRole === 'TECHNICIAN') {
+  if (enabled('myTasks') && (userRole === 'WORKER' || userRole === 'TECHNICIAN')) {
     if (userId) {
       const { organizationId } = requireTenantContext();
       const user = await prisma.user.findUnique({
@@ -70,7 +92,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   }
 
   // 2. SALES: Expiring Contracts & Pending Client Offers
-  if (userRole === 'SALES' || userRole === 'ADMIN' || userRole === 'MANAGER') {
+  if (enabled('navigation') && (userRole === 'SALES' || userRole === 'ADMIN' || userRole === 'MANAGER')) {
     const thirtyDaysInFuture = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const expiringContracts = await prisma.navigationContract.findMany({
       where: {
@@ -98,14 +120,14 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   // 3. MANAGER & ADMIN: System Operational Alerts (Overdue, Unassigned, Invoices)
   if (userRole === 'ADMIN' || userRole === 'MANAGER') {
     // Check Client Approved Print Jobs
-    const recentlyApprovedPrints = await prisma.printProductionJob.findMany({
+    const recentlyApprovedPrints = enabled('printProduction') ? await prisma.printProductionJob.findMany({
       where: {
         status: 'IN_PRINT',
         clientApprovedAt: { gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) },
       },
       select: { id: true, title: true, clientApprovedBy: true, clientApprovedAt: true },
       take: 10,
-    });
+    }) : [];
 
     recentlyApprovedPrints.forEach((job) => {
       notifications.push({
@@ -120,14 +142,14 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
     });
 
     // Check Overdue Work Tasks
-    const overdueWorkOrders = await prisma.workOrder.findMany({
+    const overdueWorkOrders = enabled('work') ? await prisma.workOrder.findMany({
       where: {
         deadlineAt: { lt: now },
         status: { notIn: ['DONE', 'CANCELLED'] },
       },
       select: { id: true, title: true, clientName: true, deadlineAt: true },
       take: 15,
-    });
+    }) : [];
 
     overdueWorkOrders.forEach((o) => {
       notifications.push({
@@ -142,7 +164,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
     });
 
     // Check Unassigned Work Orders
-    const unassignedOrders = await prisma.workOrder.findMany({
+    const unassignedOrders = enabled('work') ? await prisma.workOrder.findMany({
       where: {
         scheduledAt: { lte: next48h },
         status: { notIn: ['DONE', 'CANCELLED'] },
@@ -150,7 +172,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
       },
       select: { id: true, title: true, scheduledAt: true },
       take: 15,
-    });
+    }) : [];
 
     unassignedOrders.forEach((o) => {
       notifications.push({
@@ -165,7 +187,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
     });
 
     // Check Pending Invoices
-    const pendingInvoices = await prisma.workOrder.findMany({
+    const pendingInvoices = enabled('work') ? await prisma.workOrder.findMany({
       where: {
         ftdSent: true,
         invoiced: false,
@@ -173,7 +195,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
       },
       select: { id: true, title: true, clientName: true, price: true },
       take: 15,
-    });
+    }) : [];
 
     pendingInvoices.forEach((o) => {
       notifications.push({
@@ -189,7 +211,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
   }
 
   // 4. WAREHOUSE: Low Stock Items Alert (< minQuantity)
-  const lowStockWarehouseItems = canAccess(userRole, 'warehouse') ? await prisma.warehouseItem.findMany({
+  const lowStockWarehouseItems = canAccess(userRole, 'warehouse') && enabled('warehouse') ? await prisma.warehouseItem.findMany({
     where: {
       minQuantity: { not: null },
     },
@@ -218,7 +240,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
 
   // 6. CITY GALLERY: Permit Expiration Alerts (within 30 days)
   const thirtyDaysInFuture = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const expiringPermitProjects = canAccess(userRole, 'cityGallery') ? await prisma.cityGalleryProject.findMany({
+  const expiringPermitProjects = canAccess(userRole, 'cityGallery') && enabled('cityGallery') ? await prisma.cityGalleryProject.findMany({
     where: {
       permitValidTo: { lte: thirtyDaysInFuture, gte: now },
       status: { in: ['ACTIVE', 'PLANNED', 'DRAFT'] },

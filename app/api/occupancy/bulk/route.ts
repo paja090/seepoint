@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma, checkOccupancyConflicts, hasBlockingConflict } from '@/lib/db';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
-import { getCurrentUser } from '@/lib/auth';
 
 export async function POST(req: Request) {
   const auth = await requireApiAccess('occupancy');
   if (isApiDenied(auth)) return auth;
 
   try {
-    const user = await getCurrentUser();
+    const user = await requireApiAccess('occupancy');
+  if (isApiDenied(user)) return user;
     const body = await req.json();
     const { surfaceIds, clientId, clientName, campaignName, dateFrom, dateTo, status, price, note } = body;
 

@@ -3,7 +3,7 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { changeNavigationPointPrice, deleteNavigationPrice } from '@/lib/navigation/pricing-service';
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'navigation');
   if (isApiDenied(authResult)) return authResult;
   const user = authResult;
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'navigation');
   if (isApiDenied(authResult)) return authResult;
 
   try {

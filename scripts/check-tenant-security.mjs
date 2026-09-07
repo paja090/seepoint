@@ -28,7 +28,6 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/onboarding/page.tsx', 5],
   ['app/settings/company/page.tsx', 2],
   ['app/settings/members/page.tsx', 3],
-  ['lib/ai-usage.ts', 3],
   ['lib/auth.ts', 7],
   ['lib/db.ts', 6],
   ['lib/offers/service.ts', 3],
@@ -141,6 +140,9 @@ export function hasDirectTenantGuard(source) {
 
 export function validateTenantSecurity(root = PROJECT_ROOT) {
   const errors = [];
+  const schema = fs.readFileSync(path.join(root, 'prisma/schema.prisma'), 'utf8');
+  const policy = fs.readFileSync(path.join(root, 'lib/tenant-prisma.ts'), 'utf8');
+  errors.push(...validateTenantModelCoverage(schema, policy));
   const files = sourceFiles(root);
   const platformPrisma = collectOccurrences(root, files, /\bplatformPrisma\b/g);
   const rawSql = collectOccurrences(root, files, /\.\$(?:queryRaw|executeRaw)(?:Unsafe)?\b/g);
@@ -164,7 +166,18 @@ export function validateTenantSecurity(root = PROJECT_ROOT) {
   return errors;
 }
 
+export function validateTenantModelCoverage(schema, policy) {
+  const registry = policy.match(/TENANT_MODEL_NAMES\s*=\s*\[([\s\S]*?)\]\s*as const/)?.[1] ?? '';
+  const protectedNames = new Set([...registry.matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  // Global identity bootstrap only; adding a business model here is forbidden.
+  const exceptions = new Set(['OrganizationMember', 'OrganizationInvitation']);
+  return [...schema.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').matchAll(/model\s+(\w+)\s*\{([^}]+)\}/g)]
+    .filter(([, name, body]) => /\borganizationId\s+String\??\b/.test(body) && !protectedNames.has(name) && !exceptions.has(name))
+    .map(([, name]) => `Tenant model missing central protection registry: ${name}`);
+}
+
 function selfTest() {
+  if (validateTenantModelCoverage('model FutureJob { organizationId String }', 'TENANT_MODEL_NAMES = [] as const').length !== 1) throw new Error('Unregistered model accepted');
   if (!hasDirectTenantGuard('const user = await getCurrentUser();')) throw new Error('Self-test: getCurrentUser guard nebyl rozpoznán.');
   if (!hasDirectTenantGuard('await requireOrganizationRole(\'ADMIN\');')) throw new Error('Self-test: organization guard nebyl rozpoznán.');
   if (hasDirectTenantGuard('export async function GET() { return Response.json([]); }')) throw new Error('Self-test: nezabezpečený handler byl přijat.');

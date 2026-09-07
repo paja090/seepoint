@@ -8,7 +8,7 @@ import { OpportunityValidationError } from '@/lib/opportunities/policy';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-    const user = await requireApiAccess('clients');
+    const user = await requireApiAccess('clients', 'salesRadar');
     if (isApiDenied(user)) return user;
     const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.opportunityAi);
     if (limited) return limited;
