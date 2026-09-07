@@ -9,6 +9,7 @@ import { searchLiveOpportunitiesWithGemini } from '@/lib/opportunities/live-sear
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { runWithTenantContext } from '@/lib/tenant-context';
+import { logAIUsage } from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -104,6 +105,17 @@ export async function POST(request: Request) {
           console.error('Failed processing live search opportunity', item.companyName, err);
         }
       }
+
+      void logAIUsage({
+        organizationId: user.organizationId,
+        userId: user.id,
+        feature: 'SALES_RADAR',
+        modelName: 'gemini-3.6-flash',
+        promptTokens: 1200,
+        outputTokens: Math.max(liveFoundCount * 200, 300),
+        costEstimateUsd: 0.003,
+        metadata: { action: 'live-search-grounding', foundCount: liveFoundCount },
+      });
     } catch (err) {
       console.error('Live search grounding error (continuing with RSS)', err);
     }
@@ -137,6 +149,17 @@ export async function POST(request: Request) {
             signal.sourceUrl,
             profile
           );
+
+          void logAIUsage({
+            organizationId: user.organizationId,
+            userId: user.id,
+            feature: 'SALES_RADAR',
+            modelName: 'gemini-3.6-flash',
+            promptTokens: 800,
+            outputTokens: 250,
+            costEstimateUsd: 0.001,
+            metadata: { action: 'rss-parse', signalId: signal.id },
+          });
 
           if (!parsed.isRelevant) {
             ignoredCount++;

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { logAIUsage } from '@/lib/ai-usage';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,6 +152,19 @@ Vrať POUZE platný JSON bez markdownu ve tvaru:
         } catch (e) {
           console.error(`AI Lookup error with model ${model}:`, e);
         }
+      }
+
+      if (aiResult) {
+        void logAIUsage({
+          organizationId: actor.organizationId,
+          userId: actor.id,
+          feature: 'ASSISTANT',
+          modelName: 'gemini-3.6-flash',
+          promptTokens: 400,
+          outputTokens: 200,
+          costEstimateUsd: 0.002,
+          metadata: { action: 'crm-ai-lookup', query: searchKeyword },
+        });
       }
     }
 

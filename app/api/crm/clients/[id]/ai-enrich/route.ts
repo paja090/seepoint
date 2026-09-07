@@ -3,6 +3,7 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { logAIUsage } from '@/lib/ai-usage';
 
 export const dynamic = 'force-dynamic';
 
@@ -252,6 +253,19 @@ Vrať POUZE platný JSON objekt bez markdownu ve tvaru:
         } catch (e) {
           console.error(`Gemini AI enrichment error with model ${model}:`, e);
         }
+      }
+
+      if (aiEnrichmentResult) {
+        void logAIUsage({
+          organizationId: actor.organizationId,
+          userId: actor.id,
+          feature: 'ASSISTANT',
+          modelName: 'gemini-3.6-flash',
+          promptTokens: 800,
+          outputTokens: 400,
+          costEstimateUsd: 0.003,
+          metadata: { action: 'crm-ai-enrich', clientId: id },
+        });
       }
     }
 
