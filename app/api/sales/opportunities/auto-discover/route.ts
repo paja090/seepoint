@@ -8,6 +8,7 @@ import { collectSignalsForProfile } from '@/lib/opportunities/feed-collector';
 import { searchLiveOpportunitiesWithGemini } from '@/lib/opportunities/live-search';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -27,24 +28,29 @@ export async function POST(request: Request) {
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.opportunityDiscovery);
   if (limited) return limited;
 
-  const profile = await getOrganizationRadarProfile(user.organizationId);
-  if (!profile.enabled) {
-    return NextResponse.json({ error: 'AI Obchodní radar je pro vaši organizaci vypnutý v nastavení profilu.' }, { status: 400 });
-  }
+  return runWithTenantContext({
+    organizationId: user.organizationId,
+    userId: user.id,
+    source: 'session',
+  }, async () => {
+    const profile = await getOrganizationRadarProfile(user.organizationId);
+    if (!profile.enabled) {
+      return NextResponse.json({ error: 'AI Obchodní radar je pro vaši organizaci vypnutý v nastavení profilu.' }, { status: 400 });
+    }
 
-  const body = await request.json().catch(() => ({}));
-  const batchLimit = Math.min(Math.max(Number(body?.limit) || 15, 5), 25);
-  const startTime = Date.now();
-  const TIME_BUDGET_MS = 28_000; // 28s budget to safely return within Vercel execution window
+    const body = await request.json().catch(() => ({}));
+    const batchLimit = Math.min(Math.max(Number(body?.limit) || 15, 5), 25);
+    const startTime = Date.now();
+    const TIME_BUDGET_MS = 15_000; // 15s budget to safely return well within Vercel execution window
 
-  const run = await prisma.radarRun.create({
-    data: {
-      organizationId: user.organizationId,
-      profileId: profile.id || null,
-      triggerType: 'MANUAL',
-      status: 'RUNNING',
-    },
-  });
+    const run = await prisma.radarRun.create({
+      data: {
+        organizationId: user.organizationId,
+        profileId: profile.id || null,
+        triggerType: 'MANUAL',
+        status: 'RUNNING',
+      },
+    });
 
   try {
     let addedCount = 0;
@@ -112,14 +118,19 @@ export async function POST(request: Request) {
     const remainingSlots = Math.max(batchLimit - addedCount, 5);
     const signalsToProcess = unanalyzedSignals.slice(0, remainingSlots);
 
-    // Only process additional RSS signals if time budget permits and more items needed
-    if (addedCount < 8 && Date.now() - startTime < TIME_BUDGET_MS) {
-      for (const signal of signalsToProcess) {
+    // Only process additional RSS signals via slow per-article AI if live search didn't evaluate enough items
+    // and time budget permits
+    const shouldProcessRssAi = liveFoundCount < 3 && (addedCount + duplicateCount) < 3 && (Date.now() - startTime < TIME_BUDGET_MS);
+    let rssProcessedCount = 0;
+
+    if (shouldProcessRssAi) {
+      for (const signal of signalsToProcess.slice(0, 2)) {
         if (Date.now() - startTime > TIME_BUDGET_MS) {
           console.log('Time budget reached, stopping RSS parsing early');
           break;
         }
 
+        rssProcessedCount++;
         try {
           const parsed = await parseOpportunityFromAiInput(
             signal.sourceTitle,
@@ -175,7 +186,7 @@ export async function POST(request: Request) {
     }
 
     const totalFound = rawFound + liveFoundCount;
-    const totalProcessed = liveFoundCount + signalsToProcess.length;
+    const totalProcessed = liveFoundCount + rssProcessedCount;
 
     await prisma.radarRun.update({
       where: { id: run.id },
@@ -189,7 +200,7 @@ export async function POST(request: Request) {
         errorsCount,
         summaryLog: {
           liveFoundCount,
-          rssProcessedCount: signalsToProcess.length,
+          rssProcessedCount,
           ignoredCount,
           targetCities: profile.targetCities,
           targetRegions: profile.targetRegions,
@@ -220,5 +231,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: 'Automatické vyhledávání selhalo.' }, { status: 500 });
   }
+  });
 }
 
