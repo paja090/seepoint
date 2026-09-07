@@ -56,9 +56,9 @@ async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
   const configuredModels = [process.env.GEMINI_VISION_MODEL, process.env.GEMINI_VISION_FALLBACK_MODEL]
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value));
-  const modelsToTry = (configuredModels.length ? configuredModels : ['gemini-2.5-flash'])
+  const modelsToTry = (configuredModels.length ? configuredModels : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'])
     .filter((model, index, values) => /^[A-Za-z0-9._-]+$/.test(model) && values.indexOf(model) === index)
-    .slice(0, 2);
+    .slice(0, 3);
 
   for (const model of modelsToTry) {
     for (const apiVersion of ['v1beta']) {
