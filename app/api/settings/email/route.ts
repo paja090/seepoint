@@ -56,6 +56,8 @@ export async function GET() {
             deliveredAt: true,
           },
         }),
+      ]);
+
       const hasSystemResendKey = Boolean(process.env.RESEND_API_KEY?.trim());
 
       return NextResponse.json({
