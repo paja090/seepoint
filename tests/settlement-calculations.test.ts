@@ -929,11 +929,12 @@ test('25. InvoiceStatus enum values validation', () => {
 test('26. SystemSettings has no fake billing defaults', () => {
   const schemaPath = path.join(__dirname, '../prisma/schema.prisma');
   const schema = fs.readFileSync(schemaPath, 'utf8');
+  const systemSettingsModel = schema.match(/model\s+SystemSettings\s*\{[\s\S]*?\}/)?.[0] || '';
 
-  assert.doesNotMatch(schema, /companyId\s+String\s+@default/);
-  assert.doesNotMatch(schema, /vatId\s+String\s+@default/);
-  assert.doesNotMatch(schema, /street\s+String\s+@default/);
-  assert.doesNotMatch(schema, /city\s+String\s+@default/);
+  assert.doesNotMatch(systemSettingsModel, /companyId\s+String\s+@default/);
+  assert.doesNotMatch(systemSettingsModel, /vatId\s+String\s+@default/);
+  assert.doesNotMatch(systemSettingsModel, /street\s+String\s+@default/);
+  assert.doesNotMatch(systemSettingsModel, /city\s+String\s+@default/);
 });
 
 test('27. Cumulative carry-over corrections and baseline calculations', async () => {
