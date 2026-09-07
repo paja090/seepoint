@@ -13,7 +13,8 @@ export type SystemNotificationItem = {
     | 'VEHICLE_FAULT'
     | 'LOW_STOCK'
     | 'CITY_GALLERY_PERMIT_EXPIRING'
-    | 'PRINT_APPROVED';
+    | 'PRINT_APPROVED'
+    | 'RADAR_OPPORTUNITY';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -91,6 +92,44 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
         severity: diffDays <= 7 ? 'HIGH' : 'MEDIUM',
         link: `/navigation/contracts`,
         createdAt: now.toISOString(),
+      });
+    });
+
+    // Check Fresh High-Score AI Radar Opportunities
+    const freshRadarOpportunities = await prisma.salesOpportunity.findMany({
+      where: {
+        status: 'NEW',
+        opportunityScore: { gte: 40 },
+      },
+      select: {
+        id: true,
+        title: true,
+        companyName: true,
+        city: true,
+        region: true,
+        opportunityScore: true,
+        createdAt: true,
+      },
+      orderBy: [{ opportunityScore: 'desc' }, { createdAt: 'desc' }],
+      take: 10,
+    });
+
+    freshRadarOpportunities.forEach((opp) => {
+      const companyOrTitle = opp.companyName || opp.title;
+      const location = opp.city || opp.region || 'ČR';
+      notifications.push({
+        id: `radar-opp-${opp.id}`,
+        type: 'RADAR_OPPORTUNITY',
+        title: `🎯 Příležitost z radaru: ${companyOrTitle}`,
+        message: `${location} • Relevance ${opp.opportunityScore} % • Připraveno pro kontaktování a nabídku OOH.`,
+        severity: opp.opportunityScore >= 70 ? 'HIGH' : 'MEDIUM',
+        link: `/sales/opportunities`,
+        createdAt: opp.createdAt.toISOString(),
+        metadata: {
+          opportunityId: opp.id,
+          score: opp.opportunityScore,
+          companyName: opp.companyName,
+        },
       });
     });
   }
@@ -250,7 +289,7 @@ export async function getSystemNotifications(userRole: AppRole = 'ADMIN', userId
       const apiKey = process.env.GEMINI_API_KEY;
       if (apiKey) {
         const notifText = notifications.map((n) => `- [${n.severity}] ${n.title}: ${n.message}`).join('\n');
-        const systemPrompt = `Jsi AI Asistent vedení firmy SeePoint. Zde je seznam aktuálních notifikací a varování:\n${notifText}\n\nVytvoř 1 STRUČNÝ, PŘEHLEDNÝ A EFEKTIVNÍ SOUHRN v češtině (max 200 znaků) jako "AI Souhrn pro vedoucího", který vypíchne nejakutnější problémy (např. končící zábory měst, vypršení smluv, nevyřízené úkoly s důvody). Vrať ČISTÝ TEXT bez jakýchkoliv markdown značek.`;
+        const systemPrompt = `Jsi AI Asistent vedení firmy SeePoint. Zde je seznam aktuálních notifikací a varování:\n${notifText}\n\nVytvoř 1 STRUČNÝ, PŘEHLEDNÝ A EFEKTIVNÍ SOUHRN v češtině (max 200 znaků) jako "AI Souhrn pro vedoucího", který vypíchne nejakutnější záležitosti (např. nové obchodní příležitosti z AI radaru, končící zábory měst, vypršení smluv, nevyřízené úkoly s důvody). Vrať ČISTÝ TEXT bez jakýchkoliv markdown značek.`;
 
         const configuredModel = process.env.GEMINI_TEXT_MODEL?.trim();
         const modelsToTry = configuredModel && /^[A-Za-z0-9._-]+$/.test(configuredModel)
