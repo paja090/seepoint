@@ -116,29 +116,33 @@ export async function collectSignalsForProfile(
     (art, idx, all) => all.findIndex((cand) => cand.title === art.title || cand.link === art.link) === idx
   );
 
-  const persistedSignals = [];
-  for (const art of uniqueArticles.slice(0, 30)) {
+  const toUpsert = uniqueArticles.slice(0, 30).map((art) => {
     const pubDate = art.pubDate ? new Date(art.pubDate) : null;
     const cleanTitle = art.publisher ? `${art.title} - ${art.publisher}` : art.title;
-    const signal = await prisma.radarSignal.upsert({
-      where: {
-        organizationId_sourceUrl: {
-          organizationId,
-          sourceUrl: art.link,
-        },
-      },
-      create: {
-        organizationId,
-        sourceUrl: art.link,
-        sourceTitle: cleanTitle,
-        sourcePublishedAt: pubDate && Number.isFinite(pubDate.getTime()) ? pubDate : null,
-        rawText: art.description || null,
-        status: 'NEW',
-      },
-      update: {},
+    return {
+      organizationId,
+      sourceUrl: art.link,
+      sourceTitle: cleanTitle,
+      sourcePublishedAt: pubDate && Number.isFinite(pubDate.getTime()) ? pubDate : null,
+      rawText: art.description || null,
+      status: 'NEW',
+    };
+  });
+
+  if (toUpsert.length > 0) {
+    await prisma.radarSignal.createMany({
+      data: toUpsert,
+      skipDuplicates: true,
     });
-    persistedSignals.push(signal);
   }
+
+  const persistedSignals = await prisma.radarSignal.findMany({
+    where: {
+      organizationId,
+      sourceUrl: { in: toUpsert.map((t) => t.sourceUrl) },
+    },
+    take: 30,
+  });
 
   // Prioritize NEW unprocessed signals first
   const sortedSignals = persistedSignals.sort((a, b) => {

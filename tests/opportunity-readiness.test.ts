@@ -64,6 +64,7 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
   const discovery = source('app/api/sales/opportunities/auto-discover/route.ts');
   const scheduled = source('app/api/sales/opportunities/scheduled-discovery/route.ts');
   const collector = source('lib/opportunities/feed-collector.ts');
+  const liveSearch = source('lib/opportunities/live-search.ts');
   assert.match(service, /organizationId/);
   assert.match(service, /organizationMember\.count/);
   assert.match(parseRoute, /rateLimitPolicies\.opportunityAi/);
@@ -73,7 +74,11 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
   }
   assert.match(scheduled, /nejvýše 25 signálů/);
   assert.match(collector, /45 \* 24 \* 60 \* 60_000/);
+  assert.match(collector, /createMany/);
+  assert.match(collector, /skipDuplicates:\s*true/);
   assert.match(discovery, /\.slice\(0,\s*(?:remainingSlots|5)\)/);
+  assert.match(discovery, /runWithTenantContext/);
+  assert.match(liveSearch, /AbortSignal\.timeout\(15_000\)/);
 });
 
 test('CRM linking is serializable, tenant checked and audited without using article URL as company website', () => {

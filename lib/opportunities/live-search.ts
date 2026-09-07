@@ -85,7 +85,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
   const configuredOppModel = process.env.GEMINI_OPPORTUNITY_MODEL?.trim();
   const models = configuredOppModel
     ? [configuredOppModel]
-    : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+    : ['gemini-3.6-flash', 'gemini-flash-latest'];
 
   let jsonText = '';
 
@@ -102,7 +102,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
           contents: [{ parts: [{ text: prompt }] }],
           tools: [{ googleSearch: {} }],
         }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (resp.ok) {
