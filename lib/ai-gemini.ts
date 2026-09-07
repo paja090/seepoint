@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { logAIUsage } from './ai-usage';
 
 export type GeminiCarrierAnalysis = {
   confidence: number;
@@ -160,6 +161,19 @@ Odpověz v JSON formátu s klíči:
     if (data.photoId) {
       const existing = await prisma.photo.findUnique({ where: { id: data.photoId } }).catch(() => null);
       if (existing) {
+        if (existing.organizationId) {
+          void logAIUsage({
+            organizationId: existing.organizationId,
+            feature: 'PHOTO_ANALYSIS',
+            modelName: 'gemini-3.6-flash',
+            promptTokens: 400,
+            outputTokens: 200,
+            imageCount: 1,
+            costEstimateUsd: 0.002,
+            metadata: { photoId: data.photoId, action: 'carrier-inspection' },
+          });
+        }
+
         await prisma.photo.update({
           where: { id: data.photoId },
           data: {

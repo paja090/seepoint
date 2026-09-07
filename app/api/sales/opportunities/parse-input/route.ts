@@ -4,6 +4,7 @@ import { parseOpportunityFromAiInput } from '@/lib/opportunities/parser';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { OpportunityValidationError } from '@/lib/opportunities/policy';
+import { logAIUsage } from '@/lib/ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -25,6 +26,18 @@ export async function POST(request: Request) {
     if (url && url.length > 2_000) return NextResponse.json({ error: 'URL je příliš dlouhá.' }, { status: 400 });
 
     const parsed = await parseOpportunityFromAiInput(input || url || '', url);
+
+    void logAIUsage({
+      organizationId: user.organizationId,
+      userId: user.id,
+      feature: 'SALES_RADAR',
+      modelName: 'gemini-3.6-flash',
+      promptTokens: Math.max(Math.round((input.length || 200) / 4), 100),
+      outputTokens: 300,
+      costEstimateUsd: 0.001,
+      metadata: { action: 'manual-opportunity-parse', hasUrl: Boolean(url) },
+    });
+
     return NextResponse.json({ parsed });
   } catch (error) {
     if (error instanceof OpportunityValidationError) return NextResponse.json({ error: error.message }, { status: error.status });
