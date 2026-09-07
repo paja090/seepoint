@@ -160,19 +160,21 @@ export function SalesOpportunitiesClientView({
   };
 
   const handleAutoDiscover = async () => {
-    if (!window.confirm('Spustit AI hledání? Zpracuje nejvýše 5 aktuálních článků a může vytvořit nové neověřené návrhy příležitostí.')) return;
+    if (!window.confirm('Spustit AI Obchodní radar? Radar v reálném čase prohledá internet a zprávy podle nastavení vašeho regionu a lokalit a vyhledá nové obchodní příležitosti.')) return;
     setFeedback(null);
     setIsAutoDiscovering(true);
     try {
       const res = await fetch('/api/sales/opportunities/auto-discover', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 20 }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Automatické vyhledávání selhalo.');
       await fetchOpportunities();
       setFeedback({
         kind: 'success',
-        message: `AI zpracovala ${data.processed || 0} článků, přidala ${data.addedCount || 0} návrhů a rozpoznala ${data.duplicateCount || 0} duplicit.`,
+        message: `AI Radar vyhodnotil ${data.processed || 0} zdrojů a signálů, vytvořil ${data.addedCount || 0} nových obchodních příležitostí a zachytil ${data.duplicateCount || 0} duplicit.`,
       });
     } catch (err) {
       console.error('Auto discover failed', err);
