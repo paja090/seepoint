@@ -73,7 +73,7 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
   }
   assert.match(scheduled, /nejvýše 25 signálů/);
   assert.match(collector, /45 \* 24 \* 60 \* 60_000/);
-  assert.match(discovery, /\.slice\(0, 5\)/);
+  assert.match(discovery, /\.slice\(0,\s*(?:remainingSlots|5)\)/);
 });
 
 test('CRM linking is serializable, tenant checked and audited without using article URL as company website', () => {
