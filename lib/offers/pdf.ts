@@ -31,6 +31,12 @@ function formatArrowDirectionPdf(arrowEnum?: string | null) {
     case 'SLANTED_RIGHT': return '↗ Šikmo vpravo';
     case 'U_TURN': return '↩ Otočení do protisměru';
     case 'TWO_WAY': return '↔ Obousměrný';
+    case 'ROUNDABOUT_1': return '🔄 Kruhový objezd (1. výjezd)';
+    case 'ROUNDABOUT_2': return '🔄 Kruhový objezd (2. výjezd)';
+    case 'ROUNDABOUT_3': return '🔄 Kruhový objezd (3. výjezd)';
+    case 'ROUNDABOUT_4': return '🔄 Kruhový objezd (4. výjezd)';
+    case 'ROUNDABOUT_5': return '🔄 Kruhový objezd (5. výjezd)';
+    case 'ROUNDABOUT': return '🔄 Kruhový objezd';
     case 'STRAIGHT':
     default: return '⬆ Rovně';
   }

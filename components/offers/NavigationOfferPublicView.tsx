@@ -18,6 +18,7 @@ import {
   Sparkles,
   FileText,
   RefreshCw,
+  RotateCw,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
@@ -67,6 +68,42 @@ export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
           <MoveHorizontal size={14} className="text-purple-700 stroke-[3]" /> OBOUSMĚRNÝ
         </span>
       );
+    case 'ROUNDABOUT_1':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
+          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 1. VÝJEZD
+        </span>
+      );
+    case 'ROUNDABOUT_2':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
+          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 2. VÝJEZD
+        </span>
+      );
+    case 'ROUNDABOUT_3':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
+          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 3. VÝJEZD
+        </span>
+      );
+    case 'ROUNDABOUT_4':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
+          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 4. VÝJEZD
+        </span>
+      );
+    case 'ROUNDABOUT_5':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
+          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 5. VÝJEZD
+        </span>
+      );
+    case 'ROUNDABOUT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
+          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJEZD
+        </span>
+      );
     case 'STRAIGHT':
     default:
       return (
@@ -94,6 +131,9 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
 export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
   const navigation = offer.navigation;
   const effectiveProposalKey = proposalKey ?? offer.id;
+  const isHavirov =
+    (navigation as unknown as Record<string, unknown>)?.city === 'Havířov' ||
+    (offer.title + ' ' + (navigation?.targetAddress || '')).toLowerCase().includes('havířov');
   const isLocationSelectionPhase = (navigation as unknown as Record<string, unknown>).proposalMode !== 'PRICED_QUOTE';
   const showOfferPdf = canDownloadOfferPdf(offer);
   const showInstallationSheet = canDownloadInstallationSheet(offer);
@@ -620,7 +660,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3.5 py-1.5 text-xs font-black text-sky-400 backdrop-blur-sm">
               <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
-              Rozměr: 670 × 900 mm
+              {isHavirov ? 'Město: Havířov (horní půlkruh)' : 'Rozměr: 670 × 900 mm (Ostrava)'}
             </span>
           </div>
         </div>
@@ -628,57 +668,74 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Column: Premium Interactive Graphic Artwork Frame (7 Cols) */}
           <div className="lg:col-span-7 flex flex-col items-center">
-            <div
-              className="group relative w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3 shadow-2xl transition duration-300 hover:border-sky-500/50 cursor-pointer"
-              onClick={() =>
-                setActiveLightboxImage(
-                  typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
-                    ? String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)
-                    : '/offer/navigation-proof-template.jpg'
-                )
-              }
-            >
-              {/* Studio Window Header Bar */}
-              <div className="mb-2.5 flex items-center justify-between border-b border-slate-800/80 pb-2 px-1 text-[11px] font-bold text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
-                  <span className="ml-2 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
-                    {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
-                      ? 'NÁHLED GRAFICKÉHO MOTIVU'
-                      : 'OFICIÁLNÍ ŠABLONA PANELU (670 × 900 MM)'}
-                  </span>
+            {isHavirov && !(typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl) ? (
+              <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-2xl">
+                  🏛️
                 </div>
-                <span className="text-sky-400 group-hover:underline flex items-center gap-1">
-                  🔍 Zvětšit náhled
-                </span>
-              </div>
-
-              {/* Artwork Image Container */}
-              <div className="relative flex min-h-[300px] w-full items-center justify-center rounded-xl bg-slate-900 p-2 shadow-inner overflow-hidden">
-                {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl ? (
-                  <img
-                    src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
-                    alt="Grafický motiv cedule"
-                    className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
-                  />
-                ) : (
-                  <img
-                    src="/offer/navigation-proof-template.jpg"
-                    alt="Šablona navigačního panelu 670 × 900 mm"
-                    className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
-                  />
-                )}
-
-                {/* Hover overlay hint */}
-                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center backdrop-blur-[2px]">
-                  <span className="rounded-xl border border-white/30 bg-slate-900/90 px-4 py-2 text-xs font-bold text-white shadow-xl flex items-center gap-2">
-                    🔍 Kliknutím otevřete detail v plné velikosti
-                  </span>
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-white text-base">Navigační systém – město Havířov</h4>
+                  <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                    V Havířově se využívá schválený formát panelu s horním půlkruhem. Standardní šablona pro Ostravu se zde nezobrazuje. Finální grafický náhled na míru bude zpracován a zaslán klientovi ke schválení před výrobou.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-950/60 border border-indigo-700/50 px-4 py-2 text-xs font-bold text-indigo-300">
+                  <span>📐</span> Atypický formát s horním půlkruhem
                 </div>
               </div>
-            </div>
+            ) : (
+              <div
+                className="group relative w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3 shadow-2xl transition duration-300 hover:border-sky-500/50 cursor-pointer"
+                onClick={() =>
+                  setActiveLightboxImage(
+                    typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
+                      ? String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)
+                      : '/offer/navigation-proof-template.jpg'
+                  )
+                }
+              >
+                {/* Studio Window Header Bar */}
+                <div className="mb-2.5 flex items-center justify-between border-b border-slate-800/80 pb-2 px-1 text-[11px] font-bold text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+                    <span className="ml-2 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
+                      {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
+                        ? 'NÁHLED GRAFICKÉHO MOTIVU'
+                        : 'OFICIÁLNÍ ŠABLONA PANELU (670 × 900 MM)'}
+                    </span>
+                  </div>
+                  <span className="text-sky-400 group-hover:underline flex items-center gap-1">
+                    🔍 Zvětšit náhled
+                  </span>
+                </div>
+
+                {/* Artwork Image Container */}
+                <div className="relative flex min-h-[300px] w-full items-center justify-center rounded-xl bg-slate-900 p-2 shadow-inner overflow-hidden">
+                  {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl ? (
+                    <img
+                      src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
+                      alt="Grafický motiv cedule"
+                      className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <img
+                      src="/offer/navigation-proof-template.jpg"
+                      alt="Šablona navigačního panelu 670 × 900 mm"
+                      className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
+                    />
+                  )}
+
+                  {/* Hover overlay hint */}
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                    <span className="rounded-xl border border-white/30 bg-slate-900/90 px-4 py-2 text-xs font-bold text-white shadow-xl flex items-center gap-2">
+                      🔍 Kliknutím otevřete detail v plné velikosti
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Specification Details & Feature Cards (5 Cols) */}
@@ -692,7 +749,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 <span className="text-base leading-none">📐</span>
                 <div>
                   <span className="font-bold text-white block">Rozměry panelu:</span>
-                  <span className="text-slate-400"><strong>Ostrava 670 × 900 mm</strong>; Havířov používá odlišný tvar s horním půlkruhem (přesný rozměr bude doplněn po ověření).</span>
+                  {isHavirov ? (
+                    <span className="text-slate-400">Město Havířov používá schválený <strong>atypický tvar s horním půlkruhem</strong> (přesný rozměr bude upřesněn dle schváleného pasportu).</span>
+                  ) : (
+                    <span className="text-slate-400">Standardní rozměr pro město Ostrava <strong>670 × 900 mm</strong>.</span>
+                  )}
                 </div>
               </div>
 

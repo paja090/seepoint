@@ -281,6 +281,12 @@ enum NavigationArrowDirection {
   SLANTED_RIGHT
   U_TURN
   TWO_WAY
+  ROUNDABOUT_1
+  ROUNDABOUT_2
+  ROUNDABOUT_3
+  ROUNDABOUT_4
+  ROUNDABOUT_5
+  ROUNDABOUT
 }
 
 enum CityGalleryProjectStatus {
@@ -1499,6 +1505,7 @@ model NavigationOffer {
   id                    String   @id @default(cuid())
   organizationId        String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   offerId               String   @unique
+  city                  String   @default("Ostrava")
   targetName            String
   targetAddress         String?
   targetLatitude        Float

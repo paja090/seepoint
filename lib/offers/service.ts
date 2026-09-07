@@ -218,6 +218,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       subtotal: charge.subtotal.toFixed(2),
     })),
     navigation: row.navigationOffer ? {
+      city: row.navigationOffer.city || 'Ostrava',
       targetName: row.navigationOffer.targetName,
       targetAddress: row.navigationOffer.targetAddress,
       targetLatitude: row.navigationOffer.targetLatitude,

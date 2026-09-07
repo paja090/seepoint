@@ -13,6 +13,12 @@ function getArrowChar(arrowEnum?: string): string {
     case 'SLANTED_RIGHT': return '↗';
     case 'U_TURN': return '↩';
     case 'TWO_WAY': return '↔';
+    case 'ROUNDABOUT_1': return '🔄 1.';
+    case 'ROUNDABOUT_2': return '🔄 2.';
+    case 'ROUNDABOUT_3': return '🔄 3.';
+    case 'ROUNDABOUT_4': return '🔄 4.';
+    case 'ROUNDABOUT_5': return '🔄 5.';
+    case 'ROUNDABOUT': return '🔄';
     case 'STRAIGHT':
     default: return '⬆';
   }
@@ -399,7 +405,7 @@ export function NavigationSignVisualizer({
               <div>
                 <label className="block text-xs font-bold text-slate-400 mb-1">Směrová šipka</label>
                 <div className="grid grid-cols-4 gap-1.5">
-                  {['⬆', '➔', '⬅', '↖', '↗', '↩', '↔'].map((item) => (
+                  {['⬆', '➔', '⬅', '↖', '↗', '↩', '↔', '🔄 1.', '🔄 2.', '🔄 3.', '🔄 4.', '🔄'].map((item) => (
                     <button
                       key={item}
                       type="button"
