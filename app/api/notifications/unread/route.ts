@@ -18,7 +18,7 @@ export async function GET() {
   const now = new Date();
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults] = await Promise.all([
+  const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults, recentRadarOpps] = await Promise.all([
     // Tasks assigned to user
     canAccess(user.role, 'work') ? prisma.workAssignment.findMany({
       where: {
@@ -75,6 +75,24 @@ export async function GET() {
       take: 5,
       orderBy: { createdAt: 'desc' },
     }) : Promise.resolve([]),
+    // Fresh AI Radar opportunities in last 24h
+    canAccess(user.role, 'clients') ? prisma.salesOpportunity.findMany({
+      where: {
+        status: 'NEW',
+        opportunityScore: { gte: 40 },
+        createdAt: { gte: last24h },
+      },
+      select: {
+        id: true,
+        title: true,
+        companyName: true,
+        city: true,
+        opportunityScore: true,
+        createdAt: true,
+      },
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+    }) : Promise.resolve([]),
   ]);
 
   const items = [
@@ -113,6 +131,15 @@ export async function GET() {
       linkUrl: `/vehicles/${vf.vehicleId}`,
       isUrgent: true,
       createdAt: vf.createdAt.toISOString(),
+    })),
+    ...recentRadarOpps.map((opp) => ({
+      id: `radar-opp-${opp.id}`,
+      type: 'RADAR',
+      title: `🎯 Nová příležitost: ${opp.companyName || opp.title}`,
+      description: `${opp.city ? `${opp.city} • ` : ''}Relevance ${opp.opportunityScore} %. Zjištěno AI radarem.`,
+      linkUrl: `/sales/opportunities`,
+      isUrgent: opp.opportunityScore >= 70,
+      createdAt: opp.createdAt.toISOString(),
     })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

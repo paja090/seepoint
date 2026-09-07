@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Settings, X, Save, RefreshCw } from 'lucide-react';
+import { Settings, X, Save, RefreshCw, Clock, Bell, CheckCircle2, PauseCircle } from 'lucide-react';
 
 const REGION_OPTIONS = [
   'Moravskoslezský kraj',
@@ -199,20 +199,42 @@ export function RadarSettingsModal({
           ) : (
             <div className="space-y-5 text-sm">
               {/* Active Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-950/40 border border-slate-800">
-                <div>
-                  <h3 className="font-bold text-white text-sm">Aktivní monitoring radaru</h3>
-                  <p className="text-xs text-slate-400">Povolit automatické i ruční skenování signálů trhu</p>
+              <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Aktivní monitoring radaru</h3>
+                    <p className="text-xs text-slate-400">Povolit automatické i ruční skenování signálů trhu</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(e) => setEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={(e) => setEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                </label>
+
+                {enabled ? (
+                  <div className="pt-2 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 rounded-xl px-2.5 py-1.5 font-medium">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      <span>Ranní automat: Každý všední den v 7:00</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-purple-300 bg-purple-950/40 border border-purple-800/40 rounded-xl px-2.5 py-1.5 font-medium">
+                      <Bell className="h-3.5 w-3.5 shrink-0" />
+                      <span>Notifikace: Upozornění nad {minScoreThreshold} bodů</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-slate-800/80">
+                    <div className="flex items-center gap-1.5 text-amber-400 bg-amber-950/40 border border-amber-800/40 rounded-xl px-2.5 py-1.5 text-[11px] font-medium">
+                      <PauseCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Automatické skenování i notifikace jsou pozastaveny. Žádné AI dotazy neběží.</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Target Regions */}
