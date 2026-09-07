@@ -35,6 +35,16 @@ function getManagementApiKey(): string {
   return key;
 }
 
+function formatResendError(rawMessage: string): string {
+  if (/restricted to only send emails/i.test(rawMessage)) {
+    return 'Váš RESEND_API_KEY ve Vercelu má oprávnění pouze pro odesílání ("Sending access"). Pro automatickou registraci a správu firemních domén musí mít klíč v Resendu oprávnění "Full access". Vytvořte v Resendu nový API klíč s "Full access" a aktualizujte proměnnou RESEND_API_KEY ve Vercelu.';
+  }
+  if (/api key.*invalid/i.test(rawMessage) || /unauthorized/i.test(rawMessage)) {
+    return 'Zadaný RESEND_API_KEY je neplatný nebo byl zneplatněn. Zkontrolujte prosím hodnotu proměnné prostředí ve Vercelu.';
+  }
+  return rawMessage;
+}
+
 /**
  * Registers a new custom domain in Resend.
  * Returns the domain details including DNS records (SPF, DKIM, MX).
@@ -58,7 +68,7 @@ export async function registerResendDomain(domain: string): Promise<ResendDomain
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = data?.message || res.statusText;
+    const message = formatResendError(data?.message || res.statusText);
     console.error('[resend] Domain creation failed:', { status: res.status, message });
     throw new Error(`Registrace domény v Resend selhala: ${message}`);
   }
@@ -84,7 +94,7 @@ export async function verifyResendDomain(domainId: string): Promise<ResendDomain
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = data?.message || res.statusText;
+    const message = formatResendError(data?.message || res.statusText);
     console.error('[resend] Domain verify failed:', { status: res.status, message });
     throw new Error(`Ověření domény v Resend selhalo: ${message}`);
   }
@@ -109,7 +119,7 @@ export async function getResendDomain(domainId: string): Promise<ResendDomainRes
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = data?.message || res.statusText;
+    const message = formatResendError(data?.message || res.statusText);
     throw new Error(`Načtení stavu domény selhalo: ${message}`);
   }
 
@@ -139,7 +149,7 @@ export async function createDomainSendingKey(domainId: string, domainName: strin
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message = data?.message || res.statusText;
+    const message = formatResendError(data?.message || res.statusText);
     console.error('[resend] API key creation failed:', { status: res.status, message });
     throw new Error(`Vytvoření doménového klíče v Resend selhalo: ${message}`);
   }
