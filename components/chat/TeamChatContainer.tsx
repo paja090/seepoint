@@ -203,6 +203,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
               if (data.data.amountCzk) setFuelAmount(String(data.data.amountCzk));
               if (data.data.liters) setFuelLiters(String(data.data.liters));
               if (data.data.vendor) setFuelNote(`${data.data.vendor} (${data.data.fuelType || 'Palivo'})`);
+              if (data.data.odometer) setFuelOdometer(String(data.data.odometer));
             }
           })
           .catch(() => null)

@@ -27,10 +27,14 @@ export function AddClientModalButton() {
   // Form inputs
   const [name, setName] = useState('');
   const [companyId, setCompanyId] = useState('');
+  const [dic, setDic] = useState('');
+  const [billingStreet, setBillingStreet] = useState('');
+  const [billingCity, setBillingCity] = useState('');
+  const [billingZip, setBillingZip] = useState('');
+  const [website, setWebsite] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [contactPerson, setContactPerson] = useState('');
-  const [billingCity, setBillingCity] = useState('');
 
   // Duplicates modal step
   const [duplicates, setDuplicates] = useState<ClientSimpleItem[]>([]);
@@ -54,7 +58,11 @@ export function AddClientModalButton() {
         const d = resData.data;
         if (d.name) setName(d.name);
         if (d.companyId) setCompanyId(d.companyId);
+        if (d.dic) setDic(d.dic);
+        if (d.billingStreet) setBillingStreet(d.billingStreet);
         if (d.billingCity) setBillingCity(d.billingCity);
+        if (d.billingZip) setBillingZip(d.billingZip);
+        if (d.website) setWebsite(d.website);
         if (d.email) setEmail(d.email);
         if (d.phone) setPhone(d.phone);
         if (d.contactPerson) setContactPerson(d.contactPerson);
@@ -76,11 +84,15 @@ export function AddClientModalButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          companyId,
-          email,
-          phone,
-          contactPerson,
-          billingCity,
+          companyId: companyId ? companyId.replace(/\s+/g, '') : undefined,
+          dic: dic ? dic.replace(/\s+/g, '') : undefined,
+          billingStreet: billingStreet || undefined,
+          billingCity: billingCity || undefined,
+          billingZip: billingZip || undefined,
+          website: website ? (website.startsWith('http') ? website : `https://${website}`) : undefined,
+          email: email || undefined,
+          phone: phone || undefined,
+          contactPerson: contactPerson || undefined,
           ignoreDuplicates: forceCreate || ignoreDuplicates,
         }),
       });
@@ -205,7 +217,15 @@ export function AddClientModalButton() {
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="text-xs font-semibold">IČO<input className="input text-sm mt-1" placeholder="Např. 24261980" value={companyId} onChange={e => setCompanyId(e.target.value)} /></label>
+                  <label className="text-xs font-semibold">DIČ<input className="input text-sm mt-1" placeholder="Např. CZ24261980" value={dic} onChange={e => setDic(e.target.value)} /></label>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="text-xs font-semibold col-span-2">Fakturační ulice<input className="input text-sm mt-1" placeholder="Např. Nádražní 12" value={billingStreet} onChange={e => setBillingStreet(e.target.value)} /></label>
+                  <label className="text-xs font-semibold">PSČ<input className="input text-sm mt-1" placeholder="702 00" value={billingZip} onChange={e => setBillingZip(e.target.value)} /></label>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   <label className="text-xs font-semibold">Město (sídlo)<input className="input text-sm mt-1" placeholder="Např. Ostrava" value={billingCity} onChange={e => setBillingCity(e.target.value)} /></label>
+                  <label className="text-xs font-semibold">Webové stránky<input className="input text-sm mt-1" placeholder="https://www.firma.cz" value={website} onChange={e => setWebsite(e.target.value)} /></label>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="text-xs font-semibold">E-mail klienta<input className="input text-sm mt-1" type="email" placeholder="info@kofola.cz" value={email} onChange={e => setEmail(e.target.value)} /></label>
