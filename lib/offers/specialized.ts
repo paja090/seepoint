@@ -51,7 +51,11 @@ export function parseNavigationOfferInput(raw: unknown) {
     const manualDistUnit = text(point.manualDistanceUnit) === 'KILOMETERS' ? ('KILOMETERS' as const) : text(point.manualDistanceUnit) === 'METERS' ? ('METERS' as const) : null;
     const distSource = text(point.distanceSource) === 'MANUAL' ? ('MANUAL' as const) : ('CALCULATED' as const);
     
-    const arrowDir = (['LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT', 'U_TURN', 'TWO_WAY'].includes(text(point.arrowDirectionEnum))
+    const validArrows = [
+      'LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT', 'U_TURN', 'TWO_WAY',
+      'ROUNDABOUT_1', 'ROUNDABOUT_2', 'ROUNDABOUT_3', 'ROUNDABOUT_4', 'ROUNDABOUT_5', 'ROUNDABOUT',
+    ];
+    const arrowDir = (validArrows.includes(text(point.arrowDirectionEnum))
       ? (text(point.arrowDirectionEnum) as NavigationArrowDirection)
       : ('STRAIGHT' as NavigationArrowDirection));
 
@@ -86,9 +90,10 @@ export function parseNavigationOfferInput(raw: unknown) {
   const validUntil = text(input.validUntil);
   if (validUntil) parseDateOnly(validUntil, 'Platnost nabídky');
   const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
+  const city = text(input.city) === 'Havířov' ? 'Havířov' : (text(input.targetAddress).toLowerCase().includes('havířov') ? 'Havířov' : 'Ostrava');
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
-    validUntil, internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), targetName, targetAddress: text(input.targetAddress),
+    validUntil, internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), city, targetName, targetAddress: text(input.targetAddress),
     targetLatitude: coordinate(input.targetLatitude, 'latitude'), targetLongitude: coordinate(input.targetLongitude, 'longitude'), targetNote: text(input.targetNote), 
     targetPhotoUrl: nullable(text(input.targetPhotoUrl)),
     googlePlaceId: nullable(text(input.googlePlaceId)), formattedAddress: nullable(text(input.formattedAddress)),
@@ -146,6 +151,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
               upsert: {
                 create: {
                   organizationId: user.organizationId,
+                  city: input.city,
                   targetName: input.targetName,
                   targetAddress: nullable(input.targetAddress),
                   targetLatitude: input.targetLatitude,
@@ -162,6 +168,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
                   points: { create: pointsWithOrg },
                 },
                 update: {
+                  city: input.city,
                   targetName: input.targetName,
                   targetAddress: nullable(input.targetAddress),
                   targetLatitude: input.targetLatitude,
@@ -185,7 +192,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         });
       }
     const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
-    return tx.offer.create({ data: { ...common, organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+    return tx.offer.create({ data: { ...common, organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, city: input.city, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 

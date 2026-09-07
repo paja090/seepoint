@@ -63,6 +63,7 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
   const parseRoute = source('app/api/sales/opportunities/parse-input/route.ts');
   const discovery = source('app/api/sales/opportunities/auto-discover/route.ts');
   const scheduled = source('app/api/sales/opportunities/scheduled-discovery/route.ts');
+  const collector = source('lib/opportunities/feed-collector.ts');
   assert.match(service, /organizationId/);
   assert.match(service, /organizationMember\.count/);
   assert.match(parseRoute, /rateLimitPolicies\.opportunityAi/);
@@ -71,7 +72,7 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
     assert.match(route, /rateLimitPolicies\.opportunityDiscovery/);
   }
   assert.match(scheduled, /nejvýše 25 signálů/);
-  assert.match(discovery, /45 \* 24 \* 60 \* 60_000/);
+  assert.match(collector, /45 \* 24 \* 60 \* 60_000/);
   assert.match(discovery, /\.slice\(0, 5\)/);
 });
 
@@ -83,3 +84,53 @@ test('CRM linking is serializable, tenant checked and audited without using arti
   assert.match(route, /website: opportunity\.website \|\| null/);
   assert.doesNotMatch(route, /website: opportunity\.website \|\| opportunity\.sourceUrl/);
 });
+
+test('multi-tenant OOH scoring calculates 6 dimensions and awards points for tenant target region', async () => {
+  const { calculateOpportunityScore } = await import('../lib/opportunities/scoring.ts');
+  
+  // Case A: Praha tenant target region
+  const prahaResult = calculateOpportunityScore({
+    eventType: 'STORE_OPENING',
+    city: 'Praha',
+    region: 'Hlavní město Praha',
+    targetCities: ['Praha'],
+    targetRegions: ['Hlavní město Praha'],
+    carrierCountInCity: 5,
+    suggestedMediaTypes: ['BILLBOARD', 'CITYLIGHT'],
+    preferredMediaTypes: ['BILLBOARD', 'CITYLIGHT'],
+    hasVerifiedEvidence: true,
+  });
+
+  assert.equal(prahaResult.breakdown.trigger, 25);
+  assert.ok(prahaResult.breakdown.geo >= 20, 'Praha should receive geo points based on tenant target region and inventory');
+  assert.ok(prahaResult.breakdown.mediaFit >= 10, 'Matching preferred OOH media types should award mediaFit points');
+  assert.ok(prahaResult.score >= 50);
+
+  // Case B: Null city yields 0 geo points without falling back to Ostrava
+  const nullCityResult = calculateOpportunityScore({
+    eventType: 'STORE_OPENING',
+    city: null,
+    region: null,
+    targetCities: ['Ostrava'],
+    targetRegions: ['Moravskoslezský kraj'],
+  });
+  assert.equal(nullCityResult.breakdown.geo, 0, 'Unknown location must yield 0 geo points');
+});
+
+test('parser does not contain hardcoded SeePOINT or MS region and accepts nullable city', () => {
+  const parser = source('lib/opportunities/parser.ts');
+  assert.doesNotMatch(parser, /SeePOINT \(seepoint\.cz\)/);
+  assert.doesNotMatch(parser, /\|\|\s*'Ostrava'/);
+  assert.doesNotMatch(parser, /\|\|\s*'Moravskoslezský kraj'/);
+  assert.match(parser, /"city":\s*null/);
+  assert.match(parser, /"region":\s*null/);
+  assert.match(parser, /city\s*,\s*region/);
+});
+
+test('distance calculator computes Haversine distance in kilometers accurately', async () => {
+  const { calculateHaversineDistanceKm } = await import('../lib/opportunities/distance.ts');
+  // Distance between Ostrava (49.82, 18.26) and Opava (49.93, 17.90) is approx 28-30 km
+  const dist = calculateHaversineDistanceKm(49.8209, 18.2625, 49.9387, 17.9026);
+  assert.ok(dist >= 25 && dist <= 35, `Distance was ${dist}`);
+});
+

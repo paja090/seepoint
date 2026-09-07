@@ -1,48 +1,22 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { createOpportunity } from '@/lib/opportunities/service';
 import { parseOpportunityFromAiInput } from '@/lib/opportunities/parser';
+import { getOrganizationRadarProfile } from '@/lib/opportunities/radar-profile';
+import { collectSignalsForProfile } from '@/lib/opportunities/feed-collector';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-type RssArticle = { title: string; link: string; pubDate?: string };
-
-async function fetchRssArticles(rssUrl: string): Promise<RssArticle[]> {
-  try {
-    const res = await fetch(rssUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) SeePointBot/1.0' },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) return [];
-    const contentLength = Number(res.headers.get('content-length') || 0);
-    if (contentLength > 1_000_000) return [];
-    const xmlText = (await res.text()).slice(0, 1_000_000);
-    const items = xmlText.match(/<item>[\s\S]*?<\/item>/gi) || [];
-    return items.slice(0, 15).flatMap((itemXml) => {
-      const titleMatch = itemXml.match(/<title>(.*?)<\/title>/i);
-      const linkMatch = itemXml.match(/<link>(.*?)<\/link>/i);
-      const pubDateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/i);
-      if (!titleMatch?.[1] || !linkMatch?.[1]) return [];
-      return [{
-        title: titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/gi, '$1').trim(),
-        link: linkMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/gi, '$1').trim(),
-        pubDate: pubDateMatch?.[1],
-      }];
-    });
-  } catch {
-    return [];
-  }
-}
-
 /**
- * Live Automated AI Discovery Job for Moravskoslezský kraj
+ * Multi-Tenant Live Automated AI Discovery Job
  * 
- * Fetches regional news RSS signals (Google News MS Region, Patriot Magazín, Polar Ostrava),
- * passes items to Gemini/OpenAI for opportunity parsing, deduplicates, scores,
- * and saves into SalesOpportunity table.
+ * Loads organization radar profile (or derives intelligent inventory defaults),
+ * collects targeted RSS signals, persists into RadarSignal, parses via tenant-aware AI,
+ * calculates geospatial & network scoring, and logs into RadarRun.
  */
 export async function POST(request: Request) {
   const user = await requireApiAccess('clients');
@@ -51,46 +25,47 @@ export async function POST(request: Request) {
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.opportunityDiscovery);
   if (limited) return limited;
 
-  try {
-    const rssUrls = [
-      'https://news.google.com/rss/search?q=ostrava+otev%C5%99en%C3%AD+prodejny+pobo%C4%8Dky+provozovny&hl=cs&gl=CZ&ceid=CZ:cs',
-      'https://news.google.com/rss/search?q=moravskoslezsky+kraj+nova+pobocka+retail+park&hl=cs&gl=CZ&ceid=CZ:cs',
-      'https://news.google.com/rss/search?q=opava+havirov+karvina+frydek+mistek+otevreni+prodejna&hl=cs&gl=CZ&ceid=CZ:cs',
-      'https://news.google.com/rss/search?q=ostrava+opava+koncert+festival+sportovni+akce&hl=cs&gl=CZ&ceid=CZ:cs',
-      'https://news.google.com/rss/search?q=ostrava+novy+restaurace+autosalon+prodejna&hl=cs&gl=CZ&ceid=CZ:cs',
-    ];
+  const profile = await getOrganizationRadarProfile(user.organizationId);
+  if (!profile.enabled) {
+    return NextResponse.json({ error: 'AI Obchodní radar je pro vaši organizaci vypnutý v nastavení profilu.' }, { status: 400 });
+  }
 
-    const rawArticles = (await Promise.all(rssUrls.map(fetchRssArticles))).flat();
+  const run = await prisma.radarRun.create({
+    data: {
+      organizationId: user.organizationId,
+      profileId: profile.id || null,
+      triggerType: 'MANUAL',
+      status: 'RUNNING',
+    },
+  });
+
+  try {
+    const { rawFound, uniqueSignals } = await collectSignalsForProfile(profile, user.organizationId);
 
     let addedCount = 0;
     let duplicateCount = 0;
+    let ignoredCount = 0;
+    let errorsCount = 0;
 
-    // Keep the interactive request bounded: RSS and AI calls run in parallel, DB writes stay sequential.
-    const oldestAllowed = Date.now() - 45 * 24 * 60 * 60_000;
-    const newestAllowed = Date.now() + 24 * 60 * 60_000;
-    const freshArticles = rawArticles.filter((article) => {
-      if (!article.pubDate) return false;
-      const publishedAt = new Date(article.pubDate).getTime();
-      return Number.isFinite(publishedAt) && publishedAt >= oldestAllowed && publishedAt <= newestAllowed;
-    });
-    const uniqueArticles = freshArticles.filter(
-      (art, idx, all) => all.findIndex((candidate) => candidate.title === art.title) === idx
-    ).slice(0, 5);
+    const signalsToProcess = uniqueSignals.slice(0, 5);
 
-    const parsedArticles = await Promise.all(uniqueArticles.map(async (article) => {
+    for (const signal of signalsToProcess) {
       try {
-        const parsed = await parseOpportunityFromAiInput(article.title, article.link);
-        return { article, parsed };
-      } catch (err) {
-        console.error('Failed parsing article for opportunity', article.title, err);
-        return null;
-      }
-    }));
+        const parsed = await parseOpportunityFromAiInput(
+          signal.sourceTitle,
+          signal.sourceUrl,
+          profile
+        );
 
-    for (const candidate of parsedArticles) {
-      if (!candidate?.parsed.isRelevant) continue;
-      const { article, parsed } = candidate;
-      try {
+        if (!parsed.isRelevant) {
+          ignoredCount++;
+          await prisma.radarSignal.updateMany({
+            where: { id: signal.id, organizationId: user.organizationId },
+            data: { status: 'IGNORED', parsedData: parsed as unknown as object },
+          });
+          continue;
+        }
+
         const result = await createOpportunity({
           companyName: parsed.companyName,
           companyId: parsed.companyId,
@@ -99,13 +74,14 @@ export async function POST(request: Request) {
           title: parsed.title,
           summary: parsed.summary,
           city: parsed.city,
-          region: parsed.region || 'Moravskoslezský kraj',
+          region: parsed.region,
           address: parsed.address,
           eventDate: parsed.eventDate,
-          sourceUrl: article.link,
-          sourceTitle: article.title,
-          sourcePublishedAt: article.pubDate ? new Date(article.pubDate) : new Date(),
+          sourceUrl: signal.sourceUrl,
+          sourceTitle: signal.sourceTitle,
+          sourcePublishedAt: signal.sourcePublishedAt || new Date(),
           suggestedMediaTypes: parsed.suggestedMediaTypes,
+          radarSignalId: signal.id,
         }, user.organizationId);
 
         if (result.created) {
@@ -114,19 +90,54 @@ export async function POST(request: Request) {
           duplicateCount++;
         }
       } catch (err) {
-        console.error('Failed saving discovered opportunity', article.title, err);
+        errorsCount++;
+        console.error('Failed processing signal for opportunity', signal.sourceTitle, err);
+        await prisma.radarSignal.updateMany({
+          where: { id: signal.id, organizationId: user.organizationId },
+          data: { status: 'FAILED' },
+        }).catch(() => null);
       }
     }
 
+    await prisma.radarRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'COMPLETED',
+        finishedAt: new Date(),
+        signalsFound: rawFound,
+        signalsProcessed: signalsToProcess.length,
+        opportunitiesCreated: addedCount,
+        duplicatesCount: duplicateCount,
+        errorsCount,
+        summaryLog: {
+          ignoredCount,
+          targetCities: profile.targetCities,
+          targetRegions: profile.targetRegions,
+        },
+      },
+    });
+
     return NextResponse.json({
       success: true,
-      foundArticles: rawArticles.length,
-      processed: uniqueArticles.length,
+      runId: run.id,
+      foundArticles: rawFound,
+      processed: signalsToProcess.length,
       addedCount,
       duplicateCount,
+      ignoredCount,
+      errorsCount,
     });
   } catch (error) {
     console.error('AI Auto Discovery error', error);
+    await prisma.radarRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'FAILED',
+        finishedAt: new Date(),
+        summaryLog: { error: error instanceof Error ? error.message : 'Unknown error' },
+      },
+    }).catch(() => null);
+
     return NextResponse.json({ error: 'Automatické vyhledávání selhalo.' }, { status: 500 });
   }
 }

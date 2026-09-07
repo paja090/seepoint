@@ -96,6 +96,7 @@ export type OfferView = {
   items: OfferItemView[];
   charges: OfferChargeView[];
   navigation?: {
+    city?: string | null;
     targetName: string;
     targetAddress?: string | null;
     targetLatitude: number;

@@ -6,6 +6,15 @@ export type OpportunityScoreReason = {
   reason: string;
 };
 
+export type OpportunityScoreBreakdown = {
+  trigger: number;
+  customerFit: number;
+  timing: number;
+  geo: number;
+  mediaFit: number;
+  evidence: number;
+};
+
 export type CampaignPhase = {
   phase: 'TEASER' | 'OPENING' | 'FOLLOW_UP';
   name: string;
@@ -21,8 +30,8 @@ export type CreateOpportunityInput = {
   eventType?: OpportunityEventType;
   title: string;
   summary: string;
-  city: string;
-  region?: string;
+  city?: string | null;
+  region?: string | null;
   address?: string;
   latitude?: number;
   longitude?: number;
@@ -34,6 +43,13 @@ export type CreateOpportunityInput = {
   suggestedCampaignPhases?: CampaignPhase[];
   clientId?: string;
   assignedToUserId?: string;
+  radarSignalId?: string | null;
+  scoreTrigger?: number | null;
+  scoreCustomerFit?: number | null;
+  scoreTiming?: number | null;
+  scoreGeo?: number | null;
+  scoreMediaFit?: number | null;
+  scoreEvidence?: number | null;
 };
 
 export type OpportunityFilterParams = {
@@ -47,4 +63,18 @@ export type OpportunityFilterParams = {
   assignedToUserId?: string;
   take?: number;
   skip?: number;
+};
+
+export type OrganizationRadarProfileData = {
+  id?: string;
+  organizationId: string;
+  enabled: boolean;
+  targetRegions: string[];
+  targetCities: string[];
+  focusEventTypes: string[];
+  preferredMediaTypes: string[];
+  customKeywords: string[];
+  customRssSources: string[];
+  minScoreThreshold: number;
+  scoringWeights?: Record<string, number> | null;
 };

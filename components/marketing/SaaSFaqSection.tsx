@@ -1,47 +1,43 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 export function SaaSFaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   const faqs = [
     {
-      q: 'Pro koho je SeePoint OS určen?',
-      a: 'SeePoint OS je navržen pro provozovatele OOH médií (vlastníky billboardů, citylightů, laviček, towerů, navigací), reklamní agentury i obchodní a instalační týmy, kteří potřebují mít přehled o obsazenosti a realizacích v jednom systému.',
+      q: 'Pro koho je SeePoint OS?',
+      a: 'SeePoint OS je navržen pro provozovatele OOH médií (vlastníky billboardů, citylightů, laviček, towerů, navigací VO), reklamní agentury, obchodní týmy i montážníky v terénu, kteří potřebují mít přehled o obsazenosti, nabídkách a realizacích v jednom systému.',
     },
     {
-      q: 'Je systém pouze pro billboardy?',
-      a: 'Ne. Systém podporuje všechny typy venkovní reklamy: Billboardy, Bigboardy, City Postery (CLP vitríny), Reklamní lavičky, Promo Towery, Navigační desky na sloupech VO i speciální městská média.',
+      q: 'Lze převést naše data z Excelu?',
+      a: 'Ano. Pomůžeme vám převést vaše stávající data nosičů, adresy, GPS souřadnice, technické parametry i kontakty na klienty bez nutnosti začínat od nuly.',
     },
     {
-      q: 'Lze převést současná data z Excelu?',
-      a: 'Ano. Součástí našeho asistovaného onboarding procesu je bezpečný import nosičů, adres, GPS souřadnic i klientů z vašich stávajících tabulek a databází.',
+      q: 'Musíme mít data ve stejném formátu?',
+      a: 'Nemusíte. Data nemusí přesně kopírovat naši šablonu. V rámci asistovaného importu vám pomůžeme upravit a napárovat vaše současné tabulky a soubory do struktury SeePoint OS.',
     },
     {
-      q: 'Funguje systém na telefonu v terénu?',
-      a: 'Ano. SeePoint OS obsahuje mobilní rozhraní přizpůsobené pro montážníky a techniky. Umožňuje 1-klikové spustění GPS navigace k nosiči, zobrazení výkazu a přímé nahrání fotodokumentace z mobilu.',
+      q: 'Jak dlouho trvá nasazení?',
+      a: 'Základní spuštění systému s naimportovanou sítí nosičů a přístupy pro tým obvykle trvá jen několik pracovních dnů. Celý proces probíhá s naší asistencí.',
     },
     {
-      q: 'Jak funguje fotodokumentace?',
-      a: 'Montážník nahraje fotografii přímo u nosiče ze svého telefonu. Systém ji automaticky zkomprimuje, přiřadí k příslušné kampani a nosiči a zpřístupní ji v klientském protokolu.',
+      q: 'Funguje systém na mobilu?',
+      a: 'Ano. Systém obsahuje optimalizované mobilní rozhraní pro montážníky a techniky v terénu. Umožňuje 1-klikové spuštění GPS navigace k nosiči, zobrazení pracovního úkolu i nahrání fotodokumentace před a po instalaci.',
     },
     {
-      q: 'Obsahuje SeePoint OS AI funkce?',
-      a: 'Ano. Systém obsahuje AI Sales Radar pro vyhledávání regionálních obchodních příležitostí a AI Generátor nabídek, který podle zadání v přirozené řeči vybere nejvhodnější příjezdové trasy mimo dálnice a památkové zóny.',
+      q: 'Jak fungují nabídky a obsazenost?',
+      a: 'Obchodník vidí volné plochy v reálném čase pro zvolený termín kampaně. Vybrané nosiče vloží do nabídky a systém vygeneruje reprezentativní prezentaci s mapou a fotkami dostupnou přes bezpečný veřejný klientský odkaz.',
     },
     {
-      q: 'Musíme měnit svůj současný způsob práce?',
-      a: 'Nemusíte. SeePoint OS se přizpůsobí vašim stávajícím procesům. Můžete začít pouhou evidencí nosičů a postupně zapojovat generátor nabídek, klientské odkazy či terénní výkazy.',
+      q: 'Můžeme nejprve vidět demo?',
+      a: 'Určitě. Rádi vám systém předvedeme na reálném workflow venkovní reklamy nebo vám připravíme ukázku na vašich vlastních 20 nosičích. Stačí kliknout na tlačítko "Domluvit ukázku".',
     },
     {
-      q: 'Jak probíhá nasazení systému?',
-      a: 'Nasazení probíhá ve 4 krocích: 1. Převedení vašich dat, 2. Nastavení firemního prostředí a ceníků, 3. Pozvání vašeho týmu, 4. Spuštění provozu. Vše s naší asistencí.',
-    },
-    {
-      q: 'Můžeme systém nejdříve vidět na ukázce?',
-      a: 'Určitě. Rádi vám systém předvedeme na reálném workflow venkovní reklamy a projde s vámi možnosti převodu vašich procesů. Stačí kliknout na "Domluvit ukázku".',
+      q: 'Jak jsou zabezpečena naše data?',
+      a: 'Systém využívá přísné oddělení organizací (multi-tenancy), propracované řízení přístupových rolí (RBAC), auditní protokolování změn v rezervacích a šifrovanou komunikaci přes HTTPS.',
     },
   ];
 
@@ -50,8 +46,8 @@ export function SaaSFaqSection() {
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
         <div className="text-center space-y-3">
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">
-            ČASTÉ OTÁZKY A ODPOVĚDI
+          <span className="text-xs font-black uppercase tracking-wider text-purple-400">
+            ČASTÉ DOTAZY A ODPOVĚDI
           </span>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
             Vše, co potřebujete vědět.
@@ -62,7 +58,7 @@ export function SaaSFaqSection() {
         </div>
 
         {/* Accordion List */}
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {faqs.map((faq, index) => {
             const isOpen = openIndex === index;
             return (
@@ -79,7 +75,7 @@ export function SaaSFaqSection() {
                   onClick={() => setOpenIndex(isOpen ? null : index)}
                   className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 cursor-pointer"
                 >
-                  <strong className="text-sm sm:text-base font-bold text-white">{faq.q}</strong>
+                  <strong className="text-base sm:text-lg font-bold text-white">{faq.q}</strong>
                   <ChevronDown
                     className={`w-5 h-5 text-purple-400 shrink-0 transition-transform duration-200 ${
                       isOpen ? 'rotate-180' : ''
@@ -88,7 +84,7 @@ export function SaaSFaqSection() {
                 </button>
 
                 {isOpen && (
-                  <div className="px-5 pb-6 sm:px-6 sm:pb-6 text-xs sm:text-sm text-slate-300 font-medium leading-relaxed border-t border-slate-800/60 pt-4">
+                  <div className="px-5 pb-6 sm:px-6 sm:pb-6 text-sm sm:text-base text-slate-200 font-medium leading-relaxed border-t border-slate-800/60 pt-4">
                     {faq.a}
                   </div>
                 )}

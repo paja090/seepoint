@@ -3,27 +3,26 @@
 import { useState } from 'react';
 import { SaaSHeader } from './SaaSHeader';
 import { SaaSHero } from './SaaSHero';
-import { SaaSSegmentsBar } from './SaaSSegmentsBar';
-import { SaaSProductShowcase } from './SaaSProductShowcase';
+import { SaaSAudienceStrip } from './SaaSAudienceStrip';
 import { SaaSProblemSolution } from './SaaSProblemSolution';
+import { SaaSProductVideoSection } from './SaaSProductVideoSection';
+import { SaaSProductShowcase } from './SaaSProductShowcase';
 import { SaaSBentoOverview } from './SaaSBentoOverview';
-import { SaaSRoiCalculator } from './SaaSRoiCalculator';
-import { SaaSMapSection } from './SaaSMapSection';
 import { SaaSWorkflowSection } from './SaaSWorkflowSection';
+import { SaaSProductOrigin } from './SaaSProductOrigin';
+import { SaaSCustomerReferences } from './SaaSCustomerReferences';
 import { SaaSAiSection } from './SaaSAiSection';
 import { SaaSFieldMobileSection } from './SaaSFieldMobileSection';
 import { SaaSNavigationSection } from './SaaSNavigationSection';
+import { SaaSRoiCalculator } from './SaaSRoiCalculator';
 import { SaaSNetworkSection } from './SaaSNetworkSection';
-import { SaaSTargetAudience } from './SaaSTargetAudience';
 import { SaaSOnboardingSection } from './SaaSOnboardingSection';
 import { SaaSIntegrationsSection } from './SaaSIntegrationsSection';
 import { SaaSSecuritySection } from './SaaSSecuritySection';
-import { SaaSProductOrigin } from './SaaSProductOrigin';
 import { SaaSPricingSection } from './SaaSPricingSection';
 import { SaaSFaqSection } from './SaaSFaqSection';
 import { SaaSFinalCta } from './SaaSFinalCta';
 import { SaaSDemoModal } from './SaaSDemoModal';
-import { SaaSLiveActivityToast } from './SaaSLiveActivityToast';
 import { SaaSFooter } from './SaaSFooter';
 
 export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
@@ -58,27 +57,64 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
       {/* Header */}
       <SaaSHeader onOpenDemoModal={openDemoModal} isLoggedIn={isLoggedIn} />
 
-      {/* Main Content Sections */}
+      {/* Main Content Sections in Optimized Logical Order */}
       <main>
+        {/* 1. Hero */}
         <SaaSHero onOpenDemoModal={openDemoModal} />
-        <SaaSSegmentsBar />
-        <SaaSProductShowcase />
+
+        {/* 2. Krátký „Pro koho“ trust strip */}
+        <SaaSAudienceStrip />
+
+        {/* 3. Excel vs SeePoint */}
         <SaaSProblemSolution />
+
+        {/* 4. Produktové video / připravený video placeholder */}
+        <SaaSProductVideoSection onOpenDemoModal={openDemoModal} />
+
+        {/* 5. Interaktivní produktová ukázka (5 klíčových modulů) */}
+        <SaaSProductShowcase />
+
+        {/* 6. Kompaktní hlavní přínosy */}
         <SaaSBentoOverview />
-        <SaaSRoiCalculator onOpenDemoModal={openDemoModal} />
-        <SaaSMapSection onOpenDemoModal={openDemoModal} />
+
+        {/* 7. Workflow proces */}
         <SaaSWorkflowSection />
+
+        {/* 8. Vznikl v reálném provozu */}
+        <SaaSProductOrigin />
+
+        {/* 9. Budoucí klientské reference (skryté, dokud nejsou reálná data) */}
+        <SaaSCustomerReferences />
+
+        {/* 10. SeePoint AI */}
         <SaaSAiSection onOpenDemoModal={openDemoModal} />
+
+        {/* 11. Mobilní aplikace pro terén */}
         <SaaSFieldMobileSection />
+
+        {/* 12. Navigace VO */}
         <SaaSNavigationSection onOpenDemoModal={openDemoModal} />
+
+        {/* 13. Orientační ROI kalkulačka */}
+        <SaaSRoiCalculator onOpenDemoModal={openDemoModal} />
+
+        {/* 14. SeePoint Network – prémiový teaser */}
         <SaaSNetworkSection onOpenDemoModal={openDemoModal} />
-        <SaaSTargetAudience onOpenDemoModal={openDemoModal} />
+
+        {/* 15. Migrace a asistovaný onboarding */}
         <SaaSOnboardingSection onOpenDemoModal={openDemoModal} />
+
+        {/* 16. Integrace & Důvěra/Bezpečnost */}
         <SaaSIntegrationsSection />
         <SaaSSecuritySection />
-        <SaaSProductOrigin />
+
+        {/* 17. Přehledný ceník */}
         <SaaSPricingSection onOpenDemoModal={openDemoModal} />
+
+        {/* 18. Časté dotazy (FAQ) */}
         <SaaSFaqSection />
+
+        {/* 19. Final CTA s lead magnetem na vlastní data */}
         <SaaSFinalCta onOpenDemoModal={openDemoModal} />
       </main>
 
@@ -87,9 +123,6 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
 
       {/* Demo Booking Modal */}
       <SaaSDemoModal isOpen={isDemoModalOpen} onClose={closeDemoModal} />
-
-      {/* Floating Live Activity Toast */}
-      <SaaSLiveActivityToast />
     </div>
   );
 }

@@ -43,7 +43,20 @@ type DraftPoint = {
   carrierId?: string | null;
 
   // New structured fields
-  arrowDirectionEnum: 'LEFT' | 'RIGHT' | 'STRAIGHT' | 'SLANTED_LEFT' | 'SLANTED_RIGHT' | 'U_TURN' | 'TWO_WAY';
+  arrowDirectionEnum:
+    | 'LEFT'
+    | 'RIGHT'
+    | 'STRAIGHT'
+    | 'SLANTED_LEFT'
+    | 'SLANTED_RIGHT'
+    | 'U_TURN'
+    | 'TWO_WAY'
+    | 'ROUNDABOUT_1'
+    | 'ROUNDABOUT_2'
+    | 'ROUNDABOUT_3'
+    | 'ROUNDABOUT_4'
+    | 'ROUNDABOUT_5'
+    | 'ROUNDABOUT';
   pillarNumber: string;
   pillarType: string;
   manualDistanceValue: string;
@@ -185,6 +198,32 @@ export function NavigationOfferForm({
         };
       }) ?? [],
   );
+
+  const initialNav = initialOffer?.navigation as unknown as Record<string, unknown> | undefined;
+  const detectedInitialCity: 'Ostrava' | 'Havířov' =
+    initialNav?.city === 'Havířov' ||
+    (targetAddress && targetAddress.toLowerCase().includes('havířov')) ||
+    (initialOffer?.title && initialOffer.title.toLowerCase().includes('havířov'))
+      ? 'Havířov'
+      : 'Ostrava';
+
+  const [city, setCity] = useState<'Ostrava' | 'Havířov'>(detectedInitialCity);
+
+  function handleCityChange(newCity: 'Ostrava' | 'Havířov') {
+    setCity(newCity);
+    const newDefaultVariant = newCity === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm';
+    setPoints((current) =>
+      current.map((p) => {
+        const isOldDefault =
+          !p.variant ||
+          p.variant === '670x900 mm' ||
+          p.variant === '670 × 900 mm' ||
+          p.variant === '120x80 cm' ||
+          p.variant.includes('půlkruh');
+        return isOldDefault ? { ...p, variant: newDefaultVariant } : p;
+      })
+    );
+  }
 
   const [mode, setMode] = useState<'target' | 'point'>(target ? 'point' : 'target');
   const [proposalMode, setProposalMode] = useState<'LOCATION_SELECTION' | 'PRICED_QUOTE'>(
@@ -500,7 +539,7 @@ export function NavigationOfferForm({
         longitude,
         address: address || '',
         navigationType: 'Směrová tabule',
-        variant: '670x900 mm',
+        variant: city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm',
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
@@ -538,7 +577,7 @@ export function NavigationOfferForm({
         longitude: lng,
         address: '',
         navigationType: 'Směrová tabule',
-        variant: '120x80 cm',
+        variant: city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm',
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
@@ -648,6 +687,7 @@ export function NavigationOfferForm({
       contactPerson: selectedClient?.contactPerson,
       contactEmail: selectedClient?.email,
       contactPhone: selectedClient?.phone,
+      city,
       targetName,
       targetAddress,
       targetLatitude: target.latitude,
@@ -735,6 +775,17 @@ export function NavigationOfferForm({
 
           <Field label="Název kampaně / prodejny">
             <input className="input" placeholder="Např. Navigace Koupelny Ostrava" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} />
+          </Field>
+
+          <Field label="Město navigačního systému">
+            <select
+              className="input font-bold text-sky-900 bg-sky-50/50 border-sky-300"
+              value={city}
+              onChange={(e) => handleCityChange(e.target.value as 'Ostrava' | 'Havířov')}
+            >
+              <option value="Ostrava">🏙️ Ostrava (standardní rozměr 670 × 900 mm)</option>
+              <option value="Havířov">🏙️ Havířov (atypický tvar s horním půlkruhem)</option>
+            </select>
           </Field>
 
           <Field label="Platnost nabídky do">
@@ -1283,6 +1334,12 @@ export function NavigationOfferForm({
                       <option value="SLANTED_RIGHT">↗ Šikmo vpravo (SLANTED_RIGHT)</option>
                       <option value="U_TURN">↩ Otočení (U_TURN)</option>
                       <option value="TWO_WAY">↔ Obousměrný (TWO_WAY)</option>
+                      <option value="ROUNDABOUT_1">🔄 Kruhový objezd – 1. výjezd (ROUNDABOUT_1)</option>
+                      <option value="ROUNDABOUT_2">🔄 Kruhový objezd – 2. výjezd (ROUNDABOUT_2)</option>
+                      <option value="ROUNDABOUT_3">🔄 Kruhový objezd – 3. výjezd (ROUNDABOUT_3)</option>
+                      <option value="ROUNDABOUT_4">🔄 Kruhový objezd – 4. výjezd (ROUNDABOUT_4)</option>
+                      <option value="ROUNDABOUT_5">🔄 Kruhový objezd – 5. výjezd (ROUNDABOUT_5)</option>
+                      <option value="ROUNDABOUT">🔄 Kruhový objezd – obecně (ROUNDABOUT)</option>
                     </select>
                   </div>
 
@@ -1299,7 +1356,32 @@ export function NavigationOfferForm({
                   </Field>
 
                   <Field label="Rozměr / varianta">
-                    <input className="input" value={point.variant} onChange={(e) => updatePoint(point.id, { variant: e.target.value })} />
+                    <div className="space-y-1.5">
+                      <input className="input" value={point.variant} onChange={(e) => updatePoint(point.id, { variant: e.target.value })} />
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          type="button"
+                          onClick={() => updatePoint(point.id, { variant: '670 × 900 mm' })}
+                          className="rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-sky-100 hover:border-sky-300"
+                        >
+                          670 × 900 mm (Ostrava)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updatePoint(point.id, { variant: 'Havířov – atyp s horním půlkruhem' })}
+                          className="rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-sky-100 hover:border-sky-300"
+                        >
+                          Havířov – půlkruh
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updatePoint(point.id, { variant: '120 × 80 cm' })}
+                          className="rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-sky-100 hover:border-sky-300"
+                        >
+                          120 × 80 cm
+                        </button>
+                      </div>
+                    </div>
                   </Field>
 
                   {/* Distance Source & Values */}

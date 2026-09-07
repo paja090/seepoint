@@ -8,7 +8,11 @@ export type SaaSAnalyticsEvent =
   | 'ai_section_viewed'
   | 'product_demo_clicked'
   | 'workflow_section_viewed'
-  | 'onboarding_section_viewed';
+  | 'onboarding_section_viewed'
+  | 'product_video_play'
+  | 'product_video_completed'
+  | 'product_video_cta_clicked'
+  | 'network_interest_clicked';
 
 export function trackSaaSEvent(eventName: SaaSAnalyticsEvent, properties?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;

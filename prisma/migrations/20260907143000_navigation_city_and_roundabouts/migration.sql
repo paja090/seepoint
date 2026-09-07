@@ -1,0 +1,10 @@
+-- AlterEnum
+ALTER TYPE "NavigationArrowDirection" ADD VALUE IF NOT EXISTS 'ROUNDABOUT_1';
+ALTER TYPE "NavigationArrowDirection" ADD VALUE IF NOT EXISTS 'ROUNDABOUT_2';
+ALTER TYPE "NavigationArrowDirection" ADD VALUE IF NOT EXISTS 'ROUNDABOUT_3';
+ALTER TYPE "NavigationArrowDirection" ADD VALUE IF NOT EXISTS 'ROUNDABOUT_4';
+ALTER TYPE "NavigationArrowDirection" ADD VALUE IF NOT EXISTS 'ROUNDABOUT_5';
+ALTER TYPE "NavigationArrowDirection" ADD VALUE IF NOT EXISTS 'ROUNDABOUT';
+
+-- AlterTable NavigationOffer
+ALTER TABLE "NavigationOffer" ADD COLUMN IF NOT EXISTS "city" TEXT NOT NULL DEFAULT 'Ostrava';

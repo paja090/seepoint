@@ -13,7 +13,7 @@ export type OpportunityItem = {
   eventType: OpportunityEventType;
   title: string;
   summary: string;
-  city: string;
+  city?: string | null;
   region?: string | null;
   address?: string | null;
   latitude?: number | null;
@@ -25,6 +25,12 @@ export type OpportunityItem = {
   sourcePublishedAt?: string | Date | null;
   opportunityScore: number;
   scoreReasons?: OpportunityScoreReason[] | unknown;
+  scoreTrigger?: number | null;
+  scoreCustomerFit?: number | null;
+  scoreTiming?: number | null;
+  scoreGeo?: number | null;
+  scoreMediaFit?: number | null;
+  scoreEvidence?: number | null;
   suggestedMediaTypes?: string[] | unknown;
   status: OpportunityStatus;
   clientId?: string | null;
@@ -174,7 +180,11 @@ export function OpportunityCard({
         <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-300 pt-1">
           <div className="flex items-center gap-1.5 text-sky-300">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
-            <span>{item.city}{item.address ? `, ${item.address}` : ''} ({item.region || 'MS kraj'})</span>
+            <span>
+              {item.city
+                ? `${item.city}${item.address ? `, ${item.address}` : ''}${item.region ? ` (${item.region})` : ''}`
+                : (item.region ? `Kraj: ${item.region}` : 'Lokalita neznámá / celorepubliková')}
+            </span>
           </div>
 
           <div className="flex items-center gap-1.5 text-amber-300">
