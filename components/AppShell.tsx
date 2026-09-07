@@ -59,6 +59,7 @@ const navGroups: NavGroup[] = [
       ['/import', '📥 Import dat', 'fileUp', 'import'],
       ['/settings', '⚙️ Nastavení systému', 'settings', 'settings'],
       ['/settings/company', '🏢 Nastavení firmy', 'settings', 'settings'],
+      ['/settings/email', '✉️ Firemní e-mail', 'mail', 'settings'],
       ['/settings/members', '👥 Uživatelé organizace', 'users', 'settings'],
       ['/settings/integrations', '🔌 Integrace', 'settings', 'settings'],
     ],
