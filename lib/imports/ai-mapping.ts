@@ -9,35 +9,41 @@ const KNOWN_COLUMN_PATTERNS: Array<{
   patterns: RegExp[];
   transform?: TransformRule;
 }> = [
-  { target: 'carrierCode', patterns: [/^(k[oó]d|č\.|č[ií]slo|id|k[oó]d\s*plochy|kod\s*nosi[cč]e|ozna[cč]en[ií])$/i, /carrier.*code/i] },
-  { target: 'structureCode', patterns: [/st[ož]z[aá]r/i, /sloup/i, /stoziar/i] },
-  { target: 'name', patterns: [/^(n[aá]zev|um[ií]st[eě]n[ií]|lokalita|popis\s*um[ií]st[eě]n[ií])$/i] },
-  { target: 'city', patterns: [/^(m[eě]sto|obec|obec\s*\/\s*m[eě]sto|m[eě]sto\s*obec)$/i, /city/i] },
-  { target: 'street', patterns: [/^(ulice|t[rř][ií]da)$/i, /street/i] },
-  { target: 'address', patterns: [/^(adresa|cel[aá]\s*adresa)$/i, /address/i] },
-  { target: 'locality', patterns: [/^(katastr|katastr[aá]ln[ií]\s*[uú]zem[ií]|m[eě]stsk[aá]\s*[cč][aá]st)$/i] },
-  { target: 'gpsCoordinates', patterns: [/^gps$/i, /sou[rř]adnice/i, /poloha\s*gps/i], transform: 'COORDINATES_SPLIT' },
+  // Specific multi-word or strong identifiers first:
+  { target: 'campaignName', patterns: [/kampa[nň]/i, /motiv/i] },
+  { target: 'clientName', patterns: [/inzerent/i, /klient/i, /z[aá]kazn[ií]k/i, /odb[eě]ratel/i] },
+  { target: 'contactPerson', patterns: [/kontakt/i, /jméno/i] },
+  { target: 'email', patterns: [/e-?mail/i, /po[sš]ta/i] },
+  { target: 'phone', patterns: [/telefon/i, /mobil/i, /\btel\b/i, /gsm/i] },
+  { target: 'companyId', patterns: [/\bi[cč]o\b/i, /\bi[cč]\b/i] },
+  { target: 'dic', patterns: [/\bdi[cč]\b/i] },
+  { target: 'gpsCoordinates', patterns: [/gps/i, /sou[rř]adnice/i, /poloha/i, /koordin/i], transform: 'COORDINATES_SPLIT' },
   { target: 'latitude', patterns: [/^(lat|latitude|[sš][ií][rř]ka|lan)$/i] },
   { target: 'longitude', patterns: [/^(lon|lng|longitude|d[eé]lka|lot)$/i] },
-  { target: 'type', patterns: [/^(typ|typ\s*nosi[cč]e|druh|kategorie)$/i] },
-  { target: 'mediaType', patterns: [/^(typ\s*reklamy|typ\s*m[eé]dia|form[aá]t)$/i] },
-  { target: 'surfaceName', patterns: [/^(plocha|strana|pozice|n[aá]zev\s*plochy)$/i] },
-  { target: 'sidePosition', patterns: [/^(strana\s*[ab]|pozice\s*[0-9])$/i] },
-  { target: 'companyId', patterns: [/^(i[cč]o|i[cč])$/i] },
-  { target: 'dic', patterns: [/^(di[cč])$/i] },
-  { target: 'clientName', patterns: [/^(klient|z[aá]kazn[ií]k|inzerent|kone[cč]n[yý]\s*z[aá]kazn[ií]k|odb[eě]ratel|firma)$/i] },
-  { target: 'campaignName', patterns: [/^(kampa[nň]|motiv|produkt|n[aá]zev\s*kampan[eě])$/i] },
-  { target: 'dateFrom', patterns: [/^(od|platnost\s*od|za[cč][aá]tek|podn[aá]jem\s*od|pron[aá]jem\s*od)$/i], transform: 'DATE_ISO' },
-  { target: 'dateTo', patterns: [/^(do|platnost\s*do|konec|podn[aá]jem\s*do|pron[aá]jem\s*do)$/i], transform: 'DATE_ISO' },
-  { target: 'price', patterns: [/^(cena|n[aá]jem|cena\s*za\s*m[eě]s[ií]c|částka)$/i], transform: 'CURRENCY_CZK' },
-  { target: 'rentalPrice', patterns: [/^(n[aá]jem|cena\s*n[aá]jmu)$/i], transform: 'CURRENCY_CZK' },
-  { target: 'productionPrice', patterns: [/^(v[yý]roba|instalace|tisk|mont[aá][zž])$/i], transform: 'CURRENCY_CZK' },
-  { target: 'photoUrl', patterns: [/^(foto|fotografie|odkaz\s*na\s*foto|photo|image|url\s*fotky)$/i] },
-  { target: 'size', patterns: [/^(rozm[eě]r|rozm[eě]ry|velikost)$/i] },
-  { target: 'note', patterns: [/^(pozn[aá]mka|pozn|intern[ií]\s*pozn[aá]mka)$/i] },
+  { target: 'dateFrom', patterns: [/\bod\b/i, /za[cč][aá]tek/i, /platnost\s*od/i, /podn[aá]jem\s*od/i, /datum\s*od/i], transform: 'DATE_ISO' },
+  { target: 'dateTo', patterns: [/\bdo\b/i, /konec/i, /platnost\s*do/i, /podn[aá]jem\s*do/i, /datum\s*do/i], transform: 'DATE_ISO' },
+  { target: 'rentalPrice', patterns: [/z[aá]kladn[ií]\s*m[eě]s[ií][cč]n[ií]\s*n[aá]jem/i, /n[aá]jem/i], transform: 'CURRENCY_CZK' },
+  { target: 'productionPrice', patterns: [/v[yý]lep/i, /instalace/i, /v[yý]roba/i, /mont[aá][zž]/i], transform: 'CURRENCY_CZK' },
+  { target: 'printPrice', patterns: [/tisk/i, /banner/i, /plak[aá]t/i], transform: 'CURRENCY_CZK' },
+  { target: 'price', patterns: [/cena\s*\/\s*m[eě]s[ií]c/i, /cena/i, /cenn?[ií]k/i, /[cč][aá]stka/i], transform: 'CURRENCY_CZK' },
+  { target: 'dimensions', patterns: [/rozm[eě]r/i, /velikost/i, /dimensions/i, /size/i] },
+  { target: 'lighting', patterns: [/osv[eě]tlen/i, /sv[eě]tlo/i, /led/i, /lighting/i], transform: 'BOOLEAN_CZECH' },
+  { target: 'carrierType', patterns: [/typ\s*m[eé]dia/i, /typ\s*nosi[cč]e/i, /typ\s*form[aá]tu/i, /kategorie/i, /form[aá]t/i] },
+  { target: 'carrierCode', patterns: [/eviden[cč]n[ií]/i, /k[oó]d.*nosi[cč]/i, /k[oó]d.*form[aá]t/i, /k[oó]d\s*plochy/i, /\b(k[oó]d|č\.|č[ií]slo|id)\b/i] },
+  { target: 'structureCode', patterns: [/st[ož]z[aá]r/i, /sloup/i, /stoziar/i] },
+  { target: 'city', patterns: [/m[eě]sto/i, /obec/i, /city/i] },
+  { target: 'street', patterns: [/ulice/i, /t[rř][ií]da/i, /street/i] },
+  { target: 'address', patterns: [/adresa/i, /um[ií]st[eě]n[ií]/i] },
+  { target: 'locality', patterns: [/katastr/i, /m[eě]stsk[aá]\s*[cč][aá]st/i] },
+  { target: 'name', patterns: [/n[aá]zev/i, /lokalit/i, /popis/i] },
+  { target: 'surfaceName', patterns: [/\b(plocha|strana|pozice)\b/i] },
+  { target: 'sidePosition', patterns: [/strana\s*[ab]/i, /pozice\s*[0-9]/i] },
+  { target: 'photoUrl', patterns: [/foto/i, /image/i, /photo/i, /obr[aá]zek/i] },
+  { target: 'status', patterns: [/stav/i] },
+  { target: 'note', patterns: [/pozn[aá]mk/i, /info/i] },
 ];
 
-function ruleBasedColumnMatch(
+export function ruleBasedColumnMatch(
   header: string,
   sampleValues: string[]
 ): { targetField: string; confidence: number; transformation?: TransformRule } | null {
@@ -57,12 +63,12 @@ function ruleBasedColumnMatch(
   // Check sample value heuristics:
   // Is it coordinates? e.g. "49.832, 18.291"
   if (sampleValues.some((v) => /^\d{2}\.\d+[\s,;]+\d{2}\.\d+$/.test(v.trim()))) {
-    return { targetField: 'gpsCoordinates', confidence: 0.9, transformation: 'COORDINATES_SPLIT' };
+    return { targetField: 'gpsCoordinates', confidence: 0.95, transformation: 'COORDINATES_SPLIT' };
   }
 
   // Is it IČO? e.g. 8 digits
   if (sampleValues.some((v) => /^\d{8}$/.test(v.trim()))) {
-    return { targetField: 'companyId', confidence: 0.85, transformation: 'NONE' };
+    return { targetField: 'companyId', confidence: 0.9, transformation: 'NONE' };
   }
 
   // Is it photo url?
@@ -80,29 +86,46 @@ export function classifySheetRuleBased(
   const normName = normalizeText(sheetName);
   const normHeaders = headers.map(normalizeText);
 
+  // 1. PRICES
   if (normName.includes('cen') || normName.includes('price')) {
     return { classification: 'PRICES', confidence: 0.95 };
   }
+  // 2. CLIENTS
+  if (
+    normName.includes('klient') ||
+    normName.includes('inzerent') ||
+    normName.includes('zakaznik') ||
+    normName.includes('client') ||
+    normHeaders.some((h) => /\bi[cč]o\b/i.test(h))
+  ) {
+    return { classification: 'CLIENTS', confidence: 0.95 };
+  }
+  // 3. OCCUPANCY
+  if (
+    normName.includes('obsazen') ||
+    normName.includes('kampan') ||
+    normName.includes('rezervac') ||
+    (normHeaders.some((h) => h.includes('od')) && normHeaders.some((h) => h.includes('do')) && !normHeaders.some((h) => h.includes('gps')))
+  ) {
+    return { classification: 'OCCUPANCY', confidence: 0.95 };
+  }
+  // 4. NAVIGATION
   if (normName.includes('navig') || normHeaders.includes('stozar') || normHeaders.includes('sloup')) {
-    return { classification: 'NAVIGATION', confidence: 0.92 };
+    return { classification: 'NAVIGATION', confidence: 0.95 };
   }
-  if (normName.includes('klient') || normName.includes('zakaznik') || normName.includes('client')) {
-    return { classification: 'CLIENTS', confidence: 0.92 };
+  // 5. CARRIERS (Carrier sheet with location/carriers)
+  if (
+    normName.includes('nosic') ||
+    normHeaders.some((h) => h.includes('gps') || h.includes('lat') || h.includes('adresa') || h.includes('mesto') || h.includes('evid'))
+  ) {
+    return { classification: 'CARRIERS', confidence: 0.95 };
   }
-  if (normName.includes('obsazen') || normName.includes('kampan') || normName.includes('rezervac')) {
-    return { classification: 'OCCUPANCY', confidence: 0.9 };
-  }
-  if (normHeaders.some((h) => h.includes('podnajem') || h.includes('mesic') || h.includes('leden'))) {
-    return { classification: 'OCCUPANCY', confidence: 0.85 };
-  }
+  // 6. SURFACES
   if (normName.includes('plocha') || normName.includes('surface') || normHeaders.includes('rozmer')) {
-    return { classification: 'SURFACES', confidence: 0.85 };
-  }
-  if (normHeaders.some((h) => h.includes('gps') || h.includes('lat') || h.includes('adresa') || h.includes('mesto'))) {
-    return { classification: 'CARRIERS', confidence: 0.85 };
+    return { classification: 'SURFACES', confidence: 0.9 };
   }
 
-  return { classification: 'CARRIERS', confidence: 0.6 };
+  return { classification: 'CARRIERS', confidence: 0.7 };
 }
 
 /**
@@ -193,7 +216,7 @@ Vrať POUZE validní JSON v tomto přesném formátu bez markdownu:
 }`;
 
   try {
-    const model = process.env.GEMINI_OPPORTUNITY_MODEL?.trim() || 'gemini-2.5-flash';
+    const model = process.env.GEMINI_OPPORTUNITY_MODEL?.trim() || 'gemini-3.6-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
     const res = await fetch(url, {

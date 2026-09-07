@@ -223,9 +223,19 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
   };
 
   const currentSheet = sheets[activeSheetIdx];
-  const targetFieldOptions = currentSheet
+  const currentEntityFields = currentSheet
     ? TARGET_FIELDS_BY_ENTITY[currentSheet.classification] || TARGET_FIELDS_BY_ENTITY.CARRIERS
     : [];
+
+  // All known fields across all entities to ensure no valid field defaults to IGNORE
+  const allKnownFields = Object.entries(TARGET_FIELDS_BY_ENTITY).flatMap(([cat, fields]) =>
+    fields.map((f) => ({ ...f, category: cat }))
+  );
+  const otherFields = allKnownFields.filter(
+    (f, idx, arr) =>
+      !currentEntityFields.some((c) => c.field === f.field) &&
+      arr.findIndex((x) => x.field === f.field) === idx
+  );
 
   return (
     <div className="space-y-6">
@@ -309,6 +319,15 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                 className="hidden"
               />
             </label>
+            <div className="mt-3 text-center">
+              <a
+                href="/seepoint-vzor-importu-ooh.xlsx"
+                download="seepoint-vzor-importu-ooh.xlsx"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3.5 py-1.5 rounded-xl transition shadow-2xs"
+              >
+                <span>📥 Stáhnout vzorový testovací soubor OOH (.xlsx)</span>
+              </a>
+            </div>
           </div>
 
           {file && (
@@ -526,13 +545,28 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                           >
                             <option value="IGNORE">🚫 Ignorovat tento sloupec</option>
                             <option value="UNKNOWN">❓ Neznámé pole</option>
-                            <optgroup label="Cílová pole SeePointu">
-                              {targetFieldOptions.map((opt) => (
+                            <optgroup label={`Doporučená pole (${CLASSIFICATION_LABELS[currentSheet.classification]?.label || 'tento list'})`}>
+                              {currentEntityFields.map((opt) => (
                                 <option key={opt.field} value={opt.field}>
                                   {opt.label} ({opt.field})
                                 </option>
                               ))}
                             </optgroup>
+                            {otherFields.length > 0 && (
+                              <optgroup label="Ostatní pole SeePointu">
+                                {otherFields.map((opt) => (
+                                  <option key={`${opt.category}-${opt.field}`} value={opt.field}>
+                                    {opt.label} ({opt.field})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {mapping.targetField !== 'IGNORE' &&
+                              mapping.targetField !== 'UNKNOWN' &&
+                              !currentEntityFields.some((c) => c.field === mapping.targetField) &&
+                              !otherFields.some((o) => o.field === mapping.targetField) && (
+                                <option value={mapping.targetField}>{mapping.targetField}</option>
+                              )}
                           </select>
                         </td>
                         <td className="py-3.5 px-4">

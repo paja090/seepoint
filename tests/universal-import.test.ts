@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifySheetRuleBased, TARGET_FIELDS_BY_ENTITY } from '../lib/imports/ai-mapping.ts';
+import { classifySheetRuleBased, ruleBasedColumnMatch, TARGET_FIELDS_BY_ENTITY } from '../lib/imports/ai-mapping.ts';
+import { parseCarrierType, parseMediaType } from '../lib/imports/executor.ts';
 import { matchCarrier, matchClient } from '../lib/imports/matching.ts';
 import type { ExistingCarrierRecord, ExistingClientRecord } from '../lib/imports/matching.ts';
 import { checkSchemaDrift } from '../lib/imports/profile-service.ts';
@@ -146,4 +147,54 @@ test('9. cílová doménová pole: CARRIERS obsahuje carrierCode, city, latitude
   assert.ok(fields.includes('city'));
   assert.ok(fields.includes('latitude'));
   assert.ok(fields.includes('longitude'));
+});
+
+test('10. rule-based mapování správně rozpozná všech 10 sloupců vzorového listu OOH nosičů', () => {
+  const columns = [
+    { header: 'Evidenční kód', expected: 'carrierCode' },
+    { header: 'Název nosiče a lokality', expected: 'name' },
+    { header: 'Město', expected: 'city' },
+    { header: 'Adresa / Umístění', expected: 'address' },
+    { header: 'Typ média', expected: 'carrierType' },
+    { header: 'Rozměr', expected: 'dimensions' },
+    { header: 'Osvětlení', expected: 'lighting' },
+    { header: 'GPS souřadnice', expected: 'gpsCoordinates' },
+    { header: 'Cena / měsíc (Kč)', expected: 'price' },
+    { header: 'Poznámka', expected: 'note' },
+  ];
+
+  for (const col of columns) {
+    const match = ruleBasedColumnMatch(col.header, []);
+    assert.ok(match, `Sloupec "${col.header}" nebyl rozpoznán`);
+    assert.equal(match.targetField, col.expected, `Sloupec "${col.header}" měl být namapován na "${col.expected}", ale byl "${match?.targetField}"`);
+    assert.ok(match.confidence >= 0.9, `Confidence pro "${col.header}" je příliš nízká: ${match?.confidence}`);
+  }
+});
+
+test('11. sheet "Nosiče a reklamní plochy" je klasifikován jako CARRIERS i s obsahem ploch', () => {
+  const result = classifySheetRuleBased('Nosiče a reklamní plochy', [
+    'Evidenční kód',
+    'Název nosiče a lokality',
+    'Město',
+    'Adresa / Umístění',
+    'Typ média',
+    'Rozměr',
+    'Osvětlení',
+    'GPS souřadnice',
+    'Cena / měsíc (Kč)',
+  ]);
+  assert.equal(result.classification, 'CARRIERS');
+  assert.equal(result.confidence, 0.95);
+});
+
+test('12. parseCarrierType a parseMediaType normalizují české názvy na validní enumy', () => {
+  assert.equal(parseCarrierType('Billboard 5,1x2,4'), 'BILLBOARD');
+  assert.equal(parseCarrierType('Bigboard osvětlený'), 'BIGBOARD');
+  assert.equal(parseCarrierType('Citylight (CLV)'), 'CITYLIGHT');
+  assert.equal(parseCarrierType('LED obrazovka'), 'LED_SCREEN');
+  assert.equal(parseCarrierType('Navigační směrovka'), 'NAVIGATION');
+  assert.equal(parseCarrierType('Neznámý'), 'OTHER');
+
+  assert.equal(parseMediaType('Citylight (CLV)'), 'CITYLIGHT');
+  assert.equal(parseMediaType('Navigační směrovka'), 'NAVIGATION_SIGN');
 });

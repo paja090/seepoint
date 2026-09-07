@@ -2,6 +2,43 @@ import { prisma } from '@/lib/db';
 import { normalizeCode, normalizeText } from '@/lib/carriers-2026/normalize';
 import { saveOrUpdateProfile } from './profile-service';
 import type { ColumnMappingProposal, ConflictResolutionChoice, SheetClassificationType } from './types';
+import type { CarrierType, MediaType } from '@prisma/client';
+
+export function parseCarrierType(raw?: unknown): CarrierType {
+  if (!raw || typeof raw !== 'string') return 'OTHER';
+  const norm = raw.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (norm.includes('BILLBOARD')) return 'BILLBOARD';
+  if (norm.includes('BIGBOARD') || norm.includes('MEGABOARD')) return 'BIGBOARD';
+  if (norm.includes('CITYLIGHT') || norm.includes('CLV')) return 'CITYLIGHT';
+  if (norm.includes('LED') || norm.includes('OBRAZOV')) return 'LED_SCREEN';
+  if (norm.includes('BANNER') || norm.includes('PLACHTA')) return 'BANNER';
+  if (norm.includes('FASAD') || norm.includes('FACADE')) return 'FACADE';
+  if (norm.includes('LAVICK') || norm.includes('BENCH')) return 'PROMO_BENCH';
+  if (norm.includes('HORIZON')) return 'PROMO_HORIZON';
+  if (norm.includes('MINITOWER')) return 'PROMO_MINITOWER';
+  if (norm.includes('TOWER')) return 'PROMO_TOWER';
+  if (norm.includes('POSTER') || norm.includes('PLAKAT')) return 'CITY_POSTER';
+  if (norm.includes('NAVIG')) return 'NAVIGATION';
+  return 'OTHER';
+}
+
+export function parseMediaType(raw?: unknown): MediaType {
+  if (!raw || typeof raw !== 'string') return 'OTHER';
+  const norm = raw.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (norm.includes('BILLBOARD')) return 'BILLBOARD';
+  if (norm.includes('BIGBOARD') || norm.includes('MEGABOARD')) return 'BIGBOARD';
+  if (norm.includes('CITYLIGHT') || norm.includes('CLV')) return 'CITYLIGHT';
+  if (norm.includes('LED') || norm.includes('OBRAZOV')) return 'LED_SCREEN';
+  if (norm.includes('BANNER') || norm.includes('PLACHTA')) return 'BANNER';
+  if (norm.includes('FASAD') || norm.includes('FACADE')) return 'FACADE';
+  if (norm.includes('LAVICK') || norm.includes('BENCH')) return 'PROMO_BENCH';
+  if (norm.includes('HORIZON')) return 'PROMO_HORIZON';
+  if (norm.includes('MINITOWER')) return 'PROMO_MINITOWER';
+  if (norm.includes('TOWER')) return 'PROMO_TOWER';
+  if (norm.includes('POSTER') || norm.includes('PLAKAT')) return 'CITY_POSTER';
+  if (norm.includes('NAVIG')) return 'NAVIGATION_SIGN';
+  return 'OTHER';
+}
 
 export async function commitImportBatch(
   organizationId: string,
@@ -115,6 +152,12 @@ export async function commitImportBatch(
           const rawCode = mapped.carrierCode ? String(mapped.carrierCode) : `CARRIER_${row.rowNumber}`;
           const code = normalizeCode(rawCode);
           const sourceKey = `IMPORT:${organizationId}:CARRIER:${code}`;
+          const carrierType = parseCarrierType(mapped.carrierType || mapped.type || mapped.mediaType);
+          const mediaType = parseMediaType(mapped.mediaType || mapped.carrierType || mapped.type);
+          const surfaceSize = mapped.dimensions ? String(mapped.dimensions) : (mapped.size ? String(mapped.size) : null);
+          const surfacePrice = mapped.rentalPrice != null ? Number(mapped.rentalPrice) : (mapped.price != null ? Number(mapped.price) : null);
+          const lightingNote = mapped.lighting != null ? `Osvětlení: ${mapped.lighting ? 'Ano' : 'Ne'}` : null;
+          const surfaceNote = [lightingNote, mapped.note ? String(mapped.note) : null].filter(Boolean).join(', ') || null;
 
           if (action === 'CREATE') {
             const createdCarrier = await tx.advertisingCarrier.create({
@@ -128,15 +171,20 @@ export async function commitImportBatch(
                 locality: mapped.locality ? String(mapped.locality) : null,
                 latitude: typeof mapped.latitude === 'number' ? mapped.latitude : null,
                 longitude: typeof mapped.longitude === 'number' ? mapped.longitude : null,
-                type: 'OTHER',
+                type: carrierType,
                 structureCode: mapped.structureCode ? String(mapped.structureCode) : null,
                 sourceKey,
                 importBatchId: batch.id,
+                note: mapped.note ? String(mapped.note) : null,
+                placementDescription: mapped.address || mapped.locality ? String(mapped.address || mapped.locality) : null,
                 surfaces: {
                   create: {
                     organizationId,
                     name: mapped.surfaceName ? String(mapped.surfaceName) : 'Celý nosič',
-                    mediaType: 'OTHER',
+                    mediaType,
+                    size: surfaceSize,
+                    price: surfacePrice,
+                    note: surfaceNote,
                     sourceKey: `IMPORT:${organizationId}:SURFACE:${code}:1`,
                     importBatchId: batch.id,
                   },
@@ -154,6 +202,9 @@ export async function commitImportBatch(
             };
             if (mapped.name) updateData.name = String(mapped.name);
             if (mapped.street) updateData.street = String(mapped.street);
+            if (mapped.address) updateData.address = String(mapped.address);
+            if (mapped.city) updateData.city = String(mapped.city);
+            if (carrierType !== 'OTHER') updateData.type = carrierType;
             if (resolution === 'USE_IMPORT' && typeof mapped.latitude === 'number') {
               updateData.latitude = mapped.latitude;
               updateData.longitude = mapped.longitude;
