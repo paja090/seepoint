@@ -10,9 +10,34 @@ export type LogAIUsageInput = {
   promptTokens?: number;
   outputTokens?: number;
   imageCount?: number;
+  hasSearchGrounding?: boolean;
   costEstimateUsd?: number;
   metadata?: Record<string, unknown>;
 };
+
+/**
+ * Official Gemini 3.6 Flash pricing structure (Google AI Studio / Cloud rates):
+ * - Text prompt input: $0.10 per 1,000,000 tokens ($0.0001 / 1k tokens)
+ * - Text output: $0.40 per 1,000,000 tokens ($0.0004 / 1k tokens)
+ * - Image input: ~258 tokens per image
+ * - Web search grounding tool: baseline estimate ~$0.0025 per grounded query
+ */
+export function estimateGeminiFlashCostUsd({
+  promptTokens = 0,
+  outputTokens = 0,
+  imageCount = 0,
+  hasSearchGrounding = false,
+}: {
+  promptTokens?: number;
+  outputTokens?: number;
+  imageCount?: number;
+  hasSearchGrounding?: boolean;
+}): number {
+  const imageTokens = imageCount * 258;
+  const tokenCost = ((promptTokens + imageTokens) * 0.0000001) + (outputTokens * 0.0000004);
+  const groundingCost = hasSearchGrounding ? 0.0025 : 0;
+  return Number((tokenCost + groundingCost).toFixed(6));
+}
 
 /**
  * Log AI feature usage per organization for billing, quotas and usage analytics.
@@ -25,10 +50,15 @@ export async function logAIUsage({
   promptTokens = 0,
   outputTokens = 0,
   imageCount = 0,
-  costEstimateUsd = 0.001,
+  hasSearchGrounding = false,
+  costEstimateUsd,
   metadata,
 }: LogAIUsageInput) {
   try {
+    const effectiveCostUsd = typeof costEstimateUsd === 'number' && costEstimateUsd >= 0
+      ? costEstimateUsd
+      : estimateGeminiFlashCostUsd({ promptTokens, outputTokens, imageCount, hasSearchGrounding });
+
     const db = platformPrisma as unknown as {
       aIUsageLog?: {
         create: (args: Record<string, unknown>) => Promise<{ id: string }>;
@@ -45,12 +75,12 @@ export async function logAIUsage({
           promptTokens,
           outputTokens,
           imageCount,
-          costEstimateUsd,
+          costEstimateUsd: effectiveCostUsd,
           metadata: metadata ? JSON.stringify(metadata) : null,
         },
       });
     } else {
-      console.log('[AI Usage Log]', { organizationId, feature, costEstimateUsd, metadata });
+      console.log('[AI Usage Log]', { organizationId, feature, costEstimateUsd: effectiveCostUsd, metadata });
     }
   } catch (err) {
     console.warn('[AI Usage Log Error] Failed to write usage log:', err);
