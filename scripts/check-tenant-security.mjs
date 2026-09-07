@@ -85,6 +85,8 @@ const API_ROUTE_EXCEPTIONS = new Set([
   'app/api/proposals/[token]/route.ts',
   'app/api/proposals/[token]/salesperson-photo/route.ts',
   'app/api/proposals/[token]/selection/route.ts',
+  // Public Resend webhook receiver verifies Svix cryptographic signature
+  'app/api/webhooks/resend/route.ts',
 ]);
 
 const DIRECT_GUARD_PATTERN = /\b(?:requireApiAccess|getCurrentUser|requireOrganization|requireOrganizationMember|requireOrganizationRole|requireSuperAdmin|enterTenantContext|requireTenantContext)\s*\(/;

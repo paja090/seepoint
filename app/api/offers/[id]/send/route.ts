@@ -67,6 +67,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         ? new URL(`/api/proposals/${encodeURIComponent(delivery.token)}/salesperson-photo`, request.url).toString()
         : null,
       idempotencyKey: `offer/${id}/${delivery.offer.sentAt ? new Date(delivery.offer.sentAt).getTime() : 'first'}`,
+      organizationId: auth.organizationId || undefined,
+      metadata: { offerId: id, campaignName: delivery.offer.campaignName },
     });
     if (emailDelivery.status === 'skipped') {
       return NextResponse.json({
