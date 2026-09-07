@@ -18,8 +18,8 @@ const KNOWN_COLUMN_PATTERNS: Array<{
   { target: 'companyId', patterns: [/\bi[cč]o\b/i, /\bi[cč]\b/i] },
   { target: 'dic', patterns: [/\bdi[cč]\b/i] },
   { target: 'gpsCoordinates', patterns: [/gps/i, /sou[rř]adnice/i, /poloha/i, /koordin/i], transform: 'COORDINATES_SPLIT' },
-  { target: 'latitude', patterns: [/^(lat|latitude|[sš][ií][rř]ka|lan)$/i] },
-  { target: 'longitude', patterns: [/^(lon|lng|longitude|d[eé]lka|lot)$/i] },
+  { target: 'latitude', patterns: [/lat/i, /zem[eě]pisn[aá]\s*[sš][ií][rř]ka/i, /\b[sš][ií][rř]ka\b/i] },
+  { target: 'longitude', patterns: [/l[on]g/i, /zem[eě]pisn[aá]\s*d[eé]lka/i, /\bd[eé]lka\b/i] },
   { target: 'dateFrom', patterns: [/\bod\b/i, /za[cč][aá]tek/i, /platnost\s*od/i, /podn[aá]jem\s*od/i, /datum\s*od/i], transform: 'DATE_ISO' },
   { target: 'dateTo', patterns: [/\bdo\b/i, /konec/i, /platnost\s*do/i, /podn[aá]jem\s*do/i, /datum\s*do/i], transform: 'DATE_ISO' },
   { target: 'rentalPrice', patterns: [/z[aá]kladn[ií]\s*m[eě]s[ií][cč]n[ií]\s*n[aá]jem/i, /n[aá]jem/i], transform: 'CURRENCY_CZK' },
@@ -105,7 +105,9 @@ export function classifySheetRuleBased(
     normName.includes('obsazen') ||
     normName.includes('kampan') ||
     normName.includes('rezervac') ||
-    (normHeaders.some((h) => h.includes('od')) && normHeaders.some((h) => h.includes('do')) && !normHeaders.some((h) => h.includes('gps')))
+    (normHeaders.some((h) => /\b(od|platnost\s*od|datum\s*od)\b/i.test(h)) &&
+      normHeaders.some((h) => /\b(do|platnost\s*do|datum\s*do)\b/i.test(h)) &&
+      !normHeaders.some((h) => h.includes('gps') || h.includes('lat') || h.includes('sirka')))
   ) {
     return { classification: 'OCCUPANCY', confidence: 0.95 };
   }
@@ -116,7 +118,19 @@ export function classifySheetRuleBased(
   // 5. CARRIERS (Carrier sheet with location/carriers)
   if (
     normName.includes('nosic') ||
-    normHeaders.some((h) => h.includes('gps') || h.includes('lat') || h.includes('adresa') || h.includes('mesto') || h.includes('evid'))
+    normName.includes('billboard') ||
+    normName.includes('outdoor') ||
+    normName.includes('reklam') ||
+    normHeaders.some((h) =>
+      h.includes('gps') ||
+      h.includes('lat') ||
+      h.includes('sirka') ||
+      h.includes('adresa') ||
+      h.includes('mesto') ||
+      h.includes('obec') ||
+      h.includes('evid') ||
+      h.includes('lokalit')
+    )
   ) {
     return { classification: 'CARRIERS', confidence: 0.95 };
   }

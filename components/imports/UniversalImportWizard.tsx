@@ -320,13 +320,20 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                 className="hidden"
               />
             </label>
-            <div className="mt-3 text-center">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <a
                 href="/seepoint-vzor-importu-ooh.xlsx"
                 download="seepoint-vzor-importu-ooh.xlsx"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-3.5 py-1.5 rounded-xl transition shadow-2xs"
               >
-                <span>📥 Stáhnout vzorový testovací soubor OOH (.xlsx)</span>
+                <span>📥 Vzor 1: Standardní OOH (.xlsx)</span>
+              </a>
+              <a
+                href="/seepoint-alternativni-vzor-ooh.xlsx"
+                download="seepoint-alternativni-vzor-ooh.xlsx"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3.5 py-1.5 rounded-xl transition shadow-2xs"
+              >
+                <span>📥 Vzor 2: Alternativní struktura (.xlsx)</span>
               </a>
             </div>
           </div>

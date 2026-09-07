@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { classifySheetRuleBased, ruleBasedColumnMatch, TARGET_FIELDS_BY_ENTITY } from '../lib/imports/ai-mapping.ts';
@@ -209,4 +211,40 @@ test('13. resilientní mapování rozpozná clientName a ceníkové názvy bez c
   const matchFormatCol = ruleBasedColumnMatch('Kód formátu', []);
   assert.ok(['carrierCode', 'code'].includes(matchFormatCol?.targetField || ''));
 });
+
+test('14. alternativní testovací soubor (seepoint-alternativni-vzor-ooh.xlsx) je kompletně a správně klasifikován a namapován', async () => {
+  const filePath = path.join(process.cwd(), 'public', 'seepoint-alternativni-vzor-ooh.xlsx');
+  const buffer = await readFile(filePath);
+  const parsed = await parseUploadedWorkbook(buffer, 'seepoint-alternativni-vzor-ooh.xlsx');
+
+  assert.equal(parsed.sheets.length, 4);
+
+  // Sheet 1: CARRIERS
+  const s1 = parsed.sheets[0];
+  assert.equal(classifySheetRuleBased(s1.name, s1.headers).classification, 'CARRIERS');
+  const s1Mappings = s1.headers.map((h) => ({ header: h, match: ruleBasedColumnMatch(h, []) }));
+  assert.equal(s1Mappings.find((m) => m.header === 'Kód plochy')?.match?.targetField, 'carrierCode');
+  assert.equal(s1Mappings.find((m) => m.header === 'Lokalita')?.match?.targetField, 'name');
+  assert.equal(s1Mappings.find((m) => m.header === 'Obec')?.match?.targetField, 'city');
+  assert.equal(s1Mappings.find((m) => m.header === 'Kategorie nosiče')?.match?.targetField, 'carrierType');
+  assert.equal(s1Mappings.find((m) => m.header === 'Velikost (š x v)')?.match?.targetField, 'dimensions');
+  assert.equal(s1Mappings.find((m) => m.header === 'Světlo')?.match?.targetField, 'lighting');
+  assert.equal(s1Mappings.find((m) => m.header === 'Zeměpisná šířka')?.match?.targetField, 'latitude');
+  assert.equal(s1Mappings.find((m) => m.header === 'Zeměpisná délka')?.match?.targetField, 'longitude');
+  assert.equal(s1Mappings.find((m) => m.header === 'Cena bez DPH')?.match?.targetField, 'price');
+  assert.equal(s1Mappings.find((m) => m.header === 'Doplňující info')?.match?.targetField, 'note');
+
+  // Sheet 2: CLIENTS
+  const s2 = parsed.sheets[1];
+  assert.equal(classifySheetRuleBased(s2.name, s2.headers).classification, 'CLIENTS');
+
+  // Sheet 3: PRICES
+  const s3 = parsed.sheets[2];
+  assert.equal(classifySheetRuleBased(s3.name, s3.headers).classification, 'PRICES');
+
+  // Sheet 4: OCCUPANCY
+  const s4 = parsed.sheets[3];
+  assert.equal(classifySheetRuleBased(s4.name, s4.headers).classification, 'OCCUPANCY');
+});
+
 
