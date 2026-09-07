@@ -102,7 +102,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
           contents: [{ parts: [{ text: prompt }] }],
           tools: [{ googleSearch: {} }],
         }),
-        signal: AbortSignal.timeout(55_000),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (resp.ok) {
