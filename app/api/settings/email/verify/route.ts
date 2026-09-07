@@ -36,6 +36,10 @@ export async function POST(request: Request) {
     },
     async () => {
       try {
+        const body = await request.json().catch(() => ({}));
+        const rawResendApiKey = typeof body?.resendApiKey === 'string' ? body.resendApiKey : undefined;
+        const cleanResendApiKey = rawResendApiKey?.trim().replace(/^["']|["']$/g, '');
+
         const settings = await prisma.organizationEmailSettings.findUnique({
           where: { organizationId: user.organizationId },
         });
@@ -48,7 +52,7 @@ export async function POST(request: Request) {
         }
 
         // Call Resend verify
-        const verifiedDomain = await verifyResendDomain(settings.providerDomainId);
+        const verifiedDomain = await verifyResendDomain(settings.providerDomainId, cleanResendApiKey);
         const isVerified = verifiedDomain.status === 'verified';
 
         let encryptedKey: string | null = settings.encryptedSendingApiKey;
@@ -56,7 +60,7 @@ export async function POST(request: Request) {
         // If verified and we don't have a domain-scoped key yet, create and encrypt one
         if (isVerified && !encryptedKey) {
           try {
-            const keyResponse = await createDomainSendingKey(settings.providerDomainId, settings.domain);
+            const keyResponse = await createDomainSendingKey(settings.providerDomainId, settings.domain, cleanResendApiKey);
             if (keyResponse.token) {
               encryptedKey = encryptTenantCredential(keyResponse.token);
             }

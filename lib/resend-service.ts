@@ -27,20 +27,23 @@ export type ResendApiKeyResponse = {
   token: string;
 };
 
-function getManagementApiKey(): string {
+function getManagementApiKey(customApiKey?: string): string {
+  const cleanCustom = customApiKey?.trim().replace(/^["']|["']$/g, '');
+  if (cleanCustom) return cleanCustom;
+
   const key = process.env.RESEND_API_KEY?.trim().replace(/^["']|["']$/g, '');
   if (!key) {
-    throw new Error('Chybí RESEND_API_KEY. Nastavte jej v systémových proměnných prostředí.');
+    throw new Error('Chybí RESEND_API_KEY. Nastavte jej ve Vercelu nebo jej zadejte do formuláře níže.');
   }
   return key;
 }
 
 function formatResendError(rawMessage: string): string {
   if (/restricted to only send emails/i.test(rawMessage)) {
-    return 'Váš RESEND_API_KEY ve Vercelu má oprávnění pouze pro odesílání ("Sending access"). Pro automatickou registraci a správu firemních domén musí mít klíč v Resendu oprávnění "Full access". Vytvořte v Resendu nový API klíč s "Full access" a aktualizujte proměnnou RESEND_API_KEY ve Vercelu.';
+    return 'Váš RESEND_API_KEY má oprávnění pouze pro odesílání ("Sending access"). Pro automatickou registraci a správu firemních domén musí mít klíč v Resendu oprávnění "Full access".';
   }
   if (/api key.*invalid/i.test(rawMessage) || /unauthorized/i.test(rawMessage)) {
-    return 'Zadaný RESEND_API_KEY je neplatný nebo byl zneplatněn. Zkontrolujte prosím hodnotu proměnné prostředí ve Vercelu.';
+    return 'Zadaný RESEND_API_KEY je neplatný nebo byl zneplatněn. Zkontrolujte prosím hodnotu proměnné prostředí ve Vercelu, případně můžete klíč vložit přímo do pole ve formuláři níže.';
   }
   return rawMessage;
 }
@@ -50,13 +53,13 @@ function formatResendError(rawMessage: string): string {
  * Returns the domain details including DNS records (SPF, DKIM, MX).
  * If the domain already exists in the Resend account, seamlessly loads and returns its records.
  */
-export async function registerResendDomain(domain: string): Promise<ResendDomainResponse> {
+export async function registerResendDomain(domain: string, customApiKey?: string): Promise<ResendDomainResponse> {
   const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   if (!cleanDomain || !cleanDomain.includes('.') || cleanDomain.length > 120) {
     throw new Error('Neplatný název domény.');
   }
 
-  const apiKey = getManagementApiKey();
+  const apiKey = getManagementApiKey(customApiKey);
   const res = await fetch(`${RESEND_API_BASE}/domains`, {
     method: 'POST',
     headers: {
@@ -81,7 +84,7 @@ export async function registerResendDomain(domain: string): Promise<ResendDomain
           (d) => d.name.toLowerCase() === cleanDomain
         );
         if (existing) {
-          return await getResendDomain(existing.id);
+          return await getResendDomain(existing.id, apiKey);
         }
       } catch (lookupErr) {
         console.warn('[resend] Fallback lookup for existing domain failed:', lookupErr);
@@ -99,10 +102,10 @@ export async function registerResendDomain(domain: string): Promise<ResendDomain
 /**
  * Triggers Resend to re-verify DNS records for a registered domain.
  */
-export async function verifyResendDomain(domainId: string): Promise<ResendDomainResponse> {
+export async function verifyResendDomain(domainId: string, customApiKey?: string): Promise<ResendDomainResponse> {
   if (!domainId) throw new Error('Chybí ID domény pro ověření.');
 
-  const apiKey = getManagementApiKey();
+  const apiKey = getManagementApiKey(customApiKey);
   const res = await fetch(`${RESEND_API_BASE}/domains/${encodeURIComponent(domainId)}/verify`, {
     method: 'POST',
     headers: {
@@ -125,10 +128,10 @@ export async function verifyResendDomain(domainId: string): Promise<ResendDomain
 /**
  * Fetches current domain details and DNS status from Resend.
  */
-export async function getResendDomain(domainId: string): Promise<ResendDomainResponse> {
+export async function getResendDomain(domainId: string, customApiKey?: string): Promise<ResendDomainResponse> {
   if (!domainId) throw new Error('Chybí ID domény.');
 
-  const apiKey = getManagementApiKey();
+  const apiKey = getManagementApiKey(customApiKey);
   const res = await fetch(`${RESEND_API_BASE}/domains/${encodeURIComponent(domainId)}`, {
     method: 'GET',
     headers: {
@@ -149,10 +152,10 @@ export async function getResendDomain(domainId: string): Promise<ResendDomainRes
 /**
  * Creates a domain-scoped sending API key restricted exclusively to sending from this domain.
  */
-export async function createDomainSendingKey(domainId: string, domainName: string): Promise<ResendApiKeyResponse> {
+export async function createDomainSendingKey(domainId: string, domainName: string, customApiKey?: string): Promise<ResendApiKeyResponse> {
   if (!domainId) throw new Error('Chybí ID domény pro vytvoření sending klíče.');
 
-  const apiKey = getManagementApiKey();
+  const apiKey = getManagementApiKey(customApiKey);
   const res = await fetch(`${RESEND_API_BASE}/api-keys`, {
     method: 'POST',
     headers: {
