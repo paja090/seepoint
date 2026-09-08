@@ -294,3 +294,9 @@ Tato práce aplikaci do produkce nenasazuje.
 ## Aktualizace před otevřením PR
 
 Před odesláním větve byl zapracován také main `d237773` (#311, zachování a obnova DNS záznamů), merge `2d18c08`. Tři dotčené soubory zachovávají tenant-scoped načítání a zápis. Cílená regresní sada Resend + current-main-security: 13 testů, 13 passed, 0 failed. Úplné výsledky 453 testů / 10 DB / 3 E2E výše odpovídají předchozímu ověřenému buildu nad 7f1e98f; úplné ověření posledního merge zajistí CI v PR. Produkční nasazení zůstává samostatný krok.
+
+## Reconciliation s PR #313 a #314
+
+Zapracován main `577a980` včetně editace odesílatele / obnovy DNS (#313) a klientské komprese fotografií / HEIC handling (#314). Zachována runtime validace DNS; nový PATCH odesílatele navíc validuje adresy a nevrací šifrovaný provider klíč. Fotografie nezavádějí persistentní offline frontu.
+
+Lokální ověření výsledného merge: 470/470 testů, tenant security check a typecheck PASS; lint PASS, 0 errors, 386 warnings. Dřívější výsledky 10 DB / 3 browser E2E se tímto nepřepisují. CI na předchozím head c69656a prošlo včetně buildu (run 34193693574); build nového merge musí potvrdit následující CI.

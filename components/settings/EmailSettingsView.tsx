@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Mail,
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Info,
+  Edit3,
 } from 'lucide-react';
 
 type DnsRecord = {
@@ -70,6 +71,12 @@ export function EmailSettingsView({
   const [replyToInput, setReplyToInput] = useState(initialSettings?.replyTo || '');
   const [apiKeyInput, setApiKeyInput] = useState('');
 
+  const [isEditingSender, setIsEditingSender] = useState(false);
+  const [editSenderName, setEditSenderName] = useState(initialSettings?.senderName || '');
+  const [editFromEmail, setEditFromEmail] = useState(initialSettings?.fromEmail || '');
+  const [editReplyTo, setEditReplyTo] = useState(initialSettings?.replyTo || '');
+  const [savingSender, setSavingSender] = useState(false);
+
   const [connecting, setConnecting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -78,10 +85,62 @@ export function EmailSettingsView({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error' | 'info'; text: string } | null>(null);
 
+  // Auto-heal: If settings exist but dnsRecords are missing, fetch them
+  useEffect(() => {
+    if (settings && (!settings.dnsRecords || settings.dnsRecords.length === 0)) {
+      fetch('/api/settings/email')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.settings?.dnsRecords && data.settings.dnsRecords.length > 0) {
+            setSettings(data.settings);
+          }
+        })
+        .catch(() => null);
+    }
+  }, [settings]);
+
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleSaveSender = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFeedback(null);
+    setSavingSender(true);
+
+    try {
+      const res = await fetch('/api/settings/email', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderName: editSenderName,
+          fromEmail: editFromEmail,
+          replyTo: editReplyTo,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Uložení selhalo.');
+
+      setSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              senderName: data.settings.senderName,
+              fromEmail: data.settings.fromEmail,
+              replyTo: data.settings.replyTo,
+            }
+          : null
+      );
+      setIsEditingSender(false);
+      setFeedback({ kind: 'success', text: data.message || 'Nastavení odesílatele bylo uloženo.' });
+    } catch (err) {
+      setFeedback({ kind: 'error', text: err instanceof Error ? err.message : 'Chyba při ukládání.' });
+    } finally {
+      setSavingSender(false);
+    }
   };
 
   const handleConnect = async (e: React.FormEvent) => {
@@ -197,6 +256,35 @@ export function EmailSettingsView({
   const isVerified = settings?.status === 'VERIFIED';
   const isPending = settings?.status === 'PENDING' || settings?.status === 'NOT_STARTED';
 
+  const displayRecords: DnsRecord[] =
+    settings?.dnsRecords && settings.dnsRecords.length > 0
+      ? settings.dnsRecords
+      : [
+          {
+            record: 'DKIM',
+            name: 'resend._domainkey',
+            type: 'TXT',
+            value:
+              'p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDARpY1L3gbU+jz92bV5pA1y8rM6tIc/5FpMYXbnXJLn+hZ1RTp2CepYYLyD/sfMMUuJPZUcaXI8XMQ4ykiaqz8MgXM6m+5Ey+DpTU8bwGObIphz7s9wM7mk7RzWQOeGQeFsj8VaXM6GXK3imCy3prBYraETStJdYCZyq3Nn+tH9QIDAQAB',
+            status: settings?.status === 'VERIFIED' ? 'verified' : 'pending',
+          },
+          {
+            record: 'SPF',
+            name: 'send',
+            type: 'MX',
+            value: 'feedback-smtp.us-east-1.amazonses.com',
+            status: settings?.status === 'VERIFIED' ? 'verified' : 'pending',
+            priority: 10,
+          },
+          {
+            record: 'SPF',
+            name: 'send',
+            type: 'TXT',
+            value: 'v=spf1 include:amazonses.com ~all',
+            status: settings?.status === 'VERIFIED' ? 'verified' : 'pending',
+          },
+        ];
+
   return (
     <div className="space-y-8">
       {/* Feedback Banner */}
@@ -258,16 +346,96 @@ export function EmailSettingsView({
                     )}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Odesílatel: <span className="text-slate-200 font-semibold">{settings.senderName}</span> &lt;
-                  {settings.fromEmail}&gt;
-                  {settings.replyTo && (
-                    <span>
-                      {' '}
-                      • Reply-To: <span className="text-slate-200">{settings.replyTo}</span>
-                    </span>
-                  )}
-                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <p className="text-xs text-slate-400">
+                    Odesílatel: <span className="text-slate-200 font-semibold">{settings.senderName}</span> &lt;
+                    {settings.fromEmail}&gt;
+                    {settings.replyTo && (
+                      <span>
+                        {' '}
+                        • Reply-To: <span className="text-slate-200">{settings.replyTo}</span>
+                      </span>
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditSenderName(settings.senderName);
+                      setEditFromEmail(settings.fromEmail);
+                      setEditReplyTo(settings.replyTo || '');
+                      setIsEditingSender(!isEditingSender);
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] text-purple-400 hover:text-purple-300 transition underline underline-offset-2 ml-1"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    <span>{isEditingSender ? 'Zavřít úpravu' : 'Změnit odesílatele / Reply-To'}</span>
+                  </button>
+                </div>
+
+                {isEditingSender && (
+                  <form
+                    onSubmit={handleSaveSender}
+                    className="mt-3 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3"
+                  >
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Změna odesílatele a adres pro odpověď
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          Jméno odesílatele (From Name)
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={editSenderName}
+                          onChange={(e) => setEditSenderName(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          E-mail odesílatele (From Email)
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={editFromEmail}
+                          onChange={(e) => setEditFromEmail(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                          Odpovědět komu (Reply-To)
+                        </label>
+                        <input
+                          type="email"
+                          value={editReplyTo}
+                          onChange={(e) => setEditReplyTo(e.target.value)}
+                          placeholder="např. obchod@seepoint.cz"
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingSender(false)}
+                        className="px-3 py-1 rounded-lg text-xs text-slate-400 hover:text-white transition"
+                      >
+                        Zrušit
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingSender}
+                        className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition disabled:opacity-50"
+                      >
+                        {savingSender ? 'Ukládám...' : 'Uložit změny odesílatele'}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
 

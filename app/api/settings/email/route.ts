@@ -1,3 +1,4 @@
+import { isValidEmailAddress } from '@/lib/email-policy';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
@@ -147,6 +148,76 @@ export async function DELETE() {
       });
 
       return NextResponse.json({ success: true, message: 'Doména byla úspěšně odpojena.' });
+    }
+  );
+}
+
+/**
+ * PATCH /api/settings/email
+ * Updates senderName, fromEmail, and replyTo without having to re-verify domain.
+ */
+export async function PATCH(request: Request) {
+  const user = await requireApiAccess('settings');
+  if (isApiDenied(user)) return user;
+  if (user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Upravit e-mail může pouze administrátor.' }, { status: 403 });
+  }
+
+  return runWithTenantContext(
+    {
+      organizationId: user.organizationId,
+      userId: user.id,
+      source: 'session',
+    },
+    async () => {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const rawSenderName = typeof body?.senderName === 'string' ? body.senderName.trim() : undefined;
+        const rawFromEmail = typeof body?.fromEmail === 'string' ? body.fromEmail.trim().toLowerCase() : undefined;
+        const rawReplyTo = typeof body?.replyTo === 'string' ? body.replyTo.trim().toLowerCase() : undefined;
+
+        if ((rawSenderName && rawSenderName.length > 80)
+          || (rawFromEmail && !isValidEmailAddress(rawFromEmail))
+          || (rawReplyTo && !isValidEmailAddress(rawReplyTo))) {
+          return NextResponse.json({ error: 'Zadejte platné jméno odesílatele a e-mailové adresy.' }, { status: 400 });
+        }
+        const settings = await prisma.organizationEmailSettings.findUnique({
+          where: { organizationId: user.organizationId },
+        });
+
+        if (!settings) {
+          return NextResponse.json({ error: 'Organizace nemá nastavenou žádnou doménu.' }, { status: 404 });
+        }
+
+        if (rawFromEmail && !rawFromEmail.endsWith(`@${settings.domain}`)) {
+          return NextResponse.json(
+            { error: `E-mail odesílatele (${rawFromEmail}) musí patřit k doméně (@${settings.domain}).` },
+            { status: 400 }
+          );
+        }
+
+        const updated = await prisma.organizationEmailSettings.update({
+          omit: { encryptedSendingApiKey: true },
+          where: { id: settings.id },
+          data: {
+            senderName: rawSenderName || settings.senderName,
+            fromEmail: rawFromEmail || settings.fromEmail,
+            replyTo: rawReplyTo !== undefined ? (rawReplyTo || null) : settings.replyTo,
+          },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Nastavení odesílatele bylo uloženo.',
+          settings: updated,
+        });
+      } catch (err) {
+        console.error('[email-patch] Error updating settings:', err);
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : 'Uložení nastavení selhalo.' },
+          { status: 500 }
+        );
+      }
     }
   );
 }

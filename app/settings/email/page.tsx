@@ -43,18 +43,58 @@ export default async function EmailSettingsPage() {
     }),
   ]);
 
-  const serializedSettings = settings
+  let currentSettings = settings;
+
+  // Auto-heal: If domain exists in provider but local records were cleared or empty, fetch them from Resend
+  if (
+    currentSettings?.providerDomainId &&
+    (!currentSettings.dnsRecords ||
+      (Array.isArray(currentSettings.dnsRecords) && currentSettings.dnsRecords.length === 0))
+  ) {
+    try {
+      const { getResendDomain } = await import('@/lib/resend-service');
+      const resendData = await getResendDomain(currentSettings.providerDomainId);
+      if (resendData.records && resendData.records.length > 0) {
+        const healed = await prisma.organizationEmailSettings.update({
+          where: { id: currentSettings.id },
+          data: {
+            dnsRecords: resendData.records as unknown as object,
+            status: resendData.status === 'verified' ? 'VERIFIED' : currentSettings.status,
+          },
+          select: {
+            id: true,
+            domain: true,
+            senderName: true,
+            fromEmail: true,
+            replyTo: true,
+            providerDomainId: true,
+            status: true,
+            dnsRecords: true,
+            lastVerifiedAt: true,
+            lastTestedAt: true,
+            createdAt: true,
+          },
+        });
+        currentSettings = healed;
+      }
+    } catch (healErr) {
+      console.warn('[email-settings-page] Auto-heal DNS records failed:', healErr);
+    }
+  }
+
+  const serializedSettings = currentSettings
     ? {
-        ...settings,
-        dnsRecords: Array.isArray(settings.dnsRecords) ? settings.dnsRecords.flatMap(record => {
+        ...currentSettings,
+        dnsRecords: Array.isArray(currentSettings.dnsRecords) ? currentSettings.dnsRecords.flatMap(record => {
           if (!record || typeof record !== 'object' || Array.isArray(record)) return [];
           if (typeof record.record !== 'string' || typeof record.name !== 'string' || typeof record.type !== 'string' || typeof record.value !== 'string' || typeof record.status !== 'string') return [];
           return [{ record: record.record, name: record.name, type: record.type, value: record.value, status: record.status,
             priority: typeof record.priority === 'number' ? record.priority : undefined, ttl: typeof record.ttl === 'string' ? record.ttl : undefined }];
         }) : null,
-        lastVerifiedAt: settings.lastVerifiedAt?.toISOString() || null,
-        lastTestedAt: settings.lastTestedAt?.toISOString() || null,
-        createdAt: settings.createdAt.toISOString(),
+        lastVerifiedAt: currentSettings.lastVerifiedAt?.toISOString() || null,
+        lastTestedAt: currentSettings.lastTestedAt?.toISOString() || null,
+        createdAt: currentSettings.createdAt.toISOString(),
+
       }
     : null;
 

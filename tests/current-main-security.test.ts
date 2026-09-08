@@ -49,3 +49,14 @@ test('radar notifications honor disabled SaaS module', () => {
   assert.match(runner, /await logAIUsage/);
   assert.match(runner, /usageEstimated: true, costEstimated: true/);
  });
+
+ test('sender editing retains tenant scope and does not expose encrypted sending credentials', () => {
+  const route = source('app/api/settings/email/route.ts').split('export async function PATCH')[1];
+  assert.ok(route);
+  assert.match(route, /requireApiAccess\('settings'\)/);
+  assert.match(route, /user.role !== 'ADMIN'/);
+  assert.match(route, /organizationId: user.organizationId/);
+  assert.match(route, /isValidEmailAddress\(rawFromEmail\)/);
+  assert.match(route, /isValidEmailAddress\(rawReplyTo\)/);
+  assert.match(route, /omit: \{ encryptedSendingApiKey: true \}/);
+ });
