@@ -170,7 +170,12 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const isDelivered = printStatus === 'DELIVERED_TO_WAREHOUSE';
   const isInstalling = verifiedCount > 0 && verifiedCount < totalUnits;
   const isInstalled = verifiedCount === totalUnits && totalUnits > 0;
-  const isPhotographed = realization ? realization.photographed > 0 : (isNavigation ? navPoints.some((p) => Boolean(p.installedPhotoUrl || p.visualizedPhotoUrl)) : isInstalled);
+  const isPhotographed = realization
+    ? realization.photographed > 0
+    : (isNavigation ? navPoints.some((p) => Boolean(p.installedPhotoUrl)) : isInstalled);
+  const isFullyPhotographed = isNavigation
+    ? (navPoints.length > 0 && navPoints.every((p) => Boolean(p.installedPhotoUrl)))
+    : isInstalled;
   const isCompleted = realization ? realization.completed === realization.total && realization.total > 0 : isInstalled;
 
   type StepStatus = 'done' | 'active' | 'pending';
@@ -191,8 +196,17 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     { icon: <ShieldCheck className="h-4 w-4" />, label: 'Inženýring VO', sublabel: 'Správa sítě a vytyčení', status: isInstalled || isInstalling ? 'done' : isApproved ? 'active' : 'pending' },
     { icon: <Printer className="h-4 w-4" />, label: 'Výroba DIBOND 3 mm', sublabel: isDelivered || isInstalling || isInstalled ? 'Panely vyrobeny' : isPrinting ? 'Ve výrobě' : undefined, status: isDelivered || isInstalling || isInstalled ? 'done' : isPrinting ? 'active' : 'pending' },
     { icon: <MapPin className="h-4 w-4" />, label: 'Montáž na sloupech', sublabel: isInstalled ? `${verifiedCount}/${totalUnits} osazeno (Bandimex)` : isInstalling ? `${verifiedCount}/${totalUnits} probíhá` : undefined, status: isInstalled ? 'done' : isInstalling ? 'active' : 'pending' },
-    { icon: <Camera className="h-4 w-4" />, label: 'Pasport & Foto', sublabel: isPhotographed ? 'Fotodokumentace připravena' : undefined, status: isCompleted ? 'done' : isPhotographed ? 'active' : 'pending' },
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Předání a dohled', sublabel: 'Záruční servis a pasport', status: isCompleted ? 'done' : 'pending' },
+    {
+      icon: <Camera className="h-4 w-4" />,
+      label: 'Pasport & Foto',
+      sublabel: isFullyPhotographed
+        ? 'Fotodokumentace hotova'
+        : isPhotographed
+          ? `${installedNavPoints.length}/${totalUnits} vyfoceno`
+          : 'Čeká na montáž v terénu',
+      status: isFullyPhotographed ? 'done' : isPhotographed ? 'active' : 'pending',
+    },
+    { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Předání a dohled', sublabel: isCompleted && isFullyPhotographed ? 'Záruční servis aktivní' : 'Záruční servis a pasport', status: isCompleted && isFullyPhotographed ? 'done' : 'pending' },
   ];
 
   const steps = isNavigation ? navigationSteps : standardSteps;
@@ -546,15 +560,36 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
               <div>
                 <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  Fotodokumentace a Pasportizace bodů
+                  {installedNavPoints.length > 0 ? (
+                    <>
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      Fotodokumentace realizace (Proof of Play)
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-5 w-5 text-sky-600" />
+                      Grafické vizualizace a pasport návrhu
+                    </>
+                  )}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Reálné kontrolní fotografie z terénu a schválené grafické vizualizace na sloupech VO.
+                  {installedNavPoints.length > 0
+                    ? 'Reálné kontrolní fotografie pořízené montážní četou přímo po osazení na sloupech VO v terénu.'
+                    : 'Grafické vizualizace z návrhu nabídky a zaměření sloupů VO. Ostré fotografie hotové montáže (Proof of Play) se zde zobrazí ihned po realizaci v terénu.'}
                 </p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 border ${verifiedCount === totalUnits ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-sky-50 text-sky-800 border-sky-200'}`}>
-                {verifiedCount === totalUnits ? 'Všechny body osazeny' : `${verifiedCount} z ${totalUnits} osazeno`}
+              <span className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 border ${
+                installedNavPoints.length === totalUnits && totalUnits > 0
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : installedNavPoints.length > 0
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}>
+                {installedNavPoints.length === totalUnits && totalUnits > 0
+                  ? 'Všechny body osazeny'
+                  : installedNavPoints.length > 0
+                    ? `${installedNavPoints.length} z ${totalUnits} osazeno`
+                    : 'Čeká na montáž v terénu (zatím návrh)'}
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -839,9 +874,18 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
               <img src={selectedPhoto.url} alt={selectedPhoto.title} className="max-h-[65vh] w-auto object-contain rounded-xl shadow-lg" />
             </div>
             <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-              <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                <CheckCircle2 className="h-4 w-4" />
-                {isNavigation ? 'Fotografie z pasportizace terénu' : 'Fotografie ověřena z terénu'}
+              <span className="flex items-center gap-1.5 font-bold">
+                {selectedPhoto.isInstallation ? (
+                  <span className="flex items-center gap-1.5 text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Fotografie ověřena z terénu po montáži (Proof of Play)
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-sky-400">
+                    <Compass className="h-4 w-4" />
+                    Grafická vizualizace / zaměření z návrhu nabídky
+                  </span>
+                )}
               </span>
               <a
                 href={selectedPhoto.url}
