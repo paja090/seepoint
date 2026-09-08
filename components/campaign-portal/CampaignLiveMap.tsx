@@ -20,6 +20,7 @@ export interface NavigationMapPointInput {
   visualizedPhotoUrl?: string | null;
   sitePhotoUrl?: string | null;
   installedPhotoUrl?: string | null;
+  navigationType?: string | null;
 }
 
 export interface NavigationTargetInput {
