@@ -106,6 +106,8 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const agencyName = branding?.name || 'SeePOINT';
   const realization = offer.realizationSummary;
 
+  const strategy = offer.campaignStrategy as { dateFrom?: string; dateTo?: string } | null | undefined;
+
   const validDates = items
     .map((item) => ({ from: item.dateFrom ? new Date(item.dateFrom) : null, to: item.dateTo ? new Date(item.dateTo) : null }))
     .filter((d) => d.from && d.to);
@@ -115,7 +117,17 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   let campaignDays = 0;
   let daysRemaining = 0;
 
-  if (validDates.length > 0) {
+  if (strategy?.dateFrom && strategy?.dateTo) {
+    const from = new Date(strategy.dateFrom);
+    const to = new Date(strategy.dateTo);
+    if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+      startDateStr = from.toLocaleDateString('cs-CZ');
+      endDateStr = to.toLocaleDateString('cs-CZ');
+      const today = new Date();
+      campaignDays = Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)));
+      daysRemaining = Math.max(0, Math.ceil((to.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+  } else if (validDates.length > 0) {
     const minDate = new Date(Math.min(...validDates.map((d) => d.from!.getTime())));
     const maxDate = new Date(Math.max(...validDates.map((d) => d.to!.getTime())));
     startDateStr = minDate.toLocaleDateString('cs-CZ');

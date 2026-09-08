@@ -348,6 +348,18 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <div className="mt-1 text-xs text-sky-400 font-semibold">📍 Google Maps Routes API</div>
             </div>
 
+            {offer.campaignStrategy?.dateFrom && offer.campaignStrategy?.dateTo ? (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 backdrop-blur-xs min-w-[200px]">
+                <div className="text-xs font-bold text-slate-400">Termín kampaně</div>
+                <div className="mt-1 text-base font-black text-white">
+                  {new Date(offer.campaignStrategy.dateFrom as string).toLocaleDateString('cs-CZ')} – {new Date(offer.campaignStrategy.dateTo as string).toLocaleDateString('cs-CZ')}
+                </div>
+                <div className="mt-1 text-xs text-emerald-400 font-semibold">
+                  ⏱️ {Math.max(1, Math.round((new Date(offer.campaignStrategy.dateTo as string).getTime() - new Date(offer.campaignStrategy.dateFrom as string).getTime()) / 86400000))} dní kampaně
+                </div>
+              </div>
+            ) : null}
+
             {effectiveProposalKey && showOfferPdf ? <a
               href={`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/pdf`}
               target="_blank"
@@ -687,29 +699,86 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Column: Premium Interactive Graphic Artwork Frame (7 Cols) */}
           <div className="lg:col-span-7 flex flex-col items-center">
-            {isHavirov && !(typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl) ? (
-              <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-2xl">
-                  🏛️
+            {!((typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl)) ? (
+              isHavirov ? (
+                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-2xl">
+                    🏛️
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-white text-base">Navigační systém – statutární město Havířov</h4>
+                    <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                      V Havířově se využívá schválený formát panelu s horním půlkruhem (dle pasportu města Havířov). Finální grafický náhled na míru s Vaším logem a směrovými šipkami bude zpracován naším grafikem a zaslán klientovi ke schválení před výrobou.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-950/60 border border-indigo-700/50 px-3.5 py-1.5 text-xs font-bold text-indigo-300">
+                      <span>📐</span> Atypický formát s horním půlkruhem
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
+                      <span>✨</span> Grafická korektura před tiskem
+                    </span>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <h4 className="font-bold text-white text-base">Navigační systém – město Havířov</h4>
-                  <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                    V Havířově se využívá schválený formát panelu s horním půlkruhem. Standardní šablona pro Ostravu se zde nezobrazuje. Finální grafický náhled na míru bude zpracován a zaslán klientovi ke schválení před výrobou.
-                  </p>
+              ) : isOstrava ? (
+                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-500/30 text-2xl">
+                    🏙️
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-white text-base">Navigační systém – statutární město Ostrava</h4>
+                    <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                      V Ostravě se využívá standardizovaný schválený formát panelu <strong>670 × 900 mm</strong> na sloupech veřejného osvětlení (ve správě Dopravního podniku Ostrava a Ostravských komunikací). Finální grafický náhled na míru (s Vaším logem, směrovou šipkou a kilometráží) připraví náš grafik a zašleme vám jej ke schválení před samotnou výrobou a instalací.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
+                      <span>📐</span> Schválený rozměr 670 × 900 mm
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-1.5 text-xs font-bold text-slate-300">
+                      <span>🏙️</span> Sloupy VO (DPO / Ostrava)
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
+                      <span>✨</span> Grafická korektura v ceně
+                    </span>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/50 transition cursor-pointer"
+                    >
+                      <span>👁️</span> Zobrazit technický nákres šablony panelu (670 × 900 mm)
+                    </button>
+                  </div>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-xl bg-indigo-950/60 border border-indigo-700/50 px-4 py-2 text-xs font-bold text-indigo-300">
-                  <span>📐</span> Atypický formát s horním půlkruhem
+              ) : (
+                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-500/30 text-2xl">
+                    📍
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-white text-base">Navigační systém – {targetCity || 'lokální značení'}</h4>
+                    <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                      V dané lokalitě se využívá standardní schválený formát navigačních panelů na sloupech VO dle místního pasportu. Finální grafický náhled na míru pro vás připraví grafik a zašleme ke schválení před výrobou.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
+                      <span>📐</span> Formát dle pasportu města
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
+                      <span>✨</span> Grafická korektura v ceně
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
               <div
                 className="group relative w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3 shadow-2xl transition duration-300 hover:border-sky-500/50 cursor-pointer"
                 onClick={() =>
                   setActiveLightboxImage(
-                    typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
-                      ? String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)
-                      : '/offer/navigation-proof-template.jpg'
+                    String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)
                   )
                 }
               >
@@ -720,9 +789,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
                     <span className="ml-2 font-mono text-[10px] text-slate-400 uppercase tracking-wider">
-                      {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl
-                        ? 'NÁHLED GRAFICKÉHO MOTIVU'
-                        : 'OFICIÁLNÍ ŠABLONA PANELU (670 × 900 MM)'}
+                      NÁHLED GRAFICKÉHO MOTIVU
                     </span>
                   </div>
                   <span className="text-sky-400 group-hover:underline flex items-center gap-1">
@@ -732,19 +799,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
                 {/* Artwork Image Container */}
                 <div className="relative flex min-h-[300px] w-full items-center justify-center rounded-xl bg-slate-900 p-2 shadow-inner overflow-hidden">
-                  {typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl ? (
-                    <img
-                      src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
-                      alt="Grafický motiv cedule"
-                      className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
-                    />
-                  ) : (
-                    <img
-                      src="/offer/navigation-proof-template.jpg"
-                      alt="Šablona navigačního panelu 670 × 900 mm"
-                      className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
-                    />
-                  )}
+                  <img
+                    src={String((navigation as unknown as Record<string, unknown>).graphicArtworkUrl)}
+                    alt="Grafický motiv cedule"
+                    className="max-h-[360px] w-full object-contain rounded-lg transition transform duration-300 group-hover:scale-[1.02]"
+                  />
 
                   {/* Hover overlay hint */}
                   <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center backdrop-blur-[2px]">
