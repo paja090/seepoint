@@ -291,3 +291,6 @@ Tato práce aplikaci do produkce nenasazuje.
 - Legacy odkazy vytvořené známým fallback secretem si kvůli požadované kompatibilitě zachovávají původní předvídatelnost. Nové odkazy toto riziko nemají; podezření na kompromitaci starého URL řeší výhradně explicitní auditovaný revoke, nikoli hromadná regenerace.
 - 389 lint warnings zůstává k postupnému odstranění. Automatické skladové pohyby a mezifiremní rezervace se nepřidávají.
 - Izolovaná Neon větev zůstává pro opakování testů, compute má autosuspend. Její odstranění není součástí této práce.
+## Aktualizace před otevřením PR
+
+Před odesláním větve byl zapracován také main `d237773` (#311, zachování a obnova DNS záznamů), merge `2d18c08`. Tři dotčené soubory zachovávají tenant-scoped načítání a zápis. Cílená regresní sada Resend + current-main-security: 13 testů, 13 passed, 0 failed. Úplné výsledky 453 testů / 10 DB / 3 E2E výše odpovídají předchozímu ověřenému buildu nad 7f1e98f; úplné ověření posledního merge zajistí CI v PR. Produkční nasazení zůstává samostatný krok.
