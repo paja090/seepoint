@@ -41,3 +41,7 @@ The shared checkout was advanced by other work. Hardening was restored from its 
 ## Kontrola aktuálního main 09adb77
 
 Zahrnuty nové Resend konfigurace a delivery webhook, cron obchodního radaru, AI limity a notifikace. OrganizationEmailSettings a EmailLog jsou tenant-owned. Ruční cron je omezen na aktivní organizaci a salesRadar; globální běh vyžaduje CRON_SECRET. Profil se načítá v tenant contextu. Webhook nejprve ověřuje podpis, pak rozpozná vlastníka přes platform klienta a zapisuje tenant-aware klientem. Opětovné použití Resend domény vyžaduje providerDomainId již vlastněné organizací. Unikátní indexy brání konkurenčnímu dvojímu přiřazení. Notifikace respektují vypnutý modul.
+
+## Poslední reconciliation: main 7f1e98f
+
+Zachováno nové UI zadání Resend API klíče. Systémový klíč může obnovit pouze domain ID již vlastněné tenantem. Explicitně dodaný klíč se ověřuje skutečným úspěšným seznamem domén u poskytovatele; DB unikátní indexy i v tomto režimu zakazují převod domény vlastněné jinou organizací. Žádný reálný klíč ani externí odeslání nebyly použity v testech. Doplněn regresní test této policy. Cron AI audit nyní používá NULL místo fiktivního user FK a čeká na dokončení logu; odhadované hodnoty jsou označeny v metadata. Závěrečná regresní sada: 453/453.

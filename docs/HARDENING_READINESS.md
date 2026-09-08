@@ -53,3 +53,7 @@ Unit tests use transaction doubles for failure injection; they are not proof of 
 ## Reconciliation with main 39fb532
 
 UniversalImportWizard and lib/imports now exist in main (upload/analyze/map/dry-run/commit/history, saved ImportProfile and batch rows). Preserve this implementation rather than following the initial baseline proposal as a new importer. Its newly added tenant models are now in the reviewed registry; import/radar backend routes are included in entitlement enforcement. Current main also updates Gemini model selection and saves reviewed AI enrichment into existing client, branch and contact records. These latest behaviors are retained. Vehicle notifications now derive STK, insurance and highway-pass deadlines from existing DateTime fields; no new service due date is invented from historical service records.
+
+## Závěrečné ověření nad 09adb77
+
+Dřívější omezení pouze mock transakcemi již neplatí pro Production: doplněno a úspěšně spuštěno 10 skutečných PostgreSQL kontrol v samostatné Neon testovací větvi včetně rollbacku a CRM/auditu. Podrobný aktuální výsledek je v HARDENING_REPORT.md. Pro offline mobilní zachování fotek, storage přesuny a celý instalační happy path toto ověření stále nestačí.
