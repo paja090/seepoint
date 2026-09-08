@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { deleteStoredPhoto } from '@/lib/storage/photo-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string; candidateId: string }> }
 ) {
+  let photoIdsToClean: string[] = [];
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
@@ -16,6 +18,9 @@ export async function PUT(
 
     const { candidateId } = await params;
     const body = await request.json();
+    if (Array.isArray(body?.photoIds)) {
+      photoIdsToClean = body.photoIds;
+    }
 
     const {
       surveyRouteId,
@@ -107,7 +112,7 @@ export async function PUT(
       });
 
       if (existingOfferPoint) {
-        const pointUpdateData: Record<string, any> = {
+        const pointUpdateData: Record<string, unknown> = {
           ...(label && { label: label.trim() }),
           ...(latitude && { latitude: parseFloat(latitude) }),
           ...(longitude && { longitude: parseFloat(longitude) }),
@@ -131,22 +136,26 @@ export async function PUT(
           data: pointUpdateData,
         });
 
-        let firstPhotoId: string | null = null;
         if (Array.isArray(photoIds) && photoIds.length > 0) {
           await prisma.photo.updateMany({
             where: { id: { in: photoIds } },
             data: {
-              surveyCandidatePointId: updatedPoint.id,
+              surveyNavigationPointId: updatedPoint.id,
               type: 'SURVEY',
             },
           });
           const firstPhoto = await prisma.photo.findFirst({ where: { id: { in: photoIds } } });
           if (firstPhoto) {
-            firstPhotoId = firstPhoto.id;
-            await prisma.navigationPoint.update({
-              where: { id: updatedPoint.id },
-              data: { sitePhotoId: firstPhoto.id },
+            const isOwnedByOther = await prisma.navigationPoint.findFirst({
+              where: { sitePhotoId: firstPhoto.id, id: { not: updatedPoint.id } },
+              select: { id: true },
             });
+            if (!isOwnedByOther) {
+              await prisma.navigationPoint.update({
+                where: { id: updatedPoint.id },
+                data: { sitePhotoId: firstPhoto.id },
+              });
+            }
           }
         }
 
@@ -161,7 +170,6 @@ export async function PUT(
               where: { id: matchingOrderPoint.id },
               data: {
                 ...pointUpdateData,
-                ...(firstPhotoId && { sitePhotoId: firstPhotoId }),
               },
             });
           }
@@ -178,7 +186,6 @@ export async function PUT(
               where: { id: matchingOfferPoint.id },
               data: {
                 ...pointUpdateData,
-                ...(firstPhotoId && { sitePhotoId: firstPhotoId }),
               },
             });
           }
@@ -244,6 +251,15 @@ export async function PUT(
 
     // Sync candidate point changes to converted NavigationPoint if already converted
     if (existingCandidate.convertedNavigationPointId) {
+      let canSetConvertedSitePhoto = false;
+      if (uploadedFirstPhotoId) {
+        const isOwnedByOther = await prisma.navigationPoint.findFirst({
+          where: { sitePhotoId: uploadedFirstPhotoId, id: { not: existingCandidate.convertedNavigationPointId } },
+          select: { id: true },
+        });
+        canSetConvertedSitePhoto = !isOwnedByOther;
+      }
+
       await prisma.navigationPoint.update({
         where: { id: existingCandidate.convertedNavigationPointId },
         data: {
@@ -261,7 +277,7 @@ export async function PUT(
           }),
           ...(pillarNumber !== undefined && { pillarNumber: pillarNumber?.trim() || null }),
           ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
-          ...(uploadedFirstPhotoId && { sitePhotoId: uploadedFirstPhotoId }),
+          ...(canSetConvertedSitePhoto && uploadedFirstPhotoId && { sitePhotoId: uploadedFirstPhotoId }),
         },
       });
     }
@@ -275,6 +291,15 @@ export async function PUT(
           p.label.toLowerCase() === (existingCandidate.label || '').toLowerCase()
       );
       if (matchingOfferPoint) {
+        let canSetOfferSitePhoto = false;
+        if (uploadedFirstPhotoId) {
+          const isOwnedByOther = await prisma.navigationPoint.findFirst({
+            where: { sitePhotoId: uploadedFirstPhotoId, id: { not: matchingOfferPoint.id } },
+            select: { id: true },
+          });
+          canSetOfferSitePhoto = !isOwnedByOther;
+        }
+
         await prisma.navigationPoint.update({
           where: { id: matchingOfferPoint.id },
           data: {
@@ -292,7 +317,7 @@ export async function PUT(
             }),
             ...(pillarNumber !== undefined && { pillarNumber: pillarNumber?.trim() || null }),
             ...(internalNote !== undefined && { internalNote: internalNote?.trim() || null }),
-            ...(uploadedFirstPhotoId && { sitePhotoId: uploadedFirstPhotoId }),
+            ...(canSetOfferSitePhoto && uploadedFirstPhotoId && { sitePhotoId: uploadedFirstPhotoId }),
           },
         });
       }
@@ -301,8 +326,21 @@ export async function PUT(
     return NextResponse.json({ candidate: updated });
   } catch (error: unknown) {
     console.error('Error updating candidate point:', error);
+    try {
+      if (Array.isArray(photoIdsToClean) && photoIdsToClean.length > 0) {
+        for (const pid of photoIdsToClean) {
+          const ph = await prisma.photo.findUnique({ where: { id: pid } });
+          if (ph && !ph.surveyCandidatePointId && !ph.surveyNavigationPointId && !ph.carrierId && !ph.surfaceId && !ph.taskId) {
+            await prisma.photo.delete({ where: { id: pid } }).catch(() => {});
+            await deleteStoredPhoto(ph).catch(() => {});
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('Error during photo rollback:', cleanupErr);
+    }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Chyba při úpravě kandidátního místa.' },
+      { success: false, code: 'SURVEY_POINT_SAVE_FAILED', error: 'Místo se nepodařilo uložit. Zkuste akci zopakovat.' },
       { status: 500 }
     );
   }
