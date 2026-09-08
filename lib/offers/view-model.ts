@@ -58,6 +58,12 @@ export type OfferView = {
     email?: string | null;
     phone?: string | null;
     website?: string | null;
+    companyId?: string | null;
+    vatId?: string | null;
+    street?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    country?: string | null;
   } | null;
   id?: string;
   clientId?: string;

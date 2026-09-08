@@ -565,7 +565,25 @@ export async function listOffers(user: CurrentUser, filters: URLSearchParams) {
 export async function getOffer(user: CurrentUser, id: string) {
   const row = await getOfferRow(prisma, id);
   assertAccess(user, row);
-  return serializeOffer(row);
+  const organization = await prisma.organization.findUnique({
+    where: { id: row.organizationId },
+    select: {
+      name: true,
+      logoUrl: true,
+      primaryColor: true,
+      secondaryColor: true,
+      email: true,
+      phone: true,
+      website: true,
+      companyId: true,
+      vatId: true,
+      street: true,
+      city: true,
+      postalCode: true,
+      country: true,
+    },
+  });
+  return { ...serializeOffer(row), branding: organization };
 }
 
 function rejectDirectSend(intent: 'draft' | 'send') {
@@ -874,7 +892,21 @@ export async function getPublicOffer(token: string) {
   const row = await getPublicRow(token);
   const organization = await platformPrisma.organization.findUnique({
     where: { id: row.organizationId },
-    select: { name: true, logoUrl: true, primaryColor: true, secondaryColor: true, email: true, phone: true, website: true },
+    select: {
+      name: true,
+      logoUrl: true,
+      primaryColor: true,
+      secondaryColor: true,
+      email: true,
+      phone: true,
+      website: true,
+      companyId: true,
+      vatId: true,
+      street: true,
+      city: true,
+      postalCode: true,
+      country: true,
+    },
   });
   return { ...serializeOffer(row, { publicToken: token, publicView: true }), branding: organization };
 }

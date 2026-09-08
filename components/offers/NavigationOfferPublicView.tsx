@@ -131,9 +131,22 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
 export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
   const navigation = offer.navigation;
   const effectiveProposalKey = proposalKey ?? offer.id;
-  const isHavirov =
-    (navigation as unknown as Record<string, unknown>)?.city === 'Havířov' ||
-    (offer.title + ' ' + (navigation?.targetAddress || '')).toLowerCase().includes('havířov');
+
+  const isDefaultSeePoint = !offer.branding?.name || offer.branding.name.toLowerCase().includes('seepoint');
+  const companyName = offer.branding?.name || 'SeePOINT s.r.o.';
+  const companyEmail = offer.branding?.email || (isDefaultSeePoint ? 'info@seepoint.cz' : '');
+  const companyPhone = offer.branding?.phone || (isDefaultSeePoint ? '+420 778 089 099' : '');
+  const companyWebsite = offer.branding?.website || (isDefaultSeePoint ? 'https://seepoint.cz' : '');
+  const companyAddress = [offer.branding?.street, offer.branding?.city, offer.branding?.postalCode].filter(Boolean).join(', ')
+    || (isDefaultSeePoint ? 'Fráni Šrámka 1209/5, 709 00 Ostrava-Mariánské Hory' : '');
+  const companyLogo = offer.branding?.logoUrl || (isDefaultSeePoint ? '/seepoint-logo.svg' : '');
+
+  const rawCity = String((navigation as unknown as Record<string, unknown>)?.city || '').trim();
+  const searchCity = (offer.title + ' ' + (navigation?.targetAddress || '')).toLowerCase();
+  const isHavirov = rawCity.toLowerCase() === 'havířov' || searchCity.includes('havířov');
+  const isOstrava = rawCity.toLowerCase() === 'ostrava' || searchCity.includes('ostrava');
+  const targetCity = rawCity || (isHavirov ? 'Havířov' : isOstrava ? 'Ostrava' : '');
+
   const isLocationSelectionPhase = (navigation as unknown as Record<string, unknown>).proposalMode !== 'PRICED_QUOTE';
   const showOfferPdf = canDownloadOfferPdf(offer);
   const showInstallationSheet = canDownloadInstallationSheet(offer);
@@ -181,7 +194,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         const result = await response.json().catch(() => null) as { error?: string } | null;
         if (!response.ok) throw new Error(result?.error || 'Nahrání podkladů selhalo.');
         setUploadedArtworkName(file.name);
-        setArtworkMessage('Podklady byly úspěšně uloženy a předány grafikovi SeePOINT.');
+        setArtworkMessage('Podklady byly úspěšně uloženy k nabídce. Před tiskem obdržíte elektronickou korekturu ke schválení.');
       } catch (err: unknown) {
         setArtworkMessage(err instanceof Error ? err.message : 'Podklady se nepodařilo nahrát.');
       } finally {
@@ -614,13 +627,13 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <div className="mx-auto max-w-2xl">
               <CheckCircle2 className="mx-auto text-emerald-600" size={36} />
               <h2 className="mt-3 text-xl font-black text-slate-950">Výběr bodů byl odeslán</h2>
-              <p className="mt-2 text-sm text-slate-600">SeePOINT nyní připraví přesnou cenovou nabídku pouze pro vámi vybrané pozice.</p>
+              <p className="mt-2 text-sm text-slate-600">Nyní pro vás připravíme přesnou cenovou nabídku pouze pro vámi vybrané pozice.</p>
             </div>
           ) : (
             <div className="mx-auto max-w-2xl">
               <h2 className="text-xl font-black text-slate-950">Potvrďte vybrané navigační body</h2>
               <p className="mt-2 text-sm text-slate-600">Tímto krokem ještě neschvalujete cenu ani realizaci. Odesíláte pouze výběr {selectedPointIds.length} z {navigation.points.length} bodů k nacenění.</p>
-              {missingVisualCount > 0 ? <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">Před potvrzením musí SeePOINT doplnit fotografie a vizualizace u {missingVisualCount} bodů.</p> : null}
+              {missingVisualCount > 0 ? <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">Před potvrzením musí dodavatel doplnit fotografie a vizualizace u {missingVisualCount} bodů.</p> : null}
               <button
                 type="button"
                 disabled={submittingSelection || selectedPointIds.length === 0 || missingVisualCount > 0}
@@ -750,9 +763,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 <div>
                   <span className="font-bold text-white block">Rozměry panelu:</span>
                   {isHavirov ? (
-                    <span className="text-slate-400">Město Havířov používá schválený <strong>atypický tvar s horním půlkruhem</strong> (přesný rozměr bude upřesněn dle schváleného pasportu).</span>
+                    <span className="text-slate-400">Město Havířov používá schválený <strong>atypický tvar s horním půlkruhem</strong> (dle schváleného pasportu města Havířov).</span>
+                  ) : isOstrava ? (
+                    <span className="text-slate-400">Standardní formát pro město Ostrava <strong>670 × 900 mm</strong> na sloupech VO.</span>
                   ) : (
-                    <span className="text-slate-400">Standardní rozměr pro město Ostrava <strong>670 × 900 mm</strong>.</span>
+                    <span className="text-slate-400">Standardní formát navigačních panelů (obvykle <strong>670 × 900 mm</strong>) přizpůsobený pasportu a technickým podmínkám daného města.</span>
                   )}
                 </div>
               </div>
@@ -787,7 +802,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <span>Přesný rozměr pro danou lokalitu a finální grafický návrh budou před výrobou zaslány klientovi ke korektuře a odsouhlasení.</span>
             </div>
 
-            {/* 🚀 High-Visibility Dedicated Artwork & Logo Upload Studio Card */}
+            {/* Dedicated Artwork & Logo Upload Studio Card */}
             <div className="pt-2">
               <div className="rounded-2xl border-2 border-dashed border-sky-400/60 bg-gradient-to-br from-sky-950/80 via-slate-900/95 to-blue-950/70 p-4 shadow-xl transition-all duration-300 hover:border-sky-400 hover:shadow-sky-500/10">
                 <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
@@ -796,11 +811,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       <Sparkles size={14} />
                     </span>
                     <span className="text-xs font-black uppercase tracking-wider text-sky-300">
-                      Nahrát logo / Grafické podklady
+                      Grafické podklady / Logo pro výrobu
                     </span>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300">
-                    Vizualizace ZDARMA
+                    Korektura před tiskem
                   </span>
                 </div>
 
@@ -815,7 +830,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                           </span>
                         </div>
                         <span className="text-[10px] font-bold text-emerald-400/80 bg-emerald-900/60 px-2 py-0.5 rounded">
-                          Předáno grafikovi
+                          Uloženo k výrobě
                         </span>
                       </div>
                       <div className="flex items-center gap-2 rounded-lg bg-slate-950/80 p-2.5 text-xs font-mono font-bold text-sky-300 border border-slate-800">
@@ -843,10 +858,10 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </div>
                       <div>
                         <span className="text-sm font-black text-white group-hover:text-sky-300 transition">
-                          {isUploadingArtwork ? 'Nahrávám grafické podklady…' : 'Klikněte pro nahrání vašeho loga'}
+                          {isUploadingArtwork ? 'Nahrávám grafické podklady…' : 'Máte připravené logo či podklady?'}
                         </span>
                         <p className="text-[11px] text-slate-300 mt-0.5">
-                          Grafik SeePOINT bezplatně připraví reálný návrh panelu s vaším logem a směrovkou.
+                          Můžete je přiložit rovnou k nabídce. Před zahájením výroby vám zašleme elektronický náhled panelu ke korektuře a schválení.
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
@@ -890,12 +905,14 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 Ukázky realizací a zkušenosti našich klientů
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO v Moravskoslezském kraji.
+                {targetCity
+                  ? `Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO (${targetCity} a okolí).`
+                  : 'Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO.'}
               </p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800">
-            ✓ 100% Schváleno úřady & VO
+            ✓ Profesionální instalace na VO
           </span>
         </div>
 
@@ -907,11 +924,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
             <div className="text-xl md:text-2xl font-black text-slate-900">150+</div>
-            <div className="text-[11px] font-semibold text-slate-500">Realizovaných sítí a tras v MS kraji</div>
+            <div className="text-[11px] font-semibold text-slate-500">Realizovaných tras a navigačních sítí</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">100 %</div>
-            <div className="text-[11px] font-semibold text-slate-500">Zajištění záborů & správců VO</div>
+            <div className="text-xl md:text-2xl font-black text-slate-900">3 mm</div>
+            <div className="text-[11px] font-semibold text-slate-500">Odolný DIBOND & UV tisk</div>
           </div>
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
             <div className="text-xl md:text-2xl font-black text-emerald-700">14 dní</div>
@@ -943,7 +960,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 <span className="text-amber-500 text-xs font-bold">★★★★★</span>
               </div>
               <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Rychlé vyřízení všech potřebných záborů a povolení na sloupech VO a bezchybná pravidelná fotodokumentaci. Vše proběhlo přesně podle plánu.“
+                „Rychlé technické prověření sloupů VO, spolehlivá instalace a bezchybná fotodokumentace. Vše proběhlo přesně podle plánu.“
               </p>
             </div>
             <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
@@ -993,7 +1010,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-xs text-red-300 bg-red-950/90 px-2.5 py-1 rounded-lg border border-red-800/60 backdrop-blur-xs">PENNY Fryčovice</span>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Instalováno na VO</span>
                 </div>
                 <div className="space-y-0.5 text-white">
                   <p className="text-xs font-bold flex items-center justify-between">
@@ -1018,7 +1035,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="font-black text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">McDonald&apos;s</span>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ VO Schváleno</span>
+                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Instalováno na VO</span>
                 </div>
                 <div className="space-y-0.5 text-white">
                   <p className="text-xs font-bold flex items-center justify-between">
@@ -1067,7 +1084,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             Kompletní outdoorový servis od A do Z pod jednou střechou
           </h4>
           <p className="text-xs text-slate-300 font-medium leading-relaxed">
-            Postaráme se o kompletní realizaci bez vaší starosti – od vyřízení městských a policejních povolení (PČR), přes vlastní velkoformátový tisk a montáž plošinami, až po záruční servis a čištění do 48 hodin.
+            Postaráme se o kompletní technickou realizaci – od prověření a pasportizace sloupů VO, přes velkoformátový tisk a bezpečnou montáž plošinami, až po záruční servis a fotodokumentaci.
           </p>
         </div>
 
@@ -1075,15 +1092,15 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-4xl mx-auto pt-3 border-t border-slate-800/80">
           <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
             <span className="text-2xl font-black text-purple-400 block tracking-tight">400+</span>
-            <span className="text-[11px] font-bold text-slate-300">Ploch v MS kraji</span>
+            <span className="text-[11px] font-bold text-slate-300">Aktivních ploch v síti</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
             <span className="text-2xl font-black text-purple-400 block tracking-tight">15+ let</span>
             <span className="text-[11px] font-bold text-slate-300">Zkušeností v oboru</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
-            <span className="text-2xl font-black text-purple-400 block tracking-tight">100%</span>
-            <span className="text-[11px] font-bold text-slate-300">Vyřízení povolení</span>
+            <span className="text-2xl font-black text-purple-400 block tracking-tight">Bandimex</span>
+            <span className="text-[11px] font-bold text-slate-300">Nerezové uchycení</span>
           </div>
           <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-purple-800/50 transition">
             <span className="text-2xl font-black text-purple-400 block tracking-tight">48 hod</span>
@@ -1092,7 +1109,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         </div>
       </section>
 
-      {/* About SeePOINT s.r.o. - Full Service Advertising & Manufacturing Section */}
+      {/* Realizátor nabídky - Dynamic Organization & Technical Quality Standards */}
       <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/90 to-indigo-950/60 p-6 md:p-8 text-white shadow-2xl space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
           <div>
@@ -1100,114 +1117,105 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <span>🏢 Realizátor nabídky</span>
             </div>
             <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <span>O společnosti SEEPOINT s.r.o.</span>
+              <span>{companyName}</span>
             </h3>
             <p className="text-xs text-slate-300 mt-1 font-medium max-w-2xl">
-              Přední dodavatel outdoorové reklamy a výrobce originálních nosičů v Moravskoslezském kraji. Kromě navigačních systémů zajišťujeme kompletní reklamní servis pro malé i velké značky.
+              Specializovaný dodavatel navigačních systémů a venkovní reklamy{targetCity ? ` pro lokalitu ${targetCity} a okolí` : ''}. Zajišťujeme kompletní technické prověření, výrobu z odolných materiálů a bezpečnou montáž na sloupech veřejného osvětlení.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <a
-              href="https://seepoint.cz"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
-            >
-              <span>🌐 Navštívit seepoint.cz</span>
-            </a>
-          </div>
+          {companyWebsite && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <a
+                href={companyWebsite.startsWith('http') ? companyWebsite : `https://${companyWebsite}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
+              >
+                <span>🌐 Navštívit {companyWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+              </a>
+            </div>
+          )}
         </div>
 
-        {/* 5 Core Pillars Grid with Real Media Type Photos & Professional Copywriting */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* 4 Core Pillars Grid with Technical Standards for Navigation & Pole Signage */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* 1. Navigation */}
-          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md">
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md flex flex-col justify-between">
             <div className="relative h-36 w-full overflow-hidden bg-slate-900">
               <img
                 src="/images/media-types/navigation.jpg"
-                alt="Navigační systémy na sloupech VO a trolejí"
+                alt="Navigační panely na sloupech VO"
                 className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
                 <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Městská navigace (VO)</span>
               </div>
             </div>
-            <div className="p-4 pt-0 space-y-1">
-              <h4 className="text-sm font-extrabold text-white">Navigační tabule a směrové panely</h4>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">Exkluzivní síť více než 400+ navigačních ploch na sloupech veřejného osvětlení u nejfrekventovanějších křižovatek a tahů. Dlouhodobá navigace zákazníků přímo k provozovně.</p>
+            <div className="p-4 pt-0 space-y-1 flex-1">
+              <h4 className="text-sm font-extrabold text-white">Cílené směrové panely</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                Umístění na sloupech veřejného osvětlení u frekventovaných křižovatek a příjezdových tras. Dlouhodobě navádí řidiče i chodce přímo k vaší provozovně.
+              </p>
             </div>
           </div>
 
-          {/* 2. Citylight */}
-          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md">
+          {/* 2. Dibond 3 mm */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md flex flex-col justify-between">
             <div className="relative h-36 w-full overflow-hidden bg-slate-900">
               <img
-                src="/images/media-types/citylight.jpg"
-                alt="Prosvětlené Citylight CLV vitríny"
+                src="/offer/real-mcdonalds.jpg"
+                alt="Odolné hliníkové panely DIBOND"
                 className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">💡 Prosvětlená reklama (CLV)</span>
+                <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">🛡️ DIBOND® sendvič (3 mm)</span>
               </div>
             </div>
-            <div className="p-4 pt-0 space-y-1">
-              <h4 className="text-sm font-extrabold text-white">City Light Vitríny (CLV)</h4>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">Prestižní svítící vitríny na klíčových městských tepnách, u zastávek MHD a v pěších zónách. Zajišťují 100% nepřetržitou viditelnost a dominanci vašich motivů ve dne i v noci.</p>
+            <div className="p-4 pt-0 space-y-1 flex-1">
+              <h4 className="text-sm font-extrabold text-white">Extrémní tvarová stálost</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                Vysoce odolné hliníkové kompozitní desky s polyethylenovým jádrem, UV vytvrzovaným tiskem a ochrannou laminací proti povětrnosti i slunci.
+              </p>
             </div>
           </div>
 
-          {/* 3. Promo Tower */}
-          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md">
+          {/* 3. Bandimex uchycení */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md flex flex-col justify-between">
             <div className="relative h-36 w-full overflow-hidden bg-slate-900">
               <img
-                src="/images/media-types/promo-tower.jpg"
-                alt="Promo věže a velkoplošné konstrukce"
+                src="/offer/real-penny-frycovice.jpg"
+                alt="Nerezové upínací pásky Bandimex"
                 className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🗼 Promo věže & Dominanty</span>
+                <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🔩 Uchycení Bandimex</span>
               </div>
             </div>
-            <div className="p-4 pt-0 space-y-1">
-              <h4 className="text-sm font-extrabold text-white">Promo věže & věžní konstrukce</h4>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">Nepřehlédnutelné velkoplošné čtyřstranné věže a horizontální nosiče situované u nákupních zón, kruhových objezdů a vstupů do měst. Zásah tisíců řidičů denně.</p>
+            <div className="p-4 pt-0 space-y-1 flex-1">
+              <h4 className="text-sm font-extrabold text-white">Certifikovaná montáž</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                Pevné stažení nerezovými páskami Bandimex zamezuje protáčení panelu ve větru a garantuje bezpečné uchycení bez poškození sloupu VO.
+              </p>
             </div>
           </div>
 
-          {/* 4. City Poster */}
-          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md">
-            <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-              <img
-                src="/images/media-types/city-poster.jpg"
-                alt="City Poster CLP plakátové vitríny"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                <span className="font-extrabold text-xs text-purple-300 bg-purple-950/90 px-2.5 py-1 rounded-lg border border-purple-800/60 backdrop-blur-xs">🖼️ City Poster & Vitríny</span>
-              </div>
-            </div>
-            <div className="p-4 pt-0 space-y-1">
-              <h4 className="text-sm font-extrabold text-white">City Poster (CLP) & A0 bannery</h4>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">Městské plakátové vitríny a kampaňové plochy v těsné blízkosti poštám, úřadům, zdravotnickým zařízením a obchodním centrům pro cílenou regionální komunikaci.</p>
-            </div>
-          </div>
-
-          {/* 5. Full Service & Manufacturing */}
-          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md lg:col-span-2">
+          {/* 4. Fotodokumentace & Servis */}
+          <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-purple-500/60 transition shadow-md flex flex-col justify-between">
             <div className="relative h-36 w-full overflow-hidden bg-slate-900">
               <img
                 src="/images/media-types/promo-bench.jpg"
-                alt="Vlastní výroba, velkoformátový tisk a servis na klíč"
+                alt="Fotodokumentace a servis"
                 className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end justify-between">
-                <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">🪑 Mobiliář & Kompletní výroba na klíč</span>
-                <span className="font-bold text-[10px] text-purple-300 bg-purple-950/90 px-2.5 py-1 rounded-lg border border-purple-800/60">⚡ Servis do 48 hod</span>
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">📸 Pasport & Servis</span>
               </div>
             </div>
-            <div className="p-4 pt-0 space-y-1">
-              <h4 className="text-sm font-extrabold text-white">Vlastní tiskárna, zámečnictví & servis na klíč</h4>
-              <p className="text-xs text-slate-400 font-medium leading-relaxed">Disponujeme vlastní moderní tiskárnou, výrobou Dibond desek i montážními plošinami. Zabezpečíme kompletní legislativu (povolení měst a PČR), profesionální instalaci i bleskovou servisní údržbu či čištění do 48 hodin.</p>
+            <div className="p-4 pt-0 space-y-1 flex-1">
+              <h4 className="text-sm font-extrabold text-white">Fotodokumentace a dohled</h4>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                Po montáži obdržíte detailní fotodokumentaci osazených ploch. V průběhu kampaně poskytujeme záruční servis a technickou kontrolu.
+              </p>
             </div>
           </div>
         </div>
@@ -1215,12 +1223,21 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         {/* Contact Strip */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80 text-xs font-semibold text-slate-300">
           <div className="flex items-center gap-1.5">
-            <span>📍 Fráni Šrámka 1209/5, 709 00 Ostrava-Mariánské Hory</span>
+            {companyAddress ? <span>📍 {companyAddress}</span> : <span>📍 Specializovaný dodavatel navigační reklamy</span>}
           </div>
-          <div className="flex items-center gap-4">
-            <span>📞 +420 778 089 099</span>
-            <span>✉️ info@seepoint.cz</span>
-            <span className="text-purple-400 font-bold">seepoint.cz</span>
+          <div className="flex flex-wrap items-center gap-4">
+            {companyPhone && <span>📞 {companyPhone}</span>}
+            {companyEmail && <span>✉️ {companyEmail}</span>}
+            {companyWebsite && (
+              <a
+                href={companyWebsite.startsWith('http') ? companyWebsite : `https://${companyWebsite}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-purple-400 font-bold hover:underline"
+              >
+                {companyWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+              </a>
+            )}
           </div>
         </div>
       </section>
@@ -1241,7 +1258,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               className="max-h-[82vh] max-w-[85vw] object-contain"
             />
             <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950 p-4 text-white text-xs font-bold">
-              <span>🔍 Detail fotodokumentace / vizualizace navigační cedule SeePOINT</span>
+              <span>🔍 Detail fotodokumentace / vizualizace navigační cedule</span>
               <button
                 type="button"
                 className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700 transition"
