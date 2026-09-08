@@ -45,6 +45,14 @@ export type OfferConflict = {
 const dateOnly = (date: Date | null | undefined) => date?.toISOString().slice(0, 10) ?? null;
 const isPastValidity = (date: Date | null | undefined) => Boolean(date && date.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10));
 const value = (decimal: Prisma.Decimal | null | undefined) => decimal?.toFixed(2) ?? null;
+const safeDecimal = (val: Prisma.Decimal | number | string | null | undefined, fallback = '0.00'): string => {
+  if (val == null) return fallback;
+  if (typeof (val as { toFixed?: unknown }).toFixed === 'function') {
+    return (val as { toFixed: (digits: number) => string }).toFixed(2);
+  }
+  const n = Number(val);
+  return Number.isNaN(n) ? fallback : n.toFixed(2);
+};
 const nullable = (text: string | undefined) => text || null;
 
 const offerInclude = {
@@ -212,10 +220,10 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       code: charge.code,
       label: charge.label,
       description: charge.description,
-      quantity: charge.quantity.toFixed(2),
+      quantity: safeDecimal(charge.quantity, '1.00'),
       unit: charge.unit,
-      unitPrice: charge.unitPrice.toFixed(2),
-      subtotal: charge.subtotal.toFixed(2),
+      unitPrice: safeDecimal(charge.unitPrice),
+      subtotal: safeDecimal(charge.subtotal),
     })),
     navigation: row.navigationOffer ? {
       city: row.navigationOffer.city || 'Ostrava',
@@ -271,13 +279,13 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           latitude: point.latitude,
           longitude: point.longitude,
           address: point.address,
-          quantity: point.quantity.toFixed(2),
-          unitPrice: point.unitPrice.toFixed(2),
-          subtotal: point.subtotal.toFixed(2),
-          installationPrice: point.installationPrice.toFixed(2),
-          removalPrice: point.removalPrice.toFixed(2),
-          productionPrice: point.productionPrice.toFixed(2),
-          framePrice: (point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice ? (point as unknown as { framePrice: Prisma.Decimal }).framePrice.toFixed(2) : '0.00',
+          quantity: safeDecimal(point.quantity, '1.00'),
+          unitPrice: safeDecimal(point.unitPrice),
+          subtotal: safeDecimal(point.subtotal),
+          installationPrice: safeDecimal(point.installationPrice),
+          removalPrice: safeDecimal(point.removalPrice),
+          productionPrice: safeDecimal(point.productionPrice),
+          framePrice: safeDecimal((point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice),
           internalNote: publicView ? undefined : point.internalNote,
           clientNote: point.clientNote,
           status: point.status,
