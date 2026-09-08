@@ -122,7 +122,9 @@ export async function verifyResendDomain(domainId: string, customApiKey?: string
     throw new Error(`Ověření domény v Resend selhalo: ${message}`);
   }
 
-  return data as ResendDomainResponse;
+  // Resend POST /verify only returns { object: 'domain', id: '...' }.
+  // We fetch full domain details via getResendDomain to get updated records and status.
+  return await getResendDomain(domainId, apiKey);
 }
 
 /**
