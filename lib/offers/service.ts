@@ -273,6 +273,17 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
             : `/api/photos/${carrierPhoto.id}/thumbnail`;
         }
 
+        let installedUrl: string | undefined = undefined;
+        if (point.installedPhoto) {
+          installedUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhoto.id}`
+            : `/api/photos/${point.installedPhoto.id}/thumbnail`;
+        } else if (point.installedPhotoId) {
+          installedUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhotoId}`
+            : `/api/photos/${point.installedPhotoId}/thumbnail`;
+        }
+
         return {
           id: point.id,
           label: point.label,
@@ -302,6 +313,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           visualizedPhotoUrl: visualizedUrl,
           sitePhotoId: effectivePhotoId ?? undefined,
           sitePhotoUrl: siteUrl,
+          installedPhotoId: point.installedPhotoId ?? undefined,
+          installedPhotoUrl: installedUrl,
           isSelectedByClient: point.isSelectedByClient !== false,
         };
       }),
