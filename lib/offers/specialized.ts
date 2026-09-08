@@ -89,11 +89,18 @@ export function parseNavigationOfferInput(raw: unknown) {
   });
   const validUntil = text(input.validUntil);
   if (validUntil) parseDateOnly(validUntil, 'Platnost nabídky');
+  const dateFrom = text(input.dateFrom);
+  if (dateFrom) parseDateOnly(dateFrom, 'Termín kampaně (od)');
+  const dateTo = text(input.dateTo);
+  if (dateTo) parseDateOnly(dateTo, 'Termín kampaně (do)');
+  if (dateFrom && dateTo && dateTo < dateFrom) {
+    throw new OfferValidationError('Konec kampaně (do) nemůže předcházet začátku (od).');
+  }
   const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
   const city = text(input.city) === 'Havířov' ? 'Havířov' : (text(input.targetAddress).toLowerCase().includes('havířov') ? 'Havířov' : 'Ostrava');
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
-    validUntil, internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), city, targetName, targetAddress: text(input.targetAddress),
+    validUntil, dateFrom: nullable(dateFrom), dateTo: nullable(dateTo), internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), city, targetName, targetAddress: text(input.targetAddress),
     targetLatitude: coordinate(input.targetLatitude, 'latitude'), targetLongitude: coordinate(input.targetLongitude, 'longitude'), targetNote: text(input.targetNote), 
     targetPhotoUrl: nullable(text(input.targetPhotoUrl)),
     googlePlaceId: nullable(text(input.googlePlaceId)), formattedAddress: nullable(text(input.formattedAddress)),
@@ -124,9 +131,18 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       updatedByUserId: user.id,
     };
       if (offerId) {
-        const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { id: true, offerType: true, status: true, createdByUserId: true } });
+        const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { id: true, offerType: true, status: true, createdByUserId: true, campaignStrategy: true } });
         if (!existing || existing.offerType !== 'NAVIGATION') throw new OfferValidationError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
         if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
+
+        const existingStrategy = (existing.campaignStrategy && typeof existing.campaignStrategy === 'object' && !Array.isArray(existing.campaignStrategy))
+          ? (existing.campaignStrategy as Record<string, unknown>)
+          : {};
+        const updatedStrategy = {
+          ...existingStrategy,
+          ...(input.dateFrom !== undefined ? { dateFrom: input.dateFrom } : {}),
+          ...(input.dateTo !== undefined ? { dateTo: input.dateTo } : {}),
+        };
 
         const existingPoints = await tx.navigationPoint.findMany({
           where: { navigationOffer: { offerId } },
@@ -146,6 +162,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           where: { id: offerId },
           data: {
             ...common,
+            campaignStrategy: updatedStrategy,
             organizationId: user.organizationId,
             navigationOffer: {
               upsert: {
@@ -192,7 +209,8 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         });
       }
     const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
-    return tx.offer.create({ data: { ...common, organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, city: input.city, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+    const initialStrategy = (input.dateFrom || input.dateTo) ? { dateFrom: input.dateFrom, dateTo: input.dateTo } : undefined;
+    return tx.offer.create({ data: { ...common, ...(initialStrategy ? { campaignStrategy: initialStrategy } : {}), organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, city: input.city, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 

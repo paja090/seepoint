@@ -90,6 +90,12 @@ export type OfferView = {
   hasPublicLink?: boolean;
   portalToken?: string;
   isNoPriceConcept?: boolean;
+  campaignStrategy?: {
+    dateFrom?: string | null;
+    dateTo?: string | null;
+    [key: string]: unknown;
+  } | null;
+  campaignPhases?: unknown;
   publishedAt?: string | null;
   sentAt?: string | null;
   acceptedAt?: string | null;
