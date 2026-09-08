@@ -69,11 +69,16 @@ export async function POST(request: Request) {
           }
         }
 
+        const recordsToSave =
+          verifiedDomain.records && verifiedDomain.records.length > 0
+            ? verifiedDomain.records
+            : ((settings.dnsRecords as unknown[]) || []);
+
         const updated = await prisma.organizationEmailSettings.update({
           where: { id: settings.id },
           data: {
             status: isVerified ? 'VERIFIED' : 'PENDING',
-            dnsRecords: (verifiedDomain.records || []) as unknown as object,
+            dnsRecords: recordsToSave as unknown as object,
             encryptedSendingApiKey: encryptedKey || undefined,
             lastVerifiedAt: isVerified ? new Date() : settings.lastVerifiedAt,
           },

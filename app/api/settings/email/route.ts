@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { deleteResendDomain } from '@/lib/resend-service';
+import { deleteResendDomain, getResendDomain } from '@/lib/resend-service';
 import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
@@ -58,12 +58,50 @@ export async function GET() {
         }),
       ]);
 
+      let finalSettings = settings;
+
+      // Auto-heal: If domain exists in provider but local records were cleared or empty, fetch them from Resend
+      if (
+        settings?.providerDomainId &&
+        (!settings.dnsRecords || (Array.isArray(settings.dnsRecords) && settings.dnsRecords.length === 0))
+      ) {
+        try {
+          const resendData = await getResendDomain(settings.providerDomainId);
+          if (resendData.records && resendData.records.length > 0) {
+            const healed = await prisma.organizationEmailSettings.update({
+              where: { id: settings.id },
+              data: {
+                dnsRecords: resendData.records as unknown as object,
+                status: resendData.status === 'verified' ? 'VERIFIED' : settings.status,
+              },
+              select: {
+                id: true,
+                domain: true,
+                senderName: true,
+                fromEmail: true,
+                replyTo: true,
+                providerDomainId: true,
+                status: true,
+                dnsRecords: true,
+                lastVerifiedAt: true,
+                lastTestedAt: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            });
+            finalSettings = healed;
+          }
+        } catch (healErr) {
+          console.warn('[email-settings] Auto-heal DNS records failed:', healErr);
+        }
+      }
+
       const hasSystemResendKey = Boolean(process.env.RESEND_API_KEY?.trim());
 
       return NextResponse.json({
-        configured: Boolean(settings),
+        configured: Boolean(finalSettings),
         hasSystemResendKey,
-        settings,
+        settings: finalSettings,
         recentLogs,
       });
     }
