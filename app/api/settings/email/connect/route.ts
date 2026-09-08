@@ -40,10 +40,12 @@ export async function POST(request: Request) {
         const rawSenderName = typeof body?.senderName === 'string' ? body.senderName : '';
         const rawFromEmail = typeof body?.fromEmail === 'string' ? body.fromEmail : '';
         const rawReplyTo = typeof body?.replyTo === 'string' ? body.replyTo : '';
+        const rawResendApiKey = typeof body?.resendApiKey === 'string' ? body.resendApiKey : undefined;
 
         const cleanDomain = rawDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
         const cleanSenderName = rawSenderName.trim();
         const cleanFromEmail = rawFromEmail.trim().toLowerCase();
+        const cleanResendApiKey = rawResendApiKey?.trim().replace(/^["']|["']$/g, '');
 
         if (!cleanDomain || !cleanDomain.includes('.') || cleanDomain.length > 120) {
           return NextResponse.json({ error: 'Zadejte platný název domény (např. seepoint.cz).' }, { status: 400 });
@@ -72,10 +74,11 @@ export async function POST(request: Request) {
           cleanReplyTo = trimmedReplyTo;
         }
 
-        // Register domain via Resend Management API
+        // Existing system-key domains must already belong to this organization.
+        // An explicit provider key is verified by Resend; DB unique indexes still prevent cross-tenant reassignment.
         const ownedSettings = await prisma.organizationEmailSettings.findUnique({ where: { organizationId: user.organizationId }, select: { domain: true, providerDomainId: true } });
         const ownedProviderDomainId = ownedSettings?.domain === cleanDomain ? ownedSettings?.providerDomainId ?? undefined : undefined;
-        const resendDomain = await registerResendDomain(cleanDomain, ownedProviderDomainId);
+        const resendDomain = await registerResendDomain(cleanDomain, cleanResendApiKey, ownedProviderDomainId);
 
         // Upsert into OrganizationEmailSettings
         const saved = await prisma.organizationEmailSettings.upsert({

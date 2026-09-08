@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { canReuseResendDomain } from '../lib/email-domain-ownership';
 const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('manual radar cron is restricted to authenticated organization and active entitlement', () => {
@@ -22,7 +23,7 @@ test('signed email webhook resolves ownership before tenant-scoped mutations', (
 });
 
 test('already-registered Resend domains cannot be claimed by another organization', () => {
-  assert.match(source('lib/resend-service.ts'), /existing && existing.id === ownedProviderDomainId/);
+  assert.match(source('lib/resend-service.ts'), /canReuseResendDomain\(existing.id, ownedProviderDomainId/);
   assert.match(source('app/api/settings/email/connect/route.ts'), /ownedSettings\?\.domain === cleanDomain/);
   const schema = source('prisma/schema.prisma');
   assert.match(schema, /domain\s+String\s+@unique/);
@@ -33,3 +34,18 @@ test('radar notifications honor disabled SaaS module', () => {
   assert.match(source('app/api/notifications/unread/route.ts'), /hasModuleAccess\(user, 'salesRadar'\)/);
   assert.match(source('lib/notifications-service.ts'), /enabled\('salesRadar'\) \? await prisma.salesOpportunity/);
 });
+
+ test('domain reuse requires existing tenant ownership or separately verified provider credentials', () => {
+  assert.equal(canReuseResendDomain('domain-a', undefined, false), false);
+  assert.equal(canReuseResendDomain('domain-a', 'domain-b', false), false);
+  assert.equal(canReuseResendDomain('domain-a', 'domain-a', false), true);
+  assert.equal(canReuseResendDomain('domain-a', undefined, true), true);
+  assert.match(source('lib/resend-service.ts'), /if \(!listRes.ok\) throw/);
+ });
+ test('cron AI logs have nullable real actor and are awaited before request completion', () => {
+  const runner = source('lib/opportunities/discovery-runner.ts');
+  assert.doesNotMatch(runner, /void logAIUsage|userId: userId \|\| 'cron-runner'/);
+  assert.match(runner, /userId: triggerType === 'CRON' \? null : userId/);
+  assert.match(runner, /await logAIUsage/);
+  assert.match(runner, /usageEstimated: true, costEstimated: true/);
+ });

@@ -68,6 +68,7 @@ export function EmailSettingsView({
   const [senderNameInput, setSenderNameInput] = useState(initialSettings?.senderName || '');
   const [fromEmailInput, setFromEmailInput] = useState(initialSettings?.fromEmail || '');
   const [replyToInput, setReplyToInput] = useState(initialSettings?.replyTo || '');
+  const [apiKeyInput, setApiKeyInput] = useState('');
 
   const [connecting, setConnecting] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -97,6 +98,7 @@ export function EmailSettingsView({
           senderName: senderNameInput,
           fromEmail: fromEmailInput,
           replyTo: replyToInput,
+          resendApiKey: apiKeyInput.trim() || undefined,
         }),
       });
 
@@ -119,6 +121,10 @@ export function EmailSettingsView({
     try {
       const res = await fetch('/api/settings/email/verify', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resendApiKey: apiKeyInput.trim() || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -298,6 +304,23 @@ export function EmailSettingsView({
               </button>
             </div>
           </div>
+
+          {!isVerified && (
+            <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="w-full sm:max-w-md">
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="Volitelný Resend API klíč pro ověření (re_...)"
+                  className="w-full px-3 py-1.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-purple-500"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Pokud ověření hlásí neplatný klíč z Vercelu, vložte sem platný klíč a klikněte na Ověřit.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         /* Connect Domain Form */
@@ -372,6 +395,27 @@ export function EmailSettingsView({
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500"
                 />
                 <p className="text-[11px] text-slate-400">Kam mají chodit odpovědi klientů na nabídky.</p>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2 pt-2 border-t border-slate-800">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    Resend API klíč (Full access)
+                  </label>
+                  <span className="text-[11px] text-purple-400 font-medium">
+                    Volitelné – zadejte zde, pokud ještě neproběhl redeploy Vercelu
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder="re_•••••••••••••••••••••••••••••••• (volitelné)"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Máte-li nový klíč z Resend.com (Full access), můžete jej zadat sem. Systém načte DNS záznamy přímo bez čekání na propagaci proměnných ve Vercelu.
+                </p>
               </div>
             </div>
 

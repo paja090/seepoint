@@ -181,3 +181,12 @@ test('Resend domain normalization and tenant From address policy', () => {
   assert.equal(verifyFromDomain('attacker@spammer.com', 'seepoint.cz'), false);
   assert.equal(verifyFromDomain('info@subdomain.seepoint.cz', 'seepoint.cz'), false);
 });
+
+test('Resend API key sanitization strips surrounding quotes and whitespace', () => {
+  const sanitize = (raw?: string) => raw?.trim().replace(/^["']|["']$/g, '');
+  assert.equal(sanitize('  re_1234567890_abcdef  '), 're_1234567890_abcdef');
+  assert.equal(sanitize('"re_quoted_key_123"'), 're_quoted_key_123');
+  assert.equal(sanitize("'re_single_quoted_key'"), 're_single_quoted_key');
+  assert.equal(sanitize(undefined), undefined);
+});
+

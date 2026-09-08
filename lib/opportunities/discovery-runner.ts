@@ -128,15 +128,15 @@ export async function runDiscoveryForOrganization(
           }
 
           if (liveFoundCount > 0) {
-            void logAIUsage({
+            await logAIUsage({
               organizationId,
-              userId: userId || 'cron-runner',
+              userId: triggerType === 'CRON' ? null : userId,
               feature: 'SALES_RADAR',
               modelName: 'gemini-3.6-flash',
               promptTokens: 1200,
               outputTokens: Math.max(liveFoundCount * 200, 300),
               costEstimateUsd: 0.003,
-              metadata: { action: 'live-search-grounding', triggerType, foundCount: liveFoundCount },
+              metadata: { usageEstimated: true, costEstimated: true, action: 'live-search-grounding', triggerType, foundCount: liveFoundCount },
             });
           }
         } catch (err) {
@@ -171,15 +171,15 @@ export async function runDiscoveryForOrganization(
                 profile
               );
 
-              void logAIUsage({
+              await logAIUsage({
                 organizationId,
-                userId: userId || 'cron-runner',
+                userId: triggerType === 'CRON' ? null : userId,
                 feature: 'SALES_RADAR',
                 modelName: 'gemini-3.6-flash',
                 promptTokens: 800,
                 outputTokens: 250,
                 costEstimateUsd: 0.001,
-                metadata: { action: 'rss-parse', triggerType, signalId: signal.id },
+                metadata: { usageEstimated: true, costEstimated: true, action: 'rss-parse', triggerType, signalId: signal.id },
               });
 
               if (!parsed.isRelevant) {
