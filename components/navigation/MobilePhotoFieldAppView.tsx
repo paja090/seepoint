@@ -22,6 +22,11 @@ import {
 } from 'lucide-react';
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType } from '@/lib/mobile-photo-damage';
 import { MobileCreateCarrierModal } from '@/components/navigation/MobileCreateCarrierModal';
+import {
+  processPhotoForUpload,
+  getFriendlyPhotoErrorMessage,
+  parseApiResponseSafely,
+} from '@/lib/client-photo-processing';
 
 export type NearbyCarrier = {
   id: string;
@@ -155,6 +160,8 @@ export function MobilePhotoFieldAppView() {
   const [createPhotoFile, setCreatePhotoFile] = useState<File | null>(null);
   const [createPreviewUrl, setCreatePreviewUrl] = useState<string | null>(null);
   const [createSuccessAlert, setCreateSuccessAlert] = useState<string | null>(null);
+  const [isPreparingCreatePhoto, setIsPreparingCreatePhoto] = useState(false);
+  const [isPreparingUploadPhoto, setIsPreparingUploadPhoto] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const createFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -205,22 +212,26 @@ export function MobilePhotoFieldAppView() {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
   }, []);
 
-  const handleCreateFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCreateFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsPreparingCreatePhoto(true);
+      setUploadErrorMsg(null);
       try {
-        if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|hei[cf])$/i.test(file.name)) {
-          throw new Error('Vybraný soubor není podporovaná fotografie.');
-        }
+        const processed = await processPhotoForUpload(file);
         if (createPreviewUrlRef.current) URL.revokeObjectURL(createPreviewUrlRef.current);
-        const nextUrl = URL.createObjectURL(file);
+        const nextUrl = URL.createObjectURL(processed.file);
         createPreviewUrlRef.current = nextUrl;
-        setCreatePhotoFile(file);
+        setCreatePhotoFile(processed.file);
         setCreatePreviewUrl(nextUrl);
         setIsCreateModalOpen(true);
       } catch (error) {
         console.error('[mobile-photos/create-camera]', error);
         clearCreatePreview();
+        setUploadErrorMsg(getFriendlyPhotoErrorMessage(error));
+      } finally {
+        setIsPreparingCreatePhoto(false);
+        if (createFileInputRef.current) createFileInputRef.current.value = '';
       }
     }
   };
@@ -347,25 +358,26 @@ export function MobilePhotoFieldAppView() {
     }, 300);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsPreparingUploadPhoto(true);
+      setUploadSuccessMsg(null);
+      setUploadErrorMsg(null);
       try {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type.toLowerCase())) throw new Error('INVALID_IMAGE');
-        if (!file.size || file.size > 4 * 1024 * 1024) throw new Error('PHOTO_TOO_LARGE');
+        const processed = await processPhotoForUpload(file);
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-        const nextPreviewUrl = URL.createObjectURL(file);
+        const nextPreviewUrl = URL.createObjectURL(processed.file);
         previewUrlRef.current = nextPreviewUrl;
-        setPhotoFile(file);
+        setPhotoFile(processed.file);
         setPreviewUrl(nextPreviewUrl);
-        setUploadSuccessMsg(null);
-        setUploadErrorMsg(null);
       } catch (error) {
         console.error('[mobile-photos/camera]', error);
         clearPreview();
-        setUploadErrorMsg(error instanceof Error && error.message === 'PHOTO_TOO_LARGE'
-          ? 'Fotografie je příliš velká. Maximální velikost je 4 MB.'
-          : 'Použijte fotografii ve formátu JPEG, PNG nebo WebP.');
+        setUploadErrorMsg(getFriendlyPhotoErrorMessage(error));
+      } finally {
+        setIsPreparingUploadPhoto(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     }
   };
@@ -403,19 +415,20 @@ export function MobilePhotoFieldAppView() {
         body: fd,
       });
 
-      const responseText = await res.text();
-      let data: { error?: string; code?: string; message?: string; warnings?: string[]; clientMismatch?: ClientMismatch | null; chatSent?: boolean } = {};
-      try { data = responseText ? JSON.parse(responseText) : {}; } catch { /* filtered below */ }
-      if (!res.ok) {
-        const messages: Record<string, string> = {
-          GPS_REQUIRED: 'Před uložením fotografie je nutné získat GPS polohu.',
-          DATABASE_ERROR: 'Fotografii se nepodařilo zapsat do databáze. Zkuste akci zopakovat.',
-          INVALID_IMAGE: 'Formát fotografie není podporován.',
-          PHOTO_TOO_LARGE: 'Fotografie je příliš velká. Maximální velikost je 4 MB.',
-          DAMAGE_TYPE_REQUIRED: 'Vyberte typ závady.',
-        };
-        throw new Error(messages[data.code || ''] || 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
+      const parsed = await parseApiResponseSafely<{
+        error?: string;
+        code?: string;
+        message?: string;
+        warnings?: string[];
+        clientMismatch?: ClientMismatch | null;
+        chatSent?: boolean;
+      }>(res);
+
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.errorMessage || 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
       }
+
+      const data = parsed.data;
 
       const warningParts = [
         data.warnings?.includes('google-drive') ? 'Google Drive nebyl dostupný; použit byl bezpečný záložní zápis.' : null,
@@ -435,7 +448,7 @@ export function MobilePhotoFieldAppView() {
       void fetchCampaigns();
     } catch (err: unknown) {
       console.error('[mobile-photos/upload]', err);
-      setUploadErrorMsg(err instanceof Error && err.message ? err.message : 'Fotografii se nepodařilo uložit. Zkuste akci zopakovat.');
+      setUploadErrorMsg(getFriendlyPhotoErrorMessage(err));
     } finally {
       setUploading(false);
     }
@@ -576,12 +589,22 @@ export function MobilePhotoFieldAppView() {
           <button
             type="button"
             onClick={() => createFileInputRef.current?.click()}
-            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 py-3.5 px-4 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-xs tracking-wide"
+            disabled={isPreparingCreatePhoto}
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-400 to-teal-400 py-3.5 px-4 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-xs tracking-wide disabled:opacity-60"
           >
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-950/20">
-              <Plus size={16} className="text-slate-950" />
-            </div>
-            <span>+ ZALOŽIT NOVOU REKLAMNÍ PLOCHU Z FOTKY</span>
+            {isPreparingCreatePhoto ? (
+              <>
+                <RefreshCw size={16} className="animate-spin text-slate-950" />
+                <span>PŘIPRAVUJI FOTOGRAFII…</span>
+              </>
+            ) : (
+              <>
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-950/20">
+                  <Plus size={16} className="text-slate-950" />
+                </div>
+                <span>+ ZALOŽIT NOVOU REKLAMNÍ PLOCHU Z FOTKY</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -1169,9 +1192,18 @@ export function MobilePhotoFieldAppView() {
           {!previewUrl ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3.5 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-sm mb-3"
+              disabled={isPreparingUploadPhoto}
+              className="w-full flex items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 py-3.5 font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-98 transition text-sm mb-3 disabled:opacity-60"
             >
-              <Camera size={20} /> POŘÍDIT FOTOGRAFII FOTOAPARÁTEM
+              {isPreparingUploadPhoto ? (
+                <>
+                  <RefreshCw size={20} className="animate-spin" /> PŘIPRAVUJI FOTOGRAFII…
+                </>
+              ) : (
+                <>
+                  <Camera size={20} /> POŘÍDIT FOTOGRAFII FOTOAPARÁTEM
+                </>
+              )}
             </button>
           ) : (
             <div className="space-y-3 mb-3">
@@ -1253,6 +1285,7 @@ export function MobilePhotoFieldAppView() {
         coords={coords}
         initialFile={createPhotoFile}
         initialPreviewUrl={createPreviewUrl}
+        isPreparingPhoto={isPreparingCreatePhoto}
         onRetake={() => createFileInputRef.current?.click()}
         onSuccess={handleCreateCarrierSuccess}
       />

@@ -6,9 +6,7 @@ import type { NearbyCarrier } from './MobilePhotoFieldAppView';
 import {
   Camera,
   MapPin,
-  Compass,
   X,
-  Building2,
   Tag,
   Layers,
   User,
@@ -16,9 +14,12 @@ import {
   Check,
   RefreshCw,
   AlertCircle,
-  Sparkles,
-  Info,
 } from 'lucide-react';
+import {
+  validatePhotoBeforeUpload,
+  parseApiResponseSafely,
+  getFriendlyPhotoErrorMessage,
+} from '@/lib/client-photo-processing';
 
 type ClientItem = {
   id: string;
@@ -33,6 +34,7 @@ type Props = {
   coords: { lat: number; lng: number; accuracy: number } | null;
   initialFile: File | null;
   initialPreviewUrl: string | null;
+  isPreparingPhoto?: boolean;
   onRetake: () => void;
   onSuccess: (newCarrier: NearbyCarrier, successMessage: string) => void;
 };
@@ -59,6 +61,7 @@ export function MobileCreateCarrierModal({
   coords,
   initialFile,
   initialPreviewUrl,
+  isPreparingPhoto = false,
   onRetake,
   onSuccess,
 }: Props) {
@@ -167,6 +170,11 @@ export function MobileCreateCarrierModal({
       setErrorMsg('Nejprve pořiďte fotografii plochy.');
       return;
     }
+    const photoValidation = validatePhotoBeforeUpload(initialFile);
+    if (!photoValidation.ok) {
+      setErrorMsg(photoValidation.error || 'Neplatný soubor fotografie.');
+      return;
+    }
     if (!name.trim()) {
       setErrorMsg('Vyplňte prosím název reklamní plochy.');
       return;
@@ -175,7 +183,7 @@ export function MobileCreateCarrierModal({
       setErrorMsg('Vyplňte prosím město / obec.');
       return;
     }
-    if (!coords) {
+    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) {
       setErrorMsg('Je vyžadována GPS poloha pro zaměření v terénu.');
       return;
     }
@@ -212,16 +220,21 @@ export function MobileCreateCarrierModal({
         body: fd,
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Nepodařilo se vytvořit nosič.');
+      const parsed = await parseApiResponseSafely<{
+        success: boolean;
+        carrier: NearbyCarrier;
+        message?: string;
+      }>(res);
+
+      if (!parsed.ok || !parsed.data?.success) {
+        throw new Error(parsed.errorMessage || 'Nepodařilo se vytvořit nosič.');
       }
 
-      onSuccess(data.carrier, data.message || 'Nová reklamní plocha byla úspěšně založena!');
+      onSuccess(parsed.data.carrier, parsed.data.message || 'Nová reklamní plocha byla úspěšně založena!');
       onClose();
     } catch (err: unknown) {
       console.error('Submit create carrier error:', err);
-      setErrorMsg(err instanceof Error ? err.message : 'Chyba při ukládání do databáze.');
+      setErrorMsg(getFriendlyPhotoErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -286,11 +299,19 @@ export function MobileCreateCarrierModal({
             <button
               type="button"
               onClick={onRetake}
-              className="absolute bottom-2 right-2 flex items-center gap-1 rounded-xl bg-slate-900/90 px-3 py-1.5 text-[11px] font-bold text-white shadow border border-slate-700 hover:bg-slate-800 transition"
+              disabled={isPreparingPhoto}
+              className="absolute bottom-2 right-2 flex items-center gap-1 rounded-xl bg-slate-900/90 px-3 py-1.5 text-[11px] font-bold text-white shadow border border-slate-700 hover:bg-slate-800 transition disabled:opacity-50"
             >
               <Camera size={12} />
               <span>Přeformátovat / Přefotit</span>
             </button>
+
+            {isPreparingPhoto && (
+              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-10 text-emerald-400">
+                <RefreshCw size={24} className="animate-spin" />
+                <span className="text-xs font-bold">Připravuji fotografii…</span>
+              </div>
+            )}
           </div>
 
           {/* Error Message */}
@@ -613,13 +634,18 @@ export function MobileCreateCarrierModal({
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || isPreparingPhoto}
               className="flex-2 rounded-xl bg-emerald-500 py-3 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
             >
               {saving ? (
                 <>
                   <RefreshCw size={14} className="animate-spin" />
                   <span>Ukládám do databáze...</span>
+                </>
+              ) : isPreparingPhoto ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" />
+                  <span>Připravuji fotografii…</span>
                 </>
               ) : (
                 <>
