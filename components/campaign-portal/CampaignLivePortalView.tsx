@@ -91,7 +91,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const [copied, setCopied] = useState(false);
 
   const isNavigation = offer.offerType === 'NAVIGATION' && Boolean(offer.navigation);
-  const navPoints = offer.navigation?.points || [];
+  const navPoints = (offer.navigation?.points || []).filter((p) => p.isSelectedByClient !== false);
   const navTarget = offer.navigation ? {
     latitude: offer.navigation.targetLatitude,
     longitude: offer.navigation.targetLongitude,
