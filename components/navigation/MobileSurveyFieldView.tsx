@@ -161,6 +161,7 @@ export function MobileSurveyFieldView({
   const [editingCandidate, setEditingCandidate] = useState<CandidatePointItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Form Fields
   const [formRouteId, setFormRouteId] = useState<string>('');
@@ -254,6 +255,7 @@ export function MobileSurveyFieldView({
   };
 
   const handleOpenAddModal = (existing?: CandidatePointItem) => {
+    setModalError(null);
     if (existing) {
       setEditingCandidate(existing);
       setFormRouteId(existing.surveyRouteId || '');
@@ -314,14 +316,15 @@ export function MobileSurveyFieldView({
 
   const handleSaveCandidate = async (isDraft: boolean = false) => {
     if (!formLat || !formLng) {
-      alert('Poloha GPS je povinná. Klikněte na Získat moji GPS.');
+      setModalError('Poloha GPS je povinná. Klikněte na Získat moji GPS.');
       return;
     }
     setSaving(true);
+    setModalError(null);
 
+    const uploadedPhotoIds: string[] = [];
     try {
       // 1. Upload photos if any
-      const uploadedPhotoIds: string[] = [];
       for (const p of photosToUpload) {
         const compressed = await compressImageFile(p.file);
         const formData = new FormData();
@@ -385,11 +388,27 @@ export function MobileSurveyFieldView({
         setTimeout(() => setToastMessage(null), 4000);
         fetchSurvey();
       } else {
-        const errJson = await res.json();
-        alert(errJson.error || 'Chyba při ukládání kandidátního místa.');
+        // Rollback unlinked uploaded photos
+        if (uploadedPhotoIds.length > 0) {
+          await Promise.allSettled(
+            uploadedPhotoIds.map((id) => fetch(`/api/photos/${id}`, { method: 'DELETE' }).catch(() => {}))
+          );
+        }
+        const errJson = await res.json().catch(() => ({}));
+        const rawErr = typeof errJson?.error === 'string' ? errJson.error : '';
+        const friendlyMsg = rawErr.includes('Foreign key') || rawErr.includes('Prisma') || rawErr.includes('P2003')
+          ? 'Místo se nepodařilo uložit. Zkuste akci zopakovat.'
+          : (rawErr || 'Místo se nepodařilo uložit. Zkuste akci zopakovat.');
+        setModalError(friendlyMsg);
       }
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : 'Chyba připojení.');
+      // Rollback unlinked uploaded photos
+      if (uploadedPhotoIds.length > 0) {
+        await Promise.allSettled(
+          uploadedPhotoIds.map((id) => fetch(`/api/photos/${id}`, { method: 'DELETE' }).catch(() => {}))
+        );
+      }
+      setModalError('Chyba připojení k serveru. Zkontrolujte připojení a zkuste akci zopakovat.');
     } finally {
       setSaving(false);
     }
@@ -734,6 +753,13 @@ export function MobileSurveyFieldView({
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1.5">✕</button>
             </div>
+
+            {modalError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between gap-2 animate-in fade-in duration-150">
+                <span>⚠️ {modalError}</span>
+                <button type="button" onClick={() => setModalError(null)} className="text-rose-600 hover:text-rose-900 font-bold p-1">✕</button>
+              </div>
+            )}
 
             {/* GPS & Location Box */}
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">

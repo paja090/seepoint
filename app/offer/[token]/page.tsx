@@ -81,6 +81,11 @@ export default async function PublicOfferPage({ params, searchParams }: { params
     return <CampaignConceptPublicView offer={offer} publicToken={token} />;
   }
 
+  const search = await searchParams;
+  if (['ACCEPTED', 'CONVERTED'].includes(offer.status) && search.view !== 'proposal') {
+    return <CampaignLivePortalView offer={offer} publicToken={token} />;
+  }
+
   if (offer.offerType === 'NAVIGATION' || offer.offerType === 'CITY_GALLERY') {
     const navigationMode = (offer.navigation as unknown as { proposalMode?: string } | undefined)?.proposalMode;
     const isLocationSelection = offer.offerType === 'NAVIGATION' && navigationMode !== 'PRICED_QUOTE';
@@ -119,11 +124,6 @@ export default async function PublicOfferPage({ params, searchParams }: { params
         </div>
       </div>
     );
-  }
-
-  const search = await searchParams;
-  if (['ACCEPTED', 'CONVERTED'].includes(offer.status) && search.view !== 'proposal') {
-    return <CampaignLivePortalView offer={offer} publicToken={token} />;
   }
 
   return <OfferProposal branding={offer.branding} offer={toProposalOffer(offer)} token={token} />;

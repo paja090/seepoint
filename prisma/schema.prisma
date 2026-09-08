@@ -1603,6 +1603,7 @@ model NavigationPoint {
   surface                      AdvertisingSurface?           @relation(fields: [surfaceId], references: [id], onDelete: SetNull)
   installedPhoto               Photo?                        @relation("PointInstalledPhoto", fields: [installedPhotoId], references: [id], onDelete: SetNull)
   sitePhoto                    Photo?                        @relation("PointSitePhoto", fields: [sitePhotoId], references: [id], onDelete: SetNull)
+  surveyPhotos                 Photo[]                       @relation("NavigationPointSurveyPhotos")
   installerUser                User?                         @relation("NavPointInstaller", fields: [installerUserId], references: [id], onDelete: SetNull)
   priceVersions                NavigationPriceVersion[]
   priceAuditLogs               NavigationPriceAuditLog[]
@@ -1962,6 +1963,7 @@ model Photo {
   workEntryId            String?
   crmRealizationId       String?
   surveyCandidatePointId String?
+  surveyNavigationPointId String?
   url                    String
   driveFileId            String?
   fileName               String?
@@ -2000,6 +2002,7 @@ model Photo {
   installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
   siteNavigationPoint          NavigationPoint?              @relation("PointSitePhoto")
   surveyCandidatePoint         NavigationCandidatePoint?     @relation("CandidatePhotos", fields: [surveyCandidatePointId], references: [id], onDelete: SetNull)
+  surveyNavigationPoint        NavigationPoint?              @relation("NavigationPointSurveyPhotos", fields: [surveyNavigationPointId], references: [id], onDelete: SetNull)
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
@@ -2008,6 +2011,7 @@ model Photo {
   @@index([employeeId])
   @@index([organizationId])
   @@index([organizationId, storageProvider])
+  @@index([surveyNavigationPointId])
 }
 
 model ImportProfile {

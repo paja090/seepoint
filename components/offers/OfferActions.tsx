@@ -165,7 +165,7 @@ export function OfferActions({
                     href={persistentCampaignUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer shadow-xs"
                     title="Otevřít Klientský Live Portál & Proof of Play fotodokumentaci"
                   >
                     <ExternalLink size={13} />
