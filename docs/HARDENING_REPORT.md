@@ -327,3 +327,12 @@ Cílené offline regresní testy: 13/13 PASS. Živý běh opravy musí být ově
 - Confirmed CRON_SECRET is absent from current Vercel environment metadata (no values printed). Production automatic invocation therefore still needs the secret configured and an authorized production deployment; previews do not establish that the production schedule works.
 - Independent source checks confirmed dates for NATO Days, Meat Design and CERNA AI Festival on organizer websites. Other candidates still need commercial/factual review.
 - CI 34350154660 failed only because an assertion expected the previous schedule wording. Updated the assertion; all 25 related radar/security tests now pass. No production deployment or production migration performed.
+
+### Production release preparation and navigation conversion fix — 2026-09-09
+
+- User explicitly authorized production deployment and corrected the reported issue to offer-to-realization conversion failing on NavigationPoint.sitePhotoId uniqueness.
+- The offer and realization legitimately reference the same survey photo. Removed the unique site-photo index, retained an ordinary index and the foreign key, and made Photo.siteNavigationPoints a collection. No photo or offer data deleted.
+- Real PostgreSQL regression passed: conversion with a site photo creates the order, both offer/realization preserve the photo, and a repeated conversion returns the same order. Entire fixture transaction rolled back. Default suite: 478 pass, 1 opt-in DB test skipped; the opt-in test passed separately. Typecheck passed.
+- Recovery snapshot: snap-square-art-ato5pnea on production main br-super-boat-at3cgqf3.
+- Production DB verified: all prior migrations applied, no duplicate domain/provider claims, 7 legacy public tokens and 0 encrypted tokens. Applied email_domain_ownership and navigation_shared_site_photo transactionally through Neon, including exact Prisma migration checksums.
+- Added missing production CRON_SECRET, OFFER_PORTAL_KEYS and OFFER_PORTAL_ACTIVE_KEY as sensitive Vercel variables; no old keys rotated and no token regenerated. Full production secret export was rejected and avoided. Subsequent configuration approved after demonstrating no existing keys/encrypted tokens and tested legacy compatibility.

@@ -1542,7 +1542,7 @@ model NavigationPoint {
   carrierId         String?
   surfaceId         String?
   installedPhotoId  String?
-  sitePhotoId       String?               @unique
+  sitePhotoId       String?
   sortOrder         Int                   @default(0)
   latitude          Float
   longitude         Float
@@ -1618,6 +1618,7 @@ model NavigationPoint {
   @@index([surfaceId])
   @@index([latitude, longitude])
   @@index([organizationId])
+  @@index([sitePhotoId])
 }
 
 enum NavigationReportStatus {
@@ -2002,7 +2003,7 @@ model Photo {
   crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
   navigationDocumentationItems NavigationDocumentationItem[]
   installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
-  siteNavigationPoint          NavigationPoint?              @relation("PointSitePhoto")
+  siteNavigationPoints         NavigationPoint[]              @relation("PointSitePhoto")
   surveyCandidatePoint         NavigationCandidatePoint?     @relation("CandidatePhotos", fields: [surveyCandidatePointId], references: [id], onDelete: SetNull)
   surveyNavigationPoint        NavigationPoint?              @relation("NavigationPointSurveyPhotos", fields: [surveyNavigationPointId], references: [id], onDelete: SetNull)
 
