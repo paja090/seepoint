@@ -22,6 +22,8 @@ test('navigation conversion preserves shared site photo and is idempotent in Pos
       assert.equal(repeated.id, order.id);
       const points = await tx.navigationPoint.findMany({ where: { organizationId, sitePhotoId: photo.id } });
       assert.equal(points.length, 2);
+      const sharedPhoto = await tx.photo.findUniqueOrThrow({ where: { id: photo.id }, select: { siteNavigationPoints: { select: { id: true } } } });
+      assert.equal(sharedPhoto.siteNavigationPoints.length, 2);
       assert.ok(points.some(p => p.id === source.id && p.navigationOfferId === nav.id));
       assert.ok(points.some(p => p.navigationOrderId === order.id));
       assert.equal(await tx.crmOrder.count({ where: { organizationId, offerId: offer.id } }), 1);
