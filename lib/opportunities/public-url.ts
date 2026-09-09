@@ -1,3 +1,4 @@
+import { radarRequestSignal } from './deadline';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { OpportunityValidationError } from './policy';
@@ -57,13 +58,13 @@ async function readLimitedText(response: Response, maxBytes: number) {
   return new TextDecoder().decode(merged);
 }
 
-export async function fetchPublicArticle(rawUrl: string) {
+export async function fetchPublicArticle(rawUrl: string, deadline = Date.now() + 30_000) {
   let url = await assertPublicHttpUrl(rawUrl);
   for (let redirect = 0; redirect <= 3; redirect++) {
     const response = await fetch(url, {
       redirect: 'manual',
       headers: { 'User-Agent': 'SeePointOpportunityRadar/1.0' },
-      signal: AbortSignal.timeout(10_000),
+      signal: radarRequestSignal(deadline, 10_000),
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('location');

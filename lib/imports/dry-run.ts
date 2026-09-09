@@ -1,3 +1,4 @@
+import { importJson } from './json';
 import { prisma } from '@/lib/db';
 import { cleanText, normalizeCode, normalizeText, parseCoordinate } from '@/lib/carriers-2026/normalize';
 import { calculateHaversineDistanceKm } from '@/lib/opportunities/distance';
@@ -133,7 +134,7 @@ export async function executeDryRun(
     targetEntity: string;
     targetEntityId?: string;
     diff?: FieldDiff[];
-    conflictDetails?: any;
+    conflictDetails?: DryRunRowResult['conflictDetails'];
     issues: RowIssue[];
     mappedData: Record<string, unknown>;
   }> = [];
@@ -169,7 +170,7 @@ export async function executeDryRun(
     let targetEntityId: string | undefined;
     let targetIdentifier: string | undefined;
     const diff: FieldDiff[] = [];
-    let conflictDetails: any = null;
+    let conflictDetails: DryRunRowResult['conflictDetails'];
     const issues: RowIssue[] = [];
 
     if (classification === 'CLIENTS') {
@@ -397,10 +398,10 @@ export async function executeDryRun(
             action: item.action,
             targetEntity: item.targetEntity,
             targetEntityId: item.targetEntityId,
-            diff: (item.diff as any) || null,
-            conflictDetails: item.conflictDetails || null,
-            issues: (item.issues as any) || null,
-            mappedData: item.mappedData as any,
+            diff: importJson(item.diff ?? null),
+            conflictDetails: importJson(item.conflictDetails ?? null),
+            issues: importJson(item.issues),
+            mappedData: importJson(item.mappedData),
           },
         })
       )
@@ -427,7 +428,7 @@ export async function executeDryRun(
       validRows: createCount + updateCount + unchangedCount,
       skippedRows: skipCount,
       errorRows: errorCount + conflictCount,
-      dryRunStats: stats as any,
+      dryRunStats: stats,
     },
   });
 

@@ -29,17 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         isPrivate: true,
         carrierId: true,
         surfaceId: true,
-        siteNavigationPoint: {
-          select: {
-            navigationOffer: {
-              select: {
-                offer: {
-                  select: { createdByUserId: true },
-                },
-              },
-            },
-          },
-        },
+        siteNavigationPoints: { take: 1, select: { id: true } },
       },
     });
 

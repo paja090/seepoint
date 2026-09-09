@@ -173,8 +173,8 @@ export function SalesOpportunitiesClientView({
       if (!res.ok) throw new Error(data.error || 'Automatické vyhledávání selhalo.');
       await fetchOpportunities();
       setFeedback({
-        kind: 'success',
-        message: `AI Radar vyhodnotil ${data.processed || 0} zdrojů a signálů, vytvořil ${data.addedCount || 0} nových obchodních příležitostí a zachytil ${data.duplicateCount || 0} duplicit.`,
+        kind: data.warning ? 'error' : 'success',
+        message: `${data.warning ? data.warning + ' ' : ''}AI Radar vyhodnotil ${data.processed || 0} zdrojů a signálů, vytvořil ${data.addedCount || 0} nových obchodních příležitostí a zachytil ${data.duplicateCount || 0} duplicit.`,
       });
     } catch (err) {
       console.error('Auto discover failed', err);

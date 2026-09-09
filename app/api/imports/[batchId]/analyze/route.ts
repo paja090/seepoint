@@ -13,7 +13,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ batchId: string }> }
 ) {
-  const auth = await requireApiAccess('import');
+  const auth = await requireApiAccess('import', 'import');
   if (isApiDenied(auth)) return auth;
 
   let organizationId: string;
@@ -77,7 +77,7 @@ export async function POST(
         data: {
           classification,
           confidence,
-          columnMappings: mappings as any,
+          columnMappings: mappings,
           status: 'MAPPED',
         },
       });

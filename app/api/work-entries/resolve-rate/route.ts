@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { resolveWorkEntryRate } from '@/lib/work-entry-rates';
 import { canAccess } from '@/lib/rbac';
@@ -13,7 +13,8 @@ import {
 } from '@/lib/work-entry-policy';
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('workEntries');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }

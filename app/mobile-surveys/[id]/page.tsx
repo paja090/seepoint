@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 type Params = Promise<{ id: string }>;
 
 export default async function MobileSurveyDetailPage({ params }: { params: Params }) {
-  await requirePageAccess('navigationProjects');
+  await requirePageAccess('navigationProjects', 'mobileSurveys');
   const { id } = await params;
 
   return (

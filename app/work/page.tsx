@@ -2,6 +2,7 @@ import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { WorkModuleClient } from '@/components/WorkModuleClient';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
+import { overlapsAbsence } from '@/lib/work-absence-conflicts';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,14 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   }));
 
   const canCreateWorkOrder = !['WORKER', 'TECHNICIAN'].includes(user.role);
+  const assignedIds = [...new Set(orders.flatMap(order => order.workTasks.map(task => task.assignedToEmployeeId).filter((id): id is string => Boolean(id))))];
+  const absences = canCreateWorkOrder && assignedIds.length ? await prisma.employeeAbsence.findMany({
+    where: { employeeId: { in: assignedIds }, status: 'APPROVED' },
+    select: { employeeId: true, dateFrom: true, dateTo: true },
+  }) : [];
+  const absenceConflicts = orders.filter(order => !['DONE', 'CANCELLED'].includes(order.status)).flatMap(order =>
+    order.workTasks.filter(task => task.assignedTo && absences.some(absence => absence.employeeId === task.assignedToEmployeeId && overlapsAbsence(order.scheduledAt, order.deadlineAt, absence)))
+      .map(task => `${order.title}: ${task.assignedTo!.firstName} ${task.assignedTo!.lastName} má schválenou nepřítomnost v termínu práce.`));
 
   const mappedOrders = orders.map((order) => ({
     id: order.id,
@@ -79,6 +88,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl">
+        {absenceConflicts.length > 0 && <section role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4"><h2 className="font-bold">Konflikty s nepřítomností</h2><ul>{absenceConflicts.map((message, index) => <li key={index}>{message}</li>)}</ul><p>Upravte přiřazení nebo termín podle potřeby.</p></section>}
         <WorkModuleClient
           orders={mappedOrders}
           clients={clients.map((client) => ({ id: client.id, label: client.name }))}

@@ -1,4 +1,4 @@
-name: Tenant security
+name: SeePoint quality and security
 
 on:
   pull_request:
@@ -11,7 +11,11 @@ permissions:
 jobs:
   tenant-security:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/seepoint_ci
+      NEXTAUTH_SECRET: ci-only-not-a-production-secret
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,5 +24,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run security:tenant
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run build

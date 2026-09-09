@@ -1,41 +1,28 @@
-﻿'use server';
-
+'use server';
 import { revalidatePath } from 'next/cache';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { getPublicRow } from '@/lib/offers/service';
+import { runWithTenantContext } from '@/lib/tenant-context';
+import { isModuleEnabled } from '@/lib/organization-modules';
+import { safeArtworkUrl, textInput } from '@/lib/production/production-policy';
+import { transitionProductionJob } from '@/lib/production/production-service';
 
-/**
- * Public server action — does NOT require authentication.
- * Called from the client-facing portal when a client approves print data.
- */
-export async function approvePrintJobByClient(
-  token: string,
-  approverName: string,
-  note?: string,
-  artworkUrl?: string,
-) {
-  if (!token || typeof token !== 'string' || token.length < 10) {
-    throw new Error('Neplatný schvalovací token. Kontaktujte obchodníka.');
-  }
-  if (!approverName || typeof approverName !== 'string' || !approverName.trim()) {
-    throw new Error('Jméno schvalovatele je povinné.');
-  }
-
-  const dataToUpdate: Record<string, unknown> = {
-    status: 'IN_PRINT',
-    clientApprovedAt: new Date(),
-    clientApprovedBy: approverName.trim(),
-    clientApprovalNote: note?.trim() || null,
-  };
-
-  if (artworkUrl && artworkUrl.trim()) {
-    dataToUpdate.artworkUrl = artworkUrl.trim();
-  }
-
-  const job = await prisma.printProductionJob.update({
-    where: { clientApprovalToken: token },
-    data: dataToUpdate,
-  });
-
+export async function approvePrintJobByClient(token: string, approverName: string, note?: string, artworkUrl?: string, printJobId?: string) {
+  const name = textInput(approverName, 'Jméno schvalovatele', 120, true)!;
+  const approvalNote = textInput(note, 'Poznámka', 4000);
+  const url = safeArtworkUrl(artworkUrl);
+  const id = textInput(printJobId, 'Tisková zakázka', 128, true)!;
+  const offer = await getPublicRow(token);
+  const organization = await prisma.organization.findUnique({ where: { id: offer.organizationId } });
+  if (!organization?.isActive || !isModuleEnabled(organization, 'printProduction')) throw new Error('Schvalování není dostupné.');
+  const result = await runWithTenantContext({ organizationId: offer.organizationId, source: 'public-token' }, () => prisma.$transaction(async tx => {
+    const current = await tx.offer.findUnique({ where: { id: offer.id, publicTokenRevokedAt: null } });
+    if (!current) throw new Error('Odkaz není dostupný.');
+    return transitionProductionJob(tx, id, 'IN_PRINT', { name }, { offerId: offer.id, name, note: approvalNote, artworkUrl: url });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
   revalidatePath('/production');
-  return job;
+  revalidatePath(`/offer/${token}`);
+  revalidatePath(`/p/${token}`);
+  return result;
 }

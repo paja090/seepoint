@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma, platformPrisma } from '@/lib/db';
 import { verifyResendWebhookSignature } from '@/lib/resend-service';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import type { EmailLogStatus } from '@prisma/client';
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const emailId = typeof data.email_id === 'string' ? data.email_id : typeof data.id === 'string' ? data.id : null;
 
     if (eventType.startsWith('email.') && emailId) {
-      const emailLog = await prisma.emailLog.findUnique({
+      const emailLog = await platformPrisma.emailLog.findUnique({
         where: { providerMessageId: emailId },
       });
 
@@ -74,14 +74,14 @@ export async function POST(request: Request) {
             break;
         }
 
-        await prisma.emailLog.update({
+        await runWithTenantContext({ organizationId: emailLog.organizationId, source: 'script' }, () => prisma.emailLog.update({
           where: { id: emailLog.id },
           data: {
             status: nextStatus,
             deliveredAt: deliveredAt || undefined,
             error: errorMsg || undefined,
           },
-        });
+        }));
 
         // If this email is linked to an offer, record an event in tenant context
         const metadata = (emailLog.metadata as Record<string, unknown>) || {};
@@ -93,6 +93,8 @@ export async function POST(request: Request) {
               source: 'session',
             },
             async () => {
+              const offer = await prisma.offer.findUnique({ where: { id: String(metadata.offerId) }, select: { id: true } });
+              if (!offer) return;
               await prisma.offerEvent.create({
                 data: {
                   offerId: String(metadata.offerId),
@@ -112,7 +114,7 @@ export async function POST(request: Request) {
       const providerDomainId = String(data.id);
       const domainStatus = String(data.status || '').toLowerCase();
 
-      const settings = await prisma.organizationEmailSettings.findFirst({
+      const settings = await platformPrisma.organizationEmailSettings.findFirst({
         where: { providerDomainId },
       });
 
@@ -122,13 +124,13 @@ export async function POST(request: Request) {
         else if (domainStatus === 'failed') nextDomainStatus = 'FAILED';
         else if (domainStatus === 'pending') nextDomainStatus = 'PENDING';
 
-        await prisma.organizationEmailSettings.update({
+        await runWithTenantContext({ organizationId: settings.organizationId, source: 'script' }, () => prisma.organizationEmailSettings.update({
           where: { id: settings.id },
           data: {
             status: nextDomainStatus,
             lastVerifiedAt: domainStatus === 'verified' ? new Date() : undefined,
           },
-        });
+        }));
       }
     }
 

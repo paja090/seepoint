@@ -152,7 +152,7 @@ export function calculateOpportunityScore(input: ScoreInput): OpportunityScoreRe
   }
 
   // Dimension 6: EVIDENCE
-  let evidence = 5;
+  const evidence = 5;
   if (input.hasVerifiedEvidence !== false) {
     reasons.push({ factor: 'EVIDENCE', points: 5, reason: 'Signál doložen z externího zdroje.' });
   }

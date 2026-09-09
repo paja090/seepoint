@@ -6,7 +6,7 @@ import { OpportunityValidationError, parseOpportunityStatusInput } from '@/lib/o
 export const runtime = 'nodejs';
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {
@@ -23,7 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {

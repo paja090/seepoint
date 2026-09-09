@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
 import { canManageWarehouseCatalog } from '@/lib/rbac';
 import { WarehouseInputError, warehouseCategory, warehouseNumber, warehouseText } from '@/lib/warehouse-validation';
@@ -7,7 +7,8 @@ import { WarehouseInputError, warehouseCategory, warehouseNumber, warehouseText 
 export const runtime = 'nodejs';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('warehouse');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   if (!canManageWarehouseCatalog(user.role)) {
     return NextResponse.json({ error: 'Skladové položky může spravovat pouze administrátor nebo manažer.' }, { status: 403 });
@@ -50,7 +51,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('warehouse');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   if (!canManageWarehouseCatalog(user.role)) {
     return NextResponse.json({ error: 'Skladové položky může spravovat pouze administrátor nebo manažer.' }, { status: 403 });

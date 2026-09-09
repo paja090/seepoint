@@ -3,7 +3,7 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { convertOfferToNavigationOrder, listNavigationOrders } from '@/lib/navigation/navigation-service';
 
 export async function GET(req: NextRequest) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'navigation');
   if (isApiDenied(authResult)) return authResult;
   const user = authResult;
 
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'navigation');
   if (isApiDenied(authResult)) return authResult;
   const user = authResult;
 

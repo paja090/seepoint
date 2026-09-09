@@ -52,7 +52,7 @@ test('AI parser uses private server keys, one configured model and bounded exter
   const parser = source('lib/opportunities/parser.ts');
   assert.doesNotMatch(parser, /NEXT_PUBLIC_(GEMINI|OPENAI)/);
   assert.match(parser, /fetchPublicArticle/);
-  assert.match(parser, /AbortSignal\.timeout\(20_000\)/);
+  assert.match(parser, /radarRequestSignal\(deadline, 20_000\)/);
   assert.match(parser, /GEMINI_OPPORTUNITY_MODEL/);
   assert.match(parser, /x-goog-api-key/);
   assert.doesNotMatch(parser, /generateContent\?key=/);
@@ -64,7 +64,7 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
   const discovery = source('app/api/sales/opportunities/auto-discover/route.ts');
   const scheduled = source('app/api/sales/opportunities/scheduled-discovery/route.ts');
   const collector = source('lib/opportunities/feed-collector.ts');
-  const liveSearch = source('lib/opportunities/live-search.ts');
+  const liveSearch = source('lib/opportunities/live-search-core.ts');
   assert.match(service, /organizationId/);
   assert.match(service, /organizationMember\.count/);
   assert.match(parseRoute, /rateLimitPolicies\.opportunityAi/);
@@ -78,7 +78,7 @@ test('opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery'
   assert.match(collector, /skipDuplicates:\s*true/);
   assert.match(discovery, /\.slice\(0,\s*(?:remainingSlots|5)\)/);
   assert.match(discovery, /runWithTenantContext/);
-  assert.match(liveSearch, /AbortSignal\.timeout\(15_000\)/);
+  assert.match(liveSearch, /radarRequestSignal\(deadline, 60_000\)/);
 });
 
 test('CRM linking is serializable, tenant checked and audited without using article URL as company website', () => {

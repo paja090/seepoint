@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { PrintProductionDashboard } from './PrintProductionDashboard';
+import { recoverPortalToken } from '@/lib/offers/token';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export default async function ProductionPage() {
   const jobs = await prisma.printProductionJob.findMany({
     where: { organizationId: user.organizationId! },
     include: {
-      offer: { select: { publicTokenHash: true } },
+      offer: { select: { id: true, publicTokenHash: true, publicTokenEncrypted: true, publicTokenRevokedAt: true } },
       client: { select: { name: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -39,7 +40,7 @@ export default async function ProductionPage() {
           </div>
         </div>
 
-        <PrintProductionDashboard offers={offers} jobs={jobs} />
+        <PrintProductionDashboard offers={offers} jobs={jobs.map(job => ({ ...job, offer: job.offer ? { portalToken: recoverPortalToken(job.offer) } : null }))} />
       </div>
     </AppShell>
   );

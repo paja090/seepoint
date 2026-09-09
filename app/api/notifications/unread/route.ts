@@ -1,7 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { canAccess } from '@/lib/rbac';
+import { hasModuleAccess } from '@/lib/module-policy';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +20,7 @@ export async function GET() {
 
   const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults, recentRadarOpps] = await Promise.all([
     // Tasks assigned to user
-    canAccess(user.role, 'work') ? prisma.workAssignment.findMany({
+    hasModuleAccess(user, 'work') ? prisma.workAssignment.findMany({
       where: {
         OR: [
           { workerName: { contains: userName, mode: 'insensitive' } },
@@ -64,7 +64,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     }),
     // Vehicle fault reports in last 24h
-    canAccess(user.role, 'vehicles') ? prisma.vehicleServiceRecord.findMany({
+    hasModuleAccess(user, 'vehicles') ? prisma.vehicleServiceRecord.findMany({
       where: {
         title: { contains: 'Hlášená závada', mode: 'insensitive' },
         createdAt: { gte: last24h },
@@ -76,7 +76,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     }) : Promise.resolve([]),
     // Fresh AI Radar opportunities in last 24h
-    canAccess(user.role, 'clients') ? prisma.salesOpportunity.findMany({
+    hasModuleAccess(user, 'salesRadar') ? prisma.salesOpportunity.findMany({
       where: {
         status: 'NEW',
         opportunityScore: { gte: 40 },

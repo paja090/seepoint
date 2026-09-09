@@ -5,7 +5,7 @@ import { getOrganizationRadarProfile, saveOrganizationRadarProfile } from '@/lib
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {
@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
   if (!['ADMIN', 'MANAGER'].includes(user.role)) {
     return NextResponse.json({ error: 'Nastavení profilu radaru může měnit pouze administrátor nebo manažer.' }, { status: 403 });

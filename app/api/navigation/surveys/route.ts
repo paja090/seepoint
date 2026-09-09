@@ -1,13 +1,14 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const currentUser = await getCurrentUser();
+    const currentUser = await requireApiAccess('navigationProjects');
+  if (isApiDenied(currentUser)) return currentUser;
     if (!currentUser) {
       return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
     }

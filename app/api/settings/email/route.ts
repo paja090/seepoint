@@ -1,3 +1,4 @@
+import { isValidEmailAddress } from '@/lib/email-policy';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
@@ -175,6 +176,11 @@ export async function PATCH(request: Request) {
         const rawFromEmail = typeof body?.fromEmail === 'string' ? body.fromEmail.trim().toLowerCase() : undefined;
         const rawReplyTo = typeof body?.replyTo === 'string' ? body.replyTo.trim().toLowerCase() : undefined;
 
+        if ((rawSenderName && rawSenderName.length > 80)
+          || (rawFromEmail && !isValidEmailAddress(rawFromEmail))
+          || (rawReplyTo && !isValidEmailAddress(rawReplyTo))) {
+          return NextResponse.json({ error: 'Zadejte platné jméno odesílatele a e-mailové adresy.' }, { status: 400 });
+        }
         const settings = await prisma.organizationEmailSettings.findUnique({
           where: { organizationId: user.organizationId },
         });
@@ -191,6 +197,7 @@ export async function PATCH(request: Request) {
         }
 
         const updated = await prisma.organizationEmailSettings.update({
+          omit: { encryptedSendingApiKey: true },
           where: { id: settings.id },
           data: {
             senderName: rawSenderName || settings.senderName,
@@ -214,4 +221,3 @@ export async function PATCH(request: Request) {
     }
   );
 }
-

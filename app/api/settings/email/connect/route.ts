@@ -74,8 +74,11 @@ export async function POST(request: Request) {
           cleanReplyTo = trimmedReplyTo;
         }
 
-        // Register domain via Resend Management API (supports optional key override if Vercel env is missing/stale)
-        const resendDomain = await registerResendDomain(cleanDomain, cleanResendApiKey);
+        // Existing system-key domains must already belong to this organization.
+        // An explicit provider key is verified by Resend; DB unique indexes still prevent cross-tenant reassignment.
+        const ownedSettings = await prisma.organizationEmailSettings.findUnique({ where: { organizationId: user.organizationId }, select: { domain: true, providerDomainId: true } });
+        const ownedProviderDomainId = ownedSettings?.domain === cleanDomain ? ownedSettings?.providerDomainId ?? undefined : undefined;
+        const resendDomain = await registerResendDomain(cleanDomain, cleanResendApiKey, ownedProviderDomainId);
 
         // Upsert into OrganizationEmailSettings
         const saved = await prisma.organizationEmailSettings.upsert({

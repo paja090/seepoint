@@ -220,7 +220,7 @@ export function RadarSettingsModal({
                   <div className="pt-2 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                     <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 rounded-xl px-2.5 py-1.5 font-medium">
                       <Clock className="h-3.5 w-3.5 shrink-0" />
-                      <span>Ranní automat: Každý všední den v 7:00</span>
+                      <span>Ranní automat: Všední dny v 7:00 v zimě / 8:00 v létě</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-purple-300 bg-purple-950/40 border border-purple-800/40 rounded-xl px-2.5 py-1.5 font-medium">
                       <Bell className="h-3.5 w-3.5 shrink-0" />

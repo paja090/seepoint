@@ -5,7 +5,7 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   try {

@@ -52,7 +52,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
 
   // Batch state
   const [batchId, setBatchId] = useState<string | null>(null);
-  const [sheets, setSheets] = useState<SheetAnalysisSummary[]>([]);
+  const [sheets, setSheets] = useState<(SheetAnalysisSummary & { id: string })[]>([]);
   const [activeSheetIdx, setActiveSheetIdx] = useState(0);
 
   // Dry run state
@@ -63,7 +63,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
   // Commit state
   const [confirmationText, setConfirmationText] = useState('');
   const [saveProfileAs, setSaveProfileAs] = useState('');
-  const [commitResult, setCommitResult] = useState<any>(null);
+  const [commitResult, setCommitResult] = useState<{ createdCarriers: number; updatedCarriers: number; createdClients: number; createdPrices: number } | null>(null);
 
   // --- Step 1: Upload ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,7 +147,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheets: sheets.map((s) => ({
-            sheetId: (s as any).id,
+            sheetId: s.id,
             classification: s.classification,
             columnMappings: s.columnMappings,
           })),
@@ -720,7 +720,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                     {/* Issues display if action is ERROR or has issues */}
                     {row.issues && row.issues.length > 0 && (
                       <div className="bg-rose-50/90 rounded-lg border border-rose-200 p-2.5 text-xs text-rose-800 space-y-1">
-                        {row.issues.map((iss: any, i: number) => (
+                        {row.issues.map((iss, i) => (
                           <div key={i} className="flex items-center gap-1.5 font-semibold">
                             <span>⚠️</span>
                             <span>{iss.message}</span>

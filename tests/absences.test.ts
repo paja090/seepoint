@@ -41,7 +41,7 @@ test('review, deletion and private notes follow server-side role rules', () => {
 
 test('absence API enforces module access, approval workflow and transactional overlap checks', () => {
   const api = read('app/api/absences/route.ts');
-  assert.match(api, /requireApiAccess\('team'\)/);
+  assert.match(api, /requireApiAccess\('team', 'vacations'\)/);
   assert.match(api, /TransactionIsolationLevel\.Serializable/);
   assert.match(api, /ABSENCE_CONFLICT/);
   assert.match(api, /canCreateAbsenceFor/);

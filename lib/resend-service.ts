@@ -1,3 +1,4 @@
+import { canReuseResendDomain } from './email-domain-ownership';
 import crypto from 'node:crypto';
 
 const RESEND_API_BASE = 'https://api.resend.com';
@@ -53,7 +54,7 @@ function formatResendError(rawMessage: string): string {
  * Returns the domain details including DNS records (SPF, DKIM, MX).
  * If the domain already exists in the Resend account, seamlessly loads and returns its records.
  */
-export async function registerResendDomain(domain: string, customApiKey?: string): Promise<ResendDomainResponse> {
+export async function registerResendDomain(domain: string, customApiKey?: string, ownedProviderDomainId?: string): Promise<ResendDomainResponse> {
   const cleanDomain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
   if (!cleanDomain || !cleanDomain.includes('.') || cleanDomain.length > 120) {
     throw new Error('Neplatný název domény.');
@@ -79,11 +80,12 @@ export async function registerResendDomain(domain: string, customApiKey?: string
           headers: { Authorization: `Bearer ${apiKey}` },
           signal: AbortSignal.timeout(TIMEOUT_MS),
         });
+        if (!listRes.ok) throw new Error('Provider domain ownership could not be verified.');
         const listData = await listRes.json().catch(() => ({}));
         const existing = (listData?.data as ResendDomainResponse[] | undefined)?.find(
           (d) => d.name.toLowerCase() === cleanDomain
         );
-        if (existing) {
+        if (existing && canReuseResendDomain(existing.id, ownedProviderDomainId, Boolean(customApiKey?.trim()))) {
           return await getResendDomain(existing.id, apiKey);
         }
       } catch (lookupErr) {

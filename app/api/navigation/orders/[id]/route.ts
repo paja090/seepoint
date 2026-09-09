@@ -7,7 +7,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'navigation');
   if (isApiDenied(authResult)) return authResult;
   const user = authResult;
   const id = (await params).id;
@@ -25,7 +25,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireApiAccess('offers');
+  const authResult = await requireApiAccess('offers', 'navigation');
   if (isApiDenied(authResult)) return authResult;
   const user = authResult;
   const id = (await params).id;

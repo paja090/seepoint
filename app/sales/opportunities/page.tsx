@@ -7,7 +7,7 @@ import { SalesOpportunitiesClientView } from '@/components/opportunities/SalesOp
 export const dynamic = 'force-dynamic';
 
 export default async function SalesOpportunitiesPage() {
-  const user = await requirePageAccess('clients');
+  const user = await requirePageAccess('clients', 'salesRadar');
 
   const [opportunitiesData, stats, clients] = await Promise.all([
     getOpportunities({ take: 50 }, user.organizationId),

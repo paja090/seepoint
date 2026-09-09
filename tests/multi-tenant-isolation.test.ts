@@ -63,7 +63,7 @@ test('public offers resolve tenant only by an opaque token and never by offer id
   assert.doesNotMatch(service, /publicTokenHash: cleanToken/);
   assert.doesNotMatch(service, /publicTokenHash: \{ startsWith:/);
   assert.doesNotMatch(service, /token: id, path: `\/offer\/\$\{id\}`/);
-  assert.ok((service.match(/createPublicOfferToken\(\)/g) ?? []).length >= 2);
+  assert.ok((service.match(/preparePortalCredential\(existing\)/g) ?? []).length >= 2);
 });
 
 test('all declared tenant models receive create ownership and reject client overrides', () => {

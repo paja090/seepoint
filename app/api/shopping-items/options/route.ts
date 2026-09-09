@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const auth = await requireApiAccess('team');
+  const auth = await requireApiAccess('team', 'shopping');
   if (isApiDenied(auth)) return auth;
 
   try {

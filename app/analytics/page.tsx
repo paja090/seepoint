@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 const analyticsDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague' });
 
 export default async function AnalyticsPage() {
-  await requirePageAccess('clients');
+  await requirePageAccess('clients', 'analytics');
 
   const now = new Date();
 

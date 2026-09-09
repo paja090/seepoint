@@ -1,7 +1,7 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { getDeterministicOfferToken } from '@/lib/offers/token';
+import { recoverPortalToken } from '@/lib/offers/token';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ function surfaceSide(surface: { sidePosition?: string | null; sourcePosition?: s
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
+  const user=await requireApiAccess('offers', 'offers');if(isApiDenied(user))return user;
   if (!user || !user.organizationId) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }
@@ -34,6 +34,8 @@ export async function GET() {
         status: true,
         offerType: true,
         publicTokenHash: true,
+        publicTokenEncrypted: true,
+        publicTokenRevokedAt: true,
         validUntil: true,
         client: { select: { id: true, name: true } },
         items: {
@@ -102,7 +104,7 @@ export async function GET() {
         title: offer.campaignName ?? offer.title,
         clientName: offer.client.name,
         status: offer.status,
-        publicToken: offer.publicTokenHash ? getDeterministicOfferToken(offer.id) : null,
+        publicToken: recoverPortalToken(offer),
         totalSurfaces,
         installedCount,
         progressPercent: totalSurfaces > 0 ? Math.round((installedCount / totalSurfaces) * 100) : 0,
