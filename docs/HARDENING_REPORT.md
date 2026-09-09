@@ -314,3 +314,11 @@ Cílené offline regresní testy: 13/13 PASS. Živý běh opravy musí být ově
 - Prepared manual route budget 100 s within maxDuration 120 s, shared live deadline up to 60 s, default model gemini-3.8-flash. This timing change has NOT yet been deployed or verified through CRM storage/UI.
 - Integrated main baccd52 (PRs 315, 316), preserving hardening access checks. Full tests before timing adjustment: 478 passed. After timing adjustment: 13 targeted tests passed, typecheck passed; merged-source lint: 0 errors, 393 warnings.
 - Pending: automated cron execution budget/multi-organization behavior, final deployed real run and source quality checks. Automatic approval review blocked migration 20260908180000_photo_survey_navigation_point on the isolated test DB; no migration applied, no production changes.
+
+### Approved migration and deployed radar verification — 2026-09-09
+
+- User approved the test-only photo migration. Its first attempt failed before executing SQL because the upstream SQL file started with a UTF-8 BOM. Removed the BOM, marked the failed attempt rolled back, then successfully applied the migration to the verified isolated Neon host. All 54 migrations are applied; production was untouched.
+- Preview d7042fd: https://seepoint-kj7qjt6xn-pavels-projects-073588fb.vercel.app (READY). GitHub Actions run 34348984181 passed.
+- Configured test organization A via browser for Ostrava / Moravskoslezsky kraj; DB readback confirmed the profile. Browser start confirmation stalled, and a DB read confirmed no new run, so the paid test was performed through the authenticated API.
+- Actual API run cmtu23vpi0004jr044k7rdfns completed in 31.6 seconds: 9 live candidates processed, 8 opportunities stored, 1 duplicate, 0 errors. Independent DB read confirmed all 8 records and the completed run. This verifies discovery and persistence, not independent factual validation of every AI candidate. Browser refresh remains unreliable.
+- Follow-up fixes cap live processing to the requested batch size and allow 100 seconds per cron organization within a 300-second function. The cron explicitly reports deferred organizations and partial failures rather than unconditional success; very large installations still need a durable per-organization queue. UI schedule now states winter/summer local times accurately.

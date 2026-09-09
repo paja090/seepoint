@@ -84,9 +84,10 @@ export async function runDiscoveryForOrganization(
         // 1. Live Web Search Grounding via Gemini 3.6 Flash (real-time regional opportunities)
         try {
           const liveResults = await searchLiveOpportunitiesWithGemini(profile, startTime + Math.floor(timeBudgetMs * 0.6));
-          liveFoundCount = liveResults.length;
+          const boundedLiveResults = liveResults.slice(0, batchLimit);
+          liveFoundCount = boundedLiveResults.length;
 
-          for (const item of liveResults) {
+          for (const item of boundedLiveResults) {
             try {
               const signal = await prisma.radarSignal.upsert({
                 where: {

@@ -9,7 +9,7 @@ import { isModuleEnabled } from '@/lib/organization-modules';
 import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * Automated Cron Endpoint for AI Sales Radar
@@ -49,6 +49,8 @@ async function handleCronExecution(request: Request) {
     });
 
     const executionResults = [];
+    const deadline = Date.now() + 270_000;
+    let deferredCount = 0;
     let totalAdded = 0;
     let totalDuplicates = 0;
     let skippedCount = 0;
@@ -68,12 +70,18 @@ async function handleCronExecution(request: Request) {
           continue;
         }
 
+        if (deadline - Date.now() < 100_000) {
+          deferredCount++;
+          executionResults.push({ organizationId: org.id, name: org.name, status: 'DEFERRED_TIME_BUDGET' });
+          continue;
+        }
+
         const result = await runDiscoveryForOrganization({
           organizationId: org.id,
           userId: 'cron-scheduler',
           triggerType: 'CRON',
           batchLimit: 15,
-          timeBudgetMs: 25_000,
+          timeBudgetMs: 100_000,
         });
 
         totalAdded += result.addedCount;
@@ -100,13 +108,14 @@ async function handleCronExecution(request: Request) {
     }
 
     return NextResponse.json({
-      success: true,
+      success: deferredCount === 0 && executionResults.every((result) => result.status === 'COMPLETED' || result.status === 'SKIPPED_DISABLED'),
       mode: 'cron',
       caller: callerInfo,
       timestamp: new Date().toISOString(),
       organizationsScanned: organizations.length,
       organizationsActive: organizations.length - skippedCount,
       organizationsSkipped: skippedCount,
+      organizationsDeferred: deferredCount,
       totalOpportunitiesCreated: totalAdded,
       totalDuplicatesCaught: totalDuplicates,
       results: executionResults,
