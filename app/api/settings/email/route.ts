@@ -61,19 +61,18 @@ export async function GET() {
 
       let finalSettings = settings;
 
-      // Auto-heal: If domain exists in provider but local records were cleared or empty, fetch them from Resend
-      if (
-        settings?.providerDomainId &&
-        (!settings.dnsRecords || (Array.isArray(settings.dnsRecords) && settings.dnsRecords.length === 0))
-      ) {
+      // DNS records can be present while their saved verification status is stale.
+      let syncError: string | undefined;
+      if (settings?.providerDomainId) {
         try {
           const resendData = await getResendDomain(settings.providerDomainId);
-          if (resendData.records && resendData.records.length > 0) {
+          {
             const healed = await prisma.organizationEmailSettings.update({
               where: { id: settings.id },
               data: {
-                dnsRecords: resendData.records as unknown as object,
-                status: resendData.status === 'verified' ? 'VERIFIED' : settings.status,
+                dnsRecords: resendData.records?.length ? resendData.records as unknown as object : undefined,
+                status: resendData.status === 'verified' ? 'VERIFIED' : resendData.status === 'failed' ? 'FAILED' : 'PENDING',
+                lastVerifiedAt: resendData.status === 'verified' && settings.status !== 'VERIFIED' ? new Date() : undefined,
               },
               select: {
                 id: true,
@@ -94,6 +93,7 @@ export async function GET() {
           }
         } catch (healErr) {
           console.warn('[email-settings] Auto-heal DNS records failed:', healErr);
+          syncError = 'Aktuální stav domény se nepodařilo načíst. Zobrazen je poslední uložený stav.';
         }
       }
 
@@ -104,6 +104,7 @@ export async function GET() {
         hasSystemResendKey,
         settings: finalSettings,
         recentLogs,
+        syncError,
       });
     }
   );

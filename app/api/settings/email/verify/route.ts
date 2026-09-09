@@ -105,7 +105,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: true,
           verified: false,
-          message: 'DNS záznamy se zatím nepodařilo ověřit. Počkejte prosím na propagaci DNS (může trvat několik minut až hodin) a zkuste to znovu.',
+          message: 'Ověření DNS probíhá. Stav se na této stránce automaticky obnovuje; ověření nemusíte opakovaně spouštět.',
           settings: {
             id: updated.id,
             domain: updated.domain,

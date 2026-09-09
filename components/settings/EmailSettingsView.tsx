@@ -85,19 +85,28 @@ export function EmailSettingsView({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  // Auto-heal: If settings exist but dnsRecords are missing, fetch them
+  // Load the provider result on entry and while its asynchronous check is pending.
   useEffect(() => {
-    if (settings && (!settings.dnsRecords || settings.dnsRecords.length === 0)) {
-      fetch('/api/settings/email')
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.settings?.dnsRecords && data.settings.dnsRecords.length > 0) {
-            setSettings(data.settings);
-          }
-        })
-        .catch(() => null);
-    }
-  }, [settings]);
+    if (!settings?.id) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/settings/email', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Načtení nastavení selhalo.');
+        const data = await response.json();
+        if (cancelled) return;
+        if (data.settings) setSettings(data.settings);
+        if (data.recentLogs) setLogs(data.recentLogs);
+        if (data.syncError) setFeedback({ kind: 'error', text: data.syncError });
+      } catch {
+        if (!cancelled) setFeedback({ kind: 'error', text: 'Aktuální stav e-mailu se nepodařilo načíst.' });
+      }
+      if (!cancelled && settings?.status === 'PENDING') timer = setTimeout(refresh, 15000);
+    };
+    void refresh();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [settings?.id, settings?.status]);
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
