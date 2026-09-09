@@ -47,10 +47,10 @@ export function PrintApprovalModule({
   // State 1: Čeká na data (PREPARATION nebo CLIENT_APPROVAL)
   if (printJob.status === 'CLIENT_APPROVAL') {
     return (
-      <div className="card bg-white border-2 border-purple-500/50 rounded-3xl overflow-hidden shadow-xl mb-8">
-        <div className="bg-purple-50 border-b border-purple-100 p-6 sm:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="card bg-white border-2 border-sky-500/50 rounded-3xl overflow-hidden shadow-xl mb-8">
+        <div className="bg-sky-50 border-b border-sky-100 p-6 sm:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold tracking-wide uppercase mb-3">
+            <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold tracking-wide uppercase mb-3">
               Čeká na schválení a tisková data
             </span>
             <h2 className="text-2xl font-bold text-gray-900">Tisk kampaně: Chybí tisková data</h2>
@@ -70,7 +70,7 @@ export function PrintApprovalModule({
                  placeholder="https://we.tl/..."
                  value={artworkUrl}
                  onChange={(e) => setArtworkUrl(e.target.value)}
-                 className="w-full px-4 py-3 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none shadow-sm"
+                 className="w-full px-4 py-3 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none shadow-sm"
                />
             </div>
           </div>
@@ -87,7 +87,7 @@ export function PrintApprovalModule({
                    placeholder="Jan Novák"
                    value={approverName}
                    onChange={(e) => setApproverName(e.target.value)}
-                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
                  />
                </div>
                
@@ -100,14 +100,14 @@ export function PrintApprovalModule({
                    placeholder="Např. prosím o doručení do..."
                    value={note}
                    onChange={(e) => setNote(e.target.value)}
-                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none resize-none"
+                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none resize-none"
                  />
                </div>
 
                <button
                  type="submit"
                  disabled={!approverName.trim() || !artworkUrl.trim() || isPending}
-                 className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                 className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-6 rounded-xl transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                >
                  {isPending ? 'Odesílám...' : 'Schvaluji data do tisku'}
                </button>

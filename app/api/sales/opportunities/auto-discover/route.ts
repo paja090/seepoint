@@ -6,7 +6,7 @@ import { runWithTenantContext } from '@/lib/tenant-context';
 import { runDiscoveryForOrganization } from '@/lib/opportunities/discovery-runner';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * Manual Trigger for AI Discovery Job
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         userId: user.id,
         triggerType: 'MANUAL',
         batchLimit,
-        timeBudgetMs: 45_000,
+        timeBudgetMs: 100_000,
       });
 
       if (result.disabled) {

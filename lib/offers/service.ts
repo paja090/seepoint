@@ -47,6 +47,14 @@ export type OfferConflict = {
 const dateOnly = (date: Date | null | undefined) => date?.toISOString().slice(0, 10) ?? null;
 const isPastValidity = (date: Date | null | undefined) => Boolean(date && date.toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10));
 const value = (decimal: Prisma.Decimal | null | undefined) => decimal?.toFixed(2) ?? null;
+const safeDecimal = (val: Prisma.Decimal | number | string | null | undefined, fallback = '0.00'): string => {
+  if (val == null) return fallback;
+  if (typeof (val as { toFixed?: unknown }).toFixed === 'function') {
+    return (val as { toFixed: (digits: number) => string }).toFixed(2);
+  }
+  const n = Number(val);
+  return Number.isNaN(n) ? fallback : n.toFixed(2);
+};
 const nullable = (text: string | undefined) => text || null;
 
 const offerInclude = {
@@ -214,10 +222,10 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       code: charge.code,
       label: charge.label,
       description: charge.description,
-      quantity: charge.quantity.toFixed(2),
+      quantity: safeDecimal(charge.quantity, '1.00'),
       unit: charge.unit,
-      unitPrice: charge.unitPrice.toFixed(2),
-      subtotal: charge.subtotal.toFixed(2),
+      unitPrice: safeDecimal(charge.unitPrice),
+      subtotal: safeDecimal(charge.subtotal),
     })),
     navigation: row.navigationOffer ? {
       city: row.navigationOffer.city || 'Ostrava',
@@ -267,19 +275,30 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
             : `/api/photos/${carrierPhoto.id}/thumbnail`;
         }
 
+        let installedUrl: string | undefined = undefined;
+        if (point.installedPhoto) {
+          installedUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhoto.id}`
+            : `/api/photos/${point.installedPhoto.id}/thumbnail`;
+        } else if (point.installedPhotoId) {
+          installedUrl = publicView && token
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhotoId}`
+            : `/api/photos/${point.installedPhotoId}/thumbnail`;
+        }
+
         return {
           id: point.id,
           label: point.label,
           latitude: point.latitude,
           longitude: point.longitude,
           address: point.address,
-          quantity: point.quantity.toFixed(2),
-          unitPrice: point.unitPrice.toFixed(2),
-          subtotal: point.subtotal.toFixed(2),
-          installationPrice: point.installationPrice.toFixed(2),
-          removalPrice: point.removalPrice.toFixed(2),
-          productionPrice: point.productionPrice.toFixed(2),
-          framePrice: (point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice ? (point as unknown as { framePrice: Prisma.Decimal }).framePrice.toFixed(2) : '0.00',
+          quantity: safeDecimal(point.quantity, '1.00'),
+          unitPrice: safeDecimal(point.unitPrice),
+          subtotal: safeDecimal(point.subtotal),
+          installationPrice: safeDecimal(point.installationPrice),
+          removalPrice: safeDecimal(point.removalPrice),
+          productionPrice: safeDecimal(point.productionPrice),
+          framePrice: safeDecimal((point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice),
           internalNote: publicView ? undefined : point.internalNote,
           clientNote: point.clientNote,
           status: point.status,
@@ -296,6 +315,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           visualizedPhotoUrl: visualizedUrl,
           sitePhotoId: effectivePhotoId ?? undefined,
           sitePhotoUrl: siteUrl,
+          installedPhotoId: point.installedPhotoId ?? undefined,
+          installedPhotoUrl: installedUrl,
           isSelectedByClient: point.isSelectedByClient !== false,
         };
       }),
@@ -559,7 +580,25 @@ export async function listOffers(user: CurrentUser, filters: URLSearchParams) {
 export async function getOffer(user: CurrentUser, id: string) {
   const row = await getOfferRow(prisma, id);
   assertAccess(user, row);
-  return serializeOffer(row);
+  const organization = await prisma.organization.findUnique({
+    where: { id: row.organizationId },
+    select: {
+      name: true,
+      logoUrl: true,
+      primaryColor: true,
+      secondaryColor: true,
+      email: true,
+      phone: true,
+      website: true,
+      companyId: true,
+      vatId: true,
+      street: true,
+      city: true,
+      postalCode: true,
+      country: true,
+    },
+  });
+  return { ...serializeOffer(row), branding: organization };
 }
 
 function rejectDirectSend(intent: 'draft' | 'send') {
@@ -869,7 +908,21 @@ export async function getPublicOffer(token: string) {
   const row = await getPublicRow(token);
   const organization = await platformPrisma.organization.findUnique({
     where: { id: row.organizationId },
-    select: { name: true, logoUrl: true, primaryColor: true, secondaryColor: true, email: true, phone: true, website: true },
+    select: {
+      name: true,
+      logoUrl: true,
+      primaryColor: true,
+      secondaryColor: true,
+      email: true,
+      phone: true,
+      website: true,
+      companyId: true,
+      vatId: true,
+      street: true,
+      city: true,
+      postalCode: true,
+      country: true,
+    },
   });
   return { ...serializeOffer(row, { publicToken: token, publicView: true }), branding: organization };
 }

@@ -1,6 +1,7 @@
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { deleteStoredPhoto } from '@/lib/storage/photo-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let photoIdsToClean: string[] = [];
   try {
     const currentUser = await requireApiAccess('navigationProjects');
   if (isApiDenied(currentUser)) return currentUser;
@@ -17,6 +19,9 @@ export async function POST(
 
     const { id: navigationOrderId } = await params;
     const body = await request.json();
+    if (Array.isArray(body?.photoIds)) {
+      photoIdsToClean = body.photoIds;
+    }
 
     const {
       surveyRouteId,
@@ -83,16 +88,22 @@ export async function POST(
           await prisma.photo.updateMany({
             where: { id: { in: photoIds } },
             data: {
-              surveyCandidatePointId: newPoint.id,
+              surveyNavigationPointId: newPoint.id,
               type: 'SURVEY',
             },
           });
           const firstPhoto = await prisma.photo.findFirst({ where: { id: { in: photoIds } } });
           if (firstPhoto) {
-            await prisma.navigationPoint.update({
-              where: { id: newPoint.id },
-              data: { sitePhotoId: firstPhoto.id },
+            const isOwnedByOther = await prisma.navigationPoint.findFirst({
+              where: { sitePhotoId: firstPhoto.id, id: { not: newPoint.id } },
+              select: { id: true },
             });
+            if (!isOwnedByOther) {
+              await prisma.navigationPoint.update({
+                where: { id: newPoint.id },
+                data: { sitePhotoId: firstPhoto.id },
+              });
+            }
           }
         }
 
@@ -165,8 +176,21 @@ export async function POST(
     return NextResponse.json({ candidate });
   } catch (error: unknown) {
     console.error('Error creating survey candidate point:', error);
+    try {
+      if (Array.isArray(photoIdsToClean) && photoIdsToClean.length > 0) {
+        for (const pid of photoIdsToClean) {
+          const ph = await prisma.photo.findUnique({ where: { id: pid } });
+          if (ph && !ph.surveyCandidatePointId && !ph.surveyNavigationPointId && !ph.carrierId && !ph.surfaceId && !ph.taskId) {
+            await prisma.photo.delete({ where: { id: pid } }).catch(() => {});
+            await deleteStoredPhoto(ph).catch(() => {});
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('Error during photo rollback:', cleanupErr);
+    }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Chyba při vytváření kandidátního místa.' },
+      { success: false, code: 'SURVEY_POINT_CREATE_FAILED', error: 'Místo se nepodařilo vytvořit. Zkuste akci zopakovat.' },
       { status: 500 }
     );
   }

@@ -137,6 +137,18 @@ export function NavigationOfferForm({
   const [campaignName, setCampaignName] = useState(initialOffer?.campaignName ?? '');
   const [validUntil, setValidUntil] = useState(initialOffer?.validUntil ?? '');
 
+  const initialStrategy = initialOffer?.campaignStrategy as { dateFrom?: string; dateTo?: string } | null | undefined;
+  const [dateFrom, setDateFrom] = useState(initialStrategy?.dateFrom ?? '');
+  const [dateTo, setDateTo] = useState(initialStrategy?.dateTo ?? '');
+
+  const campaignDurationDays = useMemo(() => {
+    if (!dateFrom || !dateTo) return null;
+    const from = new Date(dateFrom).getTime();
+    const to = new Date(dateTo).getTime();
+    if (isNaN(from) || isNaN(to) || to < from) return null;
+    return Math.round((to - from) / 86400000);
+  }, [dateFrom, dateTo]);
+
   const [targetName, setTargetName] = useState(navigation?.targetName ?? '');
   const [targetAddress, setTargetAddress] = useState(navigation?.targetAddress ?? '');
   const [target, setTarget] = useState(
@@ -684,6 +696,8 @@ export function NavigationOfferForm({
       title,
       campaignName,
       validUntil,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
       contactPerson: selectedClient?.contactPerson,
       contactEmail: selectedClient?.email,
       contactPhone: selectedClient?.phone,
@@ -791,6 +805,45 @@ export function NavigationOfferForm({
           <Field label="Platnost nabídky do">
             <input className="input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
           </Field>
+
+          {/* Termín kampaně */}
+          <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-3.5 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-sky-950 flex items-center gap-1.5">
+                <span>📅</span> Termín kampaně
+              </span>
+              {campaignDurationDays !== null ? (
+                <span className="text-[11px] font-bold text-sky-800 bg-sky-200/80 border border-sky-300 px-2.5 py-0.5 rounded-lg">
+                  {campaignDurationDays} dní (~{Math.max(1, Math.round(campaignDurationDays / 30.5))} měs.)
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium text-slate-500 bg-white/80 border border-slate-200 px-2 py-0.5 rounded-md">
+                  Standardně 1 rok (365 dní)
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <Field label="Začátek kampaně (od)">
+                <input
+                  className="input text-xs font-medium"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </Field>
+              <Field label="Konec kampaně (do)">
+                <input
+                  className="input text-xs font-medium"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </Field>
+            </div>
+            <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+              Nastavený termín se automaticky propíše do klientského náhledu i klientského portálu kampaně (živý odpočet dní, trvání pronájmu).
+            </p>
+          </div>
         </section>
 
         {/* Proposal Mode Toggle Banner */}

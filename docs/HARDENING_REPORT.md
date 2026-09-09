@@ -306,3 +306,11 @@ Lokální ověření výsledného merge: 470/470 testů, tenant security check a
 Runtime preview e6f1c38 (2026-09-08 23:08 UTC) potvrdil timeout obou Gemini pokusů, přesto API hlásilo úspěch s nulovým výsledkem. Ruční discovery nyní sdílí deadline 45 s, živé hledání má 60 % rozpočtu a RSS se načítá souběžně. Parsování článků i opakované AI požadavky respektují zbývající čas. Chyby zdrojů se počítají, neúspěšný běh se ukládá jako FAILED a částečné výsledky mají upozornění. Neplatné AI odpovědi se nepletou s platným prázdným seznamem. Příležitosti bez zdrojové URL se neukládají s vymyšlenou adresou.
 
 Cílené offline regresní testy: 13/13 PASS. Živý běh opravy musí být ověřen na novém preview; uživatel autorizoval skutečná AI volání a zápis testovacích příležitostí do izolované firmy.
+
+### Radar live test — 2026-09-09
+
+- Isolated preview eee7b5d real authenticated API run: 42.5 s, 75 RSS articles, 2 processed and ignored, 0 created, 1 live-search timeout correctly reported as warning.
+- Direct paid provider diagnostics: gemini-2.5-flash returned HTTP 404; gemini-3.8-flash exceeded 30 s but completed with a 90 s diagnostic allowance in 33.5 s, returning 10 candidates. Only the NATO Days date was independently checked against the organizer; other candidates are not yet verified.
+- Prepared manual route budget 100 s within maxDuration 120 s, shared live deadline up to 60 s, default model gemini-3.8-flash. This timing change has NOT yet been deployed or verified through CRM storage/UI.
+- Integrated main baccd52 (PRs 315, 316), preserving hardening access checks. Full tests before timing adjustment: 478 passed. After timing adjustment: 13 targeted tests passed, typecheck passed; merged-source lint: 0 errors, 393 warnings.
+- Pending: automated cron execution budget/multi-organization behavior, final deployed real run and source quality checks. Automatic approval review blocked migration 20260908180000_photo_survey_navigation_point on the isolated test DB; no migration applied, no production changes.

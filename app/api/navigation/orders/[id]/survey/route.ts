@@ -32,6 +32,9 @@ export async function GET(
         points: {
           include: {
             sitePhoto: true,
+            surveyPhotos: {
+              orderBy: { createdAt: 'desc' },
+            },
           },
           orderBy: { sortOrder: 'asc' },
         },
@@ -104,34 +107,34 @@ export async function GET(
         const nav = offer.navigationOffer;
         const offerPoints = await prisma.navigationPoint.findMany({
           where: { navigationOfferId: nav.id },
-          include: { sitePhoto: true },
+          include: {
+            sitePhoto: true,
+            surveyPhotos: {
+              orderBy: { createdAt: 'desc' },
+            },
+          },
           orderBy: { sortOrder: 'asc' },
         });
 
-        const pointIds = offerPoints.map((p) => p.id);
-        const photosInDb = pointIds.length > 0
-          ? await prisma.photo.findMany({
-              where: { surveyCandidatePointId: { in: pointIds } },
-              orderBy: { createdAt: 'desc' },
-              select: { id: true, url: true, surveyCandidatePointId: true, createdAt: true },
-            })
-          : [];
-
         const candidatePoints = offerPoints.map((p) => {
-          const matchedPhotos: Array<{ id: string; url: string; createdAt: string | Date }> = photosInDb
-            .filter((ph) => ph.surveyCandidatePointId === p.id)
-            .map((ph) => ({
-              id: ph.id,
-              url: ph.url || `/api/photos/${ph.id}/file`,
-              createdAt: ph.createdAt,
-            }));
+          const matchedPhotos: Array<{ id: string; url: string; createdAt: string | Date }> = [];
 
-          if (p.sitePhoto?.id && !matchedPhotos.some((ph) => ph.id === p.sitePhoto!.id)) {
-            matchedPhotos.unshift({
+          if (p.sitePhoto?.id) {
+            matchedPhotos.push({
               id: p.sitePhoto.id,
               url: p.sitePhoto.url || `/api/photos/${p.sitePhoto.id}/file`,
-              createdAt: p.createdAt,
+              createdAt: p.sitePhoto.createdAt || p.createdAt,
             });
+          }
+
+          for (const ph of p.surveyPhotos || []) {
+            if (!matchedPhotos.some((existing) => existing.id === ph.id)) {
+              matchedPhotos.push({
+                id: ph.id,
+                url: ph.url || `/api/photos/${ph.id}/file`,
+                createdAt: ph.createdAt,
+              });
+            }
           }
 
           return {
@@ -230,39 +233,59 @@ export async function GET(
     const convertedIds = new Set(order.candidatePoints.map((c) => c.convertedNavigationPointId).filter(Boolean));
     const extraPointsFromOrder = (order.points || [])
       .filter((p) => !convertedIds.has(p.id))
-      .map((p) => ({
-        id: p.id,
-        label: p.label,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        address: p.address,
-        placementType: p.navigationType || 'NAVIGATION',
-        approachDirection: p.orientation || p.signOrientation || null,
-        arrowDirection: p.arrowDirectionEnum || p.arrowDirection || 'STRAIGHT',
-        distanceValue: p.distanceValue != null ? Number(p.distanceValue) : (p.calculatedDistanceMeters ? Math.round(p.calculatedDistanceMeters / 100) / 10 : null),
-        distanceUnit: p.distanceUnit || 'km',
-        pillarNumber: p.pillarNumber || null,
-        pillarType: p.pillarType || null,
-        ownershipType: 'SEEPOINT',
-        ownerName: null,
-        visibilityTowardTarget: 'GOOD',
-        permitStatus: 'GRANTED',
-        internalNote: p.internalNote || null,
-        surveyStatus: 'COMPLETED',
-        supervisionStatus: 'APPROVED',
-        supervisionNote: null,
-        rejectionReason: null,
-        surveyRouteId: null,
-        surveyRoute: null,
-        carrierId: p.carrierId || null,
-        surfaceId: p.surfaceId || null,
-        carrier: null,
-        convertedNavigationPointId: p.id,
-        convertedNavigationPoint: { id: p.id, label: p.label, status: p.status },
-        photos: p.sitePhoto ? [{ id: p.sitePhoto.id, url: p.sitePhoto.url || `/api/photos/${p.sitePhoto.id}/file`, createdAt: p.createdAt.toISOString() }] : [],
-        createdByUser: null,
-        createdAt: p.createdAt.toISOString(),
-      }));
+      .map((p) => {
+        const pointPhotos: Array<{ id: string; url: string; createdAt: string }> = [];
+        if (p.sitePhoto) {
+          pointPhotos.push({
+            id: p.sitePhoto.id,
+            url: p.sitePhoto.url || `/api/photos/${p.sitePhoto.id}/file`,
+            createdAt: p.sitePhoto.createdAt?.toISOString() || p.createdAt.toISOString(),
+          });
+        }
+        for (const ph of p.surveyPhotos || []) {
+          if (!pointPhotos.some((existing) => existing.id === ph.id)) {
+            pointPhotos.push({
+              id: ph.id,
+              url: ph.url || `/api/photos/${ph.id}/file`,
+              createdAt: ph.createdAt?.toISOString() || p.createdAt.toISOString(),
+            });
+          }
+        }
+
+        return {
+          id: p.id,
+          label: p.label,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          address: p.address,
+          placementType: p.navigationType || 'NAVIGATION',
+          approachDirection: p.orientation || p.signOrientation || null,
+          arrowDirection: p.arrowDirectionEnum || p.arrowDirection || 'STRAIGHT',
+          distanceValue: p.distanceValue != null ? Number(p.distanceValue) : (p.calculatedDistanceMeters ? Math.round(p.calculatedDistanceMeters / 100) / 10 : null),
+          distanceUnit: p.distanceUnit || 'km',
+          pillarNumber: p.pillarNumber || null,
+          pillarType: p.pillarType || null,
+          ownershipType: 'SEEPOINT',
+          ownerName: null,
+          visibilityTowardTarget: 'GOOD',
+          permitStatus: 'GRANTED',
+          internalNote: p.internalNote || null,
+          surveyStatus: 'COMPLETED',
+          supervisionStatus: 'APPROVED',
+          supervisionNote: null,
+          rejectionReason: null,
+          surveyRouteId: null,
+          surveyRoute: null,
+          carrierId: p.carrierId || null,
+          surfaceId: p.surfaceId || null,
+          carrier: null,
+          convertedNavigationPointId: p.id,
+          convertedNavigationPoint: { id: p.id, label: p.label, status: p.status },
+          photos: pointPhotos,
+          createdByUser: null,
+          createdAt: p.createdAt.toISOString(),
+        };
+      });
 
     const combinedCandidatePoints = [...order.candidatePoints, ...extraPointsFromOrder];
 

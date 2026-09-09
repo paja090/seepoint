@@ -16,6 +16,7 @@ const publicPathPrefixes = [
   '/reset-password',
   '/proposal',
   '/offer',
+  '/campaign',
   '/client',
   '/images',
   '/data',

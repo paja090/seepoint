@@ -5,7 +5,7 @@ import { parseOpportunityCreateInput } from './policy';
 
 export async function searchLiveOpportunitiesWithGemini(
   profile: OrganizationRadarProfileData,
-  deadline = Date.now() + 30_000
+  deadline = Date.now() + 60_000
 ): Promise<CreateOpportunityInput[]> {
   const rawKey =
     process.env.GEMINI_API_KEY ||
@@ -86,12 +86,13 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
   const configuredOppModel = process.env.GEMINI_OPPORTUNITY_MODEL?.trim();
   const models = configuredOppModel
     ? [configuredOppModel]
-    : ['gemini-3.6-flash', 'gemini-flash-latest'];
+    : ['gemini-3.8-flash', 'gemini-flash-latest'];
 
   let jsonText = '';
   let failure = 'Gemini nevrátil použitelnou odpověď.';
 
   for (const model of models) {
+    if (Date.now() >= deadline) break;
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const resp = await fetch(url, {
@@ -104,7 +105,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
           contents: [{ parts: [{ text: prompt }] }],
           tools: [{ googleSearch: {} }],
         }),
-        signal: radarRequestSignal(deadline),
+        signal: radarRequestSignal(deadline, 60_000),
       });
 
       if (!resp.ok) { failure = `Gemini ${model}: HTTP ${resp.status}.`; continue; }
