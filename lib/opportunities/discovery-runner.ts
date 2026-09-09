@@ -75,11 +75,15 @@ export async function runDiscoveryForOrganization(
       let ignoredCount = 0;
       let errorsCount = 0;
       let liveFoundCount = 0;
+      const warnings: string[] = [];
+      const deadline = startTime + timeBudgetMs;
+      // Start RSS collection while web grounding runs; catch immediately to avoid unhandled rejections.
+      const rssPromise = collectSignalsForProfile(profile, organizationId).catch(() => ({ rawFound: 0, uniqueSignals: [], sourceErrors: 1 }));
 
       try {
         // 1. Live Web Search Grounding via Gemini 3.6 Flash (real-time regional opportunities)
         try {
-          const liveResults = await searchLiveOpportunitiesWithGemini(profile);
+          const liveResults = await searchLiveOpportunitiesWithGemini(profile, startTime + Math.floor(timeBudgetMs * 0.6));
           liveFoundCount = liveResults.length;
 
           for (const item of liveResults) {
@@ -140,16 +144,20 @@ export async function runDiscoveryForOrganization(
             });
           }
         } catch (err) {
+          errorsCount++;
+          warnings.push(err instanceof Error ? err.message : 'Živé AI hledání selhalo.');
           console.error('Live search grounding error in runner (continuing with RSS)', err);
         }
 
         // 2. Targeted RSS Feeds Discovery (collect signals into DB)
-        const { rawFound, uniqueSignals } = await collectSignalsForProfile(profile, organizationId);
+        const { rawFound, uniqueSignals, sourceErrors } = await rssPromise;
+        errorsCount += sourceErrors;
+        if (sourceErrors) warnings.push(`Nepodařilo se načíst ${sourceErrors} RSS zdrojů.`);
 
         const unanalyzedSignals = uniqueSignals.filter(
           (s) => s.status === 'NEW' && !s.discoveredOpportunityId
         );
-        const remainingSlots = Math.max(batchLimit - addedCount, 5);
+        const remainingSlots = Math.max(batchLimit - addedCount, 0);
         const signalsToProcess = unanalyzedSignals.slice(0, remainingSlots);
 
         const shouldProcessRssAi =
@@ -168,7 +176,8 @@ export async function runDiscoveryForOrganization(
               const parsed = await parseOpportunityFromAiInput(
                 signal.sourceTitle,
                 signal.sourceUrl,
-                profile
+                profile,
+                deadline
               );
 
               await logAIUsage({
@@ -239,10 +248,12 @@ export async function runDiscoveryForOrganization(
         const totalFound = rawFound + liveFoundCount;
         const totalProcessed = liveFoundCount + rssProcessedCount;
 
+        const success = errorsCount === 0 || addedCount + duplicateCount + ignoredCount > 0;
+        if (errorsCount && !warnings.length) warnings.push('Některé signály se nepodařilo zpracovat.');
         await prisma.radarRun.update({
           where: { id: run.id },
           data: {
-            status: 'COMPLETED',
+            status: success ? 'COMPLETED' : 'FAILED',
             finishedAt: new Date(),
             signalsFound: totalFound,
             signalsProcessed: totalProcessed,
@@ -250,6 +261,7 @@ export async function runDiscoveryForOrganization(
             duplicatesCount: duplicateCount,
             errorsCount,
             summaryLog: {
+              warnings,
               liveFoundCount,
               rssProcessedCount,
               ignoredCount,
@@ -261,7 +273,8 @@ export async function runDiscoveryForOrganization(
         });
 
         return {
-          success: true,
+          success,
+          error: warnings.join(' ') || undefined,
           runId: run.id,
           totalFound,
           processed: totalProcessed,

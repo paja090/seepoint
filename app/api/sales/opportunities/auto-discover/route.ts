@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         userId: user.id,
         triggerType: 'MANUAL',
         batchLimit,
-        timeBudgetMs: 20_000,
+        timeBudgetMs: 45_000,
       });
 
       if (result.disabled) {
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
+        warning: result.error,
         runId: result.runId,
         foundArticles: result.totalFound,
         processed: result.processed,

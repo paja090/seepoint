@@ -300,3 +300,9 @@ Před odesláním větve byl zapracován také main `d237773` (#311, zachování
 Zapracován main `577a980` včetně editace odesílatele / obnovy DNS (#313) a klientské komprese fotografií / HEIC handling (#314). Zachována runtime validace DNS; nový PATCH odesílatele navíc validuje adresy a nevrací šifrovaný provider klíč. Fotografie nezavádějí persistentní offline frontu.
 
 Lokální ověření výsledného merge: 470/470 testů, tenant security check a typecheck PASS; lint PASS, 0 errors, 386 warnings. Dřívější výsledky 10 DB / 3 browser E2E se tímto nepřepisují. CI na předchozím head c69656a prošlo včetně buildu (run 34193693574); build nového merge musí potvrdit následující CI.
+
+## Radar: diagnostika timeoutů a oprava
+
+Runtime preview e6f1c38 (2026-09-08 23:08 UTC) potvrdil timeout obou Gemini pokusů, přesto API hlásilo úspěch s nulovým výsledkem. Ruční discovery nyní sdílí deadline 45 s, živé hledání má 60 % rozpočtu a RSS se načítá souběžně. Parsování článků i opakované AI požadavky respektují zbývající čas. Chyby zdrojů se počítají, neúspěšný běh se ukládá jako FAILED a částečné výsledky mají upozornění. Neplatné AI odpovědi se nepletou s platným prázdným seznamem. Příležitosti bez zdrojové URL se neukládají s vymyšlenou adresou.
+
+Cílené offline regresní testy: 13/13 PASS. Živý běh opravy musí být ověřen na novém preview; uživatel autorizoval skutečná AI volání a zápis testovacích příležitostí do izolované firmy.

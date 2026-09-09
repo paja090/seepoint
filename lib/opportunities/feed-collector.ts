@@ -57,9 +57,9 @@ export async function fetchRssArticles(rssUrl: string): Promise<RawRssArticle[]>
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OutdoorRadarBot/1.0; +https://seepoint.cz)' },
       signal: AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error(`RSS HTTP ${res.status}`);
     const contentLength = Number(res.headers.get('content-length') || 0);
-    if (contentLength > 1_000_000) return [];
+    if (contentLength > 1_000_000) throw new Error('RSS překročilo limit velikosti.');
     const xmlText = (await res.text()).slice(0, 1_000_000);
     const items = xmlText.match(/<item>[\s\S]*?<\/item>/gi) || [];
     return items.slice(0, 25).flatMap((itemXml) => {
@@ -79,7 +79,7 @@ export async function fetchRssArticles(rssUrl: string): Promise<RawRssArticle[]>
       }];
     });
   } catch {
-    return [];
+    throw new Error('RSS zdroj není dostupný nebo překročil časový limit.');
   }
 }
 
@@ -101,8 +101,9 @@ export async function collectSignalsForProfile(
     rssUrls.push(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=cs&gl=CZ&ceid=CZ:cs`);
   }
 
-  const fetchedGroups = await Promise.all(rssUrls.slice(0, 10).map(fetchRssArticles));
-  const rawArticles = fetchedGroups.flat();
+  const fetchedGroups = await Promise.allSettled(rssUrls.slice(0, 10).map(fetchRssArticles));
+  const sourceErrors = fetchedGroups.filter(result => result.status === 'rejected').length;
+  const rawArticles = fetchedGroups.flatMap(result => result.status === 'fulfilled' ? result.value : []);
 
   const oldestAllowed = Date.now() - 45 * 24 * 60 * 60_000;
   const newestAllowed = Date.now() + 24 * 60 * 60_000;
@@ -152,6 +153,7 @@ export async function collectSignalsForProfile(
   });
 
   return {
+    sourceErrors,
     rawFound: rawArticles.length,
     uniqueSignals: sortedSignals,
   };
