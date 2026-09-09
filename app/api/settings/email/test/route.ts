@@ -53,6 +53,13 @@ export async function POST(request: Request) {
           );
         }
 
+        if (settings.status !== 'VERIFIED') {
+          return NextResponse.json(
+            { error: 'Nejprve ověřte firemní doménu. Test musí použít jejího skutečného odesílatele.' },
+            { status: 409 }
+          );
+        }
+
         const result = await sendTenantTestEmail({
           organizationId: user.organizationId,
           to: targetEmail,
@@ -60,6 +67,13 @@ export async function POST(request: Request) {
           fromEmail: settings.fromEmail,
           replyTo: settings.replyTo || undefined,
         });
+
+        if (result.status === 'skipped') {
+          return NextResponse.json(
+            { error: 'V tomto prostředí je odesílání vypnuté. Testovací e-mail nebyl odeslán.', delivery: result },
+            { status: 409 }
+          );
+        }
 
         await prisma.organizationEmailSettings.update({
           where: { id: settings.id },

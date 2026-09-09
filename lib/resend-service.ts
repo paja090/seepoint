@@ -107,6 +107,11 @@ export async function registerResendDomain(domain: string, customApiKey?: string
 export async function verifyResendDomain(domainId: string, customApiKey?: string): Promise<ResendDomainResponse> {
   if (!domainId) throw new Error('Chybí ID domény pro ověření.');
 
+  // Verification is asynchronous. Restarting it resets even a verified domain
+  // to pending; first read the result of the previous verification.
+  const current = await getResendDomain(domainId, customApiKey);
+  if (current.status === 'verified' || current.status === 'pending') return current;
+
   const apiKey = getManagementApiKey(customApiKey);
   const res = await fetch(`${RESEND_API_BASE}/domains/${encodeURIComponent(domainId)}/verify`, {
     method: 'POST',
@@ -138,6 +143,7 @@ export async function getResendDomain(domainId: string, customApiKey?: string): 
   const apiKey = getManagementApiKey(customApiKey);
   const res = await fetch(`${RESEND_API_BASE}/domains/${encodeURIComponent(domainId)}`, {
     method: 'GET',
+    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${apiKey}`,
     },
