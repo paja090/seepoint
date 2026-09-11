@@ -18,10 +18,20 @@ test('chat assignment and resolution respect author, assignee and manager roles'
   assert.equal(canResolveChatMessage({ id: 'other', role: 'WORKER' }, message), false);
 });
 
-test('chat image validation checks data type, size and file signature', () => {
+test('chat image validation rejects raw Base64 and enforces stored file URLs', () => {
   const jpeg = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xdb, 1, 2, 3]).toString('base64')}`;
-  assert.equal(validateChatImage(jpeg).value, jpeg);
-  assert.match(validateChatImage('https://tracker.invalid/pixel.png').error ?? '', /vložený obrázek/);
+  // Default chat validation rejects inline base64
+  assert.match(validateChatImage(jpeg).error ?? '', /Base64 obrázky nelze ukládat do chatu/);
+
+  // Valid stored photo URLs are accepted
+  assert.equal(validateChatImage('/api/photos/cm12345/file').value, '/api/photos/cm12345/file');
+  assert.equal(validateChatImage('https://storage.seepoint.cz/photos/test.jpg').value, 'https://storage.seepoint.cz/photos/test.jpg');
+
+  // Invalid or dangerous schemes are rejected
+  assert.match(validateChatImage('javascript:alert(1)').error ?? '', /platná adresa uloženého souboru/);
+
+  // With explicit allowInline flag, validates format and signature
+  assert.equal(validateChatImage(jpeg, { allowInline: true }).value, jpeg);
   const fake = `data:image/jpeg;base64,${Buffer.from('not an image').toString('base64')}`;
-  assert.match(validateChatImage(fake).error ?? '', /neodpovídá/);
+  assert.match(validateChatImage(fake, { allowInline: true }).error ?? '', /neodpovídá/);
 });

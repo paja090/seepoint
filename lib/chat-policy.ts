@@ -15,18 +15,52 @@ export function canResolveChatMessage(actor: { id: string; role: AppRole; employ
   return canAssignChatMessage(actor, message) || actor.id === message.assignedToUserId || actor.employee?.id === message.assignedToUserId;
 }
 
-export function validateChatImage(value: unknown, maxBytes = 1_000_000) {
+export function isInlineImage(value?: string | null): boolean {
+  return Boolean(value?.startsWith('data:'));
+}
+
+export function isStoredChatImageUrl(value: string): boolean {
+  if (value.startsWith('/api/photos/')) return true;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+export type ValidateChatImageOptions = {
+  allowInline?: boolean;
+  maxBytes?: number;
+};
+
+export function validateChatImage(value: unknown, options?: ValidateChatImageOptions | number) {
   if (value === undefined || value === null || value === '') return { value: null as string | null };
   if (typeof value !== 'string') return { error: 'Fotografie má neplatný formát.' };
-  const match = value.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
-  if (!match) return { error: 'Chat přijímá pouze vložený obrázek JPEG, PNG nebo WebP.' };
-  const base64 = match[2];
-  const byteLength = Math.floor((base64.length * 3) / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
-  if (byteLength <= 0 || byteLength > maxBytes) return { error: 'Fotografie v chatu může mít nejvýše 1 MB.' };
-  const signature = Buffer.from(base64.slice(0, 24), 'base64');
-  const isJpeg = signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff;
-  const isPng = signature.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-  const isWebp = signature.subarray(0, 4).toString('ascii') === 'RIFF' && signature.subarray(8, 12).toString('ascii') === 'WEBP';
-  if (!isJpeg && !isPng && !isWebp) return { error: 'Obsah fotografie neodpovídá formátu JPEG, PNG ani WebP.' };
-  return { value };
+  const trimmed = value.trim();
+
+  if (trimmed.startsWith('data:')) {
+    const allowInline = typeof options === 'object' ? Boolean(options?.allowInline) : typeof options === 'number' ? true : false;
+    if (!allowInline) {
+      return { error: 'Obrázek je nutné nejdříve nahrát do úložiště. Base64 obrázky nelze ukládat do chatu.' };
+    }
+    const maxBytes = typeof options === 'object' && options?.maxBytes ? options.maxBytes : typeof options === 'number' ? options : 1_000_000;
+    const match = trimmed.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) return { error: 'Přijímá se pouze vložený obrázek JPEG, PNG nebo WebP.' };
+    const base64 = match[2];
+    const byteLength = Math.floor((base64.length * 3) / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
+    if (byteLength <= 0 || byteLength > maxBytes) return { error: 'Fotografie má nepovolenou velikost.' };
+    const signature = Buffer.from(base64.slice(0, 24), 'base64');
+    const isJpeg = signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff;
+    const isPng = signature.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const isWebp = signature.subarray(0, 4).toString('ascii') === 'RIFF' && signature.subarray(8, 12).toString('ascii') === 'WEBP';
+    if (!isJpeg && !isPng && !isWebp) return { error: 'Obsah fotografie neodpovídá formátu JPEG, PNG ani WebP.' };
+    return { value: trimmed };
+  }
+
+  if (trimmed.length > 2048) return { error: 'Fotografie má příliš dlouhou adresu.' };
+  if (isStoredChatImageUrl(trimmed)) {
+    return { value: trimmed };
+  }
+  return { error: 'Fotografie v chatu musí být platná adresa uloženého souboru.' };
 }

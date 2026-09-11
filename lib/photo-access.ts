@@ -43,7 +43,7 @@ export async function canReadPhoto(user: PhotoAccessUser, photo: PhotoAccessReco
   }
 
   if (photo.carrierId || photo.surfaceId || ['CARRIER', 'SURFACE', 'LOCATION', 'DAMAGE', 'CONTROL', 'CHECK', 'ARCHIVE', 'CAMPAIGN'].includes(photo.type)) {
-    return canAccess(user.role, 'carriers') || canAccess(user.role, 'navigationProjects');
+    return canAccess(user.role, 'carriers') || canAccess(user.role, 'navigationProjects') || canAccess(user.role, 'team');
   }
 
   return isManagerOrAdmin;

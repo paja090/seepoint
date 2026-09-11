@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
-import { canAssignChatMessage, canResolveChatMessage, isChatChannel, validateChatImage } from '@/lib/chat-policy';
+import { canAssignChatMessage, canResolveChatMessage, isChatChannel, isInlineImage, validateChatImage } from '@/lib/chat-policy';
 import { prisma } from '@/lib/db';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
@@ -30,12 +30,18 @@ export async function GET(request: Request) {
     if (!reference || reference.channel !== channel) return NextResponse.json([]);
     where.createdAt = { lt: reference.createdAt };
   }
-  const messages = (await prisma.chatMessage.findMany({
+  const rawMessages = (await prisma.chatMessage.findMany({
     where,
     include: { reads: { select: { userId: true, readAt: true } } },
     orderBy: { createdAt: 'desc' },
     take: 50,
   })).reverse();
+
+  // Legacy inline images can be >1 MB each. Never send raw base64 during channel polling.
+  const messages = rawMessages.map((message) => ({
+    ...message,
+    imageUrl: isInlineImage(message.imageUrl) ? null : message.imageUrl,
+  }));
 
   if (!before && messages.length) {
     await prisma.chatRead.createMany({
@@ -56,10 +62,22 @@ export async function POST(request: Request) {
     channel?: unknown;
     content?: unknown;
     imageUrl?: unknown;
-    fuelExpense?: { vehicleId?: unknown; amount?: unknown; liters?: unknown; odometer?: unknown; fuelType?: unknown; note?: unknown };
-    vehicleFault?: { vehicleId?: unknown; title?: unknown; description?: unknown; severity?: unknown };
+    fuelExpense?: { vehicleId?: unknown; amount?: unknown; liters?: unknown; odometer?: unknown; fuelType?: unknown; note?: unknown; receiptUrl?: unknown };
+    vehicleFault?: { vehicleId?: unknown; title?: unknown; description?: unknown; severity?: unknown; photoUrl?: unknown };
   } | null;
   if (!body) return NextResponse.json({ error: 'Neplatná data.' }, { status: 400 });
+
+  if (
+    isInlineImage(typeof body.imageUrl === 'string' ? body.imageUrl : null) ||
+    isInlineImage(typeof body.fuelExpense?.receiptUrl === 'string' ? body.fuelExpense.receiptUrl : null) ||
+    isInlineImage(typeof body.vehicleFault?.photoUrl === 'string' ? body.vehicleFault.photoUrl : null)
+  ) {
+    return NextResponse.json(
+      { error: 'Obrázek je nutné nejdříve nahrát do úložiště. Base64 obrázky nelze ukládat do chatu.' },
+      { status: 400 }
+    );
+  }
+
   const channel = body.channel ?? 'general';
   if (!isChatChannel(channel)) return NextResponse.json({ error: 'Neplatný kanál chatu.' }, { status: 400 });
   if (body.fuelExpense && body.vehicleFault) return NextResponse.json({ error: 'Zpráva nemůže současně obsahovat účtenku i závadu.' }, { status: 400 });

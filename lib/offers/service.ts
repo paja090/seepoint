@@ -133,12 +133,12 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     campaignStrategy: (row as Record<string, unknown>).campaignStrategy ?? null,
     campaignPhases: (row as Record<string, unknown>).campaignPhases ?? null,
     currency: row.currency,
-    taxRate: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.taxRate),
-    subtotalBeforeDiscount: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : row.items.reduce((sum, item) => sum.add((item.quantity ?? new Prisma.Decimal(1)).mul(item.unitPrice ?? item.price ?? 0)), new Prisma.Decimal(0)).add(row.charges.reduce((sum, charge) => sum.add(charge.subtotal), new Prisma.Decimal(0))).toFixed(2),
-    subtotal: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.subtotal ?? row.totalPrice),
-    discountAmount: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.discountAmount),
-    taxAmount: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.taxAmount),
-    totalWithTax: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.totalWithTax ?? row.totalPrice),
+    taxRate: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.taxRate),
+    subtotalBeforeDiscount: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : row.items.reduce((sum, item) => sum.add((item.quantity ?? new Prisma.Decimal(1)).mul(item.unitPrice ?? item.price ?? 0)), new Prisma.Decimal(0)).add(row.charges.reduce((sum, charge) => sum.add(charge.subtotal), new Prisma.Decimal(0))).toFixed(2),
+    subtotal: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.subtotal ?? row.totalPrice),
+    discountAmount: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.discountAmount),
+    taxAmount: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.taxAmount),
+    totalWithTax: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.totalWithTax ?? row.totalPrice),
     hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash),
     portalToken: publicView ? undefined : (recoverPortalToken(row) ?? undefined),
     publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -981,7 +981,75 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     const target = action === 'accept' ? 'ACCEPTED' : action === 'reject' ? 'REJECTED' : null;
     if (!target) throw new OfferValidationError('Akce není podporována.');
     if (body.consent !== true) throw new OfferValidationError('Pro přijetí nebo odmítnutí potvrďte oprávnění jednat za klienta.');
-    if (target === 'ACCEPTED' && isPastValidity(row.validUntil)) throw new OfferValidationError('Platnost nabídky skončila. Kontaktujte obchodníka SeePOINT.', 'INVALID_STATUS_TRANSITION');
+
+    // Idempotency: if offer is already in the requested state, return gracefully without duplicate transitions
+    if (row.status === target) {
+      return {
+        row,
+        status: target,
+        message: target === 'ACCEPTED' ? 'Děkujeme, nabídka již byla dříve přijata.' : 'Odmítnutí nabídky již bylo dříve zaznamenáno.',
+      };
+    }
+
+    if (target === 'ACCEPTED' && isPastValidity(row.validUntil)) {
+      throw new OfferValidationError('Platnost nabídky skončila. Kontaktujte obchodníka SeePOINT.', 'INVALID_STATUS_TRANSITION');
+    }
+
+    // Special handling for Navigation Phase 1 (LOCATION_SELECTION):
+    // Client is confirming the selected points and route for pricing, NOT final priced order!
+    if (target === 'ACCEPTED' && row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION') {
+      const allPoints = row.navigationOffer.points;
+      await Promise.all(
+        allPoints.map((point) =>
+          tx.navigationPoint.update({
+            where: { id: point.id },
+            data: { isSelectedByClient: true },
+          })
+        )
+      );
+
+      const effectiveStatus = row.status === 'DRAFT' ? 'SENT' : row.status;
+      if (row.status === 'DRAFT') {
+        await tx.offer.update({
+          where: { id: row.id },
+          data: { status: 'SENT', sentAt: new Date() },
+        });
+      }
+
+      await tx.offerEvent.create({
+        data: {
+          offerId: row.id,
+          organizationId: row.organizationId,
+          type: 'UPDATED',
+          actorName,
+          actorEmail,
+          message: `${actorName} potvrdil/a návrh navigační trasy (${allPoints.length} bodů) k nacenění.${message ? ` Poznámka: ${message}` : ''}`,
+          metadata: {
+            channel: 'public-token',
+            action: 'navigation-selection',
+            stage: 'phase-1-approved',
+            consent: true,
+            totalCount: allPoints.length,
+          },
+        },
+      });
+
+      return {
+        row,
+        status: effectiveStatus,
+        message: 'Děkujeme! Váš výběr navigačních bodů byl schválen. Obchodník SeePOINT pro vás nyní připraví cenovou kalkulaci.',
+      };
+    }
+
+    // TEST 4: If this is a final priced quote (Phase 2), require valid price!
+    if (target === 'ACCEPTED' && row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'PRICED_QUOTE') {
+      const totalPriceNum = Number(row.totalPrice ?? row.totalWithTax ?? 0);
+      const hasPricedPoints = row.navigationOffer.points.some((p) => Number(p.unitPrice || 0) > 0 || Number(p.subtotal || 0) > 0);
+      if (totalPriceNum <= 0 && !hasPricedPoints) {
+        throw new OfferValidationError('Finální nabídku nelze schválit bez platné cenové kalkulace.', 'MISSING_PRICE');
+      }
+    }
+
     const effectiveFromStatus = (row.status === 'DRAFT' && (target === 'ACCEPTED' || target === 'REJECTED')) ? 'SENT' : (row.status as OfferStatusValue);
     assertOfferTransition(effectiveFromStatus, target);
     const now = new Date();
@@ -1052,8 +1120,20 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
   if (!suppressPreviewTestEmail) try {
     const row = result.row;
     const recipientEmail = row.createdByUser?.email || row.contactEmail || process.env.EMAIL_BCC || 'info@seepoint.cz';
-    const actionLabel = action === 'accept' ? 'PŘIJATA' : action === 'reject' ? 'ODMÍTNUTA' : action === 'revision' ? 'ŽÁDOST O ÚPRAVU' : 'NOVÝ DOTAZ';
-    const emailSubject = action === 'accept'
+    const isNavPhase1 = row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION';
+    const actionLabel = isNavPhase1 && action === 'accept'
+      ? 'SCHVÁLEN NÁVRH LOKALIT (FÁZE 1 – K NACENĚNÍ)'
+      : action === 'accept'
+      ? 'PŘIJATA'
+      : action === 'reject'
+      ? 'ODMÍTNUTA'
+      : action === 'revision'
+      ? 'ŽÁDOST O ÚPRAVU'
+      : 'NOVÝ DOTAZ';
+
+    const emailSubject = isNavPhase1 && action === 'accept'
+      ? `📍 Klient ${actorName} schválil návrh navigace k nacenění (${row.campaignName})`
+      : action === 'accept'
       ? `🎉 Nabídka ${row.campaignName} byla PŘIJATA klientem ${actorName}`
       : action === 'reject'
       ? `❌ Nabídka ${row.campaignName} byla odmítnuta (${actorName})`

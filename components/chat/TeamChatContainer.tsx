@@ -18,6 +18,7 @@ import {
   FileImage,
   UserCheck,
   ShoppingBag,
+  Loader2,
 } from 'lucide-react';
 import { canEditShoppingList, type AppRole } from '@/lib/rbac';
 import { CompanyShoppingListModal } from './CompanyShoppingListModal';
@@ -87,6 +88,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [inputText, setInputText] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [sending, setSending] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
 
@@ -174,7 +176,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     });
   }
 
-  // Handle direct photo selection from camera or gallery with automatic compression
+  // Handle direct photo selection from camera or gallery with automatic compression and storage upload
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -186,8 +188,30 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     }
 
     try {
+      setUploadingImage(true);
       const compressedDataUrl = await compressImageForChat(file);
-      setImageUrl(compressedDataUrl);
+
+      // Convert compressed canvas dataUrl to a Blob/File for storage upload
+      const response = await fetch(compressedDataUrl);
+      const blob = await response.blob();
+      const safeName = (file.name || 'photo.jpg').replace(/\.[^.]+$/, '.jpg');
+      const uploadFile = new File([blob], safeName, { type: 'image/jpeg' });
+
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+
+      const uploadRes = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.url) {
+        throw new Error(uploadData.error || 'Nahrání fotografie se nezdařilo.');
+      }
+
+      // Store the server URL (e.g. /api/photos/.../file)
+      setImageUrl(uploadData.url);
 
       // If fuel modal is open, trigger AI OCR analysis
       if (showFuelModal) {
@@ -195,7 +219,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
         fetch('/api/fuel/ocr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: compressedDataUrl }),
+          body: JSON.stringify({ imageUrl: uploadData.url }),
         })
           .then((res) => res.json())
           .then((data) => {
@@ -209,9 +233,10 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
           .catch(() => null)
           .finally(() => setAiScanningFuel(false));
       }
-    } catch {
-      alert('Fotografii se nepodařilo zpracovat. Zkuste vybrat jinou fotku.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Fotografii se nepodařilo zpracovat a nahrát.');
     } finally {
+      setUploadingImage(false);
       e.target.value = '';
     }
   }
@@ -864,7 +889,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
             <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-2 border border-emerald-200 text-xs">
               <div className="flex items-center gap-2 min-w-0">
                 <FileImage size={16} className="text-emerald-700 shrink-0" />
-                <span className="font-bold text-emerald-900 truncate">📷 Fotka z fotoaparátu / galerii připojena</span>
+                <span className="font-bold text-emerald-900 truncate">📷 Fotka uložena a připravena k odeslání</span>
               </div>
               <button
                 type="button"
@@ -888,11 +913,12 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
             <button
               type="button"
+              disabled={uploadingImage}
               onClick={() => fileInputRef.current?.click()}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition shadow-xs shrink-0"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition shadow-xs shrink-0 disabled:opacity-50"
               title="Vyfotit fotoaparátem nebo vybrat fotku"
             >
-              <Camera size={20} />
+              {uploadingImage ? <Loader2 size={20} className="animate-spin text-emerald-600" /> : <Camera size={20} />}
             </button>
 
             <input
@@ -906,7 +932,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
             <button
               type="submit"
-              disabled={sending || (!inputText.trim() && !imageUrl)}
+              disabled={sending || uploadingImage || (!inputText.trim() && !imageUrl)}
               className="flex h-11 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 text-xs font-black text-slate-950 shadow-md hover:bg-emerald-400 active:scale-95 transition disabled:opacity-50 shrink-0"
             >
               <Send size={16} />
@@ -1004,11 +1030,12 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                 </label>
                 <button
                   type="button"
+                  disabled={uploadingImage}
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 >
-                  <Camera size={16} />
-                  <span>{imageUrl ? '📷 Účtenka nahrána' : '✨ Vyfotit účtenku (AI přečte cenu i litry)'}</span>
+                  {uploadingImage ? <Loader2 size={16} className="animate-spin text-emerald-600" /> : <Camera size={16} />}
+                  <span>{uploadingImage ? '⏳ Nahrávám fotku...' : imageUrl ? '📷 Účtenka nahrána' : '✨ Vyfotit účtenku (AI přečte cenu i litry)'}</span>
                 </button>
               </div>
 
@@ -1023,7 +1050,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
                 <button
                   type="submit"
-                  disabled={sending || !fuelAmount}
+                  disabled={sending || uploadingImage || aiScanningFuel || !fuelAmount}
                   className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-black text-slate-950 hover:bg-amber-400 shadow-md transition disabled:opacity-50"
                 >
                   Uložit Účtenku
@@ -1112,11 +1139,12 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                 <label className="block text-xs font-bold text-slate-700 mb-1">Fotodokumentace poškození</label>
                 <button
                   type="button"
+                  disabled={uploadingImage}
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 >
-                  <Camera size={16} />
-                  <span>{imageUrl ? '📷 Fotka vybraná' : 'Vyfotit / Připojit fotku poruchy'}</span>
+                  {uploadingImage ? <Loader2 size={16} className="animate-spin text-rose-600" /> : <Camera size={16} />}
+                  <span>{uploadingImage ? '⏳ Nahrávám fotku...' : imageUrl ? '📷 Fotka vybraná' : 'Vyfotit / Připojit fotku poruchy'}</span>
                 </button>
               </div>
 
@@ -1131,7 +1159,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
                 <button
                   type="submit"
-                  disabled={sending || !faultTitle.trim()}
+                  disabled={sending || uploadingImage || !faultTitle.trim()}
                   className="rounded-xl bg-rose-600 px-5 py-2 text-xs font-black text-white hover:bg-rose-500 shadow-md transition disabled:opacity-50"
                 >
                   Nahlásit Závadu

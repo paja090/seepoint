@@ -120,7 +120,7 @@ export default async function PublicOfferPage({ params, searchParams }: { params
             </div>
           </header>
           <SpecializedOfferSummary offer={offer} proposalKey={token} />
-          {isLocationSelection ? null : <SpecializedOfferResponseActions status={offer.status} token={token} />}
+          <SpecializedOfferResponseActions status={offer.status} token={token} isLocationSelection={isLocationSelection} />
         </div>
       </div>
     );

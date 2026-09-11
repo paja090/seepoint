@@ -56,6 +56,7 @@ const DIRECT_CLIENT_BASELINE = new Map([
   ['scripts/inspect-and-purge-orders.js', 1],
   ['scripts/list_employees.js', 1],
   ['scripts/list_users.js', 1],
+  ['scripts/migrate-legacy-chat-base64.mjs', 1],
   ['scripts/preview-tenant-e2e.mjs', 1],
   ['scripts/purge-test-offers.js', 1],
   ['scripts/seed-demo-settlement.ts', 1],
