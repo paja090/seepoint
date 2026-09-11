@@ -12,7 +12,7 @@ const config = {
   question: { title: 'Mám dotaz', description: 'Napište svůj dotaz, obchodník se vám ozve co nejdříve.', submitLabel: 'Odeslat dotaz', Icon: HelpCircle, accent: 'bg-sky-600 hover:bg-sky-700', placeholder: 'Váš dotaz k nabídce…' },
 } as const;
 
-export function OfferActionDialog({ action, offerStatus, onClose, onReject, token }: { action: OfferActionType | null; offerStatus: string; onClose: () => void; onReject: () => void; token?: string }) {
+export function OfferActionDialog({ action, offerStatus, onClose, onReject, token, isLocationSelection }: { action: OfferActionType | null; offerStatus: string; onClose: () => void; onReject: () => void; token?: string; isLocationSelection?: boolean }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -35,7 +35,15 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
   }, [action, onClose]);
 
   if (!action) return null;
-  const { title, description, submitLabel, Icon, accent, placeholder } = config[action];
+  const activeConfig = isLocationSelection && action === 'approve' ? {
+    title: 'Potvrdit výběr lokalit navigace',
+    description: 'Potvrďte navržený výběr navigačních bodů a trasu k nacenění. Nejedná se o cenový závazek – obchodník SeePOINT pro vás následně připraví přesnou cenovou kalkulaci.',
+    submitLabel: 'Odeslat potvrzení výběru',
+    Icon: CheckCircle2,
+    accent: 'bg-emerald-600 hover:bg-emerald-700',
+    placeholder: 'Volitelná poznámka k výběru lokalit…',
+  } : config[action];
+  const { title, description, submitLabel, Icon, accent, placeholder } = activeConfig;
   const requiresConsent = action === 'approve' || action === 'reject';
   const isAlreadyClosed = (action === 'approve' || action === 'reject') && ['ACCEPTED', 'REJECTED', 'ARCHIVED', 'CONVERTED'].includes(offerStatus);
 
@@ -89,7 +97,7 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
               <label className="text-sm font-medium text-slate-700">E-mail<input className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-base" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></label>
             </div>
             <label className="mt-3 block text-sm font-medium text-slate-700">Zpráva<textarea className="mt-1 min-h-28 w-full resize-y rounded-xl border border-slate-200 p-3 text-base" onChange={(event) => setMessage(event.target.value)} placeholder={placeholder} required={action === 'revision' || action === 'question'} value={message} /></label>
-            {requiresConsent && <label className="mt-3 flex items-start gap-2 text-sm text-slate-600"><input checked={consent} className="mt-1" onChange={(event) => setConsent(event.target.checked)} required type="checkbox" />{action === 'reject' ? 'Potvrzuji odmítnutí této nabídky.' : 'Potvrzuji souhlas s přijetím této nabídky.'}</label>}
+            {requiresConsent && <label className="mt-3 flex items-start gap-2 text-sm text-slate-600"><input checked={consent} className="mt-1" onChange={(event) => setConsent(event.target.checked)} required type="checkbox" />{action === 'reject' ? 'Potvrzuji odmítnutí této nabídky.' : isLocationSelection ? 'Potvrzuji souhlas s navrženým výběrem lokalit k nacenění.' : 'Potvrzuji souhlas s přijetím této nabídky.'}</label>}
             {isAlreadyClosed && <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Tato nabídka už není ve stavu, ve kterém ji lze přijmout.</p>}
             {result && !result.ok && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{result.message}</p>}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">

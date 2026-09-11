@@ -160,6 +160,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     (navigation as unknown as Record<string, unknown> | null)?.selectionSubmitted === true,
   );
   const [selectionMessage, setSelectionMessage] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientNote, setClientNote] = useState('');
   const [uploadedArtworkName, setUploadedArtworkName] = useState(() => {
     const value = (navigation as unknown as Record<string, unknown> | null)?.clientArtworkFileName;
     return typeof value === 'string' ? value : '';
@@ -222,13 +225,18 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       const res = await fetch(`/api/proposals/${encodeURIComponent(effectiveProposalKey)}/selection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedPointIds }),
+        body: JSON.stringify({
+          selectedPointIds,
+          name: clientName.trim() || undefined,
+          email: clientEmail.trim() || undefined,
+          note: clientNote.trim() || undefined,
+        }),
       });
       if (res.ok) {
         setSelectionSubmitted(true);
       } else {
-        const data = await res.json().catch(() => null) as { error?: string } | null;
-        setSelectionMessage(data?.error || 'Výběr bodů se nepodařilo odeslat.');
+        const data = await res.json().catch(() => null) as { error?: string; message?: string } | null;
+        setSelectionMessage(data?.error || data?.message || 'Výběr bodů se nepodařilo odeslat.');
       }
     } catch {
       setSelectionMessage('Výběr bodů se nepodařilo odeslat.');
@@ -634,6 +642,22 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       ) : null}
 
       {isLocationSelectionPhase ? (
+        <section className="rounded-3xl border border-sky-200 bg-sky-50/60 p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Kalkulace a rozpočet</p>
+              <h3 className="mt-1 text-lg font-black text-slate-900">Cena bude doplněna v další fázi</h3>
+              <p className="mt-1 text-sm text-slate-600">V této 1. fázi schvalujete pouze výběr navigačních bodů a trasu bez cenových závazků. Přesnou cenovou kalkulaci pro vás připravíme ihned po potvrzení výběru.</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-sky-200 px-4 py-3 text-center sm:text-right shrink-0">
+              <span className="text-xs font-bold text-sky-800">Fáze 1 – Návrh rozmístění</span>
+              <p className="text-sm font-black text-slate-900 mt-0.5">ZDARMA / Nezávazně</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isLocationSelectionPhase ? (
         <div className="rounded-3xl border border-amber-200 bg-white p-6 text-center shadow-sm">
           {selectionSubmitted ? (
             <div className="mx-auto max-w-2xl">
@@ -645,12 +669,48 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <div className="mx-auto max-w-2xl">
               <h2 className="text-xl font-black text-slate-950">Potvrďte vybrané navigační body</h2>
               <p className="mt-2 text-sm text-slate-600">Tímto krokem ještě neschvalujete cenu ani realizaci. Odesíláte pouze výběr {selectedPointIds.length} z {navigation.points.length} bodů k nacenění.</p>
-              {missingVisualCount > 0 ? <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">Před potvrzením musí dodavatel doplnit fotografie a vizualizace u {missingVisualCount} bodů.</p> : null}
+              {missingVisualCount > 0 ? (
+                <p className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-medium text-sky-900">
+                  ℹ️ U {missingVisualCount} {missingVisualCount === 1 ? 'bodu' : 'bodů'} ještě náš tým doplňuje terénní vizualizaci. Váš výběr lokalit k nacenění však můžete odeslat ihned.
+                </p>
+              ) : null}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 text-left">
+                <label className="text-xs font-semibold text-slate-700">
+                  Vaše jméno
+                  <input
+                    type="text"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    placeholder="Např. Jan Novák"
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Váš e-mail
+                  <input
+                    type="email"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    placeholder="jan.novak@firma.cz"
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                  />
+                </label>
+              </div>
+              <label className="mt-3 block text-left text-xs font-semibold text-slate-700">
+                Poznámka k návrhu (volitelné)
+                <textarea
+                  value={clientNote}
+                  onChange={(e) => setClientNote(e.target.value)}
+                  placeholder="Např. preferujeme instalaci přednostně na vjezdu do areálu..."
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-slate-200 p-2.5 text-sm text-slate-900 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                />
+              </label>
               <button
                 type="button"
-                disabled={submittingSelection || selectedPointIds.length === 0 || missingVisualCount > 0}
+                disabled={submittingSelection || selectedPointIds.length === 0}
                 onClick={() => void handleConfirmClientSelection()}
-                className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 cursor-pointer shadow-md"
               >
                 <CheckCircle2 size={18} />
                 {submittingSelection ? 'Odesílám výběr…' : 'Potvrdit body k nacenění'}
