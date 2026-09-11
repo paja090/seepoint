@@ -14,37 +14,126 @@ type NotificationItem = {
   createdAt: string;
 };
 
+type NotificationState = {
+  notifications: NotificationItem[];
+  totalCount: number;
+  highCount: number;
+  aiSummary: string | null;
+  loading: boolean;
+};
+
+// Singleton store to coordinate polling across all mounted bells (mobile + desktop)
+let sharedState: NotificationState = {
+  notifications: [],
+  totalCount: 0,
+  highCount: 0,
+  aiSummary: null,
+  loading: false,
+};
+
+const subscribers = new Set<(state: NotificationState) => void>();
+let pollingTimer: ReturnType<typeof setInterval> | null = null;
+let isUnauthenticated = false;
+let consecutiveErrors = 0;
+
+function notifySubscribers() {
+  subscribers.forEach((callback) => callback(sharedState));
+}
+
+export async function fetchNotifications(includeAi = false): Promise<void> {
+  if (isUnauthenticated) return;
+  // If tab is not visible, don't poll periodically unless user explicitly requested with includeAi
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden' && !includeAi) {
+    return;
+  }
+
+  sharedState = { ...sharedState, loading: true };
+  notifySubscribers();
+
+  try {
+    const res = await fetch(includeAi ? '/api/notifications?includeAi=1' : '/api/notifications');
+    if (res.status === 401) {
+      isUnauthenticated = true;
+      stopPolling();
+      sharedState = { ...sharedState, loading: false };
+      notifySubscribers();
+      return;
+    }
+    if (!res.ok) {
+      consecutiveErrors++;
+      sharedState = { ...sharedState, loading: false };
+      notifySubscribers();
+      return;
+    }
+
+    const data = await res.json();
+    consecutiveErrors = 0;
+    if (data && Array.isArray(data.notifications)) {
+      sharedState = {
+        notifications: data.notifications,
+        totalCount: data.totalCount || 0,
+        highCount: data.highCount || 0,
+        aiSummary: data.aiSummary || null,
+        loading: false,
+      };
+      notifySubscribers();
+    }
+  } catch (err) {
+    consecutiveErrors++;
+    console.error('Fetch notifications error:', err);
+    sharedState = { ...sharedState, loading: false };
+    notifySubscribers();
+  }
+}
+
+function startPolling() {
+  if (pollingTimer || isUnauthenticated) return;
+  void fetchNotifications();
+  pollingTimer = setInterval(() => {
+    // If consecutive errors occurred, back off
+    if (consecutiveErrors >= 3) {
+      return;
+    }
+    void fetchNotifications();
+  }, 60000); // exactly 1 timer for the entire page
+}
+
+function stopPolling() {
+  if (pollingTimer) {
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && subscribers.size > 0 && !isUnauthenticated) {
+      void fetchNotifications();
+    }
+  });
+}
+
 export function NotificationBellCenter() {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [totalCount, setTotalCount] = useState(0);
-  const [highCount, setHighCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  const fetchNotifications = useCallback(async (includeAi = false) => {
-    setLoading(true);
-    try {
-      const res = await fetch(includeAi ? '/api/notifications?includeAi=1' : '/api/notifications');
-      const data = await res.json();
-      if (res.ok && data.notifications) {
-        setNotifications(data.notifications);
-        setTotalCount(data.totalCount || 0);
-        setHighCount(data.highCount || 0);
-        setAiSummary(data.aiSummary || null);
-      }
-    } catch (err) {
-      console.error('Fetch notifications error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [state, setState] = useState<NotificationState>(sharedState);
 
   useEffect(() => {
-    void fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // refresh every 60s
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+    subscribers.add(setState);
+    if (subscribers.size === 1) {
+      startPolling();
+    } else {
+      setState(sharedState);
+    }
+
+    return () => {
+      subscribers.delete(setState);
+      if (subscribers.size === 0) {
+        stopPolling();
+      }
+    };
+  }, []);
+
+  const { notifications, totalCount, highCount, aiSummary, loading } = state;
 
   return (
     <div className="relative">

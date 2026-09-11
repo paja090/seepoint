@@ -578,6 +578,17 @@ export async function listOffers(user: CurrentUser, filters: URLSearchParams) {
 export async function getOffer(user: CurrentUser, id: string) {
   const row = await getOfferRow(prisma, id);
   assertAccess(user, row);
+  if (row.publicTokenHash) {
+    const expectedToken = getDeterministicOfferToken(row.id);
+    const expectedHash = hashPublicOfferToken(expectedToken);
+    if (row.publicTokenHash !== expectedHash) {
+      await prisma.offer.update({
+        where: { id: row.id },
+        data: { publicTokenHash: expectedHash },
+      });
+      row.publicTokenHash = expectedHash;
+    }
+  }
   const organization = await prisma.organization.findUnique({
     where: { id: row.organizationId },
     select: {

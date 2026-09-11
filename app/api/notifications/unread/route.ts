@@ -2,27 +2,42 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { canAccess } from '@/lib/rbac';
+import { enterTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
-  }
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
+    }
 
-  const userName = user.employee
-    ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
-    : user.name || user.email;
+    if (!user.organizationId) {
+      return NextResponse.json({ error: 'Aktivní organizace není vybraná.' }, { status: 403 });
+    }
 
-  const now = new Date();
-  const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const tenantContext = {
+      organizationId: user.organizationId,
+      userId: user.id,
+      source: 'session' as const,
+    };
 
-  const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults, recentRadarOpps] = await Promise.all([
-    // Tasks assigned to user
-    canAccess(user.role, 'work') ? prisma.workAssignment.findMany({
-      where: {
-        OR: [
+    enterTenantContext(tenantContext);
+
+    return await runWithTenantContext(tenantContext, async () => {
+      const userName = user.employee
+        ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
+        : user.name || user.email;
+
+      const now = new Date();
+      const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults, recentRadarOpps] = await Promise.all([
+        // Tasks assigned to user
+        canAccess(user.role, 'work') ? prisma.workAssignment.findMany({
+          where: {
+            OR: [
           { workerName: { contains: userName, mode: 'insensitive' } },
           { userId: user.id },
         ],
@@ -143,8 +158,18 @@ export async function GET() {
     })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  return NextResponse.json({
-    unreadCount: items.length,
-    items,
-  });
+      return NextResponse.json({
+        unreadCount: items.length,
+        items,
+      });
+    });
+  } catch (error) {
+    if (error instanceof TenantContextError) {
+      console.error(`[Notifications unread API] Critical TenantContextError: ${error.message}`);
+      return NextResponse.json({ error: 'Chyba tenant kontextu' }, { status: 500 });
+    }
+    console.error('Notifications unread API error:', error);
+    return NextResponse.json({ error: 'Chyba při načítání notifikací' }, { status: 500 });
+  }
 }
+
