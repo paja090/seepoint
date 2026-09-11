@@ -418,10 +418,13 @@ export async function getSystemNotifications(
       source: currentTenant?.source || 'session',
     },
     async () => {
-      let organization: { id: string; isActive: boolean; moduleConfig?: unknown } | null = null;
+      let organization: { id: string; isActive: boolean; plan?: string | null; enabledModules?: unknown } | null = null;
       if (process.env.DATABASE_URL) {
         try {
-          organization = await prisma.organization.findUnique({ where: { id: effectiveOrgId } });
+          organization = await prisma.organization.findUnique({
+            where: { id: effectiveOrgId },
+            select: { id: true, isActive: true, plan: true, enabledModules: true },
+          });
         } catch {
           // In test/mock environments where DATABASE_URL is not live, continue safely
         }

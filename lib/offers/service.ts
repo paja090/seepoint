@@ -26,7 +26,7 @@ import {
   type OfferInput,
   type OfferStatusValue,
 } from './domain';
-import { preparePortalCredential, recoverPortalToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
+import { preparePortalCredential, recoverPortalToken, hashPublicOfferToken, isPlausiblePublicOfferToken, getDeterministicOfferToken } from './token';
 import type { OfferView } from './view-model';
 import { offerReadinessChecks, type OfferConflictView } from './workflow';
 
