@@ -69,6 +69,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         subject: `[SeePOINT] Klient nahrál logo / grafické podklady k nabídce ${offer.title}`,
         template: 'artwork-uploaded',
         message: `Klient ${offer.client?.name || 'Zákazník'} právě nahrál grafické podklady k nabídce "${offer.title}".\n\nSoubor: ${clientArtworkFileName}\nKlient: ${offer.client?.name || 'Nezadáno'}\n\nPodklady jsou uloženy v detailu nabídky v administraci SeePOINT.`,
+        organizationId: offer.organizationId,
       });
     } catch {
       // Background email delivery fallback
