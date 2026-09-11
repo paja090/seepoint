@@ -61,7 +61,7 @@ test('API ukládá neměnný doklad, přikládá jej a chrání samostatným bil
   const downloadRoute = readFileSync(new URL('../app/api/crm/invoices/[id]/pdf/route.ts', import.meta.url), 'utf8');
   const email = readFileSync(new URL('../lib/email.ts', import.meta.url), 'utf8');
 
-  assert.match(issueRoute, /requireApiAccess\('billing'\)/);
+  assert.match(issueRoute, /requireApiAccess\('billing', 'navigation'\)/);
   assert.match(issueRoute, /uploadDocumentToGoogleDrive/);
   assert.match(issueRoute, /downloadFileFromGoogleDrive/);
   assert.match(issueRoute, /attachments: \[\{ filename: pdfFileName, content: invoicePdf/);

@@ -4,8 +4,12 @@ import { getCurrentUser } from '@/lib/auth';
 import { runDiscoveryForOrganization } from '@/lib/opportunities/discovery-runner';
 import { getOrganizationRadarProfile } from '@/lib/opportunities/radar-profile';
 
+import { hasModuleAccess } from '@/lib/module-policy';
+import { isModuleEnabled } from '@/lib/organization-modules';
+import { runWithTenantContext } from '@/lib/tenant-context';
+
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * Automated Cron Endpoint for AI Sales Radar
@@ -20,12 +24,14 @@ async function handleCronExecution(request: Request) {
 
   let isAuthorized = isCronAuthorized;
   let callerInfo = 'cron-service';
+  let callerOrganizationId: string | undefined;
 
   if (!isAuthorized) {
     const user = await getCurrentUser();
-    if (user && ['ADMIN', 'MANAGER'].includes(user.role)) {
+    if (user && ['ADMIN', 'MANAGER'].includes(user.role) && hasModuleAccess(user, 'salesRadar')) {
       isAuthorized = true;
       callerInfo = `user:${user.id}`;
+      callerOrganizationId = user.organizationId;
     }
   }
 
@@ -38,18 +44,23 @@ async function handleCronExecution(request: Request) {
 
   try {
     const organizations = await prisma.organization.findMany({
-      select: { id: true, name: true },
+      where: { isActive: true, ...(isCronAuthorized ? {} : { id: callerOrganizationId }) },
+      select: { id: true, name: true, plan: true, enabledModules: true },
     });
 
     const executionResults = [];
+    const deadline = Date.now() + 270_000;
+    let deferredCount = 0;
     let totalAdded = 0;
     let totalDuplicates = 0;
     let skippedCount = 0;
 
     for (const org of organizations) {
       try {
-        const profile = await getOrganizationRadarProfile(org.id);
-        if (!profile.enabled) {
+        const profile = isModuleEnabled(org, 'salesRadar')
+          ? await runWithTenantContext({ organizationId: org.id, source: 'script' }, () => getOrganizationRadarProfile(org.id))
+          : null;
+        if (!profile || !profile.enabled) {
           skippedCount++;
           executionResults.push({
             organizationId: org.id,
@@ -59,12 +70,18 @@ async function handleCronExecution(request: Request) {
           continue;
         }
 
+        if (deadline - Date.now() < 100_000) {
+          deferredCount++;
+          executionResults.push({ organizationId: org.id, name: org.name, status: 'DEFERRED_TIME_BUDGET' });
+          continue;
+        }
+
         const result = await runDiscoveryForOrganization({
           organizationId: org.id,
           userId: 'cron-scheduler',
           triggerType: 'CRON',
           batchLimit: 15,
-          timeBudgetMs: 25_000,
+          timeBudgetMs: 100_000,
         });
 
         totalAdded += result.addedCount;
@@ -91,13 +108,14 @@ async function handleCronExecution(request: Request) {
     }
 
     return NextResponse.json({
-      success: true,
+      success: deferredCount === 0 && executionResults.every((result) => result.status === 'COMPLETED' || result.status === 'SKIPPED_DISABLED'),
       mode: 'cron',
       caller: callerInfo,
       timestamp: new Date().toISOString(),
       organizationsScanned: organizations.length,
       organizationsActive: organizations.length - skippedCount,
       organizationsSkipped: skippedCount,
+      organizationsDeferred: deferredCount,
       totalOpportunitiesCreated: totalAdded,
       totalDuplicatesCaught: totalDuplicates,
       results: executionResults,

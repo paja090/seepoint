@@ -1,4 +1,5 @@
 import { getCurrentUser } from '@/lib/auth';
+import { hasModuleAccess } from '@/lib/module-policy';
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
 
   const [carriers, clients, employees, vehicles] = await Promise.all([
     // Carriers search (AdvertisingCarrier)
-    prisma.advertisingCarrier.findMany({
+    hasModuleAccess(user, 'carriers') ? prisma.advertisingCarrier.findMany({
       where: {
         archivedAt: null,
         OR: [
@@ -36,10 +37,10 @@ export async function GET(request: Request) {
         status: true,
       },
       take: 6,
-    }),
+    }) : [],
 
     // CRM Clients search (Client)
-    prisma.client.findMany({
+    hasModuleAccess(user, 'crm') ? prisma.client.findMany({
       where: {
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
@@ -56,10 +57,10 @@ export async function GET(request: Request) {
         phone: true,
       },
       take: 5,
-    }),
+    }) : [],
 
     // Employees search (Employee)
-    prisma.employee.findMany({
+    hasModuleAccess(user, 'employees') ? prisma.employee.findMany({
       where: {
         isActive: true,
         OR: [
@@ -77,10 +78,10 @@ export async function GET(request: Request) {
         phone: true,
       },
       take: 5,
-    }),
+    }) : [],
 
     // Vehicles search (Vehicle)
-    prisma.vehicle.findMany({
+    hasModuleAccess(user, 'vehicles') ? prisma.vehicle.findMany({
       where: {
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
         status: true,
       },
       take: 4,
-    }),
+    }) : [],
   ]);
 
   return NextResponse.json({

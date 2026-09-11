@@ -1,5 +1,6 @@
 'use client';
 
+import type { DryRunStats } from '@/lib/imports/types';
 import { useEffect, useState } from 'react';
 import { RefreshCw, FileSpreadsheet, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 
@@ -15,7 +16,7 @@ type HistoryBatch = {
   errorRows: number;
   createdAt: string;
   createdBy?: { name: string; email: string } | null;
-  dryRunStats?: any;
+  dryRunStats?: DryRunStats;
 };
 
 export function ImportHistoryList() {

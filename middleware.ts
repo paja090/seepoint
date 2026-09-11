@@ -9,6 +9,8 @@ const publicExactPaths = new Set([
   '/api/auth/login',
   '/api/auth/forgot-password',
   '/api/auth/set-password',
+  // Provider callbacks authenticate with their Svix signature in the handler.
+  '/api/webhooks/resend',
 ]);
 
 const publicPathPrefixes = [

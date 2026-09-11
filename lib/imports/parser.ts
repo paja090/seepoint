@@ -137,7 +137,7 @@ export async function parseUploadedWorkbook(
     } else {
       // Parse XLSX / XLS
       // ExcelJS load buffer:
-      await workbook.xlsx.load(buffer as any);
+      await workbook.xlsx.load(new Uint8Array(buffer).buffer);
     }
   } catch (err) {
     if (err instanceof Error && err.message.includes('prázdný')) throw err;

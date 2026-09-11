@@ -7,7 +7,7 @@ import { canManageAbsences, canViewAbsenceNote } from '@/lib/absences';
 export const dynamic = 'force-dynamic';
 
 export default async function VacationsPage() {
-  const user = await requirePageAccess('team');
+  const user = await requirePageAccess('team', 'vacations');
   const canManage = canManageAbsences(user.role);
   const ownEmployeeId = user.employee?.id ?? null;
   const oldestVisibleDate = new Date();

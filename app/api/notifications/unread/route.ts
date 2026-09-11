@@ -1,7 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
-import { canAccess } from '@/lib/rbac';
+import { hasModuleAccess } from '@/lib/module-policy';
 import { enterTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
@@ -35,128 +35,128 @@ export async function GET() {
 
       const [myAssignments, myAssignedChatMsgs, unreadChatMessages, recentVehicleFaults, recentRadarOpps] = await Promise.all([
         // Tasks assigned to user
-        canAccess(user.role, 'work') ? prisma.workAssignment.findMany({
+        hasModuleAccess(user, 'work') ? prisma.workAssignment.findMany({
           where: {
             OR: [
-          { workerName: { contains: userName, mode: 'insensitive' } },
-          { userId: user.id },
-        ],
-        workOrder: {
-          status: { in: ['PLANNED', 'IN_PROGRESS'] },
-        },
-      },
-      include: {
-        workOrder: {
+              { workerName: { contains: userName, mode: 'insensitive' } },
+              { userId: user.id },
+            ],
+            workOrder: {
+              status: { in: ['PLANNED', 'IN_PROGRESS'] },
+            },
+          },
+          include: {
+            workOrder: {
+              select: {
+                id: true,
+                title: true,
+                priority: true,
+                scheduledAt: true,
+                clientName: true,
+              },
+            },
+          },
+          take: 10,
+        }) : Promise.resolve([]),
+        // Chat messages assigned to user to solve
+        prisma.chatMessage.findMany({
+          where: {
+            assignedToUserId: { in: [user.id, ...(user.employee?.id ? [user.employee.id] : [])] },
+            isResolved: { not: true },
+          },
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        }),
+        // New chat messages that the current user has not read yet.
+        prisma.chatMessage.findMany({
+          where: {
+            userId: { not: user.id },
+            createdAt: { gte: last24h },
+            reads: { none: { userId: user.id } },
+          },
+          select: { id: true, channel: true, userName: true, content: true, imageUrl: true, createdAt: true },
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        }),
+        // Vehicle fault reports in last 24h
+        hasModuleAccess(user, 'vehicles') ? prisma.vehicleServiceRecord.findMany({
+          where: {
+            title: { contains: 'Hlášená závada', mode: 'insensitive' },
+            createdAt: { gte: last24h },
+          },
+          include: {
+            vehicle: { select: { name: true, registrationNumber: true } },
+          },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        }) : Promise.resolve([]),
+        // Fresh AI Radar opportunities in last 24h
+        hasModuleAccess(user, 'salesRadar') ? prisma.salesOpportunity.findMany({
+          where: {
+            status: 'NEW',
+            opportunityScore: { gte: 40 },
+            createdAt: { gte: last24h },
+          },
           select: {
             id: true,
             title: true,
-            priority: true,
-            scheduledAt: true,
-            clientName: true,
+            companyName: true,
+            city: true,
+            opportunityScore: true,
+            createdAt: true,
           },
-        },
-      },
-      take: 10,
-    }) : Promise.resolve([]),
-    // Chat messages assigned to user to solve
-    prisma.chatMessage.findMany({
-      where: {
-        assignedToUserId: { in: [user.id, ...(user.employee?.id ? [user.employee.id] : [])] },
-        isResolved: { not: true },
-      },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-    }),
-    // New chat messages that the current user has not read yet.
-    prisma.chatMessage.findMany({
-      where: {
-        userId: { not: user.id },
-        createdAt: { gte: last24h },
-        reads: { none: { userId: user.id } },
-      },
-      select: { id: true, channel: true, userName: true, content: true, imageUrl: true, createdAt: true },
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-    }),
-    // Vehicle fault reports in last 24h
-    canAccess(user.role, 'vehicles') ? prisma.vehicleServiceRecord.findMany({
-      where: {
-        title: { contains: 'Hlášená závada', mode: 'insensitive' },
-        createdAt: { gte: last24h },
-      },
-      include: {
-        vehicle: { select: { name: true, registrationNumber: true } },
-      },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-    }) : Promise.resolve([]),
-    // Fresh AI Radar opportunities in last 24h
-    canAccess(user.role, 'clients') ? prisma.salesOpportunity.findMany({
-      where: {
-        status: 'NEW',
-        opportunityScore: { gte: 40 },
-        createdAt: { gte: last24h },
-      },
-      select: {
-        id: true,
-        title: true,
-        companyName: true,
-        city: true,
-        opportunityScore: true,
-        createdAt: true,
-      },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-    }) : Promise.resolve([]),
-  ]);
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        }) : Promise.resolve([]),
+      ]);
 
-  const items = [
-    ...myAssignments.map((a) => ({
-      id: `task-${a.workOrder.id}`,
-      type: 'TASK',
-      title: `📋 Přiřazený úkol: ${a.workOrder.title}`,
-      description: `Klient: ${a.workOrder.clientName}. Termín: ${new Date(a.workOrder.scheduledAt).toLocaleDateString('cs-CZ')}`,
-      linkUrl: `/work/${a.workOrder.id}`,
-      isUrgent: a.workOrder.priority === 'URGENT',
-      createdAt: a.workOrder.scheduledAt.toISOString(),
-    })),
-    ...myAssignedChatMsgs.map((c) => ({
-      id: `chat-${c.id}`,
-      type: 'CHAT',
-      title: `💬 Případ k řešení v chatu`,
-      description: c.content.slice(0, 80),
-      linkUrl: '/chat',
-      isUrgent: false,
-      createdAt: c.createdAt.toISOString(),
-    })),
-    ...unreadChatMessages.map((message) => ({
-      id: `chat-message-${message.id}`,
-      type: 'CHAT_MESSAGE',
-      title: `💬 Nová zpráva od ${message.userName}`,
-      description: message.content.slice(0, 100) || (message.imageUrl ? 'Přidána nová fotografie.' : 'Nová zpráva v týmovém chatu.'),
-      linkUrl: `/chat?channel=${encodeURIComponent(message.channel)}`,
-      isUrgent: message.channel === 'urgent',
-      createdAt: message.createdAt.toISOString(),
-    })),
-    ...recentVehicleFaults.map((vf) => ({
-      id: `fault-${vf.id}`,
-      type: 'VEHICLE_FAULT',
-      title: `🚨 Porucha na autě: ${vf.vehicle.name}`,
-      description: vf.title,
-      linkUrl: `/vehicles/${vf.vehicleId}`,
-      isUrgent: true,
-      createdAt: vf.createdAt.toISOString(),
-    })),
-    ...recentRadarOpps.map((opp) => ({
-      id: `radar-opp-${opp.id}`,
-      type: 'RADAR',
-      title: `🎯 Nová příležitost: ${opp.companyName || opp.title}`,
-      description: `${opp.city ? `${opp.city} • ` : ''}Relevance ${opp.opportunityScore} %. Zjištěno AI radarem.`,
-      linkUrl: `/sales/opportunities`,
-      isUrgent: opp.opportunityScore >= 70,
-      createdAt: opp.createdAt.toISOString(),
-    })),
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const items = [
+        ...myAssignments.map((a) => ({
+          id: `task-${a.workOrder.id}`,
+          type: 'TASK',
+          title: `📋 Přiřazený úkol: ${a.workOrder.title}`,
+          description: `Klient: ${a.workOrder.clientName}. Termín: ${new Date(a.workOrder.scheduledAt).toLocaleDateString('cs-CZ')}`,
+          linkUrl: `/work/${a.workOrder.id}`,
+          isUrgent: a.workOrder.priority === 'URGENT',
+          createdAt: a.workOrder.scheduledAt.toISOString(),
+        })),
+        ...myAssignedChatMsgs.map((c) => ({
+          id: `chat-${c.id}`,
+          type: 'CHAT',
+          title: `💬 Případ k řešení v chatu`,
+          description: c.content.slice(0, 80),
+          linkUrl: '/chat',
+          isUrgent: false,
+          createdAt: c.createdAt.toISOString(),
+        })),
+        ...unreadChatMessages.map((message) => ({
+          id: `chat-message-${message.id}`,
+          type: 'CHAT_MESSAGE',
+          title: `💬 Nová zpráva od ${message.userName}`,
+          description: message.content.slice(0, 100) || (message.imageUrl ? 'Přidána nová fotografie.' : 'Nová zpráva v týmovém chatu.'),
+          linkUrl: `/chat?channel=${encodeURIComponent(message.channel)}`,
+          isUrgent: message.channel === 'urgent',
+          createdAt: message.createdAt.toISOString(),
+        })),
+        ...recentVehicleFaults.map((vf) => ({
+          id: `fault-${vf.id}`,
+          type: 'VEHICLE_FAULT',
+          title: `🚨 Porucha na autě: ${vf.vehicle.name}`,
+          description: vf.title,
+          linkUrl: `/vehicles/${vf.vehicleId}`,
+          isUrgent: true,
+          createdAt: vf.createdAt.toISOString(),
+        })),
+        ...recentRadarOpps.map((opp) => ({
+          id: `radar-opp-${opp.id}`,
+          type: 'RADAR',
+          title: `🎯 Nová příležitost: ${opp.companyName || opp.title}`,
+          description: `${opp.city ? `${opp.city} • ` : ''}Relevance ${opp.opportunityScore} %. Zjištěno AI radarem.`,
+          linkUrl: `/sales/opportunities`,
+          isUrgent: opp.opportunityScore >= 70,
+          createdAt: opp.createdAt.toISOString(),
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       return NextResponse.json({
         unreadCount: items.length,
@@ -172,4 +172,3 @@ export async function GET() {
     return NextResponse.json({ error: 'Chyba při načítání notifikací' }, { status: 500 });
   }
 }
-

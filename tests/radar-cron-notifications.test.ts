@@ -39,7 +39,7 @@ test('unread notifications route includes fresh radar opportunities in toast ite
 
 test('radar settings modal clearly shows automated morning cron status and notifications', () => {
   const modalSrc = source('components/opportunities/RadarSettingsModal.tsx');
-  assert.match(modalSrc, /Ranní automat: Každý všední den v 7:00/);
+  assert.match(modalSrc, /Ranní automat: Všední dny v 7:00 v zimě \/ 8:00 v létě/);
   assert.match(modalSrc, /Notifikace: Upozornění nad/);
   assert.match(modalSrc, /Automatické skenování i notifikace jsou pozastaveny/);
 });

@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const auth = await requireApiAccess('import');
+  const auth = await requireApiAccess('import', 'import');
   if (isApiDenied(auth)) return auth;
 
   let organizationId: string;

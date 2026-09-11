@@ -447,7 +447,7 @@ export function GoogleNavigationOfferMap({
       try {
         const features = (OSTRAVA_RESTRICTED_ZONES_GEOJSON?.features ?? []) as Array<{
           geometry?: { coordinates?: number[][][] };
-          properties?: { CISLO?: string; ID?: string };
+          properties?: { CISLO?: string; ID?: number };
         }>;
         features.forEach((feature) => {
           const rawCoords = feature.geometry?.coordinates?.[0];

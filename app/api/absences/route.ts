@@ -20,7 +20,7 @@ function isRetryConflict(error: unknown) {
 }
 
 export async function GET() {
-  const user = await requireApiAccess('team');
+  const user = await requireApiAccess('team', 'vacations');
   if (isApiDenied(user)) return user;
 
   const ownEmployeeId = user.employee?.id ?? null;
@@ -54,7 +54,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await requireApiAccess('team');
+  const user = await requireApiAccess('team', 'vacations');
   if (isApiDenied(user)) return user;
 
   try {
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const user = await requireApiAccess('team');
+  const user = await requireApiAccess('team', 'vacations');
   if (isApiDenied(user)) return user;
   if (!canManageAbsences(user.role)) {
     return NextResponse.json({ error: 'Žádosti může schvalovat pouze administrátor nebo manažer.' }, { status: 403 });
@@ -176,7 +176,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = await requireApiAccess('team');
+  const user = await requireApiAccess('team', 'vacations');
   if (isApiDenied(user)) return user;
 
   const id = new URL(request.url).searchParams.get('id')?.trim();

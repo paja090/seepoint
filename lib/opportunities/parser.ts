@@ -1,4 +1,5 @@
 import 'server-only';
+import { radarRequestSignal } from './deadline';
 import { OpportunityEventType } from '@prisma/client';
 import type { CreateOpportunityInput, OrganizationRadarProfileData } from './types';
 import { OpportunityValidationError, parseOpportunityCreateInput } from './policy';
@@ -12,7 +13,8 @@ export type ParsedOpportunityResult = CreateOpportunityInput & {
 export async function parseOpportunityFromAiInput(
   rawInput: string,
   urlHint?: string,
-  radarProfile?: OrganizationRadarProfileData
+  radarProfile?: OrganizationRadarProfileData,
+  deadline = Date.now() + 45_000
 ): Promise<ParsedOpportunityResult> {
   const rawKey =
     process.env.GEMINI_API_KEY ||
@@ -31,7 +33,7 @@ export async function parseOpportunityFromAiInput(
 
   // If a URL was provided, attempt to fetch its text content if it starts with http
   if (urlHint) {
-    const article = await fetchPublicArticle(urlHint);
+    const article = await fetchPublicArticle(urlHint, deadline);
     const titleMatch = article.text.match(/<title>(.*?)<\/title>/i);
     if (titleMatch?.[1]) pageTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim().slice(0, 500);
     const bodyText = article.text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -114,7 +116,7 @@ Text: "${pageContent.slice(0, 3000)}"`;
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': effectiveGeminiKey },
           body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
-          signal: AbortSignal.timeout(20_000),
+          signal: radarRequestSignal(deadline, 20_000),
         });
         if (resp.ok) {
           const data = await resp.json();
@@ -138,7 +140,7 @@ Text: "${pageContent.slice(0, 3000)}"`;
           messages: [{ role: 'user', content: promptText }],
           response_format: { type: 'json_object' },
         }),
-        signal: AbortSignal.timeout(20_000),
+        signal: radarRequestSignal(deadline, 20_000),
       });
       if (resp.ok) {
         const data = await resp.json();

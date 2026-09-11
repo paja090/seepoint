@@ -251,7 +251,7 @@ Vrať POUZE validní JSON v tomto přesném formátu bez markdownu:
     const data = await res.json();
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const cleanedJson = rawText.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanedJson);
+    const parsed: { classification?: SheetClassificationType; confidence?: number; mappings?: Array<Partial<ColumnMappingProposal>> } = JSON.parse(cleanedJson);
 
     const aiClassification = (parsed.classification || ruleClassification.classification) as SheetClassificationType;
     const aiConfidence = Number(parsed.confidence) || ruleClassification.confidence;
@@ -259,7 +259,7 @@ Vrať POUZE validní JSON v tomto přesném formátu bez markdownu:
     const mergedMappings: ColumnMappingProposal[] = headers.map((header) => {
       const samples = sampleRows.map((r) => r[header] || '').filter(Boolean).slice(0, 3);
       const aiMap = Array.isArray(parsed.mappings)
-        ? parsed.mappings.find((m: any) => m.sourceColumn === header)
+        ? parsed.mappings.find((m) => m.sourceColumn === header)
         : null;
 
       if (aiMap && aiMap.targetField) {

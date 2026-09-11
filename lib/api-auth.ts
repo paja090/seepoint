@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from './auth';
 import { canAccess, type AppSection } from './rbac';
+import { hasModuleAccess, moduleForSection } from './module-policy';
 
-export async function requireApiAccess(section: AppSection) {
+export async function requireApiAccess(section: AppSection, moduleId = moduleForSection(section)) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   if (!canAccess(user.role, section)) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  if (moduleId && !hasModuleAccess(user, moduleId, section)) return NextResponse.json({ error: 'Modul není dostupný.' }, { status: 403 });
   return user;
 }
 

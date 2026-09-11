@@ -217,6 +217,8 @@ export async function sendTenantTestEmail(input: {
   return sendEmail({
     to: input.to,
     subject: `Testovací e-mail – ${input.senderName} (Seepoint OS)`,
+    bcc: [],
+    requireTenantSender: true,
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:580px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px">
         <h2 style="margin-top:0;color:#059669">✓ Testovací e-mail byl úspěšně odeslán</h2>
@@ -246,6 +248,7 @@ async function sendEmail(input: {
   idempotencyKey?: string;
   organizationId?: string;
   metadata?: Record<string, unknown>;
+  requireTenantSender?: boolean;
 }): Promise<EmailDeliveryResult> {
   const attachments = input.attachments ?? [];
   const attachmentBytes = attachments.reduce((sum, attachment) => sum + attachment.content.byteLength, 0);
@@ -263,6 +266,7 @@ async function sendEmail(input: {
   let from = process.env.EMAIL_FROM || defaultFrom;
   let replyTo: string | undefined = undefined;
   let resendApiKey = process.env.RESEND_API_KEY;
+  let tenantSenderVerified = false;
 
   if (input.organizationId) {
     try {
@@ -271,6 +275,7 @@ async function sendEmail(input: {
       });
 
       if (emailSettings && emailSettings.status === 'VERIFIED') {
+        tenantSenderVerified = true;
         from = `${emailSettings.senderName} <${emailSettings.fromEmail}>`;
         if (emailSettings.replyTo) {
           replyTo = emailSettings.replyTo;
@@ -286,6 +291,10 @@ async function sendEmail(input: {
     } catch (err) {
       console.warn('[email] Error loading tenant email settings:', err);
     }
+  }
+
+  if (input.requireTenantSender && (!tenantSenderVerified || !resendApiKey)) {
+    throw new Error('Test vyžaduje ověřenou firemní doménu a dostupné odesílání přes Resend.');
   }
 
   if (from.length > 320 || /[\r\n]/.test(from)) throw new Error('Adresa odesílatele není platná.');

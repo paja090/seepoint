@@ -1,3 +1,4 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { EmploymentType, OrganizationRole, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
@@ -31,7 +32,8 @@ function positions(input: EmployeeInput) {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('employees');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
     return NextResponse.json({ error: 'Zaměstnance může vytvářet jen admin nebo manažer.' }, { status: 403 });

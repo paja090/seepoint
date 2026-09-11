@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
 import { Prisma, WarehouseItemCategory } from '@prisma/client';
 import { canManageWarehouseCatalog } from '@/lib/rbac';
@@ -27,7 +27,8 @@ type ProposedWarehouseItem = {
 };
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('warehouse');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   if (!canManageWarehouseCatalog(user.role)) {
     return NextResponse.json({ error: 'AI import skladu může spustit pouze administrátor nebo manažer.' }, { status: 403 });

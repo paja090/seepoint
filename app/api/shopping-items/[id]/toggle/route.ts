@@ -15,7 +15,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireApiAccess('team');
+  const auth = await requireApiAccess('team', 'shopping');
   if (isApiDenied(auth)) return auth;
   if (!canEditShoppingList(auth.role)) {
     return NextResponse.json({ error: 'Tato role může nákupní seznam pouze zobrazit.' }, { status: 403 });

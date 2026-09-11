@@ -154,7 +154,6 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     ? (realization ? realization.installed : installedNavPoints.length)
     : (realization ? realization.installed : installedItems.length);
 
-  const estimatedImpressions = isNavigation ? totalUnits * 25000 : totalUnits * 35000;
 
   let liveStatus = isNavigation ? 'Příprava navigačního značení' : 'Příprava zakázky';
   let liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
@@ -521,17 +520,10 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                     : 'Probíhá montáž'}
               </span>
             </div>
-            <div className="p-4 rounded-2xl bg-slate-900/70 border border-sky-800/40 space-y-1">
-              <span className="text-sky-300 font-bold uppercase text-[10px] flex items-center gap-1">
-                <Eye className="h-3.5 w-3.5 text-sky-400" />
-                Odhadovaný zásah
-              </span>
-              <div className="text-2xl font-black text-white">
-                ~ {(estimatedImpressions / 1000).toFixed(0)}k
-              </div>
-              <span className="text-[11px] text-slate-400 block">
-                {isNavigation ? 'Navigovaných řidičů / měsíc' : 'Kontaktů za měsíc'}
-              </span>
+            <div className="p-4 rounded-2xl bg-slate-900/70 border border-purple-800/40 space-y-1">
+              <span className="text-sky-300 font-bold uppercase text-[10px] flex items-center gap-1"><Eye className="h-3.5 w-3.5 text-sky-400" />Odhadovany zasah</span>
+              <div className="text-2xl font-black text-white">Nedostupný</div>
+              <span className="text-[11px] text-slate-400 block">Odhadovaný zásah není pro tuto kampaň dostupný.</span>
             </div>
             <div className="p-4 rounded-2xl bg-slate-900/70 border border-sky-800/40 space-y-1">
               <span className="text-amber-300 font-bold uppercase text-[10px] flex items-center gap-1">
@@ -916,4 +908,3 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     </div>
   );
 }
-

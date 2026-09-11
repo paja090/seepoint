@@ -1,4 +1,6 @@
-import { randomBytes } from 'crypto';
+import { isModuleEnabled } from '@/lib/organization-modules';
+import { auditProduction } from '@/lib/production/production-service';
+import { assertTenantResult } from '@/lib/tenant-result';
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
@@ -24,7 +26,7 @@ import {
   type OfferInput,
   type OfferStatusValue,
 } from './domain';
-import { createPublicOfferToken, getDeterministicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
+import { preparePortalCredential, recoverPortalToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
 import type { OfferView } from './view-model';
 import { offerReadinessChecks, type OfferConflictView } from './workflow';
 
@@ -138,7 +140,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     taxAmount: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.taxAmount),
     totalWithTax: publicView && (row as Record<string, unknown>).isNoPriceConcept ? undefined : value(row.totalWithTax ?? row.totalPrice),
     hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash),
-    portalToken: publicView ? undefined : (row.publicTokenHash ? getDeterministicOfferToken(row.id) : undefined),
+    portalToken: publicView ? undefined : (recoverPortalToken(row) ?? undefined),
     publishedAt: row.publishedAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     acceptedAt: row.acceptedAt?.toISOString() ?? null,
@@ -156,9 +158,9 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       phone: row.contactPhone ?? row.client.phone,
     },
     items: row.items.map((item) => {
-      const installationPhotos = ((row as any).crmOrder?.realizations || [])
-        .filter((r: any) => r.surfaceId === item.surfaceId)
-        .flatMap((r: any) => (r.photos || []).map((p: any) => ({ ...p, isInstallation: true })));
+      const installationPhotos = (row.crmOrder?.realizations || [])
+        .filter((r) => r.surfaceId === item.surfaceId)
+        .flatMap((r) => (r.photos || []).map((p) => ({ ...p, isInstallation: true })));
 
       const photos = [...installationPhotos, ...item.surface.photos, ...item.surface.carrier.photos]
           .filter((photo) => !publicView || photo.isClientVisible)
@@ -169,7 +171,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           note: photo.note,
           isPrimary: photo.isPrimary,
           isClientVisible: photo.isClientVisible,
-          isInstallation: (photo as any).isInstallation || ['INSTALLATION', 'AFTER_INSTALLATION'].includes((photo as any).type) || false,
+          isInstallation: ('isInstallation' in photo && photo.isInstallation === true) || ['INSTALLATION', 'AFTER_INSTALLATION'].includes(photo.type),
         }));
       return {
         id: publicView ? undefined : item.id,
@@ -337,19 +339,19 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       status: row.printProductionJobs[0].status,
       artworkUrl: row.printProductionJobs[0].artworkUrl,
       clientApprovedAt: row.printProductionJobs[0].clientApprovedAt?.toISOString() || null,
-      clientApprovalToken: publicView ? row.printProductionJobs[0].clientApprovalToken : undefined,
+      clientApprovalToken: undefined,
     } : null,
     realizationSummary: (() => {
-      const realizations = (row as any).crmOrder?.realizations || [];
+      const realizations = row.crmOrder?.realizations || [];
       if (realizations.length === 0) return null;
       const installedStatuses = ['INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
       const photographedStatuses = ['PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
       const completedStatuses = ['COMPLETED'];
       return {
         total: realizations.length,
-        installed: realizations.filter((r: any) => installedStatuses.includes(r.status)).length,
-        photographed: realizations.filter((r: any) => photographedStatuses.includes(r.status)).length,
-        completed: realizations.filter((r: any) => completedStatuses.includes(r.status)).length,
+        installed: realizations.filter((r) => installedStatuses.includes(r.status)).length,
+        photographed: realizations.filter((r) => photographedStatuses.includes(r.status)).length,
+        completed: realizations.filter((r) => completedStatuses.includes(r.status)).length,
       };
     })(),
   };
@@ -839,7 +841,6 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
 }
 
 export async function publishOffer(user: CurrentUser, id: string) {
-  const publicToken = createPublicOfferToken();
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
@@ -849,12 +850,12 @@ export async function publishOffer(user: CurrentUser, id: string) {
     }
     const newStatus = existing.status === 'DRAFT' ? 'SENT' : existing.status;
     const isFirstPublish = !existing.publishedAt;
-    const effectiveToken = getDeterministicOfferToken(id);
-    const effectiveTokenHash = hashPublicOfferToken(effectiveToken);
+    const credential = preparePortalCredential(existing);
     return tx.offer.update({
       where: { id },
       data: {
-        publicTokenHash: effectiveTokenHash,
+        publicTokenHash: credential.hash,
+        publicTokenEncrypted: credential.encrypted,
         publishedAt: existing.publishedAt || new Date(),
         status: newStatus,
         updatedByUserId: user.id,
@@ -862,13 +863,12 @@ export async function publishOffer(user: CurrentUser, id: string) {
       },
       include: offerInclude,
     });
-  });
-  const token = getDeterministicOfferToken(id);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  const token = recoverPortalToken(row)!;
   return { offer: serializeOffer(row), token, path: `/offer/${token}` };
 }
 
 export async function prepareOfferDelivery(user: CurrentUser, id: string, emailDraft?: { clientMessage?: string }) {
-  const publicToken = createPublicOfferToken();
   const row = await prisma.$transaction(async (tx) => {
     const existing = await getOfferRow(tx, id);
     assertAccess(user, existing);
@@ -878,12 +878,12 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
     const conflicts = existing.offerType === 'STANDARD_MEDIA' ? await findConflicts(tx, existing.items) : [];
     assertOfferReady(existing, conflicts);
     const isFirstPublish = !existing.publishedAt;
-    const effectiveToken = getDeterministicOfferToken(id);
-    const effectiveTokenHash = hashPublicOfferToken(effectiveToken);
+    const credential = preparePortalCredential(existing);
     return tx.offer.update({
       where: { id },
       data: {
-        publicTokenHash: effectiveTokenHash,
+        publicTokenHash: credential.hash,
+        publicTokenEncrypted: credential.encrypted,
         publishedAt: existing.publishedAt || new Date(),
         clientMessage: emailDraft?.clientMessage ?? existing.clientMessage,
         updatedByUserId: user.id,
@@ -891,8 +891,8 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
       },
       include: offerInclude,
     });
-  });
-  const token = getDeterministicOfferToken(id);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  const token = recoverPortalToken(row)!;
   return { offer: serializeOffer(row), token, path: `/offer/${token}` };
 }
 
@@ -907,7 +907,10 @@ export async function getPublicRow(token: string) {
     include: offerInclude,
   });
 
-  if (!row || row.archivedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  if (!row || row.publicTokenRevokedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  assertTenantResult(row, row.organizationId);
+  const organization = await prisma.organization.findUnique({ where: { id: row.organizationId } });
+  if (!organization?.isActive || !isModuleEnabled(organization, 'offers')) throw new OfferValidationError('Portál není dostupný.', 'NOT_FOUND');
   enterTenantContext({ organizationId: row.organizationId, source: 'public-token' });
   return row;
 }
@@ -952,7 +955,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
   const publicRow = await getPublicRow(token);
   const result = await runWithTenantContext({ organizationId: publicRow.organizationId, source: 'public-token' }, () => prisma.$transaction(async (tx) => {
     const row = await tx.offer.findUnique({ where: { publicTokenHash: hashPublicOfferToken(token) }, include: offerInclude });
-    if (!row || row.archivedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+    if (!row || row.publicTokenRevokedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
     if (action === 'question' || action === 'revision') {
       if (!message) throw new OfferValidationError(action === 'revision' ? 'Popište prosím požadovanou úpravu.' : 'Napište prosím dotaz.');
       const storedMessage = action === 'revision' ? `Požadavek na úpravu: ${message}` : message;
@@ -1018,10 +1021,11 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     }
 
     // Auto-create PrintProductionJob in PREPARATION when standard media offer is accepted (Varianta A)
-    if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA') {
+    const productionOrganization = await tx.organization.findUnique({ where: { id: row.organizationId } });
+    if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA' && isModuleEnabled(productionOrganization, 'printProduction')) {
       const existingPrintJob = await tx.printProductionJob.findFirst({ where: { offerId: row.id } });
       if (!existingPrintJob) {
-        await tx.printProductionJob.create({
+        const createdJob = await tx.printProductionJob.create({
           data: {
             organizationId: row.organizationId,
             offerId: row.id,
@@ -1029,9 +1033,9 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
             title: row.campaignName ?? row.title,
             campaignName: row.campaignName ?? row.title,
             status: 'PREPARATION',
-            clientApprovalToken: randomBytes(32).toString('hex'),
           },
         });
+        await auditProduction(tx, createdJob.id, { name: actorName, email: actorEmail }, null, 'PREPARATION');
       }
     }
 
@@ -1088,7 +1092,7 @@ export async function getPublicPhoto(token: string, photoId: string) {
         (item) =>
           item.surface.photos.some((photo) => photo.id === photoId) ||
           item.surface.carrier.photos.some((photo) => photo.id === photoId) ||
-          ((offer as any).crmOrder?.realizations || []).some((r: any) => r.surfaceId === item.surfaceId && r.photos?.some((p: any) => p.id === photoId))
+          (offer.crmOrder?.realizations || []).some((r) => r.surfaceId === item.surfaceId && r.photos?.some((p) => p.id === photoId))
       ) ||
       (offer.navigationOffer?.points.some(
         (point) =>

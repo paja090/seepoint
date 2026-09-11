@@ -118,7 +118,7 @@ test('volby nákupního formuláře používají existující tenantový endpoin
   assert.match(shoppingModule, /fetch\('\/api\/shopping-items\/options'\)/);
   assert.doesNotMatch(shoppingModule, /fetch\('\/api\/employees'\)/);
   assert.doesNotMatch(shoppingModule, /fetch\('\/api\/crm\/orders'\)/);
-  assert.match(optionsRoute, /requireApiAccess\('team'\)/);
+  assert.match(optionsRoute, /requireApiAccess\('team', 'shopping'\)/);
   assert.match(optionsRoute, /where: \{ isActive: true \}/);
   assert.match(optionsRoute, /notIn: \['COMPLETED', 'CANCELLED'\]/);
   assert.match(optionsRoute, /take: 500/);

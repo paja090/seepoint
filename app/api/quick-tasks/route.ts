@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { QuickInternalTaskStatus } from '@prisma/client';
 
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const actor = await getCurrentUser();
+    const actor=await requireApiAccess('myTasks', 'myTasks');if(isApiDenied(actor))return actor;
     if (!actor) return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const actor = await getCurrentUser();
+    const actor=await requireApiAccess('myTasks', 'myTasks');if(isApiDenied(actor))return actor;
     if (!actor) return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
 
     const input = await request.json().catch(() => null);

@@ -37,7 +37,7 @@ function campaignStatuses(dateFrom: Date | undefined, dateTo: Date | undefined) 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireApiAccess('occupancy'); if (isApiDenied(auth)) return auth;
+  const auth = await requireApiAccess('occupancy', 'carriers'); if (isApiDenied(auth)) return auth;
   try {
     const surfaceId = (await params).id;
     const body = await request.json() as {

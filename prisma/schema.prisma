@@ -1335,6 +1335,8 @@ model Offer {
   totalPrice            Decimal?             @db.Decimal(12, 2)
   totalWithTax          Decimal?             @db.Decimal(12, 2)
   publicTokenHash       String?              @unique
+  publicTokenEncrypted String?
+  publicTokenRevokedAt DateTime?
   publishedAt           DateTime?
   sentAt                DateTime?
   acceptedAt            DateTime?
@@ -1540,7 +1542,7 @@ model NavigationPoint {
   carrierId         String?
   surfaceId         String?
   installedPhotoId  String?
-  sitePhotoId       String?               @unique
+  sitePhotoId       String?
   sortOrder         Int                   @default(0)
   latitude          Float
   longitude         Float
@@ -1616,6 +1618,7 @@ model NavigationPoint {
   @@index([surfaceId])
   @@index([latitude, longitude])
   @@index([organizationId])
+  @@index([sitePhotoId])
 }
 
 enum NavigationReportStatus {
@@ -2000,7 +2003,7 @@ model Photo {
   crmRealization               CrmRealization?               @relation(fields: [crmRealizationId], references: [id], onDelete: SetNull)
   navigationDocumentationItems NavigationDocumentationItem[]
   installedNavigationPoints    NavigationPoint[]             @relation("PointInstalledPhoto")
-  siteNavigationPoint          NavigationPoint?              @relation("PointSitePhoto")
+  siteNavigationPoints         NavigationPoint[]              @relation("PointSitePhoto")
   surveyCandidatePoint         NavigationCandidatePoint?     @relation("CandidatePhotos", fields: [surveyCandidatePointId], references: [id], onDelete: SetNull)
   surveyNavigationPoint        NavigationPoint?              @relation("NavigationPointSurveyPhotos", fields: [surveyNavigationPointId], references: [id], onDelete: SetNull)
 
@@ -3058,7 +3061,7 @@ model ClientDocument {
 model CrmAuditLog {
   id             String   @id @default(cuid())
   organizationId String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
-  userId         String
+  userId         String?
   userEmail      String
   action         String
   entityType     String
@@ -3066,7 +3069,7 @@ model CrmAuditLog {
   detailsJson    String?
   createdAt      DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([entityType, entityId])
   @@index([createdAt])
@@ -3638,11 +3641,11 @@ enum EmailLogStatus {
 model OrganizationEmailSettings {
   id                     String            @id @default(cuid())
   organizationId         String            @unique
-  domain                 String
+  domain                 String            @unique
   senderName             String
   fromEmail              String
   replyTo                String?
-  providerDomainId       String?
+  providerDomainId       String?           @unique
   status                 EmailDomainStatus @default(NOT_STARTED)
   dnsRecords             Json?
   encryptedSendingApiKey String?           @db.Text

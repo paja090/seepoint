@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureWarehouseSchema } from '@/lib/db';
 import { canManageWarehouseCatalog } from '@/lib/rbac';
 import { runTransactionWithRetry } from '@/lib/transaction-retry';
@@ -7,7 +7,8 @@ import { runTransactionWithRetry } from '@/lib/transaction-retry';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('warehouse');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   if (!canManageWarehouseCatalog(user.role)) {
     return NextResponse.json({ error: 'Požadavek na doplnění zásob může vytvořit pouze administrátor nebo manažer.' }, { status: 403 });

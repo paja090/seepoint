@@ -1,5 +1,6 @@
 'use client';
 
+import type { Map as LeafletMap } from 'leaflet';
 import { useEffect, useRef } from 'react';
 import type { OfferItemView } from '@/lib/offers/view-model';
 
@@ -72,7 +73,7 @@ function formatDistance(point: NavigationMapPointInput): string {
 
 export function CampaignLiveMap({ items = [], navigationPoints = [], target = null, onSelectCarrier, onSelectNavigationPoint }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
 
   const isNavigation = navigationPoints.length > 0;
 

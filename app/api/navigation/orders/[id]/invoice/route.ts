@@ -19,7 +19,7 @@ const invoiceDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europ
 const invoicePeriodDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'UTC' });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireApiAccess('billing');
+  const auth = await requireApiAccess('billing', 'navigation');
   if (isApiDenied(auth)) return auth;
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${auth.organizationId}:${auth.id}`), rateLimitPolicies.transactionalEmail);
   if (limited) return limited;

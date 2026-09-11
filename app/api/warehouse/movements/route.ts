@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { canManageWarehouseCatalog, canRecordWarehouseMovement } from '@/lib/rbac';
 import { recordWarehouseMovements, WarehouseStockError, type WarehouseMovementRequest } from '@/lib/warehouse-stock';
 import { WarehouseInputError } from '@/lib/warehouse-validation';
@@ -7,7 +7,8 @@ import { WarehouseInputError } from '@/lib/warehouse-validation';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('warehouse');
+  if (isApiDenied(user)) return user;
   if (!user) return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   if (!canRecordWarehouseMovement(user.role)) {
     return NextResponse.json({ error: 'Nemáte oprávnění zapisovat pohyby skladu.' }, { status: 403 });

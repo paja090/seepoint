@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db';
 import { normalizeCode, normalizeText } from '@/lib/carriers-2026/normalize';
 import { saveOrUpdateProfile } from './profile-service';
 import type { ColumnMappingProposal, ConflictResolutionChoice, SheetClassificationType } from './types';
-import type { CarrierType, MediaType } from '@prisma/client';
+import type { CarrierType, MediaType, Prisma } from '@prisma/client';
 
 export function parseCarrierType(raw?: unknown): CarrierType {
   if (!raw || typeof raw !== 'string') return 'OTHER';
@@ -89,12 +89,12 @@ export async function commitImportBatch(
           continue;
         }
 
-        const mapped = (row.mappedData || {}) as Record<string, any>;
+        const mapped = (row.mappedData || {}) as Record<string, unknown>;
 
         if (row.targetEntity === 'CLIENT') {
           const clientName = mapped.name || mapped.clientName;
           if (action === 'CREATE' && clientName) {
-            const norm = normalizeText(clientName);
+            const norm = normalizeText(String(clientName));
             const client = await tx.client.upsert({
               where: {
                 organizationId_normalizedName: {
@@ -139,9 +139,9 @@ export async function commitImportBatch(
                 versionKey,
                 name: priceName,
                 rentalPrice: rentPrice,
-                productionPrice: mapped.productionPrice || 0,
+                productionPrice: Number(mapped.productionPrice || 0),
                 totalPrice: Number(rentPrice) + Number(mapped.productionPrice || 0),
-                validFrom: mapped.validFrom ? new Date(mapped.validFrom) : new Date(),
+                validFrom: mapped.validFrom ? new Date(String(mapped.validFrom)) : new Date(),
                 sourceSheet: row.sheetId,
                 sourceRow: row.rowNumber,
                 importBatchId: batch.id,
@@ -164,8 +164,8 @@ export async function commitImportBatch(
 
             if (carrier && carrier.surfaces.length > 0) {
               const surface = carrier.surfaces[0];
-              const dateFrom = mapped.dateFrom ? new Date(mapped.dateFrom) : new Date();
-              const dateTo = mapped.dateTo ? new Date(mapped.dateTo) : new Date(Date.now() + 30 * 24 * 3600 * 1000);
+              const dateFrom = mapped.dateFrom ? new Date(String(mapped.dateFrom)) : new Date();
+              const dateTo = mapped.dateTo ? new Date(String(mapped.dateTo)) : new Date(Date.now() + 30 * 24 * 3600 * 1000);
               const clientName = mapped.clientName ? String(mapped.clientName) : 'Nespecifikovaný inzerent';
               const campaignName = mapped.campaignName ? String(mapped.campaignName) : 'Kampaň';
 
@@ -249,7 +249,7 @@ export async function commitImportBatch(
               data: { importedAt: new Date(), targetEntityId: createdCarrier.id },
             });
           } else if (action === 'UPDATE' && row.targetEntityId) {
-            const updateData: Record<string, any> = {
+            const updateData: Prisma.AdvertisingCarrierUncheckedUpdateInput = {
               importBatchId: batch.id,
             };
             if (mapped.name) updateData.name = String(mapped.name);
@@ -257,7 +257,7 @@ export async function commitImportBatch(
             if (mapped.address) updateData.address = String(mapped.address);
             if (mapped.city) updateData.city = String(mapped.city);
             if (carrierType !== 'OTHER') updateData.type = carrierType;
-            if (resolution === 'USE_IMPORT' && typeof mapped.latitude === 'number') {
+            if (resolution === 'USE_IMPORT' && typeof mapped.latitude === 'number' && typeof mapped.longitude === 'number') {
               updateData.latitude = mapped.latitude;
               updateData.longitude = mapped.longitude;
             }

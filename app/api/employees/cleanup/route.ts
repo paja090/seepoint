@@ -1,12 +1,13 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const actor = await getCurrentUser();
+    const actor = await requireApiAccess('employees');
+  if (isApiDenied(actor)) return actor;
     if (!actor || actor.platformRole !== 'SUPER_ADMIN' || process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Nenalezeno.' }, { status: 404 });
     }

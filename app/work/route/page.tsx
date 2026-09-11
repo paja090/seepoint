@@ -15,7 +15,7 @@ function localDate(value: Date) {
 }
 
 export default async function WorkRoutePage() {
-  await requirePageAccess('work');
+  await requirePageAccess('work', 'workRoute');
   const now = new Date();
   const rangeStart = new Date(now);
   rangeStart.setDate(rangeStart.getDate() - 14);

@@ -22,10 +22,17 @@ export const TENANT_MODEL_NAMES = [
   'SurveyRoute', 'NavigationCandidatePoint', 'NavigationBillingPeriod',
   'NavigationPriceVersion', 'NavigationPriceAuditLog', 'NavigationContract',
   'NavigationContactPerson', 'CarrierHistoryLog', 'CompanyShoppingItem',
-  'WarehouseItem', 'WarehouseMovement', 'QuickInternalTask',
+  'WarehouseItem', 'WarehouseMovement', 'QuickInternalTask', 'PrintProductionJob', 'AIUsageLog',
+  'OrganizationRadarProfile', 'RadarSignal', 'RadarRun', 'RadarFeedback',
+  'ImportProfile', 'ImportBatchSheet', 'ImportRow', 'OrganizationEmailSettings', 'EmailLog',
 ] as const;
 
-const tenantModels = new Set<string>(TENANT_MODEL_NAMES);
+// Platform identity bootstrap must resolve memberships before tenant context exists.
+export const PLATFORM_ORGANIZATION_MODELS = ['OrganizationMember', 'OrganizationInvitation'] as const;
+const platformModels = new Set<string>(PLATFORM_ORGANIZATION_MODELS);
+const tenantModels = new Set<string>(Prisma.dmmf.datamodel.models
+  .filter((model) => model.fields.some((field) => field.name === 'organizationId') && !platformModels.has(model.name))
+  .map((model) => model.name));
 const datamodel = new Map(Prisma.dmmf.datamodel.models.map((model) => [model.name, model]));
 
 type MutableRecord = Record<string, unknown>;
@@ -151,7 +158,7 @@ export function scopeTenantQuery(model: string | undefined, operation: string, a
   const { organizationId } = requireTenantContext();
   const args = record(argsValue) ?? {};
 
-  if (['findMany', 'findFirst', 'findFirstOrThrow', 'findUnique', 'findUniqueOrThrow', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'delete', 'deleteMany', 'upsert'].includes(operation)) {
+  if (['findMany', 'findFirst', 'findFirstOrThrow', 'findUnique', 'findUniqueOrThrow', 'count', 'aggregate', 'groupBy', 'update', 'updateMany', 'updateManyAndReturn', 'delete', 'deleteMany', 'upsert'].includes(operation)) {
     args.where = tenantWhere(args.where, organizationId);
   }
   if (operation === 'create') args.data = scopeCreateData(model, args.data, organizationId);
@@ -160,7 +167,7 @@ export function scopeTenantQuery(model: string | undefined, operation: string, a
     args.create = scopeCreateData(model, args.create, organizationId);
     args.update = scopeUpdateData(model, args.update, organizationId);
   }
-  if (operation === 'update' || operation === 'updateMany') {
+  if (operation === 'update' || operation === 'updateMany' || operation === 'updateManyAndReturn') {
     args.data = scopeUpdateData(model, args.data, organizationId);
   }
   return args;

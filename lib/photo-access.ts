@@ -16,7 +16,7 @@ type PhotoAccessRecord = {
   isPrivate: boolean;
   carrierId: string | null;
   surfaceId: string | null;
-  siteNavigationPoint?: unknown;
+  siteNavigationPoints?: readonly unknown[];
 };
 
 const NAVIGATION_PHOTO_TYPES = new Set(['SURVEY', 'BEFORE_INSTALLATION', 'AFTER_INSTALLATION', 'INSTALLATION']);
@@ -38,7 +38,7 @@ export async function canReadPhoto(user: PhotoAccessUser, photo: PhotoAccessReco
 
   if (photo.id?.startsWith('vehicle-')) return canAccess(user.role, 'vehicles');
 
-  if (NAVIGATION_PHOTO_TYPES.has(photo.type) || photo.siteNavigationPoint) {
+  if (NAVIGATION_PHOTO_TYPES.has(photo.type) || photo.siteNavigationPoints?.length) {
     return canAccess(user.role, 'navigationProjects') || canAccess(user.role, 'offers');
   }
 

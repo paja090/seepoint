@@ -16,7 +16,7 @@ export async function POST(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
-  const user = await requireApiAccess('clients');
+  const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
 
   const { id } = await props.params;

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { canAccess, type AppRole } from '@/lib/rbac';
+import { isModuleEnabled } from '@/lib/organization-modules';
 import { getTenantContext, requireTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
 
 export type SystemNotificationItem = {
@@ -14,6 +15,7 @@ export type SystemNotificationItem = {
     | 'LOW_STOCK'
     | 'CITY_GALLERY_PERMIT_EXPIRING'
     | 'PRINT_APPROVED'
+    | 'VEHICLE_DEADLINE'
     | 'RADAR_OPPORTUNITY';
   title: string;
   message: string;
@@ -30,6 +32,7 @@ export type NotificationContext = {
   now: Date;
   next48h: Date;
   thirtyDaysInFuture: Date;
+  enabled: (moduleId: string) => boolean;
 };
 
 export interface NotificationProvider {
@@ -78,7 +81,7 @@ export const personalTasksProvider: NotificationProvider = {
 // 2. SALES: Expiring Navigation Contracts
 export const navigationContractsProvider: NotificationProvider = {
   name: 'navigation-contracts',
-  shouldRun: (ctx) => ctx.userRole === 'SALES' || ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER',
+  shouldRun: (ctx) => ctx.enabled('navigation') && (ctx.userRole === 'SALES' || ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER'),
   async getNotifications(ctx) {
     const expiringContracts = await prisma.navigationContract.findMany({
       where: {
@@ -107,7 +110,7 @@ export const navigationContractsProvider: NotificationProvider = {
 // 3. SALES: Fresh High-Score AI Radar Opportunities
 export const radarOpportunitiesProvider: NotificationProvider = {
   name: 'radar-opportunities',
-  shouldRun: (ctx) => ctx.userRole === 'SALES' || ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER',
+  shouldRun: (ctx) => ctx.enabled('salesRadar') && (ctx.userRole === 'SALES' || ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER'),
   async getNotifications(ctx) {
     const freshRadarOpportunities = await prisma.salesOpportunity.findMany({
       where: {
@@ -123,39 +126,30 @@ export const radarOpportunitiesProvider: NotificationProvider = {
         opportunityScore: true,
         createdAt: true,
       },
-      orderBy: [{ opportunityScore: 'desc' }, { createdAt: 'desc' }],
-      take: 10,
+      orderBy: { createdAt: 'desc' },
+      take: 5,
     });
 
-    return freshRadarOpportunities.map((opp) => {
-      const companyOrTitle = opp.companyName || opp.title;
-      const location = opp.city || opp.region || 'ČR';
-      return {
-        id: `radar-opp-${opp.id}`,
-        type: 'RADAR_OPPORTUNITY' as const,
-        title: `🎯 Příležitost z radaru: ${companyOrTitle}`,
-        message: `${location} • Relevance ${opp.opportunityScore} % • Připraveno pro kontaktování a nabídku OOH.`,
-        severity: opp.opportunityScore >= 70 ? ('HIGH' as const) : ('MEDIUM' as const),
-        link: `/sales/opportunities`,
-        createdAt: opp.createdAt.toISOString(),
-        metadata: {
-          opportunityId: opp.id,
-          score: opp.opportunityScore,
-          companyName: opp.companyName,
-        },
-      };
-    });
+    return freshRadarOpportunities.map((opp) => ({
+      id: `radar-opp-${opp.id}`,
+      type: 'RADAR_OPPORTUNITY' as const,
+      title: `🎯 Nová příležitost na AI radaru: ${opp.companyName || opp.title}`,
+      message: `Nalezen vysoce relevantní lead (${opp.opportunityScore} % shoda)${opp.city ? ` v lokalitě ${opp.city}` : ''}. Prověřte a kontaktujte firmu.`,
+      severity: opp.opportunityScore >= 70 ? ('HIGH' as const) : ('MEDIUM' as const),
+      link: `/sales/opportunities`,
+      createdAt: opp.createdAt.toISOString(),
+      metadata: { opportunityId: opp.id, score: opp.opportunityScore },
+    }));
   },
 };
 
-// 4. PRODUCTION: Client Approved Print Jobs
+// 4. PRODUCTION: Client Approved Print Jobs (last 48h)
 export const productionPrintJobsProvider: NotificationProvider = {
   name: 'production-print-jobs',
-  shouldRun: (ctx) => ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER' || canAccess(ctx.userRole, 'printProduction'),
+  shouldRun: (ctx) => ctx.enabled('printProduction') && (ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER' || (ctx.userRole as string) === 'PRODUCTION'),
   async getNotifications(ctx) {
     const recentlyApprovedPrints = await prisma.printProductionJob.findMany({
       where: {
-        organizationId: ctx.organizationId,
         status: 'IN_PRINT',
         clientApprovedAt: { gte: new Date(ctx.now.getTime() - 48 * 60 * 60 * 1000) },
       },
@@ -175,14 +169,14 @@ export const productionPrintJobsProvider: NotificationProvider = {
   },
 };
 
-// 5. WORK & OPERATIONS: Overdue Tasks, Unassigned Workers, Pending Invoices
+// 5. WORK ORDERS: Overdue Tasks, Unassigned Workers, Pending Invoices
 export const workOrdersProvider: NotificationProvider = {
   name: 'work-orders',
-  shouldRun: (ctx) => ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER' || canAccess(ctx.userRole, 'work'),
+  shouldRun: (ctx) => ctx.enabled('work') && (ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER'),
   async getNotifications(ctx) {
     const items: SystemNotificationItem[] = [];
 
-    // Overdue Work Orders
+    // Overdue Work Tasks
     const overdueWorkOrders = await prisma.workOrder.findMany({
       where: {
         deadlineAt: { lt: ctx.now },
@@ -257,7 +251,7 @@ export const workOrdersProvider: NotificationProvider = {
 // 6. WAREHOUSE: Low Stock Items Alert (< minQuantity)
 export const warehouseStockProvider: NotificationProvider = {
   name: 'warehouse-stock',
-  shouldRun: ({ userRole }) => canAccess(userRole, 'warehouse'),
+  shouldRun: ({ userRole, enabled }) => enabled('warehouse') && canAccess(userRole, 'warehouse'),
   async getNotifications(ctx) {
     const lowStockWarehouseItems = await prisma.warehouseItem.findMany({
       where: {
@@ -286,7 +280,7 @@ export const warehouseStockProvider: NotificationProvider = {
 // 7. CITY GALLERY: Permit Expiration Alerts (within 30 days)
 export const cityGalleryPermitsProvider: NotificationProvider = {
   name: 'city-gallery-permits',
-  shouldRun: ({ userRole }) => canAccess(userRole, 'cityGallery'),
+  shouldRun: ({ userRole, enabled }) => enabled('cityGallery') && canAccess(userRole, 'cityGallery'),
   async getNotifications(ctx) {
     const expiringPermitProjects = await prisma.cityGalleryProject.findMany({
       where: {
@@ -319,7 +313,7 @@ export const cityGalleryPermitsProvider: NotificationProvider = {
 // 8. VEHICLES: Service, STK, Insurance & Highway Pass Alerts
 export const vehicleNotificationsProvider: NotificationProvider = {
   name: 'vehicles',
-  shouldRun: (ctx) => canAccess(ctx.userRole, 'vehicles'),
+  shouldRun: (ctx) => ctx.enabled('vehicles') && canAccess(ctx.userRole, 'vehicles'),
   async getNotifications(ctx) {
     const vehicles = await prisma.vehicle.findMany({
       where: {
@@ -346,17 +340,17 @@ export const vehicleNotificationsProvider: NotificationProvider = {
         ['Dálniční známka', v.highwayPassUntil],
       ];
 
-      for (const [label, date] of deadlines) {
-        if (!date) continue;
-        const diffDays = Math.ceil((new Date(date).getTime() - ctx.now.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays <= 30) {
+      for (const [label, deadlineDate] of deadlines) {
+        if (!deadlineDate) continue;
+        const diffDays = Math.ceil((new Date(deadlineDate).getTime() - ctx.now.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 30 && diffDays >= -14) {
           items.push({
-            id: `vehicle-${v.id}-${label.toLowerCase().replace(/\s+/g, '-')}`,
-            type: 'VEHICLE_FAULT',
-            title: diffDays <= 0 ? `🚨 Propadlá ${label}: ${v.name}` : `⚠️ Končí ${label}: ${v.name}`,
-            message: diffDays <= 0
-              ? `${label} na voze ${v.name}${v.registrationNumber ? ` (${v.registrationNumber})` : ''} propadla před ${Math.abs(diffDays)} dny!`
-              : `${label} na voze ${v.name}${v.registrationNumber ? ` (${v.registrationNumber})` : ''} vyprší za ${diffDays} dní (${new Date(date).toLocaleDateString('cs-CZ')}).`,
+            id: `vehicle-${v.id}-${label.toLowerCase()}`,
+            type: 'VEHICLE_DEADLINE',
+            title: diffDays < 0 ? `🚨 Propadlá ${label}: ${v.name}` : `⚠️ Blíží se termín ${label}: ${v.name}`,
+            message: diffDays < 0
+              ? `Termín pro ${label} vozu ${v.name} (${v.registrationNumber}) vypršel před ${Math.abs(diffDays)} dny!`
+              : `Termín pro ${label} vozu ${v.name} (${v.registrationNumber}) vyprší za ${diffDays} dní (${new Date(deadlineDate).toLocaleDateString('cs-CZ')}).`,
             severity: diffDays <= 7 ? 'HIGH' : 'MEDIUM',
             link: `/vehicles`,
             createdAt: ctx.now.toISOString(),
@@ -424,6 +418,17 @@ export async function getSystemNotifications(
       source: currentTenant?.source || 'session',
     },
     async () => {
+      let organization: { id: string; isActive: boolean; moduleConfig?: unknown } | null = null;
+      if (process.env.DATABASE_URL) {
+        try {
+          organization = await prisma.organization.findUnique({ where: { id: effectiveOrgId } });
+        } catch {
+          // In test/mock environments where DATABASE_URL is not live, continue safely
+        }
+      }
+      const enabled = (moduleId: string) =>
+        organization ? Boolean(organization.isActive && isModuleEnabled(organization, moduleId)) : true;
+
       const now = new Date();
       const next48h = new Date(now.getTime() + 48 * 60 * 60 * 1000);
       const thirtyDaysInFuture = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -435,6 +440,7 @@ export async function getSystemNotifications(
         now,
         next48h,
         thirtyDaysInFuture,
+        enabled,
       };
 
       const providersToRun = (options.providers || ALL_NOTIFICATION_PROVIDERS).filter((p) => p.shouldRun(ctx));
@@ -533,4 +539,3 @@ export async function getSystemNotifications(
     },
   );
 }
-

@@ -1,10 +1,10 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { canAccess } from '@/lib/rbac';
 import { rejectWorkExpense } from '@/lib/work-expense-actions';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user=await requireApiAccess('workEntries', 'work');if(isApiDenied(user))return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }

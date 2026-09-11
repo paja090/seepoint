@@ -85,10 +85,16 @@ export default async function EmailSettingsPage() {
   const serializedSettings = currentSettings
     ? {
         ...currentSettings,
-        dnsRecords: currentSettings.dnsRecords as any,
+        dnsRecords: Array.isArray(currentSettings.dnsRecords) ? currentSettings.dnsRecords.flatMap(record => {
+          if (!record || typeof record !== 'object' || Array.isArray(record)) return [];
+          if (typeof record.record !== 'string' || typeof record.name !== 'string' || typeof record.type !== 'string' || typeof record.value !== 'string' || typeof record.status !== 'string') return [];
+          return [{ record: record.record, name: record.name, type: record.type, value: record.value, status: record.status,
+            priority: typeof record.priority === 'number' ? record.priority : undefined, ttl: typeof record.ttl === 'string' ? record.ttl : undefined }];
+        }) : null,
         lastVerifiedAt: currentSettings.lastVerifiedAt?.toISOString() || null,
         lastTestedAt: currentSettings.lastTestedAt?.toISOString() || null,
         createdAt: currentSettings.createdAt.toISOString(),
+
       }
     : null;
 

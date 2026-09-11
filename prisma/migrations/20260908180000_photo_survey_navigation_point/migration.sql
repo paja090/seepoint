@@ -1,4 +1,4 @@
-﻿-- AlterTable
+-- AlterTable
 ALTER TABLE "Photo" ADD COLUMN "surveyNavigationPointId" TEXT;
 
 -- CreateIndex

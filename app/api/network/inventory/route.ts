@@ -7,7 +7,7 @@ import { platformPrisma } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  const auth = await requireApiAccess('offers');
+  const auth = await requireApiAccess('offers', 'network');
   if (isApiDenied(auth)) return auth;
 
   const organizationId = auth.organizationId;

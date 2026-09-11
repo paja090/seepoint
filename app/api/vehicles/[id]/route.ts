@@ -1,5 +1,5 @@
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
 import { prisma, ensureVehicleSchema } from '@/lib/db';
 import { VehicleType, VehicleStatus } from '@prisma/client';
 
@@ -9,7 +9,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('vehicles');
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Nejste přihlášeni.' }, { status: 401 });
   }
@@ -71,7 +72,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess('vehicles');
+  if (isApiDenied(user)) return user;
   if (!user || user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Pouze administrátor může smazat vozidlo.' }, { status: 403 });
   }
