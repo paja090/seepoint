@@ -112,7 +112,8 @@ export const radarOpportunitiesProvider: NotificationProvider = {
   name: 'radar-opportunities',
   shouldRun: (ctx) => ctx.enabled('salesRadar') && (ctx.userRole === 'SALES' || ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER'),
   async getNotifications(ctx) {
-    const freshRadarOpportunities = await prisma.salesOpportunity.findMany({
+    const enabled = ctx.enabled;
+    const freshRadarOpportunities = enabled('salesRadar') ? await prisma.salesOpportunity.findMany({
       where: {
         status: 'NEW',
         opportunityScore: { gte: 40 },
@@ -128,7 +129,7 @@ export const radarOpportunitiesProvider: NotificationProvider = {
       },
       orderBy: { createdAt: 'desc' },
       take: 5,
-    });
+    }) : [];
 
     return freshRadarOpportunities.map((opp) => ({
       id: `radar-opp-${opp.id}`,
