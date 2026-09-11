@@ -138,6 +138,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
         subject: emailSubject,
         message: emailText,
         template: 'offer-client-response',
+        organizationId: offer.organizationId,
       });
     } catch (emailError) {
       console.error('[proposals/selection] Nepodařilo se odeslat notifikační email k výběru bodů:', emailError);

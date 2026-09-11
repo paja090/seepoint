@@ -824,6 +824,16 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
         assertOfferReady(existing, []);
       }
     }
+    if (target === 'ACCEPTED' && existing.offerType === 'STANDARD_MEDIA') {
+      const conflicts = await findConflicts(tx, existing.items, existing.id);
+      const blockingConflicts = conflicts.filter((c) => c.severity === 'block');
+      if (blockingConflicts.length > 0) {
+        throw new OfferValidationError(
+          `Nabídku nelze přijmout, protože obsahuje plochy obsazené jinou kampaní (${blockingConflicts.map((c) => `${c.carrierCode} / ${c.surfaceName}`).join(', ')}).`,
+          'AVAILABILITY_CONFLICT'
+        );
+      }
+    }
     const now = new Date();
     const timestamp = target === 'SENT' ? { sentAt: now } : target === 'ACCEPTED' ? { acceptedAt: now } : target === 'REJECTED' ? { rejectedAt: now } : target === 'EXPIRED' ? { expiredAt: now } : {};
     const row = await tx.offer.update({
@@ -999,11 +1009,13 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     // Client is confirming the selected points and route for pricing, NOT final priced order!
     if (target === 'ACCEPTED' && row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION') {
       const allPoints = row.navigationOffer.points;
+      const selectedPointIds = Array.isArray(body?.selectedPointIds) ? (body.selectedPointIds as string[]) : null;
+      const selectedSet = selectedPointIds ? new Set(selectedPointIds) : null;
       await Promise.all(
         allPoints.map((point) =>
           tx.navigationPoint.update({
             where: { id: point.id },
-            data: { isSelectedByClient: true },
+            data: { isSelectedByClient: selectedSet ? selectedSet.has(point.id) : true },
           })
         )
       );
@@ -1023,13 +1035,14 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
           type: 'UPDATED',
           actorName,
           actorEmail,
-          message: `${actorName} potvrdil/a návrh navigační trasy (${allPoints.length} bodů) k nacenění.${message ? ` Poznámka: ${message}` : ''}`,
+          message: `${actorName} potvrdil/a návrh navigační trasy (${selectedSet ? selectedSet.size : allPoints.length} bodů) k nacenění.${message ? ` Poznámka: ${message}` : ''}`,
           metadata: {
             channel: 'public-token',
             action: 'navigation-selection',
             stage: 'phase-1-approved',
             consent: true,
             totalCount: allPoints.length,
+            selectedCount: selectedSet ? selectedSet.size : allPoints.length,
           },
         },
       });
@@ -1039,6 +1052,18 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
         status: effectiveStatus,
         message: 'Děkujeme! Váš výběr navigačních bodů byl schválen. Obchodník SeePOINT pro vás nyní připraví cenovou kalkulaci.',
       };
+    }
+
+    // Check availability conflicts for standard media offers before accepting
+    if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA') {
+      const conflicts = await findConflicts(tx, row.items, row.id);
+      const blockingConflicts = conflicts.filter((c) => c.severity === 'block');
+      if (blockingConflicts.length > 0) {
+        throw new OfferValidationError(
+          `Některé reklamní plochy v nabídce jsou již v požadovaném termínu obsazeny jinou kampaní (${blockingConflicts.map((c) => `${c.carrierCode} / ${c.surfaceName}`).join(', ')}). Kontaktujte obchodníka SeePOINT pro úpravu termínu nebo výběr náhradní plochy.`,
+          'AVAILABILITY_CONFLICT'
+        );
+      }
     }
 
     // TEST 4: If this is a final priced quote (Phase 2), require valid price!
@@ -1155,6 +1180,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       subject: emailSubject,
       message: emailText,
       template: 'offer-client-response',
+      organizationId: row.organizationId,
     });
   } catch (emailError) {
     console.error('[respondToPublicOffer] Failed to send email notification:', emailError);

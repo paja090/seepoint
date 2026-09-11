@@ -97,6 +97,8 @@ export async function sendTransactionalEmail(input: {
   template: string;
   attachments?: EmailAttachment[];
   idempotencyKey?: string;
+  organizationId?: string;
+  metadata?: Record<string, unknown>;
 }): Promise<EmailDeliveryResult> {
 
   const html = input.message
@@ -115,6 +117,8 @@ export async function sendTransactionalEmail(input: {
     },
     attachments: input.attachments,
     idempotencyKey: input.idempotencyKey,
+    organizationId: input.organizationId,
+    metadata: input.metadata,
   });
 }
 
