@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { isGoogleOAuthConfigured } from '@/lib/integrations/google-oauth';
 import { requireOrganizationRole } from '@/lib/organization';
 
-export default async function IntegrationsSettingsPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
+export default async function IntegrationsSettingsPage({ searchParams }: { searchParams: Promise<{ google?: string; reason?: string }> }) {
   const { organizationId } = await requireOrganizationRole('ADMIN');
   const [driveConnection, gmailConnectionsRaw] = await Promise.all([
     prisma.integrationConnection.findFirst({
@@ -18,7 +18,9 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
       orderBy: { connectedAt: 'desc' },
     }),
   ]);
-  const result = (await searchParams).google;
+  const query = await searchParams;
+  const result = query.google;
+  const reason = query.reason;
   const configured = isGoogleOAuthConfigured();
 
   const gmailConnections: GmailConnectionItem[] = gmailConnectionsRaw.map((c) => ({
@@ -39,7 +41,12 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
       </div>
       {result === 'connected' && <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Google účet byl bezpečně připojen.</p>}
       {result === 'cancelled' && <p className="mb-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Připojení bylo zrušeno.</p>}
-      {result === 'error' && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">Google účet se nepodařilo připojit. Zkuste to znovu nebo zkontrolujte konfiguraci OAuth.</p>}
+      {result === 'error' && (
+        <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">
+          <p>Google účet se nepodařilo připojit. Zkuste to znovu nebo zkontrolujte konfiguraci OAuth.</p>
+          {reason && <p className="mt-1 text-xs font-mono font-normal text-red-700">Důvod: {reason}</p>}
+        </div>
+      )}
       <div className="grid gap-6 lg:grid-cols-2">
         <GmailIntegrationCard
           configured={configured}
