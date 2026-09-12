@@ -1,4 +1,5 @@
 import { cleanText, normalizeText } from '@/lib/carriers-2026/normalize';
+import { getGeminiApiKey } from '@/lib/ai-gemini';
 import type { ColumnMappingProposal, SheetClassificationType, TransformRule } from './types';
 
 export { TARGET_FIELDS_BY_ENTITY } from './types';
@@ -168,14 +169,7 @@ export async function analyzeSheetWithAI(
     };
   });
 
-  const rawKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_AI_KEY ||
-    process.env.GEMINI_KEY ||
-    process.env.GOOGLE_GEMINI_KEY ||
-    process.env.GOOGLE_GENAI_API_KEY;
-
-  const apiKey = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
+  const apiKey = getGeminiApiKey();
 
   if (!apiKey || apiKey.startsWith('sk-')) {
     // Return deterministic rule-based result without AI

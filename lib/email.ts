@@ -267,8 +267,13 @@ async function sendEmail(input: {
   }
 
   const defaultFrom = 'SeePOINT <info@seepoint.cz>';
-  let from = process.env.EMAIL_FROM || defaultFrom;
-  let replyTo: string | undefined = undefined;
+  let rawFrom = process.env.EMAIL_FROM?.trim() || defaultFrom;
+  const fromName = process.env.EMAIL_FROM_NAME?.trim();
+  if (fromName && !rawFrom.includes('<') && !rawFrom.includes('>')) {
+    rawFrom = `${fromName} <${rawFrom}>`;
+  }
+  let from = rawFrom;
+  let replyTo: string | undefined = process.env.EMAIL_REPLY_TO?.trim() || undefined;
   let resendApiKey = process.env.RESEND_API_KEY;
   let tenantSenderVerified = false;
 

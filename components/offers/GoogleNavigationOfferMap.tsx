@@ -100,7 +100,11 @@ export function GoogleNavigationOfferMap({
   selectedPointId?: string | null;
   onPointClick?: (id: string) => void;
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey =
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
   // Places Autocomplete state
   const [searchQuery, setSearchQuery] = useState('');

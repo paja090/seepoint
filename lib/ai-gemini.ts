@@ -21,19 +21,40 @@ export type GeminiFuelReceipt = {
 };
 
 /**
- * Helper to fetch Google Gemini API using REST endpoint with model fallback
+ * Resolves the Gemini API key in preferred order:
+ * 1. GEMINI_API_KEY (primary standard)
+ * 2. GOOGLE_GEMINI_API_KEY (supported fallback from Vercel)
+ * 3. GOOGLE_AI_KEY
+ * 4. GEMINI_KEY
+ * 5. GOOGLE_GEMINI_KEY
+ * 6. GOOGLE_GENAI_API_KEY
+ * 7. GEMINI_API_TOKEN
+ * 
+ * Non-aggressive sanitizing: only trims whitespace and strips one matching pair of outer quotes.
  */
-async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
+export function getGeminiApiKey(): string | undefined {
   const rawKey =
     process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GEMINI_API_KEY ||
     process.env.GOOGLE_AI_KEY ||
     process.env.GEMINI_KEY ||
     process.env.GOOGLE_GEMINI_KEY ||
     process.env.GOOGLE_GENAI_API_KEY ||
     process.env.GEMINI_API_TOKEN;
 
-  // Sanitize to valid ASCII characters only (removes quotes, newlines, non-printable chars)
-  const apiKey = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
+  if (!rawKey) return undefined;
+  let cleaned = rawKey.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned || undefined;
+}
+
+/**
+ * Helper to fetch Google Gemini API using REST endpoint with model fallback
+ */
+async function callGeminiVision(prompt: string, imageBase64OrUrl: string) {
+  const apiKey = getGeminiApiKey();
 
   if (!apiKey || apiKey.startsWith('sk-')) {
     console.warn('A server-only Gemini API key is not configured correctly.');

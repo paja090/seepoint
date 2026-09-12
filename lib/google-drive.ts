@@ -127,8 +127,8 @@ async function getAccessToken() {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const configuredPrivateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL;
+  const configuredPrivateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   const getOAuthToken = async () => {
     const response = await fetch('https://oauth2.googleapis.com/token', {

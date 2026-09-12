@@ -3,6 +3,7 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { logAIUsage } from '@/lib/ai-usage';
+import { getGeminiApiKey } from '@/lib/ai-gemini';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
       .join('\n');
 
     // Step 2: Use Gemini 3.6 AI with Live Google Search Grounding to select best candidate & fill form values
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     let aiResult: {
       name?: string;
       companyId?: string;

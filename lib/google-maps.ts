@@ -14,8 +14,39 @@ export type GeocodeResult = {
   formattedAddress: string;
 };
 
+function cleanEnvValue(val?: string): string | undefined {
+  if (!val) return undefined;
+  let cleaned = val.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned || undefined;
+}
+
+/**
+ * Resolves the Google Maps API key on the server side:
+ * 1. GOOGLE_MAPS_SERVER_API_KEY (preferred primary server key)
+ * 2. GOOGLE_MAPS_SERVER_KEY (legacy server key in Vercel)
+ * 3. GOOGLE_MAPS_API_KEY (legacy server key in Vercel)
+ * 4. NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (browser key fallback if server key not set)
+ * 5. NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY
+ * 6. NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY
+ * 7. NEXT_PUBLIC_GOOGLE_MAPS_KEY
+ */
+export function getGoogleMapsServerApiKey(): string | undefined {
+  return (
+    cleanEnvValue(process.env.GOOGLE_MAPS_SERVER_API_KEY) ||
+    cleanEnvValue(process.env.GOOGLE_MAPS_SERVER_KEY) ||
+    cleanEnvValue(process.env.GOOGLE_MAPS_API_KEY) ||
+    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ||
+    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY) ||
+    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY) ||
+    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY)
+  );
+}
+
 export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getGoogleMapsServerApiKey();
   const query = address.trim();
   if (!query) return null;
 
@@ -61,7 +92,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 }
 
 export async function reverseGeocode(latitude: number, longitude: number): Promise<GeocodeResult | null> {
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getGoogleMapsServerApiKey();
 
   if (apiKey) try {
     const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
@@ -111,7 +142,7 @@ export async function computeGoogleRoute(
   travelMode: 'DRIVING' | 'BICYCLING' | 'WALKING' = 'DRIVING',
   requestReferer?: string
 ): Promise<RouteComputeResult> {
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getGoogleMapsServerApiKey();
 
   if (!apiKey) {
     return {
@@ -209,7 +240,7 @@ export function getSignedStaticMapUrl(params: {
   markers?: Array<{ lat: number; lng: number; color?: string; label?: string }>;
   polyline?: string;
 }): string {
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const apiKey = getGoogleMapsServerApiKey();
   const signingSecret = process.env.GOOGLE_MAPS_URL_SIGNING_SECRET;
 
   if (!apiKey) {
