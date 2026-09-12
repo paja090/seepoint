@@ -8,7 +8,6 @@ import {
   BLOCKING_OCCUPANCY_STATUSES,
   WARNING_OCCUPANCY_STATUSES,
   INACTIVE_OCCUPANCY_STATUSES,
-  normalizeDateOnly,
 } from '../lib/occupancy/availability-service';
 
 describe('Canonical Occupancy Availability Engine', () => {
@@ -107,12 +106,12 @@ describe('Canonical Occupancy Availability Engine', () => {
     it('defines explicit hard blocking statuses', () => {
       assert.ok(BLOCKING_OCCUPANCY_STATUSES.includes('OCCUPIED'));
       assert.ok(BLOCKING_OCCUPANCY_STATUSES.includes('RESERVED'));
-      assert.ok(!BLOCKING_OCCUPANCY_STATUSES.includes('NEGOTIATION' as any));
+      assert.ok(!(BLOCKING_OCCUPANCY_STATUSES as readonly string[]).includes('NEGOTIATION'));
     });
 
     it('defines explicit soft warning statuses', () => {
       assert.ok(WARNING_OCCUPANCY_STATUSES.includes('NEGOTIATION'));
-      assert.ok(!WARNING_OCCUPANCY_STATUSES.includes('OCCUPIED' as any));
+      assert.ok(!(WARNING_OCCUPANCY_STATUSES as readonly string[]).includes('OCCUPIED'));
     });
 
     it('defines explicit non-blocking inactive statuses', () => {

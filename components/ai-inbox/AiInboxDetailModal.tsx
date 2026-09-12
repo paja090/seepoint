@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Sparkles,
@@ -10,14 +10,12 @@ import {
   User,
   MapPin,
   Calendar,
-  Layers,
   Paperclip,
   Send,
   Copy,
   Check,
   RefreshCw,
   ExternalLink,
-  ChevronRight,
   ShieldCheck,
   FolderKanban,
   Compass,
@@ -27,9 +25,21 @@ import {
   Search,
   Trash2,
   Ban,
+  Clock,
+  Edit3,
+  HelpCircle,
+  Save,
+  CheckCheck,
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  Phone,
+  Mail,
 } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxActionStatus, AiInboxActionType, AiInboxAnalysisResult } from '@/lib/ai-inbox/types';
+import type { CommercialRequest, DatesClarity } from '@/lib/ai-commercial/contracts/commercial-request';
+import type { CommercialNextBestAction } from '@/lib/ai-commercial/contracts/next-best-action';
 
 export type AiInboxMessageDetailData = {
   id: string;
@@ -118,6 +128,189 @@ export function AiInboxDetailModal({
     status: string;
     client?: { name: string };
   }>>([]);
+
+  const replyBoxRef = useRef<HTMLDivElement>(null);
+  const [commercialData, setCommercialData] = useState<{
+    commercialRequest: CommercialRequest;
+    nextBestAction: CommercialNextBestAction;
+  } | null>(null);
+  const [isEditingCommercial, setIsEditingCommercial] = useState(false);
+  const [isSavingCommercial, setIsSavingCommercial] = useState(false);
+  const [isConfirmingCommercial, setIsConfirmingCommercial] = useState(false);
+
+  // Form for manual edits
+  const [editForm, setEditForm] = useState({
+    companyName: '',
+    contactName: '',
+    contactEmail: '',
+    contactPhone: '',
+    cities: '',
+    mediaTypes: '',
+    dateFrom: '',
+    dateTo: '',
+    datesClarity: 'UNSPECIFIED' as DatesClarity,
+    quantityExact: '',
+    budgetExact: '',
+    notes: '',
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCommercial() {
+      try {
+        const res = await fetch(`/api/ai-inbox/${message.id}/commercial-request`);
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setCommercialData(data);
+          if (data.commercialRequest) {
+            const req = data.commercialRequest;
+            setEditForm({
+              companyName: req.companyName || '',
+              contactName: req.contactName || '',
+              contactEmail: req.contactEmail || '',
+              contactPhone: req.contactPhone || '',
+              cities: (req.cities || []).join(', '),
+              mediaTypes: (req.mediaTypes || []).join(', '),
+              dateFrom: req.dateFrom ? new Date(req.dateFrom).toISOString().slice(0, 10) : '',
+              dateTo: req.dateTo ? new Date(req.dateTo).toISOString().slice(0, 10) : '',
+              datesClarity: req.datesClarity || 'UNSPECIFIED',
+              quantityExact: req.quantity?.exact != null ? String(req.quantity.exact) : '',
+              budgetExact: req.budget?.exact != null ? String(req.budget.exact) : '',
+              notes: req.notes || '',
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Nepodařilo se načíst CommercialRequest:', err);
+      }
+    }
+    fetchCommercial();
+    return () => {
+      isMounted = false;
+    };
+  }, [message.id]);
+
+  async function handleSaveCommercial() {
+    setIsSavingCommercial(true);
+    setFeedback(null);
+    try {
+      const cities = editForm.cities
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const mediaTypes = editForm.mediaTypes
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const quantityExact = editForm.quantityExact.trim() ? parseInt(editForm.quantityExact.trim(), 10) : null;
+      const budgetExact = editForm.budgetExact.trim() ? parseFloat(editForm.budgetExact.trim()) : null;
+
+      const payload = {
+        companyName: editForm.companyName.trim() || undefined,
+        contactName: editForm.contactName.trim() || undefined,
+        contactEmail: editForm.contactEmail.trim() || undefined,
+        contactPhone: editForm.contactPhone.trim() || undefined,
+        cities,
+        mediaTypes,
+        dateFrom: editForm.dateFrom ? new Date(editForm.dateFrom).toISOString() : null,
+        dateTo: editForm.dateTo ? new Date(editForm.dateTo).toISOString() : null,
+        datesClarity: editForm.datesClarity,
+        quantity: quantityExact !== null ? { exact: quantityExact } : null,
+        budget: budgetExact !== null ? { exact: budgetExact, currency: 'CZK' } : null,
+        notes: editForm.notes.trim() || undefined,
+      };
+
+      const res = await fetch(`/api/ai-inbox/${message.id}/commercial-request`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Uložení změn selhalo.');
+      }
+
+      const updated = await res.json();
+      setCommercialData({
+        commercialRequest: updated.commercialRequest,
+        nextBestAction: updated.nextBestAction,
+      });
+      setIsEditingCommercial(false);
+      setFeedback({ type: 'success', message: 'Údaje poptávky byly úspěšně upraveny a uloženy.' });
+      onActionComplete();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při ukládání údajů.' });
+    } finally {
+      setIsSavingCommercial(false);
+    }
+  }
+
+  async function handleConfirmCommercial() {
+    setIsConfirmingCommercial(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/ai-inbox/${message.id}/commercial-request`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmed: true }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Potvrzení poptávky selhalo.');
+      }
+
+      const updated = await res.json();
+      setCommercialData({
+        commercialRequest: updated.commercialRequest,
+        nextBestAction: updated.nextBestAction,
+      });
+      setFeedback({
+        type: 'success',
+        message: 'Poptávka byla úspěšně potvrzena člověkem a připravena pro obchodní zpracování.',
+      });
+      onActionComplete();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při potvrzování poptávky.' });
+    } finally {
+      setIsConfirmingCommercial(false);
+    }
+  }
+
+  function handleRequestClarification() {
+    const missing = commercialData?.commercialRequest?.missingRequirements || [];
+    const missingLabels: string[] = [];
+
+    if (missing.includes('EXACT_CAMPAIGN_DATES')) {
+      missingLabels.push('přesný termín kampaně (konkrétní datum od–do)');
+    }
+    if (missing.includes('EXACT_QUANTITY')) {
+      missingLabels.push('požadovaný počet reklamních ploch');
+    }
+    if (missing.includes('TARGET_LOCATION')) {
+      missingLabels.push('cílová města či lokality');
+    }
+    if (missingLabels.length === 0) {
+      missingLabels.push('bližší specifikaci Vašeho požadavku');
+    }
+
+    const clientGreeting = commercialData?.commercialRequest?.contactName
+      ? `Dobrý den, ${commercialData.commercialRequest.contactName},`
+      : 'Dobrý den,';
+
+    const clarificationDraft = `${clientGreeting}\n\nděkujeme za Vaši poptávku. Rádi pro Vás prověříme dostupnost reklamních ploch a připravíme konkrétní nabídku.\n\nPro přesné zpracování bychom Vás rádi požádali o upřesnění následujících informací:\n${missingLabels.map((item) => `• ${item}`).join('\n')}\n\nJakmile tyto údaje obdržíme, obratem Vám zašleme návrh volných ploch s kalkulací.\n\nS přátelským pozdravem,\nSeePoint tým`;
+
+    setReplyText(clarificationDraft);
+    setFeedback({
+      type: 'success',
+      message: 'Návrh žádosti o doplnění informací byl předvyplněn do okna odpovědi níže.',
+    });
+
+    setTimeout(() => {
+      replyBoxRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  }
 
   async function handleLinkOrder(orderId: string | null) {
     setIsLinkingOrder(true);
@@ -450,115 +643,534 @@ export function AiInboxDetailModal({
 
           {/* RIGHT PANE (7 cols): AI INTELLIGENCE & HUMAN ACTION PANEL */}
           <div className="lg:col-span-7 p-5 space-y-6 overflow-y-auto bg-white">
-            {/* AI SUMMARY & PARAMETERS CARD */}
-            <div className="rounded-xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50/50 via-white to-indigo-50/30 p-4 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-fuchsia-900 font-bold text-sm">
-                  <Sparkles size={16} className="text-fuchsia-600" />
-                  <span>AI Rozpoznání a analýza požadavku</span>
+            {/* AI VYHODNOCENÍ / OBCHODNÍ POPTÁVKA SECTION (Commercial Engine Foundation) */}
+            <div className="rounded-xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50/50 via-white to-indigo-50/30 p-5 shadow-sm space-y-4">
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-fuchsia-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-fuchsia-600 text-white shadow-sm">
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black text-slate-900 text-sm sm:text-base">
+                        AI VYHODNOCENÍ / OBCHODNÍ POPTÁVKA
+                      </h3>
+                      <span className="rounded bg-fuchsia-100 px-2 py-0.5 text-[10px] font-black text-fuchsia-800 uppercase tracking-wider">
+                        Commercial Engine
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Strukturovaný požadavek klienta připravený pro ověření dostupnosti a kalkulaci
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={reprocessAi}
-                  disabled={isReprocessing}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-fuchsia-700 disabled:opacity-50"
-                  title="Znovu analyzovat zprávu přes AI"
-                >
-                  <RefreshCw size={12} className={isReprocessing ? 'animate-spin' : ''} />
-                  {isReprocessing ? 'Analyzuji…' : 'Zpracovat AI znovu'}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={reprocessAi}
+                    disabled={isReprocessing}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition shadow-sm"
+                    title="Znovu analyzovat zprávu přes AI"
+                  >
+                    <RefreshCw size={12} className={isReprocessing ? 'animate-spin' : ''} />
+                    <span>{isReprocessing ? 'Analyzuji…' : 'Zpracovat znovu'}</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Extracted parameters grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs">
-                {/* Company */}
-                <div className="rounded-lg bg-white/90 border border-slate-200 p-2.5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                    <Building2 size={13} />
-                    <span>Firma / Klient</span>
-                  </div>
-                  <div className="font-bold text-slate-900">
-                    {extracted.company?.name || message.client?.name || 'Neznámá firma'}
-                  </div>
-                  {message.client ? (
-                    <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                      <CheckCircle2 size={11} />
-                      Existuje v CRM (#{message.client.name})
-                    </div>
+              {/* Status / Intent & Clarity Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold border ${classMeta.badgeColor}`}>
+                  <span>{classMeta.icon}</span>
+                  <span>{classMeta.label}</span>
+                </span>
+
+                <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold border ${confBadge.colorClass}`}>
+                  Jistota AI: {confBadge.percentage} %
+                </span>
+
+                {/* Timing Clarity Badge */}
+                {commercialData?.commercialRequest ? (
+                  commercialData.commercialRequest.datesClarity === 'EXACT' ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 size={13} className="text-emerald-600" />
+                      PŘESNÝ TERMÍN
+                    </span>
+                  ) : commercialData.commercialRequest.datesClarity === 'APPROXIMATE' ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-200">
+                      <Clock size={13} className="text-amber-600" />
+                      PŘIBLIŽNÝ TERMÍN
+                    </span>
                   ) : (
-                    <div className="text-[11px] text-amber-700 font-medium">
-                      Není v CRM (bude navrženo založení)
-                    </div>
-                  )}
-                  {extracted.company?.ico && (
-                    <div className="text-[11px] text-slate-500">IČO: {extracted.company.ico}</div>
-                  )}
-                </div>
+                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 border border-slate-200">
+                      <HelpCircle size={13} className="text-slate-500" />
+                      TERMÍN NEUVEDEN
+                    </span>
+                  )
+                ) : null}
 
-                {/* Contact */}
-                <div className="rounded-lg bg-white/90 border border-slate-200 p-2.5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                    <User size={13} />
-                    <span>Kontaktní osoba</span>
-                  </div>
-                  <div className="font-bold text-slate-900">
-                    {extracted.contact?.name || message.contact ? `${message.contact?.firstName} ${message.contact?.lastName}` : message.fromName || 'Neuvedeno'}
-                  </div>
-                  <div className="text-[11px] text-slate-500 truncate">
-                    {extracted.contact?.email || message.fromEmail}
-                  </div>
-                  {extracted.contact?.phone && (
-                    <div className="text-[11px] text-slate-500">Tel: {extracted.contact.phone}</div>
-                  )}
-                </div>
-
-                {/* Project / Location */}
-                <div className="rounded-lg bg-white/90 border border-slate-200 p-2.5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                    <MapPin size={13} />
-                    <span>Projekt a lokalita</span>
-                  </div>
-                  <div className="font-bold text-slate-900">
-                    {extracted.request?.projectType === 'NAVIGATION'
-                      ? 'Navigace'
-                      : extracted.request?.projectType === 'STANDARD_MEDIA'
-                        ? 'Venkovní reklama'
-                        : 'Obchodní projekt'}{' '}
-                    {extracted.request?.location ? `• ${extracted.request.location}` : ''}
-                  </div>
-                  {extracted.request?.requestedQuantity && (
-                    <div className="text-[11px] text-slate-600">
-                      Požadavek: {extracted.request.requestedQuantity.exact || `${extracted.request.requestedQuantity.min || 8}–${extracted.request.requestedQuantity.max || 12}`} tabulí/ploch
-                    </div>
-                  )}
-                </div>
-
-                {/* Timing */}
-                <div className="rounded-lg bg-white/90 border border-slate-200 p-2.5 space-y-1">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                    <Calendar size={13} />
-                    <span>Termín otevření / realizace</span>
-                  </div>
-                  <div className="font-bold text-slate-900">
-                    {extracted.request?.openingDate
-                      ? new Date(extracted.request.openingDate).toLocaleDateString('cs-CZ')
-                      : extracted.request?.deadline
-                        ? new Date(extracted.request.deadline).toLocaleDateString('cs-CZ')
-                        : 'Nespecifikováno'}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    {extracted.request?.openingDate ? 'Plánované otevření provozovny' : 'Dle dohody'}
-                  </div>
-                </div>
+                {/* Human Review Status Badge */}
+                {commercialData?.commercialRequest?.status === 'READY_FOR_AVAILABILITY' ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                    <CheckCheck size={13} /> PŘIPRAVENO K OVĚŘENÍ PLOCH
+                  </span>
+                ) : message.requiresReview ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                    <AlertTriangle size={13} /> VYŽADUJE KONTROLU ČLOVĚKEM
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">
+                    <ShieldCheck size={13} /> SCHVÁLENO ČLOVĚKEM
+                  </span>
+                )}
               </div>
 
-              {/* Summary text */}
-              {message.aiSummary && (
-                <div className="rounded-lg bg-fuchsia-100/50 p-3 text-xs text-slate-800 border border-fuchsia-200/50">
-                  <span className="font-bold text-fuchsia-950">Souhrn požadavku: </span>
-                  {message.aiSummary}
+              {/* Missing Requirements Alert Box */}
+              {commercialData?.commercialRequest && commercialData.commercialRequest.missingRequirements.length > 0 && (
+                <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-xs text-amber-900 shadow-sm space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-amber-950">
+                    <AlertCircle size={15} className="text-amber-600 shrink-0" />
+                    <span>Chybějící informace bránící okamžitému vytvoření nabídky:</span>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5 text-amber-900">
+                    {commercialData.commercialRequest.missingRequirements.map((reqKey) => {
+                      if (reqKey === 'EXACT_CAMPAIGN_DATES') {
+                        return (
+                          <li key={reqKey}>
+                            <strong>Přesný termín kampaně</strong> — termín v e-mailu je přibližný či orientační ({commercialData.commercialRequest.rawDateDescription || 'neupřesněno'}). Bez konkrétních dnů (od–do) nelze prověřit dostupnost.
+                          </li>
+                        );
+                      }
+                      if (reqKey === 'EXACT_QUANTITY') {
+                        return (
+                          <li key={reqKey}>
+                            <strong>Počet ploch</strong> — klient neuvedl přesný počet požadovaných reklamních nosičů.
+                          </li>
+                        );
+                      }
+                      if (reqKey === 'TARGET_LOCATION') {
+                        return (
+                          <li key={reqKey}>
+                            <strong>Cílová lokalita</strong> — chybí specifikace měst nebo okresů.
+                          </li>
+                        );
+                      }
+                      return (
+                        <li key={reqKey}>
+                          <strong>{reqKey}</strong>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
+
+              {/* VIEW MODE vs EDIT MODE */}
+              {!isEditingCommercial ? (
+                <>
+                  {/* Extracted Parameters Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {/* Company */}
+                    <div className="rounded-xl bg-white/95 border border-slate-200 p-3 shadow-xs space-y-1">
+                      <div className="flex items-center justify-between text-slate-500 font-medium">
+                        <span className="flex items-center gap-1.5">
+                          <Building2 size={13} className="text-slate-400" />
+                          Klient / Společnost
+                        </span>
+                        {message.client && (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                            <CheckCircle2 size={10} /> V CRM
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-bold text-slate-900 text-sm">
+                        {commercialData?.commercialRequest?.companyName || message.client?.name || 'Neznámá společnost'}
+                      </div>
+                      {extracted.company?.ico && (
+                        <div className="text-[11px] text-slate-500">IČO: {extracted.company.ico}</div>
+                      )}
+                    </div>
+
+                    {/* Contact */}
+                    <div className="rounded-xl bg-white/95 border border-slate-200 p-3 shadow-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                        <User size={13} className="text-slate-400" />
+                        Kontaktní osoba
+                      </div>
+                      <div className="font-bold text-slate-900 text-sm">
+                        {commercialData?.commercialRequest?.contactName || message.fromName || 'Neuvedeno'}
+                      </div>
+                      <div className="text-[11px] text-slate-600 truncate flex items-center gap-1">
+                        <Mail size={11} className="text-slate-400" />
+                        <span>{commercialData?.commercialRequest?.contactEmail || message.fromEmail}</span>
+                      </div>
+                      {commercialData?.commercialRequest?.contactPhone && (
+                        <div className="text-[11px] text-slate-600 flex items-center gap-1">
+                          <Phone size={11} className="text-slate-400" />
+                          <span>{commercialData.commercialRequest.contactPhone}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Location & Media Types */}
+                    <div className="rounded-xl bg-white/95 border border-slate-200 p-3 shadow-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                        <MapPin size={13} className="text-slate-400" />
+                        Lokalita a formáty nosičů
+                      </div>
+                      <div className="font-bold text-slate-900">
+                        {commercialData?.commercialRequest?.cities?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {commercialData.commercialRequest.cities.map((city) => (
+                              <span key={city} className="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 border border-blue-200">
+                                {city}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">Nespecifikováno</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-600 pt-0.5">
+                        Formáty:{' '}
+                        {commercialData?.commercialRequest?.mediaTypes?.length
+                          ? commercialData.commercialRequest.mediaTypes.join(', ')
+                          : 'Dle doporučení'}
+                      </div>
+                      <div className="text-[11px] text-slate-700 font-medium">
+                        Požadovaný počet:{' '}
+                        {commercialData?.commercialRequest?.quantity?.exact
+                          ? `${commercialData.commercialRequest.quantity.exact} ks`
+                          : commercialData?.commercialRequest?.quantity?.min && commercialData.commercialRequest.quantity.max
+                            ? `${commercialData.commercialRequest.quantity.min}–${commercialData.commercialRequest.quantity.max} ks`
+                            : <span className="text-amber-700 font-bold">Nespecifikováno</span>}
+                      </div>
+                    </div>
+
+                    {/* Dates & Budget */}
+                    <div className="rounded-xl bg-white/95 border border-slate-200 p-3 shadow-xs space-y-1">
+                      <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                        <Calendar size={13} className="text-slate-400" />
+                        Termín realizace & Rozpočet
+                      </div>
+                      <div className="font-bold text-slate-900">
+                        {commercialData?.commercialRequest?.dateFrom && commercialData?.commercialRequest?.dateTo ? (
+                          <span>
+                            {new Date(commercialData.commercialRequest.dateFrom).toLocaleDateString('cs-CZ')} –{' '}
+                            {new Date(commercialData.commercialRequest.dateTo).toLocaleDateString('cs-CZ')}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">
+                            {commercialData?.commercialRequest?.rawDateDescription || 'Termín neuveden'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-600">
+                        Přesnost:{' '}
+                        <strong className="text-slate-800">
+                          {commercialData?.commercialRequest?.datesClarity === 'EXACT'
+                            ? 'Přesné datum'
+                            : commercialData?.commercialRequest?.datesClarity === 'APPROXIMATE'
+                              ? 'Orientační měsíc / období'
+                              : 'Neuvedeno'}
+                        </strong>
+                      </div>
+                      <div className="text-[11px] text-slate-700">
+                        Rozpočet:{' '}
+                        <strong>
+                          {commercialData?.commercialRequest?.budget?.exact
+                            ? `${commercialData.commercialRequest.budget.exact.toLocaleString('cs-CZ')} Kč`
+                            : 'Neuveden'}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary & Evidence */}
+                  {message.aiSummary && (
+                    <div className="rounded-xl bg-fuchsia-100/40 p-3 text-xs text-slate-800 border border-fuchsia-200/60 leading-relaxed">
+                      <span className="font-bold text-fuchsia-950">Souhrn poptávky: </span>
+                      {message.aiSummary}
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* INLINE EDIT FORM */
+                <div className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm space-y-3 text-xs">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="font-bold text-indigo-900 flex items-center gap-1.5 text-sm">
+                      <Edit3 size={14} className="text-indigo-600" />
+                      Úprava parametrů poptávky
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCommercial(false)}
+                      className="text-xs text-slate-400 hover:text-slate-700"
+                    >
+                      Zavřít
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Společnost / Klient</label>
+                      <input
+                        type="text"
+                        value={editForm.companyName}
+                        onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Název firmy"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Kontaktní osoba</label>
+                      <input
+                        type="text"
+                        value={editForm.contactName}
+                        onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Jméno a příjmení"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">E-mail</label>
+                      <input
+                        type="email"
+                        value={editForm.contactEmail}
+                        onChange={(e) => setEditForm({ ...editForm, contactEmail: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="email@klient.cz"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Telefon</label>
+                      <input
+                        type="text"
+                        value={editForm.contactPhone}
+                        onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="+420..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Města / Lokality (oddělená čárkou)</label>
+                      <input
+                        type="text"
+                        value={editForm.cities}
+                        onChange={(e) => setEditForm({ ...editForm, cities: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Např. Ostrava, Havířov"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Formáty ploch (např. CLV, BILLBOARD)</label>
+                      <input
+                        type="text"
+                        value={editForm.mediaTypes}
+                        onChange={(e) => setEditForm({ ...editForm, mediaTypes: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="CLV, BILLBOARD"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Termín od (YYYY-MM-DD)</label>
+                      <input
+                        type="date"
+                        value={editForm.dateFrom}
+                        onChange={(e) => setEditForm({ ...editForm, dateFrom: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Termín do (YYYY-MM-DD)</label>
+                      <input
+                        type="date"
+                        value={editForm.dateTo}
+                        onChange={(e) => setEditForm({ ...editForm, dateTo: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Přesnost termínu</label>
+                      <select
+                        value={editForm.datesClarity}
+                        onChange={(e) => setEditForm({ ...editForm, datesClarity: e.target.value as DatesClarity })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="EXACT">EXACT (Přesné dny od–do)</option>
+                        <option value="APPROXIMATE">APPROXIMATE (Přibližný termín)</option>
+                        <option value="UNSPECIFIED">UNSPECIFIED (Nespecifikováno)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Počet ploch (přesný)</label>
+                      <input
+                        type="number"
+                        value={editForm.quantityExact}
+                        onChange={(e) => setEditForm({ ...editForm, quantityExact: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Např. 15"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Rozpočet (Kč)</label>
+                      <input
+                        type="number"
+                        value={editForm.budgetExact}
+                        onChange={(e) => setEditForm({ ...editForm, budgetExact: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Např. 50000"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Poznámka k zadání</label>
+                      <input
+                        type="text"
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 p-2 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        placeholder="Doplňující informace"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCommercial(false)}
+                      disabled={isSavingCommercial}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                    >
+                      Zrušit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveCommercial}
+                      disabled={isSavingCommercial}
+                      className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50 transition shadow-sm"
+                    >
+                      <Save size={13} />
+                      <span>{isSavingCommercial ? 'Ukládám…' : 'Uložit změny'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* NEXT BEST ACTION CARD */}
+              {commercialData?.nextBestAction && (
+                <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/80 p-3.5 shadow-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-950 uppercase tracking-wider">
+                      <ArrowRight size={13} className="text-blue-600" />
+                      <span>Next Best Action (Doporučený další krok)</span>
+                    </div>
+                    <span
+                      className={`rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                        commercialData.nextBestAction.priority === 'CRITICAL'
+                          ? 'bg-rose-100 text-rose-800'
+                          : commercialData.nextBestAction.priority === 'HIGH'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
+                      Priorita: {commercialData.nextBestAction.priority}
+                    </span>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-slate-900 text-xs sm:text-sm">
+                      {commercialData.nextBestAction.title}
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {commercialData.nextBestAction.description}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* HUMAN ACTION BUTTONS BAR */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-fuchsia-100">
+                {/* 1. Potvrdit poptávku */}
+                <button
+                  type="button"
+                  onClick={handleConfirmCommercial}
+                  disabled={isConfirmingCommercial}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-500 active:scale-95 disabled:opacity-50 transition"
+                  title="Potvrdit správnost údajů a označit poptávku jako ověřenou člověkem"
+                >
+                  <CheckCheck size={14} />
+                  <span>{isConfirmingCommercial ? 'Potvrzuji…' : 'Potvrdit poptávku'}</span>
+                </button>
+
+                {/* 2. Upravit údaje */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditingCommercial(!isEditingCommercial)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 transition"
+                  title="Upravit parametry poptávky"
+                >
+                  <Edit3 size={14} className="text-slate-500" />
+                  <span>{isEditingCommercial ? 'Zavřít úpravy' : 'Upravit údaje'}</span>
+                </button>
+
+                {/* 3. Vyžádat doplnění */}
+                <button
+                  type="button"
+                  onClick={handleRequestClarification}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50/80 px-3.5 py-2 text-xs font-bold text-amber-900 shadow-sm hover:bg-amber-100 active:scale-95 transition"
+                  title="Předvyplnit e-mailovou odpověď klientovi s žádostí o chybějící informace"
+                >
+                  <HelpCircle size={14} className="text-amber-700" />
+                  <span>Vyžádat doplnění</span>
+                </button>
+
+                {/* 4. Prověřit dostupnost (Hook to Occupancy) */}
+                {commercialData?.commercialRequest?.datesClarity === 'EXACT' &&
+                commercialData?.commercialRequest?.cities?.length > 0 &&
+                commercialData?.commercialRequest?.dateFrom &&
+                commercialData?.commercialRequest?.dateTo ? (
+                  <a
+                    href={`/occupancy/ai?city=${encodeURIComponent(commercialData.commercialRequest.cities[0])}&from=${new Date(commercialData.commercialRequest.dateFrom).toISOString().slice(0, 10)}&to=${new Date(commercialData.commercialRequest.dateTo).toISOString().slice(0, 10)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:from-blue-500 hover:to-indigo-500 active:scale-95 transition ml-auto"
+                    title="Otevřít modul Obsazenost a prověřit volné plochy v daném termínu"
+                  >
+                    <Compass size={14} />
+                    <span>Prověřit dostupnost</span>
+                    <ArrowUpRight size={12} />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFeedback({
+                        type: 'error',
+                        message:
+                          'Pro automatické prověření dostupnosti je nejprve nutné doplnit přesný termín (od–do) a město. Použijte tlačítko "Upravit údaje" nebo "Vyžádat doplnění".',
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed ml-auto"
+                    title="Dostupné po zadání přesného termínu a města"
+                  >
+                    <Compass size={14} />
+                    <span>Prověřit dostupnost</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* LINKED ORDER & OFFER SECTION */}
@@ -841,7 +1453,7 @@ export function AiInboxDetailModal({
             </div>
 
             {/* AI SUGGESTED REPLY BOX */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div ref={replyBoxRef} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
                   <Sparkles size={14} className="text-fuchsia-600" />

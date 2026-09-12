@@ -33,6 +33,7 @@ export function buildAnalysisPrompt(input: {
   subject: string;
   textBody?: string | null;
   attachmentNames?: string[];
+  threadContext?: string | null;
 }): string {
   return `Jsi pokročilý specializovaný AI asistent obchodního systému SeePoint OS (český systém pro správu venkovní reklamy, billboardů, městského mobiliáře a navigačního značení).
 Tvým úkolem je pečlivě analyzovat příchozí obchodní e-mail od klienta nebo partnera a extrahovat z něj přesná strukturovaná data.
@@ -109,14 +110,23 @@ Očekávaný výstup je POUZE a VÝHRADNĚ platný JSON objekt s těmito klíči
     "openingDate": string | null (datum otevření ve formátu YYYY-MM-DD nebo null),
     "deadline": string | null (termín realizace ve formátu YYYY-MM-DD nebo null),
     "specificRequirements": string[] (seznam klíčových požadavků, např. ["trasa od dálnice", "8-12 tabulí", "dodat logo"]),
-    "missingRequirements": string[] (např. ["EXACT_DATES", "LOCATION", "QUANTITY"]),
+    "missingRequirements": string[] (např. ["EXACT_CAMPAIGN_DATES", "LOCATION", "EXACT_QUANTITY"]),
+    "evidence": {
+      "dateText": string | null (doslovný text z e-mailu týkající se termínu),
+      "locationText": string | null (doslovný text z e-mailu týkající se lokality),
+      "quantityText": string | null (doslovný text z e-mailu týkající se počtu),
+      "budgetText": string | null (doslovný text rozpočtu),
+      "mediaTypeText": string | null (doslovný text typu média)
+    } | null,
     "notes": string | null
   } | null,
   
-  DŮLEŽITÉ PRAVIDLO PRO TERMÍNY (ZÁKAZ DOMÝŠLENÍ):
-  - Pokud klient napíše pouze přibližný termín (např. "někdy v listopadu", "na podzim", "co nejdříve", "na 2 měsíce"), NIKDY si nevymýšlej přesný den! V takovém případě nastav dateFrom: null, dateTo: null, datesClarity: "APPROXIMATE", rawDateDescription: přesný text klienta, a do missingRequirements přidej "EXACT_DATES".
-  - Pouze pokud je uveden konkrétní den (např. "od 1.11.2026"), zapiš dateFrom: "2026-11-01" a datesClarity: "EXACT".
-  - Pokud termín vůbec nezmínil, nastav datesClarity: "UNSPECIFIED".
+  DŮLEŽITÁ PRAVIDLA (ZÁKAZ DOMÝŠLENÍ A HALUCINACÍ):
+  - TERMÍNY: Pokud klient napíše pouze přibližný termín (např. "někdy v listopadu", "na podzim", "co nejdříve", "na 2 měsíce"), NIKDY si nevymýšlej přesný den! V takovém případě nastav dateFrom: null, dateTo: null, datesClarity: "APPROXIMATE", rawDateDescription: přesný text klienta, a do missingRequirements přidej "EXACT_CAMPAIGN_DATES".
+    Pouze pokud je uveden konkrétní den (např. "od 1.11.2026"), zapiš dateFrom: "2026-11-01" a datesClarity: "EXACT".
+    Pokud termín vůbec nezmínil, nastav datesClarity: "UNSPECIFIED".
+  - MNOŽSTVÍ: Pokud klient uvede neurčité množství (např. "několik ploch", "máte volné billboardy?", "poptáváme CLV"), NIKDY si nevymýšlej žádné konkrétní číslo (žádné 5 ani 10)! Nastav requestedQuantity: null a do missingRequirements přidej "EXACT_QUANTITY".
+  - LOKALITA: Pokud klient uvede obecnou oblast (např. "kolem Ostravy", "u Plzně"), uveď do cities pouze dané město ("Ostrava"), ale NIKDY si nevymýšlej konkrétní městské části ani ulice.
   "summary": string (stručné české shrnutí zprávy pro obchodníka, max 2 věty),
   "reasoningSummary": string (stručné vysvětlení, proč byla zvolena daná klasifikace a akce),
   "suggestedReply": string (profesionální, zdvořilý návrh české odpovědi oslovující klienta a potvrzující přijetí),
@@ -132,7 +142,13 @@ Očekávaný výstup je POUZE a VÝHRADNĚ platný JSON objekt s těmito klíči
     }
   ]
 }
-
+${input.threadContext ? `
+<thread_context>
+PŘEDCHOZÍ ZPRÁVY V TOMTO E-MAILOVÉM VLÁKNĚ (KONTEXT PROPOJENÍ):
+${input.threadContext}
+DŮLEŽITÉ PRAVIDLO PRO VLÁKNO: Pokud tato nová zpráva reaguje na předchozí kontext (např. klient píše "ano, místo 15 bychom chtěli 20", "odsouhlasujeme to", "změňte termín"), klasifikuj odpovídajícím způsobem (např. "CHANGE_REQUEST", "OFFER_ACCEPTED"), vyplň detectedChanges a zachovej klientské entity z předchozí komunikace!
+</thread_context>
+` : ''}
 <untrusted_email_content>
 Odesílatel: ${input.fromName ? `"${input.fromName}" <${input.fromEmail}>` : input.fromEmail}
 Předmět: ${input.subject}
@@ -248,6 +264,26 @@ export function validateAndSanitizeAnalysis(raw: Record<string, unknown>): AiInb
       missingRequirements.push('EXACT_CAMPAIGN_DATES');
     }
 
+    // Automatically enforce missing requirements if quantity is not specified
+    if (
+      (!requestedQuantity || (requestedQuantity.exact === null && requestedQuantity.min === null && requestedQuantity.max === null)) &&
+      !missingRequirements.includes('EXACT_QUANTITY')
+    ) {
+      missingRequirements.push('EXACT_QUANTITY');
+    }
+
+    let evidence: ExtractedRequestData['evidence'] = null;
+    if (rq.evidence && typeof rq.evidence === 'object') {
+      const ev = rq.evidence as Record<string, unknown>;
+      evidence = {
+        dateText: typeof ev.dateText === 'string' && ev.dateText.trim() ? ev.dateText.trim() : null,
+        locationText: typeof ev.locationText === 'string' && ev.locationText.trim() ? ev.locationText.trim() : null,
+        quantityText: typeof ev.quantityText === 'string' && ev.quantityText.trim() ? ev.quantityText.trim() : null,
+        budgetText: typeof ev.budgetText === 'string' && ev.budgetText.trim() ? ev.budgetText.trim() : null,
+        mediaTypeText: typeof ev.mediaTypeText === 'string' && ev.mediaTypeText.trim() ? ev.mediaTypeText.trim() : null,
+      };
+    }
+
     request = {
       projectType: pType,
       location: typeof rq.location === 'string' && rq.location.trim() ? rq.location.trim() : null,
@@ -267,6 +303,7 @@ export function validateAndSanitizeAnalysis(raw: Record<string, unknown>): AiInb
         ? rq.specificRequirements.filter((r): r is string => typeof r === 'string' && Boolean(r.trim()))
         : [],
       missingRequirements,
+      evidence,
       notes: typeof rq.notes === 'string' && rq.notes.trim() ? rq.notes.trim() : null,
     };
   }
@@ -325,6 +362,7 @@ export async function analyzeInboundMessageWithGemini(input: {
   subject: string;
   textBody?: string | null;
   attachmentNames?: string[];
+  threadContext?: string | null;
 }): Promise<AiInboxAnalysisResult> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {

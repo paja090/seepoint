@@ -60,6 +60,13 @@ export type ExtractedRequestData = {
   specificRequirements?: string[];
   notes?: string | null;
   missingRequirements?: string[];
+  evidence?: {
+    dateText?: string | null;
+    locationText?: string | null;
+    quantityText?: string | null;
+    budgetText?: string | null;
+    mediaTypeText?: string | null;
+  } | null;
 };
 
 export type DetectedChangeItem = {

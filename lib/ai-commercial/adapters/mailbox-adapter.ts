@@ -66,6 +66,16 @@ export function buildCommercialRequestFromInboxMessage(
     }
   }
 
+  // Check if quantity is missing for a commercial inquiry
+  const hasQuantity = req?.requestedQuantity && (
+    req.requestedQuantity.exact !== null ||
+    req.requestedQuantity.min !== null ||
+    req.requestedQuantity.max !== null
+  );
+  if (!hasQuantity && !missingRequirements.includes('EXACT_QUANTITY')) {
+    missingRequirements.push('EXACT_QUANTITY');
+  }
+
   // 3. Determine status
   let status: CommercialRequestStatus = 'READY_FOR_AVAILABILITY';
   if (missingRequirements.length > 0 || datesClarity !== 'EXACT') {
@@ -81,8 +91,8 @@ export function buildCommercialRequestFromInboxMessage(
       id: message.id,
       threadId: message.providerThreadId,
     },
-    clientId: message.clientId,
-    contactId: message.contactId || explicitContact?.id,
+    clientId: message.clientId || null,
+    contactId: (message.contactId || explicitContact?.id) || null,
     companyName: message.client?.name || company?.name || message.fromName || 'Neznámá společnost',
     contactName: (explicitContact || message.contact)
       ? `${(explicitContact || message.contact)!.firstName} ${(explicitContact || message.contact)!.lastName}`.trim()

@@ -184,8 +184,8 @@ export async function saveGoogleConnection(input: { provider: IntegrationProvide
   const { organizationId } = requireTenantContext();
   const config = googleOAuthConfiguration();
   const existing = input.provider === 'GMAIL'
-    ? await prisma.integrationConnection.findFirst({ where: { provider: input.provider, externalAccountId: input.accountId } })
-    : await prisma.integrationConnection.findFirst({ where: { provider: input.provider } });
+    ? await prisma.integrationConnection.findFirst({ where: { organizationId, provider: input.provider, externalAccountId: input.accountId } })
+    : await prisma.integrationConnection.findFirst({ where: { organizationId, provider: input.provider } });
   let refreshToken = input.refreshToken;
   if (!refreshToken && existing?.credentialsEncrypted) {
     refreshToken = decryptIntegrationSecret<GoogleCredentials>(existing.credentialsEncrypted, config.encryptionKey).refreshToken;
