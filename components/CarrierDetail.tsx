@@ -71,26 +71,31 @@ export function CarrierDetail({
 
   const latestDamagePhoto = damagePhotos[0];
   const hasDamageNote = carrier.note?.includes('[ZÁVADA:') || carrier.note?.includes('ZÁVADA');
-  const isDamaged = (damagePhotos.length > 0 || hasDamageNote) && !damageResolved;
+  const damagedSurfaces = carrier.surfaces.filter(
+    (s) => s.status === 'OUT_OF_SERVICE' || (s.photos || []).some((p) => p.type === 'DAMAGE') || s.note?.includes('ZÁVADA')
+  );
+  const hasDamagedSurfaces = damagedSurfaces.length > 0;
+  const isDamaged = (damagePhotos.length > 0 || hasDamageNote || hasDamagedSurfaces) && !damageResolved;
 
-  const handleResolveDamage = async () => {
+  const handleResolveDamage = async (surfaceId?: string) => {
     setResolvingDamage(true);
     try {
-      const cleanedNote = (carrier.note || '')
-        .replace(/\[ZÁVADA:[^\]]+\]/g, '')
-        .replace(/ZÁVADA:[^\n]+/g, '')
-        .trim();
-
-      await fetch(`/api/carriers/${carrier.id}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/carriers/${carrier.id}/resolve-damage`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: cleanedNote }),
+        body: JSON.stringify({ surfaceId }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Nepodařilo se označit závadu jako opravenou.');
+      }
 
       setDamageResolved(true);
       window.location.reload();
     } catch (err) {
       console.error('Failed to resolve damage:', err);
+      alert(err instanceof Error ? err.message : 'Nepodařilo se označit závadu jako opravenou.');
     } finally {
       setResolvingDamage(false);
     }
@@ -355,13 +360,26 @@ export function CarrierDetail({
             )}
           </div>
 
+          {damagedSurfaces.length > 0 && (
+            <div className="text-xs text-rose-200 bg-rose-900/50 p-2.5 rounded-xl border border-rose-800/80 flex flex-wrap items-center gap-2">
+              <span className="font-bold text-white">Dotčené reklamní plochy se závadou:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {damagedSurfaces.map((s) => (
+                  <span key={s.id} className="bg-rose-950 px-2 py-0.5 rounded-md border border-rose-700 text-rose-200 font-bold text-[11px]">
+                    {s.name} {s.status === 'OUT_OF_SERVICE' ? '(Mimo provoz)' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="pt-2 border-t border-rose-800/80 flex flex-wrap items-center justify-between gap-3">
             <span className="text-2xs text-rose-300 font-medium">
               🛠️ Karta vyžaduje výjezd servisu nebo výměnu poškozené části.
             </span>
             <button
               type="button"
-              onClick={handleResolveDamage}
+              onClick={() => handleResolveDamage()}
               disabled={resolvingDamage}
               className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
@@ -529,42 +547,84 @@ export function CarrierDetail({
         <h3 className="mb-2 font-bold text-slate-900 text-sm">Evidované reklamní plochy & Klienti</h3>
         {carrier.surfaces.length > 0 ? (
           <div className="grid gap-2 text-xs md:grid-cols-2">
-            {carrier.surfaces.map((surface) => (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-2" key={surface.id}>
-                <div>
-                  <p className="font-bold text-slate-950">{surface.name}</p>
-                  <p className="text-slate-500 mt-0.5">
-                    {mediaTypeLabel(surface.mediaType)} · Klient: <strong className="text-slate-800">{surface.currentClient?.name ?? 'bez klienta'}</strong>
-                  </p>
+            {carrier.surfaces.map((surface) => {
+              const isSurfaceDamaged =
+                surface.status === 'OUT_OF_SERVICE' ||
+                (surface.photos || []).some((p) => p.type === 'DAMAGE') ||
+                surface.note?.includes('ZÁVADA');
+
+              return (
+                <div
+                  className={`rounded-xl border p-3 flex items-center justify-between gap-2 transition ${
+                    isSurfaceDamaged
+                      ? 'border-rose-400 bg-rose-50/70 ring-1 ring-rose-200'
+                      : 'border-slate-200 bg-slate-50'
+                  }`}
+                  key={surface.id}
+                >
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-bold text-slate-950">{surface.name}</p>
+                      {isSurfaceDamaged && (
+                        <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-100 border border-rose-200">
+                          <AlertTriangle size={11} />
+                          Závada
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-slate-500 mt-0.5">
+                      {mediaTypeLabel(surface.mediaType)} · Klient: <strong className="text-slate-800">{surface.currentClient?.name ?? 'bez klienta'}</strong>
+                    </p>
+                    {surface.note && (
+                      <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 italic">
+                        {surface.note}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge value={surface.status} />
+
+                    {/* Quick action: resolve damage / restore to service directly on the damaged surface */}
+                    {isSurfaceDamaged && (
+                      <button
+                        type="button"
+                        onClick={() => handleResolveDamage(surface.id)}
+                        disabled={resolvingDamage}
+                        className="rounded-lg px-2.5 py-1 text-[11px] font-extrabold bg-emerald-600 text-white hover:bg-emerald-500 shadow-2xs transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        title="Označit tuto reklamní plochu jako opravenou a uvést do provozu"
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>{resolvingDamage ? 'Ukládám...' : 'Označit opravené'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleSurface({
+                          id: surface.id,
+                          name: surface.name,
+                          carrierId: carrier.id,
+                          carrierCode: carrier.code,
+                          carrierName: carrier.name,
+                          city: carrier.city,
+                          price: surface.price,
+                          mediaType: surface.mediaType,
+                          photoUrl: surface.photos?.[0]?.url,
+                        })
+                      }
+                      className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
+                        isSurfaceSelected(surface.id)
+                          ? 'bg-sky-500 text-slate-950 hover:bg-sky-400'
+                          : 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
+                      }`}
+                    >
+                      {isSurfaceSelected(surface.id) ? '✓ V nabídce' : '📋 + Nabídka'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge value={surface.status} />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toggleSurface({
-                        id: surface.id,
-                        name: surface.name,
-                        carrierId: carrier.id,
-                        carrierCode: carrier.code,
-                        carrierName: carrier.name,
-                        city: carrier.city,
-                        price: surface.price,
-                        mediaType: surface.mediaType,
-                        photoUrl: surface.photos?.[0]?.url,
-                      })
-                    }
-                    className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
-                      isSurfaceSelected(surface.id)
-                        ? 'bg-sky-500 text-slate-950 hover:bg-sky-400'
-                        : 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
-                    }`}
-                  >
-                    {isSurfaceSelected(surface.id) ? '✓ V nabídce' : '📋 + Nabídka'}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="text-xs text-slate-500">Žádné evidované plochy.</p>

@@ -219,9 +219,38 @@ export function CarrierDetailTimelineView({
                     </span>
                     <h3 className="mt-1 text-base font-extrabold text-slate-900">{s.name}</h3>
                   </div>
-                  <span className="rounded-xl bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-800 border border-emerald-200">
-                    {s.currentClient ? 'Obsazeno' : 'Volná k pronájmu'}
-                  </span>
+                  {s.status === 'OUT_OF_SERVICE' ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="rounded-xl bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-800 border border-rose-300">
+                        ⚠️ Mimo provoz / Závada
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/carriers/${carrier.id}/resolve-damage`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ surfaceId: s.id }),
+                            });
+                            if (!res.ok) throw new Error('Nepodařilo se označit plochu jako opravenou');
+                            router.refresh();
+                            window.location.reload();
+                          } catch (e) {
+                            alert(e instanceof Error ? e.message : 'Chyba při označení opravy');
+                          }
+                        }}
+                        className="rounded-xl bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white hover:bg-emerald-500 shadow-2xs transition cursor-pointer"
+                        title="Označit tuto plochu jako opravenou a uvést do provozu"
+                      >
+                        ✓ Opraveno
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="rounded-xl bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-800 border border-emerald-200">
+                      {s.currentClient ? 'Obsazeno' : 'Volná k pronájmu'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="space-y-2 text-xs text-slate-700">
