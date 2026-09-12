@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, X, Loader2, CheckCircle2, Sparkles, Minus, Plus } from 'lucide-react';
+import { Camera, X, Loader2, CheckCircle2, Sparkles, Minus, Plus, AlertCircle } from 'lucide-react';
 import { compressImageFile } from '@/lib/image-compress';
 
 interface DetectedItem {
@@ -29,6 +29,8 @@ export function WarehousePhotoScannerModal({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [detectedItems, setDetectedItems] = useState<DetectedItem[]>([]);
+  const [unmatchedList, setUnmatchedList] = useState<string[]>([]);
+  const [catalogList, setCatalogList] = useState<Array<{ id: string; name: string; unit: string }>>([]);
   const [workOrderId, setWorkOrderId] = useState('');
   const [assignedEmployeeId, setAssignedEmployeeId] = useState('');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -61,8 +63,14 @@ export function WarehousePhotoScannerModal({
       if (!res.ok) throw new Error(data.error || 'Rozpoznání fotky selhalo.');
 
       setDetectedItems(data.detectedItems || []);
+      setUnmatchedList(data.unmatchedItems || []);
+      if (Array.isArray(data.catalogItems)) {
+        setCatalogList(data.catalogItems);
+      }
       if (Array.isArray(data.unmatchedItems) && data.unmatchedItems.length > 0) {
-        setError(`${data.unmatchedItems.length} položek se nepodařilo bezpečně spárovat se skladem a nebudou vydány.`);
+        if (!data.detectedItems || data.detectedItems.length === 0) {
+          setError(`${data.unmatchedItems.length} položek se nepodařilo spárovat automaticky. Můžete je přiřadit níže.`);
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Chyba při rozpoznávání fotky.');
@@ -272,6 +280,58 @@ export function WarehousePhotoScannerModal({
                     </select>
                   </label>
                 )}
+              </div>
+            )}
+
+            {/* Unmatched Items Manual Assignment */}
+            {unmatchedList.length > 0 && (
+              <div className="space-y-2 border border-amber-200 bg-amber-50/70 p-3 rounded-2xl mt-3">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                  <AlertCircle size={15} className="text-amber-700 shrink-0" />
+                  <span>Nespárované položky z fotky ({unmatchedList.length}):</span>
+                </div>
+                <p className="text-[11px] text-amber-800">
+                  Tyto položky AI na fotce rozpoznala, ale nepřiřadila automaticky. Můžete je přiřadit ke skladové položce ručně:
+                </p>
+                <div className="space-y-2">
+                  {unmatchedList.map((unmatchedName, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2.5 rounded-xl border border-amber-200 text-xs shadow-xs"
+                    >
+                      <span className="font-bold text-slate-800 truncate">🔍 {unmatchedName}</span>
+                      <select
+                        className="input text-xs py-1.5 font-medium border-slate-300 rounded-lg max-w-xs"
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          if (!selectedId) return;
+                          const catItem = catalogList.find((c) => c.id === selectedId);
+                          if (catItem) {
+                            setDetectedItems((prev) => [
+                              ...prev,
+                              {
+                                itemId: catItem.id,
+                                name: catItem.name,
+                                unit: catItem.unit,
+                                detectedQty: 1,
+                              },
+                            ]);
+                            setUnmatchedList((prev) => prev.filter((_, i) => i !== idx));
+                            setError(null);
+                          }
+                        }}
+                        defaultValue=""
+                      >
+                        <option value="">-- Přiřadit ke skladové položce --</option>
+                        {catalogList.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.unit})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
