@@ -61,6 +61,23 @@ export function buildProposedActions(input: {
     });
   }
 
+  // 1b. Zakázka: Propojit s identifikovanou zakázkou
+  if (entities.crmOrderId) {
+    const orderLabel = entities.orderNumber
+      ? `${entities.orderNumber}${entities.orderTitle ? ` – ${entities.orderTitle}` : ''}`
+      : 'nalezenou zakázkou';
+    actions.push({
+      type: 'LINK_CRM_ORDER',
+      title: `Propojit se zakázkou: ${entities.orderNumber || 'ZAK'}`,
+      description: `Spáruje tento e-mail a veškerou jeho komunikaci k zakázce ${orderLabel}.`,
+      confidence: 0.96,
+      payload: {
+        crmOrderId: entities.crmOrderId,
+        navigationOrderId: entities.navigationOrderId || null,
+      },
+    });
+  }
+
   // 2. Podle typu klasifikace
   switch (analysis.classification) {
     case 'NEW_INQUIRY': {

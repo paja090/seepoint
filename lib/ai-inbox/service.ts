@@ -94,17 +94,26 @@ export async function syncMailbox(
 
   const filterMode = options?.syncFilter || (existingSettings.syncFilter as string) || 'INBOX_ONLY';
   const label = options?.syncLabel || (existingSettings.syncLabel as string) || 'SeePoint AI';
+  const preset = options?.preset;
+  const customQuery = options?.query?.trim();
 
   let query = '-label:SPAM -label:TRASH';
-  if (filterMode === 'INBOX_ONLY') {
+  if (customQuery) {
+    query = `${customQuery} -label:SPAM -label:TRASH`;
+  } else if (preset === 'ORDERS_ONLY') {
+    query = '(zakázka OR nabídka OR objednávka OR poptávka OR faktura OR ZAK- OR NAV- OR kalkulace OR schválení) -label:SPAM -label:TRASH';
+  } else if (filterMode === 'INBOX_ONLY') {
     query = 'label:INBOX -label:SPAM -label:TRASH';
   } else if (filterMode === 'LABEL_ONLY') {
     query = `label:"${label}"`;
   }
 
+  const defaultMax = (preset === 'ORDERS_ONLY' || customQuery) ? 50 : 25;
+  const maxResults = Math.min(Math.max(options?.maxResults || defaultMax, 5), 100);
+
   try {
     const accessToken = await getGmailAccessToken(connectionId);
-    const listResult = await listGmailMessages(accessToken, { query, maxResults: 15 });
+    const listResult = await listGmailMessages(accessToken, { query, maxResults });
     const messages = listResult.messages || [];
 
     const ingested = [];
@@ -197,6 +206,10 @@ export async function listAiInboxMessages(organizationId: string, filters?: AiIn
       { fromName: { contains: q, mode: 'insensitive' } },
       { textBody: { contains: q, mode: 'insensitive' } },
       { aiSummary: { contains: q, mode: 'insensitive' } },
+      { client: { name: { contains: q, mode: 'insensitive' } } },
+      { crmOrder: { orderNumber: { contains: q, mode: 'insensitive' } } },
+      { crmOrder: { title: { contains: q, mode: 'insensitive' } } },
+      { offer: { title: { contains: q, mode: 'insensitive' } } },
     ];
   }
 
@@ -237,7 +250,7 @@ export async function listAiInboxMessages(organizationId: string, filters?: AiIn
 }
 
 export async function getAiInboxMessageDetail(organizationId: string, messageId: string) {
-  return prisma.aiInboxMessage.findFirst({
+  const message = await prisma.aiInboxMessage.findFirst({
     where: { id: messageId, organizationId },
     include: {
       integrationConnection: {
@@ -271,6 +284,51 @@ export async function getAiInboxMessageDetail(organizationId: string, messageId:
       },
     },
   });
+
+  if (!message) return null;
+
+  let activeClientOrders: Array<{
+    id: string;
+    orderNumber: string;
+    title: string;
+    status: string;
+    projectType: string;
+    isNavigation: boolean;
+  }> = [];
+
+  if (message.clientId) {
+    const orders = await prisma.crmOrder.findMany({
+      where: {
+        organizationId,
+        clientId: message.clientId,
+        status: { notIn: ['CANCELLED'] },
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+        title: true,
+        status: true,
+        projectType: true,
+        navigationOrder: { select: { id: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+    });
+
+    activeClientOrders = orders.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      title: o.title,
+      status: o.status,
+      projectType: o.projectType,
+      isNavigation: Boolean(o.navigationOrder),
+    }));
+  }
+
+  return {
+    ...message,
+    activeClientOrders,
+  };
 }
 
 export async function processAiInboxMessage(organizationId: string, messageId: string) {
@@ -314,6 +372,8 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
       subject: msg.subject,
       textBody: msg.textBody,
       clientId: bestClient?.id,
+      extractedOrderNumber: analysis.extractedOrderNumber,
+      extractedClientOrderCode: analysis.extractedClientOrderCode,
     });
 
     const proposedActions = buildProposedActions({

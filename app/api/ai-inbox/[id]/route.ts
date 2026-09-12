@@ -53,6 +53,9 @@ export async function PATCH(
 
   const body = await request.json() as {
     clientId?: string | null;
+    crmOrderId?: string | null;
+    offerId?: string | null;
+    navigationOrderId?: string | null;
     requiresReview?: boolean;
     processingStatus?: AiInboxStatus;
   };
@@ -65,10 +68,35 @@ export async function PATCH(
     return NextResponse.json({ error: 'Zpráva nebyla nalezena.' }, { status: 404 });
   }
 
+  let targetClientId = body.clientId;
+  let targetOfferId = body.offerId;
+  let targetNavigationOrderId = body.navigationOrderId;
+
+  if (body.crmOrderId) {
+    const linkedOrder = await prisma.crmOrder.findFirst({
+      where: { id: body.crmOrderId, organizationId },
+      select: { clientId: true, offerId: true, navigationOrder: { select: { id: true } } },
+    });
+    if (linkedOrder) {
+      if (targetClientId === undefined && !existing.clientId) {
+        targetClientId = linkedOrder.clientId;
+      }
+      if (targetOfferId === undefined && linkedOrder.offerId) {
+        targetOfferId = linkedOrder.offerId;
+      }
+      if (targetNavigationOrderId === undefined && linkedOrder.navigationOrder) {
+        targetNavigationOrderId = linkedOrder.navigationOrder.id;
+      }
+    }
+  }
+
   const updated = await prisma.aiInboxMessage.update({
     where: { id: params.id },
     data: {
-      clientId: body.clientId !== undefined ? body.clientId : undefined,
+      clientId: targetClientId !== undefined ? targetClientId : undefined,
+      crmOrderId: body.crmOrderId !== undefined ? body.crmOrderId : undefined,
+      offerId: targetOfferId !== undefined ? targetOfferId : undefined,
+      navigationOrderId: targetNavigationOrderId !== undefined ? targetNavigationOrderId : undefined,
       requiresReview: body.requiresReview !== undefined ? body.requiresReview : undefined,
       processingStatus: body.processingStatus !== undefined ? body.processingStatus : undefined,
     },

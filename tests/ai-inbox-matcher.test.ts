@@ -81,3 +81,26 @@ test('client matcher cascade implements priority tiers in client-matcher.ts', ()
   assert.match(matcherSource, /5\. Normalizovaný název firmy/);
   assert.match(matcherSource, /6\. Částečná shoda pro nabídku alternativních kandidátů/);
 });
+
+test('ORDER_NUMBER_REGEX and NAV_NUMBER_REGEX match flexible Czech order formats', () => {
+  // Variations with spaces, slashes and prefixes
+  const match1 = 'Zasíláme podklady k zakázce ZAK 2026/0002'.match(ORDER_NUMBER_REGEX);
+  assert.ok(match1);
+  assert.equal(match1[1].replace(/\s+/g, '-').replace(/\//g, '-').toUpperCase(), 'ZAK-2026-0002');
+
+  const match2 = 'Dotaz na průběh TEST-NAV-2026-001'.match(ORDER_NUMBER_REGEX);
+  assert.ok(match2);
+  assert.equal(match2[1].toUpperCase(), 'TEST-NAV-2026-001');
+
+  const matchNav = 'Navigace pro pobočku NAV 2026/0045'.match(NAV_NUMBER_REGEX);
+  assert.ok(matchNav);
+  assert.equal(matchNav[1].replace(/\s+/g, '-').replace(/\//g, '-').toUpperCase(), 'NAV-2026-0045');
+});
+
+test('entity-matcher implements client active orders and client PO code matching', () => {
+  const matcherSource = readFileSync(new URL('../lib/ai-inbox/entity-matcher.ts', import.meta.url), 'utf8');
+  assert.match(matcherSource, /clientOrderCode/);
+  assert.match(matcherSource, /7\. Pokud je znám klient, dohledat jeho aktivní zakázky/);
+  assert.match(matcherSource, /candidateOrders/);
+  assert.match(matcherSource, /titleMatchedOrder/);
+});

@@ -20,9 +20,21 @@ export async function POST(request: Request) {
   }
 
   let connectionId: string | undefined;
+  let query: string | undefined;
+  let preset: 'INBOX' | 'ORDERS_ONLY' | 'ALL' | undefined;
+  let maxResults: number | undefined;
+
   try {
-    const body = await request.json() as { connectionId?: string };
+    const body = await request.json() as {
+      connectionId?: string;
+      query?: string;
+      preset?: 'INBOX' | 'ORDERS_ONLY' | 'ALL';
+      maxResults?: number;
+    };
     if (body.connectionId) connectionId = body.connectionId;
+    if (body.query) query = body.query;
+    if (body.preset) preset = body.preset;
+    if (body.maxResults) maxResults = body.maxResults;
   } catch {
     // optional body
   }
@@ -52,10 +64,15 @@ export async function POST(request: Request) {
 
     const syncResults = [];
     for (const cId of connectionsToSync) {
-      const syncResult = await syncMailbox(organizationId, cId);
-      // Spustit AI analýzu na nově stažených zprávách
+      const syncResult = await syncMailbox(organizationId, cId, {
+        query,
+        preset,
+        maxResults,
+      });
+
+      // Spustit AI analýzu na nově stažených nebo dosud nezpracovaných zprávách
       for (const item of syncResult.ingested) {
-        if (!item.isDuplicate && item.message.id) {
+        if (item.message.id && (!item.isDuplicate || item.message.processingStatus === 'INGESTED')) {
           try {
             await processAiInboxMessage(organizationId, item.message.id);
           } catch (procErr) {

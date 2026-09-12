@@ -66,6 +66,8 @@ export type AiInboxAnalysisResult = {
   reasoningSummary?: string;
   suggestedReply?: string;
   detectedChanges?: DetectedChangeItem[];
+  extractedOrderNumber?: string | null;
+  extractedClientOrderCode?: string | null;
 };
 
 export type RawInboundMessageAttachment = {
@@ -106,10 +108,22 @@ export type MatchedClientCandidate = {
   contactName?: string;
 };
 
+export type CandidateOrderSummary = {
+  id: string;
+  orderNumber: string;
+  title: string;
+  status: string;
+  projectType?: string;
+  isNavigation?: boolean;
+};
+
 export type MatchedEntityResult = {
   client: MatchedClientCandidate | null;
   candidateClients: MatchedClientCandidate[];
   crmOrderId?: string | null;
+  orderNumber?: string | null;
+  orderTitle?: string | null;
+  candidateOrders?: CandidateOrderSummary[];
   offerId?: string | null;
   navigationOrderId?: string | null;
   salesOpportunityId?: string | null;
@@ -119,6 +133,9 @@ export type MatchedEntityResult = {
 export type MailboxSyncSettings = {
   syncFilter?: 'ALL' | 'INBOX_ONLY' | 'LABEL_ONLY';
   syncLabel?: string;
+  preset?: 'INBOX' | 'ORDERS_ONLY' | 'ALL';
+  query?: string;
+  maxResults?: number;
   ignoreSpamAndPromotions?: boolean;
   lastSyncAt?: string | null;
   lastHistoryId?: string | null;
