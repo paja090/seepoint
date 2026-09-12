@@ -33,6 +33,12 @@ export function middleware(request: NextRequest) {
     || publicPathPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   if (isPublicPath) return NextResponse.next();
   if (!request.cookies.has(SESSION_COOKIE)) {
+    if (path === '/api/integrations/google/connect') {
+      return NextResponse.redirect(new URL('/login?returnTo=/settings/integrations', request.url));
+    }
+    if (path === '/api/integrations/google/callback') {
+      return NextResponse.redirect(new URL('/settings/integrations?google=error', request.url));
+    }
     if (path.startsWith('/api/')) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
     return NextResponse.redirect(new URL('/login', request.url));
   }
