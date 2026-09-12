@@ -71,6 +71,7 @@ export async function runOccupancyAudit(
       city: true,
       region: true,
       status: true,
+      type: true,
       surfaces: {
         select: {
           id: true,
@@ -78,24 +79,34 @@ export async function runOccupancyAudit(
           status: true,
           mediaType: true,
           currentClientId: true,
+          contractId: true,
         },
       },
     },
   });
 
-  const allSurfaces = carriers.flatMap((c) =>
-    c.surfaces.map((s) => ({
-      ...s,
-      carrier: {
-        id: c.id,
-        code: c.code,
-        name: c.name,
-        city: c.city,
-        region: c.region,
-        status: c.status,
-      },
-    }))
-  );
+  const allSurfaces = carriers
+    .flatMap((c) =>
+      c.surfaces.map((s) => ({
+        ...s,
+        carrier: {
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          city: c.city,
+          region: c.region,
+          status: c.status,
+          type: c.type,
+        },
+      }))
+    )
+    .filter((s) => {
+      if (!profile.preferredMediaTypes?.length) return true;
+      return (
+        profile.preferredMediaTypes.includes(s.mediaType) ||
+        profile.preferredMediaTypes.includes(s.carrier.type)
+      );
+    });
 
   const surfaceIds = allSurfaces.map((s) => s.id);
   const surfaceMap = new Map(allSurfaces.map((s) => [s.id, s]));
@@ -188,6 +199,10 @@ export async function runOccupancyAudit(
       (o) => o.status !== 'FINISHED' && o.status !== 'CANCELLED'
     );
 
+    const isNavigation =
+      surface.mediaType === 'NAVIGATION_SIGN' ||
+      surface.carrier.type === 'NAVIGATION';
+
     // RULE 1: MISSING_DATA (Invalid dates or missing references)
     if (profile.checkMissingData) {
       for (const occ of occs) {
@@ -256,25 +271,33 @@ export async function runOccupancyAudit(
 
     // RULE 3: STATUS_MISMATCH (Surface status vs Calendar snapshot)
     if (profile.checkStatusMismatch && surface.status !== 'OUT_OF_SERVICE') {
-      const expectedSnapshot = getSurfaceAvailabilityState(occs, now);
-      if (surface.status !== expectedSnapshot.status) {
-        rawFindings.push({
-          type: 'STATUS_MISMATCH',
-          severity: 'HIGH',
-          fingerprint: `${organizationId}:STATUS_MISMATCH:${surface.id}`,
-          surfaceId: surface.id,
-          carrierId: surface.carrier.id,
-          occupancyId: expectedSnapshot.activeOccupancyId,
-          clientId: expectedSnapshot.currentClientId,
-          title: `Neshoda stavu plochy: ${surface.name}`,
-          deterministicReason: `Plocha ${surface.name} má v inventáři stav '${surface.status}', ale k dnešnímu dni by měla mít stav '${expectedSnapshot.status}'. ${expectedSnapshot.activeOccupancyId ? `Aktivní kampaň trvá do ${expectedSnapshot.currentRentEnd?.toISOString().slice(0, 10)}.` : 'Dnes na ploše žádná kampaň neprobíhá.'}`,
-          suggestedActionType: 'SYNC_STATUS',
-          metadata: {
-            currentStatus: surface.status,
-            expectedStatus: expectedSnapshot.status,
-            activeOccupancyId: expectedSnapshot.activeOccupancyId,
-          },
-        });
+      // In OOH, navigation signs represent long-term infrastructure with annual or indefinite leases.
+      // If a navigation sign is marked 'OCCUPIED' or has a client/contract assigned, it is legitimately occupied
+      // even if no short-term calendar entries are created.
+      const isOngoingNavigationInstallation =
+        isNavigation && (surface.status === 'OCCUPIED' || Boolean(surface.currentClientId) || Boolean(surface.contractId));
+
+      if (!isOngoingNavigationInstallation) {
+        const expectedSnapshot = getSurfaceAvailabilityState(occs, now);
+        if (surface.status !== expectedSnapshot.status) {
+          rawFindings.push({
+            type: 'STATUS_MISMATCH',
+            severity: 'HIGH',
+            fingerprint: `${organizationId}:STATUS_MISMATCH:${surface.id}`,
+            surfaceId: surface.id,
+            carrierId: surface.carrier.id,
+            occupancyId: expectedSnapshot.activeOccupancyId,
+            clientId: expectedSnapshot.currentClientId,
+            title: `Neshoda stavu plochy: ${surface.name}`,
+            deterministicReason: `Plocha ${surface.name} má v inventáři stav '${surface.status}', ale k dnešnímu dni by měla mít stav '${expectedSnapshot.status}'. ${expectedSnapshot.activeOccupancyId ? `Aktivní kampaň trvá do ${expectedSnapshot.currentRentEnd?.toISOString().slice(0, 10)}.` : 'Dnes na ploše žádná kampaň neprobíhá.'}`,
+            suggestedActionType: 'SYNC_STATUS',
+            metadata: {
+              currentStatus: surface.status,
+              expectedStatus: expectedSnapshot.status,
+              activeOccupancyId: expectedSnapshot.activeOccupancyId,
+            },
+          });
+        }
       }
     }
 
@@ -282,6 +305,12 @@ export async function runOccupancyAudit(
     for (const occ of activeOccs) {
       const toTime = normalizeDateOnly(occ.dateTo).getTime();
       if (toTime < todayTime && ['OCCUPIED', 'RESERVED'].includes(occ.status)) {
+        // Navigation signs are annual rolling leases. If the surface is actively assigned
+        // to this client or still marked OCCUPIED, treat as an annual rolling lease, not an expired anomaly.
+        if (isNavigation && (surface.status === 'OCCUPIED' || surface.currentClientId === occ.clientId || surface.contractId)) {
+          continue;
+        }
+
         const dTo = normalizeDateOnly(occ.dateTo).toISOString().slice(0, 10);
         const daysPast = Math.round((todayTime - toTime) / (1000 * 60 * 60 * 24));
 
@@ -333,30 +362,37 @@ export async function runOccupancyAudit(
 
     // RULE 6: UNDERUTILIZED_MEDIA (Ležák - no active or scheduled occupancy in X days)
     if (profile.checkUnderutilizedMedia && surface.status !== 'OUT_OF_SERVICE') {
-      const cutoffTime = todayTime - profile.underutilizedAfterDays * 24 * 60 * 60 * 1000;
-      const recentOrFuture = occs.filter((o) => {
-        if (o.status === 'CANCELLED') return false;
-        const toTime = normalizeDateOnly(o.dateTo).getTime();
-        return toTime >= cutoffTime;
-      });
+      // An occupied navigation sign or one with an active client is not an underutilized ležák
+      const isOccupiedNavigation =
+        isNavigation && (surface.status === 'OCCUPIED' || Boolean(surface.currentClientId) || Boolean(surface.contractId));
 
-      if (recentOrFuture.length === 0) {
-        rawFindings.push({
-          type: 'UNDERUTILIZED_MEDIA',
-          severity: 'LOW',
-          fingerprint: `${organizationId}:UNDERUTILIZED_MEDIA:${surface.id}`,
-          surfaceId: surface.id,
-          carrierId: surface.carrier.id,
-          title: `Nevyužitá plocha (> ${profile.underutilizedAfterDays} dní): ${surface.name}`,
-          deterministicReason: `Plocha ${surface.name} v lokalitě ${surface.carrier.city} neměla žádnou kampaň více než ${profile.underutilizedAfterDays} dní a nemá naplánovanou žádnou budoucí rezervaci.`,
-          suggestedActionType: 'CREATE_OFFER',
-          metadata: { city: surface.carrier.city, mediaType: surface.mediaType },
+      if (!isOccupiedNavigation) {
+        const cutoffTime = todayTime - profile.underutilizedAfterDays * 24 * 60 * 60 * 1000;
+        const recentOrFuture = occs.filter((o) => {
+          if (o.status === 'CANCELLED') return false;
+          const toTime = normalizeDateOnly(o.dateTo).getTime();
+          return toTime >= cutoffTime;
         });
+
+        if (recentOrFuture.length === 0) {
+          rawFindings.push({
+            type: 'UNDERUTILIZED_MEDIA',
+            severity: 'LOW',
+            fingerprint: `${organizationId}:UNDERUTILIZED_MEDIA:${surface.id}`,
+            surfaceId: surface.id,
+            carrierId: surface.carrier.id,
+            title: `Nevyužitá plocha (> ${profile.underutilizedAfterDays} dní): ${surface.name}`,
+            deterministicReason: `Plocha ${surface.name} v lokalitě ${surface.carrier.city} neměla žádnou kampaň více než ${profile.underutilizedAfterDays} dní a nemá naplánovanou žádnou budoucí rezervaci.`,
+            suggestedActionType: 'CREATE_OFFER',
+            metadata: { city: surface.carrier.city, mediaType: surface.mediaType },
+          });
+        }
       }
     }
 
     // RULE 7: CALENDAR_GAP (Empty gap between two scheduled occupancies)
-    if (profile.checkCalendarGaps) {
+    // Only applies to campaign media (billboards, bigboards), not static navigation signs
+    if (profile.checkCalendarGaps && !isNavigation) {
       const futureOrCurrentOccs = activeOccs
         .filter((o) => normalizeDateOnly(o.dateTo).getTime() >= todayTime)
         .sort((a, b) => normalizeDateOnly(a.dateFrom).getTime() - normalizeDateOnly(b.dateFrom).getTime());
