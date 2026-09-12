@@ -16,6 +16,11 @@ test('integration credentials use authenticated encryption and reject the wrong 
   assert.equal(sealed.includes('tenant-a-secret'), false);
   assert.deepEqual(decryptIntegrationSecret(sealed, key), { refreshToken: 'tenant-a-secret' });
   assert.throws(() => decryptIntegrationSecret(sealed, randomBytes(32).toString('base64')));
+
+  // Test 32-char utf8 string and quoted keys
+  const utf8Key = '12345678901234567890123456789012';
+  const sealedUtf8 = encryptIntegrationSecret({ refreshToken: 'test' }, `"${utf8Key}"`);
+  assert.deepEqual(decryptIntegrationSecret(sealedUtf8, utf8Key), { refreshToken: 'test' });
 });
 
 test('Google OAuth state is signed, expires and binds organization with user', () => {
