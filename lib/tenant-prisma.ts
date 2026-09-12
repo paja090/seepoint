@@ -26,6 +26,7 @@ export const TENANT_MODEL_NAMES = [
   'OrganizationRadarProfile', 'RadarSignal', 'RadarRun', 'RadarFeedback',
   'ImportProfile', 'ImportBatchSheet', 'ImportRow', 'OrganizationEmailSettings', 'EmailLog',
   'AiInboxMessage', 'AiInboxAttachment', 'AiInboxAction',
+  'OrganizationOccupancyAIProfile', 'OccupancyInsight',
 ] as const;
 
 // Platform identity bootstrap must resolve memberships before tenant context exists.

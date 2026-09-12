@@ -3,6 +3,7 @@ import { carrierMapColor } from './carrier-map.ts';
 import type { Carrier, CarrierType, GpsStatus, MediaType, Occupancy, OccupancyStatus, Surface, SurfaceStatus } from './types';
 import { deriveSurfaceOccupancyState } from './occupancy';
 import { tenantPrismaExtension } from './tenant-prisma';
+import { findSurfaceConflicts } from './occupancy/availability-service';
 
 const globalForPrisma = globalThis as unknown as { platformPrisma?: PrismaClient };
 const getDbUrl = () => {
@@ -497,7 +498,29 @@ export async function getOccupancyOverview(filters: OccupancyFilters = {}) {
   return { rows, ending7: activeRows.filter((row) => row.occupancy && parseDateInput(row.occupancy.dateTo)! <= in7), ending30: activeRows.filter((row) => row.occupancy && parseDateInput(row.occupancy.dateTo)! <= in30), available: rows.filter((row) => !row.occupancy && row.surface.status === 'AVAILABLE'), reserved: rows.filter((row) => row.occupancy?.status === 'RESERVED'), negotiation: rows.filter((row) => row.occupancy?.status === 'NEGOTIATION'), occupied: rows.filter((row) => row.occupancy?.status === 'OCCUPIED') };
 }
 
-export async function checkOccupancyConflicts(surfaceIds: string[], dateFromInput: string, dateToInput: string, ignoreOccupancyId?: string): Promise<OccupancyConflict[]> { const dateFrom = parseDateInput(dateFromInput); const dateTo = parseDateInput(dateToInput); if (!dateFrom || !dateTo || dateFrom > dateTo || surfaceIds.length === 0) return []; const conflicts = await prisma.occupancy.findMany({ where: { surfaceId: { in: surfaceIds }, id: ignoreOccupancyId ? { not: ignoreOccupancyId } : undefined, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] }, ...overlaps(dateFrom, dateTo) }, include: { surface: { include: { carrier: true } } }, orderBy: { dateFrom: 'asc' } }); return conflicts.map((conflict) => ({ surfaceId: conflict.surfaceId, surfaceName: conflict.surface.name, carrierName: conflict.surface.carrier.name, carrierCode: conflict.surface.carrier.code, status: conflict.status, clientName: conflict.clientName, campaignName: conflict.campaignName, dateFrom: dateOnly(conflict.dateFrom)!, dateTo: dateOnly(conflict.dateTo)!, severity: conflict.status === 'OCCUPIED' || conflict.status === 'RESERVED' ? 'block' : 'warning' })); }
+export async function checkOccupancyConflicts(surfaceIds: string[], dateFromInput: string, dateToInput: string, ignoreOccupancyId?: string): Promise<OccupancyConflict[]> {
+  const map = await findSurfaceConflicts(surfaceIds, dateFromInput, dateToInput, {
+    excludeOccupancyId: ignoreOccupancyId,
+  });
+  const allConflicts: OccupancyConflict[] = [];
+  for (const res of map.values()) {
+    for (const c of [...res.hardConflicts, ...res.softConflicts]) {
+      allConflicts.push({
+        surfaceId: c.surfaceId,
+        surfaceName: c.surfaceName,
+        carrierName: c.carrierName,
+        carrierCode: c.carrierCode,
+        status: c.status,
+        clientName: c.clientName,
+        campaignName: c.campaignName,
+        dateFrom: c.dateFrom,
+        dateTo: c.dateTo,
+        severity: c.severity === 'block' ? 'block' : 'warning',
+      });
+    }
+  }
+  return allConflicts;
+}
 export function hasBlockingConflict(conflicts: OccupancyConflict[]) { return conflicts.some((conflict) => conflict.severity === 'block'); }
 export async function upsertCarrier(input: Partial<Carrier>, surfaceTemplates: SurfaceTemplate[] = []): Promise<Carrier> { const existing = input.id ? await prisma.advertisingCarrier.findUnique({ where: { id: input.id } }) : null; const latitude = input.latitude ?? existing?.latitude ?? null; const longitude = input.longitude ?? existing?.longitude ?? null; const data = { name: input.name ?? existing?.name ?? 'Novy nosic', code: input.code ?? existing?.code ?? `NEW-${Date.now()}`, type: input.type ?? existing?.type ?? 'BILLBOARD', latitude, longitude, gpsStatus: input.gpsStatus ?? existing?.gpsStatus ?? (latitude === null || longitude === null ? 'MISSING' : 'UNVERIFIED'), street: input.street ?? existing?.street ?? null, address: input.address ?? existing?.address ?? null, locality: input.locality ?? existing?.locality ?? null, city: input.city ?? existing?.city ?? 'Praha', region: input.region ?? existing?.region ?? null, cadastralArea: input.cadastralArea ?? existing?.cadastralArea ?? null, structureCode: input.structureCode ?? existing?.structureCode ?? null, mountingType: input.mountingType ?? existing?.mountingType ?? 'UNKNOWN', status: input.status ?? existing?.status ?? 'ACTIVE', description: input.description ?? existing?.description ?? null, placementDescription: input.placementDescription ?? existing?.placementDescription ?? null, note: input.note ?? existing?.note ?? null, sourceSystem: input.sourceSystem ?? existing?.sourceSystem ?? null, sourceSheet: input.sourceSheet ?? existing?.sourceSheet ?? null, sourceRow: input.sourceRow ?? existing?.sourceRow ?? null }; const saved = existing ? await prisma.advertisingCarrier.update({ where: { id: existing.id }, data }) : await prisma.advertisingCarrier.create({ data: { ...data, id: input.id, surfaces: surfaceTemplates.length ? { create: surfaceTemplates.map((surface) => ({ name: surface.name, mediaType: surface.mediaType, orientation: surface.orientation ?? null, status: 'AVAILABLE' })) } : undefined } }); return (await getCarrier(saved.id))!; }
 export async function archiveCarrier(id: string, input: CarrierArchiveInput = {}) { await prisma.advertisingCarrier.update({ where: { id }, data: { archivedAt: new Date(), archivedBy: input.archivedBy?.trim() || null, archiveReason: input.archiveReason?.trim() || null, status: 'INACTIVE' } }); return (await getCarrier(id))!; }

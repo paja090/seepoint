@@ -1,3 +1,5 @@
+import { periodsOverlap, BLOCKING_OCCUPANCY_STATUSES } from '../occupancy/availability-service';
+
 export type AvailabilityOccupancy = { status: string; dateFrom: Date; dateTo: Date };
 
 export function hasBlockingCollision(
@@ -6,9 +8,8 @@ export function hasBlockingCollision(
   dateTo: Date,
 ) {
   return occupancies.some((row) =>
-    ['RESERVED', 'OCCUPIED'].includes(row.status)
-    && row.dateFrom <= dateTo
-    && row.dateTo >= dateFrom,
+    BLOCKING_OCCUPANCY_STATUSES.includes(row.status as any)
+    && periodsOverlap(row.dateFrom, row.dateTo, dateFrom, dateTo),
   );
 }
 
@@ -25,3 +26,4 @@ export function isSurfaceAvailable(input: {
     && !['RESERVED', 'OCCUPIED', 'OUT_OF_SERVICE'].includes(input.surfaceStatus)
     && !hasBlockingCollision(input.occupancies, input.dateFrom, input.dateTo);
 }
+
