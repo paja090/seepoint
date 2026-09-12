@@ -236,6 +236,7 @@ Vrať JSON objekt s přesně těmito poli:
 }
 
 export type GeminiWarehousePhotoItem = {
+  matchedCatalogItemId?: string | null;
   name: string;
   category: 'CONSUMABLE' | 'RETURNABLE';
   quantity: number;
@@ -247,13 +248,28 @@ export type GeminiWarehousePhotoItem = {
 /**
  * Real AI Vision model call to analyze warehouse/workshop photos
  */
-export async function analyzeWarehouseItemsFromPhotoWithGemini(imageBase64OrUrl: string): Promise<GeminiWarehousePhotoItem[]> {
+export async function analyzeWarehouseItemsFromPhotoWithGemini(
+  imageBase64OrUrl: string,
+  catalogContext?: Array<{ id: string; name: string; code?: string | null; unit?: string }>
+): Promise<GeminiWarehousePhotoItem[]> {
+  const catalogList = catalogContext && catalogContext.length > 0
+    ? `\nAKTUÁLNÍ KATALOG POLOŽEK NA SKLADĚ:
+${catalogContext.slice(0, 50).map((c) => `- ID: "${c.id}" | Název: "${c.name}"${c.code ? ` | Kód: ${c.code}` : ''} | Jednotka: ${c.unit || 'ks'}`).join('\n')}
+
+POKYNY K PÁROVÁNÍ SE SKLADEM:
+Pokud na fotografii vidíš předmět, který odpovídá některé položce z výše uvedeného katalogu skladu (např. značka lepidla jako Duvilax, Den Braven, aku nářadí DeWalt, žebřík Krause, metr CXS, pásky atd.):
+- Do pole "matchedCatalogItemId" uveď PŘESNÉ ID položky ze seznamu výše.
+- Jako "name" a "unit" přednostně uveď přesný název a jednotku z katalogu skladu.
+Pokud předmět v katalogu není, "matchedCatalogItemId" nastav na null.\n`
+    : '';
+
   const prompt = `Jsi AI specialista na rozpoznávání nářadí, montážního a skladového materiálu reklamní a stavební firmy. 
-Detailně prozkoumej přiloženou fotografii regálu, dílny nebo naloženého kufru auta.
-Identifikuj VŠECHNY viditelné předměty, produkty, balení, nářadí, měřidla, žebříky, lepidla, stahovací pásky, hmoždinky atd.
+Detailně prozkoumej přiloženou fotografii regálu, dílny, materiálu nebo naloženého kufru auta.
+Identifikuj VŠECHNY viditelné předměty, produkty, balení, nářadí, měřidla, žebříky, lepidla, stahovací pásky, hmoždinky atd.${catalogList}
 
 Pro každý nalezený předmět určete:
-- name: Přesný název předmětu v češtině (např. 'Svinovací metr 5m', 'Stahovací pásky 500mm', 'Montážní lepidlo Den Braven', 'Hliníkový žebřík 3x11', 'Aku vrtačka DeWalt')
+- matchedCatalogItemId: ID položky z katalogu skladu pokud byla spárována, jinak null
+- name: Přesný název předmětu v češtině (pokud odpovídá katalogu, použij název z katalogu)
 - category: Buď 'CONSUMABLE' (pokud jde o jednorázový/spotřební materiál jako pásky, lepidlo, pěna, hmoždinky, šrouby) nebo 'RETURNABLE' (pokud jde o vratné nářadí, měřidlo, žebřík, kufry s nářadím, aku stroje)
 - quantity: Počet viditelných kusů/balení (číslo)
 - unit: Jednotka v češtině ('ks', 'balení', 'sada', 'kbelík', 'kus')
@@ -264,6 +280,7 @@ Vrať výhradně platný JSON objekt v tomto formátu:
 {
   "items": [
     {
+      "matchedCatalogItemId": null,
       "name": "Svinovací metr 5m",
       "category": "RETURNABLE",
       "quantity": 1,
@@ -283,12 +300,13 @@ Vrať výhradně platný JSON objekt v tomto formátu:
     return items.map((rawItem) => {
       const i = rawItem && typeof rawItem === 'object' ? rawItem as Record<string, unknown> : {};
       return {
-      name: String(i.name || 'Předmět z fotky').trim(),
-      category: i.category === 'RETURNABLE' ? 'RETURNABLE' : 'CONSUMABLE',
-      quantity: Number(i.quantity) || 1,
-      unit: String(i.unit || 'ks').trim(),
-      location: String(i.location || 'Dílna / Regál').trim(),
-      note: String(i.note || 'Rozpoznáno AI Vision z fotky').trim(),
+        matchedCatalogItemId: typeof i.matchedCatalogItemId === 'string' && i.matchedCatalogItemId.trim() ? i.matchedCatalogItemId.trim() : null,
+        name: String(i.name || 'Předmět z fotky').trim(),
+        category: i.category === 'RETURNABLE' ? 'RETURNABLE' : 'CONSUMABLE',
+        quantity: Number(i.quantity) || 1,
+        unit: String(i.unit || 'ks').trim(),
+        location: String(i.location || 'Dílna / Regál').trim(),
+        note: String(i.note || 'Rozpoznáno AI Vision z fotky').trim(),
       };
     });
   }

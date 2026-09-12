@@ -39,21 +39,97 @@ export async function POST(request: Request) {
     const base64Data = `data:${file.type || 'image/jpeg'};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
 
     const { analyzeWarehouseItemsFromPhotoWithGemini } = await import('@/lib/ai-gemini');
-    const aiItems = await analyzeWarehouseItemsFromPhotoWithGemini(base64Data);
+    const aiItems = await analyzeWarehouseItemsFromPhotoWithGemini(base64Data, allItems);
 
     const detected: { itemId: string; name: string; unit: string; detectedQty: number; confidence: number }[] = [];
     const unmatchedItems: string[] = [];
 
+    function normalizeText(str: string): string {
+      return (str || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function getTokens(str: string): string[] {
+      const stopWords = new Set(['baleni', 'sada', 'kusu', 'kus', 'pro', 'cca', 'nebo', 'ks', 'mm', 'kg', 'duty']);
+      return normalizeText(str)
+        .split(' ')
+        .filter((t) => t.length >= 2 && !stopWords.has(t));
+    }
+
+    function matchItemToCatalog(aiName: string, matchedCatalogItemId?: string | null) {
+      // 1. Direct ID match from AI Vision
+      if (matchedCatalogItemId) {
+        const byId = allItems.find((c) => c.id === matchedCatalogItemId);
+        if (byId) return { ...byId, confidence: 0.98 };
+      }
+
+      const normAi = normalizeText(aiName);
+      if (!normAi) return null;
+
+      // 2. Direct code match
+      for (const item of allItems) {
+        if (item.code && normAi.includes(normalizeText(item.code))) {
+          return { ...item, confidence: 0.95 };
+        }
+      }
+
+      // 3. Exact or substring match (case and diacritics insensitive)
+      for (const item of allItems) {
+        const normDb = normalizeText(item.name);
+        if (normDb === normAi || normDb.includes(normAi) || normAi.includes(normDb)) {
+          return { ...item, confidence: 0.95 };
+        }
+      }
+
+      // 4. Token overlap and distinct brand/keyword matching
+      const aiTokens = getTokens(aiName);
+      if (aiTokens.length === 0) return null;
+
+      let bestMatch: (typeof allItems)[number] | null = null;
+      let highestScore = 0;
+
+      for (const item of allItems) {
+        const dbTokens = new Set(getTokens(item.name));
+        let matchCount = 0;
+        let distinctBonus = 0;
+
+        for (const token of aiTokens) {
+          if (dbTokens.has(token)) {
+            matchCount++;
+            const occurrences = allItems.filter((c) => getTokens(c.name).includes(token)).length;
+            if (occurrences === 1 && token.length >= 4) {
+              distinctBonus += 3;
+            } else if (occurrences <= 2) {
+              distinctBonus += 1;
+            }
+          }
+        }
+
+        if (matchCount > 0) {
+          const score = (matchCount / aiTokens.length) * 10 + distinctBonus;
+          if (score > highestScore && (matchCount >= 2 || distinctBonus >= 3)) {
+            highestScore = score;
+            bestMatch = item;
+          }
+        }
+      }
+
+      if (bestMatch) {
+        return { ...bestMatch, confidence: 0.9 };
+      }
+
+      return null;
+    }
+
     if (aiItems.length > 0) {
       for (const aiItem of aiItems) {
         const aiName = warehouseText(aiItem.name, 'Rozpoznaný název', 200, true)!;
-        const aiNameLower = aiName.toLowerCase();
-        // Try to match AI identified name with existing database items
-        const matchedDbItem = allItems.find(
-          (dbItem) =>
-            dbItem.name.toLowerCase().includes(aiNameLower) ||
-            aiNameLower.includes(dbItem.name.toLowerCase())
-        );
+        const matchedDbItem = matchItemToCatalog(aiName, aiItem.matchedCatalogItemId);
 
         if (matchedDbItem) {
           const detectedQty = warehouseNumber(aiItem.quantity, 'Rozpoznané množství');
@@ -62,7 +138,7 @@ export async function POST(request: Request) {
             name: matchedDbItem.name,
             unit: matchedDbItem.unit,
             detectedQty,
-            confidence: 0.95,
+            confidence: matchedDbItem.confidence,
           });
         } else {
           // Never bind an unknown AI result to an unrelated stock item.
@@ -92,6 +168,7 @@ export async function POST(request: Request) {
       success: true,
       detectedItems: detected,
       unmatchedItems,
+      catalogItems: allItems.map((i) => ({ id: i.id, name: i.name, unit: i.unit })),
       message: `AI bezpečně spárovala ${detected.length} položek se skladem${unmatchedItems.length ? `; ${unmatchedItems.length} nerozpoznaných položek nebylo možné vydat` : ''}.`,
     });
   } catch (error) {
