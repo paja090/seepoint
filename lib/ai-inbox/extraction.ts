@@ -2,6 +2,7 @@ import { logAIUsage, estimateGeminiFlashCostUsd } from '@/lib/ai-usage';
 import type {
   AiInboxAnalysisResult,
   AiInboxClassification,
+  ExtractedRequestData,
 } from './types';
 
 const VALID_CLASSIFICATIONS: Set<AiInboxClassification> = new Set([
@@ -87,16 +88,35 @@ Očekávaný výstup je POUZE a VÝHRADNĚ platný JSON objekt s těmito klíči
     "projectType": "NAVIGATION" | "STANDARD_MEDIA" | "CITY_GALLERY" | "OTHER",
     "location": string | null (město či oblast poptávky, např. "Opava"),
     "address": string | null (konkrétní adresa provozovny či realizace),
+    "cities": string[] (pole měst, např. ["Ostrava", "Opava"]),
+    "regions": string[] (pole krajů),
+    "requestedMediaTypes": string[] (např. ["BILLBOARD", "BIGBOARD", "NAVIGATION_SIGN", "CITYLIGHT"]),
     "requestedQuantity": {
       "min": number | null,
       "max": number | null,
       "exact": number | null
     } | null,
+    "dateFrom": string | null (přesné datum začátku YYYY-MM-DD, pouze pokud klient uvedl konkrétní den!),
+    "dateTo": string | null (přesné datum konce YYYY-MM-DD, pouze pokud klient uvedl konkrétní den!),
+    "datesClarity": "EXACT" | "APPROXIMATE" | "UNSPECIFIED",
+    "rawDateDescription": string | null (původní doslovný popis termínu, např. "někdy v listopadu", "od 1. června na 2 měsíce"),
+    "budget": {
+      "min": number | null,
+      "max": number | null,
+      "exact": number | null,
+      "currency": "CZK" | "EUR"
+    } | null,
     "openingDate": string | null (datum otevření ve formátu YYYY-MM-DD nebo null),
     "deadline": string | null (termín realizace ve formátu YYYY-MM-DD nebo null),
     "specificRequirements": string[] (seznam klíčových požadavků, např. ["trasa od dálnice", "8-12 tabulí", "dodat logo"]),
+    "missingRequirements": string[] (např. ["EXACT_DATES", "LOCATION", "QUANTITY"]),
     "notes": string | null
   } | null,
+  
+  DŮLEŽITÉ PRAVIDLO PRO TERMÍNY (ZÁKAZ DOMÝŠLENÍ):
+  - Pokud klient napíše pouze přibližný termín (např. "někdy v listopadu", "na podzim", "co nejdříve", "na 2 měsíce"), NIKDY si nevymýšlej přesný den! V takovém případě nastav dateFrom: null, dateTo: null, datesClarity: "APPROXIMATE", rawDateDescription: přesný text klienta, a do missingRequirements přidej "EXACT_DATES".
+  - Pouze pokud je uveden konkrétní den (např. "od 1.11.2026"), zapiš dateFrom: "2026-11-01" a datesClarity: "EXACT".
+  - Pokud termín vůbec nezmínil, nastav datesClarity: "UNSPECIFIED".
   "summary": string (stručné české shrnutí zprávy pro obchodníka, max 2 věty),
   "reasoningSummary": string (stručné vysvětlení, proč byla zvolena daná klasifikace a akce),
   "suggestedReply": string (profesionální, zdvořilý návrh české odpovědi oslovující klienta a potvrzující přijetí),
@@ -185,16 +205,68 @@ export function validateAndSanitizeAnalysis(raw: Record<string, unknown>): AiInb
       };
     }
 
+    const cities = Array.isArray(rq.cities)
+      ? rq.cities.filter((c): c is string => typeof c === 'string' && Boolean(c.trim())).map((c) => c.trim())
+      : [];
+
+    const regions = Array.isArray(rq.regions)
+      ? rq.regions.filter((r): r is string => typeof r === 'string' && Boolean(r.trim())).map((r) => r.trim())
+      : [];
+
+    const requestedMediaTypes = Array.isArray(rq.requestedMediaTypes)
+      ? rq.requestedMediaTypes.filter((m): m is string => typeof m === 'string' && Boolean(m.trim())).map((m) => m.trim().toUpperCase())
+      : [];
+
+    let budget: ExtractedRequestData['budget'] = null;
+    if (rq.budget && typeof rq.budget === 'object') {
+      const b = rq.budget as Record<string, unknown>;
+      budget = {
+        min: typeof b.min === 'number' && Number.isFinite(b.min) ? Math.round(b.min) : null,
+        max: typeof b.max === 'number' && Number.isFinite(b.max) ? Math.round(b.max) : null,
+        exact: typeof b.exact === 'number' && Number.isFinite(b.exact) ? Math.round(b.exact) : null,
+        currency: typeof b.currency === 'string' && b.currency.trim() ? b.currency.trim().toUpperCase() : 'CZK',
+      };
+    }
+
+    const rawDateFrom = typeof rq.dateFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rq.dateFrom) ? rq.dateFrom : null;
+    const rawDateTo = typeof rq.dateTo === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rq.dateTo) ? rq.dateTo : null;
+    const rawDesc = typeof rq.rawDateDescription === 'string' && rq.rawDateDescription.trim() ? rq.rawDateDescription.trim() : null;
+
+    let datesClarity: 'EXACT' | 'APPROXIMATE' | 'UNSPECIFIED' = 'UNSPECIFIED';
+    if (rawDateFrom && rawDateTo) {
+      datesClarity = 'EXACT';
+    } else if (rawDesc || rawDateFrom || rawDateTo || typeof rq.datesClarity === 'string' && rq.datesClarity === 'APPROXIMATE') {
+      datesClarity = 'APPROXIMATE';
+    }
+
+    const missingRequirements = Array.isArray(rq.missingRequirements)
+      ? rq.missingRequirements.filter((m): m is string => typeof m === 'string' && Boolean(m.trim()))
+      : [];
+
+    // Automatically enforce missing requirements if dates are approximate or unspecified
+    if (datesClarity !== 'EXACT' && !missingRequirements.includes('EXACT_CAMPAIGN_DATES')) {
+      missingRequirements.push('EXACT_CAMPAIGN_DATES');
+    }
+
     request = {
       projectType: pType,
       location: typeof rq.location === 'string' && rq.location.trim() ? rq.location.trim() : null,
       address: typeof rq.address === 'string' && rq.address.trim() ? rq.address.trim() : null,
+      cities,
+      regions,
+      requestedMediaTypes,
       requestedQuantity,
+      budget,
+      dateFrom: rawDateFrom,
+      dateTo: rawDateTo,
+      datesClarity,
+      rawDateDescription: rawDesc,
       openingDate: typeof rq.openingDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rq.openingDate) ? rq.openingDate : null,
       deadline: typeof rq.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rq.deadline) ? rq.deadline : null,
       specificRequirements: Array.isArray(rq.specificRequirements)
         ? rq.specificRequirements.filter((r): r is string => typeof r === 'string' && Boolean(r.trim()))
         : [],
+      missingRequirements,
       notes: typeof rq.notes === 'string' && rq.notes.trim() ? rq.notes.trim() : null,
     };
   }
