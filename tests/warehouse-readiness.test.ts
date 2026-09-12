@@ -87,7 +87,7 @@ test('warehouse AI validates bounded images, rate limits calls and hides provide
   const photo = read('app/api/warehouse/photo-recognition/route.ts');
   const aiImport = read('app/api/warehouse/ai-import-photo/route.ts');
   const aiTransport = read('lib/ai-gemini.ts');
-  assert.match(validation, /3 \* 1024 \* 1024/);
+  assert.match(validation, /20 \* 1024 \* 1024/);
   assert.match(validation, /image\/jpeg.*image\/png.*image\/webp/);
   assert.match(photo, /rateLimitPolicies\.warehouseAi/);
   assert.match(aiImport, /rateLimitPolicies\.warehouseAi/);

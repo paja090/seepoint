@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Camera, X, Loader2, CheckCircle2, Sparkles, Minus, Plus } from 'lucide-react';
+import { compressImageFile } from '@/lib/image-compress';
 
 interface DetectedItem {
   itemId: string;
@@ -36,8 +37,8 @@ export function WarehousePhotoScannerModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) {
-      setError('Fotka musí být JPEG, PNG nebo WebP a může mít nejvýše 3 MB.');
+    if (!file.type.startsWith('image/') && !['.jpg', '.jpeg', '.png', '.webp', '.heic'].some(ext => file.name.toLowerCase().endsWith(ext))) {
+      setError('Zvolený soubor musí být platný obrázek.');
       return;
     }
 
@@ -46,10 +47,11 @@ export function WarehousePhotoScannerModal({
     setError(null);
     setSuccessMessage(null);
 
-    const formData = new FormData();
-    formData.append('photo', file);
-
     try {
+      const compressedFile = await compressImageFile(file, 1920, 0.85);
+      const formData = new FormData();
+      formData.append('photo', compressedFile);
+
       const res = await fetch('/api/warehouse/photo-recognition', {
         method: 'POST',
         body: formData,
@@ -176,7 +178,7 @@ export function WarehousePhotoScannerModal({
                   <span className="text-[10px] text-slate-400">Pásky, lepidla, žebřík, krabice...</span>
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*"
                     capture="environment"
                     className="hidden"
                     onChange={handlePhotoUpload}

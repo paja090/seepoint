@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, Camera, X, Loader2, CheckCircle2, Save, Trash2, Plus } from 'lucide-react';
+import { compressImageToDataUrl } from '@/lib/image-compress';
 
 interface ProposedItem {
   name: string;
@@ -30,8 +31,8 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024) {
-      setError('Fotka musí být JPEG, PNG nebo WebP a může mít nejvýše 3 MB.');
+    if (!file.type.startsWith('image/') && !['.jpg', '.jpeg', '.png', '.webp', '.heic'].some(ext => file.name.toLowerCase().endsWith(ext))) {
+      setError('Zvolený soubor musí být platný obrázek.');
       return;
     }
 
@@ -40,28 +41,24 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
     setError(null);
     setSuccessMessage(null);
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64Data = event.target?.result as string;
+    try {
+      const base64Data = await compressImageToDataUrl(file, 1920, 0.85);
 
-      try {
-        const res = await fetch('/api/warehouse/ai-import-photo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: file.name, photoBase64: base64Data }),
-        });
+      const res = await fetch('/api/warehouse/ai-import-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, photoBase64: base64Data }),
+      });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'AI analýza fotky selhala.');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'AI analýza fotky selhala.');
 
-        setProposedItems(data.proposedItems || []);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Chyba při AI zpracování fotky.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    reader.readAsDataURL(file);
+      setProposedItems(data.proposedItems || []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Chyba při AI zpracování fotky.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function updateItem<K extends keyof ProposedItem>(index: number, field: K, value: ProposedItem[K]) {
@@ -178,7 +175,7 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
                   <span className="text-[10px] text-purple-700">AI sama rozpozná názvy, počty i typy materiálu</span>
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*"
                     capture="environment"
                     className="hidden"
                     onChange={handlePhotoUpload}
