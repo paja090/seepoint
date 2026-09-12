@@ -346,18 +346,27 @@ export function NavigationSurfaceManager({
   }
 
   async function handleToggleOutOfService(surface: Surface) {
-    const nextStatus = surface.status === 'OUT_OF_SERVICE' ? 'AVAILABLE' : 'OUT_OF_SERVICE';
+    const isRestoring = surface.status === 'OUT_OF_SERVICE';
     setSaving(true);
     try {
-      const response = await fetch(`/api/carriers/${carrierId}/surfaces`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          surfaceId: surface.id,
-          status: nextStatus,
-        }),
-      });
-      if (!response.ok) throw new Error('Nepodařilo se změnit stav pozice.');
+      if (isRestoring) {
+        const response = await fetch(`/api/carriers/${carrierId}/resolve-damage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ surfaceId: surface.id }),
+        });
+        if (!response.ok) throw new Error('Nepodařilo se označit pozici jako opravenou.');
+      } else {
+        const response = await fetch(`/api/carriers/${carrierId}/surfaces`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            surfaceId: surface.id,
+            status: 'OUT_OF_SERVICE',
+          }),
+        });
+        if (!response.ok) throw new Error('Nepodařilo se změnit stav pozice na Mimo provoz.');
+      }
       window.location.reload();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Chyba při změně stavu.');
