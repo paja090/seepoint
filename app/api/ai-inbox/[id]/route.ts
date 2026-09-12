@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { canAccess } from '@/lib/rbac';
-import { getAiInboxMessageDetail } from '@/lib/ai-inbox/service';
+import { getAiInboxMessageDetail, deleteAiInboxMessage } from '@/lib/ai-inbox/service';
 import { prisma } from '@/lib/db';
 import type { AiInboxStatus } from '@prisma/client';
 
@@ -103,4 +103,35 @@ export async function PATCH(
   });
 
   return NextResponse.json(updated);
+}
+
+export async function DELETE(
+  request: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  const params = await props.params;
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
+  }
+
+  if (!canAccess(user.role, 'aiInbox')) {
+    return NextResponse.json({ error: 'Nemáte oprávnění pro přístup k AI Inboxu.' }, { status: 403 });
+  }
+
+  const organizationId = user.organizationId;
+  if (!organizationId) {
+    return NextResponse.json({ error: 'Chybí kontext organizace.' }, { status: 400 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const ignoreSender = searchParams.get('ignoreSender') === 'true';
+
+  try {
+    const result = await deleteAiInboxMessage(organizationId, params.id, ignoreSender);
+    return NextResponse.json(result);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Chyba při mazání zprávy';
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
 }

@@ -27,6 +27,11 @@ export function buildProposedActions(input: {
   const { analysis, entities, message } = input;
   const actions: ProposedActionDraft[] = [];
 
+  // Pokud je zpráva klasifikována jako spam nebo irelevantní, nenavrhovat žádné CRM akce
+  if (analysis.classification === 'SPAM_IRRELEVANT') {
+    return [];
+  }
+
   const matchedClient = entities.client || null;
   const companyName = analysis.company?.name || message.fromName || 'Neznámá firma';
 
