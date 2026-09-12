@@ -43,6 +43,9 @@ export type AvailableSurfaceMatch = {
 };
 
 export type AvailabilityResult = {
+  /** Strict multi-tenant isolation */
+  organizationId: string;
+
   /** Evaluation status */
   status: AvailabilityMatchStatus;
 
@@ -57,6 +60,28 @@ export type AvailabilityResult = {
 
   /** Recommended alternative surfaces (nearby or similar media) if requested count is not met */
   alternatives: AvailableSurfaceMatch[];
+
+  /** Surfaces evaluated that had blocking conflicts or unavailability */
+  unavailableSurfaces?: Array<{
+    surfaceId: string;
+    surfaceName: string;
+    code?: string;
+    mediaType?: string;
+    blockingOccupancies?: Array<{
+      id: string;
+      status: 'ACTIVE_RENTED' | 'RESERVED' | 'OCCUPIED' | 'OUT_OF_SERVICE' | string;
+      dateFrom: Date;
+      dateTo: Date;
+      clientName?: string;
+    }>;
+    reason: string;
+  }>;
+
+  /** Total count of evaluated surfaces */
+  totalSurfacesEvaluated?: number;
+
+  /** Human-readable summary */
+  summary?: string;
 
   /** Explanations of why full match was not achieved or what criteria blocked it */
   missingRequirements: string[];

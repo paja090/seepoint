@@ -81,7 +81,7 @@ export type CommercialRequest = {
   /** Specific client notes or requirements */
   campaignTitle?: string | null;
   notes?: string | null;
-  specificRequirements: string[];
+  specificRequirements?: string[];
 
   /** Missing required information that blocks automated offer generation */
   missingRequirements: string[];

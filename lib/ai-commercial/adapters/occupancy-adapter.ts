@@ -23,6 +23,7 @@ export async function checkCommercialAvailability(
   // Validate date range
   if (dateFrom > dateTo) {
     return {
+      organizationId,
       status: 'NEEDS_MORE_INFORMATION',
       requestedQuantity: quantity,
       exactMatchCount: 0,
@@ -151,6 +152,7 @@ export async function checkCommercialAvailability(
   }
 
   return {
+    organizationId,
     status,
     requestedQuantity: quantity,
     exactMatchCount,

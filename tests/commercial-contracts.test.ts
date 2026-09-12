@@ -333,10 +333,14 @@ describe('AI Commercial Engine Contracts & Adapters', () => {
     it('recommends resolving conflict when unavailable conflict surfaces are detected', () => {
       const availabilityResult = {
         organizationId: TENANT_A,
-        dateFrom: new Date('2026-10-01'),
-        dateTo: new Date('2026-10-31'),
+        status: 'PARTIAL_MATCH' as const,
+        requestedQuantity: 2,
+        exactMatchCount: 1,
+        exactMatches: [],
+        alternatives: [],
+        missingRequirements: ['1 plocha v konfliktu'],
+        checkedAt: new Date(),
         totalSurfacesEvaluated: 10,
-        availableSurfaces: [],
         unavailableSurfaces: [
           {
             surfaceId: 'surf-99',
