@@ -100,6 +100,8 @@ Očekávaný výstup je POUZE a VÝHRADNĚ platný JSON objekt s těmito klíči
   "summary": string (stručné české shrnutí zprávy pro obchodníka, max 2 věty),
   "reasoningSummary": string (stručné vysvětlení, proč byla zvolena daná klasifikace a akce),
   "suggestedReply": string (profesionální, zdvořilý návrh české odpovědi oslovující klienta a potvrzující přijetí),
+  "extractedOrderNumber": string | null (číslo zakázky zmíněné v e-mailu, např. "ZAK-2026-0002", "NAV-2026-0001", "2026/001"),
+  "extractedClientOrderCode": string | null (číslo objednávky zákazníka / klientská reference, např. "PO-2026-987", "objednávka č. 45001234"),
   "detectedChanges": [
     {
       "field": string,
@@ -209,6 +211,14 @@ export function validateAndSanitizeAnalysis(raw: Record<string, unknown>): AiInb
     ? raw.suggestedReply.trim()
     : undefined;
 
+  const extractedOrderNumber = typeof raw.extractedOrderNumber === 'string' && raw.extractedOrderNumber.trim()
+    ? raw.extractedOrderNumber.trim()
+    : null;
+
+  const extractedClientOrderCode = typeof raw.extractedClientOrderCode === 'string' && raw.extractedClientOrderCode.trim()
+    ? raw.extractedClientOrderCode.trim()
+    : null;
+
   const detectedChanges = Array.isArray(raw.detectedChanges)
     ? raw.detectedChanges
         .filter((ch): ch is Record<string, unknown> => Boolean(ch && typeof ch === 'object'))
@@ -231,6 +241,8 @@ export function validateAndSanitizeAnalysis(raw: Record<string, unknown>): AiInb
     reasoningSummary,
     suggestedReply,
     detectedChanges,
+    extractedOrderNumber,
+    extractedClientOrderCode,
   };
 }
 

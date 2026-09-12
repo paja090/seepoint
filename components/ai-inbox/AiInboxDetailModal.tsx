@@ -19,6 +19,12 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldCheck,
+  FolderKanban,
+  Compass,
+  FileText,
+  Link2,
+  Unlink,
+  Search,
 } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxActionStatus, AiInboxActionType, AiInboxAnalysisResult } from '@/lib/ai-inbox/types';
@@ -49,6 +55,14 @@ export type AiInboxMessageDetailData = {
   crmOrder?: { id: string; orderNumber: string; title: string; status: string; totalPrice: unknown } | null;
   offer?: { id: string; title: string; status: string; totalPrice: unknown } | null;
   navigationOrder?: { id: string; orderNumber: string; status: string } | null;
+  activeClientOrders?: Array<{
+    id: string;
+    orderNumber: string;
+    title: string;
+    status: string;
+    projectType?: string;
+    isNavigation?: boolean;
+  }>;
   attachments: Array<{
     id: string;
     filename: string;
@@ -91,6 +105,56 @@ export function AiInboxDetailModal({
   const [replyCopied, setReplyCopied] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [viewHtml, setViewHtml] = useState(false);
+  const [isLinkingOrder, setIsLinkingOrder] = useState(false);
+  const [showOrderPicker, setShowOrderPicker] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [isSearchingOrders, setIsSearchingOrders] = useState(false);
+  const [searchedOrders, setSearchedOrders] = useState<Array<{
+    id: string;
+    orderNumber: string;
+    title: string;
+    status: string;
+    client?: { name: string };
+  }>>([]);
+
+  async function handleLinkOrder(orderId: string | null) {
+    setIsLinkingOrder(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/ai-inbox/${message.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crmOrderId: orderId }),
+      });
+      if (!res.ok) throw new Error('Nepodařilo se změnit propojení se zakázkou.');
+      setFeedback({
+        type: 'success',
+        message: orderId ? 'Zpráva byla úspěšně spárována se zakázkou.' : 'Propojení se zakázkou bylo zrušeno.',
+      });
+      setShowOrderPicker(false);
+      onActionComplete();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při propojování' });
+    } finally {
+      setIsLinkingOrder(false);
+    }
+  }
+
+  async function handleSearchOrders() {
+    if (!orderSearchQuery.trim()) return;
+    setIsSearchingOrders(true);
+    try {
+      const res = await fetch(`/api/ai-inbox/orders?q=${encodeURIComponent(orderSearchQuery.trim())}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchedOrders(data.orders || []);
+      }
+    } catch (err) {
+      console.warn('Hledání zakázek selhalo:', err);
+    } finally {
+      setIsSearchingOrders(false);
+    }
+  }
 
   const classMeta = CLASSIFICATION_LABELS[message.classification as keyof typeof CLASSIFICATION_LABELS] || CLASSIFICATION_LABELS.UNKNOWN;
   const confBadge = getConfidenceBadge(message.confidence);
@@ -429,6 +493,189 @@ export function AiInboxDetailModal({
                 <div className="rounded-lg bg-fuchsia-100/50 p-3 text-xs text-slate-800 border border-fuchsia-200/50">
                   <span className="font-bold text-fuchsia-950">Souhrn požadavku: </span>
                   {message.aiSummary}
+                </div>
+              )}
+            </div>
+
+            {/* LINKED ORDER & OFFER SECTION */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-2">
+                  <FolderKanban size={16} className="text-blue-600" />
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    Propojená zakázka a nabídka
+                  </h3>
+                </div>
+                {message.crmOrder ? (
+                  <button
+                    type="button"
+                    onClick={() => handleLinkOrder(null)}
+                    disabled={isLinkingOrder}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 transition"
+                  >
+                    <Unlink size={13} />
+                    <span>Odpojit zakázku</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowOrderPicker(!showOrderPicker)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition"
+                  >
+                    <Link2 size={13} />
+                    <span>{showOrderPicker ? 'Zavřít výběr' : 'Vybrat zakázku ručně'}</span>
+                  </button>
+                )}
+              </div>
+
+              {message.crmOrder ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-blue-50/70 border border-blue-200 p-3 text-xs">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-blue-900 text-sm">
+                        {message.crmOrder.orderNumber}
+                      </span>
+                      <span className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                        {message.crmOrder.status}
+                      </span>
+                      {message.navigationOrder && (
+                        <span className="rounded bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-800 flex items-center gap-1">
+                          <Compass size={11} /> Navigace
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-medium text-slate-700 truncate max-w-md">
+                      {message.crmOrder.title}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={message.navigationOrder ? `/navigation` : `/crm`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 border border-blue-200 shadow-sm hover:bg-blue-50 transition"
+                    >
+                      <ExternalLink size={12} />
+                      <span>Otevřít</span>
+                    </a>
+                  </div>
+                </div>
+              ) : message.offer ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-amber-50/70 border border-amber-200 p-3 text-xs">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FileText size={14} className="text-amber-700" />
+                      <span className="font-bold text-amber-950 text-sm">
+                        Nabídka: {message.offer.title}
+                      </span>
+                      <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                        {message.offer.status}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowOrderPicker(!showOrderPicker)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                  >
+                    <Link2 size={12} />
+                    <span>Přiřadit k zakázce</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-lg bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-600">
+                    Zpráva zatím není spárována s žádnou zakázkou v systému.
+                  </div>
+
+                  {/* Active client orders suggestions */}
+                  {message.activeClientOrders && message.activeClientOrders.length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="text-xs font-bold text-slate-700">
+                        Aktivní zakázky tohoto klienta ({message.activeClientOrders.length}):
+                      </span>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {message.activeClientOrders.map((ord) => (
+                          <div
+                            key={ord.id}
+                            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2 text-xs hover:border-blue-300 transition"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <div className="flex items-center gap-2 font-bold text-slate-900">
+                                <span>{ord.orderNumber}</span>
+                                <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] text-slate-600 font-medium">
+                                  {ord.status}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate">{ord.title}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleLinkOrder(ord.id)}
+                              disabled={isLinkingOrder}
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-blue-500 disabled:opacity-50 shrink-0 transition"
+                            >
+                              <Link2 size={11} />
+                              <span>Propojit</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Order picker search box */}
+                  {showOrderPicker && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                      <span className="text-xs font-bold text-slate-700">
+                        Hledat v zakázkách (číslo, název nebo klient):
+                      </span>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={orderSearchQuery}
+                          onChange={(e) => setOrderSearchQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSearchOrders()}
+                          placeholder="Např. ZAK-2026 nebo McDonald's…"
+                          className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSearchOrders}
+                          disabled={isSearchingOrders || !orderSearchQuery.trim()}
+                          className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition"
+                        >
+                          <Search size={12} />
+                          <span>{isSearchingOrders ? 'Hledám…' : 'Hledat'}</span>
+                        </button>
+                      </div>
+
+                      {searchedOrders.length > 0 && (
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pt-1">
+                          {searchedOrders.map((so) => (
+                            <div
+                              key={so.id}
+                              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-2 text-xs"
+                            >
+                              <div className="min-w-0 pr-2">
+                                <span className="font-bold text-slate-900">{so.orderNumber}</span>{' '}
+                                <span className="text-slate-600">({so.title})</span>
+                                {so.client && <span className="text-slate-400"> • {so.client.name}</span>}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleLinkOrder(so.id)}
+                                disabled={isLinkingOrder}
+                                className="inline-flex items-center gap-1 rounded bg-blue-600 px-2 py-0.5 text-[11px] font-bold text-white hover:bg-blue-500 transition"
+                              >
+                                Propojit
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

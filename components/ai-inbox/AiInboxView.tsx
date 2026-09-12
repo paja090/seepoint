@@ -12,6 +12,7 @@ import {
   Mail,
   Building2,
   Calendar,
+  FolderKanban,
 } from 'lucide-react';
 import { AiInboxMessageCard, type AiInboxListItem } from './AiInboxMessageCard';
 import { AiInboxDetailModal, type AiInboxMessageDetailData } from './AiInboxDetailModal';
@@ -70,7 +71,7 @@ export function AiInboxView({
   }
 
   // Manual mailbox sync
-  async function triggerSync() {
+  async function triggerSync(preset: 'INBOX' | 'ORDERS_ONLY' | 'ALL' = 'INBOX', customQuery?: string) {
     setIsSyncing(true);
     setSyncFeedback(null);
     try {
@@ -79,11 +80,20 @@ export function AiInboxView({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           connectionId: selectedMailboxId !== 'ALL' ? selectedMailboxId : undefined,
+          preset,
+          query: customQuery || undefined,
+          maxResults: preset === 'ORDERS_ONLY' || customQuery ? 50 : 25,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Synchronizace selhala.');
-      setSyncFeedback('Schránky byly úspěšně zkontrolovány a nové zprávy zpracovány.');
+      setSyncFeedback(
+        preset === 'ORDERS_ONLY'
+          ? 'Hledání zakázek v Gmailu dokončeno. Zprávy byly zařazeny a analyzovány.'
+          : customQuery
+            ? `Vyhledávání v Gmailu na dotaz "${customQuery}" dokončeno.`
+            : 'Schránky byly úspěšně zkontrolovány a nové zprávy zpracovány.'
+      );
       await refreshList();
     } catch (err) {
       setSyncFeedback(err instanceof Error ? err.message : 'Chyba při synchronizaci');
@@ -115,7 +125,9 @@ export function AiInboxView({
       const matchSender = item.fromEmail?.toLowerCase().includes(q) || item.fromName?.toLowerCase().includes(q);
       const matchSummary = item.aiSummary?.toLowerCase().includes(q);
       const matchClient = item.client?.name?.toLowerCase().includes(q);
-      if (!matchSubject && !matchSender && !matchSummary && !matchClient) return false;
+      const matchOrder = item.crmOrder?.orderNumber?.toLowerCase().includes(q) || item.crmOrder?.title?.toLowerCase().includes(q);
+      const matchOffer = item.offer?.title?.toLowerCase().includes(q);
+      if (!matchSubject && !matchSender && !matchSummary && !matchClient && !matchOrder && !matchOffer) return false;
     }
 
     return true;
@@ -149,15 +161,28 @@ export function AiInboxView({
               <span>Připojit Gmail schránku</span>
             </a>
           ) : (
-            <button
-              type="button"
-              onClick={triggerSync}
-              disabled={isSyncing}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 active:scale-95 disabled:opacity-50 transition"
-            >
-              <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-              <span>{isSyncing ? 'Synchronizuji schránky…' : 'Synchronizovat'}</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => triggerSync('ORDERS_ONLY')}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 active:scale-95 disabled:opacity-50 transition shadow-sm"
+                title="Prohledá celou Gmail schránku na e-maily související se zakázkami, poptávkami a nabídkami"
+              >
+                <FolderKanban size={14} className="text-blue-600" />
+                <span>Hledat zakázky v Gmailu</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerSync('INBOX')}
+                disabled={isSyncing}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 active:scale-95 disabled:opacity-50 transition"
+              >
+                <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                <span>{isSyncing ? 'Synchronizuji…' : 'Synchronizovat'}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -259,7 +284,7 @@ export function AiInboxView({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Hledat firmu, e-mail, předmět nebo požadavek…"
+            placeholder="Hledat firmu, zakázku (ZAK-...), e-mail, předmět…"
             className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500"
           />
           {searchQuery && (

@@ -73,6 +73,30 @@ export async function executeAiInboxAction(
         break;
       }
 
+      case 'LINK_CRM_ORDER': {
+        const crmOrderId = String(payload.crmOrderId || '');
+        if (!crmOrderId) throw new Error('Chybí ID zakázky k propojení.');
+
+        const order = await prisma.crmOrder.findFirst({
+          where: { id: crmOrderId, organizationId },
+          select: { id: true, clientId: true, offerId: true, navigationOrder: { select: { id: true } } },
+        });
+
+        if (!order) throw new Error('Zakázka nebyla nalezena.');
+
+        await prisma.aiInboxMessage.update({
+          where: { id: msg.id },
+          data: {
+            crmOrderId: order.id,
+            clientId: msg.clientId || order.clientId,
+            offerId: msg.offerId || order.offerId || undefined,
+            navigationOrderId: msg.navigationOrderId || order.navigationOrder?.id || undefined,
+          },
+        });
+        createdEntityId = order.id;
+        break;
+      }
+
       case 'CREATE_CRM_ORDER': {
         const clientId = msg.clientId || String(payload.clientId || '');
         if (!clientId) throw new Error('Před vytvořením zakázky je potřeba nejprve vybrat nebo založit klienta.');

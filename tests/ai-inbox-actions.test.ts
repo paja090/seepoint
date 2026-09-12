@@ -163,7 +163,38 @@ test('safe action executor enforces tenant isolation, idempotence and valid stat
   assert.match(executorSource, /validateStatusTransition/);
   // Valid status transition check for offers
   assert.match(executorSource, /transitionOffer/);
+  // LINK_CRM_ORDER handling
+  assert.match(executorSource, /case 'LINK_CRM_ORDER':/);
   // Records audit metadata
   assert.match(executorSource, /executedAt:\s*new Date\(\)/);
   assert.match(executorSource, /executedById:\s*actor\.id/);
+});
+
+test('buildProposedActions generates LINK_CRM_ORDER when crmOrderId is matched', () => {
+  const actions = buildProposedActions({
+    analysis: {
+      classification: 'EXISTING_PROJECT_REPLY',
+      confidence: 0.95,
+      summary: 'Doplňující informace k zakázce ZAK-2026-0002',
+      company: null,
+      contact: null,
+      request: null,
+    },
+    entities: {
+      crmOrderId: 'order-12345',
+      orderNumber: 'ZAK-2026-0002',
+      orderTitle: 'Navigace KFC Opava',
+    },
+    message: {
+      id: 'msg-999',
+      fromEmail: 'jan@amrest.eu',
+      subject: 'Re: Zakázka ZAK-2026-0002',
+      hasAttachments: false,
+    },
+  });
+
+  const linkAction = actions.find((a) => a.type === 'LINK_CRM_ORDER');
+  assert.ok(linkAction, 'LINK_CRM_ORDER should be proposed');
+  assert.equal(linkAction?.payload.crmOrderId, 'order-12345');
+  assert.match(linkAction?.title || '', /ZAK-2026-0002/);
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2 } from 'lucide-react';
+import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2, FolderKanban, Compass, FileText } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxClassification, AiInboxStatus } from '@/lib/ai-inbox/types';
 
@@ -145,6 +145,39 @@ export function AiInboxMessageCard({
           ) : (
             <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">
               Nová firma
+            </span>
+          )}
+
+          {/* Linked CRM Order */}
+          {item.crmOrder && (
+            <span
+              title={`Zakázka: ${item.crmOrder.orderNumber} – ${item.crmOrder.title}`}
+              className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200"
+            >
+              <FolderKanban size={11} />
+              <span className="max-w-[120px] truncate">{item.crmOrder.orderNumber}</span>
+            </span>
+          )}
+
+          {/* Linked Navigation Order */}
+          {item.navigationOrder && (
+            <span
+              title="Navigační zakázka"
+              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 border border-indigo-200"
+            >
+              <Compass size={11} />
+              <span>Navigace</span>
+            </span>
+          )}
+
+          {/* Linked Offer (if no CRM order) */}
+          {item.offer && !item.crmOrder && (
+            <span
+              title={`Nabídka: ${item.offer.title}`}
+              className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-200"
+            >
+              <FileText size={11} />
+              <span className="max-w-[120px] truncate">{item.offer.title}</span>
             </span>
           )}
 
