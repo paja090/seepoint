@@ -1,7 +1,7 @@
 import { WarehouseItemCategory, WarehouseMovementType } from '@prisma/client';
 
 export const MAX_WAREHOUSE_QUANTITY = 1_000_000;
-export const MAX_WAREHOUSE_IMAGE_BYTES = 3 * 1024 * 1024;
+export const MAX_WAREHOUSE_IMAGE_BYTES = 20 * 1024 * 1024;
 export const MAX_WAREHOUSE_BATCH_SIZE = 50;
 export const WAREHOUSE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -60,7 +60,7 @@ export function warehouseMovementType(value: unknown) {
 
 export function validateWarehouseImage(file: File) {
   if (!WAREHOUSE_IMAGE_TYPES.has(file.type)) throw new WarehouseInputError('Fotka musí být ve formátu JPEG, PNG nebo WebP.');
-  if (file.size <= 0 || file.size > MAX_WAREHOUSE_IMAGE_BYTES) throw new WarehouseInputError('Fotka může mít nejvýše 3 MB.');
+  if (file.size <= 0 || file.size > MAX_WAREHOUSE_IMAGE_BYTES) throw new WarehouseInputError('Fotka překračuje povolenou velikost.');
 }
 
 export function validateWarehouseDataImage(value: unknown) {
@@ -69,6 +69,6 @@ export function validateWarehouseDataImage(value: unknown) {
   if (!match) throw new WarehouseInputError('Fotka musí být ve formátu JPEG, PNG nebo WebP.');
   const padding = match[2].endsWith('==') ? 2 : match[2].endsWith('=') ? 1 : 0;
   const bytes = Math.floor((match[2].length * 3) / 4) - padding;
-  if (bytes <= 0 || bytes > MAX_WAREHOUSE_IMAGE_BYTES) throw new WarehouseInputError('Fotka může mít nejvýše 3 MB.');
+  if (bytes <= 0 || bytes > MAX_WAREHOUSE_IMAGE_BYTES) throw new WarehouseInputError('Fotka překračuje povolenou velikost.');
   return value;
 }

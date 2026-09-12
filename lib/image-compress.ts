@@ -53,3 +53,14 @@ export async function compressImageFile(file: File, maxDimension = 1920, quality
     }
   });
 }
+
+export async function compressImageToDataUrl(file: File, maxDimension = 1920, quality = 0.85): Promise<string> {
+  const compressedFile = await compressImageFile(file, maxDimension, quality);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Chyba při čtení komprimovaného obrázku.'));
+    reader.readAsDataURL(compressedFile);
+  });
+}
+
