@@ -16,7 +16,8 @@ export type SystemNotificationItem = {
     | 'CITY_GALLERY_PERMIT_EXPIRING'
     | 'PRINT_APPROVED'
     | 'VEHICLE_DEADLINE'
-    | 'RADAR_OPPORTUNITY';
+    | 'RADAR_OPPORTUNITY'
+    | 'AI_INBOX_UNREVIEWED';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -377,6 +378,43 @@ export const vehicleNotificationsProvider: NotificationProvider = {
   },
 };
 
+// 9. SALES, ADMIN, MANAGER: AI Inbox messages requiring human review
+export const aiInboxNotificationsProvider: NotificationProvider = {
+  name: 'ai-inbox',
+  shouldRun: (ctx) => ctx.enabled('aiInbox') && (ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER' || ctx.userRole === 'SALES'),
+  async getNotifications(ctx) {
+    const unreviewedMessages = await prisma.aiInboxMessage.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        requiresReview: true,
+        processingStatus: { in: ['READY', 'REVIEW_REQUIRED'] },
+      },
+      select: {
+        id: true,
+        subject: true,
+        fromEmail: true,
+        fromName: true,
+        classification: true,
+        confidence: true,
+        receivedAt: true,
+      },
+      orderBy: { receivedAt: 'desc' },
+      take: 10,
+    });
+
+    return unreviewedMessages.map((msg) => ({
+      id: `ai-inbox-${msg.id}`,
+      type: 'AI_INBOX_UNREVIEWED' as const,
+      title: `📬 AI Inbox: ${msg.subject || 'Nová zpráva'}`,
+      message: `Od: ${msg.fromName ? `${msg.fromName} (${msg.fromEmail})` : msg.fromEmail}. Vyžaduje potvrzení navržených akcí.`,
+      severity: msg.confidence >= 0.7 ? ('HIGH' as const) : ('MEDIUM' as const),
+      link: `/ai-inbox?messageId=${msg.id}`,
+      createdAt: msg.receivedAt.toISOString(),
+      metadata: { classification: msg.classification, confidence: msg.confidence },
+    }));
+  },
+};
+
 export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
   personalTasksProvider,
   navigationContractsProvider,
@@ -386,6 +424,7 @@ export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
   warehouseStockProvider,
   cityGalleryPermitsProvider,
   vehicleNotificationsProvider,
+  aiInboxNotificationsProvider,
 ];
 
 export async function getSystemNotifications(

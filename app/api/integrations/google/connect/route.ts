@@ -13,6 +13,9 @@ import {
 export async function GET(request: Request) {
   try {
     const context = await requireOrganizationRole('ADMIN');
+    const url = new URL(request.url);
+    const requestedProvider = url.searchParams.get('provider')?.toUpperCase();
+    const provider = requestedProvider === 'GMAIL' ? 'GMAIL' : 'GOOGLE_DRIVE';
     const config = googleOAuthConfiguration();
     const nonce = createOAuthNonce();
     const verifier = createPkceVerifier();
@@ -21,7 +24,7 @@ export async function GET(request: Request) {
       v: 1,
       organizationId: context.organizationId,
       userId: context.user.id,
-      provider: 'GOOGLE_DRIVE',
+      provider,
       nonce,
       expiresAt: Date.now() + 10 * 60 * 1000,
     }, config.stateSecret);
@@ -30,7 +33,7 @@ export async function GET(request: Request) {
       redirectUri,
       state,
       verifier,
-      provider: 'GOOGLE_DRIVE',
+      provider,
     }));
     const cookieOptions = {
       httpOnly: true,

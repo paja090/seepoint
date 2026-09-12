@@ -1,4 +1,3 @@
-import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import type { IntegrationProvider } from '@prisma/client';
 import { getAppUrl } from '@/lib/app-url';
@@ -11,12 +10,13 @@ export const GOOGLE_OAUTH_VERIFIER_COOKIE = 'seepoint_google_oauth_verifier';
 
 type GoogleCredentials = { refreshToken: string };
 
-export async function connectedGoogleAccessToken(provider: IntegrationProvider) {
+export async function connectedGoogleAccessToken(provider: IntegrationProvider, connectionId?: string) {
   const connection = await prisma.integrationConnection.findFirst({
-    where: { provider },
-    select: { id: true, status: true, credentialsEncrypted: true },
+    where: connectionId ? { id: connectionId } : { provider },
+    select: { id: true, status: true, credentialsEncrypted: true, provider: true },
   });
   if (!connection || connection.status === 'REVOKED') return null;
+  const providerLabel = connection.provider === 'GMAIL' ? 'Gmail' : 'Google Drive';
   if (!connection.credentialsEncrypted) {
     await prisma.integrationConnection.update({
       where: { id: connection.id },
@@ -24,7 +24,7 @@ export async function connectedGoogleAccessToken(provider: IntegrationProvider) 
         status: 'ERROR',
         lastCheckedAt: new Date(),
         expiresAt: null,
-        error: 'Google Drive připojení nemá obnovovací token a je potřeba ho připojit znovu.',
+        error: `${providerLabel} připojení nemá obnovovací token a je potřeba ho připojit znovu.`,
       },
     });
     return null;
@@ -63,7 +63,7 @@ export async function connectedGoogleAccessToken(provider: IntegrationProvider) 
         status: 'ERROR',
         lastCheckedAt: new Date(),
         expiresAt: null,
-        error: 'Google Drive připojení vyžaduje znovu ověřit.',
+        error: `${providerLabel} připojení vyžaduje znovu ověřit.`,
       },
     }).catch(() => undefined);
     throw error;
@@ -104,8 +104,13 @@ export function googleOAuthRedirectUri(request: Request) {
 }
 
 export function googleScopes(provider: IntegrationProvider) {
-  if (provider !== 'GOOGLE_DRIVE') throw new Error('Tato Google integrace zatím není podporovaná.');
-  return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file'];
+  if (provider === 'GOOGLE_DRIVE') {
+    return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file'];
+  }
+  if (provider === 'GMAIL') {
+    return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly'];
+  }
+  throw new Error('Tato Google integrace zatím není podporovaná.');
 }
 
 export function createPkceVerifier() {
@@ -165,7 +170,9 @@ export async function googleAccount(accessToken: string) {
 export async function saveGoogleConnection(input: { provider: IntegrationProvider; accountId: string; accountEmail: string; refreshToken?: string; scopes: string[]; expiresIn?: number }) {
   const { organizationId } = requireTenantContext();
   const config = googleOAuthConfiguration();
-  const existing = await prisma.integrationConnection.findFirst({ where: { provider: input.provider } });
+  const existing = input.provider === 'GMAIL'
+    ? await prisma.integrationConnection.findFirst({ where: { provider: input.provider, externalAccountId: input.accountId } })
+    : await prisma.integrationConnection.findFirst({ where: { provider: input.provider } });
   let refreshToken = input.refreshToken;
   if (!refreshToken && existing?.credentialsEncrypted) {
     refreshToken = decryptIntegrationSecret<GoogleCredentials>(existing.credentialsEncrypted, config.encryptionKey).refreshToken;
@@ -187,9 +194,11 @@ export async function saveGoogleConnection(input: { provider: IntegrationProvide
   return prisma.integrationConnection.create({ data: { ...data, organizationId } });
 }
 
-export async function disconnectGoogleConnection(provider: IntegrationProvider) {
+export async function disconnectGoogleConnection(provider: IntegrationProvider, connectionId?: string) {
   const config = googleOAuthConfiguration();
-  const connection = await prisma.integrationConnection.findFirst({ where: { provider } });
+  const connection = await prisma.integrationConnection.findFirst({
+    where: connectionId ? { id: connectionId } : { provider },
+  });
   if (!connection) return false;
   if (connection.credentialsEncrypted) {
     const { refreshToken } = decryptIntegrationSecret<GoogleCredentials>(connection.credentialsEncrypted, config.encryptionKey);

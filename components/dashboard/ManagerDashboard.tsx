@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { BarChart3, Building2, CalendarClock, DollarSign, Layers, PieChart, Sparkles, Tag, TrendingUp } from 'lucide-react';
 import { EmptyState, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { StatusBadge } from '@/components/StatusBadge';
+import { AiInboxDashboardWidget, type AiInboxDashboardSummary } from './AiInboxDashboardWidget';
 
 interface ManagerDashboardProps {
+  aiInboxSummary?: AiInboxDashboardSummary;
   totalSurfaces: number;
   availableSurfaces: number;
   occupiedSurfaces: number;
@@ -40,6 +42,7 @@ interface ManagerDashboardProps {
 }
 
 export function ManagerDashboard({
+  aiInboxSummary,
   totalSurfaces,
   availableSurfaces,
   occupiedSurfaces,
@@ -73,6 +76,11 @@ export function ManagerDashboard({
           </div>
         }
       />
+
+      {/* 📬 AI Inbox Status Widget */}
+      {aiInboxSummary && (
+        <AiInboxDashboardWidget summary={aiInboxSummary} />
+      )}
 
       {/* Financial & Revenue Highlights */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

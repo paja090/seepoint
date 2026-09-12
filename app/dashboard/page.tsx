@@ -220,6 +220,15 @@ export default async function Dashboard() {
     knownMonthlyRent: data.knownMonthlyRent,
   })).sort((a, b) => b.knownMonthlyRent - a.knownMonthlyRent).slice(0, 5);
 
+  const unreviewedAiInboxCount = await prisma.aiInboxMessage.count({
+    where: {
+      organizationId: user.organizationId,
+      requiresReview: true,
+      processingStatus: { in: ['READY', 'REVIEW_REQUIRED'] },
+    },
+  }).catch(() => 0);
+  const aiInboxSummary = { unreviewedCount: unreviewedAiInboxCount };
+
   if (isSales) {
     const salesFirstName = user.employee?.firstName
       ? user.employee.firstName
@@ -229,6 +238,7 @@ export default async function Dashboard() {
       <AppShell>
         <SalesDashboard
         salesName={salesFirstName}
+        aiInboxSummary={aiInboxSummary}
         activeOffers={activeOffersList.map((o) => ({
           id: o.id,
           title: o.title,
@@ -267,6 +277,7 @@ export default async function Dashboard() {
   return (
     <AppShell>
       <ManagerDashboard
+        aiInboxSummary={aiInboxSummary}
         totalSurfaces={totalSurfaces}
         availableSurfaces={availableSurfaces}
         occupiedSurfaces={occupiedSurfaces}

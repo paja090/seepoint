@@ -1,17 +1,36 @@
 import { AppShell } from '@/components/AppShell';
 import { GoogleIntegrationCard } from '@/components/GoogleIntegrationCard';
+import { GmailIntegrationCard, type GmailConnectionItem } from '@/components/GmailIntegrationCard';
 import { prisma } from '@/lib/db';
 import { isGoogleOAuthConfigured } from '@/lib/integrations/google-oauth';
 import { requireOrganizationRole } from '@/lib/organization';
 
 export default async function IntegrationsSettingsPage({ searchParams }: { searchParams: Promise<{ google?: string }> }) {
-  await requireOrganizationRole('ADMIN');
-  const connection = await prisma.integrationConnection.findFirst({
-    where: { provider: 'GOOGLE_DRIVE' },
-    select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true },
-  });
+  const { organizationId } = await requireOrganizationRole('ADMIN');
+  const [driveConnection, gmailConnectionsRaw] = await Promise.all([
+    prisma.integrationConnection.findFirst({
+      where: { organizationId, provider: 'GOOGLE_DRIVE' },
+      select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true },
+    }),
+    prisma.integrationConnection.findMany({
+      where: { organizationId, provider: 'GMAIL' },
+      select: { id: true, status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true, settings: true },
+      orderBy: { connectedAt: 'desc' },
+    }),
+  ]);
   const result = (await searchParams).google;
   const configured = isGoogleOAuthConfigured();
+
+  const gmailConnections: GmailConnectionItem[] = gmailConnectionsRaw.map((c) => ({
+    id: c.id,
+    accountEmail: c.accountEmail,
+    status: c.status,
+    connectedAt: c.connectedAt?.toISOString() ?? null,
+    lastCheckedAt: c.lastCheckedAt?.toISOString() ?? null,
+    error: c.error,
+    settings: (c.settings as GmailConnectionItem['settings']) || null,
+  }));
+
   return (
     <AppShell>
       <div className="mb-6">
@@ -21,20 +40,19 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
       {result === 'connected' && <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">Google účet byl bezpečně připojen.</p>}
       {result === 'cancelled' && <p className="mb-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">Připojení bylo zrušeno.</p>}
       {result === 'error' && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800">Google účet se nepodařilo připojit. Zkuste to znovu nebo zkontrolujte konfiguraci OAuth.</p>}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <GmailIntegrationCard
+          configured={configured}
+          connections={gmailConnections}
+        />
         <GoogleIntegrationCard
           configured={configured}
-          connection={connection ? {
-            ...connection,
-            connectedAt: connection.connectedAt?.toISOString() ?? null,
-            lastCheckedAt: connection.lastCheckedAt?.toISOString() ?? null,
+          connection={driveConnection ? {
+            ...driveConnection,
+            connectedAt: driveConnection.connectedAt?.toISOString() ?? null,
+            lastCheckedAt: driveConnection.lastCheckedAt?.toISOString() ?? null,
           } : null}
         />
-        <section className="card space-y-3 opacity-75">
-          <h2 className="text-xl font-bold">Gmail a Google Workspace</h2>
-          <p className="text-sm text-slate-600">Připraveno v datovém modelu. Oprávnění pro odesílání e-mailů přidáme samostatně, aby Drive nevyžadoval zbytečně široký přístup.</p>
-          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">Připravujeme</span>
-        </section>
       </div>
     </AppShell>
   );

@@ -4,7 +4,7 @@ type OAuthState = {
   v: 1;
   organizationId: string;
   userId: string;
-  provider: 'GOOGLE_DRIVE';
+  provider: 'GOOGLE_DRIVE' | 'GMAIL';
   nonce: string;
   expiresAt: number;
 };
@@ -49,7 +49,7 @@ export function verifyOAuthState(value: string, secret: string, now = Date.now()
   const received = Buffer.from(signature);
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) throw new Error('OAuth state signature is invalid.');
   const state = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as OAuthState;
-  if (state.v !== 1 || state.provider !== 'GOOGLE_DRIVE' || !state.organizationId || !state.userId || !state.nonce) throw new Error('OAuth state payload is invalid.');
+  if (state.v !== 1 || (state.provider !== 'GOOGLE_DRIVE' && state.provider !== 'GMAIL') || !state.organizationId || !state.userId || !state.nonce) throw new Error('OAuth state payload is invalid.');
   if (!Number.isFinite(state.expiresAt) || state.expiresAt < now) throw new Error('OAuth state has expired.');
   return state;
 }
