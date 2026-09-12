@@ -2,6 +2,7 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logAIUsage } from '@/lib/ai-usage';
+import { getGeminiApiKey } from '@/lib/ai-gemini';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       )
       .join('\n');
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     let parsedTasks: Array<{
       title: string;
       description?: string;

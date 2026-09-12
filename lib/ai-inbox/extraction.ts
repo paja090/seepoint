@@ -22,20 +22,9 @@ const VALID_CLASSIFICATIONS: Set<AiInboxClassification> = new Set([
   'UNKNOWN',
 ]);
 
+import { getGeminiApiKey } from '@/lib/ai-gemini';
+
 const VALID_PROJECT_TYPES = new Set(['NAVIGATION', 'STANDARD_MEDIA', 'CITY_GALLERY', 'OTHER']);
-
-function getGeminiApiKey(): string {
-  const rawKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_AI_KEY ||
-    process.env.GEMINI_KEY ||
-    process.env.GOOGLE_GEMINI_KEY ||
-    process.env.GOOGLE_GENAI_API_KEY ||
-    process.env.GEMINI_API_TOKEN;
-
-  const apiKey = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
-  return apiKey;
-}
 
 export function buildAnalysisPrompt(input: {
   fromEmail: string;

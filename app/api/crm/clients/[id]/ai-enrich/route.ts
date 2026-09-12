@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { logAIUsage } from '@/lib/ai-usage';
+import { getGeminiApiKey } from '@/lib/ai-gemini';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .join('\n');
 
     // Step 2: Use Gemini 3.6 AI with Live Google Search Grounding to ensure 100% accurate data
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     let aiEnrichmentResult: {
       selectedIndex?: number;
       selectedIco?: string;
