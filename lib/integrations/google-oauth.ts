@@ -70,14 +70,27 @@ export async function connectedGoogleAccessToken(provider: IntegrationProvider, 
   }
 }
 
+function cleanConfigValue(val?: string) {
+  if (!val) return '';
+  let cleaned = val.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned;
+}
+
 export function googleOAuthConfiguration() {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
-  const stateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET?.trim();
-  const encryptionKey = process.env.INTEGRATION_ENCRYPTION_KEY?.trim();
+  const clientId = cleanConfigValue(process.env.GOOGLE_OAUTH_CLIENT_ID);
+  const clientSecret = cleanConfigValue(process.env.GOOGLE_OAUTH_CLIENT_SECRET);
+  const stateSecret = cleanConfigValue(process.env.GOOGLE_OAUTH_STATE_SECRET);
+  const encryptionKey = cleanConfigValue(process.env.INTEGRATION_ENCRYPTION_KEY);
+  const isKeyValid = Boolean(
+    encryptionKey &&
+    (Buffer.from(encryptionKey, 'base64').length === 32 || Buffer.from(encryptionKey, 'utf8').length === 32)
+  );
   if (
     !clientId || !clientSecret || !stateSecret || stateSecret.length < 32
-    || !encryptionKey || Buffer.from(encryptionKey, 'base64').length !== 32
+    || !encryptionKey || !isKeyValid
   ) {
     throw new Error('Google OAuth integrace není nakonfigurovaná.');
   }
@@ -94,7 +107,7 @@ export function isGoogleOAuthConfigured() {
 }
 
 export function googleOAuthRedirectUri(request: Request) {
-  const configuredOrigin = process.env.GOOGLE_OAUTH_REDIRECT_ORIGIN?.trim();
+  const configuredOrigin = cleanConfigValue(process.env.GOOGLE_OAUTH_REDIRECT_ORIGIN);
   if (!configuredOrigin) return getAppUrl(request, '/api/integrations/google/callback');
   const origin = new URL(configuredOrigin).origin;
   if (!origin.startsWith('https://') && !origin.startsWith('http://localhost')) {

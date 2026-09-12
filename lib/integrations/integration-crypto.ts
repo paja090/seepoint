@@ -10,9 +10,15 @@ type OAuthState = {
 };
 
 function encryptionKey(encodedKey: string) {
-  const key = Buffer.from(encodedKey, 'base64');
-  if (key.length !== 32) throw new Error('INTEGRATION_ENCRYPTION_KEY must be a base64 encoded 32-byte key.');
-  return key;
+  let cleaned = encodedKey.trim();
+  if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  const base64Key = Buffer.from(cleaned, 'base64');
+  if (base64Key.length === 32) return base64Key;
+  const utf8Key = Buffer.from(cleaned, 'utf8');
+  if (utf8Key.length === 32) return utf8Key;
+  throw new Error('INTEGRATION_ENCRYPTION_KEY must be a 32-byte key (base64 encoded or 32 characters).');
 }
 
 export function encryptIntegrationSecret(value: object, encodedKey: string) {
