@@ -7,11 +7,31 @@ const ALLOWED_GOOGLE_DRIVE_TOKEN_SCOPES = new Set([
   'https://www.googleapis.com/auth/drive.file',
 ]);
 
+const ALLOWED_GMAIL_TOKEN_SCOPES = new Set([
+  'openid', 'email', 'profile',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/gmail.readonly',
+]);
+
 export function assertGoogleTokenScopes(provider: IntegrationProvider, scopes: string[]) {
-  if (provider !== 'GOOGLE_DRIVE') throw new Error('Tato Google integrace zatím není podporovaná.');
-  const unexpected = scopes.filter((scope) => !ALLOWED_GOOGLE_DRIVE_TOKEN_SCOPES.has(scope));
-  if (unexpected.length) throw new Error('Google vrátil širší oprávnění, než SeePoint požaduje. Připojení bylo odmítnuto.');
-  if (!scopes.includes('https://www.googleapis.com/auth/drive.file')) {
-    throw new Error('Google neudělil požadované omezené oprávnění drive.file.');
+  if (provider === 'GOOGLE_DRIVE') {
+    const unexpected = scopes.filter((scope) => !ALLOWED_GOOGLE_DRIVE_TOKEN_SCOPES.has(scope));
+    if (unexpected.length) throw new Error('Google vrátil širší oprávnění, než SeePoint požaduje. Připojení bylo odmítnuto.');
+    if (!scopes.includes('https://www.googleapis.com/auth/drive.file')) {
+      throw new Error('Google neudělil požadované omezené oprávnění drive.file.');
+    }
+    return;
   }
+
+  if (provider === 'GMAIL') {
+    const unexpected = scopes.filter((scope) => !ALLOWED_GMAIL_TOKEN_SCOPES.has(scope));
+    if (unexpected.length) throw new Error('Google vrátil širší oprávnění, než SeePoint požaduje. Připojení bylo odmítnuto.');
+    if (!scopes.includes('https://www.googleapis.com/auth/gmail.readonly')) {
+      throw new Error('Google neudělil požadované oprávnění gmail.readonly.');
+    }
+    return;
+  }
+
+  throw new Error('Tato Google integrace zatím není podporovaná.');
 }

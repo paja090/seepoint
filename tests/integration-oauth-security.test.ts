@@ -37,7 +37,7 @@ test('Google OAuth state is signed, expires and binds organization with user', (
 test('integration records are tenant scoped with tenant unique provider', () => {
   const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
   const tenantLayer = readFileSync(new URL('../lib/tenant-prisma.ts', import.meta.url), 'utf8');
-  assert.match(schema, /model IntegrationConnection[\s\S]*organizationId\s+String[\s\S]*@@unique\(\[organizationId, provider\]\)/);
+  assert.match(schema, /model IntegrationConnection[\s\S]*organizationId\s+String[\s\S]*@@unique\(\[organizationId, provider(?:, externalAccountId)?\]\)/);
   assert.match(tenantLayer, /'IntegrationConnection'/);
 });
 

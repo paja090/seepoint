@@ -524,6 +524,9 @@ model Organization {
   aiUsageLogs   AIUsageLog[]
   emailSettings OrganizationEmailSettings?
   emailLogs     EmailLog[]
+  aiInboxMessages     AiInboxMessage[]
+  aiInboxAttachments  AiInboxAttachment[]
+  aiInboxActions      AiInboxAction[]
 
   @@index([isActive])
   @@index([plan])
@@ -547,7 +550,10 @@ model IntegrationConnection {
   updatedAt            DateTime            @updatedAt
   organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, provider])
+  aiInboxMessages      AiInboxMessage[]
+
+  @@unique([organizationId, provider, externalAccountId])
+  @@index([organizationId, provider])
   @@index([organizationId, status])
 }
 
@@ -658,6 +664,9 @@ model User {
   supervisionCandidatePoints     NavigationCandidatePoint[]      @relation("CandidateSupervisionBy")
   assignedOpportunities          SalesOpportunity[]              @relation("OpportunityAssignedUser")
   radarFeedbacks                 RadarFeedback[]                 @relation("RadarFeedbackUser")
+  reviewedAiInboxMessages        AiInboxMessage[]                @relation("AiInboxMessageReviewer")
+  executedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionExecutor")
+  rejectedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionRejector")
 }
 
 model UserSession {
@@ -880,6 +889,7 @@ model Client {
   navigationContracts            NavigationContract[]
   navigationContactPersons       NavigationContactPerson[]
   salesOpportunities             SalesOpportunity[]
+  aiInboxMessages                AiInboxMessage[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, externalCode])
@@ -1368,6 +1378,7 @@ model Offer {
   navigationContracts            NavigationContract[]
   salesOpportunities             SalesOpportunity[]
   printProductionJobs            PrintProductionJob[]
+  aiInboxMessages                AiInboxMessage[]
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -1419,6 +1430,7 @@ model SalesOpportunity {
   assignedTo   User?         @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   radarSignal  RadarSignal?  @relation(fields: [radarSignalId], references: [id], onDelete: SetNull)
   feedbacks    RadarFeedback[]
+  aiInboxMessages AiInboxMessage[]
 
   @@index([status, opportunityScore])
   @@index([city, region])
@@ -2779,6 +2791,7 @@ model ClientContact {
   crmOrders      CrmOrder[]
   communications ClientCommunication[]
   crmTasks       CrmTask[]
+  aiInboxMessages AiInboxMessage[]
 
   @@index([clientId])
   @@index([organizationId])
@@ -2846,6 +2859,7 @@ model CrmOrder {
   workOrders      WorkOrder[]
   navigationOrder NavigationOrder?
   shoppingItems   CompanyShoppingItem[]
+  aiInboxMessages AiInboxMessage[]
 
   @@unique([organizationId, orderNumber])
   @@index([clientId])
@@ -3053,6 +3067,7 @@ model ClientDocument {
   contract     ClientContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
   invoice      ClientInvoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   uploaderUser User            @relation("ClientDocumentUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  aiInboxAttachments AiInboxAttachment[]
 
   @@index([clientId])
   @@index([organizationId])
@@ -3161,6 +3176,7 @@ model NavigationOrder {
   workOrders          WorkOrder[]
   surveyRoutes        SurveyRoute[]
   candidatePoints     NavigationCandidatePoint[]
+  aiInboxMessages     AiInboxMessage[]
 
   @@index([status])
   @@index([organizationId])
@@ -3533,6 +3549,7 @@ enum AIFeatureType {
   SALES_RADAR
   PHOTO_ANALYSIS
   ASSISTANT
+  AI_INBOX
 }
 
 model AIUsageLog {
@@ -3682,4 +3699,185 @@ model EmailLog {
   @@index([providerMessageId])
   @@index([status])
 }
+
+enum AiInboxStatus {
+  INGESTED
+  ANALYZING
+  READY
+  REVIEW_REQUIRED
+  PROCESSED
+  IGNORED
+  ERROR
+}
+
+enum AiInboxClassification {
+  NEW_INQUIRY
+  EXISTING_PROJECT_REPLY
+  OFFER_ACCEPTED
+  OFFER_REJECTED
+  CHANGE_REQUEST
+  GRAPHIC_ASSETS
+  GRAPHIC_APPROVAL
+  DOCUMENTS
+  INSTALLATION_REQUEST
+  PHOTO_DOCUMENTATION
+  INVOICE_BILLING
+  COMPLAINT
+  GENERAL_COMMUNICATION
+  SPAM_IRRELEVANT
+  UNKNOWN
+}
+
+enum AiInboxAttachmentClassification {
+  LOGO
+  GRAPHIC_ASSET
+  ORDER_DOCUMENT
+  CONTRACT
+  MAP
+  PRICE_LIST
+  PHOTO
+  INVOICE
+  OTHER
+}
+
+enum AiInboxActionType {
+  CREATE_CLIENT
+  LINK_CLIENT
+  CREATE_CONTACT
+  CREATE_CRM_ORDER
+  LINK_CRM_ORDER
+  CREATE_OFFER
+  UPDATE_OFFER
+  ACCEPT_OFFER
+  CREATE_NAVIGATION_ORDER
+  UPDATE_NAVIGATION_ORDER
+  CHANGE_NAVIGATION_STATUS
+  CREATE_TASK
+  STORE_DOCUMENT
+  CREATE_COMMUNICATION
+  PREPARE_EMAIL_REPLY
+}
+
+enum AiInboxActionStatus {
+  PROPOSED
+  APPROVED
+  EXECUTED
+  REJECTED
+  FAILED
+}
+
+model AiInboxMessage {
+  id                      String                 @id @default(cuid())
+  organizationId          String                 @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  integrationConnectionId String?
+  provider                IntegrationProvider    @default(GMAIL)
+  providerMessageId       String
+  providerThreadId        String?
+  internetMessageId       String?
+  inReplyTo               String?
+  references              String[]               @default([])
+  fromEmail               String
+  fromName                String?
+  toEmails                String[]               @default([])
+  ccEmails                String[]               @default([])
+  subject                 String
+  textBody                String?
+  htmlBody                String?
+  receivedAt              DateTime
+  processingStatus        AiInboxStatus          @default(INGESTED)
+  classification          AiInboxClassification @default(UNKNOWN)
+  confidence              Float                  @default(0.0)
+  requiresReview          Boolean                @default(true)
+  aiSummary               String?
+  aiReasoningSummary      String?
+  aiExtractedData         Json?
+  suggestedReply          String?
+  errorMessage            String?
+
+  clientId                String?
+  contactId               String?
+  crmOrderId              String?
+  offerId                 String?
+  navigationOrderId       String?
+  salesOpportunityId      String?
+
+  processedAt             DateTime?
+  reviewedAt              DateTime?
+  reviewedById            String?
+
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  organization            Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integrationConnection   IntegrationConnection? @relation(fields: [integrationConnectionId], references: [id], onDelete: SetNull)
+  client                  Client?                @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  contact                 ClientContact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  crmOrder                CrmOrder?              @relation(fields: [crmOrderId], references: [id], onDelete: SetNull)
+  offer                   Offer?                 @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  navigationOrder         NavigationOrder?       @relation(fields: [navigationOrderId], references: [id], onDelete: SetNull)
+  salesOpportunity        SalesOpportunity?      @relation(fields: [salesOpportunityId], references: [id], onDelete: SetNull)
+  reviewedBy              User?                  @relation("AiInboxMessageReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  attachments             AiInboxAttachment[]
+  actions                 AiInboxAction[]
+
+  @@unique([organizationId, provider, providerMessageId])
+  @@index([organizationId, processingStatus])
+  @@index([organizationId, receivedAt])
+  @@index([organizationId, providerThreadId])
+  @@index([organizationId, clientId])
+  @@index([organizationId, crmOrderId])
+  @@index([organizationId, offerId])
+  @@index([organizationId, navigationOrderId])
+}
+
+model AiInboxAttachment {
+  id                   String                          @id @default(cuid())
+  organizationId       String                          @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  messageId            String
+  providerAttachmentId String?
+  filename             String
+  mimeType             String
+  size                 Int                             @default(0)
+  classification       AiInboxAttachmentClassification @default(OTHER)
+  clientDocumentId     String?
+  fileUrl              String?
+  storageKey           String?
+  createdAt            DateTime                        @default(now())
+
+  organization         Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  message              AiInboxMessage                  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  clientDocument       ClientDocument?                 @relation(fields: [clientDocumentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, messageId])
+  @@index([organizationId, clientDocumentId])
+}
+
+model AiInboxAction {
+  id             String              @id @default(cuid())
+  organizationId String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  messageId      String
+  type           AiInboxActionType
+  status         AiInboxActionStatus @default(PROPOSED)
+  payload        Json                @default("{}")
+  confidence     Float               @default(1.0)
+  title          String
+  description    String
+  errorMessage   String?
+  executedAt     DateTime?
+  executedById   String?
+  rejectedAt     DateTime?
+  rejectedById   String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  message        AiInboxMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  executedBy     User?               @relation("AiInboxActionExecutor", fields: [executedById], references: [id], onDelete: SetNull)
+  rejectedBy     User?               @relation("AiInboxActionRejector", fields: [rejectedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, messageId])
+  @@index([organizationId, status])
+}
+
 

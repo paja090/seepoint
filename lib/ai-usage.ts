@@ -1,6 +1,6 @@
 import { prisma } from './db';
 
-export type AIFeatureType = 'OFFER_GENERATOR' | 'SALES_RADAR' | 'PHOTO_ANALYSIS' | 'ASSISTANT';
+export type AIFeatureType = 'OFFER_GENERATOR' | 'SALES_RADAR' | 'PHOTO_ANALYSIS' | 'ASSISTANT' | 'AI_INBOX';
 
 export type LogAIUsageInput = {
   organizationId: string;

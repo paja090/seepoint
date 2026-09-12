@@ -57,6 +57,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
 
   // Sales
   {
+    id: 'aiInbox',
+    name: 'AI Inbox',
+    description: 'Příchozí obchodní e-maily, AI klasifikace, vytěžování požadavků a párování na CRM a nabídky',
+    category: 'sales',
+    badge: 'AI Engine',
+    routes: ['/ai-inbox'],
+  },
+  {
     id: 'salesRadar',
     name: 'AI Obchodní radar',
     description: 'Automatické vyhledávání obchodních příležitostí, tendrů a monitoring konkurence',

@@ -15,9 +15,11 @@ import {
   Sparkles,
   UserPlus,
 } from 'lucide-react';
+import { AiInboxDashboardWidget, type AiInboxDashboardSummary } from './AiInboxDashboardWidget';
 
 interface SalesDashboardProps {
   salesName: string;
+  aiInboxSummary?: AiInboxDashboardSummary;
   activeOffers: Array<{
     id: string;
     title: string;
@@ -60,6 +62,7 @@ interface SalesDashboardProps {
 
 export function SalesDashboard({
   salesName,
+  aiInboxSummary,
   activeOffers,
   renewals,
   availableSurfacesCount,
@@ -139,6 +142,11 @@ export function SalesDashboard({
           </div>
         </div>
       </div>
+
+      {/* 📬 AI Inbox Status Widget */}
+      {aiInboxSummary && (
+        <AiInboxDashboardWidget summary={aiInboxSummary} />
+      )}
 
       {/* 📊 2-Column Section: Active Offers & Renewal Opportunities */}
       <div className="grid gap-6 lg:grid-cols-2">
