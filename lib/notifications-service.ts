@@ -118,6 +118,7 @@ export const radarOpportunitiesProvider: NotificationProvider = {
       where: {
         status: 'NEW',
         opportunityScore: { gte: 40 },
+        createdAt: { gte: new Date(ctx.now.getTime() - 24 * 60 * 60 * 1000) },
       },
       select: {
         id: true,
