@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       userId: context.user.id,
       provider,
       nonce,
+      verifier,
       expiresAt: Date.now() + 10 * 60 * 1000,
     }, config.stateSecret);
     const response = NextResponse.redirect(googleAuthorizationUrl({
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax' as const,
-      path: '/api/integrations/google',
+      path: '/',
       maxAge: 10 * 60,
     };
     response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, nonce, cookieOptions);

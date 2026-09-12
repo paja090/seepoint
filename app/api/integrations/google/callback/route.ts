@@ -22,6 +22,8 @@ function integrationsRedirect(request: Request, result: 'connected' | 'cancelled
 }
 
 function clearOAuthCookies(response: NextResponse) {
+  response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', { path: '/', maxAge: 0 });
+  response.cookies.set(GOOGLE_OAUTH_VERIFIER_COOKIE, '', { path: '/', maxAge: 0 });
   response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', { path: '/api/integrations/google', maxAge: 0 });
   response.cookies.set(GOOGLE_OAUTH_VERIFIER_COOKIE, '', { path: '/api/integrations/google', maxAge: 0 });
   return response;
@@ -36,10 +38,11 @@ export async function GET(request: Request) {
     const jar = await cookies();
     const stateValue = url.searchParams.get('state');
     const code = url.searchParams.get('code');
-    const expectedNonce = jar.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
-    const verifier = jar.get(GOOGLE_OAUTH_VERIFIER_COOKIE)?.value;
-    if (!stateValue || !code || !expectedNonce || !verifier) throw new Error('OAuth callback is incomplete.');
+    if (!stateValue || !code) throw new Error('OAuth callback is missing code or state.');
     const state = verifyOAuthState(stateValue, config.stateSecret);
+    const verifier = jar.get(GOOGLE_OAUTH_VERIFIER_COOKIE)?.value || state.verifier;
+    const expectedNonce = jar.get(GOOGLE_OAUTH_STATE_COOKIE)?.value || state.nonce;
+    if (!verifier) throw new Error('OAuth callback is incomplete.');
     if (state.nonce !== expectedNonce || state.organizationId !== context.organizationId || state.userId !== context.user.id) {
       throw new Error('OAuth callback does not belong to the active organization session.');
     }

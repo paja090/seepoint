@@ -6,6 +6,7 @@ type OAuthState = {
   userId: string;
   provider: 'GOOGLE_DRIVE' | 'GMAIL';
   nonce: string;
+  verifier?: string;
   expiresAt: number;
 };
 
