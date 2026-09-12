@@ -25,6 +25,8 @@ import {
   Link2,
   Unlink,
   Search,
+  Trash2,
+  Ban,
 } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxActionStatus, AiInboxActionType, AiInboxAnalysisResult } from '@/lib/ai-inbox/types';
@@ -263,6 +265,44 @@ export function AiInboxDetailModal({
     }
   }
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!window.confirm('Opravdu chcete smazat tuto zprávu z AI Inboxu?')) return;
+    setIsDeleting(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/ai-inbox/${message.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Smazání zprávy selhalo.');
+      onActionComplete();
+      onClose();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při mazání' });
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleDeleteAndIgnore() {
+    if (
+      !window.confirm(
+        `Opravdu chcete smazat tuto zprávu a trvale ignorovat všechny budoucí e-maily od odesílatele "${message.fromEmail}"?`
+      )
+    ) {
+      return;
+    }
+    setIsDeleting(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/ai-inbox/${message.id}?ignoreSender=true`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Smazání a zablokování selhalo.');
+      onActionComplete();
+      onClose();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při mazání' });
+      setIsDeleting(false);
+    }
+  }
+
   function copyReplyToClipboard() {
     if (!replyText) return;
     navigator.clipboard.writeText(replyText);
@@ -300,13 +340,37 @@ export function AiInboxDetailModal({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-            aria-label="Zavřít"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="inline-flex items-center gap-1 rounded-lg border border-rose-800/80 bg-rose-950/50 px-2.5 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-900/70 hover:text-white transition disabled:opacity-50"
+              title="Smazat tuto zprávu z AI Inboxu"
+            >
+              <Trash2 size={13} />
+              <span>{isDeleting ? 'Mažu…' : 'Smazat'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDeleteAndIgnore}
+              disabled={isDeleting}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition disabled:opacity-50"
+              title={`Smazat tuto zprávu a trvale ignorovat všechny budoucí e-maily od ${message.fromEmail}`}
+            >
+              <Ban size={13} className="text-amber-400" />
+              <span className="hidden sm:inline">Ignorovat odesílatele</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition ml-1"
+              aria-label="Zavřít"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* FEEDBACK BANNER */}

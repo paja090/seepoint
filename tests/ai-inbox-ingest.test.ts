@@ -106,5 +106,5 @@ test('validateAndSanitizeAnalysis safely sanitizes unknown classification and cl
 test('AI Inbox service defines idempotent ingestion contract', () => {
   const serviceFile = readFileSync(new URL('../lib/ai-inbox/service.ts', import.meta.url), 'utf8');
   assert.match(serviceFile, /organizationId_provider_providerMessageId/);
-  assert.match(serviceFile, /processingStatus:\s*'INGESTED'/);
+  assert.match(serviceFile, /processingStatus:\s*(isBot\s*\?\s*'IGNORED'\s*:\s*)?'INGESTED'/);
 });

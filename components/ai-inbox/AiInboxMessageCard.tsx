@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2, FolderKanban, Compass, FileText } from 'lucide-react';
+import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2, FolderKanban, Compass, FileText, Trash2 } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxClassification, AiInboxStatus } from '@/lib/ai-inbox/types';
 
@@ -43,10 +43,12 @@ function formatRelativeTime(dateInput: string | Date): string {
 export function AiInboxMessageCard({
   item,
   onSelect,
+  onDelete,
   isSelected,
 }: {
   item: AiInboxListItem;
   onSelect: (item: AiInboxListItem) => void;
+  onDelete?: (item: AiInboxListItem) => void;
   isSelected?: boolean;
 }) {
   const classMeta = CLASSIFICATION_LABELS[item.classification] || CLASSIFICATION_LABELS.UNKNOWN;
@@ -208,6 +210,20 @@ export function AiInboxMessageCard({
               Vyžaduje pozornost
             </span>
           ) : null}
+
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(item);
+              }}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+              title="Smazat zprávu z AI Inboxu"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
 
           <button
             type="button"

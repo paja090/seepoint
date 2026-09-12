@@ -13,6 +13,7 @@ import {
   Building2,
   Calendar,
   FolderKanban,
+  Trash2,
 } from 'lucide-react';
 import { AiInboxMessageCard, type AiInboxListItem } from './AiInboxMessageCard';
 import { AiInboxDetailModal, type AiInboxMessageDetailData } from './AiInboxDetailModal';
@@ -26,19 +27,28 @@ export function AiInboxView({
   mailboxes: Array<{ id: string; accountEmail: string | null; provider: string }>;
 }) {
   const [items, setItems] = useState<AiInboxListItem[]>(initialItems);
-  const [activeTab, setActiveTab] = useState<'ATTENTION' | 'NEW' | 'PROCESSED' | 'ALL'>('ATTENTION');
+  const [activeTab, setActiveTab] = useState<'ATTENTION' | 'NEW' | 'PROCESSED' | 'SPAM' | 'ALL'>('ATTENTION');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('ALL');
   const [selectedClassification, setSelectedClassification] = useState<string>('ALL');
   const [selectedMessage, setSelectedMessage] = useState<AiInboxMessageDetailData | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isCleaningSpam, setIsCleaningSpam] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
+  const isSpamOrIgnored = (i: AiInboxListItem) =>
+    i.processingStatus === 'IGNORED' || i.classification === 'SPAM_IRRELEVANT';
+
   // Tab counts
-  const attentionCount = items.filter((i) => i.requiresReview && i.processingStatus !== 'PROCESSED').length;
-  const newCount = items.filter((i) => i.processingStatus === 'INGESTED' || i.processingStatus === 'READY').length;
+  const attentionCount = items.filter(
+    (i) => i.requiresReview && i.processingStatus !== 'PROCESSED' && !isSpamOrIgnored(i)
+  ).length;
+  const newCount = items.filter(
+    (i) => (i.processingStatus === 'INGESTED' || i.processingStatus === 'READY') && !isSpamOrIgnored(i)
+  ).length;
   const processedCount = items.filter((i) => i.processingStatus === 'PROCESSED').length;
+  const spamCount = items.filter(isSpamOrIgnored).length;
   const totalCount = items.length;
 
   // Fetch updated list from server
@@ -102,12 +112,66 @@ export function AiInboxView({
     }
   }
 
+  // Bulk cleanup spam
+  async function handleCleanupSpam() {
+    if (
+      !window.confirm(
+        `Opravdu chcete trvale smazat ${spamCount} nevyžádaných / robotických e-mailů a ignorovat jejich odesílatele pro budoucí synchronizace?`
+      )
+    ) {
+      return;
+    }
+    setIsCleaningSpam(true);
+    setSyncFeedback(null);
+    try {
+      const res = await fetch('/api/ai-inbox/cleanup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addSendersToIgnoreList: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Vyčištění spamu selhalo.');
+      setSyncFeedback(
+        `Úspěšně smazáno ${data.deletedCount} nevyžádaných zpráv. Adresy botů a spamu byly přidány do seznamu ignorovaných.`
+      );
+      if (activeTab === 'SPAM') {
+        setActiveTab('ATTENTION');
+      }
+      await refreshList();
+    } catch (err) {
+      setSyncFeedback(err instanceof Error ? err.message : 'Chyba při mazání spamu');
+    } finally {
+      setIsCleaningSpam(false);
+    }
+  }
+
+  // Delete single message
+  async function handleDeleteSingle(item: AiInboxListItem) {
+    if (!window.confirm(`Opravdu chcete smazat zprávu "${item.subject}" od ${item.fromEmail}?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/ai-inbox/${item.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Smazání zprávy selhalo.');
+      setSyncFeedback('Zpráva byla úspěšně smazána.');
+      await refreshList();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při mazání');
+    }
+  }
+
   // Filtered items logic
   const filteredItems = items.filter((item) => {
     // 1. Tab filter
-    if (activeTab === 'ATTENTION' && (!item.requiresReview || item.processingStatus === 'PROCESSED')) return false;
-    if (activeTab === 'NEW' && !(item.processingStatus === 'INGESTED' || item.processingStatus === 'READY')) return false;
-    if (activeTab === 'PROCESSED' && item.processingStatus !== 'PROCESSED') return false;
+    if (activeTab === 'ATTENTION') {
+      if (!item.requiresReview || item.processingStatus === 'PROCESSED' || isSpamOrIgnored(item)) return false;
+    } else if (activeTab === 'NEW') {
+      if (!(item.processingStatus === 'INGESTED' || item.processingStatus === 'READY') || isSpamOrIgnored(item)) return false;
+    } else if (activeTab === 'PROCESSED') {
+      if (item.processingStatus !== 'PROCESSED') return false;
+    } else if (activeTab === 'SPAM') {
+      if (!isSpamOrIgnored(item)) return false;
+    }
 
     // 2. Mailbox filter
     if (selectedMailboxId !== 'ALL' && item.integrationConnection?.accountEmail) {
@@ -162,6 +226,19 @@ export function AiInboxView({
             </a>
           ) : (
             <>
+              {spamCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCleanupSpam}
+                  disabled={isCleaningSpam}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 active:scale-95 disabled:opacity-50 transition shadow-sm"
+                  title="Smaže všechny zprávy vyhodnocené jako spam a zablokuje jejich odesílatele pro budoucí synchronizace"
+                >
+                  <Trash2 size={14} className="text-rose-600" />
+                  <span>{isCleaningSpam ? 'Mažu spam…' : `Vyčistit spam (${spamCount})`}</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => triggerSync('ORDERS_ONLY')}
@@ -257,6 +334,24 @@ export function AiInboxView({
               {processedCount}
             </span>
           </button>
+
+          {spamCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('SPAM')}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold transition ${
+                activeTab === 'SPAM'
+                  ? 'border-rose-600 text-rose-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Trash2 size={15} className="text-rose-500" />
+              <span>Spam a boti</span>
+              <span className="rounded-full bg-rose-100 px-2 py-0.2 text-[11px] font-black text-rose-800">
+                {spamCount}
+              </span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -363,6 +458,7 @@ export function AiInboxView({
               key={item.id}
               item={item}
               onSelect={handleOpenDetail}
+              onDelete={handleDeleteSingle}
               isSelected={selectedMessage?.id === item.id}
             />
           ))}

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, AiInboxStatus } from '@prisma/client';
 import type { MailboxSyncSettings, RawInboundMessage } from './types';
 import {
   getGmailAccessToken,
@@ -11,6 +11,84 @@ import { analyzeInboundMessageWithGemini } from './extraction';
 import { matchClientForInboundMessage } from './client-matcher';
 import { matchRelatedEntities } from './entity-matcher';
 import { buildProposedActions } from './action-builder';
+
+export function isBotOrSystemEmail(email: string): boolean {
+  if (!email) return false;
+  const e = email.toLowerCase().trim();
+
+  // Známí boti a notifikační adresy
+  const knownBots = [
+    'notifications@github.com',
+    'noreply@github.com',
+    'no-reply@accounts.google.com',
+    'security-noreply@accounts.google.com',
+    'mailer-daemon@googlemail.com',
+    'mailer-daemon@google.com',
+    'invitations@linkedin.com',
+    'messages-noreply@linkedin.com',
+    'notification@facebookmail.com',
+    'support@vercel.com',
+    'notifications@vercel.com',
+  ];
+  if (knownBots.includes(e)) return true;
+
+  // Typické noreply a robotické prefixy
+  if (
+    e.startsWith('no-reply@') ||
+    e.startsWith('noreply@') ||
+    e.startsWith('donotreply@') ||
+    e.startsWith('do-not-reply@') ||
+    e.startsWith('postmaster@') ||
+    e.startsWith('mailer-daemon@')
+  ) {
+    return true;
+  }
+
+  // Bounce a delivery subsystemy
+  if (e.includes('mailer-daemon') || e.includes('bounce') || e.includes('system-notification')) {
+    return true;
+  }
+
+  return false;
+}
+
+export async function addSenderToIgnoreList(
+  organizationId: string,
+  email: string,
+  connectionId?: string | null
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) return;
+
+  const connections = await prisma.integrationConnection.findMany({
+    where: {
+      organizationId,
+      provider: 'GMAIL',
+      ...(connectionId ? { id: connectionId } : {}),
+    },
+  });
+
+  for (const conn of connections) {
+    const existingSettings = (conn.settings && typeof conn.settings === 'object'
+      ? conn.settings
+      : {}) as Record<string, unknown>;
+    const ignoredSenders = new Set(
+      Array.isArray(existingSettings.ignoredSenders)
+        ? (existingSettings.ignoredSenders as string[]).map((s) => s.toLowerCase().trim()).filter(Boolean)
+        : []
+    );
+    ignoredSenders.add(normalizedEmail);
+    await prisma.integrationConnection.update({
+      where: { id: conn.id },
+      data: {
+        settings: {
+          ...existingSettings,
+          ignoredSenders: Array.from(ignoredSenders),
+        },
+      },
+    });
+  }
+}
 
 export async function ingestRawMessage(
   organizationId: string,
@@ -35,6 +113,8 @@ export async function ingestRawMessage(
     return { message: existing, isDuplicate: true };
   }
 
+  const isBot = isBotOrSystemEmail(raw.fromEmail);
+
   const created = await prisma.aiInboxMessage.create({
     data: {
       organizationId,
@@ -53,7 +133,11 @@ export async function ingestRawMessage(
       textBody: raw.textBody,
       htmlBody: raw.htmlBody,
       receivedAt: raw.receivedAt,
-      processingStatus: 'INGESTED',
+      processingStatus: isBot ? 'IGNORED' : 'INGESTED', // processingStatus: 'INGESTED'
+      classification: isBot ? 'SPAM_IRRELEVANT' : 'UNKNOWN',
+      requiresReview: !isBot,
+      aiSummary: isBot ? 'Automaticky ignorovaná systémová/robotická zpráva' : null,
+      confidence: isBot ? 1.0 : 0.0,
       attachments: {
         create: (raw.attachments || []).map((att) => ({
           organizationId,
@@ -97,15 +181,33 @@ export async function syncMailbox(
   const preset = options?.preset;
   const customQuery = options?.query?.trim();
 
-  let query = '-label:SPAM -label:TRASH';
+  // Vyloučení známých botů a uživatelsky ignorovaných odesílatelů přímo z vyhledávání Gmailu
+  const customIgnored = Array.isArray(existingSettings.ignoredSenders)
+    ? (existingSettings.ignoredSenders as string[]).map((s) => s.trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  const excludedSenders = Array.from(
+    new Set([
+      'notifications@github.com',
+      'no-reply@accounts.google.com',
+      'noreply@github.com',
+      ...customIgnored,
+    ])
+  );
+
+  const excludeQuery = excludedSenders.length > 0
+    ? ` -from:(${excludedSenders.join(' OR ')})`
+    : '';
+
+  let query = `-label:SPAM -label:TRASH${excludeQuery}`;
   if (customQuery) {
-    query = `${customQuery} -label:SPAM -label:TRASH`;
+    query = `${customQuery} -label:SPAM -label:TRASH${excludeQuery}`;
   } else if (preset === 'ORDERS_ONLY') {
-    query = '(zakázka OR nabídka OR objednávka OR poptávka OR faktura OR ZAK- OR NAV- OR kalkulace OR schválení) -label:SPAM -label:TRASH';
+    query = `(zakázka OR nabídka OR objednávka OR poptávka OR faktura OR ZAK- OR NAV- OR kalkulace OR schválení) -label:SPAM -label:TRASH${excludeQuery}`;
   } else if (filterMode === 'INBOX_ONLY') {
-    query = 'label:INBOX -label:SPAM -label:TRASH';
+    query = `label:INBOX -label:SPAM -label:TRASH${excludeQuery}`;
   } else if (filterMode === 'LABEL_ONLY') {
-    query = `label:"${label}"`;
+    query = `label:"${label}"${excludeQuery}`;
   }
 
   const defaultMax = (preset === 'ORDERS_ONLY' || customQuery) ? 50 : 25;
@@ -415,7 +517,11 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
       });
     }
 
-    const nextStatus = analysis.confidence < 0.8 || !bestClient ? 'REVIEW_REQUIRED' : 'READY';
+    const isSpam = analysis.classification === 'SPAM_IRRELEVANT';
+    const nextStatus: AiInboxStatus = isSpam
+      ? 'IGNORED'
+      : (analysis.confidence < 0.8 || !bestClient ? 'REVIEW_REQUIRED' : 'READY');
+    const requiresReview = !isSpam && (nextStatus === 'REVIEW_REQUIRED' || !bestClient);
 
     const updated = await prisma.aiInboxMessage.update({
       where: { id: msg.id },
@@ -423,15 +529,16 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
         processingStatus: nextStatus,
         classification: analysis.classification,
         confidence: analysis.confidence,
+        requiresReview,
         aiSummary: analysis.summary,
         aiReasoningSummary: analysis.reasoningSummary || null,
         aiExtractedData: analysis as unknown as Prisma.InputJsonValue,
-        suggestedReply: analysis.suggestedReply || null,
-        clientId: bestClient?.id || msg.clientId || null,
-        contactId: bestClient?.contactId || msg.contactId || null,
-        crmOrderId: entityMatch.crmOrderId || msg.crmOrderId || null,
-        offerId: entityMatch.offerId || msg.offerId || null,
-        navigationOrderId: entityMatch.navigationOrderId || msg.navigationOrderId || null,
+        suggestedReply: isSpam ? null : (analysis.suggestedReply || null),
+        clientId: isSpam ? null : (bestClient?.id || msg.clientId || null),
+        contactId: isSpam ? null : (bestClient?.contactId || msg.contactId || null),
+        crmOrderId: isSpam ? null : (entityMatch.crmOrderId || msg.crmOrderId || null),
+        offerId: isSpam ? null : (entityMatch.offerId || msg.offerId || null),
+        navigationOrderId: isSpam ? null : (entityMatch.navigationOrderId || msg.navigationOrderId || null),
         errorMessage: null,
       },
       include: {
@@ -459,5 +566,80 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
 
 export async function reprocessAiInboxMessage(organizationId: string, messageId: string) {
   return processAiInboxMessage(organizationId, messageId);
+}
+
+export async function deleteAiInboxMessage(
+  organizationId: string,
+  messageId: string,
+  ignoreSender: boolean = false
+) {
+  const existing = await prisma.aiInboxMessage.findFirst({
+    where: { id: messageId, organizationId },
+    select: { id: true, fromEmail: true, integrationConnectionId: true },
+  });
+
+  if (!existing) {
+    throw new Error('Zpráva nebyla nalezena.');
+  }
+
+  if (ignoreSender && existing.fromEmail) {
+    await addSenderToIgnoreList(organizationId, existing.fromEmail, existing.integrationConnectionId);
+  }
+
+  await prisma.aiInboxMessage.delete({
+    where: { id: messageId },
+  });
+
+  return { success: true, deletedId: messageId, ignoredSender: ignoreSender ? existing.fromEmail : null };
+}
+
+export async function cleanupSpamMessages(
+  organizationId: string,
+  addSendersToIgnoreListFlag: boolean = true
+) {
+  const spamMessages = await prisma.aiInboxMessage.findMany({
+    where: {
+      organizationId,
+      OR: [
+        { classification: 'SPAM_IRRELEVANT' },
+        { processingStatus: 'IGNORED' },
+      ],
+    },
+    select: {
+      id: true,
+      fromEmail: true,
+      integrationConnectionId: true,
+    },
+  });
+
+  if (spamMessages.length === 0) {
+    return { deletedCount: 0, ignoredSendersAdded: [] };
+  }
+
+  const sendersToIgnore = new Set<string>();
+  if (addSendersToIgnoreListFlag) {
+    for (const msg of spamMessages) {
+      if (msg.fromEmail?.trim()) {
+        sendersToIgnore.add(msg.fromEmail.trim().toLowerCase());
+      }
+    }
+
+    for (const sender of sendersToIgnore) {
+      await addSenderToIgnoreList(organizationId, sender);
+    }
+  }
+
+  const ids = spamMessages.map((m) => m.id);
+  const deleteResult = await prisma.aiInboxMessage.deleteMany({
+    where: {
+      organizationId,
+      id: { in: ids },
+    },
+  });
+
+  return {
+    deletedCount: deleteResult.count,
+    ignoredSendersAdded: Array.from(sendersToIgnore),
+  };
 }
 
