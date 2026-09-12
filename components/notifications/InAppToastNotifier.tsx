@@ -55,24 +55,42 @@ export function InAppToastNotifier() {
       const items: ToastItem[] = data.items || [];
 
       if (!initializedRef.current) {
-        const stored = sessionStorage.getItem('seepoint-seen-notification-ids');
         let storedIds: string[] = [];
         try {
+          const stored = (typeof window !== 'undefined' && localStorage.getItem('seepoint-seen-notification-ids'))
+            || (typeof window !== 'undefined' && sessionStorage.getItem('seepoint-seen-notification-ids'));
           const parsed = stored ? JSON.parse(stored) : [];
           storedIds = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
         } catch {
           storedIds = [];
         }
         seenIdsRef.current = new Set(storedIds);
+        // Mark all existing items on initial mount as seen so user is not spammed with old alerts on login
+        items.forEach((item) => seenIdsRef.current.add(item.id));
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('seepoint-seen-notification-ids', JSON.stringify([...seenIdsRef.current].slice(-200)));
+          } catch {
+            // Ignore storage quota errors
+          }
+        }
         initializedRef.current = true;
+        previousCountRef.current = items.length;
+        return;
       }
 
       if (items.length > 0) {
-        // Find newest unseen notification
+        // Find newest unseen notification that arrived during active session
         const newest = items.find((item) => !seenIdsRef.current.has(item.id));
         if (newest) {
           seenIdsRef.current.add(newest.id);
-          sessionStorage.setItem('seepoint-seen-notification-ids', JSON.stringify([...seenIdsRef.current].slice(-100)));
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('seepoint-seen-notification-ids', JSON.stringify([...seenIdsRef.current].slice(-200)));
+            } catch {
+              // Ignore storage quota errors
+            }
+          }
           setActiveToast(newest);
           playAlertChime(newest.isUrgent);
 
