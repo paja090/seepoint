@@ -15,8 +15,10 @@ import {
 } from '@/lib/integrations/google-oauth';
 import { assertGoogleTokenScopes } from '@/lib/integrations/google-oauth-policy';
 
-function integrationsRedirect(request: Request, result: 'connected' | 'cancelled' | 'error') {
-  return NextResponse.redirect(getAppUrl(request, `/settings/integrations?google=${result}`));
+function integrationsRedirect(request: Request, result: 'connected' | 'cancelled' | 'error', reason?: string) {
+  const target = new URL(getAppUrl(request, `/settings/integrations?google=${result}`));
+  if (reason) target.searchParams.set('reason', reason);
+  return NextResponse.redirect(target.toString());
 }
 
 function clearOAuthCookies(response: NextResponse) {
@@ -62,7 +64,8 @@ export async function GET(request: Request) {
     );
     return clearOAuthCookies(integrationsRedirect(request, 'connected'));
   } catch (error) {
-    console.error('[google-oauth] Callback failed', error instanceof Error ? error.message : 'unknown error');
-    return clearOAuthCookies(integrationsRedirect(request, 'error'));
+    const message = error instanceof Error ? error.message : 'unknown error';
+    console.error('[google-oauth] Callback failed', message);
+    return clearOAuthCookies(integrationsRedirect(request, 'error', message));
   }
 }
