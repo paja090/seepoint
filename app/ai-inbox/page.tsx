@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { listAiInboxMessages } from '@/lib/ai-inbox/service';
 import { prisma } from '@/lib/db';
 import { AiInboxView } from '@/components/ai-inbox/AiInboxView';
+import type { AiInboxListItem } from '@/components/ai-inbox/AiInboxMessageCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ export default async function AiInboxPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
 
-  if (!canAccess(user.role, 'aiInbox' as any)) {
+  if (!canAccess(user.role, 'aiInbox')) {
     return (
       <AppShell>
         <AccessDenied />
@@ -42,7 +43,7 @@ export default async function AiInboxPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6">
-        <AiInboxView initialItems={items as any} mailboxes={mailboxes as any} />
+        <AiInboxView initialItems={items as unknown as AiInboxListItem[]} mailboxes={mailboxes} />
       </div>
     </AppShell>
   );

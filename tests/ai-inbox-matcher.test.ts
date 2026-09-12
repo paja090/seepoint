@@ -21,6 +21,7 @@ test('extractDomain correctly parses email domains', () => {
 });
 
 test('isFreemailDomain distinguishes generic public email providers from corporate domains', () => {
+  assert.ok(COMMON_FREEMAIL_DOMAINS.has('gmail.com'));
   assert.equal(isFreemailDomain('jan.novak@gmail.com'), true);
   assert.equal(isFreemailDomain('petr@seznam.cz'), true);
   assert.equal(isFreemailDomain('obchod@centrum.cz'), true);

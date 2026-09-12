@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
   }
 
-  if (!canAccess(user.role, 'aiInbox' as any)) {
+  if (!canAccess(user.role, 'aiInbox')) {
     return NextResponse.json({ error: 'Nemáte oprávnění pro synchronizaci AI Inboxu.' }, { status: 403 });
   }
 

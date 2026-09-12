@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { canAccess } from '@/lib/rbac';
 import { getAiInboxMessageDetail } from '@/lib/ai-inbox/service';
 import { prisma } from '@/lib/db';
+import type { AiInboxStatus } from '@prisma/client';
 
 export async function GET(
   request: Request,
@@ -14,7 +15,7 @@ export async function GET(
     return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
   }
 
-  if (!canAccess(user.role, 'aiInbox' as any)) {
+  if (!canAccess(user.role, 'aiInbox')) {
     return NextResponse.json({ error: 'Nemáte oprávnění pro přístup k AI Inboxu.' }, { status: 403 });
   }
 
@@ -41,7 +42,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Neautorizovaný přístup.' }, { status: 401 });
   }
 
-  if (!canAccess(user.role, 'aiInbox' as any)) {
+  if (!canAccess(user.role, 'aiInbox')) {
     return NextResponse.json({ error: 'Nemáte oprávnění pro přístup k AI Inboxu.' }, { status: 403 });
   }
 
@@ -53,7 +54,7 @@ export async function PATCH(
   const body = await request.json() as {
     clientId?: string | null;
     requiresReview?: boolean;
-    processingStatus?: any;
+    processingStatus?: AiInboxStatus;
   };
 
   const existing = await prisma.aiInboxMessage.findFirst({
