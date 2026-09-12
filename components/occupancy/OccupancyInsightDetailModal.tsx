@@ -8,7 +8,6 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
-  ChevronRight,
   Loader2,
   HelpCircle,
   Compass,
@@ -108,7 +107,7 @@ export function OccupancyInsightDetailModal({ isOpen, onClose, insight, onExecut
 
   if (!isOpen || !insight) return null;
 
-  const meta = ((insight.metadata || {}) as Record<string, any>);
+  const meta = ((insight.metadata || {}) as Record<string, unknown>);
   const periodStart = insight.periodStart || (meta.periodStart ? String(meta.periodStart) : null);
   const periodEnd = insight.periodEnd || (meta.periodEnd ? String(meta.periodEnd) : null);
   const differenceInDays = insight.differenceInDays ?? (typeof meta.differenceInDays === 'number' ? meta.differenceInDays : null);

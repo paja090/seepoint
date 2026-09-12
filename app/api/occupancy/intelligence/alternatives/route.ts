@@ -99,8 +99,7 @@ export async function POST(request: Request) {
         city: targetSurface.carrier.city,
         price: targetSurface.price ? Number(targetSurface.price) : null,
       },
-      filteredCandidates,
-      user.id
+      filteredCandidates
     );
 
     return NextResponse.json({

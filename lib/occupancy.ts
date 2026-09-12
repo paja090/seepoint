@@ -1,4 +1,4 @@
-import { OccupancyStatus, SurfaceStatus } from '@prisma/client';
+import { SurfaceStatus } from '@prisma/client';
 import { getSurfaceAvailabilityState, type BasicOccupancyRecord } from './occupancy/availability-service';
 
 export type SurfaceOccupancyState = {

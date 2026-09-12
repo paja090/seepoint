@@ -7,10 +7,6 @@ import {
   Loader2,
   Calendar,
   MapPin,
-  ExternalLink,
-  Search,
-  CheckCircle,
-  HelpCircle,
   Clock,
   ArrowRight,
 } from 'lucide-react';

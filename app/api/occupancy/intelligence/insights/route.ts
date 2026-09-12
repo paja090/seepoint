@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
-import { OccupancyInsightStatus, OccupancyInsightType, OccupancyInsightSeverity } from '@prisma/client';
+import { Prisma, OccupancyInsightStatus, OccupancyInsightType, OccupancyInsightSeverity } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const cityParam = searchParams.get('city');
   const qParam = searchParams.get('q');
 
-  const where: any = {
+  const where: Prisma.OccupancyInsightWhereInput = {
     organizationId: user.organizationId,
   };
 

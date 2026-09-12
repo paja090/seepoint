@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { OccupancyStatus, SurfaceStatus, CarrierStatus, OfferStatus } from '@prisma/client';
+import { OccupancyStatus, SurfaceStatus, CarrierStatus, OfferStatus, MediaType } from '@prisma/client';
 
 export type DateLike = Date | string;
 
@@ -418,7 +418,7 @@ export async function findAvailableSurfaces(
         city: criteria.city ? { contains: criteria.city, mode: 'insensitive' } : undefined,
         region: criteria.region ? { contains: criteria.region, mode: 'insensitive' } : undefined,
       },
-      mediaType: criteria.mediaType ? (criteria.mediaType as any) : undefined,
+      mediaType: criteria.mediaType ? (criteria.mediaType as MediaType) : undefined,
       price: criteria.maxPrice ? { lte: criteria.maxPrice } : undefined,
     },
     include: {

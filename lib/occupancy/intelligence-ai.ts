@@ -221,8 +221,7 @@ Odpověz výhradně validním JSON objektem ve tvaru:
 export async function rankAlternativeSurfaces(
   organizationId: string,
   targetSurface: { id: string; name: string; mediaType: string; city: string; price?: number | null },
-  candidates: CandidateAlternativeSurface[],
-  userId?: string | null
+  candidates: CandidateAlternativeSurface[]
 ): Promise<CandidateAlternativeSurface[]> {
   if (candidates.length <= 1) return candidates;
 

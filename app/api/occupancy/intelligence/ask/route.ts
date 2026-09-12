@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       price?: number | null;
       carrierCode: string;
     }> = [];
-    let insights: any[] = [];
+    let insights: unknown[] = [];
 
     // 2. Execute corresponding deterministic backend queries based on parsed intent
     if (parsed.intent === 'FIND_AVAILABLE_MEDIA') {

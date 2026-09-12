@@ -1,24 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Settings, X, Save, RefreshCw, CheckCircle2, ShieldAlert, AlertTriangle } from 'lucide-react';
-
-const REGION_OPTIONS = [
-  'Moravskoslezský kraj',
-  'Hlavní město Praha',
-  'Středočeský kraj',
-  'Jihomoravský kraj',
-  'Olomoucký kraj',
-  'Zlínský kraj',
-  'Plzeňský kraj',
-  'Ústecký kraj',
-  'Jihočeský kraj',
-  'Královéhradecký kraj',
-  'Pardubický kraj',
-  'Liberecký kraj',
-  'Karlovarský kraj',
-  'Kraj Vysočina',
-];
+import { Settings, X, Save, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const MEDIA_TYPE_OPTIONS = [
   { id: 'BILLBOARD', label: '📐 Billboardy' },
@@ -150,8 +133,8 @@ export function OccupancySettingsModal({
         onSaved?.();
         onClose();
       }, 800);
-    } catch (err: any) {
-      setError(err.message || 'Chyba při ukládání.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Chyba při ukládání.');
     } finally {
       setSaving(false);
     }

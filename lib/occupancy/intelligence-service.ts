@@ -1,10 +1,9 @@
 import { prisma } from '@/lib/db';
-import { OccupancyInsightType, OccupancyInsightSeverity, OccupancyInsightStatus, Prisma } from '@prisma/client';
+import { OccupancyInsightType, OccupancyInsightSeverity, Prisma } from '@prisma/client';
 import {
   periodsOverlap,
   getOverlapDaysCount,
   getSurfaceAvailabilityState,
-  isSurfaceTechnicallyAvailable,
   normalizeDateOnly,
   BLOCKING_OCCUPANCY_STATUSES,
 } from './availability-service';
@@ -51,6 +50,7 @@ export async function runOccupancyAudit(
     userId?: string;
   } = {}
 ): Promise<AuditSummary> {
+  void options;
   const profile = await getOrganizationOccupancyProfile(organizationId);
   const now = new Date();
   const today = normalizeDateOnly(now);
@@ -214,7 +214,7 @@ export async function runOccupancyAudit(
     // RULE 2: DOUBLE_BOOKING (Overlapping blocking occupancies)
     if (profile.checkCampaignConflicts || profile.checkReservationConflicts) {
       const blocking = activeOccs.filter((o) =>
-        BLOCKING_OCCUPANCY_STATUSES.includes(o.status as any)
+        BLOCKING_OCCUPANCY_STATUSES.includes(o.status as (typeof BLOCKING_OCCUPANCY_STATUSES)[number])
       );
 
       for (let i = 0; i < blocking.length; i++) {
@@ -401,7 +401,7 @@ export async function runOccupancyAudit(
       const collisions = surfaceOccs.filter(
         (o) =>
           o.offerId !== item.offerId &&
-          BLOCKING_OCCUPANCY_STATUSES.includes(o.status as any) &&
+          BLOCKING_OCCUPANCY_STATUSES.includes(o.status as (typeof BLOCKING_OCCUPANCY_STATUSES)[number]) &&
           periodsOverlap(item.dateFrom, item.dateTo, o.dateFrom, o.dateTo)
       );
 

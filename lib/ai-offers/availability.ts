@@ -8,7 +8,7 @@ export function hasBlockingCollision(
   dateTo: Date,
 ) {
   return occupancies.some((row) =>
-    BLOCKING_OCCUPANCY_STATUSES.includes(row.status as any)
+    BLOCKING_OCCUPANCY_STATUSES.includes(row.status as (typeof BLOCKING_OCCUPANCY_STATUSES)[number])
     && periodsOverlap(row.dateFrom, row.dateTo, dateFrom, dateTo),
   );
 }

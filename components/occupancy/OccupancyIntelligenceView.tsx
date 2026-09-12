@@ -9,20 +9,13 @@ import {
   AlertTriangle,
   ShieldAlert,
   Clock,
-  HelpCircle,
   Search,
-  Filter,
-  CheckCircle2,
-  XCircle,
-  ExternalLink,
   ChevronRight,
   TrendingUp,
   Boxes,
   CalendarRange,
-  MessageSquare,
-  LayoutGrid,
 } from 'lucide-react';
-import { Button, StatCard, EmptyState, PageHeader } from '@/components/ui';
+import { Button, EmptyState } from '@/components/ui';
 import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
 import { OccupancyInsightDetailModal, type InsightItem } from './OccupancyInsightDetailModal';
 import { OccupancySettingsModal } from './OccupancySettingsModal';
@@ -76,7 +69,6 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedInsight, setSelectedInsight] = useState<InsightItem | null>(null);
-  const [rightPanelTab, setRightPanelTab] = useState<'chat' | 'kpi'>('chat');
 
   // KPI calculations
   const kpiStats = useMemo(() => {
@@ -133,11 +125,18 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Chyba při auditu obsazenosti.');
 
-      // Refresh insights list
-      const listRes = await fetch('/api/occupancy/intelligence/insights?status=ALL');
+      // Refresh insights list & profile
+      const [listRes, profRes] = await Promise.all([
+        fetch('/api/occupancy/intelligence/insights?status=ALL'),
+        fetch('/api/occupancy/intelligence/profile'),
+      ]);
       const listData = await listRes.json();
       if (listRes.ok && listData.insights) {
         setInsights(listData.insights);
+      }
+      const profData = await profRes.json();
+      if (profRes.ok && profData.profile) {
+        setProfile(profData.profile);
       }
 
       setScanMessage(
@@ -406,6 +405,13 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
                 const isCritical = insight.severity === 'CRITICAL';
                 const isHigh = insight.severity === 'HIGH';
                 const isMedium = insight.severity === 'MEDIUM';
+                const meta = (insight.metadata || {}) as Record<string, unknown>;
+                const diffDays =
+                  typeof insight.differenceInDays === 'number'
+                    ? insight.differenceInDays
+                    : typeof meta.differenceInDays === 'number'
+                    ? meta.differenceInDays
+                    : null;
 
                 return (
                   <div
@@ -451,9 +457,9 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
                             </span>
                           )}
 
-                          {(insight.differenceInDays || (insight.metadata as any)?.differenceInDays) && (
+                          {diffDays !== null && (
                             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
-                              {insight.differenceInDays || (insight.metadata as any)?.differenceInDays} dní
+                              {diffDays} dní
                             </span>
                           )}
                         </div>

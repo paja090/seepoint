@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { canAccess, type AppRole } from '@/lib/rbac';
 import { isModuleEnabled } from '@/lib/organization-modules';
-import { getTenantContext, requireTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
+import { getTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
 
 export type SystemNotificationItem = {
   id: string;
