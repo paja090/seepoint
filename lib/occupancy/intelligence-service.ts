@@ -669,7 +669,7 @@ export async function executeInsightAction(
   insightId: string,
   action: 'SYNC_STATUS' | 'FINISH_EXPIRED_OCCUPANCY' | 'IGNORE' | 'RESOLVE' | 'REOPEN' | string,
   user: { id: string; name?: string | null; email?: string | null }
-): Promise<{ success: boolean; message: string; insight?: any }> {
+): Promise<{ success: boolean; message: string; insight?: unknown }> {
   return runWithTenantContext(
     {
       organizationId,
