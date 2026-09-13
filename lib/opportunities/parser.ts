@@ -92,6 +92,9 @@ Vrať VÝHRADNĚ platný JSON (JSON format) s těmito poli:
   "website": "webová stránka firmy pokud je známa, jinak null",
   "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | CAR_DEALERSHIP | RETAIL_PARK | EXPANSION | RELOCATION | REOPENING | MARKETING_EVENT | SEASONAL_CAMPAIGN | OTHER",
   "title": "Stručný atraktivní titulek příležitosti (max 8 slov)",
+  "evidenceFact": "Ověřený fakt z článku: co přesně se stalo/děje a kdy (bez domněnek)",
+  "aiInterpretation": "AI interpretace: proč je to relevantní pro venkovní reklamu (OOH)",
+  "aiRecommendation": "Doporučený další krok (Next Best Action) pro obchodníka",
   "summary": "Stručné shrnutí události (2-3 věty)",
   "city": "Město v ČR nebo null",
   "region": "Kraj v ČR nebo null",
@@ -187,6 +190,10 @@ Text: "${pageContent.slice(0, 3000)}"`;
     ? (parsed.suggestedMediaTypes as string[])
     : defaultMedia;
 
+  const evidenceFact = typeof parsed.evidenceFact === 'string' && parsed.evidenceFact.trim() ? parsed.evidenceFact.trim() : undefined;
+  const aiInterpretation = typeof parsed.aiInterpretation === 'string' && parsed.aiInterpretation.trim() ? parsed.aiInterpretation.trim() : undefined;
+  const aiRecommendation = typeof parsed.aiRecommendation === 'string' && parsed.aiRecommendation.trim() ? parsed.aiRecommendation.trim() : undefined;
+
   const normalized = parseOpportunityCreateInput({
     isRelevant,
     relevanceReason: typeof parsed.relevanceReason === 'string' ? parsed.relevanceReason : undefined,
@@ -196,6 +203,9 @@ Text: "${pageContent.slice(0, 3000)}"`;
     eventType,
     title,
     summary,
+    evidenceFact,
+    aiInterpretation,
+    aiRecommendation,
     city,
     region,
     address: typeof parsed.address === 'string' && parsed.address.trim() ? parsed.address.trim() : undefined,
@@ -205,5 +215,12 @@ Text: "${pageContent.slice(0, 3000)}"`;
     sourcePublishedAt: new Date(),
     suggestedMediaTypes,
   });
-  return { ...normalized, isRelevant, relevanceReason: typeof parsed.relevanceReason === 'string' ? parsed.relevanceReason.slice(0, 500) : undefined };
+  return {
+    ...normalized,
+    evidenceFact,
+    aiInterpretation,
+    aiRecommendation,
+    isRelevant,
+    relevanceReason: typeof parsed.relevanceReason === 'string' ? parsed.relevanceReason.slice(0, 500) : undefined,
+  };
 }

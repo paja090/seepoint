@@ -527,6 +527,8 @@ model Organization {
   aiInboxMessages     AiInboxMessage[]
   aiInboxAttachments  AiInboxAttachment[]
   aiInboxActions      AiInboxAction[]
+  occupancyAIProfile  OrganizationOccupancyAIProfile?
+  occupancyInsights   OccupancyInsight[]
 
   @@index([isActive])
   @@index([plan])
@@ -667,6 +669,7 @@ model User {
   reviewedAiInboxMessages        AiInboxMessage[]                @relation("AiInboxMessageReviewer")
   executedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionExecutor")
   rejectedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionRejector")
+  resolvedOccupancyInsights      OccupancyInsight[]              @relation("OccupancyInsightResolvedBy")
 }
 
 model UserSession {
@@ -890,6 +893,7 @@ model Client {
   navigationContactPersons       NavigationContactPerson[]
   salesOpportunities             SalesOpportunity[]
   aiInboxMessages                AiInboxMessage[]
+  occupancyInsights              OccupancyInsight[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, externalCode])
@@ -939,6 +943,7 @@ model AdvertisingCarrier {
   navigationDocumentationItems NavigationDocumentationItem[]
   historyLogs                  CarrierHistoryLog[]
   candidatePoints              NavigationCandidatePoint[]
+  occupancyInsights            OccupancyInsight[]
 
   @@unique([organizationId, code])
   @@unique([organizationId, sourceKey])
@@ -1263,6 +1268,7 @@ model AdvertisingSurface {
   navigationPoints NavigationPoint[]
   historyLogs      CarrierHistoryLog[]
   candidatePoints  NavigationCandidatePoint[]
+  occupancyInsights OccupancyInsight[]
 
   @@unique([organizationId, sourceKey])
   @@index([carrierId])
@@ -1379,6 +1385,7 @@ model Offer {
   salesOpportunities             SalesOpportunity[]
   printProductionJobs            PrintProductionJob[]
   aiInboxMessages                AiInboxMessage[]
+  occupancyInsights              OccupancyInsight[]
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -3550,6 +3557,7 @@ enum AIFeatureType {
   PHOTO_ANALYSIS
   ASSISTANT
   AI_INBOX
+  OCCUPANCY_INTELLIGENCE
 }
 
 model AIUsageLog {
@@ -3879,5 +3887,113 @@ model AiInboxAction {
   @@index([organizationId, messageId])
   @@index([organizationId, status])
 }
+
+// ==========================================
+// OCCUPANCY INTELLIGENCE (AI OBSAZENOST)
+// ==========================================
+
+enum OccupancyInsightType {
+  DOUBLE_BOOKING
+  STATUS_MISMATCH
+  EXPIRED_OCCUPANCY
+  OFFER_CONFLICT
+  EXPIRING_CAMPAIGN
+  UNDERUTILIZED_MEDIA
+  CALENDAR_GAP
+  MISSING_DATA
+}
+
+enum OccupancyInsightSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum OccupancyInsightStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+  IGNORED
+}
+
+model OrganizationOccupancyAIProfile {
+  id                          String   @id @default(cuid())
+  organizationId              String   @unique
+  enabled                     Boolean  @default(true)
+  automaticChecksEnabled      Boolean  @default(true)
+  checkFrequency              String   @default("DAILY")
+
+  checkReservationConflicts   Boolean  @default(true)
+  checkCampaignConflicts      Boolean  @default(true)
+  checkStatusMismatch         Boolean  @default(true)
+  checkOfferConflicts         Boolean  @default(true)
+  checkExpiringCampaigns      Boolean  @default(true)
+  checkUnderutilizedMedia     Boolean  @default(true)
+  checkMissingData            Boolean  @default(true)
+  checkCalendarGaps           Boolean  @default(true)
+
+  reservationHoldDays         Int      @default(14)
+  expiringCampaignWarningDays Int      @default(14)
+  underutilizedAfterDays      Int      @default(60)
+  calendarGapMaxDays          Int      @default(21)
+  offerConflictMode           String   @default("SENT_AND_ACCEPTED")
+
+  targetRegions               String[] @default([])
+  targetCities                String[] @default([])
+  preferredMediaTypes         String[] @default([])
+
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  lastCheckAt                 DateTime?
+
+  organization                Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model OccupancyInsight {
+  id                  String                   @id @default(cuid())
+  organizationId      String                   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  type                OccupancyInsightType
+  severity            OccupancyInsightSeverity
+  status              OccupancyInsightStatus   @default(OPEN)
+
+  fingerprint         String
+
+  surfaceId           String?
+  carrierId           String?
+  occupancyId         String?
+  offerId             String?
+  clientId            String?
+
+  title               String
+  deterministicReason String                   @db.Text
+  aiExplanation       String?                  @db.Text
+  aiRecommendation    String?                  @db.Text
+  suggestedActionType String?
+  metadata            Json?
+
+  detectedAt          DateTime                 @default(now())
+  resolvedAt          DateTime?
+  resolvedByUserId    String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  surface             AdvertisingSurface?      @relation(fields: [surfaceId], references: [id], onDelete: Cascade)
+  carrier             AdvertisingCarrier?      @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  client              Client?                  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  offer               Offer?                   @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  resolvedByUser      User?                    @relation("OccupancyInsightResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, fingerprint])
+  @@index([organizationId, status])
+  @@index([organizationId, type])
+  @@index([surfaceId])
+  @@index([detectedAt])
+}
+
 
 

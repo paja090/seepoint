@@ -29,8 +29,10 @@ import {
 import { preparePortalCredential, recoverPortalToken, hashPublicOfferToken, isPlausiblePublicOfferToken, getDeterministicOfferToken } from './token';
 import type { OfferView } from './view-model';
 import { offerReadinessChecks, type OfferConflictView } from './workflow';
+import { findAvailableSurfaces } from '@/lib/occupancy/availability-service';
 
 type Db = Prisma.TransactionClient | typeof prisma;
+
 type ConflictStatus = 'OCCUPIED' | 'RESERVED' | 'NEGOTIATION';
 export type OfferConflict = {
   surfaceId: string;
@@ -389,7 +391,7 @@ async function findConflicts(db: Db, items: Array<{ surfaceId: string; dateFrom:
       include: { surface: { include: { carrier: true } } },
       orderBy: { dateFrom: 'asc' },
     });
-    return rows.map((row): OfferConflict => ({
+    const occConflicts = rows.map((row): OfferConflict => ({
       surfaceId: row.surfaceId,
       surfaceName: row.surface.name,
       carrierCode: row.surface.carrier.code,
@@ -400,9 +402,41 @@ async function findConflicts(db: Db, items: Array<{ surfaceId: string; dateFrom:
       dateTo: dateOnly(row.dateTo)!,
       severity: row.status === 'NEGOTIATION' ? 'warning' : 'block',
     }));
+
+    const pendingOfferItems = await db.offerItem.findMany({
+      where: {
+        surfaceId: item.surfaceId,
+        offerId: excludeOfferId ? { not: excludeOfferId } : undefined,
+        offer: {
+          status: 'ACCEPTED',
+          archivedAt: null,
+        },
+        dateFrom: { lte: dateTo },
+        dateTo: { gte: dateFrom },
+      },
+      include: {
+        offer: { select: { title: true, client: { select: { name: true } } } },
+        surface: { include: { carrier: true } },
+      },
+    });
+
+    const offerConflicts: OfferConflict[] = pendingOfferItems.map((po) => ({
+      surfaceId: po.surfaceId,
+      surfaceName: po.surface.name,
+      carrierCode: po.surface.carrier.code,
+      status: 'RESERVED' as ConflictStatus,
+      clientName: po.offer.client?.name || 'Jiný klient',
+      campaignName: po.offer.title,
+      dateFrom: dateOnly(po.dateFrom)!,
+      dateTo: dateOnly(po.dateTo)!,
+      severity: 'block',
+    }));
+
+    return [...occConflicts, ...offerConflicts];
   }));
   return results.flat();
 }
+
 
 export function assertConflicts(conflicts: OfferConflict[], confirmNegotiation: boolean) {
   assertAvailability(conflicts, confirmNegotiation);
@@ -1281,3 +1315,88 @@ export async function checkOfferAvailability(user: CurrentUser, raw: unknown) {
   const conflicts = await findConflicts(prisma, input.items);
   return { conflicts, canContinue: !conflicts.some((conflict) => conflict.severity === 'block'), requiresConfirmation: conflicts.some((conflict) => conflict.severity === 'warning') };
 }
+
+/**
+ * Strictly verifies offer readiness and inventory availability before sending to a client.
+ * If conflicts are detected (e.g. inventory was occupied or accepted in the meantime),
+ * send is blocked and canonical alternatives are suggested.
+ */
+export async function validateOfferBeforeSend(user: CurrentUser, id: string) {
+  assertRole(user);
+  const existing = await getOfferRow(prisma, id);
+  assertAccess(user, existing);
+
+  const conflicts = existing.offerType === 'STANDARD_MEDIA'
+    ? await findConflicts(prisma, existing.items, existing.id)
+    : [];
+
+  const readiness = offerReadinessChecks(serializeOffer(existing) as OfferView, conflicts);
+  const failedReadiness = readiness.filter((r) => r.status === 'error');
+  const blockingConflicts = conflicts.filter((c) => c.severity === 'block');
+
+  const canSend = failedReadiness.length === 0 && blockingConflicts.length === 0;
+
+  // Find suggested alternatives if there are blocking conflicts
+  const suggestedAlternatives: Array<{
+    surfaceId: string;
+    surfaceName: string;
+    carrierCode: string;
+    carrierCity: string;
+    mediaType: string;
+    price: number | null;
+  }> = [];
+
+  if (blockingConflicts.length > 0 && existing.items.length > 0) {
+    const conflictingSurfaceIds = new Set(blockingConflicts.map((c) => c.surfaceId));
+    const existingSurfaceIds = new Set(existing.items.map((i) => i.surfaceId));
+
+    for (const item of existing.items) {
+      if (conflictingSurfaceIds.has(item.surfaceId)) {
+        const alts = await findAvailableSurfaces(existing.organizationId, {
+          dateFrom: item.dateFrom,
+          dateTo: item.dateTo,
+          city: item.surface.carrier.city,
+          mediaType: item.surface.mediaType,
+          excludeOfferId: existing.id,
+          limit: 5,
+        });
+
+        for (const alt of alts) {
+          if (!existingSurfaceIds.has(alt.id) && !suggestedAlternatives.some((a) => a.surfaceId === alt.id)) {
+            suggestedAlternatives.push({
+              surfaceId: alt.id,
+              surfaceName: alt.name,
+              carrierCode: alt.carrier.code,
+              carrierCity: alt.carrier.city,
+              mediaType: alt.mediaType,
+              price: alt.price ? Number(alt.price) : null,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  const warnings: string[] = [];
+  if (blockingConflicts.length > 0) {
+    warnings.push(
+      `Nabídku nelze odeslat: ${blockingConflicts.length} ploch je v termínu kampaně obsazeno jinou rezervací nebo akceptovanou nabídkou.`
+    );
+  }
+  for (const f of failedReadiness) {
+    if (f.id !== 'availability') {
+      warnings.push(`Chybí podklad: ${f.label} (${f.detail})`);
+    }
+  }
+
+  return {
+    canSend,
+    offerId: id,
+    status: existing.status,
+    conflicts,
+    suggestedAlternatives,
+    readinessChecks: readiness,
+    warnings,
+  };
+}
+

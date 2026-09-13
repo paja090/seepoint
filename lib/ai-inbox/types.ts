@@ -37,15 +37,36 @@ export type ExtractedRequestData = {
   projectType: 'NAVIGATION' | 'STANDARD_MEDIA' | 'CITY_GALLERY' | 'OTHER';
   location?: string | null;
   address?: string | null;
+  cities?: string[];
+  regions?: string[];
+  requestedMediaTypes?: string[];
   requestedQuantity?: {
     min?: number | null;
     max?: number | null;
     exact?: number | null;
   } | null;
+  budget?: {
+    min?: number | null;
+    max?: number | null;
+    exact?: number | null;
+    currency?: string;
+  } | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  datesClarity?: 'EXACT' | 'APPROXIMATE' | 'UNSPECIFIED';
+  rawDateDescription?: string | null;
   openingDate?: string | null;
   deadline?: string | null;
   specificRequirements?: string[];
   notes?: string | null;
+  missingRequirements?: string[];
+  evidence?: {
+    dateText?: string | null;
+    locationText?: string | null;
+    quantityText?: string | null;
+    budgetText?: string | null;
+    mediaTypeText?: string | null;
+  } | null;
 };
 
 export type DetectedChangeItem = {

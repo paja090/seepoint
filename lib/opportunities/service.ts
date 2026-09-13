@@ -186,6 +186,40 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
 
   const radarProfile = await getOrganizationRadarProfile(organizationId);
 
+  // Check profile exclusions (suppression)
+  if (radarProfile.excludedCompanies && radarProfile.excludedCompanies.length > 0) {
+    const norm = input.companyName.trim().toLowerCase();
+    const isExcluded = radarProfile.excludedCompanies.some((exc) => norm === exc.trim().toLowerCase());
+    if (isExcluded) {
+      if (input.radarSignalId) {
+        await prisma.radarSignal.updateMany({
+          where: { id: input.radarSignalId, organizationId },
+          data: { status: 'SUPPRESSED' },
+        }).catch(() => null);
+      }
+      return { created: false, duplicateId: undefined, opportunity: null };
+    }
+  }
+
+  if (radarProfile.excludedDomains && radarProfile.excludedDomains.length > 0 && input.sourceUrl) {
+    try {
+      const parsedUrl = new URL(input.sourceUrl);
+      const host = parsedUrl.hostname.toLowerCase();
+      const isExcludedDomain = radarProfile.excludedDomains.some((d) => host === d || host.endsWith(`.${d}`));
+      if (isExcludedDomain) {
+        if (input.radarSignalId) {
+          await prisma.radarSignal.updateMany({
+            where: { id: input.radarSignalId, organizationId },
+            data: { status: 'SUPPRESSED' },
+          }).catch(() => null);
+        }
+        return { created: false, duplicateId: undefined, opportunity: null };
+      }
+    } catch {
+      // Ignore URL parse error
+    }
+  }
+
   // Check carriers in city or nearby by GPS
   let nearbyCount = 0;
   if (typeof input.latitude === 'number' && typeof input.longitude === 'number') {
@@ -205,22 +239,43 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
     });
   }
 
-  // Check if client exists in CRM
+  // Safe client matching in CRM
   let linkedClientId = input.clientId;
-  if (!linkedClientId && input.companyName) {
-    const existingClient = await prisma.client.findFirst({
-      where: {
-        organizationId,
-        active: true,
-        OR: [
-          { name: { equals: input.companyName.trim(), mode: 'insensitive' } },
-          { normalizedName: { equals: normalizeClientName(input.companyName) } },
-        ],
-      },
-      select: { id: true },
-    });
-    if (existingClient) {
-      linkedClientId = existingClient.id;
+  if (!linkedClientId && (input.companyId || input.companyName)) {
+    // 1. Priority match by exact IČO
+    if (input.companyId?.trim()) {
+      const matchByIco = await prisma.client.findFirst({
+        where: {
+          organizationId,
+          active: true,
+          companyId: input.companyId.trim(),
+        },
+        select: { id: true },
+      });
+      if (matchByIco) {
+        linkedClientId = matchByIco.id;
+      }
+    }
+
+    // 2. Exact or normalized name match (minimum 3 characters to prevent false positives)
+    if (!linkedClientId && input.companyName?.trim()) {
+      const normInput = normalizeClientName(input.companyName);
+      if (normInput.length >= 3) {
+        const existingClient = await prisma.client.findFirst({
+          where: {
+            organizationId,
+            active: true,
+            OR: [
+              { name: { equals: input.companyName.trim(), mode: 'insensitive' } },
+              { normalizedName: { equals: normInput } },
+            ],
+          },
+          select: { id: true },
+        });
+        if (existingClient) {
+          linkedClientId = existingClient.id;
+        }
+      }
     }
   }
 
@@ -228,20 +283,23 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
     ? input.suggestedMediaTypes
     : radarProfile.preferredMediaTypes.slice(0, 3);
 
-  const { score, breakdown, reasons } = calculateOpportunityScore({
+  const { score, components, breakdown, reasons } = calculateOpportunityScore({
     eventType: input.eventType || 'NEW_BRANCH',
     city: input.city,
     region: input.region,
     eventDate: input.eventDate,
+    sourcePublishedAt: input.sourcePublishedAt,
     carrierCountInCity: carrierCount,
     nearbyCarriersCount: nearbyCount,
     suggestedMediaTypes,
     preferredMediaTypes: radarProfile.preferredMediaTypes,
     targetRegions: radarProfile.targetRegions,
     targetCities: radarProfile.targetCities,
+    targetIndustries: radarProfile.targetIndustries,
     isInCrm: Boolean(linkedClientId),
     companyId: input.companyId,
     website: input.website,
+    sourceUrl: input.sourceUrl,
   });
 
   const topMedia = suggestedMediaTypes.length ? suggestedMediaTypes : radarProfile.preferredMediaTypes.slice(0, 3);
@@ -269,6 +327,14 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
     },
   ];
 
+  const scoreMetadata = {
+    reasons,
+    components,
+    evidenceFact: input.evidenceFact || null,
+    aiInterpretation: input.aiInterpretation || null,
+    aiRecommendation: input.aiRecommendation || null,
+  };
+
   const opportunity = await prisma.salesOpportunity.create({
     data: {
       organizationId,
@@ -288,7 +354,7 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
       sourceTitle: input.sourceTitle.trim(),
       sourcePublishedAt: input.sourcePublishedAt ? new Date(input.sourcePublishedAt) : null,
       opportunityScore: score,
-      scoreReasons: reasons as unknown as Prisma.InputJsonValue,
+      scoreReasons: scoreMetadata as unknown as Prisma.InputJsonValue,
       scoreTrigger: breakdown.trigger,
       scoreCustomerFit: breakdown.customerFit,
       scoreTiming: breakdown.timing,

@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { canAccess, type AppRole } from '@/lib/rbac';
 import { isModuleEnabled } from '@/lib/organization-modules';
-import { getTenantContext, requireTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
+import { getTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
 
 export type SystemNotificationItem = {
   id: string;
@@ -17,7 +17,8 @@ export type SystemNotificationItem = {
     | 'PRINT_APPROVED'
     | 'VEHICLE_DEADLINE'
     | 'RADAR_OPPORTUNITY'
-    | 'AI_INBOX_UNREVIEWED';
+    | 'AI_INBOX_UNREVIEWED'
+    | 'OCCUPANCY_INSIGHT';
   title: string;
   message: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -416,6 +417,42 @@ export const aiInboxNotificationsProvider: NotificationProvider = {
   },
 };
 
+// 10. ADMIN, MANAGER, SALES: AI Occupancy Intelligence critical & high severity insights
+export const occupancyIntelligenceProvider: NotificationProvider = {
+  name: 'occupancy-intelligence',
+  shouldRun: (ctx) => ctx.enabled('aiOccupancy') && (ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER' || ctx.userRole === 'SALES'),
+  async getNotifications(ctx) {
+    const activeCriticalInsights = await prisma.occupancyInsight.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        status: 'OPEN',
+        severity: { in: ['CRITICAL', 'HIGH'] },
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        severity: true,
+        aiRecommendation: true,
+        createdAt: true,
+      },
+    });
+
+    return activeCriticalInsights.map((insight) => ({
+      id: `occupancy-insight-${insight.id}`,
+      type: 'OCCUPANCY_INSIGHT' as const,
+      title: `⚡ AI Obsazenost: ${insight.title}`,
+      message: insight.aiRecommendation || 'Detekována nesrovnalost v obsazenosti vyžadující kontrolu.',
+      severity: insight.severity === 'CRITICAL' ? ('HIGH' as const) : ('MEDIUM' as const),
+      link: `/occupancy/ai`,
+      createdAt: insight.createdAt.toISOString(),
+      metadata: { insightId: insight.id, type: insight.type },
+    }));
+  },
+};
+
 export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
   personalTasksProvider,
   navigationContractsProvider,
@@ -426,6 +463,7 @@ export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
   cityGalleryPermitsProvider,
   vehicleNotificationsProvider,
   aiInboxNotificationsProvider,
+  occupancyIntelligenceProvider,
 ];
 
 export async function getSystemNotifications(

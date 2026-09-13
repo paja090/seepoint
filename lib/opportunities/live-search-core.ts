@@ -72,6 +72,9 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
     "website": "https://www.firma.cz nebo null",
     "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | RETAIL_PARK | EXPANSION | RELOCATION | MARKETING_EVENT | EVENT_EXHIBITION | OTHER",
     "title": "Stručný atraktivní titulek příležitosti (max 8 slov)",
+    "evidenceFact": "Ověřený fakt z článku: co přesně se otevírá/děje a kdy (bez domněnek)",
+    "aiInterpretation": "AI interpretace: proč je tato událost komerčně relevantní pro venkovní OOH reklamu",
+    "aiRecommendation": "Doporučený další krok (Next Best Action) pro obchodní tým",
     "summary": "Stručné shrnutí události a proč potřebují billboardy/reklamu (2-3 věty)",
     "city": "Město události nebo null",
     "region": "Kraj události nebo null",
@@ -165,6 +168,10 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
           ? item.sourceUrl.trim().slice(0, 2000)
           : '';
 
+        const evidenceFact = typeof item.evidenceFact === 'string' && item.evidenceFact.trim() ? item.evidenceFact.trim().slice(0, 4000) : undefined;
+        const aiInterpretation = typeof item.aiInterpretation === 'string' && item.aiInterpretation.trim() ? item.aiInterpretation.trim().slice(0, 4000) : undefined;
+        const aiRecommendation = typeof item.aiRecommendation === 'string' && item.aiRecommendation.trim() ? item.aiRecommendation.trim().slice(0, 4000) : undefined;
+
         const parsed = parseOpportunityCreateInput({
           companyName,
           companyId: typeof item.companyId === 'string' && /^\d{8}$/.test(item.companyId.replace(/\s/g, ''))
@@ -174,6 +181,9 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
           eventType: (Object.values(OpportunityEventType).includes(item.eventType) ? item.eventType : 'NEW_BRANCH') as OpportunityEventType,
           title,
           summary,
+          evidenceFact,
+          aiInterpretation,
+          aiRecommendation,
           city: typeof item.city === 'string' && item.city.trim() && item.city.trim().toLowerCase() !== 'null' ? item.city.trim().slice(0, 120) : null,
           region: typeof item.region === 'string' && item.region.trim() && item.region.trim().toLowerCase() !== 'null' ? item.region.trim().slice(0, 120) : null,
           address: typeof item.address === 'string' && item.address.trim() ? item.address.trim().slice(0, 300) : undefined,

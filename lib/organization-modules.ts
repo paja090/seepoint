@@ -108,6 +108,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     category: 'sales',
     routes: ['/occupancy'],
   },
+  {
+    id: 'aiOccupancy',
+    name: 'AI Obsazenost (Occupancy Intelligence)',
+    description: 'Inteligentní kontrola kolizí, neshod stavů, ležáků a doporučování alternativ',
+    category: 'sales',
+    badge: 'AI Engine',
+    routes: ['/occupancy/ai'],
+  },
 
   // Networks
   {
@@ -253,6 +261,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'offers',
     'network',
     'occupancy',
+    'aiOccupancy',
     'navigation',
     'cityGallery',
     'cityInventory',

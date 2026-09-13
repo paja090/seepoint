@@ -1,6 +1,5 @@
-import 'server-only';
-
 import { cache } from 'react';
+
 import { cookies } from 'next/headers';
 import { hashToken } from './auth-crypto';
 import type { TenantContext } from './tenant-context';

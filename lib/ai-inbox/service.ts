@@ -447,6 +447,38 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
   });
 
   try {
+    let threadContext: string | null = null;
+    if (msg.providerThreadId) {
+      const priorMessages = await prisma.aiInboxMessage.findMany({
+        where: {
+          organizationId,
+          providerThreadId: msg.providerThreadId,
+          id: { not: msg.id },
+          receivedAt: { lte: msg.receivedAt },
+        },
+        orderBy: { receivedAt: 'asc' },
+        take: 3,
+        select: {
+          fromEmail: true,
+          fromName: true,
+          receivedAt: true,
+          subject: true,
+          textBody: true,
+          aiSummary: true,
+          classification: true,
+        },
+      });
+
+      if (priorMessages.length > 0) {
+        threadContext = priorMessages
+          .map(
+            (p, idx) =>
+              `[Zpráva ${idx + 1} od ${p.fromName || p.fromEmail} (${p.receivedAt.toISOString().slice(0, 10)})]\nPředmět: ${p.subject}\nShrnutí: ${p.aiSummary || p.textBody?.slice(0, 250) || 'Bez textu'}`
+          )
+          .join('\n\n');
+      }
+    }
+
     const analysis = await analyzeInboundMessageWithGemini({
       organizationId,
       fromEmail: msg.fromEmail,
@@ -454,6 +486,7 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
       subject: msg.subject,
       textBody: msg.textBody,
       attachmentNames: msg.attachments.map((a) => a.filename),
+      threadContext,
     });
 
     const clientMatch = await matchClientForInboundMessage({

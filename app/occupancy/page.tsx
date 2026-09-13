@@ -1,4 +1,4 @@
-import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset } from 'lucide-react';
+import { CalendarClock, Clock3, Handshake, ShieldAlert, TimerReset, Sparkles } from 'lucide-react';
 import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
@@ -15,6 +15,7 @@ const inventoryNavItems = [
   { href: '/projects/city-inventory', label: '📊 Přehled & Nástěnka' },
   { href: '/carriers', label: '🪧 Evidence nosičů' },
   { href: '/occupancy', label: '📅 Obsazenost ploch' },
+  { href: '/occupancy/ai', label: '🤖 AI Obsazenost' },
   { href: '/map', label: '🗺️ Mapa nosičů' },
 ];
 
@@ -167,7 +168,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
       ];
     }
 
-    const [dbRows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, filteredSurfaces] = await Promise.all([
+    const [dbRows, occupiedCount, reservedCount, negotiationCount, ending7Count, ending30Count, clients, filteredSurfaces, openInsightsCount] = await Promise.all([
       prisma.occupancy.findMany({
         where,
         include: { client: true, surface: { include: { photos: true, carrier: { include: { photos: true } } } } },
@@ -190,6 +191,14 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         orderBy: [{ carrier: { city: 'asc' } }, { name: 'asc' }],
         take: 500,
       }),
+      user.organizationId
+        ? prisma.occupancyInsight.count({
+            where: {
+              organizationId: user.organizationId,
+              status: 'OPEN',
+            },
+          }).catch(() => 0)
+        : Promise.resolve(0),
     ]);
 
     // Active blocking occupancies (where campaign end date is today or in the future)
@@ -294,8 +303,37 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         <PageHeader
           title="Obsazenost & Volné Plochy k Kampaním"
           description="Přehled, filtrování volných reklamních ploch a hromadné rezervace kampaní pro obchodníky. Prošlé kampaně automaticky mizí z tabulky a plochy se ihned stávají volnými."
-          actions={<Button href="/offers" variant="secondary">Vytvořit nabídku</Button>}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button href="/occupancy/ai" variant="secondary" className="border-indigo-200 text-indigo-900 hover:bg-indigo-50">
+                <Sparkles size={15} className="mr-1.5 text-indigo-600" />
+                AI Obsazenost
+              </Button>
+              <Button href="/offers" variant="secondary">Vytvořit nabídku</Button>
+            </div>
+          }
         />
+
+        {openInsightsCount > 0 && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-purple-50/40 to-white p-4 shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <h4 className="text-sm font-bold text-indigo-950">
+                  AI Obsazenost detekovala {openInsightsCount} {openInsightsCount === 1 ? 'otevřený nález' : openInsightsCount < 5 ? 'otevřené nálezy' : 'otevřených nálezů'} v kalendáři
+                </h4>
+                <p className="text-xs text-indigo-800/80">
+                  Kolize rezervací, nesoulad stavů ploch s kalendářem nebo příležitosti k prodloužení končících kampaní.
+                </p>
+              </div>
+            </div>
+            <Button href="/occupancy/ai" variant="primary" className="rounded-xl shadow-xs">
+              Přejít do AI Obsazenost &rarr;
+            </Button>
+          </div>
+        )}
 
         {/* Quick Campaign Booking Form for Salespeople */}
         <QuickOccupancyBookingForm
