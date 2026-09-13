@@ -19,7 +19,15 @@ export function buildCommercialOpportunityContextFromRadar(
   let opportunityType: CommercialOpportunityType = 'NEW_ACQUISITION';
 
   if (opportunity.clientId || opportunity.client) {
-    if (opportunity.eventType === 'NEW_BRANCH' || opportunity.eventType === 'EXPANSION' || opportunity.eventType === 'RELOCATION') {
+    if (
+      opportunity.eventType === 'NEW_BRANCH' ||
+      opportunity.eventType === 'NEW_ESTABLISHMENT' ||
+      opportunity.eventType === 'STORE_OPENING' ||
+      opportunity.eventType === 'EXPANSION' ||
+      opportunity.eventType === 'RELOCATION' ||
+      opportunity.eventType === 'RETAIL_PARK' ||
+      opportunity.eventType === 'RETAIL_PARK_TENANT'
+    ) {
       opportunityType = 'EXPANSION';
     } else {
       opportunityType = 'UPSELL';
@@ -79,6 +87,11 @@ export function buildCommercialRequestFromRadar(
     }
   }
 
+  const missingRequirements: string[] = ['EXACT_CAMPAIGN_DATES', 'EXACT_QUANTITY'];
+  if (context.suggestedMediaTypes.length === 0) {
+    missingRequirements.push('PREFERRED_MEDIA_TYPES');
+  }
+
   const cities = opportunity.city ? [opportunity.city] : [];
   const regions = opportunity.region ? [opportunity.region] : [];
 
@@ -101,14 +114,16 @@ export function buildCommercialRequestFromRadar(
     rawDateDescription: opportunity.eventDate
       ? `Událost plánována na ${opportunity.eventDate.toISOString().slice(0, 10)}`
       : null,
-    mediaTypes: context.suggestedMediaTypes.length ? context.suggestedMediaTypes : ['BILLBOARD'],
-    quantity: { min: 2, max: 5, exact: 3 },
-    campaignTitle: `Kampaň k otevření: ${context.companyName}`,
+    mediaTypes: context.suggestedMediaTypes.length ? context.suggestedMediaTypes : [],
+    quantity: null,
+    budget: null,
+    campaignTitle: `Příležitost: ${context.companyName} (${opportunity.title})`,
     notes: `Generováno z AI Sales Radaru (Skóre: ${opportunity.opportunityScore}/100). Typ příležitosti: ${context.opportunityType}.`,
-    specificRequirements: ['Vhodné plochy v dojezdové vzdálenosti od nové pobočky'],
-    missingRequirements: ['EXACT_CAMPAIGN_DATES'],
+    specificRequirements: opportunity.address ? [`Vhodné nosiče v dojezdové vzdálenosti od adresy: ${opportunity.address}`] : [],
+    missingRequirements,
     status: 'NEEDS_MORE_INFORMATION',
     createdAt: opportunity.createdAt,
     updatedAt: opportunity.updatedAt,
   };
 }
+

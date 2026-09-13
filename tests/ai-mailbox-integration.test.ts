@@ -140,7 +140,7 @@ describe('AI Mailbox Integration & Commercial Engine Foundation', () => {
     assert.equal(sanitized.request?.dateTo, null);
     assert.equal(sanitized.request?.rawDateDescription, 'někdy v listopadu 2026');
     assert.ok(
-      sanitized.request?.missingRequirements.includes('EXACT_CAMPAIGN_DATES'),
+      sanitized.request?.missingRequirements?.includes('EXACT_CAMPAIGN_DATES'),
       'Sanitizer must enforce EXACT_CAMPAIGN_DATES requirement for approximate timing'
     );
 
@@ -195,7 +195,7 @@ describe('AI Mailbox Integration & Commercial Engine Foundation', () => {
     const sanitized = validateAndSanitizeAnalysis(rawAiOutput);
     assert.equal(sanitized.request?.requestedQuantity, null);
     assert.ok(
-      sanitized.request?.missingRequirements.includes('EXACT_QUANTITY'),
+      sanitized.request?.missingRequirements?.includes('EXACT_QUANTITY'),
       'Sanitizer must automatically require EXACT_QUANTITY if missing'
     );
 

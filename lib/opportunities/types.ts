@@ -15,6 +15,24 @@ export type OpportunityScoreBreakdown = {
   evidence: number;
 };
 
+export type OpportunityScoreComponents = {
+  relevance: number;   // max 25
+  freshness: number;   // max 20
+  locationFit: number; // max 25
+  companyFit: number;  // max 20
+  confidence: number;  // max 10
+};
+
+export type OpportunityScoreMeta = {
+  score: number;
+  components: OpportunityScoreComponents;
+  breakdown: OpportunityScoreBreakdown;
+  reasons: OpportunityScoreReason[];
+  evidenceFact?: string;
+  aiInterpretation?: string;
+  aiRecommendation?: string;
+};
+
 export type CampaignPhase = {
   phase: 'TEASER' | 'OPENING' | 'FOLLOW_UP';
   name: string;
@@ -30,6 +48,9 @@ export type CreateOpportunityInput = {
   eventType?: OpportunityEventType;
   title: string;
   summary: string;
+  evidenceFact?: string;
+  aiInterpretation?: string;
+  aiRecommendation?: string;
   city?: string | null;
   region?: string | null;
   address?: string;
@@ -75,6 +96,10 @@ export type OrganizationRadarProfileData = {
   preferredMediaTypes: string[];
   customKeywords: string[];
   customRssSources: string[];
+  targetIndustries?: string[];
+  excludedCompanies?: string[];
+  excludedDomains?: string[];
   minScoreThreshold: number;
-  scoringWeights?: Record<string, number> | null;
+  scoringWeights?: Record<string, unknown> | null;
 };
+

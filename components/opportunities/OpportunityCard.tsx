@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, MapPin, Calendar, Building2, Sparkles, UserCheck, Ban, ChevronDown, Check } from 'lucide-react';
+import { ExternalLink, MapPin, Calendar, Building2, Sparkles, UserCheck, Ban, ChevronDown, Check, ShieldCheck, BrainCircuit, Compass, Layers } from 'lucide-react';
 import type { OpportunityEventType, OpportunityStatus } from '@prisma/client';
 import type { OpportunityScoreReason } from '@/lib/opportunities/types';
 
@@ -116,7 +116,28 @@ export function OpportunityCard({
 
   const scoreBadge = getScoreBadge(item.opportunityScore);
   const eventMeta = eventTypeLabels[item.eventType] || eventTypeLabels.OTHER;
-  const reasonsList = Array.isArray(item.scoreReasons) ? (item.scoreReasons as OpportunityScoreReason[]) : [];
+  const rawMeta = item.scoreReasons && typeof item.scoreReasons === 'object' && !Array.isArray(item.scoreReasons)
+    ? (item.scoreReasons as {
+        reasons?: OpportunityScoreReason[];
+        components?: {
+          relevance: number;
+          freshness: number;
+          locationFit: number;
+          companyFit: number;
+          confidence: number;
+        };
+        evidenceFact?: string | null;
+        aiInterpretation?: string | null;
+        aiRecommendation?: string | null;
+      })
+    : null;
+
+  const reasonsList = rawMeta?.reasons || (Array.isArray(item.scoreReasons) ? (item.scoreReasons as OpportunityScoreReason[]) : []);
+  const components = rawMeta?.components;
+  const evidenceFact = rawMeta?.evidenceFact;
+  const aiInterpretation = rawMeta?.aiInterpretation;
+  const aiRecommendation = rawMeta?.aiRecommendation;
+
   const mediaTypesList = Array.isArray(item.suggestedMediaTypes) ? (item.suggestedMediaTypes as string[]) : ['CITY_POSTER', 'PROMO_BENCH', 'NAVIGATION_SIGN'];
 
   const eventDateFormatted = item.eventDate
@@ -139,15 +160,15 @@ export function OpportunityCard({
             {eventMeta.badge}
           </span>
 
-          {/* CRM Status */}
+          {/* CRM / Opportunity Type Status */}
           {item.client ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
               <Check className="w-3.5 h-3.5" />
-              <span>V CRM: {item.client.name}</span>
+              <span>Expanze / Upsell: {item.client.name}</span>
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-slate-400 bg-slate-950 border border-slate-800">
-              <span>Mimo CRM</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold text-sky-400 bg-sky-950/50 border border-sky-800/40">
+              <span>Nová akvizice (Prospekt)</span>
             </span>
           )}
 
@@ -163,16 +184,13 @@ export function OpportunityCard({
         </span>
       </div>
 
-      {/* Main Content */}
+      {/* Main Title & Subtitle */}
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-black text-white tracking-tight leading-snug">
               {item.companyName} — <span className="text-purple-300 font-bold">{item.title}</span>
             </h3>
-            <p className="text-xs text-slate-300 mt-1 font-medium leading-relaxed">
-              {item.summary}
-            </p>
           </div>
         </div>
 
@@ -193,6 +211,75 @@ export function OpportunityCard({
           </div>
         </div>
       </div>
+
+      {/* Segregated Cards: Fact vs AI Interpretation vs Next Best Action */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+        {/* 1. Co se stalo (Ověřený fakt) */}
+        <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Co se stalo (Ověřený fakt):</span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed font-medium">
+            {evidenceFact || item.summary}
+          </p>
+        </div>
+
+        {/* 2. Proč je to relevantní (AI interpretace) */}
+        <div className="rounded-xl border border-slate-800 bg-purple-950/30 p-3 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+            <BrainCircuit className="w-4 h-4 text-purple-400" />
+            <span>Proč je to relevantní (AI interpretace OOH):</span>
+          </div>
+          <p className="text-xs text-purple-200/90 leading-relaxed font-medium">
+            {aiInterpretation || 'Významný impuls pro venkovní reklamu. Doporučeno oslovit firmu s lokální nabídkou v dojezdové vzdálenosti provozovny.'}
+          </p>
+        </div>
+      </div>
+
+      {/* 3. Doporučený postup (Next Best Action) */}
+      <div className="rounded-xl border border-sky-800/40 bg-sky-950/30 p-3 space-y-1.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300">
+            <Compass className="w-4 h-4 text-sky-400" />
+            <span>Next Best Action:</span>
+          </div>
+          <span className="text-[11px] font-semibold text-sky-400/80">
+            {item.client ? 'Priorita: Stávající klient' : 'Priorita: Akvizice nového klienta'}
+          </span>
+        </div>
+        <p className="text-xs text-slate-200 leading-relaxed font-medium">
+          {aiRecommendation || (item.client
+            ? `Navázat na stávající spolupráci s ${item.client.name} a předložit nabídku na podporu ${item.city || 'lokality'}.`
+            : `Prověřit volné kapacity nosičů v lokalitě ${item.city || 'ČR'} a oslovit firmu s konkrétním návrhem.`)}
+        </p>
+      </div>
+
+      {/* 5-Component Score Breakdown */}
+      {components && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-[11px]">
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-center">
+            <div className="text-slate-400 font-semibold">Relevance</div>
+            <div className="text-purple-300 font-black text-sm">{components.relevance} / 25</div>
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-center">
+            <div className="text-slate-400 font-semibold">Čerstvost</div>
+            <div className="text-emerald-300 font-black text-sm">{components.freshness} / 20</div>
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-center">
+            <div className="text-slate-400 font-semibold">Lokalita</div>
+            <div className="text-sky-300 font-black text-sm">{components.locationFit} / 25</div>
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-center">
+            <div className="text-slate-400 font-semibold">Firma Fit</div>
+            <div className="text-amber-300 font-black text-sm">{components.companyFit} / 20</div>
+          </div>
+          <div className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-center col-span-2 sm:col-span-1">
+            <div className="text-slate-400 font-semibold">Důvěryhodnost</div>
+            <div className="text-indigo-300 font-black text-sm">{components.confidence} / 10</div>
+          </div>
+        </div>
+      )}
 
       {/* Recommended Media Pills */}
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -217,7 +304,7 @@ export function OpportunityCard({
           >
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Zdůvodnění skóre ({reasonsList.length} faktorů)</span>
+              <span>Detailní zdůvodnění skóre ({reasonsList.length} faktorů)</span>
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${showReasons ? 'rotate-180' : ''}`} />
           </button>
@@ -227,7 +314,9 @@ export function OpportunityCard({
               {reasonsList.map((r, idx) => (
                 <li key={idx} className="flex items-start justify-between gap-2">
                   <span>• {r.reason}</span>
-                  <span className="font-mono text-purple-400 font-bold shrink-0">+{r.points}</span>
+                  <span className={`font-mono font-bold shrink-0 ${r.points >= 0 ? 'text-purple-400' : 'text-rose-400'}`}>
+                    {r.points >= 0 ? `+${r.points}` : r.points}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -269,6 +358,17 @@ export function OpportunityCard({
             <Sparkles className="w-3.5 h-3.5" />
             <span>Připravit návrh kampaně</span>
           </button>
+
+          {/* Direct Link to Occupancy / Inventory check */}
+          <a
+            href={`/occupancy/ai?city=${encodeURIComponent(item.city || '')}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-xs border border-sky-800/50 transition"
+          >
+            <Layers className="w-3.5 h-3.5 text-sky-400" />
+            <span>Prověřit inventář</span>
+          </a>
 
           {/* CRM Link Action */}
           {!item.client && (

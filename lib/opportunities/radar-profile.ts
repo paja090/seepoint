@@ -28,6 +28,9 @@ export async function getOrganizationRadarProfile(organizationId: string): Promi
   });
 
   if (existing) {
+    const meta = (existing.scoringWeights && typeof existing.scoringWeights === 'object')
+      ? (existing.scoringWeights as Record<string, unknown>)
+      : {};
     return {
       id: existing.id,
       organizationId: existing.organizationId,
@@ -38,8 +41,11 @@ export async function getOrganizationRadarProfile(organizationId: string): Promi
       preferredMediaTypes: existing.preferredMediaTypes.length ? existing.preferredMediaTypes : DEFAULT_MEDIA_TYPES,
       customKeywords: existing.customKeywords,
       customRssSources: existing.customRssSources,
+      targetIndustries: Array.isArray(meta.targetIndustries) ? (meta.targetIndustries as string[]) : [],
+      excludedCompanies: Array.isArray(meta.excludedCompanies) ? (meta.excludedCompanies as string[]) : [],
+      excludedDomains: Array.isArray(meta.excludedDomains) ? (meta.excludedDomains as string[]) : [],
       minScoreThreshold: existing.minScoreThreshold,
-      scoringWeights: existing.scoringWeights as Record<string, number> | null,
+      scoringWeights: existing.scoringWeights as Record<string, unknown> | null,
     };
   }
 
@@ -92,6 +98,9 @@ export async function getOrganizationRadarProfile(organizationId: string): Promi
     preferredMediaTypes: detectedMediaTypes,
     customKeywords: [],
     customRssSources: [],
+    targetIndustries: [],
+    excludedCompanies: [],
+    excludedDomains: [],
     minScoreThreshold: 40,
     scoringWeights: null,
   };
@@ -107,8 +116,11 @@ export async function saveOrganizationRadarProfile(
     preferredMediaTypes?: string[];
     customKeywords?: string[];
     customRssSources?: string[];
+    targetIndustries?: string[];
+    excludedCompanies?: string[];
+    excludedDomains?: string[];
     minScoreThreshold?: number;
-    scoringWeights?: Record<string, number> | null;
+    scoringWeights?: Record<string, unknown> | null;
   }
 ): Promise<OrganizationRadarProfileData> {
   const cleanRegions = (input.targetRegions || []).map((r) => r.trim()).filter(Boolean);
@@ -117,6 +129,16 @@ export async function saveOrganizationRadarProfile(
   const cleanMediaTypes = (input.preferredMediaTypes || []).map((m) => m.trim()).filter(Boolean);
   const cleanKeywords = (input.customKeywords || []).map((k) => k.trim()).filter(Boolean);
   const cleanSources = (input.customRssSources || []).map((s) => s.trim()).filter(Boolean);
+  const cleanIndustries = (input.targetIndustries || []).map((i) => i.trim()).filter(Boolean);
+  const cleanExcludedCompanies = (input.excludedCompanies || []).map((c) => c.trim()).filter(Boolean);
+  const cleanExcludedDomains = (input.excludedDomains || []).map((d) => d.trim().toLowerCase()).filter(Boolean);
+
+  const mergedWeights = {
+    ...(input.scoringWeights || {}),
+    targetIndustries: cleanIndustries,
+    excludedCompanies: cleanExcludedCompanies,
+    excludedDomains: cleanExcludedDomains,
+  };
 
   const saved = await prisma.organizationRadarProfile.upsert({
     where: { organizationId },
@@ -130,7 +152,7 @@ export async function saveOrganizationRadarProfile(
       customKeywords: cleanKeywords,
       customRssSources: cleanSources,
       minScoreThreshold: typeof input.minScoreThreshold === 'number' ? Math.max(0, Math.min(100, input.minScoreThreshold)) : 40,
-      scoringWeights: input.scoringWeights || undefined,
+      scoringWeights: mergedWeights,
     },
     update: {
       enabled: input.enabled,
@@ -141,7 +163,7 @@ export async function saveOrganizationRadarProfile(
       customKeywords: cleanKeywords,
       customRssSources: cleanSources,
       minScoreThreshold: typeof input.minScoreThreshold === 'number' ? Math.max(0, Math.min(100, input.minScoreThreshold)) : undefined,
-      scoringWeights: input.scoringWeights || undefined,
+      scoringWeights: mergedWeights,
     },
   });
 
@@ -155,7 +177,10 @@ export async function saveOrganizationRadarProfile(
     preferredMediaTypes: saved.preferredMediaTypes,
     customKeywords: saved.customKeywords,
     customRssSources: saved.customRssSources,
+    targetIndustries: cleanIndustries,
+    excludedCompanies: cleanExcludedCompanies,
+    excludedDomains: cleanExcludedDomains,
     minScoreThreshold: saved.minScoreThreshold,
-    scoringWeights: saved.scoringWeights as Record<string, number> | null,
+    scoringWeights: saved.scoringWeights as Record<string, unknown> | null,
   };
 }
