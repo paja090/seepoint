@@ -292,7 +292,7 @@ test('Scénář G: Occupancy selhání → Proces zachován a retryable', () => 
   // Engine must catch errors in CHECK_AVAILABILITY step
   assert.match(
     engineSource,
-    /CHECK_AVAILABILITY.*FAILED/s,
+    /CHECK_AVAILABILITY[\s\S]*FAILED/,
     'Engine must mark CHECK_AVAILABILITY step as FAILED on error'
   );
   assert.match(
@@ -304,7 +304,7 @@ test('Scénář G: Occupancy selhání → Proces zachován a retryable', () => 
   // CommercialRequest must be preserved (prior steps remain in run.steps)
   assert.match(
     engineSource,
-    /commercialRequest.*=.*buildCommercialRequestFromInboxMessage/s,
+    /commercialRequest[\s\S]*=[\s\S]*buildCommercialRequestFromInboxMessage/,
     'CommercialRequest must be built before availability check'
   );
 });
@@ -320,7 +320,7 @@ test('Scénář H: Offer builder selhání → AvailabilityResult zachován', ()
   // Engine must catch errors in CREATE_OFFER_DRAFT step
   assert.match(
     engineSource,
-    /CREATE_OFFER_DRAFT.*FAILED/s,
+    /CREATE_OFFER_DRAFT[\s\S]*FAILED/,
     'Engine must mark CREATE_OFFER_DRAFT step as FAILED on error'
   );
   assert.match(
@@ -353,7 +353,7 @@ test('Scénář I: Tenant izolace — Tenant A nevidí data Tenant B', () => {
   // Engine must set organizationId on the run
   assert.match(
     engineSource,
-    /organizationId.*=.*currentUser\.organizationId/s,
+    /organizationId[\s\S]*=[\s\S]*currentUser\.organizationId/,
     'Engine must extract organizationId from currentUser'
   );
 
@@ -410,14 +410,14 @@ test('Scénář K: SEMI_AUTOMATIC vytvoří DRAFT, nikdy samo neodešle', () => 
   // SEMI_AUTOMATIC must allow CREATE_OFFER_DRAFT
   assert.match(
     policySource,
-    /SEMI_AUTOMATIC.*CREATE_OFFER_DRAFT/s,
+    /SEMI_AUTOMATIC[\s\S]*CREATE_OFFER_DRAFT/,
     'SEMI_AUTOMATIC must allow CREATE_OFFER_DRAFT'
   );
 
   // SEND_OFFER must always require human approval
   assert.match(
     policySource,
-    /ALWAYS_REQUIRES_HUMAN.*SEND_OFFER/s,
+    /ALWAYS_REQUIRES_HUMAN[\s\S]*SEND_OFFER/,
     'SEND_OFFER must always require human approval'
   );
   assert.match(
@@ -603,7 +603,7 @@ test('Contract consolidation: DatesClarity importován z kanonického kontraktu'
   // Must import DatesClarity from canonical contract
   assert.match(
     inboxSource,
-    /import type \{.*DatesClarity.*\} from ['"]@\/lib\/ai-commercial\/contracts\/commercial-request['"]/s,
+    /import type \{[\s\S]*DatesClarity[\s\S]*\} from ['"]@\/lib\/ai-commercial\/contracts\/commercial-request['"]/,
     'ai-inbox/types.ts must import DatesClarity from canonical contract'
   );
 
@@ -639,7 +639,7 @@ test('Contract consolidation: Priority typy definovány v příslušných module
   const orchTypesPath = join(process.cwd(), 'lib/ai-orchestrator/contracts/types.ts');
   const orchSource = readFileSync(orchTypesPath, 'utf-8');
   assert.match(orchSource, /CommercialPriority/, 'Orchestrator must define unified CommercialPriority');
-  assert.match(orchSource, /CRITICAL.*URGENT.*HIGH.*MEDIUM.*LOW/s, 'CommercialPriority must include all levels');
+  assert.match(orchSource, /CRITICAL[\s\S]*URGENT[\s\S]*HIGH[\s\S]*MEDIUM[\s\S]*LOW/, 'CommercialPriority must include all levels');
 });
 
 // ---------------------------------------------------------------------------
@@ -663,7 +663,7 @@ test('Orchestrátor: Neobsahuje business logiku modulů', () => {
   assert.doesNotMatch(engineSource, /evaluateRealization|billingReadiness/, 'Engine must not contain realization logic');
 
   // Must NOT contain client scoring
-  assert.doesNotMatch(engineSource, /opportunityScore.*>.*\d+.*\?/s, 'Engine must not contain opportunity scoring');
+  assert.doesNotMatch(engineSource, /opportunityScore[\s\S]*>[\s\S]*\d+[\s\S]*\?/, 'Engine must not contain opportunity scoring');
 });
 
 test('Orchestrátor: Volá existující moduly, nevytváří paralelní implementaci', () => {
