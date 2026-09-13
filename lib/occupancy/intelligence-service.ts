@@ -667,9 +667,9 @@ export async function runOccupancyAudit(
 export async function executeInsightAction(
   organizationId: string,
   insightId: string,
-  action: 'SYNC_STATUS' | 'FINISH_EXPIRED_OCCUPANCY' | 'IGNORE' | string,
+  action: 'SYNC_STATUS' | 'FINISH_EXPIRED_OCCUPANCY' | 'IGNORE' | 'RESOLVE' | 'REOPEN' | string,
   user: { id: string; name?: string | null; email?: string | null }
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; insight?: unknown }> {
   return runWithTenantContext(
     {
       organizationId,
@@ -689,7 +689,7 @@ export async function executeInsightAction(
       }
 
       if (action === 'IGNORE') {
-        await prisma.occupancyInsight.update({
+        const updated = await prisma.occupancyInsight.update({
           where: { id: insightId },
           data: {
             status: 'IGNORED',
@@ -711,7 +711,59 @@ export async function executeInsightAction(
           },
         });
 
-        return { success: true, message: 'Nález byl označen jako ignorovaný.' };
+        return { success: true, message: 'Nález byl označen jako ignorovaný.', insight: updated };
+      }
+
+      if (action === 'REOPEN') {
+        const updated = await prisma.occupancyInsight.update({
+          where: { id: insightId },
+          data: {
+            status: 'OPEN',
+            resolvedAt: null,
+            resolvedByUserId: null,
+          },
+        });
+
+        // Write audit log
+        await prisma.crmAuditLog.create({
+          data: {
+            organizationId,
+            userId: user.id,
+            userEmail: user.email || 'unknown',
+            action: 'OCCUPANCY_INSIGHT_REOPEN',
+            entityType: 'OccupancyInsight',
+            entityId: insightId,
+            detailsJson: JSON.stringify({ fingerprint: insight.fingerprint, type: insight.type }),
+          },
+        });
+
+        return { success: true, message: 'Nález byl znovu otevřen.', insight: updated };
+      }
+
+      if (action === 'RESOLVE' || action === 'RESOLVED') {
+        const updated = await prisma.occupancyInsight.update({
+          where: { id: insightId },
+          data: {
+            status: 'RESOLVED',
+            resolvedAt: new Date(),
+            resolvedByUserId: user.id,
+          },
+        });
+
+        // Write audit log
+        await prisma.crmAuditLog.create({
+          data: {
+            organizationId,
+            userId: user.id,
+            userEmail: user.email || 'unknown',
+            action: 'OCCUPANCY_INSIGHT_RESOLVE_MANUAL',
+            entityType: 'OccupancyInsight',
+            entityId: insightId,
+            detailsJson: JSON.stringify({ fingerprint: insight.fingerprint, type: insight.type }),
+          },
+        });
+
+        return { success: true, message: 'Nález byl označen jako vyřešený.', insight: updated };
       }
 
       if (action === 'SYNC_STATUS') {
@@ -736,7 +788,7 @@ export async function executeInsightAction(
           },
         });
 
-        await prisma.occupancyInsight.update({
+        const updated = await prisma.occupancyInsight.update({
           where: { id: insightId },
           data: {
             status: 'RESOLVED',
@@ -757,7 +809,7 @@ export async function executeInsightAction(
           },
         });
 
-        return { success: true, message: `Stav plochy byl úspěšně synchronizován na '${derived.status}'.` };
+        return { success: true, message: `Stav plochy byl úspěšně synchronizován na '${derived.status}'.`, insight: updated };
       }
 
       if (action === 'FINISH_EXPIRED_OCCUPANCY') {
@@ -788,7 +840,7 @@ export async function executeInsightAction(
           });
         }
 
-        await prisma.occupancyInsight.update({
+        const updated = await prisma.occupancyInsight.update({
           where: { id: insightId },
           data: {
             status: 'RESOLVED',
@@ -809,7 +861,7 @@ export async function executeInsightAction(
           },
         });
 
-        return { success: true, message: 'Kampaň byla úspěšně označena jako ukončená (FINISHED).' };
+        return { success: true, message: 'Kampaň byla úspěšně označena jako ukončená (FINISHED).', insight: updated };
       }
 
       throw new Error(`Neznámá akce: ${action}`);

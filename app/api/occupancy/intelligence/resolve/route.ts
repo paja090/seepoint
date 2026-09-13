@@ -13,7 +13,8 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { insightId, action } = body;
+    const insightId = body.insightId;
+    const action = body.action || body.actionType;
 
     if (!insightId || !action) {
       return NextResponse.json({ error: 'Chybí povinné parametry insightId nebo action.' }, { status: 400 });

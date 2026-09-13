@@ -116,6 +116,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     badge: 'AI Engine',
     routes: ['/occupancy/ai'],
   },
+  {
+    id: 'commercial',
+    name: 'AI Obchodní centrum (Commercial Orchestrator)',
+    description: 'Centrální řízení obchodního workflow: poptávky, nabídky, realizace, Next Best Action a timeline',
+    category: 'sales',
+    badge: 'AI Engine',
+    routes: ['/commercial'],
+  },
 
   // Networks
   {
@@ -262,6 +270,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'network',
     'occupancy',
     'aiOccupancy',
+    'commercial',
     'navigation',
     'cityGallery',
     'cityInventory',

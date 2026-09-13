@@ -25,7 +25,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   const user = await getCurrentUser();
-  if (!user || !user.organizationId || !['ADMIN', 'MANAGER'].includes(user.role)) {
+  if (!user || !user.organizationId || (!['ADMIN', 'MANAGER', 'SALES'].includes(user.role) && !canAccess(user.role, 'aiOccupancy'))) {
     return NextResponse.json({ error: 'Úpravu profilu může provádět pouze administrátor nebo manažer.' }, { status: 403 });
   }
 

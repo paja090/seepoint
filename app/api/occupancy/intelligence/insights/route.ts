@@ -72,12 +72,20 @@ export async function GET(request: Request) {
             name: true,
             city: true,
             region: true,
+            address: true,
           },
         },
         client: {
           select: {
             id: true,
             name: true,
+          },
+        },
+        offer: {
+          select: {
+            id: true,
+            title: true,
+            campaignName: true,
           },
         },
         resolvedByUser: {
@@ -96,8 +104,36 @@ export async function GET(request: Request) {
     prisma.occupancyInsight.count({ where: { organizationId: user.organizationId, status: { in: ['OPEN', 'REVIEWED'] } } }),
   ]);
 
+  const mappedInsights = insights.map((i) => {
+    const meta = (i.metadata || {}) as Record<string, unknown>;
+    return {
+      id: i.id,
+      type: i.type,
+      severity: i.severity,
+      status: i.status,
+      title: i.title,
+      deterministicReason: i.deterministicReason,
+      aiRecommendation: i.aiRecommendation,
+      aiExplanation: i.aiExplanation,
+      suggestedActionType: i.suggestedActionType,
+      periodStart: meta.periodStart ? String(meta.periodStart) : null,
+      periodEnd: meta.periodEnd ? String(meta.periodEnd) : null,
+      differenceInDays: typeof meta.differenceInDays === 'number' ? meta.differenceInDays : null,
+      opportunityValue: typeof meta.opportunityValue === 'number' ? meta.opportunityValue : null,
+      technicalFacts: (meta.technicalFacts as Record<string, unknown> | undefined) || meta,
+      metadata: meta,
+      surfaceId: i.surfaceId,
+      surface: i.surface,
+      carrier: i.carrier,
+      client: i.client,
+      offer: i.offer,
+      createdAt: i.createdAt.toISOString(),
+      resolvedAt: i.resolvedAt ? i.resolvedAt.toISOString() : null,
+    };
+  });
+
   return NextResponse.json({
-    insights,
+    insights: mappedInsights,
     metrics: {
       totalCount,
       criticalCount,
