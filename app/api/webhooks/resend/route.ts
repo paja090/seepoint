@@ -74,7 +74,8 @@ export async function POST(request: Request) {
             break;
         }
 
-        await runWithTenantContext({ organizationId: emailLog.organizationId, source: 'script' }, () => prisma.emailLog.update({
+        // Prisma queries are lazy: consume the promise before leaving tenant context.
+        await runWithTenantContext({ organizationId: emailLog.organizationId, source: 'script' }, async () => prisma.emailLog.update({
           where: { id: emailLog.id },
           data: {
             status: nextStatus,
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
         else if (domainStatus === 'failed') nextDomainStatus = 'FAILED';
         else if (domainStatus === 'pending') nextDomainStatus = 'PENDING';
 
-        await runWithTenantContext({ organizationId: settings.organizationId, source: 'script' }, () => prisma.organizationEmailSettings.update({
+        await runWithTenantContext({ organizationId: settings.organizationId, source: 'script' }, async () => prisma.organizationEmailSettings.update({
           where: { id: settings.id },
           data: {
             status: nextDomainStatus,
