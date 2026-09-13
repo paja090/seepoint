@@ -1,4 +1,3 @@
-import 'server-only';
 import crypto from 'node:crypto';
 import { formatCzechBusinessSalutation } from '@/lib/czech-salutation';
 import { isValidEmailAddress, isValidEmailIdempotencyKey, skippedEmailEnvironment } from '@/lib/email-policy';
