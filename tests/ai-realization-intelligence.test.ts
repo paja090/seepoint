@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { Prisma } from '@prisma/client';
 import type { CurrentUser } from '../lib/rbac.ts';
 import type {
   RealizationContext,
@@ -669,8 +670,8 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
           sitePhotoId: null,
           installedPhotoId: 'pho-nav-001',
           quantity: 1,
-          unitPrice: 1500 as unknown as any,
-          subtotal: 1500 as unknown as any,
+          unitPrice: new Prisma.Decimal(1500),
+          subtotal: new Prisma.Decimal(1500),
           installationPrice: null,
           removalPrice: null,
           productionPrice: null,
