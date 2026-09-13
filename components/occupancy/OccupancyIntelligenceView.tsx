@@ -135,8 +135,8 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
         setInsights(listData.insights);
       }
       const profData = await profRes.json();
-      if (profRes.ok && profData.profile) {
-        setProfile(profData.profile);
+      if (profRes.ok) {
+        setProfile(profData.profile || profData);
       }
 
       setScanMessage(
@@ -154,10 +154,13 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
     const res = await fetch('/api/occupancy/intelligence/resolve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ insightId, actionType }),
+      body: JSON.stringify({ insightId, action: actionType, actionType }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Akci se nepodařilo provést.');
+
+    const newStatus = data.insight?.status || (actionType === 'IGNORE' ? 'IGNORED' : actionType === 'REOPEN' ? 'OPEN' : 'RESOLVED');
+    const newResolvedAt = newStatus === 'OPEN' ? null : (data.insight?.resolvedAt ? String(data.insight.resolvedAt) : new Date().toISOString());
 
     // Update local state
     setInsights((prev) =>
@@ -165,14 +168,14 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
         if (item.id !== insightId) return item;
         return {
           ...item,
-          status: data.insight?.status || (actionType === 'IGNORE' ? 'IGNORED' : 'RESOLVED'),
-          resolvedAt: new Date().toISOString(),
+          status: newStatus,
+          resolvedAt: newResolvedAt,
         };
       }),
     );
 
     if (selectedInsight?.id === insightId) {
-      setSelectedInsight((prev) => (prev ? { ...prev, status: data.insight?.status || 'RESOLVED' } : null));
+      setSelectedInsight((prev) => (prev ? { ...prev, status: newStatus, resolvedAt: newResolvedAt } : null));
     }
   };
 

@@ -15,11 +15,15 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { surfaceId, dateFrom, dateTo } = body;
+    const { surfaceId } = body;
+    const now = new Date();
+    const in30 = new Date(now.getTime() + 30 * 86400000);
+    const dateFrom = body.dateFrom || now.toISOString().slice(0, 10);
+    const dateTo = body.dateTo || in30.toISOString().slice(0, 10);
 
-    if (!surfaceId || !dateFrom || !dateTo) {
+    if (!surfaceId) {
       return NextResponse.json(
-        { error: 'Chybí parametry surfaceId, dateFrom nebo dateTo.' },
+        { error: 'Chybí parametr surfaceId.' },
         { status: 400 }
       );
     }

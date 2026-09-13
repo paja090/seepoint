@@ -7,6 +7,8 @@ import type {
   IntegrationProvider,
 } from '@prisma/client';
 
+import type { DatesClarity } from '@/lib/ai-commercial/contracts/commercial-request';
+
 export type {
   AiInboxActionStatus,
   AiInboxActionType,
@@ -53,7 +55,7 @@ export type ExtractedRequestData = {
   } | null;
   dateFrom?: string | null;
   dateTo?: string | null;
-  datesClarity?: 'EXACT' | 'APPROXIMATE' | 'UNSPECIFIED';
+  datesClarity?: DatesClarity;
   rawDateDescription?: string | null;
   openingDate?: string | null;
   deadline?: string | null;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -104,6 +104,13 @@ export function OccupancyInsightDetailModal({ isOpen, onClose, insight, onExecut
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
   const [alternatives, setAlternatives] = useState<AlternativeCandidate[] | null>(null);
   const [altError, setAltError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    setActionFeedback(null);
+    setAlternatives(null);
+    setAltError(null);
+  }, [insight?.id]);
 
   if (!isOpen || !insight) return null;
 
@@ -122,8 +129,27 @@ export function OccupancyInsightDetailModal({ isOpen, onClose, insight, onExecut
 
   const handleAction = async (actionType: string) => {
     try {
+      setActionFeedback(null);
       setLoadingAction(actionType);
       await onExecuteAction(insight.id, actionType);
+      setActionFeedback({
+        type: 'success',
+        message:
+          actionType === 'IGNORE'
+            ? 'Nález byl označen jako ignorovaný.'
+            : actionType === 'REOPEN'
+            ? 'Nález byl znovu otevřen k řešení.'
+            : actionType === 'SYNC_STATUS'
+            ? 'Stav plochy byl úspěšně synchronizován.'
+            : actionType === 'FINISH_EXPIRED_OCCUPANCY'
+            ? 'Kampaň byla označena jako ukončená (FINISHED).'
+            : 'Úprava byla úspěšně provedena a nález vyřešen.',
+      });
+    } catch (err) {
+      setActionFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Provedení úpravy selhalo.',
+      });
     } finally {
       setLoadingAction(null);
     }
@@ -368,6 +394,26 @@ export function OccupancyInsightDetailModal({ isOpen, onClose, insight, onExecut
           )}
         </div>
 
+        {/* Action feedback message */}
+        {actionFeedback && (
+          <div className="px-6 pt-3">
+            <div
+              className={`flex items-center gap-2 rounded-xl border p-3 text-xs font-medium ${
+                actionFeedback.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-850'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
+              }`}
+            >
+              {actionFeedback.type === 'success' ? (
+                <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
+              ) : (
+                <AlertTriangle size={15} className="shrink-0 text-rose-600" />
+              )}
+              <span>{actionFeedback.message}</span>
+            </div>
+          </div>
+        )}
+
         {/* Footer Actions */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 p-6 rounded-b-2xl">
           <div className="flex items-center gap-2">
@@ -414,6 +460,21 @@ export function OccupancyInsightDetailModal({ isOpen, onClose, insight, onExecut
                       <CheckCircle2 size={14} className="mr-1.5" />
                     )}
                     Označit kampaň za ukončenou
+                  </Button>
+                )}
+
+                {insight.type !== 'STATUS_MISMATCH' && insight.type !== 'EXPIRED_OCCUPANCY' && (
+                  <Button
+                    variant="primary"
+                    disabled={Boolean(loadingAction)}
+                    onClick={() => handleAction('RESOLVE')}
+                  >
+                    {loadingAction === 'RESOLVE' ? (
+                      <Loader2 size={14} className="animate-spin mr-1.5" />
+                    ) : (
+                      <CheckCircle2 size={14} className="mr-1.5" />
+                    )}
+                    Označit jako vyřešené
                   </Button>
                 )}
 

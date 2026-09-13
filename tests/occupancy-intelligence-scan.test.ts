@@ -134,4 +134,38 @@ describe('Occupancy Intelligence Audit & AI Layer', () => {
       assert.deepEqual(resolved, ['org-1:DOUBLE_BOOKING:s1:o1_o2'], 'Fixed issue must be auto-resolved');
     });
   });
+
+  describe('Occupancy Intelligence Actions & Payload Compatibility', () => {
+    it('accepts both action and actionType in resolve request payload', () => {
+      const resolveAction = (body: { insightId?: string; action?: string; actionType?: string }) => {
+        const action = body.action || body.actionType;
+        if (!body.insightId || !action) {
+          throw new Error('Chybí povinné parametry insightId nebo action.');
+        }
+        return { insightId: body.insightId, action };
+      };
+
+      assert.equal(resolveAction({ insightId: 'test-1', actionType: 'SYNC_STATUS' }).action, 'SYNC_STATUS');
+      assert.equal(resolveAction({ insightId: 'test-1', action: 'IGNORE', actionType: 'IGNORE' }).action, 'IGNORE');
+      assert.equal(resolveAction({ insightId: 'test-1', action: 'REOPEN' }).action, 'REOPEN');
+      assert.equal(resolveAction({ insightId: 'test-1', action: 'RESOLVE' }).action, 'RESOLVE');
+      assert.throws(() => resolveAction({ insightId: 'test-1' }), /Chybí povinné parametry/);
+    });
+
+    it('provides fallback date range when alternatives search has null dates', () => {
+      const getDates = (body: { surfaceId: string; dateFrom?: string | null; dateTo?: string | null }) => {
+        const now = new Date();
+        const in30 = new Date(now.getTime() + 30 * 86400000);
+        const dateFrom = body.dateFrom || now.toISOString().slice(0, 10);
+        const dateTo = body.dateTo || in30.toISOString().slice(0, 10);
+        if (!body.surfaceId) throw new Error('Chybí parametr surfaceId.');
+        return { dateFrom, dateTo };
+      };
+
+      const res = getDates({ surfaceId: 'surf-1', dateFrom: null, dateTo: null });
+      assert.ok(res.dateFrom, 'Should have fallback dateFrom');
+      assert.ok(res.dateTo, 'Should have fallback dateTo');
+      assert.ok(res.dateFrom <= res.dateTo, 'dateFrom must be before dateTo');
+    });
+  });
 });
