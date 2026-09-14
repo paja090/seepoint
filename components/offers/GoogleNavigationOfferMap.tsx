@@ -46,6 +46,9 @@ export type GoogleOfferMapPoint = NavigationMapPoint & {
   pillarType?: string;
   routePolyline?: string;
   calculatedDistanceMeters?: number;
+  targetId?: string;
+  targetLatitude?: number;
+  targetLongitude?: number;
 };
 
 export type SuggestedNavigationPoint = {
@@ -69,8 +72,19 @@ type SearchResultItem = {
   longitude: number;
 };
 
+export type NavigationMapTarget = {
+  id?: string;
+  latitude: number;
+  longitude: number;
+  label: string;
+  address?: string;
+  placeId?: string;
+  color?: string;
+};
+
 export function GoogleNavigationOfferMap({
   target,
+  targets,
   points,
   mode,
   onTargetSelect,
@@ -85,7 +99,8 @@ export function GoogleNavigationOfferMap({
   selectedPointId,
   onPointClick,
 }: {
-  target?: { latitude: number; longitude: number; label: string; address?: string; placeId?: string };
+  target?: NavigationMapTarget;
+  targets?: NavigationMapTarget[];
   points: GoogleOfferMapPoint[];
   mode: 'target' | 'point';
   onTargetSelect: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }) => void;
@@ -394,19 +409,21 @@ export function GoogleNavigationOfferMap({
 
     const bounds = new googleMaps.LatLngBounds();
 
-    // 1. Target Marker (High quality SVG Glowing Brand Pin)
-    if (target) {
-      const targetPos = { lat: target.latitude, lng: target.longitude };
+    // 1. Target Markers (High quality SVG Glowing Brand Pin for each target)
+    const effectiveTargets = targets && targets.length > 0 ? targets : (target ? [target] : []);
+
+    effectiveTargets.forEach((tItem, tIndex) => {
+      const targetPos = { lat: tItem.latitude, lng: tItem.longitude };
       bounds.extend(targetPos);
 
       const targetMarker = new googleMaps.Marker({
         position: targetPos,
         map,
-        title: `CÍL: ${target.label}`,
-        draggable: !readOnly,
+        title: `CÍL (${tIndex + 1}): ${tItem.label}`,
+        draggable: !readOnly && tIndex === 0, // primary target is draggable
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-          fillColor: '#be123c',
+          fillColor: tItem.color || (tIndex === 0 ? '#be123c' : '#2563eb'),
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
@@ -415,36 +432,38 @@ export function GoogleNavigationOfferMap({
         },
       });
 
-      targetMarker.addListener('dragend', (e) => {
-        if (e.latLng) {
-          const lat = e.latLng.lat();
-          const lng = e.latLng.lng();
-          if (window.google?.maps?.Geocoder) {
-            const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-              const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : target.address;
+      if (!readOnly && tIndex === 0) {
+        targetMarker.addListener('dragend', (e) => {
+          if (e.latLng) {
+            const lat = e.latLng.lat();
+            const lng = e.latLng.lng();
+            if (window.google?.maps?.Geocoder) {
+              const geocoder = new window.google.maps.Geocoder();
+              geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : tItem.address;
+                onTargetSelect({
+                  label: tItem.label,
+                  address: street || '',
+                  latitude: lat,
+                  longitude: lng,
+                  placeId: tItem.placeId,
+                });
+              });
+            } else {
               onTargetSelect({
-                label: target.label,
-                address: street || '',
+                label: tItem.label,
+                address: tItem.address || '',
                 latitude: lat,
                 longitude: lng,
-                placeId: target.placeId,
+                placeId: tItem.placeId,
               });
-            });
-          } else {
-            onTargetSelect({
-              label: target.label,
-              address: target.address || '',
-              latitude: lat,
-              longitude: lng,
-              placeId: target.placeId,
-            });
+            }
           }
-        }
-      });
+        });
+      }
 
       markersRef.current.push(targetMarker);
-    }
+    });
 
     // Render Ostrava Municipal Heritage & Restricted Advertising Zones (Nařízení č. 2/2020 a č. 11/2019)
     if (googleMaps.Polygon) {
@@ -531,8 +550,12 @@ export function GoogleNavigationOfferMap({
       markersRef.current.push(marker);
 
       // Route polyline to target
-      if (target) {
-        let polylinePath: Array<{ lat: number; lng: number }> = [pointPos, { lat: target.latitude, lng: target.longitude }];
+      const pointTarget = (point.targetLatitude && point.targetLongitude)
+        ? { latitude: point.targetLatitude, longitude: point.targetLongitude }
+        : (point.targetId && targets ? targets.find((t) => t.id === point.targetId) : (targets && targets[0] ? targets[0] : target));
+
+      if (pointTarget) {
+        let polylinePath: Array<{ lat: number; lng: number }> = [pointPos, { lat: pointTarget.latitude, lng: pointTarget.longitude }];
         if (point.routePolyline && googleMaps.geometry?.encoding) {
           try {
             const decoded = googleMaps.geometry.encoding.decodePath(point.routePolyline);

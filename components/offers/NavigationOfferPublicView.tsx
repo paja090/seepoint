@@ -174,6 +174,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     navigation?.points[0]?.id || null,
   );
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
+  const [activeBranchFilter, setActiveBranchFilter] = useState<string>('ALL');
 
   async function handleArtworkFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -275,11 +276,50 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
   const taxAmount = Math.round(priceTotals.subtotal * taxRate) / 100;
   const totalWithTax = priceTotals.subtotal + taxAmount;
 
+  const rawTargets = (navigation as unknown as Record<string, unknown>)?.targets;
+  const targets: Array<{
+    id: string;
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    note?: string;
+    photoUrl?: string | null;
+    color?: string;
+  }> = Array.isArray(rawTargets) && rawTargets.length > 0
+    ? rawTargets.map((t: Record<string, unknown>, idx: number) => ({
+        id: String(t.id || `target-${idx + 1}`),
+        name: String(t.name || `Prodejna ${idx + 1}`),
+        address: String(t.address || ''),
+        latitude: Number(t.latitude || 0),
+        longitude: Number(t.longitude || 0),
+        note: t.note ? String(t.note) : undefined,
+        photoUrl: typeof t.photoUrl === 'string' ? t.photoUrl : null,
+        color: typeof t.color === 'string' ? t.color : (idx === 0 ? '#be123c' : '#2563eb'),
+      }))
+    : [{
+        id: 'target-1',
+        name: navigation.targetName || 'Hlavní prodejna',
+        address: navigation.targetAddress || '',
+        latitude: navigation.targetLatitude,
+        longitude: navigation.targetLongitude,
+        note: navigation.targetNote || undefined,
+        photoUrl: typeof targetPhotoUrl === 'string' ? targetPhotoUrl : null,
+        color: '#be123c',
+      }];
+
+  const displayedPoints = activeBranchFilter === 'ALL'
+    ? navigation.points
+    : navigation.points.filter((p) => {
+        const pTargetId = (p as unknown as Record<string, unknown>).targetId || targets[0].id;
+        return pTargetId === activeBranchFilter;
+      });
+
   const target = {
-    latitude: navigation.targetLatitude,
-    longitude: navigation.targetLongitude,
-    label: navigation.targetName,
-    address: navigation.targetAddress || undefined,
+    latitude: targets[0]?.latitude || navigation.targetLatitude,
+    longitude: targets[0]?.longitude || navigation.targetLongitude,
+    label: targets[0]?.name || navigation.targetName,
+    address: targets[0]?.address || navigation.targetAddress || undefined,
   };
 
   return (
@@ -322,31 +362,65 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         </div>
       )}
 
-      {/* Target Business Banner */}
+      {/* Target Business Banner (Multiple branches supported) */}
       <div className="overflow-hidden rounded-3xl border border-sky-800/60 bg-gradient-to-br from-sky-950 via-slate-900 to-slate-950 p-6 text-white shadow-xl lg:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1">
             <div className="flex items-center gap-2">
               <span className="rounded-xl bg-rose-500/20 p-2 text-rose-400 border border-rose-500/30">
                 <Store size={22} />
               </span>
               <span className="text-xs font-extrabold uppercase tracking-widest text-sky-400">
-                Cílová provozovna navigace
+                {targets.length > 1 ? `Cílové provozovny navigace (${targets.length} poboček)` : 'Cílová provozovna navigace'}
               </span>
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-white md:text-3xl">
-              {navigation.targetName}
-            </h2>
-            <p className="text-sm font-medium text-slate-300">
-              📍 {navigation.targetAddress || `${navigation.targetLatitude.toFixed(5)}, ${navigation.targetLongitude.toFixed(5)}`}
-            </p>
-            {typeof targetPhotoUrl === 'string' && targetPhotoUrl ? (
-              <img
-                alt={`Cílová provozovna ${navigation.targetName}`}
-                className="mt-4 h-36 w-full max-w-md rounded-2xl border border-sky-700/60 object-cover shadow-lg"
-                src={targetPhotoUrl}
-              />
-            ) : null}
+            {targets.length === 1 ? (
+              <>
+                <h2 className="text-2xl font-black tracking-tight text-white md:text-3xl">
+                  {targets[0].name}
+                </h2>
+                <p className="text-sm font-medium text-slate-300">
+                  📍 {targets[0].address || `${targets[0].latitude.toFixed(5)}, ${targets[0].longitude.toFixed(5)}`}
+                </p>
+                {targets[0].photoUrl ? (
+                  <img
+                    alt={`Cílová provozovna ${targets[0].name}`}
+                    className="mt-4 h-36 w-full max-w-md rounded-2xl border border-sky-700/60 object-cover shadow-lg"
+                    src={targets[0].photoUrl}
+                  />
+                ) : null}
+                {targets[0].note && (
+                  <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
+                    <strong>Poznámka k příjezdu:</strong> {targets[0].note}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                {targets.map((t, idx) => (
+                  <div
+                    key={t.id}
+                    className="rounded-2xl border border-slate-800 bg-slate-900/90 p-3.5 space-y-2 backdrop-blur-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.color || '#2563eb' }} />
+                      <h4 className="font-extrabold text-white text-sm">#{idx + 1} {t.name}</h4>
+                    </div>
+                    <p className="text-xs text-slate-300">📍 {t.address || 'Poloha na mapě'}</p>
+                    {t.photoUrl ? (
+                      <img
+                        alt={t.name}
+                        className="h-24 w-full rounded-xl border border-slate-700 object-cover"
+                        src={t.photoUrl}
+                      />
+                    ) : null}
+                    {t.note && (
+                      <p className="text-[11px] text-slate-400 italic">“{t.note}”</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -388,13 +462,53 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             </a> : null}
           </div>
         </div>
-
-        {navigation.targetNote && (
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
-            <strong>Poznámka k příjezdu:</strong> {navigation.targetNote}
-          </div>
-        )}
       </div>
+
+      {/* Branch Filter Tabs if multiple targets */}
+      {targets.length > 1 && (
+        <div className="flex items-center gap-2 flex-wrap bg-slate-100/90 border border-slate-200 p-2.5 rounded-2xl shadow-2xs">
+          <span className="text-xs font-extrabold text-slate-700 px-2 flex items-center gap-1.5">
+            <Store size={15} className="text-sky-700" /> Zobrazit body pro pobočku:
+          </span>
+          <button
+            type="button"
+            onClick={() => setActiveBranchFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer ${
+              activeBranchFilter === 'ALL'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            Všechny provozovny ({navigation.points.length})
+          </button>
+          {targets.map((t, tIdx) => {
+            const count = navigation.points.filter((p) => {
+              const ptId = (p as unknown as Record<string, unknown>).targetId || targets[0].id;
+              return ptId === t.id;
+            }).length;
+            const isActive = activeBranchFilter === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setActiveBranchFilter(t.id)}
+                style={{ borderColor: isActive ? t.color || '#be123c' : undefined }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                  isActive
+                    ? 'bg-white text-slate-900 shadow-xs border-2'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color || (tIdx === 0 ? '#be123c' : '#2563eb') }} />
+                <span>#{tIdx + 1} {t.name}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-black">
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Main Interactive Google Map & Detail Panel */}
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
@@ -405,13 +519,21 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <Compass size={18} className="text-sky-600" /> Interaktivní mapa navigační trasy
             </h3>
             <span className="text-xs font-semibold text-slate-500">
-              {navigation.points.length} bodů v nabídce
+              {displayedPoints.length} bodů v zobrazení
             </span>
           </div>
 
           <GoogleNavigationOfferMap
             target={target}
-            points={navigation.points.map((p) => {
+            targets={targets.map((t) => ({
+              id: t.id,
+              latitude: t.latitude,
+              longitude: t.longitude,
+              label: t.name,
+              address: t.address,
+              color: t.color,
+            }))}
+            points={displayedPoints.map((p) => {
               const pObj = p as unknown as Record<string, unknown>;
               return {
                 id: p.id,
@@ -423,6 +545,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 pillarType: typeof pObj.pillarType === 'string' ? pObj.pillarType : undefined,
                 routePolyline: typeof pObj.routePolyline === 'string' ? pObj.routePolyline : undefined,
                 calculatedDistanceMeters: typeof pObj.calculatedDistanceMeters === 'number' ? pObj.calculatedDistanceMeters : undefined,
+                targetId: typeof pObj.targetId === 'string' ? pObj.targetId : undefined,
+                targetLatitude: typeof pObj.targetLatitude === 'number' ? pObj.targetLatitude : undefined,
+                targetLongitude: typeof pObj.targetLongitude === 'number' ? pObj.targetLongitude : undefined,
               };
             })}
             mode="point"
@@ -444,7 +569,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900">
-              Navigační body v nabídce ({navigation.points.length})
+              Navigační body {targets.length > 1 && activeBranchFilter !== 'ALL' ? `pro pobočku (${displayedPoints.length})` : `v nabídce (${navigation.points.length})`}
             </h3>
             {isLocationSelectionPhase && (
               <span className="text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg">
@@ -454,7 +579,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
 
           <div className="space-y-3 max-h-[620px] overflow-y-auto pr-1">
-            {navigation.points.map((point, index) => {
+            {displayedPoints.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
+                <p className="text-sm font-semibold">Pro tuto pobočku zatím nejsou navrženy žádné navigační body.</p>
+              </div>
+            ) : (
+              displayedPoints.map((point, index) => {
               const isSelected = selectedPointIds.includes(point.id);
               const isFocused = selectedPointId === point.id;
               const pObj = point as unknown as Record<string, unknown>;
@@ -504,7 +634,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     </button>
                   </div>
 
-                  {/* Metadata Row: Arrow + Distance + Pillar */}
+                  {/* Metadata Row: Arrow + Distance + Pillar + Target Store */}
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                     <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} />
 
@@ -516,6 +646,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     {Boolean(pObj.pillarNumber) && (
                       <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 border border-amber-200">
                         📍 Sloup {String(pObj.pillarNumber)}
+                      </span>
+                    )}
+
+                    {targets.length > 1 && (
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-900 border border-sky-200">
+                        🎯 Směr: {targets.find((t) => t.id === ((pObj.targetId as string) || targets[0].id))?.name || 'Prodejna'}
                       </span>
                     )}
                   </div>
@@ -568,7 +704,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   })()}
                 </article>
               );
-            })}
+            }))}
           </div>
         </div>
       </div>

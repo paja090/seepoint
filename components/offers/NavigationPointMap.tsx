@@ -14,6 +14,7 @@ export type NavigationMapPoint = {
 
 export function NavigationPointMap({
   target,
+  targets,
   points,
   mode,
   onMapClick,
@@ -21,7 +22,8 @@ export function NavigationPointMap({
   selectedPointId,
   onPointClick,
 }: {
-  target?: { latitude: number; longitude: number; label: string };
+  target?: { latitude: number; longitude: number; label: string; color?: string };
+  targets?: Array<{ latitude: number; longitude: number; label: string; color?: string }>;
   points: NavigationMapPoint[];
   mode: 'target' | 'point';
   onMapClick: (latitude: number, longitude: number) => void;
@@ -95,8 +97,14 @@ export function NavigationPointMap({
       layer.clearLayers();
       const bounds = L.latLngBounds([]);
 
-      // 1. Target marker (Prodejna / Cíl - Premium Red Pin with Glowing Wave)
-      if (target) {
+      // 1. Target markers (Prodejna / Cíl - Premium Glowing Wave Pin for each target)
+      const effectiveTargets = targets && targets.length > 0 ? targets : (target ? [target] : []);
+
+      effectiveTargets.forEach((tItem, tIndex) => {
+        const pinColor = tItem.color || (tIndex === 0 ? '#be123c' : '#2563eb');
+        const gradStart = tIndex === 0 ? '#f43f5e' : '#3b82f6';
+        const gradEnd = pinColor;
+
         const targetHtml = `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
             <div style="
@@ -106,22 +114,22 @@ export function NavigationPointMap({
               height: 52px;
               border-radius: 50%;
               background: rgba(225, 29, 72, 0.25);
-              box-shadow: 0 0 12px rgba(225, 29, 72, 0.6);
+              box-shadow: 0 0 12px ${pinColor}99;
             "></div>
-            <svg width="40" height="52" viewBox="0 0 40 52" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 8px 12px rgba(225, 29, 72, 0.5));">
-              <path d="M20 0C8.954 0 0 8.954 0 20C0 32.5 17 49 19.15 51.1C19.62 51.56 20.38 51.56 20.85 51.1C23 49 40 32.5 40 20C40 8.954 31.046 0 20 0Z" fill="url(#targetGrad)"/>
+            <svg width="40" height="52" viewBox="0 0 40 52" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 8px 12px ${pinColor}80);">
+              <path d="M20 0C8.954 0 0 8.954 0 20C0 32.5 17 49 19.15 51.1C19.62 51.56 20.38 51.56 20.85 51.1C23 49 40 32.5 40 20C40 8.954 31.046 0 20 0Z" fill="url(#targetGrad-${tIndex})"/>
               <circle cx="20" cy="20" r="13" fill="#FFFFFF"/>
               <text x="20" y="25" text-anchor="middle" font-size="15">🏬</text>
               <defs>
-                <linearGradient id="targetGrad" x1="0" y1="0" x2="40" y2="52" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#f43f5e"/>
-                  <stop offset="1" stop-color="#be123c"/>
+                <linearGradient id="targetGrad-${tIndex}" x1="0" y1="0" x2="40" y2="52" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="${gradStart}"/>
+                  <stop offset="1" stop-color="${gradEnd}"/>
                 </linearGradient>
               </defs>
             </svg>
             <div style="
               margin-top: -6px;
-              background: #be123c;
+              background: ${pinColor};
               color: #ffffff;
               padding: 3px 10px;
               border-radius: 12px;
@@ -132,7 +140,7 @@ export function NavigationPointMap({
               border: 2px solid #ffffff;
               box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             ">
-              🎯 PRODEJNA: ${target.label}
+              🎯 PRODEJNA: ${tItem.label}
             </div>
           </div>
         `;
@@ -144,15 +152,15 @@ export function NavigationPointMap({
           iconAnchor: [70, 52],
         });
 
-        const targetMarker = L.marker([target.latitude, target.longitude], {
+        const targetMarker = L.marker([tItem.latitude, tItem.longitude], {
           icon: targetIcon,
-          title: `CÍL: ${target.label}`,
+          title: `CÍL (${tIndex + 1}): ${tItem.label}`,
           zIndexOffset: 1000,
         });
 
         targetMarker.addTo(layer);
-        bounds.extend([target.latitude, target.longitude]);
-      }
+        bounds.extend([tItem.latitude, tItem.longitude]);
+      });
 
       // 2. Navigation Points markers (Sleek Blue / Vibrant Gold Selected Pin with Number & Arrow)
       points.forEach((point, index) => {
