@@ -174,6 +174,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     navigation?.points[0]?.id || null,
   );
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
+  const [activeBranchFilter, setActiveBranchFilter] = useState<string>('ALL');
 
   async function handleArtworkFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -306,8 +307,6 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         photoUrl: typeof targetPhotoUrl === 'string' ? targetPhotoUrl : null,
         color: '#be123c',
       }];
-
-  const [activeBranchFilter, setActiveBranchFilter] = useState<string>('ALL');
 
   const displayedPoints = activeBranchFilter === 'ALL'
     ? navigation.points

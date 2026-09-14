@@ -82,6 +82,8 @@ export type NavigationTargetItem = {
   color?: string;
 };
 
+export const TARGET_COLORS = ['#be123c', '#2563eb', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2'];
+
 const newId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -164,8 +166,6 @@ export function NavigationOfferForm({
     if (isNaN(from) || isNaN(to) || to < from) return null;
     return Math.round((to - from) / 86400000);
   }, [dateFrom, dateTo]);
-
-  const TARGET_COLORS = ['#be123c', '#2563eb', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2'];
 
   const initialTargets: NavigationTargetItem[] = useMemo(() => {
     const rawTargets = (initialOffer?.navigation as unknown as Record<string, unknown>)?.targets;
