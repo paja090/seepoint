@@ -42,7 +42,7 @@ export default async function AiInboxPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-6">
+      <div className="mx-auto max-w-7xl max-w-full overflow-x-hidden px-2 sm:px-6 lg:px-8 py-4 sm:py-6">
         <AiInboxView
           initialItems={items as unknown as AiInboxListItem[]}
           mailboxes={mailboxes as unknown as Parameters<typeof AiInboxView>[0]['mailboxes']}

@@ -211,7 +211,7 @@ export function AiInboxView({
   return (
     <div className="space-y-6">
       {/* TOP BAR: TITLE & ACTIONS */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-fuchsia-600 to-indigo-600 text-white shadow-md">
@@ -226,7 +226,7 @@ export function AiInboxView({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {mailboxes.length === 0 ? (
             <a
               href="/settings/integrations"
@@ -242,11 +242,11 @@ export function AiInboxView({
                   type="button"
                   onClick={handleCleanupSpam}
                   disabled={isCleaningSpam}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 active:scale-95 disabled:opacity-50 transition shadow-sm"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 active:scale-95 disabled:opacity-50 transition shadow-sm"
                   title="Smaže všechny zprávy vyhodnocené jako spam a zablokuje jejich odesílatele pro budoucí synchronizace"
                 >
                   <Trash2 size={14} className="text-rose-600" />
-                  <span>{isCleaningSpam ? 'Mažu spam…' : `Vyčistit spam (${spamCount})`}</span>
+                  <span>{isCleaningSpam ? 'Mažu…' : `Spam (${spamCount})`}</span>
                 </button>
               )}
 
@@ -258,29 +258,30 @@ export function AiInboxView({
                     : mailboxes[0];
                   if (targetMb) setEditingMailbox(targetMb);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 transition"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 transition"
                 title="Upravit pravidla stahování, velikost dávky a automatický cron"
               >
                 <Settings size={14} className="text-slate-500" />
-                <span>Nastavení schránky</span>
+                <span>Nastavení</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => triggerSync('ORDERS_ONLY')}
                 disabled={isSyncing}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 active:scale-95 disabled:opacity-50 transition shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 active:scale-95 disabled:opacity-50 transition shadow-sm"
                 title="Prohledá celou Gmail schránku na e-maily související se zakázkami, poptávkami a nabídkami"
               >
                 <FolderKanban size={14} className="text-blue-600" />
-                <span>Hledat zakázky v Gmailu</span>
+                <span className="hidden sm:inline">Hledat zakázky v Gmailu</span>
+                <span className="sm:hidden">Hledat zakázky</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => triggerSync('INBOX')}
                 disabled={isSyncing}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 active:scale-95 disabled:opacity-50 transition"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 active:scale-95 disabled:opacity-50 transition"
               >
                 <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
                 <span>{isSyncing ? 'Synchronizuji…' : 'Synchronizovat'}</span>
@@ -307,12 +308,12 @@ export function AiInboxView({
       )}
 
       {/* FILTER TABS */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
-        <div className="flex items-center gap-1 sm:gap-2">
+      <div className="border-b border-slate-200 max-w-full overflow-hidden">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap pb-1">
           <button
             type="button"
             onClick={() => setActiveTab('ATTENTION')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold shrink-0 transition ${
               activeTab === 'ATTENTION'
                 ? 'border-fuchsia-600 text-fuchsia-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -330,7 +331,7 @@ export function AiInboxView({
           <button
             type="button"
             onClick={() => setActiveTab('NEW')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold shrink-0 transition ${
               activeTab === 'NEW'
                 ? 'border-fuchsia-600 text-fuchsia-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -348,7 +349,7 @@ export function AiInboxView({
           <button
             type="button"
             onClick={() => setActiveTab('PROCESSED')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold shrink-0 transition ${
               activeTab === 'PROCESSED'
                 ? 'border-fuchsia-600 text-fuchsia-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -365,7 +366,7 @@ export function AiInboxView({
             <button
               type="button"
               onClick={() => setActiveTab('SPAM')}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold transition ${
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold shrink-0 transition ${
                 activeTab === 'SPAM'
                   ? 'border-rose-600 text-rose-700'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -382,7 +383,7 @@ export function AiInboxView({
           <button
             type="button"
             onClick={() => setActiveTab('ALL')}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold transition ${
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs sm:text-sm font-bold shrink-0 transition ${
               activeTab === 'ALL'
                 ? 'border-fuchsia-600 text-fuchsia-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
