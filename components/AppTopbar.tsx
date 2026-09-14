@@ -29,7 +29,7 @@ const pageTitles: Array<[string, string]> = [
   ['/settings', 'Nastavení'],
 ];
 
-export function AppTopbar({ user }: { user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
+export function AppTopbar({ user, canUseTeam = true }: { canUseTeam?: boolean; user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
   const pathname = usePathname();
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
@@ -57,22 +57,22 @@ export function AppTopbar({ user }: { user: { name: string; email: string; role:
 
         <NotificationBellCenter />
 
-        <Link
+        {canUseTeam && <Link
           href="/chat"
           className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 transition shrink-0"
           title="💬 Týmový Chat & Účtenky za palivo"
         >
           <MessageSquare size={15} />
           <span className="hidden xl:inline">Chat</span>
-        </Link>
+        </Link>}
 
-        <Link
+        {canUseTeam && <Link
           href="/team"
           className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition shrink-0"
           title="📞 Telefonní seznam týmu SeePOINT"
         >
           <PhoneCall size={16} />
-        </Link>
+        </Link>}
 
         <div className="h-6 w-px bg-slate-200 mx-0.5" />
 

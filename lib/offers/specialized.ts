@@ -59,9 +59,17 @@ export function parseNavigationOfferInput(raw: unknown) {
       ? (text(point.arrowDirectionEnum) as NavigationArrowDirection)
       : ('STRAIGHT' as NavigationArrowDirection));
 
+    const pointTargetLat = point.targetLatitude !== undefined && point.targetLatitude !== null && point.targetLatitude !== ''
+      ? coordinate(point.targetLatitude, 'latitude')
+      : null;
+    const pointTargetLng = point.targetLongitude !== undefined && point.targetLongitude !== null && point.targetLongitude !== ''
+      ? coordinate(point.targetLongitude, 'longitude')
+      : null;
+
     return {
       carrierId: text(point.carrierId) || null, surfaceId: text(point.surfaceId) || null, sortOrder: index,
       latitude: coordinate(point.latitude, 'latitude'), longitude: coordinate(point.longitude, 'longitude'),
+      targetLatitude: pointTargetLat, targetLongitude: pointTargetLng,
       address: nullable(text(point.address)), label: text(point.label) || `Navigační bod ${index + 1}`,
       navigationType: text(point.navigationType) || 'Směrová tabule', variant: nullable(text(point.variant)), orientation: nullable(text(point.orientation)),
       quantity, unitPrice, subtotal, installationPrice, removalPrice, productionPrice, framePrice,
@@ -98,11 +106,43 @@ export function parseNavigationOfferInput(raw: unknown) {
   }
   const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
   const city = text(input.city) === 'Havířov' ? 'Havířov' : (text(input.targetAddress).toLowerCase().includes('havířov') ? 'Havířov' : 'Ostrava');
+
+  // Parse optional multiple targets
+  const rawTargets = Array.isArray(input.targets) ? input.targets : [];
+  const targets = rawTargets.map((t, idx) => {
+    if (!t || typeof t !== 'object') return null;
+    const tRec = t as Record<string, unknown>;
+    const tName = text(tRec.name || tRec.label || `Prodejna ${idx + 1}`);
+    const tAddr = text(tRec.address);
+    const tLat = coordinate(tRec.latitude, 'latitude');
+    const tLng = coordinate(tRec.longitude, 'longitude');
+    return {
+      id: text(tRec.id) || `target-${idx + 1}`,
+      name: tName,
+      address: tAddr,
+      latitude: tLat,
+      longitude: tLng,
+      note: nullable(text(tRec.note)),
+      photoUrl: nullable(text(tRec.photoUrl)),
+    };
+  }).filter(Boolean);
+
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
     validUntil, dateFrom: nullable(dateFrom), dateTo: nullable(dateTo), internalNote: text(input.internalNote), clientMessage: text(input.clientMessage), city, targetName, targetAddress: text(input.targetAddress),
     targetLatitude: coordinate(input.targetLatitude, 'latitude'), targetLongitude: coordinate(input.targetLongitude, 'longitude'), targetNote: text(input.targetNote), 
     targetPhotoUrl: nullable(text(input.targetPhotoUrl)),
+    targets: targets.length > 0 ? targets : [
+      {
+        id: 'target-1',
+        name: targetName,
+        address: text(input.targetAddress),
+        latitude: coordinate(input.targetLatitude, 'latitude'),
+        longitude: coordinate(input.targetLongitude, 'longitude'),
+        note: nullable(text(input.targetNote)),
+        photoUrl: nullable(text(input.targetPhotoUrl)),
+      }
+    ],
     googlePlaceId: nullable(text(input.googlePlaceId)), formattedAddress: nullable(text(input.formattedAddress)),
     proposalMode: propMode,
     graphicArtworkUrl: nullable(text(input.graphicArtworkUrl)),
@@ -140,6 +180,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           : {};
         const updatedStrategy = {
           ...existingStrategy,
+          targets: input.targets,
           ...(input.dateFrom !== undefined ? { dateFrom: input.dateFrom } : {}),
           ...(input.dateTo !== undefined ? { dateTo: input.dateTo } : {}),
         };
@@ -209,8 +250,12 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         });
       }
     const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
-    const initialStrategy = (input.dateFrom || input.dateTo) ? { dateFrom: input.dateFrom, dateTo: input.dateTo } : undefined;
-    return tx.offer.create({ data: { ...common, ...(initialStrategy ? { campaignStrategy: initialStrategy } : {}), organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, city: input.city, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+    const initialStrategy = {
+      targets: input.targets,
+      ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
+      ...(input.dateTo ? { dateTo: input.dateTo } : {}),
+    };
+    return tx.offer.create({ data: { ...common, campaignStrategy: initialStrategy, organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, city: input.city, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 

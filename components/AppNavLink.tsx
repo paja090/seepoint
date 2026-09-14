@@ -59,7 +59,7 @@ export type AppNavIcon =
   | 'printer'
   | 'mail';
 
-const icons = {
+export const navigationIcons = {
   badgeDollarSign: BadgeDollarSign,
   barChart3: BarChart3,
   briefcaseBusiness: BriefcaseBusiness,
@@ -92,22 +92,26 @@ type AppNavLinkProps = {
   href: string;
   label: string;
   icon: AppNavIcon;
+  active?: boolean;
+  ai?: boolean;
 };
 
-export function AppNavLink({ href, label, icon }: AppNavLinkProps) {
+export function AppNavLink({ href, label, icon, active: activeOverride, ai = false }: AppNavLinkProps) {
   const pathname = usePathname();
-  const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
-  const Icon = icons[icon] || PanelsTopLeft;
+  const active = activeOverride ?? (pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`)));
+  const Icon = navigationIcons[icon] || PanelsTopLeft;
 
   return (
     <Link
-      className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
-        active ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+      aria-current={active ? 'page' : undefined}
+      className={`flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium leading-5 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${ai ? 'bg-gradient-to-r from-emerald-950/30 to-violet-950/20' : ''} ${
+        active ? 'bg-emerald-400/10 text-emerald-300 ring-1 ring-inset ring-emerald-400/25' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
       }`}
       href={href}
     >
-      <Icon size={18} />
-      <span>{label}</span>
+      <span className="shrink-0"><Icon size={16} /></span>
+      <span className="min-w-0 flex-1">{label}</span>
+      {ai && <span className="rounded border border-violet-400/25 px-1 text-[10px] leading-4 text-violet-300">AI</span>}
     </Link>
   );
 }

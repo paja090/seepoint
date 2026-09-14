@@ -21,3 +21,5 @@ tmp-hardening-*.log
 tmp-hardening-*.json
 test-results/
 playwright-report/
+scratch/
+output/

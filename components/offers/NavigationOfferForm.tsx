@@ -64,6 +64,22 @@ type DraftPoint = {
   distanceSource: 'CALCULATED' | 'MANUAL';
   routePolyline?: string;
   calculatedDistanceMeters?: number;
+
+  // Multiple targets linkage
+  targetId?: string;
+  targetLatitude?: number;
+  targetLongitude?: number;
+};
+
+export type NavigationTargetItem = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  note?: string;
+  photoUrl?: string | null;
+  color?: string;
 };
 
 const newId = () =>
@@ -149,12 +165,78 @@ export function NavigationOfferForm({
     return Math.round((to - from) / 86400000);
   }, [dateFrom, dateTo]);
 
-  const [targetName, setTargetName] = useState(navigation?.targetName ?? '');
-  const [targetAddress, setTargetAddress] = useState(navigation?.targetAddress ?? '');
-  const [target, setTarget] = useState(
-    navigation ? { latitude: navigation.targetLatitude, longitude: navigation.targetLongitude } : undefined,
-  );
-  const [targetNote, setTargetNote] = useState(navigation?.targetNote ?? '');
+  const TARGET_COLORS = ['#be123c', '#2563eb', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2'];
+
+  const initialTargets: NavigationTargetItem[] = useMemo(() => {
+    const rawTargets = (initialOffer?.navigation as unknown as Record<string, unknown>)?.targets;
+    if (Array.isArray(rawTargets) && rawTargets.length > 0) {
+      return rawTargets.map((t: Record<string, unknown>, idx: number) => ({
+        id: String(t.id || `target-${idx + 1}`),
+        name: String(t.name || `Prodejna ${idx + 1}`),
+        address: String(t.address || ''),
+        latitude: Number(t.latitude || 0),
+        longitude: Number(t.longitude || 0),
+        note: t.note ? String(t.note) : '',
+        photoUrl: typeof t.photoUrl === 'string' ? t.photoUrl : null,
+        color: typeof t.color === 'string' ? t.color : TARGET_COLORS[idx % TARGET_COLORS.length],
+      }));
+    }
+    if (navigation?.targetName || (navigation && navigation.targetLatitude)) {
+      return [{
+        id: 'target-1',
+        name: navigation.targetName || 'Hlavní prodejna',
+        address: navigation.targetAddress || '',
+        latitude: navigation.targetLatitude || 0,
+        longitude: navigation.targetLongitude || 0,
+        note: navigation.targetNote || '',
+        photoUrl: typeof (navigation as unknown as Record<string, unknown>).targetPhotoUrl === 'string'
+          ? String((navigation as unknown as Record<string, unknown>).targetPhotoUrl)
+          : null,
+        color: TARGET_COLORS[0],
+      }];
+    }
+    return [];
+  }, [navigation, initialOffer]);
+
+  const [targets, setTargets] = useState<NavigationTargetItem[]>(initialTargets);
+  const [selectedTargetId, setSelectedTargetId] = useState<string>(() => initialTargets[0]?.id || 'target-1');
+
+  const activeTarget = targets.find((t) => t.id === selectedTargetId) || targets[0] || null;
+
+  function updateActiveTarget(changes: Partial<NavigationTargetItem>) {
+    if (!activeTarget) return;
+    setTargets((current) =>
+      current.map((t) => (t.id === activeTarget.id ? { ...t, ...changes } : t))
+    );
+  }
+
+  function handleAddTarget() {
+    const nextIdx = targets.length + 1;
+    const newT: NavigationTargetItem = {
+      id: `target-${Date.now()}`,
+      name: `Prodejna ${nextIdx}`,
+      address: '',
+      latitude: activeTarget ? activeTarget.latitude + 0.008 : 49.82,
+      longitude: activeTarget ? activeTarget.longitude + 0.008 : 15.48,
+      note: '',
+      photoUrl: null,
+      color: TARGET_COLORS[targets.length % TARGET_COLORS.length],
+    };
+    setTargets((prev) => [...prev, newT]);
+    setSelectedTargetId(newT.id);
+  }
+
+  function handleRemoveTarget(id: string) {
+    if (targets.length <= 1) return;
+    const remaining = targets.filter((t) => t.id !== id);
+    setTargets(remaining);
+    if (selectedTargetId === id) {
+      setSelectedTargetId(remaining[0].id);
+    }
+    setPoints((pts) =>
+      pts.map((p) => (p.targetId === id ? { ...p, targetId: remaining[0].id } : p))
+    );
+  }
 
   const [internalNote, setInternalNote] = useState(initialOffer?.internalNote ?? '');
   const [clientMessage, setClientMessage] = useState(initialOffer?.clientMessage ?? '');
@@ -207,6 +289,9 @@ export function NavigationOfferForm({
           sitePhotoId: typeof point.sitePhotoId === 'string' ? point.sitePhotoId : undefined,
           sitePhotoUrl: typeof point.sitePhotoUrl === 'string' ? point.sitePhotoUrl : undefined,
           isSelectedByClient: point.isSelectedByClient !== false,
+          targetId: typeof point.targetId === 'string' ? point.targetId : undefined,
+          targetLatitude: typeof point.targetLatitude === 'number' ? point.targetLatitude : undefined,
+          targetLongitude: typeof point.targetLongitude === 'number' ? point.targetLongitude : undefined,
         };
       }) ?? [],
   );
@@ -214,7 +299,7 @@ export function NavigationOfferForm({
   const initialNav = initialOffer?.navigation as unknown as Record<string, unknown> | undefined;
   const detectedInitialCity: 'Ostrava' | 'Havířov' =
     initialNav?.city === 'Havířov' ||
-    (targetAddress && targetAddress.toLowerCase().includes('havířov')) ||
+    (activeTarget?.address && activeTarget.address.toLowerCase().includes('havířov')) ||
     (initialOffer?.title && initialOffer.title.toLowerCase().includes('havířov'))
       ? 'Havířov'
       : 'Ostrava';
@@ -237,18 +322,13 @@ export function NavigationOfferForm({
     );
   }
 
-  const [mode, setMode] = useState<'target' | 'point'>(target ? 'point' : 'target');
+  const [mode, setMode] = useState<'target' | 'point'>(activeTarget ? 'point' : 'target');
   const [proposalMode, setProposalMode] = useState<'LOCATION_SELECTION' | 'PRICED_QUOTE'>(
     (initialOffer?.navigation as unknown as Record<string, unknown>)?.proposalMode === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION'
   );
   const [graphicArtworkUrl, setGraphicArtworkUrl] = useState<string | null>(
     typeof (initialOffer?.navigation as unknown as Record<string, unknown>)?.graphicArtworkUrl === 'string'
       ? String((initialOffer?.navigation as unknown as Record<string, unknown>)?.graphicArtworkUrl)
-      : null
-  );
-  const [targetPhotoUrl, setTargetPhotoUrl] = useState<string | null>(
-    typeof (initialOffer?.navigation as unknown as Record<string, unknown>)?.targetPhotoUrl === 'string'
-      ? String((initialOffer?.navigation as unknown as Record<string, unknown>)?.targetPhotoUrl)
       : null
   );
   const [includeGraphicProof, setIncludeGraphicProof] = useState<boolean>(
@@ -513,15 +593,22 @@ export function NavigationOfferForm({
 
   const [recalculatingRoutes, setRecalculatingRoutes] = useState(false);
 
-  async function recalculateAllRoutes(targetPos?: { latitude: number; longitude: number }) {
-    const activeTarget = targetPos || target;
-    if (!activeTarget || points.length === 0) return;
+  async function recalculateAllRoutes(targetList?: NavigationTargetItem[]) {
+    const effectiveTargets = targetList || targets;
+    if (effectiveTargets.length === 0 || points.length === 0) return;
     setRecalculatingRoutes(true);
     try {
       const updated = await Promise.all(
         points.map(async (p) => {
-          const routeInfo = await fetchRouteInfo(p.latitude, p.longitude, activeTarget.latitude, activeTarget.longitude);
-          return { ...p, ...routeInfo };
+          const ptTarget = effectiveTargets.find((t) => t.id === p.targetId) || effectiveTargets[0];
+          if (!ptTarget || !ptTarget.latitude || !ptTarget.longitude) return p;
+          const routeInfo = await fetchRouteInfo(p.latitude, p.longitude, ptTarget.latitude, ptTarget.longitude);
+          return {
+            ...p,
+            targetLatitude: ptTarget.latitude,
+            targetLongitude: ptTarget.longitude,
+            ...routeInfo,
+          };
         })
       );
       setPoints(updated);
@@ -532,15 +619,32 @@ export function NavigationOfferForm({
 
   async function mapClick(latitude: number, longitude: number, address?: string) {
     if (mode === 'target') {
-      const newTarget = { latitude, longitude };
-      setTarget(newTarget);
-      setMode('point');
-      if (address && !targetAddress) setTargetAddress(address);
-      void recalculateAllRoutes(newTarget);
+      if (activeTarget) {
+        const updatedTarget = { ...activeTarget, latitude, longitude, address: address || activeTarget.address };
+        const updatedTargets = targets.map((t) => (t.id === activeTarget.id ? updatedTarget : t));
+        setTargets(updatedTargets);
+        setMode('point');
+        void recalculateAllRoutes(updatedTargets);
+      } else {
+        const newTarget: NavigationTargetItem = {
+          id: 'target-1',
+          name: 'Hlavní prodejna',
+          address: address || '',
+          latitude,
+          longitude,
+          color: TARGET_COLORS[0],
+        };
+        const updatedTargets = [newTarget];
+        setTargets(updatedTargets);
+        setSelectedTargetId(newTarget.id);
+        setMode('point');
+        void recalculateAllRoutes(updatedTargets);
+      }
       return;
     }
 
-    const routeInfo = target ? await fetchRouteInfo(latitude, longitude, target.latitude, target.longitude) : {};
+    const ptTarget = (activeTarget && activeTarget.latitude && activeTarget.longitude) ? activeTarget : (targets[0] || null);
+    const routeInfo = ptTarget ? await fetchRouteInfo(latitude, longitude, ptTarget.latitude, ptTarget.longitude) : {};
 
     setPoints((current) => [
       ...current,
@@ -567,6 +671,9 @@ export function NavigationOfferForm({
         manualDistanceValue: '',
         manualDistanceUnit: 'METERS',
         distanceSource: 'CALCULATED',
+        targetId: ptTarget?.id,
+        targetLatitude: ptTarget?.latitude,
+        targetLongitude: ptTarget?.longitude,
         ...routeInfo,
       },
     ]);
@@ -574,11 +681,12 @@ export function NavigationOfferForm({
 
   async function handleAddPoint() {
     setMode('point');
+    const ptTarget = (activeTarget && activeTarget.latitude && activeTarget.longitude) ? activeTarget : (targets[0] || null);
     const offsetIndex = points.length + 1;
-    const lat = target ? target.latitude + 0.0015 * (offsetIndex % 2 === 0 ? 1 : -1) : 49.82;
-    const lng = target ? target.longitude + 0.0015 * (offsetIndex > 2 ? 1 : -1) : 15.48;
+    const lat = ptTarget ? ptTarget.latitude + 0.0015 * (offsetIndex % 2 === 0 ? 1 : -1) : 49.82;
+    const lng = ptTarget ? ptTarget.longitude + 0.0015 * (offsetIndex > 2 ? 1 : -1) : 15.48;
 
-    const routeInfo = target ? await fetchRouteInfo(lat, lng, target.latitude, target.longitude) : {};
+    const routeInfo = ptTarget ? await fetchRouteInfo(lat, lng, ptTarget.latitude, ptTarget.longitude) : {};
 
     setPoints((current) => [
       ...current,
@@ -605,6 +713,9 @@ export function NavigationOfferForm({
         manualDistanceValue: '',
         manualDistanceUnit: 'METERS',
         distanceSource: 'CALCULATED',
+        targetId: ptTarget?.id,
+        targetLatitude: ptTarget?.latitude,
+        targetLongitude: ptTarget?.longitude,
         ...routeInfo,
       },
     ]);
@@ -677,16 +788,22 @@ export function NavigationOfferForm({
   }
 
   async function geocode() {
+    if (!activeTarget || !activeTarget.address.trim()) return;
     setMessage('');
-    const response = await fetch(`/api/geocode?q=${encodeURIComponent(targetAddress)}`);
+    const response = await fetch(`/api/geocode?q=${encodeURIComponent(activeTarget.address)}`);
     const data = (await response.json()) as Array<{ latitude: number; longitude: number; label: string }> | { error?: string };
     if (!response.ok) return setMessage((data as { error?: string }).error ?? 'Adresu se nepodařilo najít.');
     setResults(data as Array<{ latitude: number; longitude: number; label: string }>);
   }
 
   async function save() {
-    if (!target) return setMessage('Nejprve označte cílové místo (prodejnu) v mapě.');
-    if (!targetName.trim()) return setMessage('Zadejte název cílového místa / prodejny.');
+    const primaryTarget = targets[0];
+    if (!primaryTarget || !primaryTarget.latitude || !primaryTarget.longitude) {
+      return setMessage('Nejprve označte alespoň jedno cílové místo (prodejnu) v mapě.');
+    }
+    if (!primaryTarget.name.trim()) {
+      return setMessage('Zadejte název cílového místa / prodejny.');
+    }
 
     setSaving(true);
     setMessage('');
@@ -702,18 +819,36 @@ export function NavigationOfferForm({
       contactEmail: selectedClient?.email,
       contactPhone: selectedClient?.phone,
       city,
-      targetName,
-      targetAddress,
-      targetLatitude: target.latitude,
-      targetLongitude: target.longitude,
-      targetNote,
-      targetPhotoUrl,
+      targetName: primaryTarget.name,
+      targetAddress: primaryTarget.address,
+      targetLatitude: primaryTarget.latitude,
+      targetLongitude: primaryTarget.longitude,
+      targetNote: primaryTarget.note || '',
+      targetPhotoUrl: primaryTarget.photoUrl || null,
+      targets: targets.map((t) => ({
+        id: t.id,
+        name: t.name,
+        address: t.address,
+        latitude: t.latitude,
+        longitude: t.longitude,
+        note: t.note,
+        photoUrl: t.photoUrl,
+        color: t.color,
+      })),
       internalNote,
       clientMessage,
       proposalMode,
       graphicArtworkUrl,
       includeGraphicProof,
-      points,
+      points: points.map((p) => {
+        const ptTarget = targets.find((t) => t.id === p.targetId) || targets[0];
+        return {
+          ...p,
+          targetId: p.targetId || targets[0]?.id,
+          targetLatitude: ptTarget?.latitude,
+          targetLongitude: ptTarget?.longitude,
+        };
+      }),
     };
 
     const response = await fetch(initialOffer?.id ? `/api/offers/navigation/${initialOffer.id}` : '/api/offers/navigation', {
@@ -958,89 +1093,199 @@ export function NavigationOfferForm({
           )}
         </section>
 
-        {/* Target Store / Destination */}
-        <section className="card space-y-3 border-2 border-sky-100 bg-sky-50/30">
-          <h2 className="flex items-center gap-2 text-base font-bold text-sky-900">
-            <Crosshair size={18} className="text-sky-600" />
-            Cílové místo (Prodejna / Areál)
-          </h2>
-
-          <Field label="Název provozovny">
-            <input className="input" placeholder="Např. Showroom SeePOINT Brno" value={targetName} onChange={(e) => setTargetName(e.target.value)} />
-          </Field>
-
-          <Field label="Adresa provozovny">
-            <div className="flex gap-2">
-              <input className="input" placeholder="Ulice, č.p., Město" value={targetAddress} onChange={(e) => setTargetAddress(e.target.value)} />
-              <button aria-label="Vyhledat adresu" className="rounded-xl border border-slate-200 bg-white px-3 hover:bg-slate-50" onClick={() => void geocode()} type="button">
-                <Search size={16} />
-              </button>
-            </div>
-          </Field>
-
-          {results.map((result) => (
+        {/* Target Stores / Destinations (Multiple branches supported) */}
+        <section className="card space-y-3 border-2 border-sky-200 bg-sky-50/40">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-base font-bold text-sky-900">
+              <Crosshair size={18} className="text-sky-600" />
+              Cílové provozovny ({targets.length})
+            </h2>
             <button
-              className="block w-full rounded-lg bg-white p-2.5 text-left text-xs font-semibold hover:bg-sky-100 border border-sky-200 transition"
-              key={`${result.latitude}-${result.longitude}`}
-              onClick={() => {
-                setTarget({ latitude: result.latitude, longitude: result.longitude });
-                setTargetAddress(result.label);
-                setResults([]);
-                setMode('point');
-              }}
               type="button"
+              onClick={handleAddTarget}
+              className="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs hover:bg-sky-700 transition cursor-pointer"
+              title="Přidat další pobočku / prodejnu do nabídky"
             >
-              📍 {result.label}
+              <Plus size={13} /> + Přidat pobočku
             </button>
-          ))}
-
-          <Field label="Poznámka k příjezdu pro klienta">
-            <textarea className="input min-h-16 text-xs" placeholder="Instrukce k příjezdu, parkoviště…" value={targetNote} onChange={(e) => setTargetNote(e.target.value)} />
-          </Field>
-
-          <div className="rounded-xl border border-sky-200 bg-white p-3 space-y-3">
-            <div>
-              <p className="text-xs font-bold text-slate-900">Fotografie cílové provozovny</p>
-              <p className="mt-1 text-[11px] text-slate-500">Zobrazí se klientovi v hlavičce nabídky společně s jeho logem.</p>
-            </div>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-sky-400 px-3 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-50">
-              <Upload size={15} />
-              {targetPhotoUrl ? 'Změnit fotografii provozovny' : 'Nahrát fotografii provozovny'}
-              <input
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                type="file"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-                    setMessage('Fotografie provozovny musí být ve formátu JPG, PNG nebo WebP.');
-                    return;
-                  }
-                  if (file.size > 5 * 1024 * 1024) {
-                    setMessage('Fotografie provozovny může mít maximálně 5 MB.');
-                    return;
-                  }
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    setTargetPhotoUrl(String(reader.result));
-                    setMessage('');
-                  };
-                  reader.readAsDataURL(file);
-                }}
-              />
-            </label>
-            {targetPhotoUrl ? (
-              <div className="relative overflow-hidden rounded-xl border border-slate-200">
-                <img alt="Fotografie cílové provozovny" className="h-36 w-full object-cover" src={targetPhotoUrl} />
-                <button className="absolute right-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold text-white" onClick={() => setTargetPhotoUrl(null)} type="button">Odstranit</button>
-              </div>
-            ) : null}
           </div>
 
-          <button className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900" onClick={() => setMode('target')} type="button">
-            <MapPin size={15} /> Změnit cíl kliknutím na mapě
-          </button>
+          {/* Store Tabs Switcher */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {targets.map((t, idx) => {
+              const isSelected = t.id === (activeTarget?.id || targets[0]?.id);
+              const pointsCountForStore = points.filter((p) => (p.targetId || targets[0]?.id) === t.id).length;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSelectedTargetId(t.id)}
+                  style={{ borderColor: isSelected ? t.color || '#be123c' : undefined }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer shrink-0 ${
+                    isSelected
+                      ? 'bg-white shadow-xs text-slate-900 border-2'
+                      : 'bg-slate-100/80 text-slate-600 border-slate-200 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: t.color || (idx === 0 ? '#be123c' : '#2563eb') }}
+                  />
+                  <span>{t.name || `Pobočka ${idx + 1}`}</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700">
+                    {pointsCountForStore} bodů
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {activeTarget ? (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+                <span className="text-xs font-bold text-sky-950 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: activeTarget.color || '#be123c' }} />
+                  Editace pobočky #{targets.findIndex((t) => t.id === activeTarget.id) + 1}
+                </span>
+                {targets.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTarget(activeTarget.id)}
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-800 transition cursor-pointer"
+                    title="Odstranit tuto pobočku z nabídky"
+                  >
+                    Odstranit pobočku
+                  </button>
+                )}
+              </div>
+
+              <Field label="Název provozovny">
+                <input
+                  className="input"
+                  placeholder="Např. Showroom SeePOINT Brno"
+                  value={activeTarget.name}
+                  onChange={(e) => updateActiveTarget({ name: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Adresa provozovny">
+                <div className="flex gap-2">
+                  <input
+                    className="input"
+                    placeholder="Ulice, č.p., Město"
+                    value={activeTarget.address}
+                    onChange={(e) => updateActiveTarget({ address: e.target.value })}
+                  />
+                  <button
+                    aria-label="Vyhledat adresu"
+                    className="rounded-xl border border-slate-200 bg-white px-3 hover:bg-slate-50 cursor-pointer"
+                    onClick={() => void geocode()}
+                    type="button"
+                  >
+                    <Search size={16} />
+                  </button>
+                </div>
+              </Field>
+
+              {results.map((result) => (
+                <button
+                  className="block w-full rounded-lg bg-white p-2.5 text-left text-xs font-semibold hover:bg-sky-100 border border-sky-200 transition cursor-pointer"
+                  key={`${result.latitude}-${result.longitude}`}
+                  onClick={() => {
+                    updateActiveTarget({
+                      latitude: result.latitude,
+                      longitude: result.longitude,
+                      address: result.label,
+                    });
+                    setResults([]);
+                    setMode('point');
+                    void recalculateAllRoutes(
+                      targets.map((t) =>
+                        t.id === activeTarget.id
+                          ? { ...t, latitude: result.latitude, longitude: result.longitude, address: result.label }
+                          : t
+                      )
+                    );
+                  }}
+                  type="button"
+                >
+                  📍 {result.label}
+                </button>
+              ))}
+
+              <Field label="Poznámka k příjezdu pro klienta">
+                <textarea
+                  className="input min-h-16 text-xs"
+                  placeholder="Instrukce k příjezdu, parkoviště…"
+                  value={activeTarget.note || ''}
+                  onChange={(e) => updateActiveTarget({ note: e.target.value })}
+                />
+              </Field>
+
+              <div className="rounded-xl border border-sky-200 bg-white p-3 space-y-3">
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Fotografie této provozovny</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Zobrazí se klientovi v hlavičce nabídky.</p>
+                </div>
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-sky-400 px-3 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-50">
+                  <Upload size={15} />
+                  {activeTarget.photoUrl ? 'Změnit fotografii provozovny' : 'Nahrát fotografii provozovny'}
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        setMessage('Fotografie provozovny musí být ve formátu JPG, PNG nebo WebP.');
+                        return;
+                      }
+                      if (file.size > 5 * 1024 * 1024) {
+                        setMessage('Fotografie provozovny může mít maximálně 5 MB.');
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        updateActiveTarget({ photoUrl: String(reader.result) });
+                        setMessage('');
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+                {activeTarget.photoUrl ? (
+                  <div className="relative overflow-hidden rounded-xl border border-slate-200">
+                    <img alt="Fotografie cílové provozovny" className="h-36 w-full object-cover" src={activeTarget.photoUrl} />
+                    <button
+                      className="absolute right-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold text-white cursor-pointer"
+                      onClick={() => updateActiveTarget({ photoUrl: null })}
+                      type="button"
+                    >
+                      Odstranit
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900 cursor-pointer"
+                  onClick={() => setMode('target')}
+                  type="button"
+                >
+                  <MapPin size={15} /> Zaměřit tuto prodejnu na mapě
+                </button>
+                {activeTarget.latitude && activeTarget.longitude ? (
+                  <span className="text-[11px] font-mono text-slate-500">
+                    {activeTarget.latitude.toFixed(4)}, {activeTarget.longitude.toFixed(4)}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-rose-600">⚠️ Není v mapě</span>
+                )}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         {/* Financial Calculation Summary Card */}
@@ -1145,16 +1390,16 @@ export function NavigationOfferForm({
               onClick={() => setMode('target')}
               type="button"
             >
-              <Crosshair size={15} /> Určit cíl (Prodejnu)
+              <Crosshair size={15} /> Zaměřit cíl ({activeTarget?.name || 'Prodejnu'})
             </button>
 
-            {target && points.length > 0 && (
+            {targets.length > 0 && points.length > 0 && (
               <button
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5"
                 onClick={() => void recalculateAllRoutes()}
                 disabled={recalculatingRoutes}
                 type="button"
-                title="Přepočítat jízdní trasy pro všechny bodů přes Google Routes API"
+                title="Přepočítat jízdní trasy pro všechny body k jejich cílovým prodejnám přes Google Routes API"
               >
                 <RefreshCw size={14} className={recalculatingRoutes ? 'animate-spin text-sky-600' : ''} />
                 {recalculatingRoutes ? 'Přepočítávám trasy...' : 'Přepočítat reálné trasy'}
@@ -1163,19 +1408,40 @@ export function NavigationOfferForm({
           </div>
 
           <span className="text-xs font-semibold text-slate-500">
-            {points.length} zadaných bodů {target ? '· Cíl nastaven 🎯' : '· Chybí cíl ⚠️'}
+            {points.length} bodů · {targets.length} {targets.length === 1 ? 'prodejna' : targets.length < 5 ? 'prodejny' : 'prodejen'} 🎯
           </span>
         </div>
 
         <GoogleNavigationOfferMap
           mode={mode}
+          targets={targets.map((t) => ({
+            latitude: t.latitude,
+            longitude: t.longitude,
+            label: t.name,
+            address: t.address,
+            color: t.color,
+          }))}
+          target={activeTarget ? {
+            latitude: activeTarget.latitude,
+            longitude: activeTarget.longitude,
+            label: activeTarget.name || 'Cíl navigace',
+            address: activeTarget.address,
+            color: activeTarget.color,
+          } : undefined}
           onTargetSelect={(place) => {
-            const newTarget = { latitude: place.latitude, longitude: place.longitude };
-            setTarget(newTarget);
-            setTargetName(place.label);
-            setTargetAddress(place.address);
-            setMode('point');
-            void recalculateAllRoutes(newTarget);
+            if (activeTarget) {
+              const updatedTarget = {
+                ...activeTarget,
+                latitude: place.latitude,
+                longitude: place.longitude,
+                name: activeTarget.name || place.label,
+                address: place.address || activeTarget.address,
+              };
+              const updatedTargets = targets.map((t) => (t.id === activeTarget.id ? updatedTarget : t));
+              setTargets(updatedTargets);
+              setMode('point');
+              void recalculateAllRoutes(updatedTargets);
+            }
           }}
           onMapClick={mapClick}
           onPointMove={async (id: string, latitude: number, longitude: number, _dist?: number, _poly?: string, passedAddress?: string) => {
@@ -1203,13 +1469,13 @@ export function NavigationOfferForm({
             const addrObj = freshAddress ? { address: freshAddress, label: newLabel } : { label: newLabel };
             updatePoint(id, { latitude, longitude, ...addrObj });
 
-            if (target) {
-              const routeInfo = await fetchRouteInfo(latitude, longitude, target.latitude, target.longitude);
+            const ptTarget = targets.find((t) => t.id === currentPoint?.targetId) || targets[0];
+            if (ptTarget && ptTarget.latitude && ptTarget.longitude) {
+              const routeInfo = await fetchRouteInfo(latitude, longitude, ptTarget.latitude, ptTarget.longitude);
               updatePoint(id, { latitude, longitude, ...addrObj, ...routeInfo });
             }
           }}
           points={points}
-          target={target ? { ...target, label: targetName || 'Cíl navigace', address: targetAddress } : undefined}
         />
 
         {/* Itemized Points Editor & Photo Visualizer Trigger */}
@@ -1369,6 +1635,43 @@ export function NavigationOfferForm({
                 </label>
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {targets.length > 1 && (
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-sky-950 mb-1 flex items-center justify-between">
+                        <span>🎯 Cílová pobočka pro tento bod</span>
+                        <span className="text-[10px] text-slate-500 font-normal">Trasa se počítá k této pobočce</span>
+                      </label>
+                      <select
+                        className="input font-bold text-sky-900 border-sky-300 bg-sky-50/70"
+                        value={point.targetId || targets[0]?.id}
+                        onChange={async (e) => {
+                          const newTid = e.target.value;
+                          const chosenT = targets.find((t) => t.id === newTid) || targets[0];
+                          updatePoint(point.id, {
+                            targetId: newTid,
+                            targetLatitude: chosenT?.latitude,
+                            targetLongitude: chosenT?.longitude,
+                          });
+                          if (chosenT && chosenT.latitude && chosenT.longitude) {
+                            const routeInfo = await fetchRouteInfo(point.latitude, point.longitude, chosenT.latitude, chosenT.longitude);
+                            updatePoint(point.id, {
+                              targetId: newTid,
+                              targetLatitude: chosenT.latitude,
+                              targetLongitude: chosenT.longitude,
+                              ...routeInfo,
+                            });
+                          }
+                        }}
+                      >
+                        {targets.map((t, tIdx) => (
+                          <option key={t.id} value={t.id}>
+                            🏬 #{tIdx + 1} {t.name} {t.address ? `(${t.address})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <Field label="Označení bodu">
                     <input className="input" value={point.label} onChange={(e) => updatePoint(point.id, { label: e.target.value })} />
                   </Field>
@@ -1582,7 +1885,7 @@ export function NavigationOfferForm({
       {/* Visualizer Modal Dialog */}
       {activePointForVisualizer && (
         <NavigationSignVisualizer
-          initialSignText={targetName || activePointForVisualizer.label}
+          initialSignText={targets.find((t) => t.id === activePointForVisualizer.targetId)?.name || targets[0]?.name || activePointForVisualizer.label}
           subText={activePointForVisualizer.navigationType || 'Směrová tabule'}
           distanceText={activePointForVisualizer.realDistanceText || (activePointForVisualizer.calculatedDistanceMeters ? (activePointForVisualizer.calculatedDistanceMeters >= 1000 ? `${(activePointForVisualizer.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${activePointForVisualizer.calculatedDistanceMeters} m`) : '1,1 km')}
           arrowDirectionEnum={activePointForVisualizer.arrowDirectionEnum}

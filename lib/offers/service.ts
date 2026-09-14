@@ -237,6 +237,21 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       targetLongitude: row.navigationOffer.targetLongitude,
       targetNote: row.navigationOffer.targetNote,
       targetPhotoUrl: row.navigationOffer.targetPhotoUrl,
+      targets: (
+        row.campaignStrategy &&
+        typeof row.campaignStrategy === 'object' &&
+        Array.isArray((row.campaignStrategy as Record<string, unknown>).targets)
+      ) ? (row.campaignStrategy as { targets: Array<{ id?: string; name: string; address?: string; latitude: number; longitude: number; note?: string; photoUrl?: string }> }).targets : [
+        {
+          id: 'target-1',
+          name: row.navigationOffer.targetName,
+          address: row.navigationOffer.targetAddress || undefined,
+          latitude: row.navigationOffer.targetLatitude,
+          longitude: row.navigationOffer.targetLongitude,
+          note: row.navigationOffer.targetNote || undefined,
+          photoUrl: row.navigationOffer.targetPhotoUrl || undefined,
+        }
+      ],
       proposalMode: row.navigationOffer.proposalMode || 'LOCATION_SELECTION',
       selectionSubmitted: row.events.some((event) => {
         const metadata = event.metadata as Record<string, unknown> | null;
@@ -306,6 +321,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           status: point.status,
 
           // Structured Navigation fields
+          targetLatitude: point.targetLatitude,
+          targetLongitude: point.targetLongitude,
           arrowDirectionEnum: point.arrowDirectionEnum,
           pillarNumber: point.pillarNumber,
           pillarType: point.pillarType,
