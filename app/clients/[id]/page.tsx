@@ -17,6 +17,7 @@ import { ClientTasksTab } from '@/components/crm/ClientTasksTab';
 import { ClientDocumentsTab } from '@/components/crm/ClientDocumentsTab';
 import { ClientAuditTab } from '@/components/crm/ClientAuditTab';
 import { ClientAiEnrichCard } from '@/components/clients/ClientAiEnrichCard';
+import { ClientCrmIntelligenceCard } from '@/components/crm/ClientCrmIntelligenceCard';
 import { ClientProfileData } from '@/lib/crm/types';
 import { canConvertOfferRole } from '@/lib/offers/domain';
 
@@ -73,6 +74,9 @@ export default async function ClientProfilePage({
       <div className="space-y-6 pb-12">
         {/* Main Client Profile Header & Metrics */}
         <ClientHeader client={client} canManageLifecycle={user.role === 'ADMIN' || user.role === 'MANAGER'} />
+
+        {/* AI CRM Intelligence 360 View */}
+        <ClientCrmIntelligenceCard clientId={client.id} />
 
         {/* AI Client Enrichment & ARES Lookup Card */}
         <ClientAiEnrichCard

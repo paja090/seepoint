@@ -80,6 +80,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     routes: ['/clients', '/clients/dashboard'],
   },
   {
+    id: 'crmIntelligence',
+    name: 'AI CRM Intelligence',
+    description: 'Prioritizace pipeline, detekce rizik, automatický follow-up, obnova smluv a Next Best Action',
+    category: 'sales',
+    badge: 'AI Engine',
+    routes: ['/crm/intelligence'],
+  },
+  {
     id: 'analytics',
     name: 'Analytics & Tržby',
     description: 'Finanční přehledy, tržby z ploch, grafy výkonu a predikce obsazenosti',
@@ -257,6 +265,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'import',
     'aiInbox',
     'commercial',
+    'crmIntelligence',
   ],
   PRO: [
     'dashboard',
@@ -268,6 +277,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'aiInbox',
     'salesRadar',
     'crm',
+    'crmIntelligence',
     'analytics',
     'offers',
     'network',
