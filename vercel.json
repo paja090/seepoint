@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sales-radar",
       "schedule": "0 6 * * 1-5"
+    },
+    {
+      "path": "/api/cron/ai-inbox",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

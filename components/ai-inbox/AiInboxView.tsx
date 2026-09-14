@@ -14,18 +14,29 @@ import {
   Calendar,
   FolderKanban,
   Trash2,
+  Settings,
 } from 'lucide-react';
 import { AiInboxMessageCard, type AiInboxListItem } from './AiInboxMessageCard';
 import { AiInboxDetailModal, type AiInboxMessageDetailData } from './AiInboxDetailModal';
+import { MailboxSettingsModal, type MailboxSettingsData } from './MailboxSettingsModal';
 import { CLASSIFICATION_LABELS } from '@/lib/ai-inbox/classifier';
+
+export type MailboxItem = {
+  id: string;
+  accountEmail: string | null;
+  provider: string;
+  settings?: MailboxSettingsData | null;
+};
 
 export function AiInboxView({
   initialItems,
-  mailboxes,
+  mailboxes: initialMailboxes,
 }: {
   initialItems: AiInboxListItem[];
-  mailboxes: Array<{ id: string; accountEmail: string | null; provider: string }>;
+  mailboxes: MailboxItem[];
 }) {
+  const [mailboxes, setMailboxes] = useState<MailboxItem[]>(initialMailboxes);
+  const [editingMailbox, setEditingMailbox] = useState<MailboxItem | null>(null);
   const [items, setItems] = useState<AiInboxListItem[]>(initialItems);
   const [activeTab, setActiveTab] = useState<'ATTENTION' | 'NEW' | 'PROCESSED' | 'SPAM' | 'ALL'>('ATTENTION');
   const [searchQuery, setSearchQuery] = useState('');
@@ -238,6 +249,21 @@ export function AiInboxView({
                   <span>{isCleaningSpam ? 'Mažu spam…' : `Vyčistit spam (${spamCount})`}</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const targetMb = selectedMailboxId !== 'ALL'
+                    ? mailboxes.find((m) => m.id === selectedMailboxId) || mailboxes[0]
+                    : mailboxes[0];
+                  if (targetMb) setEditingMailbox(targetMb);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 active:scale-95 transition"
+                title="Upravit pravidla stahování, velikost dávky a automatický cron"
+              >
+                <Settings size={14} className="text-slate-500" />
+                <span>Nastavení schránky</span>
+              </button>
 
               <button
                 type="button"
@@ -478,6 +504,27 @@ export function AiInboxView({
               const updated = await res.json();
               setSelectedMessage(updated);
             }
+          }}
+        />
+      )}
+
+      {/* MAILBOX SETTINGS MODAL */}
+      {editingMailbox && (
+        <MailboxSettingsModal
+          isOpen={true}
+          onClose={() => setEditingMailbox(null)}
+          connectionId={editingMailbox.id}
+          accountEmail={editingMailbox.accountEmail}
+          initialSettings={editingMailbox.settings}
+          onSaved={(updated) => {
+            setMailboxes((prev) =>
+              prev.map((m) =>
+                m.id === editingMailbox.id
+                  ? { ...m, settings: { ...m.settings, ...updated } }
+                  : m
+              )
+            );
+            setSyncFeedback('Nastavení schránky bylo úspěšně aktualizováno.');
           }}
         />
       )}

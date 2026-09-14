@@ -63,6 +63,8 @@ export async function POST(request: Request) {
     }
 
     const syncResults = [];
+    const messagesToAnalyze: string[] = [];
+
     for (const cId of connectionsToSync) {
       const syncResult = await syncMailbox(organizationId, cId, {
         query,
@@ -70,17 +72,37 @@ export async function POST(request: Request) {
         maxResults,
       });
 
-      // Spustit AI analýzu na nově stažených nebo dosud nezpracovaných zprávách
       for (const item of syncResult.ingested) {
         if (item.message.id && (!item.isDuplicate || item.message.processingStatus === 'INGESTED')) {
-          try {
-            await processAiInboxMessage(organizationId, item.message.id);
-          } catch (procErr) {
-            console.warn(`[AI Inbox Sync] Chyba při analýze zprávy ${item.message.id}:`, procErr);
-          }
+          messagesToAnalyze.push(item.message.id);
         }
       }
       syncResults.push(syncResult);
+    }
+
+    // Pro zamezení vypršení časového limitu (timeout na mobilu):
+    // Zpracujeme první zprávu inline (do ~2-3 s), zbytek spustíme asynchronně na pozadí.
+    if (messagesToAnalyze.length > 0) {
+      const firstBatch = messagesToAnalyze.slice(0, 2);
+      const remainingBatch = messagesToAnalyze.slice(2);
+
+      await Promise.allSettled(
+        firstBatch.map((id) => processAiInboxMessage(organizationId, id).catch((err) => {
+          console.warn(`[AI Inbox Sync] Chyba při analýze zprávy ${id}:`, err);
+        }))
+      );
+
+      if (remainingBatch.length > 0) {
+        void (async () => {
+          for (const id of remainingBatch) {
+            try {
+              await processAiInboxMessage(organizationId, id);
+            } catch (err) {
+              console.warn(`[AI Inbox Background Sync] Chyba při analýze zprávy ${id}:`, err);
+            }
+          }
+        })();
+      }
     }
 
     return NextResponse.json({ ok: true, results: syncResults });

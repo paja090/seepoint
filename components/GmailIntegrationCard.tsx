@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, RefreshCw, Trash2, Plus, ExternalLink, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Mail, RefreshCw, Trash2, Plus, ExternalLink, ShieldCheck, AlertCircle, Settings } from 'lucide-react';
+import { MailboxSettingsModal, type MailboxSettingsData } from '@/components/ai-inbox/MailboxSettingsModal';
 
 export type GmailConnectionItem = {
   id: string;
@@ -15,6 +16,11 @@ export type GmailConnectionItem = {
     ingestMode?: 'INBOX_ONLY' | 'LABEL_ONLY' | 'ALL';
     labelName?: string;
     lastSyncAt?: string;
+    syncFilter?: 'INBOX_ONLY' | 'ORDERS_ONLY' | 'LABEL_ONLY';
+    syncLabel?: string;
+    batchSize?: number;
+    autoSyncIntervalMinutes?: number;
+    ignoredSenders?: string[];
   } | null;
 };
 
@@ -30,6 +36,7 @@ export function GmailIntegrationCard({
   );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [editingMailbox, setEditingMailbox] = useState<GmailConnectionItem | null>(null);
 
   async function handleDisconnect(connectionId: string, email: string | null) {
     if (!window.confirm(`Opravdu chcete odpojit schránku ${email || 'tento účet'} od SeePoint AI Inboxu?`)) {
@@ -126,9 +133,9 @@ export function GmailIntegrationCard({
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
                     {c.connectedAt && <span>Připojeno: {formatDate(c.connectedAt)}</span>}
                     {c.settings?.lastSyncAt && <span>Poslední sync: {formatDate(c.settings.lastSyncAt)}</span>}
-                    {c.settings?.ingestMode && (
-                      <span className="text-slate-400">
-                        Režim: {c.settings.ingestMode === 'LABEL_ONLY' ? 'Štítek SeePoint AI' : 'Všechny příchozí'}
+                    {c.settings && (
+                      <span className="text-slate-500 font-medium">
+                        Režim: {c.settings.syncFilter === 'ORDERS_ONLY' ? 'Chytrý filtr zakázek' : c.settings.syncFilter === 'LABEL_ONLY' || c.settings.ingestMode === 'LABEL_ONLY' ? `Štítek ${c.settings.syncLabel || c.settings.labelName || 'SeePoint AI'}` : 'Všechny příchozí'}
                       </span>
                     )}
                   </div>
@@ -136,6 +143,15 @@ export function GmailIntegrationCard({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setEditingMailbox(c)}
+                    className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition"
+                    title="Upravit pravidla stahování e-mailů a automatický cron"
+                  >
+                    <Settings size={14} className="text-slate-500" />
+                    <span>Nastavení</span>
+                  </button>
                   <button
                     type="button"
                     disabled={isConnBusy}
@@ -150,6 +166,25 @@ export function GmailIntegrationCard({
             );
           })}
         </div>
+      )}
+
+      {editingMailbox && (
+        <MailboxSettingsModal
+          isOpen={true}
+          onClose={() => setEditingMailbox(null)}
+          connectionId={editingMailbox.id}
+          accountEmail={editingMailbox.accountEmail}
+          initialSettings={editingMailbox.settings as MailboxSettingsData}
+          onSaved={(updated) => {
+            setConnections((prev) =>
+              prev.map((item) =>
+                item.id === editingMailbox.id
+                  ? { ...item, settings: { ...item.settings, ...updated } }
+                  : item
+              )
+            );
+          }}
+        />
       )}
 
       {/* Security & Scope info */}
