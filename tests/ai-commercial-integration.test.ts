@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  getCommercialAttentionItems,
   getCommercialCenterData,
   priorityWeight,
   isActionAllowed,
@@ -11,9 +11,8 @@ import {
   getOrchestrationRunByCorrelationId,
   getOrchestrationRunsForEntity,
 } from '../lib/ai-orchestrator';
-import type { CommercialPriority, UnifiedNextBestAction } from '../lib/ai-orchestrator/contracts/types';
+import type { CommercialPriority } from '../lib/ai-orchestrator/contracts/types';
 import { prisma } from '../lib/db';
-import { runWithTenantContext } from '../lib/tenant-context';
 
 test('Integration: Priority ordering follows CRITICAL > URGENT > HIGH > MEDIUM > LOW', () => {
   const priorities: CommercialPriority[] = ['CRITICAL', 'URGENT', 'HIGH', 'MEDIUM', 'LOW'];

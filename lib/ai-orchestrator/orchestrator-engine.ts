@@ -32,7 +32,6 @@ import type {
   CommercialRunStep,
   CommercialRunStatus,
   AutomationLevel,
-  CorrelationChain,
 } from './contracts/types';
 import type { CommercialRequest } from '@/lib/ai-commercial/contracts/commercial-request';
 import type { AvailabilityResult } from '@/lib/ai-commercial/contracts/availability';
