@@ -147,6 +147,9 @@ export type TimelineEntry = {
 // Attention / "Co potřebuje moji pozornost"
 // ---------------------------------------------------------------------------
 
+export type CommercialPriority = 'CRITICAL' | 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type AttentionPriority = CommercialPriority;
+
 export type AttentionCategory =
   | 'MISSING_INFO'
   | 'DRAFT_REVIEW'
@@ -157,8 +160,27 @@ export type AttentionCategory =
   | 'RENEWAL'
   | 'NEW_OPPORTUNITY';
 
-/** Sjednocená priorita pro orchestrátor — mapuje z CommercialNextBestAction i RealizationNextBestAction */
-export type CommercialPriority = 'CRITICAL' | 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type AttentionSource = 'CRM' | 'MAILBOX' | 'OFFER' | 'OCCUPANCY' | 'REALIZATION' | 'RADAR';
+
+/** Sjednocená doporučená akce (Next Best Action) napříč CRM, Mailboxem a orchestrátorem */
+export type UnifiedNextBestAction = {
+  id: string;
+  organizationId: string;
+  source: AttentionSource;
+  actionType: string;
+  priority: CommercialPriority;
+  title: string;
+  description: string;
+  targetEntityType: string;
+  targetEntityId: string;
+  recommendedAt: Date;
+  dueAt?: Date;
+  reason?: string;
+  requiresHumanApproval: boolean;
+  executableByOrchestrator: boolean;
+  link?: string;
+  suggestedPayload?: Record<string, unknown>;
+};
 
 export type AttentionItem = {
   id: string;
@@ -171,7 +193,11 @@ export type AttentionItem = {
   entityId: string;
   link: string;
   createdAt: Date;
+  source?: AttentionSource;
+  whyReason?: string;
+  dueAt?: Date;
   nextBestAction?: CommercialNextBestAction;
+  unifiedNextBestAction?: UnifiedNextBestAction;
 };
 
 // ---------------------------------------------------------------------------
@@ -242,8 +268,8 @@ export type CommercialCenterData = {
     readyForBilling: number;
   };
 
-  /** Next Best Actions (centrální resolver) */
-  nextBestActions: CommercialNextBestAction[];
+  /** Next Best Actions (centrální resolver sjednocený s CRM Intelligence) */
+  nextBestActions: UnifiedNextBestAction[];
 };
 
 // ---------------------------------------------------------------------------

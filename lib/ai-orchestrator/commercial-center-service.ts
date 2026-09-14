@@ -7,9 +7,10 @@
  */
 
 import { prisma } from '@/lib/db';
+import { runWithTenantContext } from '@/lib/tenant-context';
 import { getOrganizationNextBestActions } from '@/lib/ai-commercial/next-best-action';
-import { getCommercialAttentionItems } from './attention-service';
-import type { CommercialCenterData } from './contracts/types';
+import { getCommercialAttentionItems, priorityWeight } from './attention-service';
+import type { CommercialCenterData, UnifiedNextBestAction, CommercialPriority } from './contracts/types';
 
 /**
  * Returns complete Commercial Center dashboard data for an organization.
@@ -17,16 +18,17 @@ import type { CommercialCenterData } from './contracts/types';
 export async function getCommercialCenterData(
   organizationId: string
 ): Promise<CommercialCenterData> {
-  const [
-    attentionItems,
-    nextBestActions,
-    inboxRequests,
-    radarOpportunities,
-    draftOffers,
-    sentOffers,
-    acceptedOffers,
-    realizationStats,
-  ] = await Promise.all([
+  return runWithTenantContext({ organizationId }, async () => {
+    const [
+      attentionItems,
+      legacyNextBestActions,
+      inboxRequests,
+      radarOpportunities,
+      draftOffers,
+      sentOffers,
+      acceptedOffers,
+      realizationStats,
+    ] = await Promise.all([
     getCommercialAttentionItems(organizationId),
     getOrganizationNextBestActions(organizationId),
     getInboxRequests(organizationId),
@@ -37,18 +39,87 @@ export async function getCommercialCenterData(
     getRealizationStats(organizationId),
   ]);
 
-  return {
-    attentionItems,
-    inboxRequests,
-    radarOpportunities,
-    offers: {
-      drafts: draftOffers,
-      sent: sentOffers,
-      accepted: acceptedOffers,
-    },
-    realizations: realizationStats,
-    nextBestActions,
-  };
+  // Aggregate Unified Next Best Actions
+  const unifiedActions: UnifiedNextBestAction[] = [];
+
+  // 1. Actions directly from CRM Intelligence Attention Items
+  for (const item of attentionItems) {
+    if (item.unifiedNextBestAction) {
+      unifiedActions.push(item.unifiedNextBestAction);
+    }
+  }
+
+  // 2. Actions for pending inbox inquiries (Availability check)
+  for (const inbox of inboxRequests) {
+    if (!inbox.offerId && inbox.requiresReview) {
+      unifiedActions.push({
+        id: `nba-inbox-${inbox.id}`,
+        organizationId,
+        source: 'MAILBOX',
+        actionType: 'CHECK_AVAILABILITY',
+        priority: 'HIGH',
+        title: `Prověřit dostupnost: ${inbox.clientName || inbox.fromName || inbox.fromEmail}`,
+        description: `Poptávka "${inbox.subject}". Zkontrolovat termín a volné reklamní kapacity.`,
+        targetEntityType: 'INBOX_MESSAGE',
+        targetEntityId: inbox.id,
+        recommendedAt: new Date(),
+        requiresHumanApproval: false,
+        executableByOrchestrator: true,
+        link: '/ai-inbox',
+        reason: 'Nová poptávka z AI Mailboxu čeká na ověření dostupnosti.',
+      });
+    }
+  }
+
+  // 3. Fallback / supplementary actions from legacy commercial NBA generator
+  for (const leg of legacyNextBestActions) {
+    const isAutomated = leg.actionType === 'CHECK_AVAILABILITY';
+    unifiedActions.push({
+      id: leg.id,
+      organizationId: leg.organizationId || organizationId,
+      source: leg.targetEntityType === 'SALES_OPPORTUNITY' ? 'RADAR' : leg.targetEntityType === 'OFFER' ? 'OFFER' : 'CRM',
+      actionType: leg.actionType,
+      priority: leg.priority as CommercialPriority,
+      title: leg.title,
+      description: leg.description,
+      targetEntityType: leg.targetEntityType,
+      targetEntityId: leg.targetEntityId,
+      recommendedAt: leg.recommendedAt || new Date(),
+      requiresHumanApproval: !isAutomated,
+      executableByOrchestrator: isAutomated,
+      suggestedPayload: leg.suggestedPayload,
+      link: leg.targetEntityType === 'OFFER' ? `/offers/${leg.targetEntityId}` : undefined,
+    });
+  }
+
+  // Deduplicate by target entity + action type
+  const seen = new Set<string>();
+  const deduplicatedNba: UnifiedNextBestAction[] = [];
+
+  for (const nba of unifiedActions) {
+    const key = `${nba.targetEntityType}:${nba.targetEntityId}:${nba.actionType}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduplicatedNba.push(nba);
+    }
+  }
+
+  // Sort by priority weight
+  deduplicatedNba.sort((a, b) => (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0));
+
+    return {
+      attentionItems,
+      inboxRequests,
+      radarOpportunities,
+      offers: {
+        drafts: draftOffers,
+        sent: sentOffers,
+        accepted: acceptedOffers,
+      },
+      realizations: realizationStats,
+      nextBestActions: deduplicatedNba,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

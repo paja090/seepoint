@@ -32,7 +32,6 @@ import type {
   CommercialRunStep,
   CommercialRunStatus,
   AutomationLevel,
-  CorrelationChain,
 } from './contracts/types';
 import type { CommercialRequest } from '@/lib/ai-commercial/contracts/commercial-request';
 import type { AvailabilityResult } from '@/lib/ai-commercial/contracts/availability';
@@ -591,3 +590,103 @@ export async function orchestrateOfferAccepted(
     return completeRun(run, 'COMPLETED');
   });
 }
+
+// ---------------------------------------------------------------------------
+// Run Trace Retrieval Helpers (CrmAuditLog based)
+// ---------------------------------------------------------------------------
+
+export interface OrchestrationRunSummary {
+  id: string;
+  action: string;
+  userId: string | null;
+  userEmail: string | null;
+  createdAt: Date;
+  details: Record<string, unknown>;
+}
+
+/**
+ * Reconstructs an orchestration run by its correlationId for a given organization.
+ */
+export async function getOrchestrationRunByCorrelationId(
+  organizationId: string,
+  correlationId: string
+): Promise<OrchestrationRunSummary | null> {
+  return runWithTenantContext({ organizationId }, async () => {
+    const log = await prisma.crmAuditLog.findFirst({
+      where: {
+        organizationId,
+        entityType: 'CommercialRun',
+        entityId: correlationId,
+      },
+    });
+
+    if (!log) return null;
+
+    let details: Record<string, unknown> = {};
+    if (log.detailsJson) {
+      try {
+        details = JSON.parse(log.detailsJson);
+      } catch {
+        details = {};
+      }
+    }
+
+    return {
+      id: log.entityId || log.id,
+      action: log.action,
+      userId: log.userId,
+      userEmail: log.userEmail,
+      createdAt: log.createdAt,
+      details,
+    };
+  });
+}
+
+/**
+ * Retrieves recent orchestration runs associated with a given entity.
+ */
+export async function getOrchestrationRunsForEntity(
+  organizationId: string,
+  entityType: string,
+  entityId: string
+): Promise<OrchestrationRunSummary[]> {
+  return runWithTenantContext({ organizationId }, async () => {
+    const logs = await prisma.crmAuditLog.findMany({
+      where: {
+        organizationId,
+        entityType: 'CommercialRun',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return logs
+      .map((log) => {
+        let details: Record<string, unknown> = {};
+        if (log.detailsJson) {
+          try {
+            details = JSON.parse(log.detailsJson);
+          } catch {
+            details = {};
+          }
+        }
+        return {
+          id: log.entityId || log.id,
+          action: log.action,
+          userId: log.userId,
+          userEmail: log.userEmail,
+          createdAt: log.createdAt,
+          details,
+        };
+      })
+      .filter((run) => {
+        const type = entityType.toLowerCase();
+        if (type.includes('offer') && run.details.offerId === entityId) return true;
+        if (type.includes('inbox') && run.details.inboxMessageId === entityId) return true;
+        if (type.includes('request') && run.details.commercialRequestId === entityId) return true;
+        if (type.includes('order') && run.details.crmOrderId === entityId) return true;
+        return false;
+      });
+  });
+}
+
