@@ -207,24 +207,49 @@ export async function saveGoogleConnection(input: { provider: IntegrationProvide
   return prisma.integrationConnection.create({ data: { ...data, organizationId } });
 }
 
-export async function disconnectGoogleConnection(provider: IntegrationProvider, connectionId?: string) {
+export async function disconnectGoogleConnection(provider: IntegrationProvider, connectionId?: string, organizationId?: string) {
   const config = googleOAuthConfiguration();
+  const where: { id?: string; provider?: IntegrationProvider; organizationId?: string } = {};
+  if (connectionId) {
+    where.id = connectionId;
+  } else {
+    where.provider = provider;
+  }
+  if (organizationId) {
+    where.organizationId = organizationId;
+  }
+
   const connection = await prisma.integrationConnection.findFirst({
-    where: connectionId ? { id: connectionId } : { provider },
+    where,
   });
   if (!connection) return false;
+
   if (connection.credentialsEncrypted) {
-    const { refreshToken } = decryptIntegrationSecret<GoogleCredentials>(connection.credentialsEncrypted, config.encryptionKey);
-    await fetch('https://oauth2.googleapis.com/revoke', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token: refreshToken }),
-      cache: 'no-store',
-    }).catch(() => undefined);
+    try {
+      const { refreshToken } = decryptIntegrationSecret<GoogleCredentials>(connection.credentialsEncrypted, config.encryptionKey);
+      if (refreshToken) {
+        await fetch('https://oauth2.googleapis.com/revoke', {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ token: refreshToken }),
+          cache: 'no-store',
+        }).catch(() => undefined);
+      }
+    } catch {
+      // Ignore decryption/revocation failure to ensure disconnect proceeds
+    }
   }
-  await prisma.integrationConnection.update({
-    where: { id: connection.id },
-    data: { status: 'REVOKED', credentialsEncrypted: null, expiresAt: null, error: null },
-  });
+
+  try {
+    await prisma.integrationConnection.delete({
+      where: { id: connection.id },
+    });
+  } catch {
+    await prisma.integrationConnection.update({
+      where: { id: connection.id },
+      data: { status: 'REVOKED', credentialsEncrypted: null, expiresAt: null, error: null },
+    });
+  }
+
   return true;
 }

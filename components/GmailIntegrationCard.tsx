@@ -19,12 +19,15 @@ export type GmailConnectionItem = {
 };
 
 export function GmailIntegrationCard({
-  connections,
+  connections: initialConnections,
   configured,
 }: {
   connections: GmailConnectionItem[];
   configured: boolean;
 }) {
+  const [connections, setConnections] = useState<GmailConnectionItem[]>(() =>
+    initialConnections.filter((c) => c.status !== 'REVOKED')
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -40,8 +43,9 @@ export function GmailIntegrationCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ provider: 'GMAIL', connectionId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
+        setConnections((prev) => prev.filter((c) => c.id !== connectionId));
         window.location.reload();
       } else {
         setErrorMsg(data.error || 'Odpojení se nezdařilo.');
