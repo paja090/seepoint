@@ -90,6 +90,51 @@ export async function addSenderToIgnoreList(
   }
 }
 
+export type CustomMailboxSettings = {
+  syncFilter?: 'INBOX_ONLY' | 'ORDERS_ONLY' | 'LABEL_ONLY';
+  syncLabel?: string;
+  batchSize?: number;
+  autoSyncIntervalMinutes?: number; // 0 = off, 15, 60
+  ignoredSenders?: string[];
+};
+
+export async function updateMailboxSettings(
+  organizationId: string,
+  connectionId: string,
+  settingsUpdate: CustomMailboxSettings
+) {
+  const connection = await prisma.integrationConnection.findFirst({
+    where: { id: connectionId, organizationId, provider: 'GMAIL' },
+  });
+
+  if (!connection) {
+    throw new Error('Připojená Gmail schránka nebyla nalezena.');
+  }
+
+  const existingSettings = (connection.settings && typeof connection.settings === 'object'
+    ? connection.settings
+    : {}) as Record<string, unknown>;
+
+  const mergedSettings = {
+    ...existingSettings,
+    ...(settingsUpdate.syncFilter !== undefined ? { syncFilter: settingsUpdate.syncFilter, ingestMode: settingsUpdate.syncFilter } : {}),
+    ...(settingsUpdate.syncLabel !== undefined ? { syncLabel: settingsUpdate.syncLabel, labelName: settingsUpdate.syncLabel } : {}),
+    ...(settingsUpdate.batchSize !== undefined ? { batchSize: settingsUpdate.batchSize } : {}),
+    ...(settingsUpdate.autoSyncIntervalMinutes !== undefined ? { autoSyncIntervalMinutes: settingsUpdate.autoSyncIntervalMinutes } : {}),
+    ...(settingsUpdate.ignoredSenders !== undefined ? { ignoredSenders: settingsUpdate.ignoredSenders.map((s) => s.trim().toLowerCase()).filter(Boolean) } : {}),
+  };
+
+  const updated = await prisma.integrationConnection.update({
+    where: { id: connection.id },
+    data: {
+      settings: mergedSettings,
+    },
+  });
+
+  return { ok: true, settings: updated.settings };
+}
+
+
 export async function ingestRawMessage(
   organizationId: string,
   integrationConnectionId: string | null,
@@ -176,8 +221,9 @@ export async function syncMailbox(
     ? connection.settings
     : {}) as Record<string, unknown>;
 
-  const filterMode = options?.syncFilter || (existingSettings.syncFilter as string) || 'INBOX_ONLY';
-  const label = options?.syncLabel || (existingSettings.syncLabel as string) || 'SeePoint AI';
+  const configuredMode = (existingSettings.syncFilter as string) || (existingSettings.ingestMode as string) || 'INBOX_ONLY';
+  const filterMode = options?.syncFilter || configuredMode;
+  const label = options?.syncLabel || (existingSettings.syncLabel as string) || (existingSettings.labelName as string) || 'SeePoint AI';
   const preset = options?.preset;
   const customQuery = options?.query?.trim();
 
@@ -202,7 +248,7 @@ export async function syncMailbox(
   let query = `-label:SPAM -label:TRASH${excludeQuery}`;
   if (customQuery) {
     query = `${customQuery} -label:SPAM -label:TRASH${excludeQuery}`;
-  } else if (preset === 'ORDERS_ONLY') {
+  } else if (preset === 'ORDERS_ONLY' || filterMode === 'ORDERS_ONLY') {
     query = `(zakázka OR nabídka OR objednávka OR poptávka OR faktura OR ZAK- OR NAV- OR kalkulace OR schválení) -label:SPAM -label:TRASH${excludeQuery}`;
   } else if (filterMode === 'INBOX_ONLY') {
     query = `label:INBOX -label:SPAM -label:TRASH${excludeQuery}`;
@@ -210,7 +256,8 @@ export async function syncMailbox(
     query = `label:"${label}"${excludeQuery}`;
   }
 
-  const defaultMax = (preset === 'ORDERS_ONLY' || customQuery) ? 50 : 25;
+  const configuredBatchSize = typeof existingSettings.batchSize === 'number' ? existingSettings.batchSize : undefined;
+  const defaultMax = (preset === 'ORDERS_ONLY' || customQuery) ? 50 : (configuredBatchSize || 25);
   const maxResults = Math.min(Math.max(options?.maxResults || defaultMax, 5), 100);
 
   try {
