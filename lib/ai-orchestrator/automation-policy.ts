@@ -53,7 +53,7 @@ const AUTOMATION_MATRIX: Record<AutomationLevel, Set<AutomationAction>> = {
  * Toto je bezpečnostní záchrana — i kdyby někdo nastavil ADVANCED,
  * tyto akce nikdy nebudou provedeny automaticky.
  */
-const ALWAYS_REQUIRES_HUMAN: ReadonlySet<AutomationAction> = new Set([
+export const ALWAYS_REQUIRES_HUMAN: ReadonlySet<AutomationAction> = new Set([
   'SEND_OFFER',
   'CHANGE_PRICE',
   'RESERVE_SURFACE',
