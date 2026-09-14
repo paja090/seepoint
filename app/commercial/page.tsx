@@ -339,7 +339,6 @@ export default async function CommercialCenterPage() {
                     <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{nba.description}</p>
                     <p className="mt-1 text-[11px] text-slate-400">
                       {nba.targetEntityType} · {nba.actionType}
-                      {nba.dueAt && <> · do {dateStr(nba.dueAt)}</>}
                     </p>
                   </div>
                 </li>

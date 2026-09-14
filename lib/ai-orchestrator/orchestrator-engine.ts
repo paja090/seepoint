@@ -135,7 +135,6 @@ export async function orchestrateMailboxToOffer(
       include: {
         client: true,
         contact: true,
-        attachments: true,
       },
     }) as InboxMessageWithRelations | null;
 
