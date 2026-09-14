@@ -35,7 +35,7 @@ export default async function AiInboxPage() {
   const [{ items }, mailboxes] = await Promise.all([
     listAiInboxMessages(organizationId, { take: 100 }),
     prisma.integrationConnection.findMany({
-      where: { organizationId, provider: 'GMAIL' },
+      where: { organizationId, provider: 'GMAIL', status: { not: 'REVOKED' } },
       select: { id: true, accountEmail: true, provider: true, status: true },
     }),
   ]);

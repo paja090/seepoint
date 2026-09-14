@@ -3,20 +3,25 @@ import { GoogleIntegrationCard } from '@/components/GoogleIntegrationCard';
 import { GmailIntegrationCard, type GmailConnectionItem } from '@/components/GmailIntegrationCard';
 import { prisma } from '@/lib/db';
 import { isGoogleOAuthConfigured } from '@/lib/integrations/google-oauth';
-import { requireOrganizationRole } from '@/lib/organization';
+import { requirePageAccess } from '@/lib/page-auth';
 
 export default async function IntegrationsSettingsPage({ searchParams }: { searchParams: Promise<{ google?: string; reason?: string }> }) {
-  const { organizationId } = await requireOrganizationRole('ADMIN');
+  const user = await requirePageAccess('settings');
+  const organizationId = user.organizationId;
   const [driveConnection, gmailConnectionsRaw] = await Promise.all([
-    prisma.integrationConnection.findFirst({
-      where: { organizationId, provider: 'GOOGLE_DRIVE' },
-      select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true },
-    }),
-    prisma.integrationConnection.findMany({
-      where: { organizationId, provider: 'GMAIL' },
-      select: { id: true, status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true, settings: true },
-      orderBy: { connectedAt: 'desc' },
-    }),
+    organizationId
+      ? prisma.integrationConnection.findFirst({
+          where: { organizationId, provider: 'GOOGLE_DRIVE', status: { not: 'REVOKED' } },
+          select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true },
+        })
+      : null,
+    organizationId
+      ? prisma.integrationConnection.findMany({
+          where: { organizationId, provider: 'GMAIL', status: { not: 'REVOKED' } },
+          select: { id: true, status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true, settings: true },
+          orderBy: { connectedAt: 'desc' },
+        })
+      : [],
   ]);
   const query = await searchParams;
   const result = query.google;
