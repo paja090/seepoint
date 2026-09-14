@@ -255,6 +255,8 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'printProduction',
     'employees',
     'import',
+    'aiInbox',
+    'commercial',
   ],
   PRO: [
     'dashboard',
@@ -263,6 +265,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'myTasks',
     'workRoute',
     'vacations',
+    'aiInbox',
     'salesRadar',
     'crm',
     'analytics',

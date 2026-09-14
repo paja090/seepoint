@@ -7,7 +7,7 @@
  *   NESMÍ: odeslat nabídku, změnit cenu, rezervovat plochu, kontaktovat klienta, fakturovat
  */
 
-import type { AutomationLevel, OrchestratorProfile, DEFAULT_ORCHESTRATOR_PROFILE } from './contracts/types';
+import type { AutomationLevel, OrchestratorProfile } from './contracts/types';
 
 export type AutomationAction =
   | 'ANALYZE_EMAIL'
