@@ -18,6 +18,7 @@ import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
 import { OfferBasketProvider } from '@/context/OfferBasketContext';
 import { OfferBasketBar } from './offers/OfferBasketBar';
+import { OrganizationSwitcher } from './OrganizationSwitcher';
 
 export function ResponsiveAppShell({
   children,
@@ -146,6 +147,11 @@ export function ResponsiveAppShell({
                 <p className="rounded-lg border border-purple-700/60 bg-purple-950/60 px-2 py-1 text-center text-[10px] font-bold text-purple-200">
                   Platforma: Superadmin
                 </p>
+              )}
+              {user.organizations && user.organizations.length > 1 && (
+                <div className="flex justify-center text-xs">
+                  <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
+                </div>
               )}
               <div className="lg:hidden flex justify-center">
                 <WeatherClockWidget compact />

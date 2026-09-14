@@ -7,6 +7,7 @@ import { roleLabel } from '@/lib/rbac';
 import { statusLabel } from '@/lib/internal-format';
 import { ProfileForms } from '@/components/ProfileForms';
 import { EmployeeRates } from '@/components/EmployeeRates';
+import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 import {
   User,
   ShieldCheck,
@@ -97,6 +98,9 @@ export default async function ProfilePage() {
                   <ShieldCheck size={14} />
                   Aktivní role: {roleLabel(user.role)}
                 </span>
+                <div className="inline-block">
+                  <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} compact />
+                </div>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-500/20 px-3 py-0.5 text-xs font-extrabold text-sky-200 border border-sky-400/30">
                   Členství: {user.membership?.role === 'OWNER' ? 'Vlastník organizace' : roleLabel(user.primaryRole)}
                 </span>

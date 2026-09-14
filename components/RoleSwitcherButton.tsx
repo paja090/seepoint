@@ -47,63 +47,65 @@ export function RoleSwitcherButton({
   }
 
   return (
-    <div className="relative inline-block text-left">
+    <div className="w-full">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         disabled={switching}
-        className={`flex items-center gap-1 rounded-xl border text-xs font-bold transition active:scale-95 ${
+        className={`flex w-full items-center justify-between gap-2 rounded-xl border text-xs font-bold transition active:scale-[0.98] ${
           compact
-            ? 'bg-slate-900 border-slate-700 px-2 py-1 text-slate-200 hover:bg-slate-800'
-            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/20 px-3 py-1.5'
+            ? 'bg-slate-900 border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800'
+            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 px-3 py-2'
         }`}
         title="Přepnout roli"
       >
-        <RefreshCw size={13} className={`text-emerald-400 ${switching ? 'animate-spin' : ''}`} />
-        <span className="truncate max-w-[90px] sm:max-w-none">
-          {compact ? roleLabel(currentRole) : `Přepnout roli: ${roleLabel(currentRole)}`}
-        </span>
-        <ChevronDown size={13} className="opacity-70" />
+        <div className="flex items-center gap-2 truncate">
+          <RefreshCw size={13} className={`text-emerald-400 shrink-0 ${switching ? 'animate-spin' : ''}`} />
+          <span className="truncate">
+            {compact ? roleLabel(currentRole) : `Role: ${roleLabel(currentRole)}`}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 text-[11px] text-emerald-400 shrink-0">
+          <span>Přepnout</span>
+          <ChevronDown size={13} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+        </div>
       </button>
 
       {open && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl bg-slate-950 p-2 text-white shadow-2xl border border-slate-800 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-3 py-2 border-b border-slate-800 mb-1">
-              <p className="text-[11px] font-black uppercase text-slate-400">Vaše funkce (Přepnutí zobrazení)</p>
-              <p className="text-xs text-slate-300 font-medium">Zvolte aktivní roli pro rozhraní</p>
-            </div>
-
-            <div className="space-y-1">
-              {allowedRoles.map((roleItem) => {
-                const isActive = roleItem === currentRole;
-                return (
-                  <button
-                    key={roleItem}
-                    onClick={() => {
-                      setOpen(false);
-                      handleRoleSwitch(roleItem);
-                    }}
-                    className={`w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-bold transition ${
-                      isActive
-                        ? 'bg-emerald-500 text-slate-950 font-black'
-                        : 'text-slate-300 hover:bg-slate-900 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck size={14} />
-                      <span>{roleLabel(roleItem)}</span>
-                    </div>
-                    {isActive && <Check size={14} />}
-                  </button>
-                );
-              })}
-            </div>
+        <div className="mt-2 space-y-1 rounded-xl bg-slate-950 p-2 text-white border border-slate-800 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="px-2.5 py-1.5 border-b border-slate-800 mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Přepnutí role</span>
+            <span className="text-[10px] text-slate-500">Zvolte pohled</span>
           </div>
-        </>
+
+          <div className="space-y-1">
+            {allowedRoles.map((roleItem) => {
+              const isActive = roleItem === currentRole;
+              return (
+                <button
+                  type="button"
+                  key={roleItem}
+                  disabled={switching}
+                  onClick={() => {
+                    setOpen(false);
+                    handleRoleSwitch(roleItem);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition active:scale-[0.98] ${
+                    isActive
+                      ? 'bg-emerald-500 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-300 hover:bg-slate-900 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={14} className={isActive ? 'text-slate-950' : 'text-emerald-400'} />
+                    <span>{roleLabel(roleItem)}</span>
+                  </div>
+                  {isActive && <Check size={14} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
