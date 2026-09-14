@@ -52,6 +52,8 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
   const [mobileSelection, setMobileSelection] = useState<{ path: string; id: string | null } | null>(null);
   const mobileHubId = mobileSelection?.path === pathname ? mobileSelection.id : active?.hub.id;
   const bottom = mobileHrefs.flatMap(href => items.filter(i => i[0] === href));
+  const bottomLeft = bottom.slice(0, 2);
+  const bottomRight = bottom.slice(2);
   const dialog = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -121,7 +123,16 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}
       className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-none w-[min(360px,100vw)] max-w-none border-r border-slate-800 bg-slate-950 p-0 text-white backdrop:bg-slate-950/75 backdrop:backdrop-blur-sm lg:hidden">
       <div className="flex h-full flex-col" onClick={event => { if ((event.target as HTMLElement).closest('a')) onClose(); }}>
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800 px-4"><h2 id="mobile-navigation-title" className="font-semibold">SeePoint OS</h2><button type="button" autoFocus onClick={onClose} aria-label="Zavřít menu" className={`grid h-11 w-11 place-items-center rounded-lg ${focusClass}`}><X size={20} /></button></div>
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800 px-4">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-400 text-xs font-black text-slate-950">SP</span>
+            <h2 id="mobile-navigation-title" className="font-semibold text-white">SeePoint OS</h2>
+          </div>
+          <button type="button" autoFocus onClick={onClose} aria-label="Zavřít menu" className={`grid h-11 w-11 place-items-center rounded-lg ${focusClass}`}><X size={20} /></button>
+        </div>
+        <div className="shrink-0 border-b border-slate-800 bg-slate-950/90 p-3">
+          {children}
+        </div>
         <nav aria-label="Mobilní navigace" style={scrollStyle} className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
           <QuickAccess items={quick} activeHref={active?.item[0]} />
           {hubs.map(h => {
@@ -142,14 +153,62 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
             {utilityAccess.photos && <AppNavLink href="/mobile-photos" label="Mobilní foto" icon="camera" />}
             {utilityAccess.team && <><AppNavLink href="/chat" label="Týmový chat" icon="messageSquare" /><AppNavLink href="/team" label="Kontakty týmu" icon="phone" /></>}
           </section>
-          {children}
         </nav>
       </div>
     </dialog>
     <nav aria-label="Rychlá mobilní navigace" className="fixed inset-x-0 bottom-0 z-40 flex min-h-16 items-center justify-around border-t border-slate-800 bg-slate-950 px-2 pb-[env(safe-area-inset-bottom)] lg:hidden">
-      {bottom.map(([href, label, icon]) => { const Icon = navigationIcons[icon]; return <Link key={href} href={href} aria-current={active?.item[0] === href ? 'page' : undefined} className={`flex min-h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[10px] ${focusClass} ${active?.item[0] === href ? 'text-emerald-300' : 'text-slate-400'}`}><Icon size={20} /><span>{href === '/dashboard' ? 'Přehled' : href === '/warehouse' ? 'Sklad' : label}</span></Link>; })}
-      {utilityAccess.photos && <Link href="/mobile-photos" aria-label="Mobilní foto" className={`grid h-11 w-11 place-items-center rounded-full bg-emerald-400 text-slate-950 ${focusClass}`}><Camera size={21} /></Link>}
-      <button type="button" onClick={onOpen} aria-label="Otevřít menu" aria-expanded={mobileOpen} className={`flex min-h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-lg text-[10px] text-slate-400 ${focusClass}`}><Menu size={20} />Menu</button>
+      {bottomLeft.map(([href, label, icon]) => {
+        const Icon = navigationIcons[icon];
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active?.item[0] === href ? 'page' : undefined}
+            className={`flex min-h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[10px] ${focusClass} ${
+              active?.item[0] === href ? 'text-emerald-300 font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Icon size={20} />
+            <span>{href === '/dashboard' ? 'Přehled' : href === '/warehouse' ? 'Sklad' : label}</span>
+          </Link>
+        );
+      })}
+      {utilityAccess.photos && (
+        <Link
+          href="/mobile-photos"
+          aria-label="Mobilní foto"
+          title="Mobilní foto"
+          className={`flex h-12 w-12 -translate-y-3 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/30 border-4 border-slate-950 transition active:scale-95 ${focusClass}`}
+        >
+          <Camera size={22} />
+        </Link>
+      )}
+      {bottomRight.map(([href, label, icon]) => {
+        const Icon = navigationIcons[icon];
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active?.item[0] === href ? 'page' : undefined}
+            className={`flex min-h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-lg px-2 text-[10px] ${focusClass} ${
+              active?.item[0] === href ? 'text-emerald-300 font-bold' : 'text-slate-400'
+            }`}
+          >
+            <Icon size={20} />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="Otevřít menu"
+        aria-expanded={mobileOpen}
+        className={`flex min-h-14 min-w-12 flex-col items-center justify-center gap-1 rounded-lg text-[10px] text-slate-400 ${focusClass}`}
+      >
+        <Menu size={20} />
+        <span>Menu</span>
+      </button>
     </nav>
   </>;
 }
