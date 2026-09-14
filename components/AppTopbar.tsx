@@ -12,6 +12,7 @@ import { OrganizationSwitcher } from '@/components/OrganizationSwitcher';
 const pageTitles: Array<[string, string]> = [
   ['/dashboard', 'Dashboard'],
   ['/commercial', 'AI Obchodní centrum'],
+  ['/crm/intelligence', 'AI CRM Intelligence'],
   ['/map', 'Mapa nosičů'],
   ['/carriers', 'Evidence nosičů'],
   ['/occupancy', 'Obsazenost ploch'],
