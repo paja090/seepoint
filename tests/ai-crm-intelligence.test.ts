@@ -329,7 +329,7 @@ test('Scénář K: Kontrola oprávnění RBAC a přístup k modulu CRM', () => {
     assert.equal(canAccess(role, 'clients'), true, `${role} should have access to clients`);
   }
 
-  const restrictedRoles: AppRole[] = ['INSTALLER', 'PRINTER'];
+  const restrictedRoles: AppRole[] = ['WORKER', 'TECHNICIAN'];
   for (const role of restrictedRoles) {
     assert.equal(canAccess(role, 'clients'), false, `${role} should NOT have access to clients`);
   }
