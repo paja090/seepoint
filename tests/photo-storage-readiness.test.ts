@@ -87,9 +87,11 @@ test('photo confirmation is authenticated, one-way and idempotent', () => {
 test('installation photos share tenant storage and clean up failed writes', () => {
   const api = read('app/api/navigation/orders/[id]/photo/route.ts');
   const service = read('lib/navigation/navigation-service.ts');
-  assert.match(api, /storeTenantPhoto/);
-  assert.match(api, /deleteStoredPhoto/);
-  assert.match(api, /validatePhotoFile/);
+  assert.match(api, /uploadInstallationPhotos/);
+  const upload = read('lib/navigation/installation-photo-upload.ts');
+  assert.match(upload, /storeTenantPhoto/);
+  assert.match(upload, /deleteStoredPhoto/);
+  assert.match(upload, /validatePhotoFile/);
   assert.match(service, /storageProvider: stored\.storageProvider/);
   assert.match(service, /contentChecksum: stored\.contentChecksum/);
   assert.match(service, /Buffer\.from\(stored\.content\)/);
@@ -101,13 +103,17 @@ test('all active photo upload routes use the shared storage boundary or verified
     'app/api/mobile-photos/upload/route.ts',
     'app/api/mobile-photos/create-carrier/route.ts',
     'app/api/navigation/orders/[id]/photo/route.ts',
+    'app/api/work/route/mine/photo/route.ts',
     'app/api/navigation/orders/[id]/issue/route.ts',
     'app/api/vehicles/[id]/photo/route.ts',
     'app/api/profile/photo/route.ts',
     'app/api/carriers/photo/route.ts',
   ]) {
     const source = read(path);
-    assert.match(source, /storeTenantPhoto/);
+    if (path === 'app/api/navigation/orders/[id]/photo/route.ts' || path === 'app/api/work/route/mine/photo/route.ts') {
+      assert.match(source, /uploadInstallationPhotos/);
+      assert.match(read('lib/navigation/installation-photo-upload.ts'), /storeTenantPhoto/);
+    } else assert.match(source, /storeTenantPhoto/);
     assert.match(source, /enforcePhotoUploadRateLimit/);
   }
   assert.match(read('app/api/clients/[id]/logo/route.ts'), /validatePhotoFile/);

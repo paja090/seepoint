@@ -1,4 +1,6 @@
 import 'server-only';
+import { requireTenantContext } from './tenant-context';
+import type { PlanningResult } from './field-planning/contracts';
 import { prisma } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
 
@@ -13,6 +15,7 @@ type PhotoAccessRecord = {
   employeeId: string | null;
   type: string;
   workEntryId: string | null;
+  workOrderItemId?: string | null;
   isPrivate: boolean;
   carrierId: string | null;
   surfaceId: string | null;
@@ -32,6 +35,15 @@ export async function canReadPhoto(user: PhotoAccessUser, photo: PhotoAccessReco
       select: { employee: { select: { id: true, userId: true } } },
     });
     return Boolean(entry && (entry.employee.userId === user.id || entry.employee.id === user.employee?.id));
+  }
+
+  if (photo.workOrderItemId) {
+    if (isManagerOrAdmin) return true;
+    const { organizationId } = requireTenantContext();
+    const employee = await prisma.employee.findFirst({ where: { organizationId, userId: user.id, isActive: true }, select: { id: true } });
+    if (!employee) return false;
+    const plans = await prisma.fieldPlan.findMany({ where: { organizationId, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, select: { planningSummary: true } });
+    return plans.some(p => (p.planningSummary as unknown as PlanningResult).crews.some(c => c.employeeIds.includes(employee.id) && c.stops.some(s => s.workOrderItemId === photo.workOrderItemId)));
   }
 
   if (photo.employeeId) return user.employee?.id === photo.employeeId || canAccess(user.role, 'employees');

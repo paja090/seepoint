@@ -1,3 +1,4 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
@@ -5,6 +6,7 @@ import { prisma } from '@/lib/db';
 export async function POST() {
   const auth = await requireApiAccess('work');
   if (isApiDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
 
   try {
     const cutoffDate = new Date();
@@ -15,6 +17,7 @@ export async function POST() {
       where: {
         status: { in: ['DONE', 'CANCELLED'] },
         scheduledAt: { lt: cutoffDate },
+        items: { none: {} },
       },
       select: { id: true },
     });

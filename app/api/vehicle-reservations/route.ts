@@ -12,20 +12,9 @@ import {
   reservationStatuses,
 } from '@/lib/vehicle-reservations';
 
-export const runtime = 'nodejs';
+import { createVehicleReservation, synchronizeVehicleStatus } from '@/lib/vehicle-reservation-service';
 
-async function synchronizeVehicleStatus(transaction: Prisma.TransactionClient, vehicleId: string, releaseOperationalStatus = false) {
-  const [vehicle, reservations] = await Promise.all([
-    transaction.vehicle.findUnique({ where: { id: vehicleId }, select: { status: true } }),
-    transaction.vehicleReservation.findMany({
-      where: { vehicleId, status: { in: ['RESERVED', 'ACTIVE'] } },
-      select: { status: true, dateFrom: true, dateTo: true },
-    }),
-  ]);
-  if (!vehicle) return;
-  const status = derivedVehicleStatus(vehicle.status, reservations, new Date(), releaseOperationalStatus);
-  if (status !== vehicle.status) await transaction.vehicle.update({ where: { id: vehicleId }, data: { status } });
-}
+export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   const user = await requireApiAccess('vehicles');
@@ -82,40 +71,7 @@ export async function POST(request: Request) {
     if (!assignedEmployeeId) return NextResponse.json({ error: 'K účtu není přiřazen platný pracovník.' }, { status: 400 });
 
     const reservation = await prisma.$transaction(async (transaction) => {
-      const [vehicle, employee] = await Promise.all([
-        transaction.vehicle.findUnique({ where: { id: vehicleId }, select: { id: true, status: true } }),
-        transaction.employee.findUnique({ where: { id: assignedEmployeeId }, select: { id: true } }),
-      ]);
-      if (!vehicle) throw new Error('VEHICLE_NOT_FOUND');
-      if (!employee) throw new Error('EMPLOYEE_NOT_FOUND');
-      if (vehicle.status === 'SERVICE' || vehicle.status === 'OUT_OF_SERVICE') throw new Error('VEHICLE_UNAVAILABLE');
-      if (vehicle.status === 'IN_USE' && reservationCoversDay(start, end)) throw new Error('VEHICLE_UNAVAILABLE');
-
-      const conflict = await transaction.vehicleReservation.findFirst({
-        where: {
-          vehicleId,
-          status: { in: ['RESERVED', 'ACTIVE'] },
-          dateFrom: { lte: end },
-          dateTo: { gte: start },
-        },
-        select: { id: true },
-      });
-      if (conflict) throw new Error('RESERVATION_CONFLICT');
-
-      const created = await transaction.vehicleReservation.create({
-        data: {
-          vehicleId,
-          employeeId: assignedEmployeeId,
-          dateFrom: start,
-          dateTo: end,
-          purpose,
-          note: note || null,
-          status: 'RESERVED',
-        },
-        include: { vehicle: true, employee: true },
-      });
-      await synchronizeVehicleStatus(transaction, vehicleId);
-      return created;
+      return createVehicleReservation(transaction, { vehicleId, employeeId: assignedEmployeeId, dateFrom: start, dateTo: end, purpose, note: note || null });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return NextResponse.json(reservation, { status: 201 });

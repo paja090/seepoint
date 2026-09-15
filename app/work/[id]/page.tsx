@@ -1,3 +1,6 @@
+import { hasModuleAccess } from '@/lib/module-policy';
+import { WorkItemsEditor } from '@/components/field-planning/WorkItemsEditor';
+import { itemStatus } from '@/lib/field-planning/item-jobs';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
@@ -75,18 +78,19 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         client: true,
         assignments: true,
         workTasks: { include: { assignedTo: true } },
-        items: { include: { carrier: true, surface: true } },
+        items: { include: { carrier: true, surface: true, crmRealization: true } },
       },
     }),
     prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     prisma.advertisingCarrier.findMany({
       orderBy: [{ city: 'asc' }, { name: 'asc' }],
-      select: { id: true, code: true, name: true, city: true },
+      select: { id: true, code: true, name: true, city: true, surfaces: { select: { id: true, name: true } } },
     }),
   ]);
 
   if (!order) notFound();
 
+  const realizations = order.crmOrderId && ['ADMIN', 'MANAGER'].includes(user.role) ? await prisma.crmRealization.findMany({ where: { organizationId: user.organizationId!, crmOrderId: order.crmOrderId }, select: { id: true, carrierId: true, surfaceId: true } }) : [];
   const scheduledDate = order.scheduledAt || order.createdAt;
   const startOfDay = new Date(scheduledDate);
   startOfDay.setHours(0, 0, 0, 0);
@@ -510,6 +514,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           </aside>
         </div>
 
+        {!order.navigationOrderId && hasModuleAccess(user, 'workRoute', 'work') && ['ADMIN', 'MANAGER'].includes(user.role) && <WorkItemsEditor workOrderId={order.id} carriers={carriers} realizations={realizations} items={order.items.map(i => ({ id: i.id, carrierId: i.carrierId, surfaceId: i.surfaceId, crmRealizationId: i.crmRealizationId, description: i.description, estimatedMinutes: i.estimatedMinutes, status: itemStatus(i), issue: i.issueNote ?? i.crmRealization?.claimNote ?? null }))} />}
         {/* Edit Form Accordion at bottom */}
         <WorkOrderEditForm
           clients={clients.map((client) => ({ id: client.id, label: client.name }))}

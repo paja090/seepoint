@@ -1,3 +1,4 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -9,11 +10,13 @@ export const runtime = 'nodejs';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
+  if (!user.organizationId) return NextResponse.json({ error: 'Vyberte organizaci.' }, { status: 403 });
+  enterTenantContext({ organizationId: user.organizationId, userId: user.id, source: 'session' });
 
   try {
     const { id } = await params;
     const photo = await prisma.photo.findUnique({
-      where: { id },
+      where: { id, organizationId: user.organizationId },
       select: {
         id: true,
         url: true,
@@ -26,6 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         employeeId: true,
         type: true,
         workEntryId: true,
+        workOrderItemId: true,
         isPrivate: true,
         carrierId: true,
         surfaceId: true,

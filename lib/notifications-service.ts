@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { fieldPlanningNotifications } from '@/lib/field-planning/notifications';
 import { canAccess, type AppRole } from '@/lib/rbac';
 import { isModuleEnabled } from '@/lib/organization-modules';
 import { getTenantContext, runWithTenantContext, TenantContextError } from '@/lib/tenant-context';
@@ -7,6 +8,9 @@ export type SystemNotificationItem = {
   id: string;
   type:
     | 'OVERDUE_TASK'
+    | 'FIELD_PLAN_CONFLICT'
+    | 'FIELD_PLAN_ASSIGNED'
+    | 'FIELD_EXECUTION_BLOCKED'
     | 'UNASSIGNED_WORKER'
     | 'PENDING_INVOICE'
     | 'EXPIRING_CONTRACT'
@@ -454,6 +458,7 @@ export const occupancyIntelligenceProvider: NotificationProvider = {
 };
 
 export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
+  fieldPlanningNotifications,
   personalTasksProvider,
   navigationContractsProvider,
   radarOpportunitiesProvider,

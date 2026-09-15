@@ -45,7 +45,7 @@ export const SYSTEM_MODULES: SystemModule[] = [
     name: 'Pracovní výjezdy & Trasy',
     description: 'Optimalizace denních výjezdů, trasa k nosičům a mobilní odbavení',
     category: 'overview',
-    routes: ['/work/route'],
+    routes: ['/work/route', '/my-route'],
   },
   {
     id: 'vacations',

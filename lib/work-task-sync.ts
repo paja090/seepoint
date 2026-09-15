@@ -65,6 +65,12 @@ export async function syncWorkOrderTasks(workOrderId: string, tx?: Prisma.Transa
   const workerNames = [...new Set(order.assignments.map((assignment) => assignment.workerName.trim()).filter(Boolean))];
   const namesForTasks = workerNames.length ? workerNames : [''];
   const employees = await employeeByNames(workerNames, client);
+  // Prefer stable user identity over legacy display-name matching (including duplicate names).
+  for (const assignment of order.assignments) {
+    if (!assignment.userId) continue;
+    const employee = await client.employee.findFirst({ where: { organizationId: order.organizationId, userId: assignment.userId, isActive: true } });
+    if (employee) employees.set(assignment.workerName, employee);
+  }
   const carrierId = order.items[0]?.carrierId ?? null;
   const status = workTaskStatus(order.status);
   const priority = workTaskPriority(order.priority);

@@ -1,282 +1,70 @@
 'use client';
-
-import type { WorkOrderStatus, WorkPriority } from '@prisma/client';
-import type { LayerGroup, Map as LeafletMap } from 'leaflet';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { workPriorityLabels, workPriorityStyles, workStatusLabels, workStatusStyles } from '@/lib/work';
-
-type RouteCarrier = {
-  id: string;
-  code: string;
-  name: string;
-  city: string;
-  address?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
-type RouteOrder = {
-  id: string;
-  title: string;
-  clientName: string;
-  requestedBy?: string | null;
-  description: string;
-  locationNote?: string | null;
-  scheduledAt: string;
-  status: WorkOrderStatus;
-  priority: WorkPriority;
-  workers: string[];
-  carrier?: RouteCarrier | null;
-};
-
-type WorkRoutePlannerProps = {
-  defaultDate: string;
-  initialOrders: RouteOrder[];
-};
-
-function localDate(value: string) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Prague',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(value));
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CrewInput, PlanningInput, PlanningProfile, PlanView } from '@/lib/field-planning/contracts';
+import { RouteMap } from './field-planning/RouteMap';
+import { PlanningProfileForm } from './field-planning/PlanningProfileForm';
+import { JobPlanningSettings } from './field-planning/JobPlanningSettings';
+type Loaded = { profile: PlanningProfile | null; data: PlanningInput | null; plans: PlanView[] };
+function mapsLinks(plan: PlanView, crewId: string) {
+  const crew = plan.result.crews.find(c => c.id === crewId); if (!crew) return [];
+  const coords = (p: { latitude: number; longitude: number }) => `${p.latitude},${p.longitude}`;
+  const points = [crew.startLocation ?? plan.profile.depot, ...crew.stops.map(s => s.location), plan.profile.endLocation]; const links: string[] = [];
+  for (let i = 0; i < points.length - 1; i += 4) {
+    const slice = points.slice(i, i + 5);
+    links.push(`https://www.google.com/maps/dir/?${new URLSearchParams({ api: '1', origin: coords(slice[0]), destination: coords(slice.at(-1)!), waypoints: slice.slice(1, -1).map(coords).join('|'), travelmode: 'driving' })}`);
+  } return links;
 }
-
-function hasCoordinates(carrier?: RouteCarrier | null): carrier is RouteCarrier & { latitude: number; longitude: number } {
-  return Boolean(carrier && Number.isFinite(carrier.latitude) && Number.isFinite(carrier.longitude));
-}
-
-function destinationFor(order: RouteOrder) {
-  if (hasCoordinates(order.carrier)) return `${order.carrier.latitude},${order.carrier.longitude}`;
-  return [order.carrier?.address, order.carrier?.city, order.locationNote, order.clientName]
-    .filter(Boolean)
-    .join(', ');
-}
-
-function navigationUrl(order: RouteOrder) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationFor(order))}`;
-}
-
-function routeUrl(orders: RouteOrder[]) {
-  const stops = orders.map(destinationFor).filter(Boolean).slice(0, 10);
-  if (stops.length === 0) return undefined;
-  const destination = stops.at(-1);
-  const waypoints = stops.slice(0, -1);
-  const query = new URLSearchParams({ api: '1', destination: destination || '' });
-  if (waypoints.length) query.set('waypoints', waypoints.join('|'));
-  return `https://www.google.com/maps/dir/?${query.toString()}`;
-}
-
-function changeDate(value: string, days: number) {
-  const date = new Date(`${value}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return new Intl.DateTimeFormat('en-CA').format(date);
-}
-
-export function WorkRoutePlanner({ defaultDate, initialOrders }: WorkRoutePlannerProps) {
-  const [selectedDate, setSelectedDate] = useState(defaultDate);
-  const [worker, setWorker] = useState('ALL');
-  const [mapReady, setMapReady] = useState(false);
-  const mapElementRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<LeafletMap | null>(null);
-  const layerRef = useRef<LayerGroup | null>(null);
-  const leafletRef = useRef<typeof import('leaflet') | null>(null);
-
-  const workers = useMemo(() => [...new Set(initialOrders.flatMap((order) => order.workers))]
-    .sort((left, right) => left.localeCompare(right, 'cs')), [initialOrders]);
-  const [optimizeRoute, setOptimizeRoute] = useState(false);
-
-  function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+export function WorkRoutePlanner({ defaultDate, country, navigation = false }: { navigation?: boolean; defaultDate: string; country: string | null }) {
+  const [date, setDate] = useState(defaultDate); const [startTime, setStartTime] = useState(''); const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [plan, setPlan] = useState<PlanView | null>(null); const [crews, setCrews] = useState<CrewInput[]>([]);
+  const [selectedJobs, setSelectedJobs] = useState<string[]>([]); const [active, setActive] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all'); const [query, setQuery] = useState(''); const [readyOnly, setReadyOnly] = useState(false);
+  const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [settings, setSettings] = useState(false);
+  const [inputsChanged, setInputsChanged] = useState(false); const [acceptEstimated, setAcceptEstimated] = useState(false); const requestKey = useRef<string | null>(null); const loadCounter = useRef(0);
+  const load = useCallback(async () => {
+    const ticket = ++loadCounter.current; setError('');
+    try {
+      const response = await fetch(`/api/work/route?date=${date}`); const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      if (ticket !== loadCounter.current) return; setInputsChanged(false); setLoaded(data); setPlan(data.plans[0] ?? null); setCrews(data.data?.crews ?? []);
+      setSelectedJobs(data.data?.jobs.filter((j: { status: string }) => !['DONE', 'CANCELLED'].includes(j.status)).map((j: { id: string }) => j.id) ?? []);
+      setActive(data.plans[0]?.result.crews[0]?.id ?? '');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Načtení selhalo.'); }
+  }, [date]);
+  useEffect(() => { setPlan(null); setLoaded(null); requestKey.current = null; void load(); }, [load]);
+  async function action(kind: 'generate' | 'replan' | 'approve' | 'cancel') {
+    setBusy(true); setError('');
+    try {
+      const generating = kind === 'generate' || kind === 'replan'; requestKey.current ??= crypto.randomUUID();
+      const response = await fetch('/api/work/route', { method: generating ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(generating ? { date, startTime: startTime || undefined, requestKey: requestKey.current, crews, jobIds: selectedJobs, ...(kind === 'replan' ? { parentPlanId: plan?.id } : {}) } : { action: kind, id: plan?.id, acceptEstimated }) });
+      const value = await response.json(); if (!response.ok) throw new Error(value.error);
+      setInputsChanged(false); setPlan(value); setActive(value.result.crews[0]?.id ?? ''); requestKey.current = null; setAcceptEstimated(false);
+      setLoaded(old => old ? { ...old, plans: [value, ...old.plans.filter(p => p.id !== value.id)] } : old);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Operace selhala.'); } finally { setBusy(false); }
   }
-
-  const dayOrders = useMemo(() => {
-    const raw = initialOrders
-      .filter((order) => localDate(order.scheduledAt) === selectedDate)
-      .filter((order) => worker === 'ALL' || order.workers.includes(worker));
-
-    if (!optimizeRoute || raw.length <= 1) {
-      return raw.sort((left, right) => new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime());
-    }
-
-    const unvisited = [...raw];
-    const sorted: RouteOrder[] = [];
-
-    const startIdx = unvisited.findIndex((o) => hasCoordinates(o.carrier));
-    let current = unvisited.splice(startIdx >= 0 ? startIdx : 0, 1)[0];
-    sorted.push(current);
-
-    while (unvisited.length > 0) {
-      if (hasCoordinates(current.carrier)) {
-        const cLat = current.carrier.latitude;
-        const cLng = current.carrier.longitude;
-        let nearestIdx = 0;
-        let minDistance = Infinity;
-
-        unvisited.forEach((item, idx) => {
-          if (hasCoordinates(item.carrier)) {
-            const dist = getDistanceKm(cLat, cLng, item.carrier.latitude, item.carrier.longitude);
-            if (dist < minDistance) {
-              minDistance = dist;
-              nearestIdx = idx;
-            }
-          }
-        });
-
-        current = unvisited.splice(nearestIdx, 1)[0];
-        sorted.push(current);
-      } else {
-        current = unvisited.splice(0, 1)[0];
-        sorted.push(current);
-      }
-    }
-
-    return sorted;
-  }, [initialOrders, selectedDate, worker, optimizeRoute]);
-
-  const locatedOrders = useMemo(() => dayOrders.filter((order) => hasCoordinates(order.carrier)), [dayOrders]);
-  const fullRouteUrl = routeUrl(dayOrders);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function initializeMap() {
-      const L = await import('leaflet');
-      if (cancelled || !mapElementRef.current || mapRef.current) return;
-      const map = L.map(mapElementRef.current, {
-        center: [49.8209, 18.2625],
-        zoom: 11,
-        scrollWheelZoom: true,
-      });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map);
-      leafletRef.current = L;
-      layerRef.current = L.layerGroup().addTo(map);
-      mapRef.current = map;
-      setMapReady(true);
-    }
-
-    void initializeMap();
-    return () => {
-      cancelled = true;
-      mapRef.current?.remove();
-      mapRef.current = null;
-      layerRef.current = null;
-      leafletRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    const L = leafletRef.current;
-    const map = mapRef.current;
-    const layer = layerRef.current;
-    if (!L || !map || !layer) return;
-    layer.clearLayers();
-    const bounds = L.latLngBounds([]);
-
-    locatedOrders.forEach((order) => {
-      if (!hasCoordinates(order.carrier)) return;
-      const orderIndex = dayOrders.findIndex((item) => item.id === order.id) + 1;
-      const marker = L.circleMarker([order.carrier.latitude, order.carrier.longitude], {
-        radius: 13,
-        color: '#ffffff',
-        weight: 3,
-        fillColor: order.priority === 'URGENT' ? '#dc2626' : '#0369a1',
-        fillOpacity: 1,
-      });
-      const tooltip = document.createElement('span');
-      tooltip.textContent = `${orderIndex}. ${order.title}`;
-      marker.bindTooltip(tooltip, { direction: 'top' }).addTo(layer);
-      bounds.extend([order.carrier.latitude, order.carrier.longitude]);
-    });
-
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-    else map.setView([49.8209, 18.2625], 11);
-    window.setTimeout(() => map.invalidateSize(), 0);
-  }, [dayOrders, locatedOrders, mapReady]);
-
-  const formattedDate = new Intl.DateTimeFormat('cs-CZ', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(`${selectedDate}T12:00:00`));
-
-  return (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Pracovní výjezd</p>
-          <h1 className="text-3xl font-bold">Úkoly na mapě</h1>
-          <p className="mt-2 text-slate-600">Pořadí zastávek, zadání a navigace pro vybraný pracovní den.</p>
-        </div>
-        <Link className="text-sm font-semibold text-sky-700 hover:text-sky-900" href="/work">← Zpět na plán práce</Link>
-      </header>
-
-      <section className="card grid gap-3 md:grid-cols-2 xl:grid-cols-[auto_auto_1fr_auto] xl:items-end">
-        <div className="flex gap-2">
-          <button className="rounded-xl border bg-white px-3 py-2 font-medium" onClick={() => setSelectedDate((value) => changeDate(value, -1))} type="button" aria-label="Předchozí den">←</button>
-          <button className="rounded-xl border bg-white px-3 py-2 font-medium" onClick={() => setSelectedDate(new Intl.DateTimeFormat('en-CA').format(new Date()))} type="button">Dnes</button>
-          <button className="rounded-xl border bg-white px-3 py-2 font-medium" onClick={() => setSelectedDate((value) => changeDate(value, 1))} type="button" aria-label="Další den">→</button>
-        </div>
-        <label className="text-sm font-medium">Datum<input className="input mt-1" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setOptimizeRoute((v) => !v)}
-            className={`rounded-xl px-4 py-3 text-center text-sm font-bold transition shadow-xs cursor-pointer ${
-              optimizeRoute
-                ? 'bg-emerald-600 text-white hover:bg-emerald-500 ring-2 ring-emerald-300'
-                : 'bg-slate-900 text-white hover:bg-slate-800'
-            }`}
-          >
-            {optimizeRoute ? '⚡ Nejkratší trasa aktivní' : '⚡ Seřadit podle nejkratší trasy'}
-          </button>
-          {fullRouteUrl && (
-            <a className="rounded-xl bg-sky-700 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-sky-800 transition" href={fullRouteUrl} rel="noreferrer" target="_blank">
-              🧭 Navigovat celou trasu ↗
-            </a>
-          )}
-        </div>
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
-        <div className="relative min-h-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-          <div ref={mapElementRef} className="absolute inset-0" role="region" aria-label={`Mapa pracovních úkolů pro ${formattedDate}`} />
-          {locatedOrders.length === 0 && <div className="pointer-events-none absolute inset-x-4 top-4 z-[500] rounded-xl bg-white/95 p-3 text-center text-sm shadow">Pro tento den zatím není žádný úkol propojený s přesným GPS bodem.</div>}
-        </div>
-
-        <div>
-          <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-sm font-semibold uppercase tracking-wide text-sky-700">Pořadí zastávek</p><h2 className="text-xl font-bold capitalize">{formattedDate}</h2></div><span className="text-sm font-semibold text-slate-500">{dayOrders.length} úkolů</span></div>
-          {dayOrders.length === 0 ? <div className="card text-center"><p className="font-semibold">Na tento den není naplánovaná žádná práce.</p><p className="mt-1 text-sm text-slate-500">Vyberte jiný den nebo pracovníka.</p></div> : <ol className="space-y-3">{dayOrders.map((order, index) => {
-            const located = hasCoordinates(order.carrier);
-            return <li className={`rounded-2xl border bg-white p-4 shadow-sm ${order.priority === 'URGENT' ? 'border-red-300' : 'border-slate-200'}`} key={order.id}>
-              <div className="flex items-start gap-3">
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full font-bold text-white ${order.priority === 'URGENT' ? 'bg-red-600' : 'bg-sky-700'}`}>{index + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span><span className="ml-auto text-xs font-semibold text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Prague' })}</span></div>
-                  <Link className="mt-2 block font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
-                  <p className="mt-1 text-sm text-slate-600">{order.clientName}</p>
-                  <p className="mt-1 text-xs text-slate-500">{order.workers.join(', ') || 'Nepřiřazený pracovník'}</p>
-                  <p className="mt-2 text-sm text-slate-700">{order.carrier ? `${order.carrier.code} · ${order.carrier.address || order.carrier.city}` : order.locationNote || 'Místo není upřesněno'}</p>
-                  {!located && <p className="mt-1 text-xs font-medium text-amber-700">Bez přesného GPS bodu – navigace použije textové místo.</p>}
-                  <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold"><a className="text-sky-700 hover:text-sky-900" href={navigationUrl(order)} rel="noreferrer" target="_blank">Navigovat ↗</a><Link className="text-slate-600 hover:text-slate-900" href={`/work/${order.id}`}>Otevřít zadání</Link>{order.carrier && <Link className="text-slate-600 hover:text-slate-900" href={`/carriers/${order.carrier.id}`}>Detail nosiče</Link>}</div>
-                </div>
-              </div>
-            </li>;
-          })}</ol>}
-        </div>
-      </section>
-    </div>
-  );
+  function updateCrews(value: CrewInput[]) { setCrews(value); setInputsChanged(true); requestKey.current = null; }
+  const time = (v: string) => new Date(v).toLocaleTimeString('cs-CZ', { timeZone: plan?.profile.timezone ?? loaded?.profile?.timezone ?? 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+  const visibleJobs = loaded?.data?.jobs.filter(j => (sourceFilter === 'all' || Boolean(j.navigationPointId) === (sourceFilter === 'navigation')) && (!readyOnly || !j.blockedReason) && [j.title, j.clientName, j.orderNumber, j.address].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [];
+  const crew = plan?.result.crews.find(c => c.id === active);
+  return <div className="mx-auto max-w-[1600px] space-y-5">
+    <header className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-sky-700">Práce / Terénní operace</p><h1 className="mt-1 text-3xl font-bold">AI Route & Field Planner</h1><p className="mt-2 text-slate-600">Kdo, čím a kdy. Návrh se stane provozním plánem až po vašem schválení.</p></div><div className="flex gap-4 text-sm font-semibold text-sky-700"><Link href="/work">Plán práce</Link><Link href="/my-route">Moje trasa</Link><button onClick={() => setSettings(!settings)}>Nastavení organizace</button></div></header>
+    {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}</p>}
+    {(settings || (loaded && !loaded!.profile)) && <PlanningProfileForm navigation={navigation} country={country} initial={loaded?.profile ?? null} onSaved={() => { setSettings(false); void load(); }} />}
+    <section className="flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-4"><label className="text-sm font-semibold">Den<input className="input" type="date" value={date} disabled={busy} onChange={e => setDate(e.target.value)} /></label>
+      <label className="text-sm font-semibold">Nejdřívější odjezd ({loaded?.profile?.timezone})<input className="input" type="time" value={startTime} disabled={busy} onChange={e => { setStartTime(e.target.value); setInputsChanged(true); requestKey.current = null; }} /></label><button className="rounded-xl bg-sky-700 px-4 py-3 font-semibold text-white disabled:opacity-40" disabled={busy || !loaded?.data || !selectedJobs.length || !crews.length} onClick={() => void action('generate')}>{busy ? 'Zpracovávám…' : 'Vygenerovat plán'}</button>
+      <button className="rounded-xl border px-4 py-3 disabled:opacity-40" disabled={busy || !plan || !['DRAFT', 'APPROVED', 'ACTIVE'].includes(plan.status)} onClick={() => void action('replan')}>Přepočítat zbývající plán</button>
+      <button className="rounded-xl bg-emerald-700 px-4 py-3 font-semibold text-white disabled:opacity-40" disabled={busy || inputsChanged || plan?.status !== 'DRAFT' || Boolean(plan.result.conflicts.length || plan.result.unassigned.length)} onClick={() => void action('approve')}>Schválit plán</button>
+      <button className="px-3 py-2 text-sm text-slate-500 disabled:opacity-40" disabled={busy || plan?.status !== 'DRAFT'} onClick={() => void action('cancel')}>Zrušit návrh</button>
+      {!!loaded?.plans.length && <label className="ml-auto text-sm">Verze<select className="input" value={plan?.id ?? ''} onChange={e => { const chosen = loaded.plans.find(p => p.id === e.target.value)!; setPlan(chosen); setActive(chosen.result.crews[0]?.id ?? ''); }}><option value="" disabled>Vyberte</option>{loaded.plans.map(p => <option key={p.id} value={p.id}>v{p.version} · {p.status}</option>)}</select></label>}
+    </section>
+    {inputsChanged && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Výběr se změnil. Před schválením vygenerujte nebo přepočítejte návrh.</p>}{plan && <section className="rounded-2xl bg-slate-900 p-5 text-white"><div className="flex flex-wrap gap-6"><strong>v{plan.version} · {plan.status}</strong><span>{plan.result.crews.reduce((n, c) => n + c.stops.length, 0)} zastávek / {new Set(plan.result.crews.flatMap(c => c.stops.map(s => s.workOrderId || s.navigationOrderId))).size} zakázek / {plan.result.crews.length} posádek</span><span>{(plan.result.distanceMeters / 1000).toFixed(1)} km</span><span>Jízda {Math.round(plan.result.travelSeconds / 60)} min</span><span>Práce {plan.result.serviceMinutes} min</span></div><p className="mt-3 text-sm text-slate-300">{plan.result.explanation}</p>{plan.result.estimated && plan.status === 'DRAFT' && <label className="mt-3 flex gap-2 text-sm text-amber-200"><input type="checkbox" checked={acceptEstimated} onChange={e => setAcceptEstimated(e.target.checked)} />Ověřil/a jsem odhadované přejezdy a souhlasím s jejich použitím.</label>}</section>}
+    <div className="grid items-start gap-4 xl:grid-cols-[290px_minmax(300px,1fr)_340px]">
+      <aside className="space-y-4"><section className="card"><h2 className="font-bold">Úkoly k naplánování</h2><p className="mb-3 text-xs text-slate-500">Včetně nedokončených starších úkolů.</p><label className="block text-xs">Typ zastávky<select className="input" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="all">Všechny</option><option value="work">Běžná práce</option>{navigation && <option value="navigation">Navigation</option>}</select></label><label className="mt-2 block text-xs">Klient, zakázka, město nebo adresa<input className="input" value={query} onChange={e => setQuery(e.target.value)} /></label><label className="my-2 flex gap-2 text-xs"><input type="checkbox" checked={readyOnly} onChange={e => setReadyOnly(e.target.checked)} />Pouze neplánované a připravené</label><p className="my-2 text-xs">Vybráno {selectedJobs.length} zastávek · zobrazeno {visibleJobs.length}</p><div className="mb-3 flex flex-wrap gap-3 text-xs"><button className="font-semibold text-sky-700" onClick={() => { setSelectedJobs(visibleJobs.map(j => j.id)); setInputsChanged(true); requestKey.current = null; }}>Vybrat pouze zobrazené</button><button className="text-slate-600" onClick={() => { setSelectedJobs([]); setInputsChanged(true); requestKey.current = null; }}>Zrušit výběr</button></div><div className="max-h-80 space-y-3 overflow-auto">{visibleJobs.map(j => <div key={j.id}><label className="flex gap-2 text-sm"><input type="checkbox" checked={selectedJobs.includes(j.id)} onChange={e => { setSelectedJobs(old => e.target.checked ? [...old, j.id] : old.filter(id => id !== j.id)); setInputsChanged(true); requestKey.current = null; }} /><span><Link className="font-semibold hover:underline" href={j.navigationOrderId ? `/navigation/orders/${j.navigationOrderId}` : `/work/${j.parentWorkOrderId ?? j.id}`}>{j.title}</Link><small className="block text-slate-500">{j.clientName} · {j.orderNumber} · {j.priority} · {j.serviceMinutes ?? loaded!.profile?.serviceMinutes[j.workType] ?? '?'} min</small><small className="block text-slate-500">{j.address} · {j.location ? `${j.location.latitude}, ${j.location.longitude}` : 'Chybí GPS'}</small>{j.blockedReason && <small className="block text-amber-700">{j.blockedReason}</small>}{j.deadlineAt && <small className="block text-amber-700">Termín {new Date(j.deadlineAt).toLocaleString('cs-CZ', { timeZone: loaded!.profile!.timezone })}</small>}</span></label><JobPlanningSettings job={j} onSaved={load} employees={loaded!.data!.employees} jobs={loaded!.data!.jobs} timezone={loaded!.profile!.timezone} /></div>)}</div></section>
+        <section className="card space-y-3"><h2 className="font-bold">Posádky a dostupnost</h2>{loaded?.data?.employees.filter(e => e.isActive).map(e => <p key={e.id} className={`text-xs ${e.available ? 'text-emerald-700' : 'text-red-700'}`}>{e.name} · {e.available ? 'dostupný' : 'absence / jiná práce'} · {e.positions.join(', ')}</p>)}
+          {crews.map((c, index) => <div key={c.id} className="space-y-2 rounded-xl border p-3"><div className="flex justify-between text-sm font-bold"><span>Posádka {index + 1}</span><button aria-label="Odebrat posádku" onClick={() => updateCrews(crews.filter(x => x.id !== c.id))}>×</button></div><label className="block text-xs">Pracovníci<select multiple className="input mt-1 min-h-20" value={c.employeeIds} onChange={e => updateCrews(crews.map(x => x.id === c.id ? { ...x, employeeIds: Array.from(e.target.selectedOptions, o => o.value) } : x))}>{loaded?.data?.employees.filter(e => e.isActive).map(e => <option key={e.id} value={e.id}>{e.name}{!e.available ? ' (nedostupný)' : ''}</option>)}</select></label><label className="block text-xs">Vozidlo<select className="input mt-1" value={c.vehicleId ?? ''} onChange={e => updateCrews(crews.map(x => x.id === c.id ? { ...x, vehicleId: e.target.value || null } : x))}><option value="">Bez vozidla</option>{loaded?.data?.vehicles.map(v => <option key={v.id} value={v.id}>{v.name} · {v.status}{v.reserved ? ' / rezervace' : ''}</option>)}</select></label><label className="block text-xs">Aktuální GPS při přepočtu (lat, lng)<input className="input mt-1" placeholder="Potvrďte skutečnou polohu" onBlur={e => { const values = e.target.value.split(',').map(Number); if (values.length === 2 && values.every(Number.isFinite)) updateCrews(crews.map(x => x.id === c.id ? { ...x, startLocation: { latitude: values[0], longitude: values[1] } } : x)); }} /></label></div>)}
+          <button className="text-sm font-semibold text-sky-700" onClick={() => updateCrews([...crews, { id: crypto.randomUUID(), employeeIds: [], vehicleId: null }])}>+ Přidat posádku</button>{plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && <button className="block text-sm text-sky-700" onClick={() => updateCrews(plan.result.crews.map(c => ({ id: c.id, employeeIds: c.employeeIds, vehicleId: c.vehicleId })))}>Použít posádky schváleného plánu</button>}
+        </section></aside>
+      <main className="space-y-3"><div className="flex flex-wrap gap-2">{plan?.result.crews.map((c, i) => <button key={c.id} onClick={() => setActive(c.id)} className={`rounded-full px-4 py-2 text-sm font-semibold ${active === c.id ? 'bg-sky-700 text-white' : 'bg-white'}`}>Posádka {i + 1} · {c.stops.length}</button>)}</div><RouteMap result={plan?.result} depot={loaded?.profile?.depot} active={active} /><p className="text-xs text-slate-500">Přerušovaná čára = odhad. Plná čára = silniční trasa.</p>{plan && [...plan.result.conflicts, ...plan.result.unassigned].map((a, i) => <p key={i} className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{a.code}: {a.message}</p>)}</main>
+      <aside className="space-y-3">{crew ? <><section className="card"><h2 className="text-xl font-bold">{crew.names.join(' + ')}</h2><p className="text-sm text-slate-500">{crew.vehicleName ?? 'Bez vozidla'}</p><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><p>Odjezd <strong>{time(crew.departureAt)}</strong></p><p>Návrat <strong>{time(crew.endAt)}</strong></p><p>{(crew.distanceMeters / 1000).toFixed(1)} km</p><p>{Math.round(crew.travelSeconds / 60)} min jízdy</p><p>{crew.serviceMinutes} min práce</p><p>{crew.breakMinutes} min přestávka před návratem</p></div>{mapsLinks(plan!, active).map((href, i, links) => <a key={href} href={href} target="_blank" rel="noreferrer" className="mt-3 block text-sm font-semibold text-sky-700">Google Maps{links.length > 1 ? ` · část ${i + 1}/${links.length}` : ''} ↗</a>)}</section><ol className="space-y-3">{crew.stops.map(s => <li key={s.jobId ?? s.workOrderId} className="rounded-2xl border bg-white p-4"><p className="text-xs font-semibold text-sky-700">{s.routeOrder}. · ETA {time(s.arrivalAt)} · práce {time(s.startAt)}–{time(s.endAt)}</p><Link href={s.navigationOrderId ? `/navigation/orders/${s.navigationOrderId}` : `/work/${s.workOrderId}`} className="mt-1 block font-bold">{s.title}</Link><p className="mt-2 text-xs text-slate-500">{s.reason}</p></li>)}</ol></> : <section className="card text-sm text-slate-500">Vyberte úkoly, pracovníky a vozidla. Návrh zobrazí pořadí a časy.</section>}</aside>
+    </div></div>;
 }

@@ -529,6 +529,8 @@ model Organization {
   aiInboxActions      AiInboxAction[]
   occupancyAIProfile  OrganizationOccupancyAIProfile?
   occupancyInsights   OccupancyInsight[]
+  fieldPlanningProfile OrganizationFieldPlanningProfile?
+  fieldPlans FieldPlan[]
 
   @@index([isActive])
   @@index([plan])
@@ -557,6 +559,49 @@ model IntegrationConnection {
   @@unique([organizationId, provider, externalAccountId])
   @@index([organizationId, provider])
   @@index([organizationId, status])
+}
+
+enum FieldPlanStatus {
+  DRAFT
+  APPROVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model OrganizationFieldPlanningProfile {
+  id String @id @default(cuid())
+  organizationId String @unique
+  configuration Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Immutable planning snapshots; WorkOrder remains the business source of truth.
+model FieldPlan {
+  id String @id @default(cuid())
+  organizationId String
+  date String
+  version Int
+  requestKey String
+  requestHash String
+  parentPlanId String?
+  status FieldPlanStatus @default(DRAFT)
+  createdByUserId String
+  approvedByUserId String?
+  approvedAt DateTime?
+  generatedAt DateTime @default(now())
+  planningInputSnapshot Json
+  planningSummary Json
+  approvalSnapshot Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date, version])
+  @@unique([organizationId, requestKey])
+  @@index([organizationId, date, status])
 }
 
 model OrganizationOnboarding {
@@ -1981,6 +2026,8 @@ model Photo {
   carrierId              String?
   surfaceId              String?
   employeeId             String?
+  workOrderItemId        String?
+  workOrderItem          WorkOrderItem? @relation(fields: [workOrderItemId], references: [id], onDelete: Restrict)
   taskId                 String?
   workEntryId            String?
   crmRealizationId       String?
@@ -2030,6 +2077,7 @@ model Photo {
   @@index([carrierId])
   @@index([carrierId, sortOrder])
   @@index([surfaceId])
+  @@index([workOrderItemId])
   @@index([employeeId])
   @@index([organizationId])
   @@index([organizationId, storageProvider])
@@ -2224,6 +2272,7 @@ model WorkOrder {
   contactPhone     String?
   locationNote     String?
   estimatedHours   Decimal?        @db.Decimal(5, 2)
+  planningConstraints Json?
   pdfUrl           String?
   mediaLabel       String?
   quantity         Int?
@@ -2281,6 +2330,16 @@ model WorkOrderItem {
   description    String?
   quantity       Int      @default(1)
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+  executionStatus WorkOrderStatus?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  estimatedMinutes Int?
+  issueType      String?
+  issueNote      String?
+  crmRealizationId String? @unique
+  crmRealization CrmRealization? @relation(fields: [crmRealizationId], references: [id], onDelete: Restrict)
+  photos         Photo[]
 
   workOrder WorkOrder           @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   carrier   AdvertisingCarrier? @relation(fields: [carrierId], references: [id], onDelete: SetNull)
@@ -2896,6 +2955,7 @@ model CrmRealization {
   workOrder    WorkOrder?          @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
   assignedUser User?               @relation("CrmRealizationAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
   photos       Photo[]
+  workOrderItem WorkOrderItem?
 
   @@index([crmOrderId])
   @@index([status])

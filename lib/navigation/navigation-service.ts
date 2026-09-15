@@ -694,20 +694,23 @@ export async function attachPointInstallationPhotos(
   navigationPointId: string,
   photos: StoredInstallationPhoto[],
   capturedBy: { userId: string; userName: string },
+  transaction?: Prisma.TransactionClient,
 ) {
   const afterPhoto = photos.find((photo) => photo.type === 'AFTER_INSTALLATION');
   if (!afterPhoto) {
     throw new NavigationServiceError('Fotografie po montáži je povinná.', 'MISSING_INSTALLATION_PHOTO');
   }
 
-  return prisma.$transaction(async (tx) => {
+  const install = async (tx: Prisma.TransactionClient) => {
+    const { organizationId } = requireTenantContext();
     const point = await tx.navigationPoint.findUnique({
-      where: { id: navigationPointId },
+      where: { id: navigationPointId, organizationId },
       include: {
         navigationOrder: {
           include: {
             crmOrder: {
               select: {
+                organizationId: true,
                 orderNumber: true,
                 clientId: true,
                 offer: {
@@ -728,6 +731,10 @@ export async function attachPointInstallationPhotos(
       throw new NavigationServiceError('Navigační bod nebyl nalezen.', 'NOT_FOUND');
     }
 
+    if (point.organizationId !== organizationId || point.navigationOrder.organizationId !== organizationId || point.navigationOrder.crmOrder.organizationId !== organizationId) throw new NavigationServiceError('Cross-tenant reference rejected.');
+    if (point.carrierId && !await tx.advertisingCarrier.count({ where: { id: point.carrierId, organizationId } })) throw new NavigationServiceError('Cross-tenant carrier rejected.');
+    if (point.surfaceId && !await tx.advertisingSurface.count({ where: { id: point.surfaceId, organizationId } })) throw new NavigationServiceError('Cross-tenant surface rejected.');
+    if (['CANCELLED', 'REMOVED'].includes(point.status) || point.issueReported) throw new NavigationServiceError('Nejprve vyřešte stav nebo problém bodu.');
     const sourceKey = `NAVIGATION_POINT:${point.id}`;
     let carrierId = point.carrierId;
     if (!carrierId) {
@@ -827,5 +834,6 @@ export async function attachPointInstallationPhotos(
     });
 
     return { photo: installedPhoto, carrierId, surfaceId: surface.id };
-  });
+  };
+  return transaction ? install(transaction) : prisma.$transaction(install);
 }

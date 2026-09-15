@@ -182,6 +182,7 @@ export async function computeGoogleRoute(
         'Referer': referer,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!res.ok) {
