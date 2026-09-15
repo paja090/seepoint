@@ -1,3 +1,5 @@
+import { enterTenantContext } from '@/lib/tenant-context';
+import { usesItemExecution } from '@/lib/field-planning/item-jobs';
 import { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
@@ -48,6 +50,7 @@ function validDriveUrl(value?: string) {
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
   const input = await request.json().catch(() => null) as UpdateInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
   if (typeof input.status !== 'string' || !Object.values(WorkOrderStatus).includes(input.status as WorkOrderStatus)) {
@@ -65,6 +68,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   
   try {
     const saved = await prisma.$transaction(async (tx) => {
+      const current = await tx.workOrder.findUniqueOrThrow({ where: { id }, include: { items: true } });
+      if (usesItemExecution(current.items) && input.status !== current.status) throw new Error('FIELD_ITEM_STATE: Stav této zakázky se řídí dokončením jednotlivých pracovních položek.');
       const updated = await tx.workOrder.update({
         where: { id },
         data: {
@@ -81,6 +86,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     });
     return NextResponse.json({ ...saved, price: saved.price?.toString() ?? null });
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith('FIELD_ITEM_STATE:')) return NextResponse.json({ error: err.message.slice(18).trim() }, { status: 409 });
     if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {
       return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });
     }
@@ -90,6 +96,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
   const input = await request.json().catch(() => null) as EditInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
 
@@ -134,6 +141,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     await prisma.$transaction(async (tx) => {
+      const current = await tx.workOrder.findUniqueOrThrow({ where: { id }, include: { items: { include: { photos: { select: { id: true } } } } } });
+      const preserveItems = usesItemExecution(current.items) || current.items.some(i => i.photos.length);
       await tx.workOrder.update({
         where: { id },
         data: {
@@ -158,11 +167,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           quantity,
           referenceUrl: text(input, 'referenceUrl') ?? null,
           ftdUrl: ftdUrl ?? null,
-          assignments: {
+          assignments: preserveItems ? undefined : {
             deleteMany: {},
             ...(workerNames.length ? { create: workerNames.map((workerName) => ({ workerName })) } : {}),
           },
-          items: {
+          items: preserveItems ? undefined : {
             deleteMany: {},
             ...(carrier ? { create: [{ carrierId: carrier.id, quantity: quantity || 1 }] } : {}),
           },
@@ -171,6 +180,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await syncWorkOrderTasks(id, tx);
     });
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith('FIELD_ITEM_STATE:')) return NextResponse.json({ error: err.message.slice(18).trim() }, { status: 409 });
     if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {
       return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });
     }
@@ -182,13 +192,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('work');
   if (isApiDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
   const { id } = await params;
   const existing = await prisma.workOrder.findUnique({
     where: { id },
-    include: { workEntries: { select: { id: true } } },
+    include: { workEntries: { select: { id: true } }, items: { include: { photos: { select: { id: true } } } } },
   });
   if (!existing) return NextResponse.json({ error: 'Pracovní zakázka nebyla nalezena.' }, { status: 404 });
-  if (existing.workEntries.length > 0) {
+  if (existing.workEntries.length > 0 || usesItemExecution(existing.items) || existing.items.some(i => i.photos.length)) {
     await prisma.workOrder.update({
       where: { id },
       data: { status: 'CANCELLED' },

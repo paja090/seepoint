@@ -6,11 +6,9 @@ import { PhotoValidationError, photoFileFromDataUrl, validatePhotoFile } from '@
 import { deleteStoredPhoto, storeTenantPhoto } from '@/lib/storage/photo-storage';
 import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 
-const ISSUE_TYPES = new Set([
-  'Sloup nebyl nalezen', 'Sloup neodpovídá dokumentaci', 'Místo je obsazené jiným nájemcem',
-  'Montáž není technicky možná', 'Poškozená konstrukce nebo nosič', 'Chybí cedule z tisku',
-  'Nesprávný motiv grafiky', 'Překážka nebo vegetace v místě', 'Jiný provozní problém',
-]);
+import { navigationIssueTypes, reportNavigationPointIssue } from '@/lib/navigation/point-issue';
+import { enterTenantContext } from '@/lib/tenant-context';
+const ISSUE_TYPES = new Set<string>(navigationIssueTypes);
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationProjects');
@@ -20,6 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) return NextResponse.json({ error: 'Nebyla nalezena organizace pro uložení fotografie.' }, { status: 400 });
 
+  enterTenantContext({ organizationId, userId: auth.id, source: 'session' });
   let stored: Awaited<ReturnType<typeof storeTenantPhoto>> | undefined;
   try {
     const navigationOrderId = (await params).id;
@@ -76,15 +75,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         });
       }
 
-      await tx.navigationPoint.update({
-        where: { id: point.id },
-        data: {
-          issueReported: true,
-          issueType: body.issueType,
-          issueNote,
-          ...(photoData ? { installedPhotoId: photoData.id } : {}),
-        },
-      });
+      await reportNavigationPointIssue(tx, navigationOrderId, point.id, body.issueType!, issueNote, photoData?.id);
     });
 
     return NextResponse.json({ success: true, photoUrl: photoData?.url || null, storageWarning: stored?.warning || null });

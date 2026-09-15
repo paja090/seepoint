@@ -1,4 +1,6 @@
 import { AppShell } from '@/components/AppShell';
+import Link from 'next/link';
+import { hasModuleAccess } from '@/lib/module-policy';
 import { prisma } from '@/lib/db';
 import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
@@ -100,6 +102,7 @@ export default async function MyTasksPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-5xl space-y-8">
+        {hasModuleAccess(user, 'workRoute', 'myTasks') && <Link href="/my-route" className="block rounded-2xl bg-sky-700 p-5 text-lg font-bold text-white">Moje trasa dnes →</Link>}
         {/* QUICK INTERNAL TASKS SECTION */}
         <section className="space-y-4">
           <div>

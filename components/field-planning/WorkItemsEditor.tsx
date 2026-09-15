@@ -1,0 +1,21 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+type Item = { id: string; carrierId: string | null; surfaceId: string | null; crmRealizationId: string | null; description: string | null; estimatedMinutes: number | null; status: string; issue: string | null };
+export function WorkItemsEditor({ workOrderId, items, carriers, realizations }: { workOrderId: string; items: Item[];
+  carriers: Array<{ id: string; code: string; name: string; surfaces: Array<{ id: string; name: string }> }>;
+  realizations: Array<{ id: string; carrierId: string | null; surfaceId: string | null }> }) {
+  const router = useRouter(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  async function submit(form: FormData, id?: string, action = 'save') {
+    setBusy(true); setError('');
+    try {
+      const response = await fetch(`/api/work-orders/${workOrderId}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action, requestKey,
+        carrierId: form.get('carrier'), surfaceId: form.get('surface'), crmRealizationId: form.get('realization'), description: form.get('description'), estimatedMinutes: form.get('minutes') ? Number(form.get('minutes')) : null }) });
+      const result = await response.json(); if (!response.ok) throw new Error(result.error); setRequestKey(crypto.randomUUID()); router.refresh();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Uložení selhalo.'); } finally { setBusy(false); }
+  }
+  function fields(item?: Item) { return <div className="grid gap-3 sm:grid-cols-2"><label>Nosič<select name="carrier" className="input" defaultValue={item?.carrierId ?? ''}><option value="">Podle plochy</option>{carriers.map(c => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label><label>Plocha (volitelně)<select name="surface" className="input" defaultValue={item?.surfaceId ?? ''}><option value="">Celý nosič</option>{carriers.flatMap(c => c.surfaces.map(s => <option key={s.id} value={s.id}>{c.code} · {s.name}</option>))}</select></label><label>Existující CRM realizace<select name="realization" className="input" defaultValue={item?.crmRealizationId ?? ''}><option value="">Samostatná pracovní položka</option>{realizations.map(r => <option key={r.id} value={r.id}>{carriers.find(c => c.id === r.carrierId)?.code ?? r.id} · {r.surfaceId ?? 'nosič'}</option>)}</select></label><label>Délka práce (min; prázdné = profil)<input type="number" min={1} max={1440} className="input" name="minutes" defaultValue={item?.estimatedMinutes ?? ''} /></label><label className="sm:col-span-2">Instrukce / popis vyřešení<textarea className="input" name="description" maxLength={2000} defaultValue={item?.description ?? ''} /></label></div>; }
+  return <section className="card space-y-4"><h2 className="text-xl font-bold">Pracovní zastávky</h2><p className="text-sm text-slate-600">Každá položka představuje jednu konkrétní práci na nosiči nebo ploše. Počet kusů nevytváří další GPS body. Časy a omezení zakázky platí pro všechny její položky.</p>{error && <p role="alert" className="text-red-700">{error}</p>}
+    {items.map(item => <details key={item.id} className="rounded-xl border p-3"><summary>{carriers.find(c => c.id === item.carrierId)?.code ?? item.description ?? 'Položka'} · {item.status}{item.issue ? ' · Problém' : ''}</summary><form action={f => submit(f, item.id)} className="mt-3 space-y-3">{fields(item)}<div className="flex gap-4"><button disabled={busy} className="font-bold text-sky-700">Uložit položku</button><button disabled={busy} formAction={f => submit(f, item.id, 'cancel')} className="text-red-700">Zrušit položku</button>{item.issue && <button disabled={busy} formAction={f => submit(f, item.id, 'resolve')} className="text-emerald-700">Potvrdit vyřešení problému</button>}</div>{item.issue && <p>{item.issue}</p>}</form></details>)}
+    <details><summary className="font-bold text-sky-700">Přidat pracovní zastávku</summary><form key={requestKey} action={f => submit(f)} className="mt-3 space-y-3">{fields()}<button disabled={busy} className="rounded-xl bg-sky-700 px-4 py-2 font-bold text-white">Přidat položku</button></form></details></section>;
+}

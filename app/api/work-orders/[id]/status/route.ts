@@ -1,3 +1,5 @@
+import { enterTenantContext } from '@/lib/tenant-context';
+import { usesItemExecution } from '@/lib/field-planning/item-jobs';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
@@ -10,6 +12,7 @@ export async function PATCH(
   try {
     const user = await requireApiAccess('work');
   if (isApiDenied(user)) return user;
+    enterTenantContext({ organizationId: user.organizationId!, userId: user.id, source: 'session' });
     if (!user) {
       return NextResponse.json({ error: 'Nejste přihlášeni' }, { status: 401 });
     }
@@ -34,6 +37,8 @@ export async function PATCH(
     if (!existing) {
       return NextResponse.json({ error: 'Zakázka nebyla nalezena' }, { status: 404 });
     }
+
+    if (usesItemExecution(existing.items)) return NextResponse.json({ error: 'Dokončete jednotlivé položky přes Moje trasa dnes.' }, { status: 409 });
 
     // Update WorkOrder status & FTD status if DONE
     const updated = await prisma.workOrder.update({

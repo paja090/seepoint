@@ -1,3 +1,4 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
@@ -10,6 +11,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const auth = await requireApiAccess('dashboard');
     if (isApiDenied(auth)) return auth;
+    enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
     const id = (await params).id;
     const body = await request.json().catch(() => null);
     if (!body) {
@@ -17,7 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const photo = await prisma.photo.findUnique({
-      where: { id },
+      where: { id, organizationId: auth.organizationId! },
     });
     if (!photo) {
       return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
@@ -98,7 +100,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       // Apply primary, visibility, note updates
       await tx.photo.update({
-        where: { id },
+        where: { id, organizationId: auth.organizationId! },
         data: dataToUpdate,
       });
     });
@@ -115,12 +117,15 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const auth = await requireApiAccess('dashboard');
     if (isApiDenied(auth)) return auth;
+    enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
     const id = (await params).id;
     const photo = await prisma.photo.findUnique({
-      where: { id },
-      select: { id: true, driveFileId: true, storageProvider: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true, capturedByWorkerUserId: true },
+      where: { id, organizationId: auth.organizationId! },
+      select: { workOrderItemId: true, id: true, driveFileId: true, storageProvider: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true, capturedByWorkerUserId: true },
     });
     if (!photo) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
+
+    if (photo.workOrderItemId) return NextResponse.json({ error: 'Fotografie je dokladem realizace pracovní položky a její historii nelze smazat.' }, { status: 409 });
 
     // Authorization checks
     if (photo.employeeId && auth.role !== 'ADMIN') {
