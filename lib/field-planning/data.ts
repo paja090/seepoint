@@ -1,16 +1,20 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
-import { coordinates, dayInZone, parseConstraints, parseProfile, profileForNavigation, zonedTime } from './profile';
+import { coordinates, dayInZone, defaultPlanningProfile, parseConstraints, parseProfile, profileForNavigation, zonedTime } from './profile';
 import { navigationAvailable } from './capabilities';
 import { workItemJobs, usesItemExecution } from './item-jobs';
 import { navigationPointJobs } from './navigation-jobs';
 import type { PlanningJob, PlanningInput, PlanningProfile, CrewInput } from './contracts';
 
-export async function loadProfile(db: Prisma.TransactionClient = prisma): Promise<PlanningProfile | null> {
+export async function loadProfile(db: Prisma.TransactionClient = prisma): Promise<PlanningProfile> {
   const { organizationId } = requireTenantContext();
   const row = await db.organizationFieldPlanningProfile.findUnique({ where: { organizationId } });
-  if (!row) return null;
+  if (!row) {
+    const org = await db.organization.findUnique({ where: { id: organizationId }, select: { city: true, country: true } });
+    const profile = defaultPlanningProfile({ country: org?.country ?? 'CZ' });
+    return profileForNavigation(profile, await navigationAvailable(db));
+  }
   const profile = parseProfile(row.configuration);
   return profileForNavigation(profile, await navigationAvailable(db));
 }
@@ -21,7 +25,7 @@ export async function loadPlanningData(date: string, options: {
   const profile = await loadProfile(db);
   const navigation = await navigationAvailable(db);
   if (!navigation && options.jobIds?.some(id => id.startsWith('navigation-point:'))) throw new Error('FORBIDDEN: Navigation není aktivní.');
-  if (!profile?.enabled) throw new Error('Nejprve nastavte a aktivujte profil plánování organizace.');
+  if (!profile.enabled) throw new Error('Plánování výjezdů je v profilu organizace vypnuto.');
   const start = zonedTime(date, '00:00', profile.timezone);
   const nextDay = new Date(Date.parse(`${date}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
   const end = zonedTime(nextDay, '00:00', profile.timezone);
