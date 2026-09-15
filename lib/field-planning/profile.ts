@@ -34,6 +34,38 @@ export function parseProfile(value: unknown): PlanningProfile {
     maximumJobsPerRoute: bounded(p.maximumJobsPerRoute, 1, 100, 'počet zastávek'), vehicleRequired: p.vehicleRequired,
     requireHumanApproval: true, enabled: p.enabled };
 }
+export function defaultPlanningProfile(overrides?: Partial<PlanningProfile>): PlanningProfile {
+  const defaultDepot = { latitude: 49.8346, longitude: 18.2820 };
+  return {
+    timezone: 'Europe/Prague',
+    country: 'CZ',
+    depot: overrides?.depot ?? defaultDepot,
+    endLocation: overrides?.endLocation ?? overrides?.depot ?? defaultDepot,
+    workdayStart: '08:00',
+    workdayEnd: '16:30',
+    breakMinutes: 30,
+    overtimeMinutes: 60,
+    strategy: 'BALANCED',
+    serviceMinutes: {
+      INSTALLATION: 45,
+      NAVIGATION_INSTALLATION: 30,
+      REINSTALLATION: 45,
+      DEINSTALLATION: 30,
+      REPAIR: 45,
+      CHECK: 20,
+      TRANSPORT: 60,
+      OTHER: 45,
+      ...(overrides?.serviceMinutes ?? {}),
+    },
+    fallbackSpeedKph: 50,
+    fallbackDistanceFactor: 1.25,
+    maximumJobsPerRoute: 25,
+    vehicleRequired: false,
+    requireHumanApproval: true,
+    enabled: true,
+    ...overrides,
+  };
+}
 export function parseConstraints(value: unknown): JobConstraints {
   if (value == null) return {};
   const p = object(value); const result: JobConstraints = {};
