@@ -596,7 +596,7 @@ export function WorkRoutePlanner({
                           <option value="">Bez vybraného vozidla</option>
                           {loaded?.data?.vehicles?.map((v) => (
                             <option key={v.id} value={v.id}>
-                              {v.name} {v.licensePlate ? `(${v.licensePlate})` : ''} · {v.status === 'AVAILABLE' ? 'Volné' : v.status}
+                              {v.name} · {v.status === 'AVAILABLE' ? 'Volné' : v.status}
                             </option>
                           ))}
                         </select>
@@ -841,9 +841,9 @@ export function WorkRoutePlanner({
                           📍 {s.address}
                         </p>
 
-                        {s.instructions && (
+                        {s.reason && (
                           <p className="text-xs text-slate-500 mt-1.5 bg-white p-2 rounded-xl border border-slate-100">
-                            {s.instructions}
+                            {s.reason}
                           </p>
                         )}
                       </div>
