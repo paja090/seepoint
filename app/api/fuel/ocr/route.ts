@@ -1,4 +1,4 @@
-import { parseFuelReceiptWithGemini } from '@/lib/ai-gemini';
+import { parseFuelReceiptWithGemini, parseOdometerWithGemini } from '@/lib/ai-gemini';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { validateChatImage } from '@/lib/chat-policy';
@@ -15,17 +15,22 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as {
     imageUrl: string;
+    mode?: 'receipt' | 'odometer';
   } | null;
 
   if (!body || !body.imageUrl) {
     return NextResponse.json({ error: 'Chybí fotka účtenky.' }, { status: 400 });
   }
+  if (body.mode !== undefined && body.mode !== 'receipt' && body.mode !== 'odometer') return NextResponse.json({ error: 'Neplatný režim čtení fotografie.' }, { status: 400 });
   // OCR needs image bytes, not the authenticated download URL used for storage.
   const image = validateChatImage(body.imageUrl, { allowInline: true, maxBytes: 3_000_000 });
   if ('error' in image) return NextResponse.json({ error: image.error }, { status: 400 });
   if (!image.value?.startsWith('data:')) return NextResponse.json({ error: 'Pro čtení účtenky pošlete obsah fotografie.' }, { status: 400 });
 
   try {
+    if (body.mode === 'odometer') {
+      return NextResponse.json({ ok: true, data: await parseOdometerWithGemini(image.value) });
+    }
     const ocrData = await parseFuelReceiptWithGemini(image.value!);
     return NextResponse.json({
       ok: true,
@@ -34,6 +39,6 @@ export async function POST(request: Request) {
     });
   } catch (err: unknown) {
     console.error('Fuel OCR error:', err);
-    return NextResponse.json({ error: 'Účtenku se nepodařilo bezpečně přečíst. Údaje můžete zadat ručně.' }, { status: 502 });
+    return NextResponse.json({ error: body.mode === 'odometer' ? 'Celkový stav tachometru není čitelný. Vyfoťte detail počítadla kilometrů nebo stav zadejte ručně.' : 'Účtenku se nepodařilo bezpečně přečíst. Údaje můžete zadat ručně.' }, { status: 502 });
   }
 }

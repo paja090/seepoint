@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { logAIUsage } from './ai-usage';
+import { validOdometer } from './odometer';
 
 export type GeminiCarrierAnalysis = {
   confidence: number;
@@ -225,6 +226,14 @@ Odpověz v JSON formátu s klíči:
 /**
  * 2. AI Fuel Receipt OCR & Parser
  */
+export async function parseOdometerWithGemini(image: string): Promise<{ odometer: number }> {
+  const result = await callGeminiVision(`Přečti celkový počet najetých kilometrů z fotografie přístrojové desky vozidla.
+Hledej celkový stav ODO / odometr v km. Nezaměňuj jej s denním počítadlem TRIP, dojezdem, rychlostí, časem ani servisním intervalem.
+Vrať JSON {"odometer": celé číslo v km nebo null}. Mezery mezi tisíci ignoruj. Pokud celkový stav není jednoznačně čitelný nebo je v mílích, vrať null. Nikdy číslo neodhaduj.`, image);
+  if (!validOdometer(result?.odometer)) throw new Error('Stav tachometru není jednoznačně čitelný.');
+  return { odometer: result.odometer };
+}
+
 export async function parseFuelReceiptWithGemini(imageUrlBase64: string): Promise<GeminiFuelReceipt> {
   const prompt = `Jsi asistent pro vytěžování účtenek firemních vozidel a nákupů pohonných hmot. Analyzuj přiloženou účtenku za pohonné hmoty (benzínka Orlen, Shell, MOL, OMV, EuroOil atd.) nebo snímek účtenky s dopsanými km.
 

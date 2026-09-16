@@ -7,6 +7,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { dateOnly, StatusPill } from '@/lib/internal-format';
 import { UserCheck, AlertTriangle, CalendarPlus } from 'lucide-react';
 import { VehiclePhotoUploader } from '@/components/VehiclePhotoUploader';
+import { VehicleDocumentPreview } from '@/components/VehicleDocumentPreview';
 import { VehicleEditModal } from '@/components/VehicleEditModal';
 import { VehicleServiceManager } from '@/components/VehicleServiceManager';
 import { derivedVehicleStatus } from '@/lib/vehicle-reservations';
@@ -178,7 +179,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               <div>
                 <dt className="text-slate-500 font-bold uppercase tracking-wider text-[10px]">Techničák (VTP)</dt>
                 <dd className="mt-1">
-                  {vehicle.vtpUrl ? (
+                  {vehicle.vtpUrl?.startsWith('/api/photos/') ? <VehicleDocumentPreview url={vehicle.vtpUrl} label="Technický průkaz" /> : vehicle.vtpUrl ? (
                     <a
                       href={vehicle.vtpUrl}
                       target="_blank"
@@ -251,15 +252,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                   </div>
 
                   {expense.receiptUrl && (
-                    <a
-                      href={expense.receiptUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-900 font-bold hover:bg-amber-200 transition"
-                      title="Zobrazit účtenku"
-                    >
-                      📷
-                    </a>
+                    <VehicleDocumentPreview url={expense.receiptUrl} />
                   )}
                 </div>
 
