@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { canEditShoppingList, type AppRole } from '@/lib/rbac';
 import { CompanyShoppingListModal } from './CompanyShoppingListModal';
+import { validOdometer } from '@/lib/odometer';
 
 interface VehicleOption {
   id: string;
@@ -109,6 +110,9 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
   const [aiScanningFuel, setAiScanningFuel] = useState(false);
   const [fuelReceiptUrl, setFuelReceiptUrl] = useState('');
   const [fuelOcrStatus, setFuelOcrStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [scanningOdometer, setScanningOdometer] = useState(false);
+  const [odometerMessage, setOdometerMessage] = useState('');
+  const odometerInputRef = useRef<HTMLInputElement>(null);
 
   // Vehicle fault modal state
   const [faultTitle, setFaultTitle] = useState('');
@@ -243,6 +247,32 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
     } finally {
       setUploadingImage(false);
       e.target.value = '';
+    }
+  }
+
+  async function handleOdometerPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+    setOdometerMessage('');
+    setScanningOdometer(true);
+    try {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 12 * 1024 * 1024) throw new Error('Vyberte fotografii JPEG, PNG nebo WebP do 12 MB.');
+      const imageUrl = await compressImageForChat(file);
+      const res = await fetch('/api/fuel/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl, mode: 'odometer' }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.ok || !validOdometer(result.data?.odometer)) throw new Error(result.error || 'Tachometr se nepodařilo přečíst. Zadejte kilometry ručně.');
+      setFuelOdometer(String(result.data.odometer));
+      setOdometerMessage('Kilometry jsou doplněné. Před uložením je zkontrolujte.');
+    } catch (error) {
+      setOdometerMessage(error instanceof Error ? error.message : 'Tachometr se nepodařilo přečíst. Zadejte kilometry ručně.');
+    } finally {
+      setScanningOdometer(false);
+      input.value = '';
     }
   }
 
@@ -465,7 +495,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
   async function handleSendFuelExpense(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedVehicleId || !fuelReceiptUrl || !fuelAmount || !Number.isFinite(Number(fuelAmount)) || Number(fuelAmount) <= 0 || sending || uploadingImage || aiScanningFuel) return;
+    if (!selectedVehicleId || !fuelReceiptUrl || !fuelAmount || !Number.isFinite(Number(fuelAmount)) || Number(fuelAmount) <= 0 || sending || uploadingImage || aiScanningFuel || scanningOdometer) return;
 
     try {
       setSending(true);
@@ -495,6 +525,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
         setFuelNote('');
         setFuelReceiptUrl('');
         setFuelOcrStatus('idle');
+        setOdometerMessage('');
         setActiveChannel('vehicles');
         await fetchMessages();
       } else {
@@ -951,7 +982,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
       {/* ⛽ Fuel Receipt Modal */}
       {showFuelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
+          <div className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div className="flex items-center gap-2">
                 <Fuel className="h-5 w-5 text-amber-600" />
@@ -1017,8 +1048,16 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                   placeholder="Např. 142500"
                   value={fuelOdometer}
                   onChange={(e) => setFuelOdometer(e.target.value)}
+                  min="0"
+                  step="1"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs font-semibold text-slate-900"
                 />
+                <input ref={odometerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleOdometerPhoto} />
+                <button type="button" disabled={scanningOdometer || aiScanningFuel || uploadingImage || sending} onClick={() => odometerInputRef.current?.click()} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 p-2 text-xs font-bold text-slate-800 disabled:opacity-50">
+                  {scanningOdometer ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                  {scanningOdometer ? 'AI čte tachometr…' : 'Vyfotit / vybrat tachometr'}
+                </button>
+                {odometerMessage && <p role="status" className="mt-2 text-xs text-slate-700">{odometerMessage}</p>}
               </div>
 
               <div>
@@ -1037,7 +1076,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                 </label>
                 <button
                   type="button"
-                  disabled={uploadingImage || aiScanningFuel}
+                  disabled={uploadingImage || aiScanningFuel || scanningOdometer || sending}
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 >
@@ -1059,7 +1098,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
                 <button
                   type="submit"
-                  disabled={sending || uploadingImage || aiScanningFuel || !fuelAmount || !fuelReceiptUrl || !selectedVehicleId}
+                  disabled={sending || uploadingImage || aiScanningFuel || scanningOdometer || !fuelAmount || !fuelReceiptUrl || !selectedVehicleId}
                   className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-black text-slate-950 hover:bg-amber-400 shadow-md transition disabled:opacity-50"
                 >
                   Uložit Účtenku

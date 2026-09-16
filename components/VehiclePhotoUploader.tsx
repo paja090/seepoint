@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Camera, Upload, Check, Loader2 } from 'lucide-react';
+import { VehicleDocumentPreview } from './VehicleDocumentPreview';
 
 interface VehiclePhotoUploaderProps {
   vehicleId: string;
@@ -59,26 +60,8 @@ export function VehiclePhotoUploader({ vehicleId, currentPhotoUrl, vehicleName }
       {/* Current Photo Preview */}
       <div className="relative overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-2 text-center">
         {photoUrl ? (
-          <div className="relative group aspect-video w-full max-w-sm mx-auto overflow-hidden rounded-xl bg-slate-900 shadow-md">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoUrl}
-              alt={`Fotografie ${vehicleName}`}
-              className="h-full w-full object-cover transition group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-              <label className="cursor-pointer rounded-xl bg-white/90 px-3.5 py-2 text-xs font-black text-slate-900 shadow-md hover:bg-white transition flex items-center gap-1.5">
-                <Camera size={14} className="text-sky-600" />
-                <span>Změnit fotku</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  disabled={uploading || isPending}
-                  className="hidden"
-                />
-              </label>
-            </div>
+          <div className="mx-auto w-full max-w-sm overflow-hidden rounded-xl bg-slate-900 shadow-md">
+            <VehicleDocumentPreview url={photoUrl} label={`Fotografie ${vehicleName}`} thumbnail />
           </div>
         ) : (
           <div className="py-6 px-4">
