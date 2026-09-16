@@ -20,8 +20,10 @@ export async function POST(request: Request) {
   if (!body || !body.imageUrl) {
     return NextResponse.json({ error: 'Chybí fotka účtenky.' }, { status: 400 });
   }
-  const image = validateChatImage(body.imageUrl);
+  // OCR needs image bytes, not the authenticated download URL used for storage.
+  const image = validateChatImage(body.imageUrl, { allowInline: true, maxBytes: 3_000_000 });
   if ('error' in image) return NextResponse.json({ error: image.error }, { status: 400 });
+  if (!image.value?.startsWith('data:')) return NextResponse.json({ error: 'Pro čtení účtenky pošlete obsah fotografie.' }, { status: 400 });
 
   try {
     const ocrData = await parseFuelReceiptWithGemini(image.value!);

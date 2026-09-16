@@ -88,6 +88,8 @@ export async function POST(request: Request) {
   if ('error' in image) return NextResponse.json({ error: image.error }, { status: 400 });
 
   const fuel = body.fuelExpense;
+  const receipt = validateChatImage(fuel?.receiptUrl ?? body.imageUrl);
+  if (fuel && 'error' in receipt) return NextResponse.json({ error: receipt.error }, { status: 400 });
   if (fuel) {
     if (typeof fuel.vehicleId !== 'string' || !finiteNumber(fuel.amount, 0.01, 10_000_000)) return NextResponse.json({ error: 'Zadejte platné vozidlo a částku za palivo.' }, { status: 400 });
     if (fuel.liters !== undefined && !finiteNumber(fuel.liters, 0.01, 10_000)) return NextResponse.json({ error: 'Množství paliva není platné.' }, { status: 400 });
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
             liters: fuel.liters as number | undefined,
             odometer: fuel.odometer as number | undefined,
             fuelType: typeof fuel.fuelType === 'string' ? fuel.fuelType : 'DIESEL',
-            receiptUrl: image.value,
+            receiptUrl: receipt.value,
             note: typeof fuel.note === 'string' ? fuel.note.trim() || null : null,
           },
         });

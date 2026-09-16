@@ -107,6 +107,8 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
   const [fuelOdometer, setFuelOdometer] = useState('');
   const [fuelNote, setFuelNote] = useState('');
   const [aiScanningFuel, setAiScanningFuel] = useState(false);
+  const [fuelReceiptUrl, setFuelReceiptUrl] = useState('');
+  const [fuelOcrStatus, setFuelOcrStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Vehicle fault modal state
   const [faultTitle, setFaultTitle] = useState('');
@@ -211,26 +213,29 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
       }
 
       // Store the server URL (e.g. /api/photos/.../file)
-      setImageUrl(uploadData.url);
+      if (showFuelModal) setFuelReceiptUrl(uploadData.url);
+      else setImageUrl(uploadData.url);
 
       // If fuel modal is open, trigger AI OCR analysis
       if (showFuelModal) {
         setAiScanningFuel(true);
+        setFuelOcrStatus('idle');
         fetch('/api/fuel/ocr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: uploadData.url }),
+          body: JSON.stringify({ imageUrl: compressedDataUrl }),
         })
           .then((res) => res.json())
           .then((data) => {
             if (data.ok && data.data) {
+              setFuelOcrStatus('success');
               if (data.data.amountCzk) setFuelAmount(String(data.data.amountCzk));
               if (data.data.liters) setFuelLiters(String(data.data.liters));
               if (data.data.vendor) setFuelNote(`${data.data.vendor} (${data.data.fuelType || 'Palivo'})`);
               if (data.data.odometer) setFuelOdometer(String(data.data.odometer));
-            }
+            } else setFuelOcrStatus('error');
           })
-          .catch(() => null)
+          .catch(() => setFuelOcrStatus('error'))
           .finally(() => setAiScanningFuel(false));
       }
     } catch (err) {
@@ -460,7 +465,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
   async function handleSendFuelExpense(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedVehicleId || !fuelAmount || Number(fuelAmount) <= 0 || sending) return;
+    if (!selectedVehicleId || !fuelReceiptUrl || !fuelAmount || !Number.isFinite(Number(fuelAmount)) || Number(fuelAmount) <= 0 || sending || uploadingImage || aiScanningFuel) return;
 
     try {
       setSending(true);
@@ -470,14 +475,14 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
         body: JSON.stringify({
           channel: 'vehicles',
           content: `⛽ Načerpáno palivo: ${fuelAmount} Kč ${fuelLiters ? `(${fuelLiters} l)` : ''} ${fuelOdometer ? `· stav tacho: ${fuelOdometer} km` : ''}`,
-          imageUrl: imageUrl || null,
+          imageUrl: null,
           fuelExpense: {
             vehicleId: selectedVehicleId,
             amount: Number(fuelAmount),
             liters: fuelLiters ? Number(fuelLiters) : undefined,
             odometer: fuelOdometer ? Number(fuelOdometer) : undefined,
             note: fuelNote || undefined,
-            receiptUrl: imageUrl || undefined,
+            receiptUrl: fuelReceiptUrl,
           },
         }),
       });
@@ -488,7 +493,8 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
         setFuelLiters('');
         setFuelOdometer('');
         setFuelNote('');
-        setImageUrl('');
+        setFuelReceiptUrl('');
+        setFuelOcrStatus('idle');
         setActiveChannel('vehicles');
         await fetchMessages();
       } else {
@@ -981,7 +987,8 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                   <label className="block text-xs font-bold text-slate-700 mb-1">Částka (Kč)*</label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
+                    min="0.01"
                     placeholder="Např. 1850"
                     value={fuelAmount}
                     onChange={(e) => setFuelAmount(e.target.value)}
@@ -1022,7 +1029,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                       <Sparkles size={12} /> AI čte účtenku...
                     </span>
                   )}
-                  {!aiScanningFuel && imageUrl && (
+                  {!aiScanningFuel && fuelOcrStatus === 'success' && (
                     <span className="text-[10px] font-extrabold text-emerald-600 flex items-center gap-1">
                       <Sparkles size={12} /> ✨ AI automaticky vyčetla údaje
                     </span>
@@ -1030,13 +1037,15 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
                 </label>
                 <button
                   type="button"
-                  disabled={uploadingImage}
+                  disabled={uploadingImage || aiScanningFuel}
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
                 >
                   {uploadingImage ? <Loader2 size={16} className="animate-spin text-emerald-600" /> : <Camera size={16} />}
-                  <span>{uploadingImage ? '⏳ Nahrávám fotku...' : imageUrl ? '📷 Účtenka nahrána' : '✨ Vyfotit účtenku (AI přečte cenu i litry)'}</span>
+                  <span>{uploadingImage ? '⏳ Nahrávám fotku...' : fuelReceiptUrl ? '📷 Účtenka nahrána' : '✨ Vyfotit účtenku (AI přečte cenu i litry)'}</span>
                 </button>
+                {fuelOcrStatus === 'error' && <p role="status" className="mt-2 text-xs text-amber-700">Fotka je nahraná, ale AI údaje nepřečetla. Vyplňte částku ručně a účtenku uložte.</p>}
+                {fuelReceiptUrl && <p className="mt-2 text-xs text-slate-600">Fotka účtenky se uloží k vybranému vozidlu. Částku můžete upravit ručně.</p>}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1050,7 +1059,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
                 <button
                   type="submit"
-                  disabled={sending || uploadingImage || aiScanningFuel || !fuelAmount}
+                  disabled={sending || uploadingImage || aiScanningFuel || !fuelAmount || !fuelReceiptUrl || !selectedVehicleId}
                   className="rounded-xl bg-amber-500 px-5 py-2 text-xs font-black text-slate-950 hover:bg-amber-400 shadow-md transition disabled:opacity-50"
                 >
                   Uložit Účtenku
