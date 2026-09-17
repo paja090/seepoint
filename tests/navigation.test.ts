@@ -10,12 +10,14 @@ const original = readFileSync('docs/navigation-audit.md', 'utf8').split('\n')
   .filter(line => line.startsWith('| ') && line.includes(' | /'))
   .map(line => { const [, , href, section, module] = line.split('|').map(s => s.trim()); return { href, section: section as AppSection, module }; });
 const hrefs = (hubs: typeof navigationHubs) => hubs.flatMap(h => h.groups.flatMap(g => g.items.map(i => i[0]))).sort();
+const additions = [{ href: '/planner', section: 'planner' as AppSection, module: 'planner' }, { href: '/settings/planner', section: 'planner' as AppSection, module: 'planner' }];
+const current = [...original, ...additions];
 
 test('every original link is preserved exactly once and resolves to an existing page', () => {
   assert.equal(original.length, 36);
-  assert.deepEqual(hrefs(navigationHubs), original.map(i => i.href).sort());
-  assert.equal(new Set(hrefs(navigationHubs)).size, original.length);
-  for (const { href } of original) assert.ok(existsSync(`app${href}/page.tsx`), href);
+  assert.deepEqual(hrefs(navigationHubs), current.map(i => i.href).sort());
+  assert.equal(new Set(hrefs(navigationHubs)).size, current.length);
+  for (const { href } of current) assert.ok(existsSync(`app${href}/page.tsx`), href);
 });
 
 test('all roles retain the original visibility across plans, overrides and missing organization', () => {
@@ -25,7 +27,8 @@ test('all roles retain the original visibility across plans, overrides and missi
     ...SYSTEM_MODULES.map(m => ({ plan: 'ENTERPRISE', enabledModules: { [m.id]: false } })),
   ];
   for (const role of roles) for (const organization of organizations) {
-    const expected = original.filter(item => canAccess(role, item.section) &&
+    const expected = current.filter(item => canAccess(role, item.section) &&
+      (item.module !== 'planner' || organization) &&
       (!organization || item.module === '—' || isModuleEnabled(organization, item.module))).map(i => i.href).sort();
     const actual = getVisibleNavigation({ role, organization });
     assert.deepEqual(hrefs(actual), expected, `${role}: ${JSON.stringify(organization)}`);

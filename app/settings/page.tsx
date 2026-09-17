@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
+import { hasModuleAccess } from '@/lib/module-policy';
 import { CompanyRatesSettings } from '@/components/CompanyRatesSettings';
 import { OfferPriceCatalogSettings } from '@/components/offers/OfferPriceCatalogSettings';
 import { MediaPackageSettings } from '@/components/offers/MediaPackageSettings';
@@ -24,6 +25,7 @@ export default async function Settings() {
   return (
     <AppShell>
       <h1 className="text-3xl font-bold mb-6">Nastavení</h1>
+      {hasModuleAccess(user, 'planner', 'planner') && <div className="card mb-6"><a href="/settings/planner" className="font-bold text-sky-700">Calendar & Planner →</a><p className="text-sm text-slate-600">Osobní kalendáře, pracovní doba a soustředěná práce.</p></div>}
       <div className="card space-y-3">
         <p>Google Maps API: <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code></p>
         <p>Databáze: <code>DATABASE_URL</code> pro PostgreSQL.</p>

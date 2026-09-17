@@ -10,6 +10,9 @@ export interface SystemModule {
 }
 
 export const SYSTEM_MODULES: SystemModule[] = [
+  { id: 'planner', name: 'Planner', description: 'Osobní den, pracovní bloky a dostupnost týmu', category: 'overview', routes: ['/planner', '/settings/planner'] },
+  { id: 'googleCalendar', name: 'Google Calendar v Planneru', description: 'Osobní a sdílené kalendáře', category: 'management', routes: [] },
+  { id: 'aiPlanner', name: 'AI Planner (připravujeme)', description: 'Návrhy plánu s potvrzením uživatele', category: 'management', routes: [] },
   // Overview
   {
     id: 'dashboard',
@@ -311,6 +314,8 @@ export function getOrganizationEnabledModules(
   SYSTEM_MODULES.forEach((mod) => {
     result[mod.id] = defaultModules.has(mod.id);
   });
+  // Foundation rollout is explicit per tenant, including enterprise/internal plans.
+  for (const id of ['planner', 'googleCalendar', 'aiPlanner']) result[id] = false;
 
   if (organization?.enabledModules && typeof organization.enabledModules === 'object') {
     const overrides = organization.enabledModules as Record<string, unknown>;

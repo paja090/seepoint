@@ -89,6 +89,7 @@ enum UserTokenType {
 }
 
 enum AuditAction {
+  PLANNER_CHANGED
   ACCOUNT_CREATED
   ROLE_CHANGED
   ACCOUNT_ACTIVATED
@@ -511,6 +512,7 @@ model Organization {
   swift               String?
   plan                OrganizationPlan   @default(START)
   enabledModules      Json?
+  plannerDefaults     Json?
   subscriptionStatus  SubscriptionStatus @default(TRIAL)
   trialEndsAt         DateTime?
   isActive            Boolean            @default(true)
@@ -531,9 +533,115 @@ model Organization {
   occupancyInsights   OccupancyInsight[]
   fieldPlanningProfile OrganizationFieldPlanningProfile?
   fieldPlans FieldPlan[]
+  calendarConnections CalendarConnection[]
+  plannerPreferences PlannerPreferences[]
+  plannerBlocks PlannerBlock[]
 
   @@index([isActive])
   @@index([plan])
+}
+
+// Personal credentials never reuse organization-wide Drive/Gmail connections.
+model CalendarConnection {
+  id                   String             @id @default(cuid())
+  organizationId       String
+  userId               String
+  provider             String
+  providerAccountId    String
+  email                String
+  status               String             @default("CONNECTED")
+  credentialsEncrypted String?
+  scopes               String[]           @default([])
+  connectedAt          DateTime           @default(now())
+  lastSyncAt           DateTime?
+  syncStatus           String             @default("IDLE")
+  syncLeaseUntil       DateTime?
+  syncLeaseId          String?
+  retryAt              DateTime?
+  errorCode            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  calendars            ExternalCalendar[]
+
+  @@unique([organizationId, userId, provider, providerAccountId])
+  @@unique([organizationId, id])
+  @@index([organizationId, userId, status])
+  @@index([retryAt, lastSyncAt])
+}
+
+model ExternalCalendar {
+  id             String                  @id @default(cuid())
+  organizationId String
+  connectionId   String
+  externalId     String
+  name           String
+  timezone       String                  @default("Europe/Prague")
+  kind           String                  @default("PERSONAL")
+  visibility     String                  @default("FREE_BUSY")
+  selected       Boolean                 @default(false)
+  isPrimary      Boolean                 @default(false)
+  syncToken      String?
+  fullSyncedAt   DateTime?
+  lastSyncedAt   DateTime?
+  connection     CalendarConnection      @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+  events         ExternalCalendarEvent[]
+
+  @@unique([organizationId, connectionId, externalId])
+  @@unique([organizationId, id])
+}
+
+model ExternalCalendarEvent {
+  id              String           @id @default(cuid())
+  organizationId  String
+  calendarId      String
+  externalEventId String
+  title           String
+  startAt         DateTime
+  endAt           DateTime
+  timezone        String
+  allDay          Boolean          @default(false)
+  busy            Boolean          @default(true)
+  isPrivate       Boolean          @default(true)
+  location        String?
+  etag            String?
+  lastSyncedAt    DateTime         @default(now())
+  calendar        ExternalCalendar @relation(fields: [organizationId, calendarId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, calendarId, externalEventId])
+  @@index([organizationId, startAt, endAt])
+}
+
+model PlannerPreferences {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  configuration  Json
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+// A time allocation, not a second task system. References resolve via canonical adapters.
+model PlannerBlock {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  title          String
+  startAt        DateTime
+  endAt          DateTime
+  category       String       @default("FOCUS")
+  sourceKind     String?
+  sourceId       String?
+  requestKey     String
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, requestKey])
+  @@index([organizationId, userId, startAt, endAt])
 }
 
 model IntegrationConnection {
