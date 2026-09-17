@@ -13,6 +13,7 @@ export type CurrentUser = {
 };
 
 export type AppSection =
+  | 'planner'
   | 'dashboard'
   | 'map'
   | 'carriers'
@@ -180,6 +181,7 @@ const permissions: Record<AppRole, AppSection[]> = {
 };
 
 export function canAccess(role: AppRole | string, section: AppSection) {
+  if (section === 'planner') return roles.includes(role as AppRole) && role !== 'VIEWER';
   const rolePermissions = permissions[role as AppRole];
   if (!rolePermissions) return false;
   return rolePermissions.includes(section);

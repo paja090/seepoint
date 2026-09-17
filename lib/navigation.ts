@@ -44,6 +44,7 @@ export const navigationHubs: NavigationHub[] = [
   ] },
   { id: 'operations', label: 'Provoz & Realizace', icon: 'wrench', groups: [
     { label: 'Moje agenda', items: [
+      ["/planner","Planner","calendarRange","planner"],
       ["/my-tasks","Moje úkoly","calendarCheck","myTasks"],
       ["/my-work-entries","Moje odvedená práce","clipboardCheck","myWorkEntries"],
       ["/my-settlements","Moje vyúčtování","fileText","mySettlements"],
@@ -69,6 +70,7 @@ export const navigationHubs: NavigationHub[] = [
       ["/import","Import dat","fileUp","import"]
     ] },
     { label: 'Nastavení', items: [
+      ["/settings/planner","Calendar & Planner","calendarRange","planner"],
       ["/settings","Nastavení systému","settings","settings"],
       ["/settings/company","Nastavení firmy","settings","settings"],
       ["/settings/email","Firemní e-mail","mail","settings"],
@@ -102,7 +104,7 @@ export function getVisibleNavigation(user: {
   const hubs = navigationHubs.map(hub => ({ ...hub, groups: hub.groups.map(group => ({ ...group,
     items: group.items.filter(([href, , , section]) => {
       const moduleId = getModuleIdForPath(href);
-      return canAccess(user.role, section) && (!user.organization || !moduleId || isModuleEnabled(user.organization, moduleId));
+      return canAccess(user.role, section) && (moduleId !== 'planner' || Boolean(user.organization)) && (!user.organization || !moduleId || isModuleEnabled(user.organization, moduleId));
     }),
   })).filter(group => group.items.length > 0) })).filter(hub => hub.groups.length > 0);
   const management = hubs.find(hub => hub.id === 'management');

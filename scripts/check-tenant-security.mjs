@@ -9,6 +9,8 @@ const SELF_PATH = 'scripts/check-tenant-security.mjs';
 // Every bypass is intentionally explicit. A legitimate change must update this
 // baseline in the same reviewed pull request instead of silently widening access.
 const PLATFORM_PRISMA_BASELINE = new Map([
+  // Cron enumerates only organization flags and due connection IDs/owners; all sync work is tenant-scoped.
+  ['app/api/cron/planner/route.ts', 3],
   // Signed provider webhook: ownership lookup only; mutations enter the resolved tenant.
   ['app/api/webhooks/resend/route.ts', 3],
   ['app/admin/organizations/[id]/page.tsx', 5],
@@ -91,7 +93,7 @@ const API_ROUTE_EXCEPTIONS = new Set([
   'app/api/webhooks/resend/route.ts',
 ]);
 
-const DIRECT_GUARD_PATTERN = /\b(?:requireApiAccess|getCurrentUser|requireOrganization|requireOrganizationMember|requireOrganizationRole|requireSuperAdmin|enterTenantContext|requireTenantContext)\s*\(/;
+const DIRECT_GUARD_PATTERN = /\b(?:requireApiAccess|getCurrentUser|requireOrganization|requireOrganizationMember|requireOrganizationRole|requireSuperAdmin|enterTenantContext|requireTenantContext|plannerApi|plannerActor)\s*\(/;
 const ROUTE_HANDLER_PATTERN = /export\s+(?:(?:async\s+)?function|const)\s+(?:GET|POST|PUT|PATCH|DELETE)\b/;
 
 function normalizePath(root, file) {
