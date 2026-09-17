@@ -33,6 +33,7 @@ describe('AI Sales Radar Integration & Commercial Engine Foundation', () => {
    */
   it('Scenario A: New prospect discovery produces NEW_ACQUISITION, null quantity, and missingRequirements', () => {
     const mockOpportunity: SalesOpportunityWithRelations = {
+      semanticData: null, fieldProvenance: null, dataConflicts: null, normalizedCompany: null, normalizedCity: null, normalizedProject: null, projectIdentifier: null, tenderIdentifier: null, mergedIntoId: null,
       id: 'opp-prospect-001',
       organizationId: TENANT_A,
       companyName: 'Lidl Česká republika v.o.s.',
@@ -125,6 +126,7 @@ describe('AI Sales Radar Integration & Commercial Engine Foundation', () => {
     } as unknown as Client;
 
     const mockOpportunity: SalesOpportunityWithRelations = {
+      semanticData: null, fieldProvenance: null, dataConflicts: null, normalizedCompany: null, normalizedCity: null, normalizedProject: null, projectIdentifier: null, tenderIdentifier: null, mergedIntoId: null,
       id: 'opp-client-002',
       organizationId: TENANT_A,
       companyName: 'Mountfield a.s.',
@@ -271,6 +273,7 @@ describe('AI Sales Radar Integration & Commercial Engine Foundation', () => {
    */
   it('Scenario E: Strict multi-tenant isolation across opportunities and commercial requests', () => {
     const oppA: SalesOpportunityWithRelations = {
+      semanticData: null, fieldProvenance: null, dataConflicts: null, normalizedCompany: null, normalizedCity: null, normalizedProject: null, projectIdentifier: null, tenderIdentifier: null, mergedIntoId: null,
       id: 'opp-tenant-a-1',
       organizationId: TENANT_A,
       companyName: 'Firma Alpha',

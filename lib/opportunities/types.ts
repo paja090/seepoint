@@ -42,6 +42,7 @@ export type CampaignPhase = {
 };
 
 export type CreateOpportunityInput = {
+  semanticData?: import("./semantic-core").Facts;
   companyName: string;
   companyId?: string;
   website?: string;

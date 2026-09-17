@@ -121,6 +121,7 @@ export const radarOpportunitiesProvider: NotificationProvider = {
     const enabled = ctx.enabled;
     const freshRadarOpportunities = enabled('salesRadar') ? await prisma.salesOpportunity.findMany({
       where: {
+        mergedIntoId: null,
         status: 'NEW',
         opportunityScore: { gte: 40 },
         createdAt: { gte: new Date(ctx.now.getTime() - 24 * 60 * 60 * 1000) },

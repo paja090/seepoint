@@ -26,46 +26,28 @@ export async function detectCrmDuplicates(
 ): Promise<DuplicateProposal[]> {
   const proposals: DuplicateProposal[] = [];
 
-  // 1. Detect duplicate SalesOpportunities (same company & event type or close title)
-  const opportunities = await prisma.salesOpportunity.findMany({
-    where: {
-      organizationId,
-      status: { in: ['NEW', 'REVIEWED', 'CONTACT_PLANNED'] },
-    },
-    select: {
-      id: true,
-      companyName: true,
-      eventType: true,
-      title: true,
-      city: true,
-      detectedAt: true,
-    },
-    take: 50,
+  // Reuse Radar's reviewed semantic decisions instead of a competing company/city heuristic.
+  const pending = await prisma.radarSignal.findMany({
+    where: { organizationId, semanticDecision: 'POSSIBLE_DUPLICATE', canonicalOpportunity: { mergedIntoId: null } },
+    include: { canonicalOpportunity: { select: { id: true, title: true } } },
+    take: 50, orderBy: { updatedAt: 'desc' },
   });
-
-  for (let i = 0; i < opportunities.length; i++) {
-    for (let j = i + 1; j < opportunities.length; j++) {
-      const a = opportunities[i];
-      const b = opportunities[j];
-
-      const sameCompany =
-        a.companyName.trim().toLowerCase() === b.companyName.trim().toLowerCase();
-      const sameCity = (a.city || '').toLowerCase() === (b.city || '').toLowerCase();
-      const sameEvent = a.eventType === b.eventType;
-
-      if (sameCompany && (sameCity || sameEvent)) {
-        proposals.push({
-          id: `dup-opp-${a.id}-${b.id}`,
-          type: 'DUPLICATE_OPPORTUNITY',
-          title: `Duplicitní příležitost pro ${a.companyName}`,
-          description: `Nalezeny dvě souběžné příležitosti: „${a.title}“ a „${b.title}“.`,
-          primaryEntity: { type: 'SalesOpportunity', id: a.id, name: a.title },
-          matchingEntity: { type: 'SalesOpportunity', id: b.id, name: b.title },
-          confidence: sameCity && sameEvent ? 0.95 : 0.8,
-          recommendation: 'Doporučeno sloučit nebo jednu z příležitostí označit jako vyřízenou.',
-        });
-      }
-    }
+  const targets = await prisma.salesOpportunity.findMany({
+    where: { organizationId, mergedIntoId: null, id: { in: pending.flatMap(s => s.candidateOpportunityId ? [s.candidateOpportunityId] : []) } },
+    select: { id: true, title: true },
+  });
+  for (const source of pending) {
+    const primary = source.canonicalOpportunity;
+    const target = targets.find(o => o.id === source.candidateOpportunityId);
+    if (!primary || !target) continue;
+    proposals.push({
+      id: 'radar-review-' + source.id, type: 'DUPLICATE_OPPORTUNITY', title: 'Možná duplicitní obchodní příležitost',
+      description: primary.title + ' / ' + target.title,
+      primaryEntity: { type: 'SalesOpportunity', id: primary.id, name: primary.title },
+      matchingEntity: { type: 'SalesOpportunity', id: target.id, name: target.title },
+      confidence: source.semanticConfidence || 0,
+      recommendation: 'Ověřit zdroje v AI Radaru → Možné duplicity.',
+    });
   }
 
   // 2. Detect Radar Opportunity + Unassigned Mailbox Inquiry from same company
@@ -87,6 +69,7 @@ export async function detectCrmDuplicates(
     }),
     prisma.salesOpportunity.findMany({
       where: {
+      mergedIntoId: null,
         organizationId,
         status: { in: ['NEW', 'REVIEWED'] },
       },

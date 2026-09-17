@@ -1,3 +1,4 @@
+import { extractionInstruction, extractFacts } from './semantic-core';
 import { radarRequestSignal } from './deadline';
 import { OpportunityEventType } from '@prisma/client';
 import type { CreateOpportunityInput, OrganizationRadarProfileData } from './types';
@@ -13,9 +14,7 @@ export async function searchLiveOpportunitiesWithGemini(
     process.env.GOOGLE_API_KEY ||
     process.env.GEMINI_KEY;
 
-  const rawOpenAiKey = process.env.OPENAI_API_KEY;
   const apiKey = rawKey ? rawKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
-  const openAiKey = rawOpenAiKey ? rawOpenAiKey.replace(/[^\x20-\x7E]/g, '').replace(/["']/g, '').trim() : '';
   const effectiveGeminiKey = apiKey.startsWith('sk-') ? '' : apiKey;
 
   // Live web search grounding requires Gemini API
@@ -47,6 +46,7 @@ export async function searchLiveOpportunitiesWithGemini(
 
   const prompt = `Jsi specializovaný AI Obchodní radar pro venkovní reklamu (OOH - Out Of Home) v České republice.
 Dnešní datum je: ${todayISO}.
+${extractionInstruction}
 ${regionsStr}.
 ${citiesStr}.
 ${keywordsStr}
@@ -173,6 +173,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
         const aiRecommendation = typeof item.aiRecommendation === 'string' && item.aiRecommendation.trim() ? item.aiRecommendation.trim().slice(0, 4000) : undefined;
 
         const parsed = parseOpportunityCreateInput({
+          semanticData: extractFacts(item.semanticData),
           companyName,
           companyId: typeof item.companyId === 'string' && /^\d{8}$/.test(item.companyId.replace(/\s/g, ''))
             ? item.companyId.replace(/\s/g, '')
@@ -190,7 +191,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
           eventDate: validDate,
           sourceUrl,
           sourceTitle: typeof item.sourceTitle === 'string' && item.sourceTitle.trim() ? item.sourceTitle.trim().slice(0, 500) : 'AI Živý webový průzkum',
-          sourcePublishedAt: todayISO,
+          sourcePublishedAt: typeof item.sourcePublishedAt === 'string' ? item.sourcePublishedAt : undefined,
           suggestedMediaTypes: suggestedMedia,
         });
 

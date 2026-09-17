@@ -117,7 +117,10 @@ export async function collectSignalsForProfile(
     (art, idx, all) => all.findIndex((cand) => cand.title === art.title || cand.link === art.link) === idx
   );
 
-  const toUpsert = uniqueArticles.slice(0, 30).map((art) => {
+  // Preserve every distinct URL, including syndications with identical titles.
+  // The original title/URL Stage 1 check still prioritizes one article per title in this batch.
+  const articlesToPersist = fresh.filter((art, idx, all) => all.findIndex(c => c.link === art.link) === idx);
+  const toUpsert = articlesToPersist.slice(0, 30).map((art) => {
     const pubDate = art.pubDate ? new Date(art.pubDate) : null;
     const cleanTitle = art.publisher ? `${art.title} - ${art.publisher}` : art.title;
     return {
@@ -149,11 +152,12 @@ export async function collectSignalsForProfile(
   const sortedSignals = persistedSignals.sort((a, b) => {
     if (a.status === 'NEW' && b.status !== 'NEW') return -1;
     if (a.status !== 'NEW' && b.status === 'NEW') return 1;
-    return 0;
+    return Number(!uniqueArticles.some(x => x.link === a.sourceUrl)) - Number(!uniqueArticles.some(x => x.link === b.sourceUrl));
   });
 
   return {
     sourceErrors,
+    stage1DuplicateCount: Math.max(0, fresh.length - uniqueArticles.length) + persistedSignals.filter(s => Boolean(s.discoveredOpportunityId)).length,
     rawFound: rawArticles.length,
     uniqueSignals: sortedSignals,
   };

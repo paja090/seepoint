@@ -1,3 +1,4 @@
+import { extractionInstruction, extractFacts } from './semantic-core';
 import 'server-only';
 import { radarRequestSignal } from './deadline';
 import { OpportunityEventType } from '@prisma/client';
@@ -63,6 +64,7 @@ export async function parseOpportunityFromAiInput(
 
   const promptText = `Jsi AI Obchodní radar specializovaný na venkovní reklamu (OOH - Out Of Home).
 Dnešní datum je: ${todayISO}.
+${extractionInstruction}
 Dostupné typy venkovních reklamních nosičů: ${mediaTypesStr}.
 ${regionsStr}. ${citiesStr}.
 Tvým úkolem je z textu novinové zprávy, tiskové zprávy nebo inzerátu identifikovat jakoukoliv OBCHODNÍ NEBO KULTURNÍ PŘÍLEŽITOST pro venkovní reklamu.
@@ -197,6 +199,7 @@ Text: "${pageContent.slice(0, 3000)}"`;
   const normalized = parseOpportunityCreateInput({
     isRelevant,
     relevanceReason: typeof parsed.relevanceReason === 'string' ? parsed.relevanceReason : undefined,
+    semanticData: extractFacts(parsed.semanticData),
     companyName,
     companyId: typeof parsed.companyId === 'string' && parsed.companyId.trim() ? parsed.companyId.trim() : undefined,
     website: typeof parsed.website === 'string' && parsed.website.trim() ? parsed.website.trim() : undefined,
@@ -212,7 +215,7 @@ Text: "${pageContent.slice(0, 3000)}"`;
     eventDate: typeof parsed.eventDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.eventDate) ? parsed.eventDate : undefined,
     sourceUrl: urlHint || 'https://radar.internal',
     sourceTitle: pageTitle,
-    sourcePublishedAt: new Date(),
+    sourcePublishedAt: typeof parsed.sourcePublishedAt === 'string' ? parsed.sourcePublishedAt : undefined,
     suggestedMediaTypes,
   });
   return {

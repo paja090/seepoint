@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/db';
-import type { OpportunityEventType, OpportunityStatus, Prisma } from '@prisma/client';
+import type { OpportunityStatus, Prisma } from '@prisma/client';
 import { calculateOpportunityScore } from './scoring';
 import type { CreateOpportunityInput, OpportunityFilterParams } from './types';
 import { normalizeClientName } from '@/lib/crm/domain';
 import { assertOpportunityTransition, OpportunityValidationError } from './policy';
 
 export async function getOpportunities(params: OpportunityFilterParams = {}, organizationId: string) {
-  const where: Prisma.SalesOpportunityWhereInput = { organizationId };
+  const where: Prisma.SalesOpportunityWhereInput = { organizationId, mergedIntoId: null };
 
   if (params.status) {
     where.status = params.status;
@@ -46,6 +46,8 @@ export async function getOpportunities(params: OpportunityFilterParams = {}, org
     prisma.salesOpportunity.findMany({
       where,
       include: {
+        _count: { select: { sources: true } },
+        sources: { where: { organizationId, semanticDecision: 'SAME_OPPORTUNITY', semanticConfidence: { not: null } }, select: { semanticConfidence: true }, orderBy: { updatedAt: 'desc' }, take: 1 },
         client: {
           select: {
             id: true,
@@ -85,9 +87,10 @@ export async function getOpportunities(params: OpportunityFilterParams = {}, org
 }
 
 export async function getOpportunityById(id: string, organizationId: string) {
-  return prisma.salesOpportunity.findFirst({
+  const item = await prisma.salesOpportunity.findFirst({
     where: { id, organizationId },
     include: {
+      sources: { where: { organizationId }, orderBy: { createdAt: 'asc' } },
       client: true,
       createdOffer: {
         include: {
@@ -104,154 +107,39 @@ export async function getOpportunityById(id: string, organizationId: string) {
       },
     },
   });
+  if (!item) return null;
+  const mergedRecords = await prisma.salesOpportunity.findMany({ where: { organizationId, mergedIntoId: id }, select: { id: true, title: true, status: true, client: { select: { name: true } }, createdOffer: { select: { id: true, title: true } } }, take: 50 });
+  return { ...item, mergedRecords };
 }
 
 import { getOrganizationRadarProfile } from './radar-profile';
 import { findNearbyCarriers } from './distance';
+import { factsFromInput, semanticKeys } from './semantic-core';
 
-export async function findDuplicateOpportunity(
-  companyName: string,
-  eventType: OpportunityEventType,
-  city: string | null | undefined,
-  organizationId: string,
-  sourceUrl?: string
-) {
-  const normCompany = companyName.trim().toLowerCase();
-
-  // 1. Check exact source URL duplicate
-  const source = sourceUrl?.trim();
-  const isGenericInternalSource = !source || source.includes('radar.internal') || source === 'https://seepoint.cz' || source === 'https://seepoint.cz/';
-  if (source && !isGenericInternalSource) {
-    const existingByUrl = await prisma.salesOpportunity.findFirst({
-      where: { organizationId, sourceUrl: source },
-      select: { id: true, companyName: true, sourceUrl: true, createdAt: true },
-    });
-    if (existingByUrl) return existingByUrl;
+export async function createOpportunity(input: CreateOpportunityInput, organizationId: string, deadline = Date.now() + 15000) {
+  const profile = await getOrganizationRadarProfile(organizationId);
+  const excludedCompany = profile.excludedCompanies?.some(c => c.trim().toLowerCase() === input.companyName.trim().toLowerCase());
+  let excludedDomain = false;
+  try { const host = new URL(input.sourceUrl).hostname.toLowerCase(); excludedDomain = Boolean(profile.excludedDomains?.some(d => host === d || host.endsWith('.' + d))); } catch { /* validated by caller */ }
+  if (excludedCompany || excludedDomain) {
+    if (input.radarSignalId) await prisma.radarSignal.updateMany({ where: { organizationId, id: input.radarSignalId }, data: { status: 'SUPPRESSED' } });
+    return { created: false, stage: 'SUPPRESSED', duplicateId: undefined, opportunity: null };
   }
-
-  // 2. Check company name match in database
-  const where: Prisma.SalesOpportunityWhereInput = {
-    organizationId,
-    companyName: { contains: normCompany, mode: 'insensitive' },
-    eventType,
-    createdAt: { gte: new Date(Date.now() - 180 * 24 * 60 * 60_000) },
-  };
-  if (city?.trim()) {
-    where.city = { equals: city.trim(), mode: 'insensitive' };
-  }
-
-  const candidates = await prisma.salesOpportunity.findMany({
-    where,
-    select: {
-      id: true,
-      companyName: true,
-      sourceUrl: true,
-      createdAt: true,
-    },
-  });
-
-  return candidates.find(
-    (c) => c.companyName.trim().toLowerCase() === normCompany
-  );
+  const { ingestOpportunity } = await import('./semantic-service');
+  return ingestOpportunity(input, organizationId, deadline);
 }
 
-export async function createOpportunity(input: CreateOpportunityInput, organizationId: string) {
-  const duplicate = await findDuplicateOpportunity(
-    input.companyName,
-    input.eventType || 'NEW_BRANCH',
-    input.city,
-    organizationId,
-    input.sourceUrl
-  );
-  if (duplicate) {
-    if (input.radarSignalId) {
-      await prisma.radarSignal.updateMany({
-        where: { id: input.radarSignalId, organizationId },
-        data: { status: 'DUPLICATE', discoveredOpportunityId: duplicate.id },
-      }).catch(() => null);
-    }
-    return { created: false, duplicateId: duplicate.id, opportunity: await getOpportunityById(duplicate.id, organizationId) };
-  }
-
-  if (input.clientId) {
-    const clientExists = await prisma.client.count({ where: { id: input.clientId, organizationId, active: true } });
-    if (!clientExists) throw new OpportunityValidationError('Vybraný klient v aktivní organizaci neexistuje.', 404);
-  }
-  if (input.assignedToUserId) {
-    const assigneeExists = await prisma.organizationMember.count({
-      where: { organizationId, userId: input.assignedToUserId, isActive: true },
-    });
-    if (!assigneeExists) throw new OpportunityValidationError('Vybraný obchodník není aktivním členem organizace.');
-  }
-
+// Existing scoring/CRM creation reused inside the resolver transaction.
+export async function persistOpportunity(input: CreateOpportunityInput, organizationId: string, db: Prisma.TransactionClient) {
+  if (input.clientId && !await db.client.count({ where: { id: input.clientId, organizationId, active: true } })) throw new OpportunityValidationError('Klient nebyl nalezen.', 404);
+  if (input.assignedToUserId && !await db.organizationMember.count({ where: { organizationId, userId: input.assignedToUserId, isActive: true } })) throw new OpportunityValidationError('Obchodník není členem organizace.');
   const radarProfile = await getOrganizationRadarProfile(organizationId);
-
-  // Check profile exclusions (suppression)
-  if (radarProfile.excludedCompanies && radarProfile.excludedCompanies.length > 0) {
-    const norm = input.companyName.trim().toLowerCase();
-    const isExcluded = radarProfile.excludedCompanies.some((exc) => norm === exc.trim().toLowerCase());
-    if (isExcluded) {
-      if (input.radarSignalId) {
-        await prisma.radarSignal.updateMany({
-          where: { id: input.radarSignalId, organizationId },
-          data: { status: 'SUPPRESSED' },
-        }).catch(() => null);
-      }
-      return { created: false, duplicateId: undefined, opportunity: null };
-    }
-  }
-
-  if (radarProfile.excludedDomains && radarProfile.excludedDomains.length > 0 && input.sourceUrl) {
-    try {
-      const parsedUrl = new URL(input.sourceUrl);
-      const host = parsedUrl.hostname.toLowerCase();
-      const isExcludedDomain = radarProfile.excludedDomains.some((d) => host === d || host.endsWith(`.${d}`));
-      if (isExcludedDomain) {
-        if (input.radarSignalId) {
-          await prisma.radarSignal.updateMany({
-            where: { id: input.radarSignalId, organizationId },
-            data: { status: 'SUPPRESSED' },
-          }).catch(() => null);
-        }
-        return { created: false, duplicateId: undefined, opportunity: null };
-      }
-    } catch {
-      // Ignore URL parse error
-    }
-  }
-
-  // Check carriers in city or nearby by GPS
-  let nearbyCount = 0;
-  if (typeof input.latitude === 'number' && typeof input.longitude === 'number') {
-    const nearby = await findNearbyCarriers(organizationId, input.latitude, input.longitude, 5);
-    nearbyCount = nearby.length;
-  }
-
-  let carrierCount = 0;
-  if (input.city?.trim()) {
-    carrierCount = await prisma.advertisingCarrier.count({
-      where: {
-        organizationId,
-        archivedAt: null,
-        status: 'ACTIVE',
-        city: { contains: input.city.trim(), mode: 'insensitive' },
-      },
-    });
-  }
-
-  // Safe client matching in CRM
+  const nearbyCount = typeof input.latitude === 'number' && typeof input.longitude === 'number' ? (await findNearbyCarriers(organizationId, input.latitude, input.longitude, 5)).length : 0;
+  const carrierCount = input.city ? await db.advertisingCarrier.count({ where: { organizationId, archivedAt: null, status: 'ACTIVE', city: { contains: input.city, mode: 'insensitive' } } }) : 0;
   let linkedClientId = input.clientId;
-  if (!linkedClientId && (input.companyId || input.companyName)) {
-    // 1. Priority match by exact IČO
-    if (input.companyId?.trim()) {
-      const matchByIco = await prisma.client.findFirst({
-        where: {
-          organizationId,
-          active: true,
-          companyId: input.companyId.trim(),
-        },
-        select: { id: true },
-      });
+  if (!linkedClientId) {
+    if (input.companyId) {
+      const matchByIco = await db.client.findFirst({ where: { organizationId, active: true, companyId: input.companyId }, select: { id: true } });
       if (matchByIco) {
         linkedClientId = matchByIco.id;
       }
@@ -261,7 +149,7 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
     if (!linkedClientId && input.companyName?.trim()) {
       const normInput = normalizeClientName(input.companyName);
       if (normInput.length >= 3) {
-        const existingClient = await prisma.client.findFirst({
+        const existingClient = await db.client.findFirst({
           where: {
             organizationId,
             active: true,
@@ -335,9 +223,11 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
     aiRecommendation: input.aiRecommendation || null,
   };
 
-  const opportunity = await prisma.salesOpportunity.create({
+  const opportunity = await db.salesOpportunity.create({
     data: {
       organizationId,
+      semanticData: factsFromInput(input),
+      ...semanticKeys(factsFromInput(input)),
       companyName: input.companyName.trim(),
       companyId: input.companyId?.trim() || null,
       website: input.website?.trim() || null,
@@ -379,7 +269,7 @@ export async function createOpportunity(input: CreateOpportunityInput, organizat
   });
 
   if (input.radarSignalId) {
-    await prisma.radarSignal.updateMany({
+    await db.radarSignal.updateMany({
       where: { id: input.radarSignalId, organizationId },
       data: { status: 'PROMOTED', discoveredOpportunityId: opportunity.id },
     }).catch(() => null);
@@ -445,17 +335,18 @@ export async function linkOpportunityToClient(id: string, clientId: string, orga
 
 export async function getOpportunityStats(organizationId: string) {
   const [totalNew, totalHighScore, totalContactThisWeek, totalProposals, totalConverted] = await Promise.all([
-    prisma.salesOpportunity.count({ where: { organizationId, status: 'NEW' } }),
-    prisma.salesOpportunity.count({ where: { organizationId, opportunityScore: { gte: 80 }, status: { notIn: ['DISMISSED'] } } }),
+    prisma.salesOpportunity.count({ where: { organizationId, mergedIntoId: null, status: 'NEW' } }),
+    prisma.salesOpportunity.count({ where: { organizationId, mergedIntoId: null, opportunityScore: { gte: 80 }, status: { notIn: ['DISMISSED'] } } }),
     prisma.salesOpportunity.count({
       where: {
         organizationId,
+        mergedIntoId: null,
         status: { in: ['NEW', 'REVIEWED', 'CONTACT_PLANNED'] },
         eventDate: { gte: new Date(), lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
       },
     }),
-    prisma.salesOpportunity.count({ where: { organizationId, status: 'PROPOSAL_CREATED' } }),
-    prisma.salesOpportunity.count({ where: { organizationId, status: 'CONVERTED' } }),
+    prisma.salesOpportunity.count({ where: { organizationId, mergedIntoId: null, status: 'PROPOSAL_CREATED' } }),
+    prisma.salesOpportunity.count({ where: { organizationId, mergedIntoId: null, status: 'CONVERTED' } }),
   ]);
 
   return {

@@ -1,3 +1,4 @@
+import { extractFacts } from './semantic-core';
 import { OpportunityEventType, OpportunityStatus } from '@prisma/client';
 import type { CreateOpportunityInput, OpportunityFilterParams } from './types';
 
@@ -75,6 +76,7 @@ export function parseOpportunityCreateInput(raw: unknown): CreateOpportunityInpu
   const eventDate = strictDate(body.eventDate, 'Datum události');
   if (eventDate && eventDate < new Date().toISOString().slice(0, 10)) throw new OpportunityValidationError('Obchodní radar nepřijímá události v minulosti.');
   return {
+    semanticData: extractFacts(body.semanticData),
     companyName: clean(body.companyName, 'Název firmy', 200, true)!,
     companyId: companyId?.replace(/\s/g, ''),
     website: httpUrl(body.website, 'Web'),

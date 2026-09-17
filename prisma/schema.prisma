@@ -1585,6 +1585,17 @@ model SalesOpportunity {
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
 
+  semanticData            Json?
+  fieldProvenance         Json?
+  dataConflicts           Json?
+  normalizedCompany       String?
+  normalizedCity          String?
+  normalizedProject       String?
+  projectIdentifier       String?
+  tenderIdentifier        String?
+  mergedIntoId            String?
+  sources                 RadarSignal[] @relation("CanonicalSources")
+
   client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdOffer Offer?        @relation(fields: [createdOfferId], references: [id], onDelete: SetNull)
   assignedTo   User?         @relation("OpportunityAssignedUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
@@ -1592,6 +1603,14 @@ model SalesOpportunity {
   feedbacks    RadarFeedback[]
   aiInboxMessages AiInboxMessage[]
 
+  @@unique([organizationId, id])
+  @@index([organizationId, normalizedCompany, normalizedCity])
+  @@index([organizationId, normalizedCity, eventType])
+  @@index([organizationId, normalizedProject])
+  @@index([organizationId, projectIdentifier])
+  @@index([organizationId, tenderIdentifier])
+  @@index([organizationId, mergedIntoId])
+  @@index([organizationId, sourceUrl])
   @@index([status, opportunityScore])
   @@index([city, region])
   @@index([clientId])
@@ -1635,8 +1654,18 @@ model RadarSignal {
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
 
+  canonicalOpportunityId  String?
+  canonicalOpportunity    SalesOpportunity? @relation("CanonicalSources", fields: [organizationId, canonicalOpportunityId], references: [organizationId, id], onDelete: Restrict)
+  candidateOpportunityId  String?
+  semanticDecision        String?
+  semanticConfidence      Float?
+  resolution              Json?
+  keptSeparateIds         String[] @default([])
+  sourceDomain            String?
   opportunities           SalesOpportunity[]
 
+  @@index([organizationId, canonicalOpportunityId])
+  @@index([organizationId, semanticDecision])
   @@unique([organizationId, sourceUrl])
   @@index([organizationId, status])
 }

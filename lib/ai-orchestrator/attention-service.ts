@@ -365,6 +365,7 @@ export async function collectNewOpportunityItems(
   // 2. Nové neznámé prospects bez přiřazeného klienta (čistý Radar discovery)
   const opportunities = await prisma.salesOpportunity.findMany({
     where: {
+      mergedIntoId: null,
       organizationId,
       status: 'NEW',
       clientId: null,

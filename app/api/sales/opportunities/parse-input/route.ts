@@ -1,3 +1,4 @@
+import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { parseOpportunityFromAiInput } from '@/lib/opportunities/parser';
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
     if (input.length > 10_000) return NextResponse.json({ error: 'Text podkladu je příliš dlouhý.' }, { status: 413 });
     if (url && url.length > 2_000) return NextResponse.json({ error: 'URL je příliš dlouhá.' }, { status: 400 });
 
+    if (url) {
+      const previous = await prisma.radarSignal.findUnique({ where: { organizationId_sourceUrl: { organizationId: user.organizationId, sourceUrl: url } } });
+      if (previous?.canonicalOpportunityId && previous.parsedData) return NextResponse.json({ parsed: { ...(previous.parsedData as object), radarSignalId: previous.id, sourcePublishedAt: previous.sourcePublishedAt?.toISOString().slice(0, 10), isRelevant: true }, duplicateId: previous.canonicalOpportunityId });
+    }
     const parsed = await parseOpportunityFromAiInput(input || url || '', url);
 
     void logAIUsage({

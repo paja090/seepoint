@@ -158,6 +158,7 @@ async function getInboxRequests(organizationId: string) {
 async function getRadarOpportunities(organizationId: string) {
   const opportunities = await prisma.salesOpportunity.findMany({
     where: {
+      mergedIntoId: null,
       organizationId,
       status: { in: ['NEW', 'REVIEWED', 'CONTACT_PLANNED', 'CONTACTED', 'PROPOSAL_CREATED'] },
     },
