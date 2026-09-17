@@ -78,7 +78,7 @@ export async function runDiscoveryForOrganization(
       const warnings: string[] = [];
       const deadline = startTime + timeBudgetMs;
       // Start RSS collection while web grounding runs; catch immediately to avoid unhandled rejections.
-      const rssPromise = collectSignalsForProfile(profile, organizationId).catch(() => ({ rawFound: 0, uniqueSignals: [], sourceErrors: 1 }));
+      const rssPromise = collectSignalsForProfile(profile, organizationId).catch(() => ({ rawFound: 0, uniqueSignals: [], sourceErrors: 1, stage1DuplicateCount: 0 }));
 
       try {
         // 1. Live Web Search Grounding via Gemini 3.6 Flash (real-time regional opportunities)
@@ -89,6 +89,7 @@ export async function runDiscoveryForOrganization(
 
           for (const item of boundedLiveResults) {
             try {
+              if (Date.now() >= deadline) break;
               const signal = await prisma.radarSignal.upsert({
                 where: {
                   organizationId_sourceUrl: {
@@ -100,7 +101,7 @@ export async function runDiscoveryForOrganization(
                   organizationId,
                   sourceUrl: item.sourceUrl,
                   sourceTitle: item.sourceTitle,
-                  sourcePublishedAt: item.sourcePublishedAt ? new Date(item.sourcePublishedAt) : new Date(),
+                  sourcePublishedAt: item.sourcePublishedAt ? new Date(item.sourcePublishedAt) : null,
                   rawText: item.summary,
                   status: 'NEW',
                 },
@@ -112,7 +113,7 @@ export async function runDiscoveryForOrganization(
                   ...item,
                   radarSignalId: signal.id,
                 },
-                organizationId
+                organizationId, deadline
               );
 
               if (result.created) {
@@ -151,7 +152,7 @@ export async function runDiscoveryForOrganization(
         }
 
         // 2. Targeted RSS Feeds Discovery (collect signals into DB)
-        const { rawFound, uniqueSignals, sourceErrors } = await rssPromise;
+        const { rawFound, uniqueSignals, sourceErrors, stage1DuplicateCount } = await rssPromise;
         errorsCount += sourceErrors;
         if (sourceErrors) warnings.push(`Nepodařilo se načíst ${sourceErrors} RSS zdrojů.`);
 
@@ -203,6 +204,7 @@ export async function runDiscoveryForOrganization(
 
               const result = await createOpportunity(
                 {
+                  ...parsed,
                   companyName: parsed.companyName,
                   companyId: parsed.companyId,
                   website: parsed.website,
@@ -215,11 +217,11 @@ export async function runDiscoveryForOrganization(
                   eventDate: parsed.eventDate,
                   sourceUrl: signal.sourceUrl,
                   sourceTitle: signal.sourceTitle,
-                  sourcePublishedAt: signal.sourcePublishedAt || new Date(),
+                  sourcePublishedAt: signal.sourcePublishedAt || undefined,
                   suggestedMediaTypes: parsed.suggestedMediaTypes,
                   radarSignalId: signal.id,
                 },
-                organizationId
+                organizationId, deadline
               );
 
               if (result.created) {
@@ -266,6 +268,7 @@ export async function runDiscoveryForOrganization(
               liveFoundCount,
               rssProcessedCount,
               ignoredCount,
+              rssStage1Duplicates: stage1DuplicateCount,
               triggerType,
               targetCities: profile.targetCities,
               targetRegions: profile.targetRegions,

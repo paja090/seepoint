@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!item) {
       return NextResponse.json({ error: 'Příležitost nebyla nalezena.' }, { status: 404 });
     }
-    return NextResponse.json({ item });
+    return NextResponse.json({ item, canReviewSources: ['ADMIN', 'MANAGER'].includes(user.role) });
   } catch (error) {
     console.error('Failed to fetch opportunity by ID', error);
     return NextResponse.json({ error: 'Příležitost se nepodařilo načíst.' }, { status: 500 });

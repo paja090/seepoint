@@ -295,7 +295,9 @@ test('Scénář I: Detekce duplicit v CRM → Pouze linkování, ŽÁDNÝ automa
   const detectorCode = readFileSync(detectorPath, 'utf-8');
 
   assert.ok(detectorCode.includes('detectCrmDuplicates'), 'Must export detectCrmDuplicates');
-  assert.ok(detectorCode.includes('sameCompany'), 'Must match duplicates by company');
+  assert.ok(detectorCode.includes("semanticDecision: 'POSSIBLE_DUPLICATE'"), 'Must reuse Radar semantic review proposals');
+  assert.ok(detectorCode.includes('candidateOpportunityId'), 'Must use the candidate selected by the semantic resolver');
+  assert.ok(!detectorCode.includes('sameCompany'), 'Company identity alone must not identify duplicate opportunities');
   assert.ok(detectorCode.includes('RADAR_INBOX_MATCH'), 'Must identify cross-channel matches');
   assert.ok(!detectorCode.includes('client.delete'), 'Must NOT automatically delete duplicate client records');
 });

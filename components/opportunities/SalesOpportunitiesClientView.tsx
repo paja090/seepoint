@@ -5,6 +5,7 @@ import { SalesOpportunitiesHeader } from './SalesOpportunitiesHeader';
 import { OpportunityFiltersBar, FilterState } from './OpportunityFiltersBar';
 import { OpportunityCard, OpportunityItem } from './OpportunityCard';
 import { ManualOpportunityModal } from './ManualOpportunityModal';
+import { RadarDuplicateReview } from './RadarDuplicateReview';
 import { RadarSettingsModal } from './RadarSettingsModal';
 import { AiOfferGeneratorModal, ClientOption } from '@/components/offers/AiOfferGeneratorModal';
 import { RefreshCw, Radar } from 'lucide-react';
@@ -216,6 +217,8 @@ export function SalesOpportunitiesClientView({
         onReset={handleResetFilters}
       />
 
+      <RadarDuplicateReview onChanged={fetchOpportunities} />
+
       {/* Card List */}
       <div className="space-y-4">
         {loading ? (
@@ -236,6 +239,7 @@ export function SalesOpportunitiesClientView({
             <OpportunityCard
               key={item.id}
               item={item}
+              onChanged={fetchOpportunities}
               onPrepareProposal={handlePrepareProposal}
               onLinkCrm={handleLinkCrm}
               onUpdateStatus={(id, status, reason) => handleUpdateStatus(id, status, reason)}

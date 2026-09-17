@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { OpportunitySources } from './OpportunitySources';
 import { ExternalLink, MapPin, Calendar, Building2, Sparkles, UserCheck, Ban, ChevronDown, Check, ShieldCheck, BrainCircuit, Compass, Layers } from 'lucide-react';
 import type { OpportunityEventType, OpportunityStatus } from '@prisma/client';
 import type { OpportunityScoreReason } from '@/lib/opportunities/types';
 
 export type OpportunityItem = {
   id: string;
+  updatedAt?: string | Date;
+  _count?: { sources: number };
+  sources?: { semanticConfidence: number | null }[];
   companyName: string;
   companyId?: string | null;
   website?: string | null;
@@ -106,8 +110,10 @@ export function OpportunityCard({
   onPrepareProposal,
   onLinkCrm,
   onUpdateStatus,
+  onChanged,
 }: {
   item: OpportunityItem;
+  onChanged: () => void;
   onPrepareProposal: (item: OpportunityItem) => void;
   onLinkCrm: (item: OpportunityItem) => void;
   onUpdateStatus: (id: string, status: OpportunityStatus, dismissedReason?: string) => void;
@@ -324,6 +330,12 @@ export function OpportunityCard({
         </div>
       )}
 
+      <div className="flex flex-wrap gap-3 text-xs text-purple-300">
+        <span className="rounded-lg border border-purple-800 bg-purple-950/50 px-2 py-1">{item._count?.sources || 1} {(item._count?.sources || 1) === 1 ? 'zdroj' : (item._count?.sources || 1) < 5 ? 'zdroje' : 'zdrojů'}</span>
+        {item.sources?.[0]?.semanticConfidence != null && <span>Jistota posledního přiřazení: {Math.round(item.sources[0].semanticConfidence * 100)} %</span>}
+        {item.updatedAt && <span>Poslední aktualizace: {new Date(item.updatedAt).toLocaleDateString('cs-CZ')}</span>}
+      </div>
+      <OpportunitySources key={`${item.id}:${item.updatedAt}`} opportunityId={item.id} count={item._count?.sources || 1} onChanged={onChanged} />
       {/* Source Citation */}
       <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
         <div className="flex items-center gap-1.5 truncate max-w-md">

@@ -299,6 +299,7 @@ export async function getMyAttentionItems(
   if (profile.enableRadarClientInsights) {
     const radarOpportunities = await prisma.salesOpportunity.findMany({
       where: {
+      mergedIntoId: null,
         organizationId,
         clientId: { not: null },
         status: { in: ['NEW', 'REVIEWED', 'CONTACT_PLANNED'] },

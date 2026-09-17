@@ -124,6 +124,7 @@ export async function getOrganizationNextBestActions(
   // 2. Check high-score NEW sales opportunities from AI Sales Radar
   const topRadarOpportunities = await prisma.salesOpportunity.findMany({
     where: {
+      mergedIntoId: null,
       organizationId,
       status: 'NEW',
       opportunityScore: { gte: 70 },

@@ -93,6 +93,7 @@ export async function GET() {
         // Fresh AI Radar opportunities in last 24h
         hasModuleAccess(user, 'salesRadar') ? prisma.salesOpportunity.findMany({
           where: {
+      mergedIntoId: null,
             status: 'NEW',
             opportunityScore: { gte: 40 },
             createdAt: { gte: last24h },
