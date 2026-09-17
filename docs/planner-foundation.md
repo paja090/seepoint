@@ -120,3 +120,13 @@ Finální `next build` dokončen s exit code 0 včetně TypeScript kontroly a v�
 Další iterace: menší background job dávky pro velké týmy, přímé Google free/busy a monitoring stáří zdrojů, společné resource rezervace, rozsáhlejší integrační testy provider retry/lease závodů proti síťovým fixtures a pokročilejší kapacita s odhady práce. Týmový přehled zatím odhaduje přetížení pouze z dostupných odhadů úkolů s termínem v zobrazeném období; chybějící odhady nenahrazuje vymyšlenými hodinami.
 
 Produkční migrace, nasazení a živý Google OAuth nejsou součástí ověřeného lokálního výsledku. Phase 2/3 zůstávají záměrně oddělené.
+
+## Nasazení 17. 9. 2026
+
+Následně dokončeno PR #349: `main` commit `fe7c73b46bc388ec2c89d337ec9b80da5e78de48`, Vercel production `dpl_6UejV28g1tff569iRvY9rydkbPE4`, stav READY, doména `https://seepoint.vercel.app`.
+
+Migrace nejprve prošla na kopii produkce `br-curly-dew-atrr56ls`, včetně skutečného offboarding testu s rollbackem fixture. Potom byla transakčně aplikována na produkční `br-super-boat-at3cgqf3` a zaznamenána do Prisma historie se shodným checksumem `fcdd92fc3831e3cacbd3dde728a0f538912295b3c8f834a4dfbfd84211c1d006`. Před změnou vznikl recovery snapshot `snap-morning-firefly-atttgoxa`.
+
+Planner a Google Calendar flags jsou zapnuté jen pro `org_seepoint_default`; AI zůstává vypnutá. Aktivace je zaznamenána do UserAuditLog jako autorizované nasazení, bez předstírání uživatelské session. Druhý tenant zůstává bez aktivace. GitHub CI #35185415974 prošlo celé; produkční anonymní API vrací 401 a stránka vede na login.
+
+Následná kontrola zachytila session middleware před cronem. Přidána pouze přesná výjimka `/api/cron/planner`; handler dál ověřuje CRON_SECRET. Nové dva regresní testy ověřují průchod cronu a zachování ochrany uživatelských/nested cest. Úspěšný živý sync s Google není tímto ověřen: je nutná registrace callbacku v Google Cloud a souhlas konkrétního uživatele. Nové ani širší OAuth oprávnění nebylo žádnému účtu automaticky uděleno.
