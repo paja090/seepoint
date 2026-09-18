@@ -112,7 +112,7 @@ export function AiQuickTaskModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
+    <div className="ai-theme fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
       <div className="card w-full max-w-lg bg-white shadow-2xl rounded-3xl p-6 relative space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <div className="flex items-center gap-3">
@@ -124,7 +124,7 @@ export function AiQuickTaskModal({
               <p className="text-xs text-slate-500">Zadejte hlasem nebo textem rychlý Check-list pro dílnu</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+          <button onClick={onClose} aria-label="Zavřít AI úkolníček" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
             <X size={20} />
           </button>
         </div>

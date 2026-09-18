@@ -599,7 +599,7 @@ export function AiInboxDetailModal({
               )}
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-sm text-slate-800 max-h-[420px] overflow-y-auto">
+            <div className={`${viewHtml && message.htmlBody ? 'ai-original-email' : ''} rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-sm text-slate-800 max-h-[420px] overflow-y-auto`}>
               {viewHtml && message.htmlBody ? (
                 <div
                   className="prose prose-sm max-w-none break-words"

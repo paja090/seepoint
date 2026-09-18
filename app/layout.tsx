@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import 'leaflet/dist/leaflet.css';
 import './globals.css';
+import './ai-theme.css';
 
 export const metadata: Metadata = {
   title: 'SeePOINT Outdoor Reklama',

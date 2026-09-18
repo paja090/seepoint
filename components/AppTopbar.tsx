@@ -10,6 +10,10 @@ import { WeatherClockWidget } from '@/components/WeatherClockWidget';
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher';
 
 const pageTitles: Array<[string, string]> = [
+  ['/sales/opportunities', 'AI Obchodní radar'],
+  ['/ai-inbox', 'AI Inbox'],
+  ['/occupancy/ai', 'AI Obsazenost'],
+  ['/clients/dashboard', 'AI CRM Intelligence'],
   ['/dashboard', 'Dashboard'],
   ['/commercial', 'AI Obchodní centrum'],
   ['/crm/intelligence', 'AI CRM Intelligence'],

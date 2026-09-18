@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { isAiWorkspace } from '@/lib/ai-theme';
 import { Menu, LogOut, MessageSquare, PhoneCall, Sparkles } from 'lucide-react';
 import { AiQuickTaskModal } from './tasks/AiQuickTaskModal';
 import { AppNavigation } from './AppNavigation';
@@ -36,6 +37,7 @@ export function ResponsiveAppShell({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isAiTaskModalOpen, setIsAiTaskModalOpen] = useState(false);
   const pathname = usePathname();
+  const aiWorkspace = isAiWorkspace(pathname);
 
   // Close mobile drawer when route changes
   useEffect(() => {
@@ -53,7 +55,7 @@ export function ResponsiveAppShell({
 
   return (
     <OfferBasketProvider>
-      <div className="flex min-h-screen max-w-full overflow-x-hidden bg-slate-100 text-slate-900 font-sans antialiased">
+      <div className={`flex min-h-screen max-w-full overflow-x-hidden ${aiWorkspace ? 'bg-[#090f1d]' : 'bg-slate-100'} text-slate-900 font-sans antialiased`}>
         <InAppToastNotifier />
         <PwaInstallPrompt />
 
@@ -164,7 +166,7 @@ export function ResponsiveAppShell({
         </AppNavigation>
 
         {/* MAIN CONTENT AREA */}
-        <main className={`min-w-0 max-w-full overflow-x-hidden flex-1 pt-14 lg:pt-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 ${collapsed ? 'lg:pl-[60px]' : 'lg:pl-[292px]'}`}>
+        <main className={`${aiWorkspace ? 'ai-theme ai-workspace' : ''} min-w-0 max-w-full overflow-x-hidden flex-1 pt-14 lg:pt-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 ${collapsed ? 'lg:pl-[60px]' : 'lg:pl-[292px]'}`}>
           <AppTopbar user={user} canUseTeam={utilityAccess.team} />
           <div className="w-full px-3 py-4 sm:px-4 sm:py-6 lg:px-8">{children}</div>
         </main>

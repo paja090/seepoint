@@ -239,7 +239,7 @@ export function AiOfferGeneratorModal({
   const canPreview = Boolean(clientId || clientName.trim()) && (offerType === 'NAVIGATION' ? Boolean(targetName.trim() && targetAddress.trim()) : Boolean(prompt.trim()));
   if (!isOpen) return null;
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-2 backdrop-blur-sm sm:p-3">
+  return <div className="ai-theme fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-2 backdrop-blur-sm sm:p-3">
     <div className="flex max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 shadow-2xl sm:rounded-3xl">
       <header className="flex items-start justify-between border-b border-slate-800 px-4 py-3 sm:px-5 sm:py-4">
         <div><h2 className="flex items-center gap-2 text-lg font-black"><Sparkles className="text-amber-400" /> AI Copilot nabídek</h2><p className="mt-0.5 text-xs text-slate-400">AI připraví návrh. Obchodník jej potvrdí a doladí.</p></div>
