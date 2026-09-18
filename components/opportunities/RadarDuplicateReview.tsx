@@ -7,29 +7,36 @@ export function RadarDuplicateReview({ onChanged }: { onChanged: () => void }) {
   const [items, setItems] = useState<Proposal[]>([]), [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [canReview, setCanReview] = useState(false), [cursor, setCursor] = useState<string | null>(null);
   const [backfillCursor, setBackfillCursor] = useState<string | null>(null);
+  const [failedSourceId, setFailedSourceId] = useState<string | null>(null);
   async function load(next?: string) {
     const res = await fetch(`/api/sales/radar/duplicates${next ? `?cursor=${encodeURIComponent(next)}` : ''}`);
     const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Načtení návrhů selhalo.');
     setItems(data.items); setOpportunities(data.opportunities); setCanReview(data.canReview); setCursor(data.nextCursor);
   }
   async function perform(action?: string, sourceId?: string, next?: string) {
-    setBusy(true); setMessage('');
+    setBusy(true); setMessage(''); setFailedSourceId(null);
     try {
       if (action) {
         const res = await fetch('/api/sales/radar/duplicates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, sourceId, cursor: action === 'BACKFILL_PREVIEW' ? backfillCursor : undefined }) });
-        const data = await res.json(); if (!res.ok) throw new Error(data.error);
+        const data = await res.json();
+        if (!res.ok) {
+          const retryAfter = Number(res.headers.get('Retry-After'));
+          throw new Error(res.status === 429 && retryAfter > 0
+            ? `Příliš mnoho akcí. Zkuste to znovu za ${Math.ceil(retryAfter)} s. Změna nebyla provedena.`
+            : data.error || 'Akce se nezdařila. Zkuste to znovu.');
+        }
         if (action === 'BACKFILL_PREVIEW') { setBackfillCursor(data.nextCursor); setMessage(`Prověřeno ${data.processed} příležitostí, ${data.proposals} návrhů. ${data.nextCursor ? 'Pokračujte další dávkou.' : 'Historie prošla kontrolou.'}`); }
         else { setMessage(action === 'MERGE' ? 'Příležitosti byly sjednoceny. Zdroje lze znovu oddělit.' : 'Příležitosti zůstávají oddělené.'); onChanged(); }
       }
       await load(next);
-    } catch (e) { setMessage(e instanceof Error ? e.message : 'Akce se nezdařila.'); }
+    } catch (e) { setFailedSourceId(sourceId || null); setMessage(e instanceof Error ? e.message : 'Akce se nezdařila.'); }
     finally { setBusy(false); }
   }
   return <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-300">
     <button type="button" aria-expanded={open} disabled={busy} className="font-bold text-purple-300" onClick={() => { setOpen(!open); if (!open) void perform(); }}>Možné duplicity {open ? '▴' : '▾'}</button>
     {open && <div className="mt-3 space-y-3">
       {canReview && <button type="button" disabled={busy} className="rounded-lg border border-slate-700 px-3 py-2 text-xs disabled:opacity-50" onClick={() => void perform('BACKFILL_PREVIEW')}>{backfillCursor ? 'Prověřit další historickou dávku' : 'Backfill Semantic Deduplication – vytvořit návrhy'}</button>}
-      {message && <p role="status">{message}</p>}
+      {message && !failedSourceId && <p role="status">{message}</p>}
       {busy && <p role="status">Zpracování…</p>}
       {!items.length && !busy && <p>Žádné návrhy ke kontrole.</p>}
       {items.map(item => <article key={item.id} className="space-y-2 rounded-xl border border-slate-800 p-3">
@@ -38,6 +45,7 @@ export function RadarDuplicateReview({ onChanged }: { onChanged: () => void }) {
         <p className="text-xs">{item.resolution?.reason} {item.semanticConfidence != null ? `(${Math.round(item.semanticConfidence * 100)} %)` : ''}</p>
         {!!item.resolution?.conflictingSignals?.length && <p className="text-xs text-amber-300">Konflikty: {item.resolution.conflictingSignals.join(', ')}</p>}
         {canReview && <div className="flex flex-wrap gap-3 text-xs"><button type="button" disabled={busy} className="text-emerald-300 underline disabled:opacity-50" onClick={() => void perform('MERGE', item.id)}>Je to stejná příležitost</button><button type="button" disabled={busy} className="text-sky-300 underline disabled:opacity-50" onClick={() => void perform('KEEP_SEPARATE', item.id)}>Jde o jinou příležitost</button></div>}
+        {failedSourceId === item.id && <p role="alert" className="text-sm text-amber-300">{message}</p>}
       </article>)}
       {cursor && <button type="button" disabled={busy} onClick={() => void perform(undefined, undefined, cursor)}>Další návrhy</button>}
     </div>}
