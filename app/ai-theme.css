@@ -17,6 +17,13 @@
   color: var(--ai-text);
 }
 .ai-workspace { background: var(--ai-page); }
+/* The sidebar reduces the available toolbar width on laptops. */
+@media (min-width: 1024px) and (max-width: 1599px) {
+  .ai-theme .app-topbar { flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+  .ai-theme .app-topbar-title { flex: 1 1 220px; }
+  .ai-theme .app-topbar-search { flex: 1 1 240px; max-width: none; margin: 0; }
+  .ai-theme .app-topbar-actions { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; }
+}
 .ai-theme .card, .ai-theme .card-dark, .ai-theme.ai-panel, .ai-theme .ai-panel {
   background: var(--ai-surface); color: var(--ai-text);
   border: 1px solid var(--ai-border); border-radius: 16px;
