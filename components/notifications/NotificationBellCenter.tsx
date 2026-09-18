@@ -161,7 +161,7 @@ export function NotificationBellCenter() {
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-xs sm:bg-transparent" onClick={() => setOpen(false)} />
-          <div className="fixed inset-x-3 top-16 z-50 max-h-[85vh] overflow-hidden sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-96 rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+          <div className="ai-theme fixed inset-x-3 top-16 z-50 max-h-[85vh] overflow-hidden sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-96 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2">

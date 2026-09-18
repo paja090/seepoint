@@ -981,7 +981,7 @@ export function TeamChatContainer({ currentUser, vehicles, teamMembers = [], ini
 
       {/* ⛽ Fuel Receipt Modal */}
       {showFuelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4">
+        <div className="ai-theme fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4">
           <div className="max-h-[90dvh] overflow-y-auto w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div className="flex items-center gap-2">

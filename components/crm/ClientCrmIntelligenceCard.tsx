@@ -117,7 +117,7 @@ export function ClientCrmIntelligenceCard({ clientId }: { clientId: string }) {
   const topAction = data.intelligence.nextBestActions[0];
 
   return (
-    <div className="rounded-3xl border border-sky-900/40 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950/70 p-5 text-white shadow-xl space-y-4">
+    <div className="ai-theme ai-panel rounded-2xl p-5 space-y-4">
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
         <div className="flex items-center gap-3">

@@ -1,0 +1,574 @@
+/* Shared AI workspace palette. Scoped compatibility rules keep existing component
+ * variants and status semantics without changing the rest of the application.
+ * New AI components should use ai-panel / ai-primary / ai-secondary directly. */
+.ai-theme {
+  color-scheme: dark;
+  --ai-page: #090f1d;
+  --ai-surface: #111a2b;
+  --ai-raised: #182338;
+  --ai-border: #26334a;
+  --ai-text: #eef2fa;
+  --ai-muted: #a2afc4;
+  --ai-accent: #43d9b1;
+  --ai-violet: #b9a4ff;
+  --ai-info: #9dcaff;
+  --ai-warning: #f0c477;
+  --ai-danger: #f69aa8;
+  color: var(--ai-text);
+}
+.ai-workspace { background: var(--ai-page); }
+.ai-theme .card, .ai-theme .card-dark, .ai-theme.ai-panel, .ai-theme .ai-panel {
+  background: var(--ai-surface); color: var(--ai-text);
+  border: 1px solid var(--ai-border); border-radius: 16px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .12);
+}
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-slate-950\/85:not(.fixed),
+  .bg-slate-950,
+  .bg-slate-950\/60:not(.fixed),
+  .bg-slate-950\/50:not(.fixed),
+  .bg-slate-950\/75:not(.fixed),
+  .bg-slate-950\/20:not(.fixed),
+  .bg-slate-950\/70:not(.fixed),
+  .bg-slate-950\/80:not(.fixed),
+  .bg-slate-950\/90:not(.fixed),
+  .bg-slate-950\/40:not(.fixed)
+) { background-color: var(--ai-page); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .border-slate-700,
+  .border-slate-800,
+  .border-slate-600,
+  .border-slate-200,
+  .border-slate-300,
+  .border-slate-100,
+  .border-slate-200\/80,
+  .border-slate-200\/60,
+  .border-slate-200\/90,
+  .hover\:border-slate-300:hover,
+  .border-slate-200\/50,
+  .border-slate-800\/80,
+  .border-slate-800\/60,
+  .border-slate-200\/70,
+  .border-white\/10,
+  .border-white\/20,
+  .border-slate-500\/30,
+  .border-white\/5,
+  .border-white,
+  .hover\:border-slate-700:hover
+) { border-color: var(--ai-border); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-slate-900,
+  .bg-white,
+  .bg-slate-50,
+  .focus\:bg-white:focus,
+  .hover\:bg-slate-900:hover,
+  .bg-white\/80,
+  .bg-white\/60,
+  .hover\:bg-slate-50:hover,
+  .hover\:bg-slate-50\/70:hover,
+  .bg-white\/95,
+  .bg-slate-50\/70,
+  .hover\:bg-slate-700:hover,
+  .bg-slate-50\/50,
+  .bg-slate-900\/90,
+  .bg-slate-50\/40,
+  .bg-slate-50\/60,
+  .bg-slate-900\/60,
+  .hover\:bg-white\/20:hover,
+  .bg-slate-50\/90,
+  .hover\:bg-white:hover,
+  .bg-slate-500\/10,
+  .bg-slate-700,
+  .bg-slate-900\/80
+) { background-color: var(--ai-surface); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-slate-100,
+  .text-white,
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-950,
+  .hover\:text-white:hover,
+  .hover\:text-slate-900:hover,
+  .hover\:text-slate-800:hover,
+  .hover\:text-slate-200:hover,
+  .text-slate-200
+) { color: var(--ai-text); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-amber-400,
+  .text-amber-200,
+  .text-amber-100,
+  .text-amber-950,
+  .text-amber-600,
+  .text-amber-800,
+  .text-amber-900,
+  .text-orange-800,
+  .text-yellow-800,
+  .text-amber-700,
+  .hover\:text-amber-700:hover,
+  .hover\:text-amber-600:hover,
+  .text-yellow-300,
+  .text-amber-300,
+  .text-orange-500,
+  .text-orange-700,
+  .text-orange-950,
+  .text-orange-600,
+  .text-amber-500,
+  .text-orange-400
+) { color: var(--ai-warning); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-slate-400,
+  .text-slate-500,
+  .text-slate-300,
+  .text-slate-700,
+  .text-slate-600,
+  .hover\:text-slate-700:hover,
+  .hover\:text-slate-600:hover
+) { color: var(--ai-muted); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-slate-100:hover,
+  .bg-slate-100,
+  .hover\:bg-slate-200:hover,
+  .bg-slate-800,
+  .bg-slate-200,
+  .bg-white\/10,
+  .hover\:bg-white\/10:hover,
+  .bg-white\/5,
+  .bg-slate-800\/60,
+  .bg-slate-800\/80,
+  .bg-slate-800\/90,
+  .hover\:bg-slate-100\/80:hover,
+  .bg-slate-200\/80
+) { background-color: var(--ai-raised); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .border-rose-700,
+  .border-rose-200,
+  .hover\:border-red-200:hover,
+  .border-rose-800\/80,
+  .border-rose-500\/50,
+  .border-rose-300,
+  .border-rose-600,
+  .hover\:border-rose-400:hover,
+  .border-red-500\/30,
+  .border-rose-800\/70,
+  .border-rose-800,
+  .border-rose-500,
+  .border-rose-100
+) { border-color: color-mix(in srgb, var(--ai-danger) 30%, var(--ai-border)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-rose-950,
+  .bg-rose-50,
+  .bg-red-100,
+  .bg-red-50,
+  .hover\:bg-red-50:hover,
+  .bg-rose-950\/50,
+  .hover\:bg-rose-900\/70:hover,
+  .bg-rose-100,
+  .bg-rose-950\/90,
+  .bg-rose-50\/70,
+  .bg-rose-950\/80,
+  .hover\:bg-rose-50:hover,
+  .hover\:bg-rose-100:hover,
+  .bg-rose-50\/50,
+  .hover\:bg-rose-200:hover,
+  .bg-rose-950\/60,
+  .bg-rose-900,
+  .bg-rose-50\/40
+) { background-color: color-mix(in srgb, var(--ai-danger) 10%, var(--ai-surface)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-rose-200,
+  .text-rose-300,
+  .text-rose-800,
+  .text-red-800,
+  .text-red-700,
+  .hover\:text-red-600:hover,
+  .text-rose-600,
+  .hover\:text-rose-700:hover,
+  .hover\:text-rose-600:hover,
+  .text-rose-950,
+  .text-rose-400,
+  .text-rose-100,
+  .hover\:text-rose-400:hover,
+  .text-rose-700,
+  .text-rose-500,
+  .text-rose-900,
+  .text-red-400
+) { color: var(--ai-danger); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .border-amber-400,
+  .border-amber-900\/70,
+  .border-amber-200,
+  .border-amber-200\/80,
+  .border-amber-200\/60,
+  .border-amber-300,
+  .border-amber-700,
+  .border-amber-800\/60,
+  .hover\:border-amber-400:hover,
+  .border-orange-300,
+  .border-orange-200,
+  .hover\:border-orange-400:hover,
+  .border-amber-800,
+  .border-yellow-400,
+  .border-amber-500\/30,
+  .border-amber-800\/40,
+  .border-amber-500,
+  .border-amber-100,
+  .border-orange-500\/30
+) { border-color: color-mix(in srgb, var(--ai-warning) 30%, var(--ai-border)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-amber-400\/10,
+  .bg-amber-950\/60,
+  .bg-amber-950,
+  .bg-amber-50\/50,
+  .bg-amber-100,
+  .hover\:bg-amber-200:hover,
+  .bg-orange-100,
+  .bg-yellow-100,
+  .bg-amber-50,
+  .bg-amber-50\/80,
+  .bg-amber-50\/90,
+  .hover\:bg-amber-100:hover,
+  .bg-amber-50\/70,
+  .bg-amber-950\/50,
+  .bg-amber-950\/70,
+  .bg-orange-50\/50,
+  .bg-amber-50\/40,
+  .hover\:bg-amber-50\/30:hover,
+  .bg-yellow-300,
+  .bg-amber-950\/40,
+  .bg-amber-50\/60,
+  .hover\:bg-amber-50:hover
+) { background-color: color-mix(in srgb, var(--ai-warning) 10%, var(--ai-surface)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .border-sky-800,
+  .border-sky-400,
+  .border-sky-200,
+  .border-sky-100,
+  .border-sky-200\/80,
+  .border-sky-200\/70,
+  .hover\:border-sky-300:hover,
+  .border-blue-200,
+  .hover\:border-blue-300:hover,
+  .focus\:border-blue-500:focus,
+  .border-sky-700\/80,
+  .border-sky-800\/40,
+  .border-sky-800\/50,
+  .border-sky-300,
+  .border-sky-900\/40,
+  .border-sky-500\/20,
+  .border-sky-500\/30,
+  .border-sky-900\/50
+) { border-color: color-mix(in srgb, var(--ai-info) 30%, var(--ai-border)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-sky-950\/30,
+  .bg-sky-950,
+  .bg-sky-950\/60,
+  .bg-sky-200,
+  .bg-sky-50\/50,
+  .bg-sky-100,
+  .hover\:bg-sky-200:hover,
+  .bg-blue-100,
+  .bg-blue-50,
+  .hover\:bg-sky-50:hover,
+  .bg-blue-50\/70,
+  .hover\:bg-blue-50:hover,
+  .bg-sky-950\/90,
+  .bg-sky-950\/50,
+  .hover\:bg-blue-100:hover,
+  .bg-blue-50\/50,
+  .bg-sky-950\/40,
+  .hover\:bg-sky-400:hover,
+  .hover\:bg-sky-900:hover,
+  .bg-sky-900,
+  .bg-sky-950\/70,
+  .bg-sky-50\/60,
+  .bg-sky-50,
+  .hover\:bg-sky-100:hover
+) { background-color: color-mix(in srgb, var(--ai-info) 10%, var(--ai-surface)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-sky-400,
+  .text-sky-200,
+  .text-sky-300,
+  .text-sky-500,
+  .text-sky-600,
+  .text-sky-950,
+  .text-sky-800,
+  .text-sky-900,
+  .text-sky-700,
+  .text-blue-800,
+  .text-blue-700,
+  .hover\:text-sky-700:hover,
+  .hover\:text-sky-600:hover,
+  .text-blue-950,
+  .text-blue-600,
+  .hover\:text-blue-800:hover,
+  .text-blue-900,
+  .hover\:text-sky-300:hover,
+  .text-sky-400\/80,
+  .text-sky-100
+) { color: var(--ai-info); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-sky-500\/20,
+  .bg-sky-600,
+  .hover\:bg-sky-700:hover,
+  .bg-blue-600,
+  .hover\:bg-blue-500:hover,
+  .hover\:bg-sky-500:hover,
+  .bg-sky-500,
+  .bg-sky-500\/10
+) { background-color: #244f7e; }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .border-purple-800\/60,
+  .border-fuchsia-200,
+  .border-indigo-200,
+  .border-indigo-200\/80,
+  .border-indigo-100,
+  .border-indigo-100\/80,
+  .border-purple-200,
+  .border-fuchsia-100,
+  .border-fuchsia-200\/60,
+  .focus\:border-indigo-500:focus,
+  .border-fuchsia-300,
+  .focus\:border-fuchsia-500:focus,
+  .border-purple-300,
+  .border-purple-800\/80,
+  .border-purple-700\/80,
+  .hover\:border-purple-800\/60:hover,
+  .border-purple-800\/40,
+  .border-purple-800,
+  .hover\:border-indigo-300:hover,
+  .border-indigo-900\/50,
+  .border-fuchsia-500,
+  .border-fuchsia-100\/60,
+  .border-fuchsia-600,
+  .border-indigo-600,
+  .border-purple-500\/30,
+  .border-purple-500,
+  .focus\:border-purple-500:focus,
+  .border-indigo-500\/30
+) { border-color: color-mix(in srgb, var(--ai-violet) 30%, var(--ai-border)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-purple-950\/30,
+  .bg-fuchsia-100,
+  .bg-fuchsia-50,
+  .bg-indigo-50\/50,
+  .bg-indigo-50,
+  .bg-indigo-100\/70,
+  .bg-purple-50,
+  .bg-fuchsia-100\/40,
+  .bg-indigo-100,
+  .bg-fuchsia-50\/20,
+  .bg-purple-50\/50,
+  .hover\:bg-purple-100\/50:hover,
+  .hover\:bg-purple-800:hover,
+  .bg-purple-950\/40,
+  .bg-purple-950\/90,
+  .bg-purple-950\/60,
+  .bg-purple-950\/50,
+  .hover\:bg-indigo-50\/40:hover,
+  .bg-fuchsia-50\/40,
+  .bg-indigo-50\/60,
+  .hover\:bg-fuchsia-100:hover,
+  .bg-indigo-50\/80,
+  .bg-indigo-50\/40,
+  .bg-purple-950\/80,
+  .bg-purple-950,
+  .bg-purple-900
+) { background-color: color-mix(in srgb, var(--ai-violet) 10%, var(--ai-surface)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-purple-600,
+  .text-purple-200,
+  .text-fuchsia-700,
+  .text-indigo-950,
+  .text-indigo-600,
+  .text-indigo-700,
+  .hover\:text-purple-700:hover,
+  .hover\:text-purple-600:hover,
+  .text-purple-700,
+  .text-fuchsia-800,
+  .text-fuchsia-950,
+  .text-indigo-900,
+  .text-indigo-800,
+  .text-fuchsia-600,
+  .text-purple-950,
+  .text-purple-900,
+  .text-fuchsia-100,
+  .text-purple-400,
+  .text-purple-300,
+  .text-purple-200\/90,
+  .text-indigo-300,
+  .hover\:text-indigo-900:hover,
+  .hover\:text-indigo-800:hover,
+  .hover\:text-fuchsia-700:hover,
+  .text-fuchsia-900,
+  .hover\:text-fuchsia-950:hover,
+  .hover\:text-indigo-950:hover,
+  .hover\:text-indigo-600:hover,
+  .text-indigo-400
+) { color: var(--ai-violet); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .border-emerald-700,
+  .border-emerald-200,
+  .border-emerald-100,
+  .border-emerald-500,
+  .border-emerald-300,
+  .border-emerald-200\/80,
+  .border-emerald-200\/70,
+  .focus\:border-emerald-500:focus,
+  .hover\:border-emerald-300:hover,
+  .border-emerald-800\/60,
+  .hover\:border-emerald-500:hover,
+  .border-emerald-500\/30,
+  .border-emerald-800\/70,
+  .border-emerald-800\/40,
+  .border-emerald-800,
+  .border-emerald-500\/20
+) { border-color: color-mix(in srgb, var(--ai-accent) 30%, var(--ai-border)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-emerald-950,
+  .bg-emerald-50,
+  .bg-emerald-100,
+  .bg-emerald-50\/70,
+  .bg-emerald-50\/50,
+  .bg-green-50,
+  .bg-green-100,
+  .bg-emerald-50\/40,
+  .hover\:bg-emerald-50:hover,
+  .bg-emerald-50\/60,
+  .bg-emerald-950\/80,
+  .hover\:bg-emerald-400:hover,
+  .hover\:bg-emerald-50\/40:hover,
+  .bg-emerald-950\/40,
+  .bg-emerald-400,
+  .bg-emerald-950\/60
+) { background-color: color-mix(in srgb, var(--ai-accent) 10%, var(--ai-surface)); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .text-emerald-200,
+  .text-emerald-900,
+  .text-emerald-800,
+  .text-emerald-600,
+  .text-emerald-950,
+  .text-emerald-700,
+  .text-green-700,
+  .text-green-800,
+  .hover\:text-emerald-700:hover,
+  .hover\:text-emerald-600:hover,
+  .text-emerald-500,
+  .text-emerald-300,
+  .text-emerald-400,
+  .text-emerald-850,
+  .hover\:text-emerald-900:hover,
+  .hover\:text-emerald-800:hover,
+  .text-teal-400
+) { color: var(--ai-accent); }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-rose-600,
+  .bg-red-500\/10
+) { background-color: #853446; }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-emerald-600,
+  .hover\:bg-emerald-700:hover,
+  .hover\:bg-emerald-500:hover,
+  .bg-emerald-500,
+  .bg-emerald-500\/20,
+  .bg-emerald-500\/10,
+  .bg-emerald-700
+) { background-color: #155f50; }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-amber-600,
+  .hover\:bg-amber-700:hover,
+  .bg-amber-500,
+  .bg-amber-500\/10,
+  .bg-amber-700,
+  .bg-orange-500\/10
+) { background-color: #765120; }
+
+:where(.ai-theme, .ai-theme *):not(:where(.ai-original-email, .ai-original-email *)):is(
+  .bg-indigo-600,
+  .hover\:bg-indigo-500:hover,
+  .hover\:bg-purple-700:hover,
+  .bg-fuchsia-600,
+  .bg-purple-700,
+  .bg-purple-600,
+  .hover\:bg-purple-500:hover,
+  .bg-indigo-500,
+  .hover\:bg-fuchsia-500:hover,
+  .bg-indigo-700,
+  .hover\:bg-indigo-700:hover,
+  .bg-purple-600\/20,
+  .bg-indigo-500\/20
+) { background-color: #59438a; }
+
+/* Existing decorative gradients become quiet surfaces; action gradients become
+ * the same emerald treatment as explicit primary actions. */
+:where(.ai-theme, .ai-theme *)[class*="bg-gradient-"] {
+  background-image: none;
+  background-color: var(--ai-surface);
+}
+.ai-theme :is(button, a)[class*="bg-gradient-"],
+.ai-theme :is(button, a):is(.bg-purple-600, .bg-indigo-600, .bg-fuchsia-600, .bg-sky-600, .bg-slate-950, .bg-emerald-500),
+.ai-theme .ai-primary, .ai-theme.ai-primary {
+  background: var(--ai-accent); color: #062b24; border-color: transparent;
+  box-shadow: none; font-weight: 700;
+}
+.ai-theme :is(button, a)[class*="bg-gradient-"] *,
+.ai-theme :is(button, a):is(.bg-purple-600, .bg-indigo-600, .bg-fuchsia-600, .bg-sky-600, .bg-slate-950, .bg-emerald-500) *,
+.ai-theme .ai-primary * { color: inherit; }
+.ai-theme .ai-secondary {
+  background: var(--ai-raised); color: var(--ai-text);
+  border: 1px solid var(--ai-border); box-shadow: none;
+}
+.ai-theme .input, .ai-theme :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  background-color: var(--ai-page); color: var(--ai-text);
+  border-color: var(--ai-border); box-shadow: none;
+}
+.ai-theme :is(input, textarea)::placeholder { color: var(--ai-muted); opacity: 1; }
+.ai-theme :is(input, textarea, select):focus { border-color: var(--ai-accent); }
+.ai-theme :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--ai-accent); outline-offset: 3px;
+  box-shadow: none;
+}
+.ai-theme :is(button, a).ai-primary:hover { background: #77e5c7; }
+.ai-theme button:disabled { cursor: not-allowed; opacity: .5; }
+.ai-theme .font-black { font-weight: 700; }
+.ai-theme :is(.text-\[10px\], .text-\[11px\]) { font-size: 12px; line-height: 1.5; }
+.ai-theme :is(.shadow-xl, .shadow-lg, .shadow-md) { box-shadow: 0 8px 24px rgb(0 0 0 / .12); }
+.ai-theme .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: var(--ai-border); }
+.ai-theme :is(button, summary) { touch-action: manipulation; }
+.ai-theme summary { cursor: pointer; }
+.ai-theme ::-webkit-scrollbar-thumb { background: #3e506d; }
+.ai-theme .ai-radar-card { box-shadow: 0 6px 24px rgb(0 0 0 / .1); }
+.ai-theme .ai-radar-card:hover { border-color: #3e506d; }
+/* Source email is a document, not application chrome: preserve its own colors. */
+.ai-theme .ai-original-email { color-scheme: light; background: white; color: #1e293b; }
+@media (prefers-reduced-motion: reduce) {
+  .ai-theme *, .ai-theme *::before, .ai-theme *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important;
+  }
+}

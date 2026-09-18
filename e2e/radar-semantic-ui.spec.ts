@@ -3,6 +3,7 @@ import { build } from 'esbuild';
 import postcss from 'postcss';
 import tailwindcss from 'tailwindcss';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 // Isolated component browser test: real React components/styles, mocked HTTP fixtures.
 // Does not contact the project database or any AI provider.
@@ -12,15 +13,16 @@ test('Radar sources, merge review, keep separate and detach work on desktop and 
     import { OpportunityCard } from './components/opportunities/OpportunityCard';
     import { RadarDuplicateReview } from './components/opportunities/RadarDuplicateReview';
     const item = { id:'one', companyName:'Kaufland', title:'Nová prodejna Opava', summary:'Nová prodejna na ulici Hlučínská.', eventType:'STORE_OPENING', city:'Opava', address:'Hlučínská 10', detectedAt:'2026-09-17', updatedAt:'2026-09-17', sourceUrl:'https://news.example/a', sourceTitle:'Nová prodejna', opportunityScore:82, status:'NEW', suggestedMediaTypes:['BILLBOARD'], _count:{sources:2}, sources:[{semanticConfidence:.97}] };
-    createRoot(document.getElementById('root')).render(<main style={{maxWidth:1000,margin:'auto',padding:16}}><RadarDuplicateReview onChanged={()=>{}}/><div style={{height:20}}/><OpportunityCard item={item} onChanged={()=>{}} onPrepareProposal={()=>{}} onLinkCrm={()=>{}} onUpdateStatus={()=>{}}/></main>);`, resolveDir: root, loader: 'tsx' }, bundle: true, write: false, format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
+    createRoot(document.getElementById('root')).render(<main className="ai-theme ai-workspace" style={{maxWidth:1000,margin:'auto',padding:16}}><RadarDuplicateReview onChanged={()=>{}}/><div style={{height:20}}/><OpportunityCard item={item} onChanged={()=>{}} onPrepareProposal={()=>{}} onLinkCrm={()=>{}} onUpdateStatus={()=>{}}/></main>);`, resolveDir: root, loader: 'tsx' }, bundle: true, write: false, format: 'iife', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
   const css = await postcss([tailwindcss({ content: [path.join(root, 'components/opportunities/*.tsx')] })]).process('@tailwind base; @tailwind components; @tailwind utilities;', { from: undefined });
+  const theme = await readFile(path.join(root, 'app/ai-theme.css'), 'utf8');
   const source = (id: string) => ({ id, sourceTitle: id === 's1' ? 'Kaufland plánuje prodejnu' : 'Investice 350 milionů korun', sourceUrl: `https://news.example/${id}`, sourceDomain: 'news.example', sourcePublishedAt: '2026-09-16', createdAt: '2026-09-17', semanticConfidence: .97, semanticDecision: 'SAME_OPPORTUNITY' });
   let pending = true, detached = false, rejectMerge = true;
   const actions: string[] = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('http://radar.test/**', async route => {
     const url = new URL(route.request().url());
-    if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: `<html lang="cs"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css.css} body{background:#020617;font-family:Arial,sans-serif}</style></head><body><div id="root"></div><script>${bundle.outputFiles[0].text}</script></body></html>` });
+    if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: `<html lang="cs"><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css.css}\n${theme}\n body{background:#090f1d;font-family:Arial,sans-serif}</style></head><body><div id="root"></div><script>${bundle.outputFiles[0].text}</script></body></html>` });
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON(); actions.push(body.action);
       if (body.action === 'MERGE' && rejectMerge) return route.fulfill({ status: 429, headers: { 'Retry-After': '42' }, json: { error: 'Příliš mnoho požadavků.' } });
@@ -33,6 +35,10 @@ test('Radar sources, merge review, keep separate and detach work on desktop and 
   });
   await page.setViewportSize({ width: 1280, height: 1100 });
   await page.goto('http://radar.test/');
+  await expect(page.locator('.ai-radar-card')).toHaveCSS('background-color', 'rgb(17, 26, 43)');
+  await expect(page.getByText('Co se stalo (Ověřený fakt):')).not.toBeVisible();
+  await page.getByText('Podklady a AI interpretace', { exact: true }).click();
+  await expect(page.getByText('Co se stalo (Ověřený fakt):')).toBeVisible();
   await expect(page.getByText('Jistota posledního přiřazení: 97 %')).toBeVisible();
   await page.getByRole('button', { name: 'Zdroje (2)' }).click();
   await expect(page.getByText('Hodnota investice:')).toBeVisible();

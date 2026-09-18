@@ -28,10 +28,10 @@ export function SalesOpportunitiesHeader({
   return (
     <div className="space-y-6">
       {/* Title Bar */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-slate-800 pb-5">
+      <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-center 2xl:justify-between border-b border-slate-800 pb-5">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-purple-950/80 text-purple-300 border border-purple-800/60 mb-2">
-            <Radar className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+            <Radar className="w-3.5 h-3.5 text-purple-400" />
             <span>AI OOH Business Intelligence</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
@@ -58,20 +58,20 @@ export function SalesOpportunitiesHeader({
               type="button"
               disabled={isAutoDiscovering}
               onClick={onAutoDiscover}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition transform active:scale-95 disabled:opacity-50"
+              className="ai-primary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition disabled:opacity-50"
             >
               <Sparkles className={`w-4 h-4 text-purple-300 ${isAutoDiscovering ? 'animate-spin' : ''}`} />
-              <span>{isAutoDiscovering ? 'AI prohledává signály…' : '🤖 Spustit AI Hledání'}</span>
+              <span>{isAutoDiscovering ? 'AI prohledává signály…' : 'Spustit AI hledání'}</span>
             </button>
           ) : null}
 
           <button
             type="button"
             onClick={onOpenManualModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg transition transform active:scale-95"
+            className="ai-secondary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Nová AI příležitost</span>
+            <span>Nová AI příležitost</span>
           </button>
         </div>
       </div>
@@ -80,7 +80,7 @@ export function SalesOpportunitiesHeader({
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
         {/* KPI 1 */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-1.5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400">
+          <div className="flex items-center justify-between gap-2 text-slate-400 [&>svg]:shrink-0">
             <span className="text-[11px] font-black uppercase tracking-wider">Nové příležitosti</span>
             <Sparkles className="w-4 h-4 text-purple-400" />
           </div>
@@ -90,17 +90,17 @@ export function SalesOpportunitiesHeader({
 
         {/* KPI 2 */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-1.5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400">
+          <div className="flex items-center justify-between gap-2 text-slate-400 [&>svg]:shrink-0">
             <span className="text-[11px] font-black uppercase tracking-wider">Silné (Score 80+)</span>
-            <Flame className="w-4 h-4 text-rose-400" />
+            <Flame className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-2xl sm:text-3xl font-black text-rose-400">{stats.totalHighScore}</p>
+          <p className="text-2xl sm:text-3xl font-black text-emerald-400">{stats.totalHighScore}</p>
           <p className="text-[10px] font-semibold text-slate-400">Nejvyšší potenciál zásahu</p>
         </div>
 
         {/* KPI 3 */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-1.5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400">
+          <div className="flex items-center justify-between gap-2 text-slate-400 [&>svg]:shrink-0">
             <span className="text-[11px] font-black uppercase tracking-wider">K oslovení do 30 dnů</span>
             <CalendarClock className="w-4 h-4 text-amber-400" />
           </div>
@@ -110,7 +110,7 @@ export function SalesOpportunitiesHeader({
 
         {/* KPI 4 */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-1.5 shadow-md">
-          <div className="flex items-center justify-between text-slate-400">
+          <div className="flex items-center justify-between gap-2 text-slate-400 [&>svg]:shrink-0">
             <span className="text-[11px] font-black uppercase tracking-wider">Vytvořené návrhy</span>
             <FileText className="w-4 h-4 text-sky-400" />
           </div>
@@ -120,7 +120,7 @@ export function SalesOpportunitiesHeader({
 
         {/* KPI 5 */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 space-y-1.5 shadow-md col-span-2 md:col-span-1">
-          <div className="flex items-center justify-between text-slate-400">
+          <div className="flex items-center justify-between gap-2 text-slate-400 [&>svg]:shrink-0">
             <span className="text-[11px] font-black uppercase tracking-wider">Konverze</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>

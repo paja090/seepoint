@@ -277,7 +277,7 @@ export function ClientAiEnrichCard({
   };
 
   return (
-    <div className="rounded-3xl border border-sky-200 bg-gradient-to-br from-sky-50/80 via-indigo-50/40 to-white p-5 shadow-sm space-y-4">
+    <div className="ai-theme ai-panel rounded-2xl p-5 space-y-4">
       {/* Header & Refined Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">

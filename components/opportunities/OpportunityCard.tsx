@@ -50,7 +50,7 @@ function getScoreBadge(score: number) {
   if (score >= 90) {
     return {
       label: `${score} / 100`,
-      className: 'bg-gradient-to-r from-amber-500 to-rose-600 text-white font-black border-amber-400 shadow-md',
+      className: 'bg-emerald-950/80 text-emerald-300 font-bold border-emerald-800/60',
       tag: '🔥 Mimořádně silná příležitost',
     };
   }
@@ -151,7 +151,7 @@ export function OpportunityCard({
     : 'Datum nepotvrzeno';
 
   return (
-    <article className="group rounded-2xl border border-slate-800 bg-slate-900/90 p-5 space-y-4 shadow-xl hover:border-purple-800/60 transition">
+    <article className="ai-radar-card group rounded-2xl border border-slate-800 bg-slate-900/90 p-5 space-y-4 transition">
       {/* Top Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -218,7 +218,10 @@ export function OpportunityCard({
         </div>
       </div>
 
-      {/* Segregated Cards: Fact vs AI Interpretation vs Next Best Action */}
+      <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{item.summary}</p>
+      <details className="rounded-xl border border-slate-800 p-3">
+        <summary className="text-sm font-semibold text-slate-300">Podklady a AI interpretace</summary>
+      {/* Evidence remains accessible without overwhelming the opportunity overview. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
         {/* 1. Co se stalo (Ověřený fakt) */}
         <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-1.5">
@@ -243,12 +246,13 @@ export function OpportunityCard({
         </div>
       </div>
 
+      </details>
       {/* 3. Doporučený postup (Next Best Action) */}
       <div className="rounded-xl border border-sky-800/40 bg-sky-950/30 p-3 space-y-1.5">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 text-xs font-bold text-sky-300">
             <Compass className="w-4 h-4 text-sky-400" />
-            <span>Next Best Action:</span>
+            <span>Doporučený další krok</span>
           </div>
           <span className="text-[11px] font-semibold text-sky-400/80">
             {item.client ? 'Priorita: Stávající klient' : 'Priorita: Akvizice nového klienta'}
@@ -306,6 +310,7 @@ export function OpportunityCard({
           <button
             type="button"
             onClick={() => setShowReasons(!showReasons)}
+            aria-expanded={showReasons}
             className="flex items-center justify-between w-full text-xs font-extrabold text-slate-300 hover:text-white"
           >
             <span className="flex items-center gap-1.5">

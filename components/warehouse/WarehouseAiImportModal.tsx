@@ -129,7 +129,7 @@ export function WarehouseAiImportModal({ triggerClassName }: { triggerClassName?
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="ai-theme fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="card w-full max-w-2xl bg-white shadow-2xl rounded-3xl p-6 relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <div>

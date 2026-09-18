@@ -23,14 +23,14 @@ export function AiInboxDashboardWidget({
   const count = summary.unreviewedCount;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm transition hover:shadow-md">
-      <div className="flex items-center justify-between gap-4">
+    <div className="ai-theme ai-panel relative overflow-hidden rounded-2xl p-6 transition">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100/80">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100/80">
             <Mail size={24} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-black text-slate-900 text-lg">AI Inbox</h3>
               <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100/70 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
                 <Sparkles size={11} />
