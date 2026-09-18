@@ -32,6 +32,8 @@ export const rateLimitPolicies = {
   crmAi: { scope: 'crm:ai', windowMs: 60 * 60_000, limits: { ip: 30, identity: 10, pair: 8 } },
   opportunityAi: { scope: 'sales:opportunity-ai', windowMs: 60 * 60_000, limits: { ip: 30, identity: 10, pair: 8 } },
   opportunityDiscovery: { scope: 'sales:opportunity-discovery', windowMs: 60 * 60_000, limits: { ip: 10, identity: 3, pair: 2 } },
+  radarReview: { scope: 'sales:radar-review', windowMs: 60_000, limits: { ip: 120, identity: 60, pair: 60 } },
+  radarBackfill: { scope: 'sales:radar-backfill', windowMs: 60_000, limits: { ip: 20, identity: 6, pair: 6 } },
   photoUpload: { scope: 'files:photo-upload', windowMs: 60 * 60_000, limits: { ip: 150, identity: 80, pair: 60 } },
   emailSettingsMutation: { scope: 'settings:email-mutation', windowMs: 15 * 60_000, limits: { ip: 30, identity: 15, pair: 10 } },
 } satisfies Record<string, RateLimitPolicy>;

@@ -20,10 +20,12 @@ export async function POST(request: Request) {
   const user = await requireApiAccess('clients', 'salesRadar');
   if (isApiDenied(user)) return user;
   if (!['ADMIN', 'MANAGER'].includes(user.role)) return NextResponse.json({ error: 'Zdroje může slučovat nebo oddělovat administrátor či manažer.' }, { status: 403 });
-  const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), rateLimitPolicies.opportunityDiscovery);
-  if (limited) return limited;
   try {
     const body = await request.json();
+    // Manual review performs no AI calls and must not consume the discovery budget.
+    const policy = body.action === 'BACKFILL_PREVIEW' ? rateLimitPolicies.radarBackfill : rateLimitPolicies.radarReview;
+    const limited = await enforceRateLimit(request, hashRateLimitIdentity(`${user.organizationId}:${user.id}`), policy);
+    if (limited) return limited;
     if (body.action === 'BACKFILL_PREVIEW') {
       if (body.cursor != null && (typeof body.cursor !== 'string' || body.cursor.length > 100)) throw new OpportunityValidationError('Neplatný kurzor.');
       return NextResponse.json(await backfillSemanticPreview(user.organizationId, user.id, body.cursor || undefined));
