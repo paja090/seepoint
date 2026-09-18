@@ -103,7 +103,7 @@ export function GoogleNavigationOfferMap({
   targets?: NavigationMapTarget[];
   points: GoogleOfferMapPoint[];
   mode: 'target' | 'point';
-  onTargetSelect: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }) => void;
+  onTargetSelect: (place: { label: string; address: string; latitude: number; longitude: number; placeId?: string }, targetId?: string) => void;
   onPointMove: (id: string, latitude: number, longitude: number, calculatedDistanceMeters?: number, polyline?: string, address?: string) => void;
   onMapClick: (latitude: number, longitude: number, address?: string) => void;
   compact?: boolean;
@@ -134,6 +134,10 @@ export function GoogleNavigationOfferMap({
   const markersRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
   const polylinesRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
   const suggestionKeyRef = useRef('');
+  const callbacksRef = useRef({ onMapClick, onTargetSelect, readOnly });
+  useEffect(() => {
+    callbacksRef.current = { onMapClick, onTargetSelect, readOnly };
+  }, [onMapClick, onTargetSelect, readOnly]);
 
   useEffect(() => {
     if ((!apiKey || loadError) && target && suggestionCount && onSuggestedPoints && suggestionKeyRef.current !== 'maps-unavailable') {
@@ -381,6 +385,8 @@ export function GoogleNavigationOfferMap({
       });
 
       (newMap as { addListener: (evt: string, fn: (e: { latLng?: { lat: () => number; lng: () => number } }) => void) => void }).addListener('click', (e) => {
+        if (callbacksRef.current.readOnly) return;
+        const handleClick = callbacksRef.current.onMapClick;
         if (e.latLng) {
           const lat = e.latLng.lat();
           const lng = e.latLng.lng();
@@ -388,10 +394,10 @@ export function GoogleNavigationOfferMap({
             const geocoder = new window.google.maps.Geocoder();
             geocoder.geocode({ location: { lat, lng } }, (results, status) => {
               const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : '';
-              onMapClick(lat, lng, street);
+              if (!callbacksRef.current.readOnly) handleClick(lat, lng, street);
             });
           } else {
-            onMapClick(lat, lng);
+            handleClick(lat, lng);
           }
         }
       });
@@ -420,7 +426,7 @@ export function GoogleNavigationOfferMap({
         position: targetPos,
         map,
         title: `CÍL (${tIndex + 1}): ${tItem.label}`,
-        draggable: !readOnly && tIndex === 0, // primary target is draggable
+        draggable: !readOnly && (Boolean(tItem.id) || effectiveTargets.length === 1),
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
           fillColor: tItem.color || (tIndex === 0 ? '#be123c' : '#2563eb'),
@@ -432,7 +438,7 @@ export function GoogleNavigationOfferMap({
         },
       });
 
-      if (!readOnly && tIndex === 0) {
+      if (!readOnly && (tItem.id || effectiveTargets.length === 1)) {
         targetMarker.addListener('dragend', (e) => {
           if (e.latLng) {
             const lat = e.latLng.lat();
@@ -441,22 +447,23 @@ export function GoogleNavigationOfferMap({
               const geocoder = new window.google.maps.Geocoder();
               geocoder.geocode({ location: { lat, lng } }, (results, status) => {
                 const street = (status === 'OK' && results?.[0]?.formatted_address) ? results[0].formatted_address : tItem.address;
-                onTargetSelect({
+                if (callbacksRef.current.readOnly) return;
+                callbacksRef.current.onTargetSelect({
                   label: tItem.label,
                   address: street || '',
                   latitude: lat,
                   longitude: lng,
                   placeId: tItem.placeId,
-                });
+                }, tItem.id);
               });
             } else {
-              onTargetSelect({
+              callbacksRef.current.onTargetSelect({
                 label: tItem.label,
                 address: tItem.address || '',
                 latitude: lat,
                 longitude: lng,
                 placeId: tItem.placeId,
-              });
+              }, tItem.id);
             }
           }
         });
@@ -610,7 +617,7 @@ export function GoogleNavigationOfferMap({
     if (!selectedPointId && (points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick]);
+  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick]);
 
   // Center/Pan smoothly to selected point when it changes
   useEffect(() => {

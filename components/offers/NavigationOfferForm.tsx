@@ -1415,6 +1415,7 @@ export function NavigationOfferForm({
         <GoogleNavigationOfferMap
           mode={mode}
           targets={targets.map((t) => ({
+            id: t.id,
             latitude: t.latitude,
             longitude: t.longitude,
             label: t.name,
@@ -1422,22 +1423,24 @@ export function NavigationOfferForm({
             color: t.color,
           }))}
           target={activeTarget ? {
+            id: activeTarget.id,
             latitude: activeTarget.latitude,
             longitude: activeTarget.longitude,
             label: activeTarget.name || 'Cíl navigace',
             address: activeTarget.address,
             color: activeTarget.color,
           } : undefined}
-          onTargetSelect={(place) => {
-            if (activeTarget) {
+          onTargetSelect={(place, targetId) => {
+            const movedTarget = targetId ? targets.find((t) => t.id === targetId) : activeTarget;
+            if (movedTarget) {
               const updatedTarget = {
-                ...activeTarget,
+                ...movedTarget,
                 latitude: place.latitude,
                 longitude: place.longitude,
-                name: activeTarget.name || place.label,
-                address: place.address || activeTarget.address,
+                name: movedTarget.name || place.label,
+                address: place.address || movedTarget.address,
               };
-              const updatedTargets = targets.map((t) => (t.id === activeTarget.id ? updatedTarget : t));
+              const updatedTargets = targets.map((t) => (t.id === movedTarget.id ? updatedTarget : t));
               setTargets(updatedTargets);
               setMode('point');
               void recalculateAllRoutes(updatedTargets);

@@ -41,8 +41,8 @@ export function AppTopbar({ user, canUseTeam = true }: { canUseTeam?: boolean; u
   async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
 
   return (
-    <header className="sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-5 backdrop-blur-md shadow-2xs">
-      <div className="min-w-0 flex items-center gap-2">
+    <header className="app-topbar sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-5 backdrop-blur-md shadow-2xs">
+      <div className="app-topbar-title min-w-0 flex items-center gap-2">
         <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 shrink-0">
           SeePoint OS
         </span>
@@ -50,11 +50,11 @@ export function AppTopbar({ user, canUseTeam = true }: { canUseTeam?: boolean; u
         <h1 className="truncate text-base font-bold text-slate-900 tracking-tight">{title}</h1>
       </div>
 
-      <div className="flex-1 max-w-md mx-2">
+      <div className="app-topbar-search flex-1 max-w-md mx-2">
         <QuickSearchInput />
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div className="app-topbar-actions flex items-center gap-2.5">
         <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
         <WeatherClockWidget />
 
