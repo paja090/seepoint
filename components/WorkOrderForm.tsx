@@ -23,8 +23,6 @@ import {
   Package,
   Car,
   Calendar,
-  Building2,
-  Info,
 } from 'lucide-react';
 
 type Option = { id: string; label: string };
@@ -500,7 +498,7 @@ export function WorkOrderForm({
           <select
             className="input w-full text-xs font-semibold"
             value={priority}
-            onChange={(e) => setPriority(e.target.value as any)}
+            onChange={(e) => setPriority(e.target.value as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT')}
           >
             {Object.entries(workPriorityLabels).map(([v, l]) => (
               <option key={v} value={v}>
@@ -687,6 +685,18 @@ export function WorkOrderForm({
                 <CheckCircle2 size={14} /> {pdfFileName}
               </span>
             )}
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              Odkaz na fotodokumentaci / cloud tisková data
+            </label>
+            <input
+              type="url"
+              className="input w-full text-xs font-semibold"
+              placeholder="https://..."
+              value={ftdUrl}
+              onChange={(e) => setFtdUrl(e.target.value)}
+            />
           </div>
         </div>
 
