@@ -235,6 +235,15 @@ export function WorkPlanListView({
                           ⚠️ Po termínu
                         </span>
                       )}
+                      {(order.locationNote?.toLowerCase().includes('dílna') || order.mediaLabel?.toLowerCase().includes('dílna') || order.mediaLabel?.toLowerCase().includes('tisk') || order.mediaLabel?.toLowerCase().includes('grafika')) ? (
+                        <span className="rounded-full bg-sky-100 text-sky-800 border border-sky-200 px-2.5 py-0.5 text-xs font-bold">
+                          🏭 Dílna / Tisk
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold">
+                          🚗 Výjezd / Montáž
+                        </span>
+                      )}
                       <span className="text-xs font-extrabold text-slate-600">
                         {workTypeLabels[order.workType as keyof typeof workTypeLabels] || order.workType}
                       </span>

@@ -1,0 +1,505 @@
+TAP version 13
+# Subtest: Integration: Priority ordering follows CRITICAL > URGENT > HIGH > MEDIUM > LOW
+ok 1 - Integration: Priority ordering follows CRITICAL > URGENT > HIGH > MEDIUM > LOW
+  ---
+  duration_ms: 2.9977
+  type: 'test'
+  ...
+# Subtest: Integration: Human approval enforcement — dangerous actions always require human approval
+ok 2 - Integration: Human approval enforcement — dangerous actions always require human approval
+  ---
+  duration_ms: 38.4382
+  type: 'test'
+  ...
+# Subtest: Integration: Profile defaults guarantee autoSendOffer and autoInvoice are false
+ok 3 - Integration: Profile defaults guarantee autoSendOffer and autoInvoice are false
+  ---
+  duration_ms: 0.3754
+  type: 'test'
+  ...
+# [attention-service] Chyba načtení CRM Intelligence attention items: PrismaClientInitializationError: 
+# Invalid `prisma.occupancy.findMany()` invocation in
+# C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-crm\\crm-intelligence-service.ts:223:56
+#   220 // 3. EVALUATE RENEWALS (Campaigns ending within renewalWarningDays)
+#   221 if (profile.enableRenewalInsights) {
+#   222   const warningDate = new Date(now.getTime() + profile.renewalWarningDays * 86400000);
+# → 223   const expiringOccupancies = await prisma.occupancy.findMany(
+# error: Environment variable not found: DATABASE_URL.
+#   -->  schema.prisma:8
+#    | 
+#  7 |   provider = "postgresql"
+#  8 |   url      = env("DATABASE_URL")
+#    | 
+# Validation Error Count: 1
+#     at ei.handleRequestError (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:242:13)
+#     at ei.handleAndLogRequestError (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:174:12)
+#     at ei.request (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:143:12)
+#     at async a (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\getPrismaClient.ts:833:24)
+#     at async getMyAttentionItems (C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-crm\\crm-intelligence-service.ts:223:33)
+#     at async <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-orchestrator\\attention-service.ts:46:22)
+#     at async Promise.all (index 0)
+#     at async <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-orchestrator\\commercial-center-service.ts:31:9)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\ai-commercial-integration.test.ts:133:18)
+#     at async Test.run (node:internal/test_runner/test:1054:7) {
+#   clientVersion: '6.19.3',
+#   errorCode: undefined,
+#   retryable: undefined
+# }
+# Subtest: Integration: Commercial Center Data aggregates UnifiedNextBestActions from Attention and Mailbox
+ok 4 - Integration: Commercial Center Data aggregates UnifiedNextBestActions from Attention and Mailbox
+  ---
+  duration_ms: 1736.7649
+  type: 'test'
+  ...
+# Subtest: Integration: Audit log trace retrieval for CommercialRun
+ok 5 - Integration: Audit log trace retrieval for CommercialRun
+  ---
+  duration_ms: 1.6224
+  type: 'test'
+  ...
+# Subtest: Integration: Follow-up & Renewal delegation to CRM Intelligence (no duplicate 4-day logic)
+ok 6 - Integration: Follow-up & Renewal delegation to CRM Intelligence (no duplicate 4-day logic)
+  ---
+  duration_ms: 9.4876
+  type: 'test'
+  ...
+# Subtest: Integration: Multi-tenant isolation — items from Org A never leak to Org B
+ok 7 - Integration: Multi-tenant isolation — items from Org A never leak to Org B
+  ---
+  duration_ms: 2.2169
+  type: 'test'
+  ...
+# Subtest: AI Sales Radar Integration & Commercial Engine Foundation
+    # Subtest: Scenario A: New prospect discovery produces NEW_ACQUISITION, null quantity, and missingRequirements
+    ok 1 - Scenario A: New prospect discovery produces NEW_ACQUISITION, null quantity, and missingRequirements
+      ---
+      duration_ms: 3535.178
+      type: 'test'
+      ...
+    # Subtest: Scenario B: Existing client in CRM is classified as EXPANSION with linked clientId
+    ok 2 - Scenario B: Existing client in CRM is classified as EXPANSION with linked clientId
+      ---
+      duration_ms: 2.1408
+      type: 'test'
+      ...
+    # Subtest: Scenario C: Freshness decay penalizes signals older than 1 year or past events
+    ok 3 - Scenario C: Freshness decay penalizes signals older than 1 year or past events
+      ---
+      duration_ms: 0.7568
+      type: 'test'
+      ...
+    # Subtest: Scenario D: Scoring returns transparent 5-component breakdown bounded to 100
+    ok 4 - Scenario D: Scoring returns transparent 5-component breakdown bounded to 100
+      ---
+      duration_ms: 0.5346
+      type: 'test'
+      ...
+    # Subtest: Scenario E: Strict multi-tenant isolation across opportunities and commercial requests
+    ok 5 - Scenario E: Strict multi-tenant isolation across opportunities and commercial requests
+      ---
+      duration_ms: 0.5652
+      type: 'test'
+      ...
+    # Subtest: Scenario F: Policy validation enforces sanitization, bounds and prevents past dates
+    ok 6 - Scenario F: Policy validation enforces sanitization, bounds and prevents past dates
+      ---
+      duration_ms: 2.4398
+      type: 'test'
+      ...
+    # Subtest: Scenario G: Opportunity filters reject unbounded pagination and invalid ranges
+    ok 7 - Scenario G: Opportunity filters reject unbounded pagination and invalid ranges
+      ---
+      duration_ms: 0.922
+      type: 'test'
+      ...
+    # Subtest: Scenario H: Opportunity state machine requires dismissal reason when DISMISSED
+    ok 8 - Scenario H: Opportunity state machine requires dismissal reason when DISMISSED
+      ---
+      duration_ms: 0.4736
+      type: 'test'
+      ...
+    # Subtest: Scenario I: Commercial Next Best Action guides salesperson without unapproved automation
+    ok 9 - Scenario I: Commercial Next Best Action guides salesperson without unapproved automation
+      ---
+      duration_ms: 0.617
+      type: 'test'
+      ...
+    1..9
+ok 8 - AI Sales Radar Integration & Commercial Engine Foundation
+  ---
+  duration_ms: 3546.8285
+  type: 'suite'
+  ...
+# Subtest: Organization A client listing is always scoped away from Organization B
+ok 9 - Organization A client listing is always scoped away from Organization B
+  ---
+  duration_ms: 44.2228
+  type: 'test'
+  ...
+# Subtest: GET by a foreign client id receives an organization predicate and therefore resolves as 404
+ok 10 - GET by a foreign client id receives an organization predicate and therefore resolves as 404
+  ---
+  duration_ms: 0.4335
+  type: 'test'
+  ...
+# Subtest: updates and deletes cannot target a record outside the active organization
+ok 11 - updates and deletes cannot target a record outside the active organization
+  ---
+  duration_ms: 1.7502
+  type: 'test'
+  ...
+# Subtest: same normalized client name is unique per organization, not globally
+ok 12 - same normalized client name is unique per organization, not globally
+  ---
+  duration_ms: 9.3719
+  type: 'test'
+  ...
+# Subtest: one global user email can have memberships in multiple organizations
+ok 13 - one global user email can have memberships in multiple organizations
+  ---
+  duration_ms: 11.6104
+  type: 'test'
+  ...
+# Subtest: AI inventory lookup is scoped to the active organization
+ok 14 - AI inventory lookup is scoped to the active organization
+  ---
+  duration_ms: 0.3118
+  type: 'test'
+  ...
+# Subtest: dashboard counts and aggregates are scoped to the active organization
+ok 15 - dashboard counts and aggregates are scoped to the active organization
+  ---
+  duration_ms: 0.4012
+  type: 'test'
+  ...
+# Subtest: public offers resolve tenant only by an opaque token and never by offer id fallback
+ok 16 - public offers resolve tenant only by an opaque token and never by offer id fallback
+  ---
+  duration_ms: 57.1241
+  type: 'test'
+  ...
+# Subtest: all declared tenant models receive create ownership and reject client overrides
+ok 17 - all declared tenant models receive create ownership and reject client overrides
+  ---
+  duration_ms: 0.9848
+  type: 'test'
+  ...
+# [NotificationsProviderError] Provider: "failing-warehouse", Tenant: "org_test", Route: "/api/notifications", Error: Simulated database timeout in warehouseItem.findMany
+# Subtest: getSystemNotifications throws TenantContextError when called without tenant context and no organizationId
+ok 18 - getSystemNotifications throws TenantContextError when called without tenant context and no organizationId
+  ---
+  duration_ms: 1642.697
+  type: 'test'
+  ...
+# Subtest: getSystemNotifications propagates tenant context to all active providers
+ok 19 - getSystemNotifications propagates tenant context to all active providers
+  ---
+  duration_ms: 1463.5373
+  type: 'test'
+  ...
+# Subtest: failure of one non-critical provider does not crash getSystemNotifications and other providers succeed
+ok 20 - failure of one non-critical provider does not crash getSystemNotifications and other providers succeed
+  ---
+  duration_ms: 3.2555
+  type: 'test'
+  ...
+# Subtest: critical security error (TenantContextError) inside a provider is never swallowed
+ok 21 - critical security error (TenantContextError) inside a provider is never swallowed
+  ---
+  duration_ms: 1.0232
+  type: 'test'
+  ...
+# Subtest: all required providers are registered in ALL_NOTIFICATION_PROVIDERS
+ok 22 - all required providers are registered in ALL_NOTIFICATION_PROVIDERS
+  ---
+  duration_ms: 0.465
+  type: 'test'
+  ...
+# Subtest: route /api/notifications enforces authentication, active organization, and explicit runWithTenantContext
+ok 23 - route /api/notifications enforces authentication, active organization, and explicit runWithTenantContext
+  ---
+  duration_ms: 478.1756
+  type: 'test'
+  ...
+# Subtest: route /api/notifications/unread enforces authentication, active organization, and explicit runWithTenantContext
+ok 24 - route /api/notifications/unread enforces authentication, active organization, and explicit runWithTenantContext
+  ---
+  duration_ms: 35.4731
+  type: 'test'
+  ...
+# Subtest: NotificationBellCenter coordinates polling across multiple mounted instances with single timer and 401 guard
+ok 25 - NotificationBellCenter coordinates polling across multiple mounted instances with single timer and 401 guard
+  ---
+  duration_ms: 90.2479
+  type: 'test'
+  ...
+# Subtest: opportunity create input validates lengths, enums, dates, URLs and GPS
+ok 26 - opportunity create input validates lengths, enums, dates, URLs and GPS
+  ---
+  duration_ms: 5.8598
+  type: 'test'
+  ...
+# Subtest: opportunity filters are bounded and reject invalid enum or scores
+ok 27 - opportunity filters are bounded and reject invalid enum or scores
+  ---
+  duration_ms: 0.8707
+  type: 'test'
+  ...
+# Subtest: opportunity state machine and dismissal reason are enforced
+ok 28 - opportunity state machine and dismissal reason are enforced
+  ---
+  duration_ms: 0.5657
+  type: 'test'
+  ...
+# Subtest: article URL guard blocks loopback and private targets before fetch
+ok 29 - article URL guard blocks loopback and private targets before fetch
+  ---
+  duration_ms: 106.6799
+  type: 'test'
+  ...
+# Subtest: AI parser uses private server keys, one configured model and bounded external calls
+ok 30 - AI parser uses private server keys, one configured model and bounded external calls
+  ---
+  duration_ms: 1.4592
+  type: 'test'
+  ...
+# Subtest: opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery
+ok 31 - opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery
+  ---
+  duration_ms: 4.4751
+  type: 'test'
+  ...
+# Subtest: CRM linking is serializable, tenant checked and audited without using article URL as company website
+ok 32 - CRM linking is serializable, tenant checked and audited without using article URL as company website
+  ---
+  duration_ms: 76.574
+  type: 'test'
+  ...
+# Subtest: multi-tenant OOH scoring calculates 6 dimensions and awards points for tenant target region
+ok 33 - multi-tenant OOH scoring calculates 6 dimensions and awards points for tenant target region
+  ---
+  duration_ms: 64.5816
+  type: 'test'
+  ...
+# Subtest: parser does not contain hardcoded SeePOINT or MS region and accepts nullable city
+ok 34 - parser does not contain hardcoded SeePOINT or MS region and accepts nullable city
+  ---
+  duration_ms: 38.2843
+  type: 'test'
+  ...
+# Subtest: distance calculator computes Haversine distance in kilometers accurately
+ok 35 - distance calculator computes Haversine distance in kilometers accurately
+  ---
+  duration_ms: 506.1156
+  type: 'test'
+  ...
+# Subtest: vercel.json is valid and contains sales-radar cron job
+ok 36 - vercel.json is valid and contains sales-radar cron job
+  ---
+  duration_ms: 4.1839
+  type: 'test'
+  ...
+# Subtest: cron route guards execution with CRON_SECRET and admin check
+ok 37 - cron route guards execution with CRON_SECRET and admin check
+  ---
+  duration_ms: 13.6782
+  type: 'test'
+  ...
+# Subtest: notifications service supports RADAR_OPPORTUNITY and includes them for sales
+ok 38 - notifications service supports RADAR_OPPORTUNITY and includes them for sales
+  ---
+  duration_ms: 1.4518
+  type: 'test'
+  ...
+# Subtest: unread notifications route includes fresh radar opportunities in toast items
+ok 39 - unread notifications route includes fresh radar opportunities in toast items
+  ---
+  duration_ms: 1.3051
+  type: 'test'
+  ...
+# Subtest: radar settings modal clearly shows automated morning cron status and notifications
+ok 40 - radar settings modal clearly shows automated morning cron status and notifications
+  ---
+  duration_ms: 1.2585
+  type: 'test'
+  ...
+# Subtest: expired shared deadline rejects before another request can start
+ok 41 - expired shared deadline rejects before another request can start
+  ---
+  duration_ms: 1.7548
+  type: 'test'
+  ...
+# Subtest: live search reports provider HTTP failures rather than a successful empty result
+ok 42 - live search reports provider HTTP failures rather than a successful empty result
+  ---
+  duration_ms: 1764.9333
+  type: 'test'
+  ...
+# Error parsing live search JSON: Error: Neplatný JSON.
+#     at searchLiveOpportunitiesWithGemini (C:\\Users\\42077\\Documents\\seepoint\\lib\\opportunities\\live-search-core.ts:138:53)
+#     at async waitForActual (node:assert:644:5)
+#     at async Function.rejects (node:assert:767:25)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\radar-deadline.test.ts:23:45)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Error parsing live search JSON: Error: Žádná položka neprošla validací.
+#     at searchLiveOpportunitiesWithGemini (C:\\Users\\42077\\Documents\\seepoint\\lib\\opportunities\\live-search-core.ts:204:60)
+#     at async waitForActual (node:assert:644:5)
+#     at async Function.rejects (node:assert:767:25)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\radar-deadline.test.ts:24:41)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: valid empty search remains distinct from malformed provider output
+ok 43 - valid empty search remains distinct from malformed provider output
+  ---
+  duration_ms: 11.3662
+  type: 'test'
+  ...
+# Subtest: additive radar migration preserves historical opportunities and articles with tenant-safe source identity
+ok 44 - additive radar migration preserves historical opportunities and articles with tenant-safe source identity
+  ---
+  duration_ms: 7380.9091
+  type: 'test'
+  ...
+# Subtest: production semantic ingestion and manual review preserve source identity and canonical records
+    # Subtest: same URL twice -> one source and one opportunity, zero comparison calls
+    ok 1 - same URL twice -> one source and one opportunity, zero comparison calls
+      ---
+      duration_ms: 18.4482
+      type: 'test'
+      ...
+    # Subtest: two URLs, same concrete project -> two sources and one opportunity
+    ok 2 - two URLs, same concrete project -> two sources and one opportunity
+      ---
+      duration_ms: 66.3049
+      type: 'test'
+      ...
+    # Subtest: different cities -> separate; same company and city alone -> never auto merge
+    ok 3 - different cities -> separate; same company and city alone -> never auto merge
+      ---
+      duration_ms: 15.6916
+      type: 'test'
+      ...
+    # Subtest: same tender, distinct titles -> deterministic merge without provider
+    ok 4 - same tender, distinct titles -> deterministic merge without provider
+      ---
+      duration_ms: 12.6476
+      type: 'test'
+      ...
+    # Subtest: .82 confidence -> review; manual merge moves both sources; detach reverses enrichment
+    ok 5 - .82 confidence -> review; manual merge moves both sources; detach reverses enrichment
+      ---
+      duration_ms: 16.7394
+      type: 'test'
+      ...
+    # Subtest: keep separate survives recrawl and higher resolver confidence
+    ok 6 - keep separate survives recrawl and higher resolver confidence
+      ---
+      duration_ms: 12.3849
+      type: 'test'
+      ...
+    # Subtest: new investment is added without overwriting confirmed facts and sources remain
+    ok 7 - new investment is added without overwriting confirmed facts and sources remain
+      ---
+      duration_ms: 5.9555
+      type: 'test'
+      ...
+    # Subtest: provider failure retains source and creates review instead of an automatic merge
+    ok 8 - provider failure retains source and creates review instead of an automatic merge
+      ---
+      duration_ms: 8.1601
+      type: 'test'
+      ...
+    # Subtest: new article cannot override an indistinguishable pair previously kept separate
+    ok 9 - new article cannot override an indistinguishable pair previously kept separate
+      ---
+      duration_ms: 119.889
+      type: 'test'
+      ...
+    # Subtest: conflicting exact location or identifier vetoes automatic merge
+    ok 10 - conflicting exact location or identifier vetoes automatic merge
+      ---
+      duration_ms: 12.0873
+      type: 'test'
+      ...
+    # Subtest: foreign-tenant review cannot move sources
+    ok 11 - foreign-tenant review cannot move sources
+      ---
+      duration_ms: 2.7595
+      type: 'test'
+      ...
+    # Subtest: historical preview is non-destructive and does not call paid AI
+    ok 12 - historical preview is non-destructive and does not call paid AI
+      ---
+      duration_ms: 13.7246
+      type: 'test'
+      ...
+    # Subtest: candidate retrieval bounds every database branch and returns at most ten
+    ok 13 - candidate retrieval bounds every database branch and returns at most ten
+      ---
+      duration_ms: 1.8917
+      type: 'test'
+      ...
+    1..13
+ok 45 - production semantic ingestion and manual review preserve source identity and canonical records
+  ---
+  duration_ms: 5042.2876
+  type: 'test'
+  ...
+# Subtest: two differently titled articles with a shared tender identifier resolve without LLM
+ok 46 - two differently titled articles with a shared tender identifier resolve without LLM
+  ---
+  duration_ms: 54.9664
+  type: 'test'
+  ...
+# Subtest: same company and category or same company and city cannot auto merge
+ok 47 - same company and category or same company and city cannot auto merge
+  ---
+  duration_ms: 1.0738
+  type: 'test'
+  ...
+# Subtest: configured confidence boundaries: .90 auto, .82 review, .74 new
+ok 48 - configured confidence boundaries: .90 auto, .82 review, .74 new
+  ---
+  duration_ms: 2.1638
+  type: 'test'
+  ...
+# Subtest: critical conflicts veto high-confidence auto merge, including an identical identifier
+ok 49 - critical conflicts veto high-confidence auto merge, including an identical identifier
+  ---
+  duration_ms: 1.7716
+  type: 'test'
+  ...
+# Subtest: different cities and distinct identifiers bypass paid comparison
+ok 50 - different cities and distinct identifiers bypass paid comparison
+  ---
+  duration_ms: 2.3261
+  type: 'test'
+  ...
+# Subtest: untrusted resolver output cannot invent candidate IDs or confidence
+ok 51 - untrusted resolver output cannot invent candidate IDs or confidence
+  ---
+  duration_ms: 0.6146
+  type: 'test'
+  ...
+# Subtest: enrichment retains investment provenance and conflicts; detach reconstruction removes its facts
+ok 52 - enrichment retains investment provenance and conflicts; detach reconstruction removes its facts
+  ---
+  duration_ms: 0.9805
+  type: 'test'
+  ...
+# Subtest: optional extraction fields stay absent; domain comes from actual URL
+ok 53 - optional extraction fields stay absent; domain comes from actual URL
+  ---
+  duration_ms: 3.5813
+  type: 'test'
+  ...
+1..53
+# tests 74
+# suites 1
+# pass 74
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 13948.3485

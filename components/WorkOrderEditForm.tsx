@@ -3,7 +3,7 @@
 import type { WorkPriority, WorkType } from '@prisma/client';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { workPriorityLabels, workRequesters, workTypeLabels } from '@/lib/work';
+import { workPriorityLabels, workTypeLabels } from '@/lib/work';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -75,7 +75,7 @@ export function WorkOrderEditForm({ order, clients, carriers }: WorkOrderEditFor
         <label>Dokončit nejpozději<input className="input mt-1" defaultValue={order.deadlineAt} name="deadlineAt" type="datetime-local" /></label>
         <label>Typ práce<select className="input mt-1" defaultValue={order.workType} name="workType">{Object.entries(workTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <label>Priorita<select className="input mt-1" defaultValue={order.priority} name="priority">{Object.entries(workPriorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label>Úkol zadal/a<select className="input mt-1" defaultValue={order.requestedBy} name="requestedBy" required>{workRequesters.map((requester) => <option key={requester} value={requester}>{requester}</option>)}</select></label>
+        <label>Úkol zadal/a<input className="input mt-1" defaultValue={order.requestedBy} name="requestedBy" required placeholder="Jméno zadavatele" /></label>
         <label>Cena za úkol v Kč<input className="input mt-1" defaultValue={order.price} min="0" name="price" step="0.01" type="number" /></label>
         <label>Pracovníci<input className="input mt-1" defaultValue={order.workerNames} name="workerNames" placeholder="Pavel, Mirek" /></label>
         <label>Existující klient<select className="input mt-1" defaultValue={order.clientId} name="clientId"><option value="">Bez vybraného klienta</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></label>
@@ -89,7 +89,7 @@ export function WorkOrderEditForm({ order, clients, carriers }: WorkOrderEditFor
         <label>Telefon<input className="input mt-1" defaultValue={order.contactPhone} name="contactPhone" type="tel" /></label>
         <label className="lg:col-span-2">Místo a pokyny<input className="input mt-1" defaultValue={order.locationNote} name="locationNote" /></label>
         <label className="lg:col-span-2">Podrobné zadání<textarea className="input mt-1 min-h-28" defaultValue={order.description} name="description" required /></label>
-        <label className="lg:col-span-2">Složka fotodokumentace na Google Disku<input className="input mt-1" defaultValue={order.ftdUrl} name="ftdUrl" type="url" placeholder="https://drive.google.com/…" /></label>
+        <label className="lg:col-span-2">Odkaz na fotodokumentaci<input className="input mt-1" defaultValue={order.ftdUrl} name="ftdUrl" type="url" placeholder="https://…" /></label>
         <label className="lg:col-span-2">Odkaz na podklady<input className="input mt-1" defaultValue={order.referenceUrl} name="referenceUrl" type="url" /></label>
         {error && <p className="lg:col-span-2 text-sm text-red-700" role="alert">{error}</p>}
         {saved && <p className="lg:col-span-2 text-sm font-medium text-emerald-700" role="status">Změny byly uloženy.</p>}
