@@ -1,0 +1,4964 @@
+
+> seepoint@0.1.0 test
+> npx tsx --test tests/*.test.ts
+
+TAP version 13
+# Subtest: absence dates accept strict calendar days only
+ok 1 - absence dates accept strict calendar days only
+  ---
+  duration_ms: 161.2327
+  type: 'test'
+  ...
+# Subtest: workers request only their own absence while managers can plan for the team
+ok 2 - workers request only their own absence while managers can plan for the team
+  ---
+  duration_ms: 0.3344
+  type: 'test'
+  ...
+# Subtest: review, deletion and private notes follow server-side role rules
+ok 3 - review, deletion and private notes follow server-side role rules
+  ---
+  duration_ms: 0.36
+  type: 'test'
+  ...
+# Subtest: absence API enforces module access, approval workflow and transactional overlap checks
+ok 4 - absence API enforces module access, approval workflow and transactional overlap checks
+  ---
+  duration_ms: 142.9757
+  type: 'test'
+  ...
+# Subtest: vacation UI counts only approved presence and exposes manager review actions
+ok 5 - vacation UI counts only approved presence and exposes manager review actions
+  ---
+  duration_ms: 178.5521
+  type: 'test'
+  ...
+# Subtest: Integration: Priority ordering follows CRITICAL > URGENT > HIGH > MEDIUM > LOW
+ok 6 - Integration: Priority ordering follows CRITICAL > URGENT > HIGH > MEDIUM > LOW
+  ---
+  duration_ms: 3.3291
+  type: 'test'
+  ...
+# Subtest: Integration: Human approval enforcement — dangerous actions always require human approval
+ok 7 - Integration: Human approval enforcement — dangerous actions always require human approval
+  ---
+  duration_ms: 55.4997
+  type: 'test'
+  ...
+# Subtest: Integration: Profile defaults guarantee autoSendOffer and autoInvoice are false
+ok 8 - Integration: Profile defaults guarantee autoSendOffer and autoInvoice are false
+  ---
+  duration_ms: 0.471
+  type: 'test'
+  ...
+# [attention-service] Chyba načtení CRM Intelligence attention items: PrismaClientInitializationError: 
+# Invalid `prisma.occupancy.findMany()` invocation in
+# C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-crm\\crm-intelligence-service.ts:223:56
+#   220 // 3. EVALUATE RENEWALS (Campaigns ending within renewalWarningDays)
+#   221 if (profile.enableRenewalInsights) {
+#   222   const warningDate = new Date(now.getTime() + profile.renewalWarningDays * 86400000);
+# → 223   const expiringOccupancies = await prisma.occupancy.findMany(
+# error: Environment variable not found: DATABASE_URL.
+#   -->  schema.prisma:8
+#    | 
+#  7 |   provider = "postgresql"
+#  8 |   url      = env("DATABASE_URL")
+#    | 
+# Validation Error Count: 1
+#     at ei.handleRequestError (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:242:13)
+#     at ei.handleAndLogRequestError (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:174:12)
+#     at ei.request (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:143:12)
+#     at async a (C:\\Users\\42077\\Documents\\seepoint\\node_modules\\@prisma\\client\\src\\runtime\\getPrismaClient.ts:833:24)
+#     at async getMyAttentionItems (C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-crm\\crm-intelligence-service.ts:223:33)
+#     at async <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-orchestrator\\attention-service.ts:46:22)
+#     at async Promise.all (index 0)
+#     at async <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\ai-orchestrator\\commercial-center-service.ts:31:9)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\ai-commercial-integration.test.ts:133:18)
+#     at async Test.run (node:internal/test_runner/test:1054:7) {
+#   clientVersion: '6.19.3',
+#   errorCode: undefined,
+#   retryable: undefined
+# }
+# Subtest: Integration: Commercial Center Data aggregates UnifiedNextBestActions from Attention and Mailbox
+ok 9 - Integration: Commercial Center Data aggregates UnifiedNextBestActions from Attention and Mailbox
+  ---
+  duration_ms: 953.6476
+  type: 'test'
+  ...
+# Subtest: Integration: Audit log trace retrieval for CommercialRun
+ok 10 - Integration: Audit log trace retrieval for CommercialRun
+  ---
+  duration_ms: 3.0111
+  type: 'test'
+  ...
+# Subtest: Integration: Follow-up & Renewal delegation to CRM Intelligence (no duplicate 4-day logic)
+ok 11 - Integration: Follow-up & Renewal delegation to CRM Intelligence (no duplicate 4-day logic)
+  ---
+  duration_ms: 20.7922
+  type: 'test'
+  ...
+# Subtest: Integration: Multi-tenant isolation — items from Org A never leak to Org B
+ok 12 - Integration: Multi-tenant isolation — items from Org A never leak to Org B
+  ---
+  duration_ms: 6.7418
+  type: 'test'
+  ...
+# Subtest: Scénář A: Kompletní poptávka → CommercialRequest → Offer DRAFT
+ok 13 - Scénář A: Kompletní poptávka → CommercialRequest → Offer DRAFT
+  ---
+  duration_ms: 109.9272
+  type: 'test'
+  ...
+# Subtest: Scénář B: Neúplná poptávka → NEEDS_INFORMATION, žádné vymýšlení dat
+ok 14 - Scénář B: Neúplná poptávka → NEEDS_INFORMATION, žádné vymýšlení dat
+  ---
+  duration_ms: 75.6863
+  type: 'test'
+  ...
+# Subtest: Scénář C: Částečná dostupnost → DRAFT s jasně rozlišenými alternativami
+ok 15 - Scénář C: Částečná dostupnost → DRAFT s jasně rozlišenými alternativami
+  ---
+  duration_ms: 297.0007
+  type: 'test'
+  ...
+# Subtest: Scénář D: Žádná dostupnost → Nevznikne nabídka, vhodná Next Best Action
+ok 16 - Scénář D: Žádná dostupnost → Nevznikne nabídka, vhodná Next Best Action
+  ---
+  duration_ms: 1.5686
+  type: 'test'
+  ...
+# Subtest: Scénář E: Offer ACCEPTED → Realization handoff proběhne právě jednou
+ok 17 - Scénář E: Offer ACCEPTED → Realization handoff proběhne právě jednou
+  ---
+  duration_ms: 107.567
+  type: 'test'
+  ...
+# Subtest: Scénář F: Duplicitní trigger → Žádné duplicity
+ok 18 - Scénář F: Duplicitní trigger → Žádné duplicity
+  ---
+  duration_ms: 1.6438
+  type: 'test'
+  ...
+# Subtest: Scénář G: Occupancy selhání → Proces zachován a retryable
+ok 19 - Scénář G: Occupancy selhání → Proces zachován a retryable
+  ---
+  duration_ms: 5.4222
+  type: 'test'
+  ...
+# Subtest: Scénář H: Offer builder selhání → AvailabilityResult zachován
+ok 20 - Scénář H: Offer builder selhání → AvailabilityResult zachován
+  ---
+  duration_ms: 1.6223
+  type: 'test'
+  ...
+# Subtest: Scénář I: Tenant izolace — Tenant A nevidí data Tenant B
+ok 21 - Scénář I: Tenant izolace — Tenant A nevidí data Tenant B
+  ---
+  duration_ms: 63.211
+  type: 'test'
+  ...
+# Subtest: Scénář J: Cross-tenant reference zamítnuta
+ok 22 - Scénář J: Cross-tenant reference zamítnuta
+  ---
+  duration_ms: 55.8057
+  type: 'test'
+  ...
+# Subtest: Scénář K: SEMI_AUTOMATIC vytvoří DRAFT, nikdy samo neodešle
+ok 23 - Scénář K: SEMI_AUTOMATIC vytvoří DRAFT, nikdy samo neodešle
+  ---
+  duration_ms: 1.7268
+  type: 'test'
+  ...
+# Subtest: Scénář K (unit): isActionAllowed correctly enforces policy
+ok 24 - Scénář K (unit): isActionAllowed correctly enforces policy
+  ---
+  duration_ms: 491.2819
+  type: 'test'
+  ...
+# Subtest: Scénář L: Uživatel bez práva SEND nemůže odeslat nabídku
+ok 25 - Scénář L: Uživatel bez práva SEND nemůže odeslat nabídku
+  ---
+  duration_ms: 29.2886
+  type: 'test'
+  ...
+# Subtest: Scénář L (unit): canAccess enforces commercial permissions
+ok 26 - Scénář L (unit): canAccess enforces commercial permissions
+  ---
+  duration_ms: 204.3651
+  type: 'test'
+  ...
+# Subtest: Scénář M: Full traceability — correlation chain structure
+ok 27 - Scénář M: Full traceability — correlation chain structure
+  ---
+  duration_ms: 2.5287
+  type: 'test'
+  ...
+# Subtest: Automation policy: Business-critical akce VŽDY vyžadují lidské schválení
+ok 28 - Automation policy: Business-critical akce VŽDY vyžadují lidské schválení
+  ---
+  duration_ms: 2.8212
+  type: 'test'
+  ...
+# Subtest: Automation policy: Orchestrator profile defaults to SEMI_AUTOMATIC
+ok 29 - Automation policy: Orchestrator profile defaults to SEMI_AUTOMATIC
+  ---
+  duration_ms: 1.4714
+  type: 'test'
+  ...
+# Subtest: Automation policy: autoSendOffer a autoInvoice jsou VŽDY false
+ok 30 - Automation policy: autoSendOffer a autoInvoice jsou VŽDY false
+  ---
+  duration_ms: 1.2873
+  type: 'test'
+  ...
+# Subtest: Contract consolidation: DatesClarity importován z kanonického kontraktu
+ok 31 - Contract consolidation: DatesClarity importován z kanonického kontraktu
+  ---
+  duration_ms: 8.6872
+  type: 'test'
+  ...
+# Subtest: Contract consolidation: Priority typy definovány v příslušných modulech
+ok 32 - Contract consolidation: Priority typy definovány v příslušných modulech
+  ---
+  duration_ms: 33.1122
+  type: 'test'
+  ...
+# Subtest: Orchestrátor: Neobsahuje business logiku modulů
+ok 33 - Orchestrátor: Neobsahuje business logiku modulů
+  ---
+  duration_ms: 1.8477
+  type: 'test'
+  ...
+# Subtest: Orchestrátor: Volá existující moduly, nevytváří paralelní implementaci
+ok 34 - Orchestrátor: Volá existující moduly, nevytváří paralelní implementaci
+  ---
+  duration_ms: 1.5776
+  type: 'test'
+  ...
+# Subtest: Orchestrátor: Výchozí mód je SEMI_AUTOMATIC
+ok 35 - Orchestrátor: Výchozí mód je SEMI_AUTOMATIC
+  ---
+  duration_ms: 1.3665
+  type: 'test'
+  ...
+# Subtest: Commercial Timeline: Struktura TimelineEntry pokrývá celý chain
+ok 36 - Commercial Timeline: Struktura TimelineEntry pokrývá celý chain
+  ---
+  duration_ms: 1.2911
+  type: 'test'
+  ...
+# Subtest: Commercial Timeline: Timeline service existuje a exportuje buildCommercialTimeline
+ok 37 - Commercial Timeline: Timeline service existuje a exportuje buildCommercialTimeline
+  ---
+  duration_ms: 5.5853
+  type: 'test'
+  ...
+# Subtest: My Attention: Pokrývá všechny potřebné zdroje pozornosti
+ok 38 - My Attention: Pokrývá všechny potřebné zdroje pozornosti
+  ---
+  duration_ms: 76.7023
+  type: 'test'
+  ...
+# Subtest: My Attention: AttentionCategory pokrývá všechny typy
+ok 39 - My Attention: AttentionCategory pokrývá všechny typy
+  ---
+  duration_ms: 3.7722
+  type: 'test'
+  ...
+# Subtest: Module policy: commercial modul registrován v SYSTEM_MODULES
+ok 40 - Module policy: commercial modul registrován v SYSTEM_MODULES
+  ---
+  duration_ms: 7.3843
+  type: 'test'
+  ...
+# Subtest: Module policy: commercial modul v PRO plánu
+ok 41 - Module policy: commercial modul v PRO plánu
+  ---
+  duration_ms: 4.9774
+  type: 'test'
+  ...
+# Subtest: Commercial Center: Stránka existuje a je server component
+ok 42 - Commercial Center: Stránka existuje a je server component
+  ---
+  duration_ms: 19.1952
+  type: 'test'
+  ...
+# Subtest: Commercial Center: API routes existují
+ok 43 - Commercial Center: API routes existují
+  ---
+  duration_ms: 33.2493
+  type: 'test'
+  ...
+# Subtest: Orchestrátor: Barrel exports pokrývají všechny veřejné API
+ok 44 - Orchestrátor: Barrel exports pokrývají všechny veřejné API
+  ---
+  duration_ms: 1.1174
+  type: 'test'
+  ...
+# Subtest: Idempotency: Mailbox flow používá message.offerId jako anchor
+ok 45 - Idempotency: Mailbox flow používá message.offerId jako anchor
+  ---
+  duration_ms: 1.1943
+  type: 'test'
+  ...
+# Subtest: Idempotency: Offer accepted flow deleguje na idempotentní handoff
+ok 46 - Idempotency: Offer accepted flow deleguje na idempotentní handoff
+  ---
+  duration_ms: 1.114
+  type: 'test'
+  ...
+# Subtest: Error handling: Každý krok zachovává výsledky předchozích kroků
+ok 47 - Error handling: Každý krok zachovává výsledky předchozích kroků
+  ---
+  duration_ms: 1.5545
+  type: 'test'
+  ...
+# Subtest: Audit: Orchestrační run je logován do CrmAuditLog
+ok 48 - Audit: Orchestrační run je logován do CrmAuditLog
+  ---
+  duration_ms: 1.5203
+  type: 'test'
+  ...
+# Subtest: Audit: Offer events obsahují orchestration metadata
+ok 49 - Audit: Offer events obsahují orchestration metadata
+  ---
+  duration_ms: 3.2407
+  type: 'test'
+  ...
+# Subtest: Human Control: Orchestrátor nikdy automaticky neodešle nabídku
+ok 50 - Human Control: Orchestrátor nikdy automaticky neodešle nabídku
+  ---
+  duration_ms: 1.5633
+  type: 'test'
+  ...
+# Subtest: Human Control: Orchestrátor nikdy automaticky nefakturuje
+ok 51 - Human Control: Orchestrátor nikdy automaticky nefakturuje
+  ---
+  duration_ms: 1.378
+  type: 'test'
+  ...
+# Subtest: Scénář A: Odeslaná nabídka bez reakce po limitu dnů → FOLLOW_UP_DUE
+ok 52 - Scénář A: Odeslaná nabídka bez reakce po limitu dnů → FOLLOW_UP_DUE
+  ---
+  duration_ms: 6.0398
+  type: 'test'
+  ...
+# Subtest: Scénář B: Klient nedávno odpověděl → Nehlásit falešný follow-up
+ok 53 - Scénář B: Klient nedávno odpověděl → Nehlásit falešný follow-up
+  ---
+  duration_ms: 1354.6374
+  type: 'test'
+  ...
+# Subtest: Scénář C: Končící kampaň v okně renewalWarningDays → RENEWAL_OPPORTUNITY
+ok 54 - Scénář C: Končící kampaň v okně renewalWarningDays → RENEWAL_OPPORTUNITY
+  ---
+  duration_ms: 12.3899
+  type: 'test'
+  ...
+# Subtest: Scénář D: Radar zachytil příležitost pro existujícího klienta → UPSELL_OPPORTUNITY
+ok 55 - Scénář D: Radar zachytil příležitost pro existujícího klienta → UPSELL_OPPORTUNITY
+  ---
+  duration_ms: 9.463
+  type: 'test'
+  ...
+# Subtest: Scénář E: Neúplná nebo čekající zpráva v AI Inboxu → bez halucinací
+ok 56 - Scénář E: Neúplná nebo čekající zpráva v AI Inboxu → bez halucinací
+  ---
+  duration_ms: 67.1893
+  type: 'test'
+  ...
+# Subtest: Scénář F: Koncept nabídky čekající na schválení obchodníkem → REVIEW_AND_SEND_OFFER
+ok 57 - Scénář F: Koncept nabídky čekající na schválení obchodníkem → REVIEW_AND_SEND_OFFER
+  ---
+  duration_ms: 21.8692
+  type: 'test'
+  ...
+# Subtest: Scénář G: Překážka realizace (reklamace / chybí materiál) → REALIZATION_RISK (CRITICAL)
+ok 58 - Scénář G: Překážka realizace (reklamace / chybí materiál) → REALIZATION_RISK (CRITICAL)
+  ---
+  duration_ms: 23.6093
+  type: 'test'
+  ...
+# Subtest: Scénář H: Realizace zakázky hotová bez vystavené faktury → READY_FOR_BILLING
+ok 59 - Scénář H: Realizace zakázky hotová bez vystavené faktury → READY_FOR_BILLING
+  ---
+  duration_ms: 44.98
+  type: 'test'
+  ...
+# Subtest: Scénář I: Detekce duplicit v CRM → Pouze linkování, ŽÁDNÝ automatický merge
+ok 60 - Scénář I: Detekce duplicit v CRM → Pouze linkování, ŽÁDNÝ automatický merge
+  ---
+  duration_ms: 32.9437
+  type: 'test'
+  ...
+# Subtest: Scénář J: Striktní izolace tenantů (organizationId) ve všech službách
+ok 61 - Scénář J: Striktní izolace tenantů (organizationId) ve všech službách
+  ---
+  duration_ms: 41.191
+  type: 'test'
+  ...
+# Subtest: Scénář K: Kontrola oprávnění RBAC a přístup k modulu CRM
+ok 62 - Scénář K: Kontrola oprávnění RBAC a přístup k modulu CRM
+  ---
+  duration_ms: 0.6512
+  type: 'test'
+  ...
+# Subtest: Scénář L: Výpadek LLM API → 100% deterministický fallback s fakty v češtině
+ok 63 - Scénář L: Výpadek LLM API → 100% deterministický fallback s fakty v češtině
+  ---
+  duration_ms: 2214.1425
+  type: 'test'
+  ...
+# Subtest: Scénář M: Výpočet prioritního skóre a vysvětlitelný rozpad (Explainable AI)
+ok 64 - Scénář M: Výpočet prioritního skóre a vysvětlitelný rozpad (Explainable AI)
+  ---
+  duration_ms: 0.3425
+  type: 'test'
+  ...
+# Subtest: Scénář N: Ochrana před zahlcením alerty (Deduplikace a cap limit)
+ok 65 - Scénář N: Ochrana před zahlcením alerty (Deduplikace a cap limit)
+  ---
+  duration_ms: 0.5086
+  type: 'test'
+  ...
+# Subtest: buildProposedActions generates CREATE_CLIENT, CREATE_NAVIGATION_ORDER, CREATE_TASK for new inquiry without client
+ok 66 - buildProposedActions generates CREATE_CLIENT, CREATE_NAVIGATION_ORDER, CREATE_TASK for new inquiry without client
+  ---
+  duration_ms: 2.4999
+  type: 'test'
+  ...
+# Subtest: buildProposedActions generates LINK_CLIENT when client already exists
+ok 67 - buildProposedActions generates LINK_CLIENT when client already exists
+  ---
+  duration_ms: 0.4741
+  type: 'test'
+  ...
+# Subtest: buildProposedActions generates ACCEPT_OFFER for OFFER_ACCEPTED classification with matched offer
+ok 68 - buildProposedActions generates ACCEPT_OFFER for OFFER_ACCEPTED classification with matched offer
+  ---
+  duration_ms: 0.525
+  type: 'test'
+  ...
+# Subtest: buildProposedActions generates CHANGE_NAVIGATION_STATUS on GRAPHIC_APPROVAL
+ok 69 - buildProposedActions generates CHANGE_NAVIGATION_STATUS on GRAPHIC_APPROVAL
+  ---
+  duration_ms: 0.3393
+  type: 'test'
+  ...
+# Subtest: human-in-the-loop: actions in schema default to PROPOSED and requiresReview is true
+ok 70 - human-in-the-loop: actions in schema default to PROPOSED and requiresReview is true
+  ---
+  duration_ms: 315.5017
+  type: 'test'
+  ...
+# Subtest: safe action executor enforces tenant isolation, idempotence and valid state transitions
+ok 71 - safe action executor enforces tenant isolation, idempotence and valid state transitions
+  ---
+  duration_ms: 130.1165
+  type: 'test'
+  ...
+# Subtest: buildProposedActions generates LINK_CRM_ORDER when crmOrderId is matched
+ok 72 - buildProposedActions generates LINK_CRM_ORDER when crmOrderId is matched
+  ---
+  duration_ms: 0.9897
+  type: 'test'
+  ...
+# Subtest: AI Inbox schema includes AiInboxMessage, AiInboxAttachment, AiInboxAction models
+ok 73 - AI Inbox schema includes AiInboxMessage, AiInboxAttachment, AiInboxAction models
+  ---
+  duration_ms: 5.1536
+  type: 'test'
+  ...
+# Subtest: tenant layer registers AI Inbox models for strict tenant isolation
+ok 74 - tenant layer registers AI Inbox models for strict tenant isolation
+  ---
+  duration_ms: 1466.0303
+  type: 'test'
+  ...
+# Subtest: extractTextAndHtml extracts plain text, html and attachments from MIME tree
+ok 75 - extractTextAndHtml extracts plain text, html and attachments from MIME tree
+  ---
+  duration_ms: 21.2312
+  type: 'test'
+  ...
+# Subtest: validateAndSanitizeAnalysis validates valid AI JSON output
+ok 76 - validateAndSanitizeAnalysis validates valid AI JSON output
+  ---
+  duration_ms: 1.4147
+  type: 'test'
+  ...
+# Subtest: validateAndSanitizeAnalysis safely sanitizes unknown classification and clamps confidence
+ok 77 - validateAndSanitizeAnalysis safely sanitizes unknown classification and clamps confidence
+  ---
+  duration_ms: 0.5209
+  type: 'test'
+  ...
+# Subtest: AI Inbox service defines idempotent ingestion contract
+ok 78 - AI Inbox service defines idempotent ingestion contract
+  ---
+  duration_ms: 64.9317
+  type: 'test'
+  ...
+# Subtest: extractDomain correctly parses email domains
+ok 79 - extractDomain correctly parses email domains
+  ---
+  duration_ms: 6.9089
+  type: 'test'
+  ...
+# Subtest: isFreemailDomain distinguishes generic public email providers from corporate domains
+ok 80 - isFreemailDomain distinguishes generic public email providers from corporate domains
+  ---
+  duration_ms: 1372.3103
+  type: 'test'
+  ...
+# Subtest: ORDER_NUMBER_REGEX matches ZAK-YYYY-XXXX order codes in email subjects and bodies
+ok 81 - ORDER_NUMBER_REGEX matches ZAK-YYYY-XXXX order codes in email subjects and bodies
+  ---
+  duration_ms: 1.0226
+  type: 'test'
+  ...
+# Subtest: NAV_NUMBER_REGEX matches NAV-YYYY-XXXX navigation order codes
+ok 82 - NAV_NUMBER_REGEX matches NAV-YYYY-XXXX navigation order codes
+  ---
+  duration_ms: 0.6973
+  type: 'test'
+  ...
+# Subtest: PROPOSAL_TOKEN_REGEX extracts public offer link token
+ok 83 - PROPOSAL_TOKEN_REGEX extracts public offer link token
+  ---
+  duration_ms: 0.6388
+  type: 'test'
+  ...
+# Subtest: client matcher cascade implements priority tiers in client-matcher.ts
+ok 84 - client matcher cascade implements priority tiers in client-matcher.ts
+  ---
+  duration_ms: 18.6397
+  type: 'test'
+  ...
+# Subtest: ORDER_NUMBER_REGEX and NAV_NUMBER_REGEX match flexible Czech order formats
+ok 85 - ORDER_NUMBER_REGEX and NAV_NUMBER_REGEX match flexible Czech order formats
+  ---
+  duration_ms: 1.0015
+  type: 'test'
+  ...
+# Subtest: entity-matcher implements client active orders and client PO code matching
+ok 86 - entity-matcher implements client active orders and client PO code matching
+  ---
+  duration_ms: 63.6864
+  type: 'test'
+  ...
+# Subtest: AI inbox models have tenant isolation in prisma schema and tenant layer
+ok 87 - AI inbox models have tenant isolation in prisma schema and tenant layer
+  ---
+  duration_ms: 89.2602
+  type: 'test'
+  ...
+# Subtest: buildAnalysisPrompt provides prompt injection isolation with untrusted boundary tags
+ok 88 - buildAnalysisPrompt provides prompt injection isolation with untrusted boundary tags
+  ---
+  duration_ms: 1373.7639
+  type: 'test'
+  ...
+# Subtest: RBAC permits ADMIN, MANAGER, SALES to access aiInbox and denies WORKER, TECHNICIAN, VIEWER
+ok 89 - RBAC permits ADMIN, MANAGER, SALES to access aiInbox and denies WORKER, TECHNICIAN, VIEWER
+  ---
+  duration_ms: 0.5574
+  type: 'test'
+  ...
+# Subtest: AI Inbox API routes enforce organizationId scoping and authentication
+ok 90 - AI Inbox API routes enforce organizationId scoping and authentication
+  ---
+  duration_ms: 179.0707
+  type: 'test'
+  ...
+# Subtest: isBotOrSystemEmail accurately identifies automated bot and system emails
+ok 91 - isBotOrSystemEmail accurately identifies automated bot and system emails
+  ---
+  duration_ms: 3.8029
+  type: 'test'
+  ...
+# Subtest: buildProposedActions returns empty array for SPAM_IRRELEVANT messages
+ok 92 - buildProposedActions returns empty array for SPAM_IRRELEVANT messages
+  ---
+  duration_ms: 1372.7682
+  type: 'test'
+  ...
+# Subtest: buildProposedActions returns empty array for spam even when client candidate is passed
+ok 93 - buildProposedActions returns empty array for spam even when client candidate is passed
+  ---
+  duration_ms: 0.4121
+  type: 'test'
+  ...
+# Subtest: AI Mailbox Integration & Commercial Engine Foundation
+    # Subtest: Scenario A: Clear inquiry produces EXACT dates, valid quantity, READY_FOR_AVAILABILITY status
+    ok 1 - Scenario A: Clear inquiry produces EXACT dates, valid quantity, READY_FOR_AVAILABILITY status
+      ---
+      duration_ms: 1334.8792
+      type: 'test'
+      ...
+    # Subtest: Scenario B: Vague timing sets APPROXIMATE, missing EXACT_CAMPAIGN_DATES, NEEDS_MORE_INFORMATION
+    ok 2 - Scenario B: Vague timing sets APPROXIMATE, missing EXACT_CAMPAIGN_DATES, NEEDS_MORE_INFORMATION
+      ---
+      duration_ms: 0.882
+      type: 'test'
+      ...
+    # Subtest: Scenario C: Missing quantity keeps quantity null and enforces EXACT_QUANTITY requirement
+    ok 3 - Scenario C: Missing quantity keeps quantity null and enforces EXACT_QUANTITY requirement
+      ---
+      duration_ms: 0.6201
+      type: 'test'
+      ...
+    # Subtest: Scenario D: Existing client in CRM is correctly matched and linked in CommercialRequest
+    ok 4 - Scenario D: Existing client in CRM is correctly matched and linked in CommercialRequest
+      ---
+      duration_ms: 0.4097
+      type: 'test'
+      ...
+    # Subtest: Scenario E: Unknown client does not trigger false positive matching to random CRM entities
+    ok 5 - Scenario E: Unknown client does not trigger false positive matching to random CRM entities
+      ---
+      duration_ms: 0.5363
+      type: 'test'
+      ...
+    # Subtest: Scenario F: providerMessageId check prevents duplicate inbox records
+    ok 6 - Scenario F: providerMessageId check prevents duplicate inbox records
+      ---
+      duration_ms: 0.222
+      type: 'test'
+      ...
+    # Subtest: Scenario G: Thread context is properly injected into analysis prompt for ongoing discussions
+    ok 7 - Scenario G: Thread context is properly injected into analysis prompt for ongoing discussions
+      ---
+      duration_ms: 0.6975
+      type: 'test'
+      ...
+    # Subtest: Scenario H: Malformed or failing AI output degrades safely to UNKNOWN without crashing
+    ok 8 - Scenario H: Malformed or failing AI output degrades safely to UNKNOWN without crashing
+      ---
+      duration_ms: 1.4965
+      type: 'test'
+      ...
+    # Subtest: Scenario I: Tenant isolation guarantees Tenant A client is never matched or leaked to Tenant B
+    ok 9 - Scenario I: Tenant isolation guarantees Tenant A client is never matched or leaked to Tenant B
+      ---
+      duration_ms: 0.8161
+      type: 'test'
+      ...
+    1..9
+ok 94 - AI Mailbox Integration & Commercial Engine Foundation
+  ---
+  duration_ms: 1343.7505
+  type: 'suite'
+  ...
+# Subtest: no application logic refers to deprecated gemini-2.5-flash
+ok 95 - no application logic refers to deprecated gemini-2.5-flash
+  ---
+  duration_ms: 1257.363
+  type: 'test'
+  ...
+# Subtest: AI Offer Intelligence / Offer Builder (AI Commercial Engine)
+    # Subtest: Scenario A: Complete request produces a valid DRAFT with exact matches and no conflicts
+    ok 1 - Scenario A: Complete request produces a valid DRAFT with exact matches and no conflicts
+      ---
+      duration_ms: 34.9403
+      type: 'test'
+      ...
+    # Subtest: Scenario B: Partial availability correctly tags alternatives and informs human reviewer
+    ok 2 - Scenario B: Partial availability correctly tags alternatives and informs human reviewer
+      ---
+      duration_ms: 0.6263
+      type: 'test'
+      ...
+    # Subtest: Scenario C: Zero availability prevents draft creation and recommends Next Best Action
+    ok 3 - Scenario C: Zero availability prevents draft creation and recommends Next Best Action
+      ---
+      duration_ms: 3.454
+      type: 'test'
+      ...
+    # Subtest: Scenario D: Request with approximate or missing dates refuses draft creation and requests clarification
+    ok 4 - Scenario D: Request with approximate or missing dates refuses draft creation and requests clarification
+      ---
+      duration_ms: 0.5224
+      type: 'test'
+      ...
+    # Subtest: Scenario E: Inclusive OOH period overlap correctly blocks touching collision dates
+    ok 5 - Scenario E: Inclusive OOH period overlap correctly blocks touching collision dates
+      ---
+      duration_ms: 0.5772
+      type: 'test'
+      ...
+    # Subtest: Scenario F: validateOfferBeforeSend function is exported and guards offer sending
+    ok 6 - Scenario F: validateOfferBeforeSend function is exported and guards offer sending
+      ---
+      duration_ms: 1.6618
+      type: 'test'
+      ...
+    # Subtest: Scenario G: convertOfferToOccupancy enforces Serializable transaction and FOR UPDATE surface locks
+    ok 7 - Scenario G: convertOfferToOccupancy enforces Serializable transaction and FOR UPDATE surface locks
+      ---
+      duration_ms: 2.4396
+      type: 'test'
+      ...
+    # Subtest: Scenario H: Offer adapter and builder contain no invented price fallbacks or automatic discounts
+    ok 8 - Scenario H: Offer adapter and builder contain no invented price fallbacks or automatic discounts
+      ---
+      duration_ms: 4.25
+      type: 'test'
+      ...
+    # Subtest: Scenario I: Tenant mismatch throws security violation error
+    ok 9 - Scenario I: Tenant mismatch throws security violation error
+      ---
+      duration_ms: 1.8377
+      type: 'test'
+      ...
+    # Subtest: Scenario J: Builder contains deterministic structured Czech fallback copy when LLM fails
+    ok 10 - Scenario J: Builder contains deterministic structured Czech fallback copy when LLM fails
+      ---
+      duration_ms: 1.9978
+      type: 'test'
+      ...
+    # Subtest: Scenario K: Builder logs AI_COMMERCIAL_DRAFT_CREATED with source references
+    ok 11 - Scenario K: Builder logs AI_COMMERCIAL_DRAFT_CREATED with source references
+      ---
+      duration_ms: 1.5791
+      type: 'test'
+      ...
+    # Subtest: Scenario L: Adapter delegates cleanly to builder preserving interface compatibility
+    ok 12 - Scenario L: Adapter delegates cleanly to builder preserving interface compatibility
+      ---
+      duration_ms: 1.7618
+      type: 'test'
+      ...
+    1..12
+ok 96 - AI Offer Intelligence / Offer Builder (AI Commercial Engine)
+  ---
+  duration_ms: 58.7852
+  type: 'suite'
+  ...
+# Subtest: navigation intent is never interpreted as standard media
+ok 97 - navigation intent is never interpreted as standard media
+  ---
+  duration_ms: 4.0904
+  type: 'test'
+  ...
+# Subtest: standard media intent and media details are extracted
+ok 98 - standard media intent and media details are extracted
+  ---
+  duration_ms: 96.658
+  type: 'test'
+  ...
+# Subtest: reserved and occupied overlaps block a surface
+ok 99 - reserved and occupied overlaps block a surface
+  ---
+  duration_ms: 0.604
+  type: 'test'
+  ...
+# Subtest: availability is evaluated per advertising surface (A can be blocked while B is free)
+ok 100 - availability is evaluated per advertising surface (A can be blocked while B is free)
+  ---
+  duration_ms: 0.2822
+  type: 'test'
+  ...
+# Subtest: surface scoring is transparent
+ok 101 - surface scoring is transparent
+  ---
+  duration_ms: 0.5294
+  type: 'test'
+  ...
+# Subtest: AI endpoint contains no invented price fallback or automatic budget discount
+ok 102 - AI endpoint contains no invented price fallback or automatic budget discount
+  ---
+  duration_ms: 2.3518
+  type: 'test'
+  ...
+# Subtest: pricing segment and historical price snapshot fields exist in schema
+ok 103 - pricing segment and historical price snapshot fields exist in schema
+  ---
+  duration_ms: 2.2655
+  type: 'test'
+  ...
+# Subtest: navigation catalog migration contains the supplied Ostrava prices
+ok 104 - navigation catalog migration contains the supplied Ostrava prices
+  ---
+  duration_ms: 64.8195
+  type: 'test'
+  ...
+# Subtest: navigation confirmation records missing prices as an explicit draft state
+ok 105 - navigation confirmation records missing prices as an explicit draft state
+  ---
+  duration_ms: 1.4437
+  type: 'test'
+  ...
+# Subtest: navigation target can be geocoded from an address
+ok 106 - navigation target can be geocoded from an address
+  ---
+  duration_ms: 42.0709
+  type: 'test'
+  ...
+# Subtest: browser route analysis replaces radial placeholders with real decision points
+ok 107 - browser route analysis replaces radial placeholders with real decision points
+  ---
+  duration_ms: 160.9911
+  type: 'test'
+  ...
+# Subtest: confirmed navigation keeps the route points selected in the browser
+ok 108 - confirmed navigation keeps the route points selected in the browser
+  ---
+  duration_ms: 2.0067
+  type: 'test'
+  ...
+# Subtest: AI navigation points are new proposals requiring a real pole photo
+ok 109 - AI navigation points are new proposals requiring a real pole photo
+  ---
+  duration_ms: 1.8511
+  type: 'test'
+  ...
+# Subtest: AI Realization Intelligence (AI Commercial Engine Phase)
+    # Subtest: Scenario A: Accepted offer handoff produces a valid RealizationContext structure
+    ok 1 - Scenario A: Accepted offer handoff produces a valid RealizationContext structure
+      ---
+      duration_ms: 39.7483
+      type: 'test'
+      ...
+    # Subtest: Scenario B: Missing graphics artwork creates BLOCKING blocker and recommends REQUEST_GRAPHICS
+    ok 2 - Scenario B: Missing graphics artwork creates BLOCKING blocker and recommends REQUEST_GRAPHICS
+      ---
+      duration_ms: 3.0945
+      type: 'test'
+      ...
+    # Subtest: Scenario C: Graphics artwork uploaded but not approved blocks production and recommends APPROVE_GRAPHICS
+    ok 3 - Scenario C: Graphics artwork uploaded but not approved blocks production and recommends APPROVE_GRAPHICS
+      ---
+      duration_ms: 0.4707
+      type: 'test'
+      ...
+    # Subtest: Scenario D: Installation cannot proceed while production is incomplete
+    ok 4 - Scenario D: Installation cannot proceed while production is incomplete
+      ---
+      duration_ms: 0.3181
+      type: 'test'
+      ...
+    # Subtest: Scenario E: Approaching campaign start date with pending lead times dynamically evaluates HIGH risk
+    ok 5 - Scenario E: Approaching campaign start date with pending lead times dynamically evaluates HIGH risk
+      ---
+      duration_ms: 0.2499
+      type: 'test'
+      ...
+    # Subtest: Scenario F: Installed surfaces lacking photo documentation blocks billing readiness
+    ok 6 - Scenario F: Installed surfaces lacking photo documentation blocks billing readiness
+      ---
+      duration_ms: 0.429
+      type: 'test'
+      ...
+    # Subtest: Scenario G: All items installed, verified photos present, and no blockers produces READY_FOR_BILLING
+    ok 7 - Scenario G: All items installed, verified photos present, and no blockers produces READY_FOR_BILLING
+      ---
+      duration_ms: 0.3098
+      type: 'test'
+      ...
+    # Subtest: Scenario H: Defect or OUT_OF_SERVICE carrier creates SURFACE_TECHNICAL_ISSUE blocker and does not auto-delete
+    ok 8 - Scenario H: Defect or OUT_OF_SERVICE carrier creates SURFACE_TECHNICAL_ISSUE blocker and does not auto-delete
+      ---
+      duration_ms: 0.5248
+      type: 'test'
+      ...
+    # Subtest: Scenario I: Tenant isolation enforces strict organization barrier
+    ok 9 - Scenario I: Tenant isolation enforces strict organization barrier
+      ---
+      duration_ms: 0.3877
+      type: 'test'
+      ...
+    # Subtest: Scenario J: Realization insights and summary function 100% deterministically without Gemini API
+    ok 10 - Scenario J: Realization insights and summary function 100% deterministically without Gemini API
+      ---
+      duration_ms: 1.6911
+      type: 'test'
+      ...
+    # Subtest: Scenario K: Deterministic insights compile from blockers with exact entityId and orderId
+    ok 11 - Scenario K: Deterministic insights compile from blockers with exact entityId and orderId
+      ---
+      duration_ms: 0.4394
+      type: 'test'
+      ...
+    # Subtest: Scenario L: Navigation points adapter correctly preserves installed status, defects and photos
+    ok 12 - Scenario L: Navigation points adapter correctly preserves installed status, defects and photos
+      ---
+      duration_ms: 0.8218
+      type: 'test'
+      ...
+    # Subtest: Scenario M: Repeating realization handoff check for existing offer is completely idempotent
+    ok 13 - Scenario M: Repeating realization handoff check for existing offer is completely idempotent
+      ---
+      duration_ms: 0.172
+      type: 'test'
+      ...
+    # Subtest: Scenario N: Historical carrier photo from past campaign does NOT qualify as realization documentation
+    ok 14 - Scenario N: Historical carrier photo from past campaign does NOT qualify as realization documentation
+      ---
+      duration_ms: 0.9888
+      type: 'test'
+      ...
+    # Subtest: Scenario O: NavigationOrder not yet in PRIPRAVENO_K_FAKTURACI blocks billing readiness even if photos exist
+    ok 15 - Scenario O: NavigationOrder not yet in PRIPRAVENO_K_FAKTURACI blocks billing readiness even if photos exist
+      ---
+      duration_ms: 0.8698
+      type: 'test'
+      ...
+    1..15
+ok 110 - AI Realization Intelligence (AI Commercial Engine Phase)
+  ---
+  duration_ms: 53.3143
+  type: 'suite'
+  ...
+# Subtest: AI Sales Radar Integration & Commercial Engine Foundation
+    # Subtest: Scenario A: New prospect discovery produces NEW_ACQUISITION, null quantity, and missingRequirements
+    ok 1 - Scenario A: New prospect discovery produces NEW_ACQUISITION, null quantity, and missingRequirements
+      ---
+      duration_ms: 53.3585
+      type: 'test'
+      ...
+    # Subtest: Scenario B: Existing client in CRM is classified as EXPANSION with linked clientId
+    ok 2 - Scenario B: Existing client in CRM is classified as EXPANSION with linked clientId
+      ---
+      duration_ms: 1.177
+      type: 'test'
+      ...
+    # Subtest: Scenario C: Freshness decay penalizes signals older than 1 year or past events
+    ok 3 - Scenario C: Freshness decay penalizes signals older than 1 year or past events
+      ---
+      duration_ms: 0.903
+      type: 'test'
+      ...
+    # Subtest: Scenario D: Scoring returns transparent 5-component breakdown bounded to 100
+    ok 4 - Scenario D: Scoring returns transparent 5-component breakdown bounded to 100
+      ---
+      duration_ms: 0.3987
+      type: 'test'
+      ...
+    # Subtest: Scenario E: Strict multi-tenant isolation across opportunities and commercial requests
+    ok 5 - Scenario E: Strict multi-tenant isolation across opportunities and commercial requests
+      ---
+      duration_ms: 0.5372
+      type: 'test'
+      ...
+    # Subtest: Scenario F: Policy validation enforces sanitization, bounds and prevents past dates
+    ok 6 - Scenario F: Policy validation enforces sanitization, bounds and prevents past dates
+      ---
+      duration_ms: 2.2378
+      type: 'test'
+      ...
+    # Subtest: Scenario G: Opportunity filters reject unbounded pagination and invalid ranges
+    ok 7 - Scenario G: Opportunity filters reject unbounded pagination and invalid ranges
+      ---
+      duration_ms: 1.1604
+      type: 'test'
+      ...
+    # Subtest: Scenario H: Opportunity state machine requires dismissal reason when DISMISSED
+    ok 8 - Scenario H: Opportunity state machine requires dismissal reason when DISMISSED
+      ---
+      duration_ms: 0.6749
+      type: 'test'
+      ...
+    # Subtest: Scenario I: Commercial Next Best Action guides salesperson without unapproved automation
+    ok 9 - Scenario I: Commercial Next Best Action guides salesperson without unapproved automation
+      ---
+      duration_ms: 1.0474
+      type: 'test'
+      ...
+    1..9
+ok 111 - AI Sales Radar Integration & Commercial Engine Foundation
+  ---
+  duration_ms: 64.9722
+  type: 'suite'
+  ...
+# Subtest: active explicitly priced occupancy contributes known monthly rent
+ok 112 - active explicitly priced occupancy contributes known monthly rent
+  ---
+  duration_ms: 3.7455
+  type: 'test'
+  ...
+# Subtest: valid active contract price has priority over occupancy price
+ok 113 - valid active contract price has priority over occupancy price
+  ---
+  duration_ms: 0.3685
+  type: 'test'
+  ...
+# Subtest: expired or terminated contract never creates occupancy or revenue
+ok 114 - expired or terminated contract never creates occupancy or revenue
+  ---
+  duration_ms: 0.2921
+  type: 'test'
+  ...
+# Subtest: manual occupied state without explicit price remains visible but is not assigned an estimate
+ok 115 - manual occupied state without explicit price remains visible but is not assigned an estimate
+  ---
+  duration_ms: 0.2091
+  type: 'test'
+  ...
+# Subtest: analytics dates are formatted on the server to keep hydration deterministic
+ok 116 - analytics dates are formatted on the server to keep hydration deterministic
+  ---
+  duration_ms: 260.9792
+  type: 'test'
+  ...
+# Subtest: hlavní dashboard nepoužívá ceníkové ani smyšlené fallback sazby
+ok 117 - hlavní dashboard nepoužívá ceníkové ani smyšlené fallback sazby
+  ---
+  duration_ms: 160.0022
+  type: 'test'
+  ...
+# Subtest: Galerie venku vyžaduje modulové oprávnění a validuje stav i počet rámů
+ok 118 - Galerie venku vyžaduje modulové oprávnění a validuje stav i počet rámů
+  ---
+  duration_ms: 112.7771
+  type: 'test'
+  ...
+# Subtest: ceníkové API odmítá neplatné enumy, záporné ceny a chybné období
+ok 119 - ceníkové API odmítá neplatné enumy, záporné ceny a chybné období
+  ---
+  duration_ms: 152.1437
+  type: 'test'
+  ...
+# Subtest: obchodní radar nepředává neznámý stav do Prisma vrstvy
+ok 120 - obchodní radar nepředává neznámý stav do Prisma vrstvy
+  ---
+  duration_ms: 13.2425
+  type: 'test'
+  ...
+# Subtest: formulář navigační smlouvy nepoužívá náhodnou hodnotu během SSR
+ok 121 - formulář navigační smlouvy nepoužívá náhodnou hodnotu během SSR
+  ---
+  duration_ms: 363.9326
+  type: 'test'
+  ...
+# Subtest: Drive OAuth údaje samy o sobě nepovolují odesílání přes Gmail
+ok 122 - Drive OAuth údaje samy o sobě nepovolují odesílání přes Gmail
+  ---
+  duration_ms: 2.0126
+  type: 'test'
+  ...
+# Subtest: detail navigační objednávky hydratuje se serverovým datem a pevnými časovými pásmy
+ok 123 - detail navigační objednávky hydratuje se serverovým datem a pevnými časovými pásmy
+  ---
+  duration_ms: 95.5206
+  type: 'test'
+  ...
+# Subtest: standardní nabídka zachová klienta předaného z CRM
+ok 124 - standardní nabídka zachová klienta předaného z CRM
+  ---
+  duration_ms: 66.7766
+  type: 'test'
+  ...
+# Subtest: Preview reakce z rezervované .invalid domény nikdy nespustí e-mailový provider
+ok 125 - Preview reakce z rezervované .invalid domény nikdy nespustí e-mailový provider
+  ---
+  duration_ms: 2.1169
+  type: 'test'
+  ...
+# Subtest: tenantový AsyncLocalStorage zůstává singleton i v produkčním serverless bundlu
+ok 126 - tenantový AsyncLocalStorage zůstává singleton i v produkčním serverless bundlu
+  ---
+  duration_ms: 2.3501
+  type: 'test'
+  ...
+# Subtest: převod přijaté nabídky obnoví tenantový kontext z ověřeného uživatele
+ok 127 - převod přijaté nabídky obnoví tenantový kontext z ověřeného uživatele
+  ---
+  duration_ms: 2.8544
+  type: 'test'
+  ...
+# Subtest: explicit APP_URL has priority for transactional links
+ok 128 - explicit APP_URL has priority for transactional links
+  ---
+  duration_ms: 31.1631
+  type: 'test'
+  ...
+# Subtest: Vercel preview URL cannot be overwritten by the production APP_URL
+ok 129 - Vercel preview URL cannot be overwritten by the production APP_URL
+  ---
+  duration_ms: 0.6902
+  type: 'test'
+  ...
+# Subtest: Vercel preview URL is used when APP_URL is missing
+ok 130 - Vercel preview URL is used when APP_URL is missing
+  ---
+  duration_ms: 0.386
+  type: 'test'
+  ...
+# Subtest: local request origin is the final fallback
+ok 131 - local request origin is the final fallback
+  ---
+  duration_ms: 0.4906
+  type: 'test'
+  ...
+# Subtest: passwords are salted and verifiable
+ok 132 - passwords are salted and verifiable
+  ---
+  duration_ms: 729.7084
+  type: 'test'
+  ...
+# Subtest: tokens are hashed deterministically and usability enforces expiry and one-time use
+ok 133 - tokens are hashed deterministically and usability enforces expiry and one-time use
+  ---
+  duration_ms: 0.839
+  type: 'test'
+  ...
+# Subtest: manager cannot manage or assign admin
+ok 134 - manager cannot manage or assign admin
+  ---
+  duration_ms: 0.391
+  type: 'test'
+  ...
+# Subtest: last active admin cannot be removed
+ok 135 - last active admin cannot be removed
+  ---
+  duration_ms: 0.3741
+  type: 'test'
+  ...
+# Subtest: organization member policy protects owners and administrators inside the active tenant
+ok 136 - organization member policy protects owners and administrators inside the active tenant
+  ---
+  duration_ms: 0.6076
+  type: 'test'
+  ...
+# Subtest: supplementary organization roles retain owner and admin protection
+ok 137 - supplementary organization roles retain owner and admin protection
+  ---
+  duration_ms: 0.3762
+  type: 'test'
+  ...
+# Subtest: last active organization owner or admin cannot be removed
+ok 138 - last active organization owner or admin cannot be removed
+  ---
+  duration_ms: 0.372
+  type: 'test'
+  ...
+# Subtest: employee onboarding normalizes email and requires matching passwords
+ok 139 - employee onboarding normalizes email and requires matching passwords
+  ---
+  duration_ms: 0.6552
+  type: 'test'
+  ...
+# Subtest: employee account email validation rejects malformed and oversized addresses
+ok 140 - employee account email validation rejects malformed and oversized addresses
+  ---
+  duration_ms: 0.9439
+  type: 'test'
+  ...
+# Subtest: temporary password validation reports the exact rejected requirement
+ok 141 - temporary password validation reports the exact rejected requirement
+  ---
+  duration_ms: 1.6168
+  type: 'test'
+  ...
+# Subtest: admin temporary password forces change and invalidates prior access
+ok 142 - admin temporary password forces change and invalidates prior access
+  ---
+  duration_ms: 4.7697
+  type: 'test'
+  ...
+# Subtest: admin reset backdoors are absent and auth middleware uses an explicit public allowlist
+ok 143 - admin reset backdoors are absent and auth middleware uses an explicit public allowlist
+  ---
+  duration_ms: 2.4299
+  type: 'test'
+  ...
+# Subtest: CarrierDetail calculates isDamaged considering carrier photos, notes, and surface OUT_OF_SERVICE status
+ok 144 - CarrierDetail calculates isDamaged considering carrier photos, notes, and surface OUT_OF_SERVICE status
+  ---
+  duration_ms: 229.2355
+  type: 'test'
+  ...
+# Subtest: CarrierDetail calls /api/carriers/:id/resolve-damage with surfaceId and has resolution button on surfaces
+ok 145 - CarrierDetail calls /api/carriers/:id/resolve-damage with surfaceId and has resolution button on surfaces
+  ---
+  duration_ms: 2.1388
+  type: 'test'
+  ...
+# Subtest: resolve-damage route enforces auth, updates damage photos to ARCHIVE, restores OUT_OF_SERVICE, and logs history
+ok 146 - resolve-damage route enforces auth, updates damage photos to ARCHIVE, restores OUT_OF_SERVICE, and logs history
+  ---
+  duration_ms: 101.9332
+  type: 'test'
+  ...
+# Subtest: NavigationSurfaceManager and CarrierDetailTimelineView integrate with resolve-damage
+ok 147 - NavigationSurfaceManager and CarrierDetailTimelineView integrate with resolve-damage
+  ---
+  duration_ms: 157.0455
+  type: 'test'
+  ...
+# Subtest: měsíční text je kampaň, nikoli klient
+ok 148 - měsíční text je kampaň, nikoli klient
+  ---
+  duration_ms: 2.5947
+  type: 'test'
+  ...
+# Subtest: číselné značky volnosti nevytvoří kampaň
+ok 149 - číselné značky volnosti nevytvoří kampaň
+  ---
+  duration_ms: 0.2478
+  type: 'test'
+  ...
+# Subtest: navazující měsíce stejné kampaně se spojí
+ok 150 - navazující měsíce stejné kampaně se spojí
+  ---
+  duration_ms: 20.2104
+  type: 'test'
+  ...
+# Subtest: mezera rozdělí období
+ok 151 - mezera rozdělí období
+  ---
+  duration_ms: 0.4699
+  type: 'test'
+  ...
+# Subtest: různé kampaně stejného klienta se nesloučí
+ok 152 - různé kampaně stejného klienta se nesloučí
+  ---
+  duration_ms: 0.2772
+  type: 'test'
+  ...
+# Subtest: stejná kampaň různých klientů se nesloučí
+ok 153 - stejná kampaň různých klientů se nesloučí
+  ---
+  duration_ms: 0.2781
+  type: 'test'
+  ...
+# Subtest: kampaň bez klienta nevytvoří Client a je v reportu
+ok 154 - kampaň bez klienta nevytvoří Client a je v reportu
+  ---
+  duration_ms: 6.2909
+  type: 'test'
+  ...
+# Subtest: existující jednoznačné mapování kampaně propojí klienta
+ok 155 - existující jednoznačné mapování kampaně propojí klienta
+  ---
+  duration_ms: 1.8327
+  type: 'test'
+  ...
+# Subtest: klient ze samostatného pole se páruje, ale nevytváří z kampaně
+ok 156 - klient ze samostatného pole se páruje, ale nevytváří z kampaně
+  ---
+  duration_ms: 0.9062
+  type: 'test'
+  ...
+# Subtest: klient se může bezpečně propojit přes existující číslo objednávky
+ok 157 - klient se může bezpečně propojit přes existující číslo objednávky
+  ---
+  duration_ms: 1.3334
+  type: 'test'
+  ...
+# Subtest: existující nosič se aktualizuje bez operace s fotkami
+ok 158 - existující nosič se aktualizuje bez operace s fotkami
+  ---
+  duration_ms: 1.6825
+  type: 'test'
+  ...
+# Subtest: nový nosič je NEW a přesný kód zabrání duplicitě
+ok 159 - nový nosič je NEW a přesný kód zabrání duplicitě
+  ---
+  duration_ms: 0.9395
+  type: 'test'
+  ...
+# Subtest: více kandidátů vytvoří AMBIGUOUS_MATCH
+ok 160 - více kandidátů vytvoří AMBIGUOUS_MATCH
+  ---
+  duration_ms: 17.8848
+  type: 'test'
+  ...
+# Subtest: kolize obsazenosti nepřepíše ruční historii
+ok 161 - kolize obsazenosti nepřepíše ruční historii
+  ---
+  duration_ms: 1.3697
+  type: 'test'
+  ...
+# Subtest: opakovaný import identické obsazenosti je UNCHANGED
+ok 162 - opakovaný import identické obsazenosti je UNCHANGED
+  ---
+  duration_ms: 0.5736
+  type: 'test'
+  ...
+# Subtest: chybějící dříve importovaný nosič se pouze reportuje
+ok 163 - chybějící dříve importovaný nosič se pouze reportuje
+  ---
+  duration_ms: 0.8701
+  type: 'test'
+  ...
+# Subtest: změna ceny vytvoří novou historickou verzi
+ok 164 - změna ceny vytvoří novou historickou verzi
+  ---
+  duration_ms: 0.7127
+  type: 'test'
+  ...
+# Subtest: manual conflict includes origin, classification and fingerprint
+ok 165 - manual conflict includes origin, classification and fingerprint
+  ---
+  duration_ms: 0.6268
+  type: 'test'
+  ...
+# Subtest: previous import extension is distinguished from manual history
+ok 166 - previous import extension is distinguished from manual history
+  ---
+  duration_ms: 0.9154
+  type: 'test'
+  ...
+# Subtest: normalization and import metadata are not material updates
+ok 167 - normalization and import metadata are not material updates
+  ---
+  duration_ms: 0.4562
+  type: 'test'
+  ...
+# Subtest: new surface has an auditable reason
+ok 168 - new surface has an auditable reason
+  ---
+  duration_ms: 0.4122
+  type: 'test'
+  ...
+# Subtest: database fingerprint is stable and detects record changes
+ok 169 - database fingerprint is stable and detects record changes
+  ---
+  duration_ms: 0.2766
+  type: 'test'
+  ...
+# Subtest: resolution validation rejects stale hashes, duplicate ids and unsafe actions
+ok 170 - resolution validation rejects stale hashes, duplicate ids and unsafe actions
+  ---
+  duration_ms: 30.9056
+  type: 'test'
+  ...
+# Subtest: temporal classification is deterministic at boundaries
+ok 171 - temporal classification is deterministic at boundaries
+  ---
+  duration_ms: 0.7642
+  type: 'test'
+  ...
+# Subtest: historical campaigns are reported but absent from safe and blocked plans
+ok 172 - historical campaigns are reported but absent from safe and blocked plans
+  ---
+  duration_ms: 0.8794
+  type: 'test'
+  ...
+# Subtest: current and future unknown-client campaigns are safe with correct statuses
+ok 173 - current and future unknown-client campaigns are safe with correct statuses
+  ---
+  duration_ms: 2.78
+  type: 'test'
+  ...
+# Subtest: scopes isolate inventory pricing and occupancy operations
+ok 174 - scopes isolate inventory pricing and occupancy operations
+  ---
+  duration_ms: 1.1347
+  type: 'test'
+  ...
+# Subtest: occupancy conflict does not block an inventory safe plan
+ok 175 - occupancy conflict does not block an inventory safe plan
+  ---
+  duration_ms: 0.9047
+  type: 'test'
+  ...
+# Subtest: photo audit is immutable and reports zero operations
+ok 176 - photo audit is immutable and reports zero operations
+  ---
+  duration_ms: 0.7637
+  type: 'test'
+  ...
+# Subtest: large GPS changes are excluded from the safe inventory plan
+ok 177 - large GPS changes are excluded from the safe inventory plan
+  ---
+  duration_ms: 1.0406
+  type: 'test'
+  ...
+# Subtest: CP26 ambiguity is historical only when the whole source month is past
+ok 178 - CP26 ambiguity is historical only when the whole source month is past
+  ---
+  duration_ms: 1.2394
+  type: 'test'
+  ...
+# Subtest: unresolved client UI label and filter are explicit
+ok 179 - unresolved client UI label and filter are explicit
+  ---
+  duration_ms: 0.3578
+  type: 'test'
+  ...
+# Subtest: asOfDate is part of the immutable plan hash
+ok 180 - asOfDate is part of the immutable plan hash
+  ---
+  duration_ms: 0.987
+  type: 'test'
+  ...
+# Subtest: safe plan validation rejects XLSX, database and as-of changes
+ok 181 - safe plan validation rejects XLSX, database and as-of changes
+  ---
+  duration_ms: 2.1168
+  type: 'test'
+  ...
+# Subtest: campaign client groups do not merge the same generic name across sources
+ok 182 - campaign client groups do not merge the same generic name across sources
+  ---
+  duration_ms: 1.0528
+  type: 'test'
+  ...
+# Subtest: manual CP slot dates must stay in month and never overlap
+ok 183 - manual CP slot dates must stay in month and never overlap
+  ---
+  duration_ms: 14.1977
+  type: 'test'
+  ...
+# Subtest: chat image opens in an in-app modal instead of an unreliable data URL window
+ok 184 - chat image opens in an in-app modal instead of an unreliable data URL window
+  ---
+  duration_ms: 1.6221
+  type: 'test'
+  ...
+# Subtest: chat image preview supports close, Escape, containment and load errors
+ok 185 - chat image preview supports close, Escape, containment and load errors
+  ---
+  duration_ms: 0.4256
+  type: 'test'
+  ...
+# Subtest: chat delegates carrier photography to the dedicated mobile workflow
+ok 186 - chat delegates carrier photography to the dedicated mobile workflow
+  ---
+  duration_ms: 0.2506
+  type: 'test'
+  ...
+# Subtest: chat accepts only declared channels
+ok 187 - chat accepts only declared channels
+  ---
+  duration_ms: 1.5508
+  type: 'test'
+  ...
+# Subtest: chat assignment and resolution respect author, assignee and manager roles
+ok 188 - chat assignment and resolution respect author, assignee and manager roles
+  ---
+  duration_ms: 0.6896
+  type: 'test'
+  ...
+# Subtest: chat image validation rejects raw Base64 and enforces stored file URLs
+ok 189 - chat image validation rejects raw Base64 and enforces stored file URLs
+  ---
+  duration_ms: 97.3363
+  type: 'test'
+  ...
+# Subtest: chat assignments use user ids and keep legacy employee-id notifications compatible
+ok 190 - chat assignments use user ids and keep legacy employee-id notifications compatible
+  ---
+  duration_ms: 2.4222
+  type: 'test'
+  ...
+# Subtest: fuel and fault side effects are atomic with chat message creation
+ok 191 - fuel and fault side effects are atomic with chat message creation
+  ---
+  duration_ms: 0.347
+  type: 'test'
+  ...
+# Subtest: chat mutation and media boundaries are enforced server-side
+ok 192 - chat mutation and media boundaries are enforced server-side
+  ---
+  duration_ms: 0.2221
+  type: 'test'
+  ...
+# Subtest: automatic notification polling does not invoke AI and module alerts are role-gated
+ok 193 - automatic notification polling does not invoke AI and module alerts are role-gated
+  ---
+  duration_ms: 0.3107
+  type: 'test'
+  ...
+# Subtest: project data validates capacity fields, dates and active permit
+ok 194 - project data validates capacity fields, dates and active permit
+  ---
+  duration_ms: 6.5392
+  type: 'test'
+  ...
+# Subtest: status workflow releases frames through completion and blocks reopening archive
+ok 195 - status workflow releases frames through completion and blocks reopening archive
+  ---
+  duration_ms: 0.896
+  type: 'test'
+  ...
+# Subtest: activation requires approved and current dated permit
+ok 196 - activation requires approved and current dated permit
+  ---
+  duration_ms: 1.1119
+  type: 'test'
+  ...
+# Subtest: fleet input rejects decimals and maintenance above total
+ok 197 - fleet input rejects decimals and maintenance above total
+  ---
+  duration_ms: 1.9159
+  type: 'test'
+  ...
+# Subtest: capacity mutations are tenant-scoped and serializable
+ok 198 - capacity mutations are tenant-scoped and serializable
+  ---
+  duration_ms: 9.8564
+  type: 'test'
+  ...
+# Subtest: City Gallery offer validates server input and excludes archived projects
+ok 199 - City Gallery offer validates server input and excludes archived projects
+  ---
+  duration_ms: 3.6883
+  type: 'test'
+  ...
+# Subtest: city inventory uses only schema-backed categories
+ok 200 - city inventory uses only schema-backed categories
+  ---
+  duration_ms: 1.3614
+  type: 'test'
+  ...
+# Subtest: city inventory summary keeps all carriers in exactly one category
+ok 201 - city inventory summary keeps all carriers in exactly one category
+  ---
+  duration_ms: 1.2933
+  type: 'test'
+  ...
+# Subtest: city inventory page requires explicit tenant and excludes archived rows
+ok 202 - city inventory page requires explicit tenant and excludes archived rows
+  ---
+  duration_ms: 10.8098
+  type: 'test'
+  ...
+# Subtest: AI Commercial Engine Contracts & Adapters
+    # Subtest: AI Sales Radar Adapter
+        # Subtest: classifies new prospect opportunity as NEW_ACQUISITION when no client is linked
+        ok 1 - classifies new prospect opportunity as NEW_ACQUISITION when no client is linked
+          ---
+          duration_ms: 41.8284
+          type: 'test'
+          ...
+        # Subtest: classifies existing client opportunity as EXPANSION for new branch event
+        ok 2 - classifies existing client opportunity as EXPANSION for new branch event
+          ---
+          duration_ms: 0.3604
+          type: 'test'
+          ...
+        # Subtest: classifies existing client opportunity as UPSELL for campaign/marketing event
+        ok 3 - classifies existing client opportunity as UPSELL for campaign/marketing event
+          ---
+          duration_ms: 0.2458
+          type: 'test'
+          ...
+        # Subtest: builds CommercialRequest from Radar with approximate timing and flags EXACT_CAMPAIGN_DATES as missing
+        ok 4 - builds CommercialRequest from Radar with approximate timing and flags EXACT_CAMPAIGN_DATES as missing
+          ---
+          duration_ms: 1.0466
+          type: 'test'
+          ...
+        1..4
+    ok 1 - AI Sales Radar Adapter
+      ---
+      duration_ms: 45.5858
+      type: 'suite'
+      ...
+    # Subtest: AI Mailbox Adapter & Anti-Hallucination Guard
+        # Subtest: sets status to READY_FOR_AVAILABILITY when dates are exact and media types are present
+        ok 1 - sets status to READY_FOR_AVAILABILITY when dates are exact and media types are present
+          ---
+          duration_ms: 0.9046
+          type: 'test'
+          ...
+        # Subtest: flags missing requirements and prevents availability scan when dates are vague or seasonal
+        ok 2 - flags missing requirements and prevents availability scan when dates are vague or seasonal
+          ---
+          duration_ms: 0.369
+          type: 'test'
+          ...
+        # Subtest: correctly maps CRM ClientContact with firstName and lastName without crashing
+        ok 3 - correctly maps CRM ClientContact with firstName and lastName without crashing
+          ---
+          duration_ms: 0.3164
+          type: 'test'
+          ...
+        1..3
+    ok 2 - AI Mailbox Adapter & Anti-Hallucination Guard
+      ---
+      duration_ms: 2.2346
+      type: 'suite'
+      ...
+    # Subtest: Deterministic Next-Best-Action Recommender
+        # Subtest: recommends COMPLETE_INFORMATION when CommercialRequest needs more information
+        ok 1 - recommends COMPLETE_INFORMATION when CommercialRequest needs more information
+          ---
+          duration_ms: 0.7579
+          type: 'test'
+          ...
+        # Subtest: recommends CHECK_AVAILABILITY when CommercialRequest is READY_FOR_AVAILABILITY
+        ok 2 - recommends CHECK_AVAILABILITY when CommercialRequest is READY_FOR_AVAILABILITY
+          ---
+          duration_ms: 0.4437
+          type: 'test'
+          ...
+        # Subtest: recommends CHECK_AVAILABILITY for high-score Sales Radar opportunity
+        ok 3 - recommends CHECK_AVAILABILITY for high-score Sales Radar opportunity
+          ---
+          duration_ms: 0.5189
+          type: 'test'
+          ...
+        # Subtest: recommends resolving conflict when unavailable conflict surfaces are detected
+        ok 4 - recommends resolving conflict when unavailable conflict surfaces are detected
+          ---
+          duration_ms: 0.405
+          type: 'test'
+          ...
+        1..4
+    ok 3 - Deterministic Next-Best-Action Recommender
+      ---
+      duration_ms: 2.5952
+      type: 'suite'
+      ...
+    1..3
+ok 203 - AI Commercial Engine Contracts & Adapters
+  ---
+  duration_ms: 51.6211
+  type: 'suite'
+  ...
+# Subtest: CRM client input normalizes safe values and rejects invalid contact data
+ok 204 - CRM client input normalizes safe values and rejects invalid contact data
+  ---
+  duration_ms: 5.1275
+  type: 'test'
+  ...
+# Subtest: CRM contacts and branches enforce lengths, email and complete GPS pairs
+ok 205 - CRM contacts and branches enforce lengths, email and complete GPS pairs
+  ---
+  duration_ms: 1.8661
+  type: 'test'
+  ...
+# Subtest: CRM client list query is bounded and validates enum filters
+ok 206 - CRM client list query is bounded and validates enum filters
+  ---
+  duration_ms: 2.7034
+  type: 'test'
+  ...
+# Subtest: CRM update keeps normalized name, assignee tenant check and audit in one transaction
+ok 207 - CRM update keeps normalized name, assignee tenant check and audit in one transaction
+  ---
+  duration_ms: 2.5073
+  type: 'test'
+  ...
+# Subtest: CRM merge moves every client-linked module and serializes concurrent merges
+ok 208 - CRM merge moves every client-linked module and serializes concurrent merges
+  ---
+  duration_ms: 2.3308
+  type: 'test'
+  ...
+# Subtest: CRM AI lookup is authorized, rate-limited and advisory only
+ok 209 - CRM AI lookup is authorized, rate-limited and advisory only
+  ---
+  duration_ms: 55.3063
+  type: 'test'
+  ...
+# Subtest: CRM list and active profile relations are bounded
+ok 210 - CRM list and active profile relations are bounded
+  ---
+  duration_ms: 3.9333
+  type: 'test'
+  ...
+# Subtest: CRM contact and branch UI describes soft deletion as archiving
+ok 211 - CRM contact and branch UI describes soft deletion as archiving
+  ---
+  duration_ms: 6.0805
+  type: 'test'
+  ...
+# Subtest: CRM normalizes client names consistently
+ok 212 - CRM normalizes client names consistently
+  ---
+  duration_ms: 2.0683
+  type: 'test'
+  ...
+# Subtest: CRM order number starts at one and increments within a year
+ok 213 - CRM order number starts at one and increments within a year
+  ---
+  duration_ms: 0.4104
+  type: 'test'
+  ...
+# Subtest: CRM order number ignores a previous-year sequence
+ok 214 - CRM order number ignores a previous-year sequence
+  ---
+  duration_ms: 0.191
+  type: 'test'
+  ...
+# Subtest: manual radar cron is restricted to authenticated organization and active entitlement
+ok 215 - manual radar cron is restricted to authenticated organization and active entitlement
+  ---
+  duration_ms: 4.2624
+  type: 'test'
+  ...
+# Subtest: signed email webhook resolves ownership before tenant-scoped mutations
+ok 216 - signed email webhook resolves ownership before tenant-scoped mutations
+  ---
+  duration_ms: 2.6305
+  type: 'test'
+  ...
+# Subtest: already-registered Resend domains cannot be claimed by another organization
+ok 217 - already-registered Resend domains cannot be claimed by another organization
+  ---
+  duration_ms: 6.1339
+  type: 'test'
+  ...
+# Subtest: radar notifications honor disabled SaaS module
+ok 218 - radar notifications honor disabled SaaS module
+  ---
+  duration_ms: 2.2712
+  type: 'test'
+  ...
+# Subtest: domain reuse requires existing tenant ownership or separately verified provider credentials
+ok 219 - domain reuse requires existing tenant ownership or separately verified provider credentials
+  ---
+  duration_ms: 1.7172
+  type: 'test'
+  ...
+# Subtest: cron AI logs have nullable real actor and are awaited before request completion
+ok 220 - cron AI logs have nullable real actor and are awaited before request completion
+  ---
+  duration_ms: 3.1126
+  type: 'test'
+  ...
+# Subtest: sender editing retains tenant scope and does not expose encrypted sending credentials
+ok 221 - sender editing retains tenant scope and does not expose encrypted sending credentials
+  ---
+  duration_ms: 2.4728
+  type: 'test'
+  ...
+# Subtest: Pavel Šubert je v e-mailu osloven českým vokativem
+ok 222 - Pavel Šubert je v e-mailu osloven českým vokativem
+  ---
+  duration_ms: 2.7413
+  type: 'test'
+  ...
+# Subtest: neznámé jméno zůstane beze změny místo chybného automatického skloňování
+ok 223 - neznámé jméno zůstane beze změny místo chybného automatického skloňování
+  ---
+  duration_ms: 0.484
+  type: 'test'
+  ...
+# Subtest: Preview delivery is suppressed unless explicitly enabled
+ok 224 - Preview delivery is suppressed unless explicitly enabled
+  ---
+  duration_ms: 2.8947
+  type: 'test'
+  ...
+# Subtest: Email addresses and provider idempotency keys reject unsafe input
+ok 225 - Email addresses and provider idempotency keys reject unsafe input
+  ---
+  duration_ms: 0.9305
+  type: 'test'
+  ...
+# Subtest: Business routes only persist SENT after confirmed delivery
+ok 226 - Business routes only persist SENT after confirmed delivery
+  ---
+  duration_ms: 24.4769
+  type: 'test'
+  ...
+# Subtest: Configured provider does not silently fall through to another provider after rejection
+ok 227 - Configured provider does not silently fall through to another provider after rejection
+  ---
+  duration_ms: 2.5948
+  type: 'test'
+  ...
+# Subtest: Verification reads verified without restarting the provider check
+ok 228 - Verification reads verified without restarting the provider check
+  ---
+  duration_ms: 154.7715
+  type: 'test'
+  ...
+# Subtest: Verification reads pending without restarting the provider check
+ok 229 - Verification reads pending without restarting the provider check
+  ---
+  duration_ms: 1.2486
+  type: 'test'
+  ...
+# Subtest: Verification starts an asynchronous check for not_started
+ok 230 - Verification starts an asynchronous check for not_started
+  ---
+  duration_ms: 2.542
+  type: 'test'
+  ...
+# Subtest: Verification starts an asynchronous check for failed
+ok 231 - Verification starts an asynchronous check for failed
+  ---
+  duration_ms: 2.2297
+  type: 'test'
+  ...
+# Subtest: Provider read failure does not initiate a fresh verification
+ok 232 - Provider read failure does not initiate a fresh verification
+  ---
+  duration_ms: 3.9699
+  type: 'test'
+  ...
+# Subtest: Resend callbacks reach signature verification without a user session
+ok 233 - Resend callbacks reach signature verification without a user session
+  ---
+  duration_ms: 11.571
+  type: 'test'
+  ...
+# Subtest: The webhook exemption does not expose other webhooks, child routes or email settings
+ok 234 - The webhook exemption does not expose other webhooks, child routes or email settings
+  ---
+  duration_ms: 8.4547
+  type: 'test'
+  ...
+# Subtest: Field Planner real Postgres: isolation, approval races, execution and replanning
+ok 235 - Field Planner real Postgres: isolation, approval races, execution and replanning # SKIP
+  ---
+  duration_ms: 2.7654
+  type: 'test'
+  ...
+# Subtest: A: one worker and five GPS jobs make a feasible complete route
+ok 236 - A: one worker and five GPS jobs make a feasible complete route
+  ---
+  duration_ms: 110.0006
+  type: 'test'
+  ...
+# Subtest: B: two workers and ten jobs distribute work to both crews
+ok 237 - B: two workers and ten jobs distribute work to both crews
+  ---
+  duration_ms: 5.5702
+  type: 'test'
+  ...
+# Subtest: C: absence prevents assigning worker
+ok 238 - C: absence prevents assigning worker
+  ---
+  duration_ms: 7.159
+  type: 'test'
+  ...
+# Subtest: D: SERVICE vehicle is not assigned
+ok 239 - D: SERVICE vehicle is not assigned
+  ---
+  duration_ms: 1.77
+  type: 'test'
+  ...
+# Subtest: D: OUT_OF_SERVICE vehicle is not assigned
+ok 240 - D: OUT_OF_SERVICE vehicle is not assigned
+  ---
+  duration_ms: 1.8892
+  type: 'test'
+  ...
+# Subtest: D: IN_USE vehicle is not assigned
+ok 241 - D: IN_USE vehicle is not assigned
+  ---
+  duration_ms: 1.1835
+  type: 'test'
+  ...
+# Subtest: E: overlapping vehicle reservation excludes the vehicle
+ok 242 - E: overlapping vehicle reservation excludes the vehicle
+  ---
+  duration_ms: 1.4438
+  type: 'test'
+  ...
+# Subtest: F: urgent job wins over a closer normal job
+ok 243 - F: urgent job wins over a closer normal job
+  ---
+  duration_ms: 1.7256
+  type: 'test'
+  ...
+# Subtest: G: fixed windows wait until opening and finish before hard deadline
+ok 244 - G: fixed windows wait until opening and finish before hard deadline
+  ---
+  duration_ms: 1.5455
+  type: 'test'
+  ...
+# Subtest: G: impossible window is unassigned, never silently violated
+ok 245 - G: impossible window is unassigned, never silently violated
+  ---
+  duration_ms: 1.8351
+  type: 'test'
+  ...
+# Subtest: hard earlier deadline wins over urgency with a later fixed window
+ok 246 - hard earlier deadline wins over urgency with a later fixed window
+  ---
+  duration_ms: 2.4773
+  type: 'test'
+  ...
+# Subtest: H: deterministic fallback marks estimates and repeats identically
+ok 247 - H: deterministic fallback marks estimates and repeats identically
+  ---
+  duration_ms: 5.6827
+  type: 'test'
+  ...
+# Subtest: H: actual Google failure uses explicit fallback, successful Routes drives ETA
+ok 248 - H: actual Google failure uses explicit fallback, successful Routes drives ETA
+  ---
+  duration_ms: 47.3902
+  type: 'test'
+  ...
+# Subtest: I: missing GPS does not become guessed coordinates
+ok 249 - I: missing GPS does not become guessed coordinates
+  ---
+  duration_ms: 2.3736
+  type: 'test'
+  ...
+# Subtest: K: mixed tenant workers, jobs and vehicles hard reject
+ok 250 - K: mixed tenant workers, jobs and vehicles hard reject
+  ---
+  duration_ms: 2.9316
+  type: 'test'
+  ...
+# Subtest: M: replanning excludes DONE and CANCELLED without mutating history
+ok 251 - M: replanning excludes DONE and CANCELLED without mutating history
+  ---
+  duration_ms: 2.7971
+  type: 'test'
+  ...
+# Subtest: required people and qualifications are hard constraints
+ok 252 - required people and qualifications are hard constraints
+  ---
+  duration_ms: 3.1338
+  type: 'test'
+  ...
+# Subtest: required predecessor finishes before dependent task, despite urgent dependent
+ok 253 - required predecessor finishes before dependent task, despite urgent dependent
+  ---
+  duration_ms: 2.1018
+  type: 'test'
+  ...
+# Subtest: cyclic prerequisites stay unassigned
+ok 254 - cyclic prerequisites stay unassigned
+  ---
+  duration_ms: 1.7068
+  type: 'test'
+  ...
+# Subtest: duplicate crew vehicle and worker use cannot make overlapping assignments
+ok 255 - duplicate crew vehicle and worker use cannot make overlapping assignments
+  ---
+  duration_ms: 1.8244
+  type: 'test'
+  ...
+# Subtest: tenant workday differences change departure times
+ok 256 - tenant workday differences change departure times
+  ---
+  duration_ms: 2.4463
+  type: 'test'
+  ...
+# Subtest: tenant durations and WorkOrder estimatedHours override are respected
+ok 257 - tenant durations and WorkOrder estimatedHours override are respected
+  ---
+  duration_ms: 4.2869
+  type: 'test'
+  ...
+# Subtest: unknown service duration is unplannable, not invented
+ok 258 - unknown service duration is unplannable, not invented
+  ---
+  duration_ms: 1.593
+  type: 'test'
+  ...
+# Subtest: return travel and mandatory break count against shift end
+ok 259 - return travel and mandatory break count against shift end
+  ---
+  duration_ms: 1.8248
+  type: 'test'
+  ...
+# Subtest: timezone conversion supports differing regions and rejects DST ambiguity
+ok 260 - timezone conversion supports differing regions and rejects DST ambiguity
+  ---
+  duration_ms: 25.3773
+  type: 'test'
+  ...
+# Subtest: profile validates clocks, unknown country and mandatory human approval
+ok 261 - profile validates clocks, unknown country and mandatory human approval
+  ---
+  duration_ms: 1.7143
+  type: 'test'
+  ...
+# Subtest: tenant plan scope applies to reads, updates, deletes and creation
+ok 262 - tenant plan scope applies to reads, updates, deletes and creation
+  ---
+  duration_ms: 2.1083
+  type: 'test'
+  ...
+# Subtest: disabled module cannot be accessed even by manager
+ok 263 - disabled module cannot be accessed even by manager
+  ---
+  duration_ms: 0.7613
+  type: 'test'
+  ...
+# Subtest: snapshot fingerprint survives JSONB key reordering
+ok 264 - snapshot fingerprint survives JSONB key reordering
+  ---
+  duration_ms: 0.7637
+  type: 'test'
+  ...
+# Subtest: Generic Field Planner real Postgres without Navigation
+ok 265 - Generic Field Planner real Postgres without Navigation # SKIP
+  ---
+  duration_ms: 2.8388
+  type: 'test'
+  ...
+# Subtest: 20 ordinary billboard items produce 20 stops across crews with one parent WorkOrder
+ok 266 - 20 ordinary billboard items produce 20 stops across crews with one parent WorkOrder
+  ---
+  duration_ms: 388.8253
+  type: 'test'
+  ...
+# Subtest: same GPS keeps item identity and does not multiply aggregate WorkOrder hours
+ok 267 - same GPS keeps item identity and does not multiply aggregate WorkOrder hours
+  ---
+  duration_ms: 0.8092
+  type: 'test'
+  ...
+# Subtest: tenant-specific carrier duration and item override precede WorkType default
+ok 268 - tenant-specific carrier duration and item override precede WorkType default
+  ---
+  duration_ms: 0.4878
+  type: 'test'
+  ...
+# Subtest: missing GPS stays unassigned while other items remain feasible
+ok 269 - missing GPS stays unassigned while other items remain feasible
+  ---
+  duration_ms: 2.6917
+  type: 'test'
+  ...
+# Subtest: cross-tenant item rejected
+ok 270 - cross-tenant item rejected
+  ---
+  duration_ms: 1.3052
+  type: 'test'
+  ...
+# Subtest: cross-tenant carrier rejected
+ok 271 - cross-tenant carrier rejected
+  ---
+  duration_ms: 0.295
+  type: 'test'
+  ...
+# Subtest: cross-tenant surface rejected
+ok 272 - cross-tenant surface rejected
+  ---
+  duration_ms: 0.5846
+  type: 'test'
+  ...
+# Subtest: cross-tenant realization rejected
+ok 273 - cross-tenant realization rejected
+  ---
+  duration_ms: 0.4187
+  type: 'test'
+  ...
+# Subtest: one DONE and one blocked item do not affect sibling execution or history
+ok 274 - one DONE and one blocked item do not affect sibling execution or history
+  ---
+  duration_ms: 3.2688
+  type: 'test'
+  ...
+# Subtest: linked CRM state is authoritative even when an item has an old state
+ok 275 - linked CRM state is authoritative even when an item has an old state
+  ---
+  duration_ms: 0.9816
+  type: 'test'
+  ...
+# Subtest: item road fallback remains deterministic and explicitly estimated
+ok 276 - item road fallback remains deterministic and explicitly estimated
+  ---
+  duration_ms: 12.2574
+  type: 'test'
+  ...
+# Subtest: disabled Navigation profile view hides its settings while preserving historical route geometry
+ok 277 - disabled Navigation profile view hides its settings while preserving historical route geometry
+  ---
+  duration_ms: 0.6262
+  type: 'test'
+  ...
+# Subtest: existing CRM installer is a hard crew requirement, not an optimizer suggestion
+ok 278 - existing CRM installer is a hard crew requirement, not an optimizer suggestion
+  ---
+  duration_ms: 0.7483
+  type: 'test'
+  ...
+# Subtest: Navigation Field Planner real Postgres
+ok 279 - Navigation Field Planner real Postgres # SKIP
+  ---
+  duration_ms: 2.0161
+  type: 'test'
+  ...
+# Subtest: A: one NavigationOrder with five locations yields five independently identified stops
+ok 280 - A: one NavigationOrder with five locations yields five independently identified stops
+  ---
+  duration_ms: 63.6477
+  type: 'test'
+  ...
+# Subtest: B: five plus three points from different orders share the same engine and route
+ok 281 - B: five plus three points from different orders share the same engine and route
+  ---
+  duration_ms: 6.3602
+  type: 'test'
+  ...
+# Subtest: C: invalid GPS is unplannable without inventing coordinates
+ok 282 - C: invalid GPS is unplannable without inventing coordinates
+  ---
+  duration_ms: 1.9512
+  type: 'test'
+  ...
+# Subtest: D: cross-tenant NavigationPoint is rejected before optimization
+ok 283 - D: cross-tenant NavigationPoint is rejected before optimization
+  ---
+  duration_ms: 0.9149
+  type: 'test'
+  ...
+# Subtest: F: installed and cancelled points are excluded without removing their source records
+ok 284 - F: installed and cancelled points are excluded without removing their source records
+  ---
+  duration_ms: 2.0251
+  type: 'test'
+  ...
+# Subtest: J: existing deterministic estimated travel applies to point routes
+ok 285 - J: existing deterministic estimated travel applies to point routes
+  ---
+  duration_ms: 5.946
+  type: 'test'
+  ...
+# Subtest: point-specific durations override the tenant default and survive profile validation
+ok 286 - point-specific durations override the tenant default and survive profile validation
+  ---
+  duration_ms: 2.3018
+  type: 'test'
+  ...
+# Subtest: Navigation and ordinary WorkOrder stops can share one plan
+ok 287 - Navigation and ordinary WorkOrder stops can share one plan
+  ---
+  duration_ms: 1.5151
+  type: 'test'
+  ...
+# Subtest: point issue and approval-required state block installation independently
+ok 288 - point issue and approval-required state block installation independently
+  ---
+  duration_ms: 2.6478
+  type: 'test'
+  ...
+# Subtest: order installer is required when the point has no more specific installer
+ok 289 - order installer is required when the point has no more specific installer
+  ---
+  duration_ms: 0.8215
+  type: 'test'
+  ...
+# Subtest: OCR accepts image bytes while persistent chat rejects inline images
+ok 290 - OCR accepts image bytes while persistent chat rejects inline images
+  ---
+  duration_ms: 2.3708
+  type: 'test'
+  ...
+# Subtest: vehicle receipt is saved independently of the chat attachment
+ok 291 - vehicle receipt is saved independently of the chat attachment
+  ---
+  duration_ms: 0.7327
+  type: 'test'
+  ...
+# Subtest: failed OCR is visible and does not claim success just because a photo exists
+ok 292 - failed OCR is visible and does not claim success just because a photo exists
+  ---
+  duration_ms: 0.4191
+  type: 'test'
+  ...
+# Google Drive OAuth failed; falling back to the service account.
+# Subtest: 1. Mock cannot be activated in production
+ok 293 - 1. Mock cannot be activated in production
+  ---
+  duration_ms: 2.779
+  type: 'test'
+  ...
+# Subtest: 2. Missing credentials without mock enabled throws error
+ok 294 - 2. Missing credentials without mock enabled throws error
+  ---
+  duration_ms: 63.6112
+  type: 'test'
+  ...
+# Subtest: 3. verifyFileInFolder strictly checks parent folder alignment
+ok 295 - 3. verifyFileInFolder strictly checks parent folder alignment
+  ---
+  duration_ms: 1.5837
+  type: 'test'
+  ...
+# Subtest: 4. downloadPhotoFromGoogleDrive returns binary response stream
+ok 296 - 4. downloadPhotoFromGoogleDrive returns binary response stream
+  ---
+  duration_ms: 44.8639
+  type: 'test'
+  ...
+# Subtest: 5. Photo reordering logic prevents duplicates and preserves contiguous index orders
+ok 297 - 5. Photo reordering logic prevents duplicates and preserves contiguous index orders
+  ---
+  duration_ms: 2.2276
+  type: 'test'
+  ...
+# Subtest: 6. Primary photo re-election when deleting primary photo
+ok 298 - 6. Primary photo re-election when deleting primary photo
+  ---
+  duration_ms: 0.8089
+  type: 'test'
+  ...
+# Subtest: 7. listImagesInFolder lists files in the mock folder
+ok 299 - 7. listImagesInFolder lists files in the mock folder
+  ---
+  duration_ms: 1.5595
+  type: 'test'
+  ...
+# Subtest: 8. expired OAuth falls back to a configured service account
+ok 300 - 8. expired OAuth falls back to a configured service account
+  ---
+  duration_ms: 1.6566
+  type: 'test'
+  ...
+# Subtest: 9. OAuth error remains visible when no fallback is configured
+ok 301 - 9. OAuth error remains visible when no fallback is configured
+  ---
+  duration_ms: 0.7563
+  type: 'test'
+  ...
+# Subtest: navigační plán používá SHA-256 a změna neidentitních polí zneplatní náhled
+ok 302 - navigační plán používá SHA-256 a změna neidentitních polí zneplatní náhled
+  ---
+  duration_ms: 148.5275
+  type: 'test'
+  ...
+# Subtest: chybějící klient nevytvoří sdíleného zástupného zákazníka
+ok 303 - chybějící klient nevytvoří sdíleného zástupného zákazníka
+  ---
+  duration_ms: 0.9707
+  type: 'test'
+  ...
+# Subtest: mediální import nikdy nepotvrdí prázdný report jako platný
+ok 304 - mediální import nikdy nepotvrdí prázdný report jako platný
+  ---
+  duration_ms: 1.1645
+  type: 'test'
+  ...
+# Subtest: oba chráněné importy auditují uživatele a prostředí
+ok 305 - oba chráněné importy auditují uživatele a prostředí
+  ---
+  duration_ms: 43.8382
+  type: 'test'
+  ...
+# Subtest: integration credentials use authenticated encryption and reject the wrong key
+ok 306 - integration credentials use authenticated encryption and reject the wrong key
+  ---
+  duration_ms: 269.6441
+  type: 'test'
+  ...
+# Subtest: Google OAuth state is signed, expires and binds organization with user
+ok 307 - Google OAuth state is signed, expires and binds organization with user
+  ---
+  duration_ms: 1.3049
+  type: 'test'
+  ...
+# Subtest: integration records are tenant scoped with tenant unique provider
+ok 308 - integration records are tenant scoped with tenant unique provider
+  ---
+  duration_ms: 17.4874
+  type: 'test'
+  ...
+# Subtest: OAuth callback rejects a state for another organization before saving
+ok 309 - OAuth callback rejects a state for another organization before saving
+  ---
+  duration_ms: 3.1547
+  type: 'test'
+  ...
+# Subtest: OAuth redirect supports one explicitly configured stable HTTPS origin
+ok 310 - OAuth redirect supports one explicitly configured stable HTTPS origin
+  ---
+  duration_ms: 1.9288
+  type: 'test'
+  ...
+# Subtest: Google Drive connection rejects inherited broad scopes
+ok 311 - Google Drive connection rejects inherited broad scopes
+  ---
+  duration_ms: 1.2525
+  type: 'test'
+  ...
+# Subtest: tenant Google Drive connection is the primary runtime credential and reports refresh health
+ok 312 - tenant Google Drive connection is the primary runtime credential and reports refresh health
+  ---
+  duration_ms: 6.5004
+  type: 'test'
+  ...
+# Subtest: invoice settings normalize tenant defaults and reject unsafe values
+ok 313 - invoice settings normalize tenant defaults and reject unsafe values
+  ---
+  duration_ms: 4.0252
+  type: 'test'
+  ...
+# Subtest: invoice sequence, due date and VAT calculations are deterministic
+ok 314 - invoice sequence, due date and VAT calculations are deterministic
+  ---
+  duration_ms: 3.6426
+  type: 'test'
+  ...
+# Subtest: invoice party snapshots are detached from later source changes
+ok 315 - invoice party snapshots are detached from later source changes
+  ---
+  duration_ms: 0.3272
+  type: 'test'
+  ...
+# Subtest: invoice route uses stored line items, party snapshots, currency and atomic tenant sequence
+ok 316 - invoice route uses stored line items, party snapshots, currency and atomic tenant sequence
+  ---
+  duration_ms: 1.5941
+  type: 'test'
+  ...
+# Subtest: photo format detection: identifies JPEG, PNG, WebP, and iPhone HEIC/HEIF
+ok 317 - photo format detection: identifies JPEG, PNG, WebP, and iPhone HEIC/HEIF
+  ---
+  duration_ms: 2.4251
+  type: 'test'
+  ...
+# Subtest: dimension calculation: downscales long edge to max 2560px preserving aspect ratio
+ok 318 - dimension calculation: downscales long edge to max 2560px preserving aspect ratio
+  ---
+  duration_ms: 0.4838
+  type: 'test'
+  ...
+# Subtest: client pre-upload validation: verifies size, empty files and unconverted HEIC
+ok 319 - client pre-upload validation: verifies size, empty files and unconverted HEIC
+  ---
+  duration_ms: 4.2415
+  type: 'test'
+  ...
+# Subtest: client compression: automatically downscales large mobile photo safely under 3.5 MB
+ok 320 - client compression: automatically downscales large mobile photo safely under 3.5 MB
+  ---
+  duration_ms: 5.6822
+  type: 'test'
+  ...
+# Subtest: HEIC decoder fallback: returns friendly Czech message when decoder is not available
+ok 321 - HEIC decoder fallback: returns friendly Czech message when decoder is not available
+  ---
+  duration_ms: 0.3997
+  type: 'test'
+  ...
+# Subtest: backend validatePhotoFile: accepts valid JPEG, PNG and WebP under 4 MB
+ok 322 - backend validatePhotoFile: accepts valid JPEG, PNG and WebP under 4 MB
+  ---
+  duration_ms: 3.1676
+  type: 'test'
+  ...
+# Subtest: backend validatePhotoFile: rejects oversized JPEG (> 4 MB) with 413 PHOTO_TOO_LARGE
+ok 323 - backend validatePhotoFile: rejects oversized JPEG (> 4 MB) with 413 PHOTO_TOO_LARGE
+  ---
+  duration_ms: 3.2633
+  type: 'test'
+  ...
+# Subtest: backend validatePhotoFile: rejects raw unconverted HEIC with 415 INVALID_IMAGE
+ok 324 - backend validatePhotoFile: rejects raw unconverted HEIC with 415 INVALID_IMAGE
+  ---
+  duration_ms: 0.4895
+  type: 'test'
+  ...
+# Subtest: backend validatePhotoFile: rejects empty file with 415 INVALID_IMAGE
+ok 325 - backend validatePhotoFile: rejects empty file with 415 INVALID_IMAGE
+  ---
+  duration_ms: 0.9309
+  type: 'test'
+  ...
+# Subtest: safe API parsing: handles HTTP 413 and returns clean Czech message
+ok 326 - safe API parsing: handles HTTP 413 and returns clean Czech message
+  ---
+  duration_ms: 42.609
+  type: 'test'
+  ...
+# Subtest: safe API parsing: handles non-JSON response (HTML proxy error / 504 / 413) without crashing
+ok 327 - safe API parsing: handles non-JSON response (HTML proxy error / 504 / 413) without crashing
+  ---
+  duration_ms: 46.6582
+  type: 'test'
+  ...
+# Subtest: safe API parsing: handles 500 HTML crash page cleanly
+ok 328 - safe API parsing: handles 500 HTML crash page cleanly
+  ---
+  duration_ms: 1.3632
+  type: 'test'
+  ...
+# Subtest: error shielding: never exposes raw technical Safari / DOMException strings to user
+ok 329 - error shielding: never exposes raw technical Safari / DOMException strings to user
+  ---
+  duration_ms: 0.5016
+  type: 'test'
+  ...
+# Subtest: GPS preservation: valid coordinates are parsed and preserved for carrier creation
+ok 330 - GPS preservation: valid coordinates are parsed and preserved for carrier creation
+  ---
+  duration_ms: 0.3509
+  type: 'test'
+  ...
+# Subtest: create-carrier route: creates Carrier, Surfaces, Photo, GPS, MediaTypes, and History
+ok 331 - create-carrier route: creates Carrier, Surfaces, Photo, GPS, MediaTypes, and History
+  ---
+  duration_ms: 18.6039
+  type: 'test'
+  ...
+# Subtest: MobileCreateCarrierModal & MobilePhotoFieldAppView use unified client photo processing
+ok 332 - MobileCreateCarrierModal & MobilePhotoFieldAppView use unified client photo processing
+  ---
+  duration_ms: 49.6262
+  type: 'test'
+  ...
+# Subtest: routine mobile photos are not duplicated into installation chat
+ok 333 - routine mobile photos are not duplicated into installation chat
+  ---
+  duration_ms: 2.3638
+  type: 'test'
+  ...
+# Subtest: damage photos still create urgent operational alerts
+ok 334 - damage photos still create urgent operational alerts
+  ---
+  duration_ms: 0.5339
+  type: 'test'
+  ...
+# Subtest: global notifications include unread chat messages but exclude own messages
+ok 335 - global notifications include unread chat messages but exclude own messages
+  ---
+  duration_ms: 0.5069
+  type: 'test'
+  ...
+# Subtest: opening a chat channel marks every delivered message as read
+ok 336 - opening a chat channel marks every delivered message as read
+  ---
+  duration_ms: 0.4248
+  type: 'test'
+  ...
+# [mobile-photos/upload] Následná operace chat selhala Error: chat unavailable
+#     at Object.run (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:31:46)
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:69)
+#     at Array.map (<anonymous>)
+#     at runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:50)
+#     at TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:29:26)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+# [mobile-photos/upload] Pokus 1/2 selhal Error: temporary chat outage
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:41:31)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:39:24)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [mobile-photos/upload] Pokus 1/2 selhal Error: chat unavailable
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:55:15)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at Object.run (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:53:18)
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:69)
+#     at Array.map (<anonymous>)
+#     at runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:50)
+#     at TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:50:26)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+# [mobile-photos/upload] Pokus 2/2 selhal Error: chat unavailable
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:55:15)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at async Promise.allSettled (index 0)
+#     at async runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:19)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:50:20)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [mobile-photos/upload] Následná operace chat selhala Error: chat unavailable
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:55:15)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at async Promise.allSettled (index 0)
+#     at async runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:19)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:50:20)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: mobile upload: saved photos use a stable internal URL
+ok 337 - mobile upload: saved photos use a stable internal URL
+  ---
+  duration_ms: 2.7183
+  type: 'test'
+  ...
+# Subtest: mobile upload: missing or invalid GPS is rejected
+ok 338 - mobile upload: missing or invalid GPS is rejected
+  ---
+  duration_ms: 2.0949
+  type: 'test'
+  ...
+# Subtest: mobile upload: chat failure after persistence is only a warning
+ok 339 - mobile upload: chat failure after persistence is only a warning
+  ---
+  duration_ms: 4.005
+  type: 'test'
+  ...
+# Subtest: mobile upload: transient chat failure is retried before becoming a warning
+ok 340 - mobile upload: transient chat failure is retried before becoming a warning
+  ---
+  duration_ms: 1.2554
+  type: 'test'
+  ...
+# Subtest: mobile upload: persistent chat failure is still isolated from saved photo
+ok 341 - mobile upload: persistent chat failure is still isolated from saved photo
+  ---
+  duration_ms: 2.0809
+  type: 'test'
+  ...
+# Subtest: mobile upload: invalid photo ids cannot become URLs
+ok 342 - mobile upload: invalid photo ids cannot become URLs
+  ---
+  duration_ms: 1.1094
+  type: 'test'
+  ...
+# Subtest: mobile upload: damage options contain the requested field defects
+ok 343 - mobile upload: damage options contain the requested field defects
+  ---
+  duration_ms: 0.432
+  type: 'test'
+  ...
+# Subtest: mobile nearby: client assigned in carrier detail is visible without an occupancy row
+ok 344 - mobile nearby: client assigned in carrier detail is visible without an occupancy row
+  ---
+  duration_ms: 0.3973
+  type: 'test'
+  ...
+# Subtest: Organization A client listing is always scoped away from Organization B
+ok 345 - Organization A client listing is always scoped away from Organization B
+  ---
+  duration_ms: 5.5263
+  type: 'test'
+  ...
+# Subtest: GET by a foreign client id receives an organization predicate and therefore resolves as 404
+ok 346 - GET by a foreign client id receives an organization predicate and therefore resolves as 404
+  ---
+  duration_ms: 0.5593
+  type: 'test'
+  ...
+# Subtest: updates and deletes cannot target a record outside the active organization
+ok 347 - updates and deletes cannot target a record outside the active organization
+  ---
+  duration_ms: 1.9522
+  type: 'test'
+  ...
+# Subtest: same normalized client name is unique per organization, not globally
+ok 348 - same normalized client name is unique per organization, not globally
+  ---
+  duration_ms: 3.4028
+  type: 'test'
+  ...
+# Subtest: one global user email can have memberships in multiple organizations
+ok 349 - one global user email can have memberships in multiple organizations
+  ---
+  duration_ms: 7.5248
+  type: 'test'
+  ...
+# Subtest: AI inventory lookup is scoped to the active organization
+ok 350 - AI inventory lookup is scoped to the active organization
+  ---
+  duration_ms: 0.4548
+  type: 'test'
+  ...
+# Subtest: dashboard counts and aggregates are scoped to the active organization
+ok 351 - dashboard counts and aggregates are scoped to the active organization
+  ---
+  duration_ms: 0.6781
+  type: 'test'
+  ...
+# Subtest: public offers resolve tenant only by an opaque token and never by offer id fallback
+ok 352 - public offers resolve tenant only by an opaque token and never by offer id fallback
+  ---
+  duration_ms: 5.0267
+  type: 'test'
+  ...
+# Subtest: all declared tenant models receive create ownership and reject client overrides
+ok 353 - all declared tenant models receive create ownership and reject client overrides
+  ---
+  duration_ms: 1.6494
+  type: 'test'
+  ...
+# Subtest: grafické podklady lze nahrát až po přijetí cenové nabídky
+ok 354 - grafické podklady lze nahrát až po přijetí cenové nabídky
+  ---
+  duration_ms: 1.9438
+  type: 'test'
+  ...
+# Subtest: veřejný artwork endpoint vynucuje stejnou stavovou politiku jako UI
+ok 355 - veřejný artwork endpoint vynucuje stejnou stavovou politiku jako UI
+  ---
+  duration_ms: 2.4109
+  type: 'test'
+  ...
+# Subtest: 1. parseNavigationOfferInput recognizes roundabout exit directions
+ok 356 - 1. parseNavigationOfferInput recognizes roundabout exit directions
+  ---
+  duration_ms: 7.9244
+  type: 'test'
+  ...
+# Subtest: 2. parseNavigationOfferInput recognizes Havířov city and fallback detection
+ok 357 - 2. parseNavigationOfferInput recognizes Havířov city and fallback detection
+  ---
+  duration_ms: 99.2748
+  type: 'test'
+  ...
+# Subtest: contract input normalizes data and preserves a zero-day alert
+ok 358 - contract input normalizes data and preserves a zero-day alert
+  ---
+  duration_ms: 4.3207
+  type: 'test'
+  ...
+# Subtest: contact input validates enums, e-mail, phone and lengths
+ok 359 - contact input validates enums, e-mail, phone and lengths
+  ---
+  duration_ms: 0.9182
+  type: 'test'
+  ...
+# Subtest: display state respects explicit draft and terminated states before dates
+ok 360 - display state respects explicit draft and terminated states before dates
+  ---
+  duration_ms: 0.3998
+  type: 'test'
+  ...
+# Subtest: list filters are bounded and reject invalid statuses
+ok 361 - list filters are bounded and reject invalid statuses
+  ---
+  duration_ms: 1.1161
+  type: 'test'
+  ...
+# Subtest: contracts and contacts use dedicated permissions excluded from field roles
+ok 362 - contracts and contacts use dedicated permissions excluded from field roles
+  ---
+  duration_ms: 9.3471
+  type: 'test'
+  ...
+# Subtest: mutations enforce tenant-bound links, serialize primary contact changes and create audit logs
+ok 363 - mutations enforce tenant-bound links, serialize primary contact changes and create audit logs
+  ---
+  duration_ms: 1.9803
+  type: 'test'
+  ...
+# Subtest: contact form sends e-mail and both modules support non-destructive editing
+ok 364 - contact form sends e-mail and both modules support non-destructive editing
+  ---
+  duration_ms: 3.2525
+  type: 'test'
+  ...
+# Subtest: navigation conversion preserves shared site photo and is idempotent in PostgreSQL
+ok 365 - navigation conversion preserves shared site photo and is idempotent in PostgreSQL # SKIP
+  ---
+  duration_ms: 2.0606
+  type: 'test'
+  ...
+# Subtest: fáze 1 blokuje cenové PDF i montážní list
+ok 366 - fáze 1 blokuje cenové PDF i montážní list
+  ---
+  duration_ms: 1.5342
+  type: 'test'
+  ...
+# Subtest: fáze 2 zpřístupní cenové PDF, ale montážní list až po přijetí
+ok 367 - fáze 2 zpřístupní cenové PDF, ale montážní list až po přijetí
+  ---
+  duration_ms: 0.431
+  type: 'test'
+  ...
+# Subtest: cenová PDF ostatních typů nabídek zůstávají dostupná
+ok 368 - cenová PDF ostatních typů nabídek zůstávají dostupná
+  ---
+  duration_ms: 0.2258
+  type: 'test'
+  ...
+# Subtest: public navigation reports are limited to PUBLISHED and SENT states
+ok 369 - public navigation reports are limited to PUBLISHED and SENT states
+  ---
+  duration_ms: 2.3203
+  type: 'test'
+  ...
+# Subtest: public link requires an unexpired expiry date
+ok 370 - public link requires an unexpired expiry date
+  ---
+  duration_ms: 2.0112
+  type: 'test'
+  ...
+# Subtest: only explicitly client-visible non-private photos are approved
+ok 371 - only explicitly client-visible non-private photos are approved
+  ---
+  duration_ms: 0.7345
+  type: 'test'
+  ...
+# Subtest: quarter and report year validation is strict
+ok 372 - quarter and report year validation is strict
+  ---
+  duration_ms: 0.7945
+  type: 'test'
+  ...
+# Subtest: recipient email rejects malformed input and normalizes casing
+ok 373 - recipient email rejects malformed input and normalizes casing
+  ---
+  duration_ms: 0.8079
+  type: 'test'
+  ...
+# Subtest: custom token expiry is bounded to one year
+ok 374 - custom token expiry is bounded to one year
+  ---
+  duration_ms: 3.7214
+  type: 'test'
+  ...
+# Subtest: 1. Token generation creates cryptographically random token and valid SHA-256 hash
+ok 375 - 1. Token generation creates cryptographically random token and valid SHA-256 hash
+  ---
+  duration_ms: 2.5381
+  type: 'test'
+  ...
+# Subtest: 2. Two generated tokens are unique and non-colliding
+ok 376 - 2. Two generated tokens are unique and non-colliding
+  ---
+  duration_ms: 1.0525
+  type: 'test'
+  ...
+# Subtest: 3. Pre-publish checks detect empty report
+ok 377 - 3. Pre-publish checks detect empty report
+  ---
+  duration_ms: 0.9918
+  type: 'test'
+  ...
+# Subtest: 4. Pre-publish checks detect missing client email
+ok 378 - 4. Pre-publish checks detect missing client email
+  ---
+  duration_ms: 0.55
+  type: 'test'
+  ...
+# Subtest: 5. Pre-publish checks detect missing photos and unapproved photos
+ok 379 - 5. Pre-publish checks detect missing photos and unapproved photos
+  ---
+  duration_ms: 0.5995
+  type: 'test'
+  ...
+# Subtest: 6. Pre-publish checks detect missing GPS coordinates
+ok 380 - 6. Pre-publish checks detect missing GPS coordinates
+  ---
+  duration_ms: 0.4845
+  type: 'test'
+  ...
+# Subtest: 7. Immutable snapshot builder freezes item details correctly
+ok 381 - 7. Immutable snapshot builder freezes item details correctly
+  ---
+  duration_ms: 3.2522
+  type: 'test'
+  ...
+# Subtest: 8. RBAC section navigationDocumentation access control
+ok 382 - 8. RBAC section navigationDocumentation access control
+  ---
+  duration_ms: 0.5364
+  type: 'test'
+  ...
+# Subtest: 1. parseMountingType parses traction, column, light pole, pole correctly
+ok 383 - 1. parseMountingType parses traction, column, light pole, pole correctly
+  ---
+  duration_ms: 3.3309
+  type: 'test'
+  ...
+# Subtest: 2. parseDistanceMeters parses m and km formats accurately
+ok 384 - 2. parseDistanceMeters parses m and km formats accurately
+  ---
+  duration_ms: 1.096
+  type: 'test'
+  ...
+# Subtest: 3. Surface multi-tenant state isolation logic
+ok 385 - 3. Surface multi-tenant state isolation logic
+  ---
+  duration_ms: 0.5957
+  type: 'test'
+  ...
+# Subtest: faktura vyžaduje identifikaci, adresy a platební údaje
+ok 386 - faktura vyžaduje identifikaci, adresy a platební údaje
+  ---
+  duration_ms: 7.7016
+  type: 'test'
+  ...
+# Subtest: generátor vytvoří skutečný PDF dokument
+ok 387 - generátor vytvoří skutečný PDF dokument
+  ---
+  duration_ms: 1113.8329
+  type: 'test'
+  ...
+# Subtest: API ukládá neměnný doklad, přikládá jej a chrání samostatným billing oprávněním
+ok 388 - API ukládá neměnný doklad, přikládá jej a chrání samostatným billing oprávněním
+  ---
+  duration_ms: 3.533
+  type: 'test'
+  ...
+# Subtest: 1. Average GPS calculation logic when merging multiple poles
+ok 389 - 1. Average GPS calculation logic when merging multiple poles
+  ---
+  duration_ms: 1.893
+  type: 'test'
+  ...
+# Subtest: 2. Surface relocation and photo attachment transfer state structure
+ok 390 - 2. Surface relocation and photo attachment transfer state structure
+  ---
+  duration_ms: 0.3914
+  type: 'test'
+  ...
+# Subtest: TEST 1 & TEST 2: Navigace 1. fáze bez cen – schválení výběru lokalit bez objednávky výroby
+ok 391 - TEST 1 & TEST 2: Navigace 1. fáze bez cen – schválení výběru lokalit bez objednávky výroby
+  ---
+  duration_ms: 7.5972
+  type: 'test'
+  ...
+# Subtest: TEST 3: Navigace 1. fáze bez cen – nezobrazuje falešné 0 Kč v public view modelu
+ok 392 - TEST 3: Navigace 1. fáze bez cen – nezobrazuje falešné 0 Kč v public view modelu
+  ---
+  duration_ms: 5.822
+  type: 'test'
+  ...
+# Subtest: TEST 4: Finální nabídka (PRICED_QUOTE) vyžaduje validní cenu a odmítne 0 Kč
+ok 393 - TEST 4: Finální nabídka (PRICED_QUOTE) vyžaduje validní cenu a odmítne 0 Kč
+  ---
+  duration_ms: 1.865
+  type: 'test'
+  ...
+# Subtest: TEST 5 & TEST 6: Ochrana tokenů a tenant boundary při schvalování
+ok 394 - TEST 5 & TEST 6: Ochrana tokenů a tenant boundary při schvalování
+  ---
+  duration_ms: 3.1296
+  type: 'test'
+  ...
+# Subtest: TEST 7: Idempotence potvrzení výběru bodů klientem
+ok 395 - TEST 7: Idempotence potvrzení výběru bodů klientem
+  ---
+  duration_ms: 1.3571
+  type: 'test'
+  ...
+# Subtest: TEST 8: Selhání notifikačního e-mailu neohrozí uložení potvrzení klienta
+ok 396 - TEST 8: Selhání notifikačního e-mailu neohrozí uložení potvrzení klienta
+  ---
+  duration_ms: 1.4096
+  type: 'test'
+  ...
+# Subtest: 1. extractNavigationFromPhotoText extracts brand, distance, and direction
+ok 397 - 1. extractNavigationFromPhotoText extracts brand, distance, and direction
+  ---
+  duration_ms: 3.8229
+  type: 'test'
+  ...
+# Subtest: 2. extractFromPhotoList prioritizes notes and filenames with high confidence
+ok 398 - 2. extractFromPhotoList prioritizes notes and filenames with high confidence
+  ---
+  duration_ms: 4.0863
+  type: 'test'
+  ...
+# Subtest: 1. Haversine distance calculates straight line distance accurately
+ok 399 - 1. Haversine distance calculates straight line distance accurately
+  ---
+  duration_ms: 2.9276
+  type: 'test'
+  ...
+# Subtest: 2. Format distance formats meters and kilometers in Czech
+ok 400 - 2. Format distance formats meters and kilometers in Czech
+  ---
+  duration_ms: 0.8735
+  type: 'test'
+  ...
+# Subtest: 3. Real route distance returns structured result with fallback
+ok 401 - 3. Real route distance returns structured result with fallback
+  ---
+  duration_ms: 382.2205
+  type: 'test'
+  ...
+# Subtest: 1. Updating existing NavigationPoint links photos to surveyNavigationPointId and avoids P2003 FK violation
+ok 402 - 1. Updating existing NavigationPoint links photos to surveyNavigationPointId and avoids P2003 FK violation
+  ---
+  duration_ms: 2.2499
+  type: 'test'
+  ...
+# Subtest: 2. Multiple photos uploaded to NavigationPoint attach all via surveyNavigationPointId and set first as sitePhotoId
+ok 403 - 2. Multiple photos uploaded to NavigationPoint attach all via surveyNavigationPointId and set first as sitePhotoId
+  ---
+  duration_ms: 0.8544
+  type: 'test'
+  ...
+# Subtest: 3. Candidate point links photos strictly via surveyCandidatePointId
+ok 404 - 3. Candidate point links photos strictly via surveyCandidatePointId
+  ---
+  duration_ms: 0.4491
+  type: 'test'
+  ...
+# Subtest: 4. sitePhotoId unique constraint is respected and avoids reusing same photo on different NavigationPoints
+ok 405 - 4. sitePhotoId unique constraint is respected and avoids reusing same photo on different NavigationPoints
+  ---
+  duration_ms: 0.3903
+  type: 'test'
+  ...
+# Subtest: 5. Safe error formatting transforms raw Prisma exceptions into friendly Czech messages
+ok 406 - 5. Safe error formatting transforms raw Prisma exceptions into friendly Czech messages
+  ---
+  duration_ms: 0.4663
+  type: 'test'
+  ...
+# Subtest: 1. formatSurveyArrowBadge correctly resolves standard and roundabout arrows
+ok 407 - 1. formatSurveyArrowBadge correctly resolves standard and roundabout arrows
+  ---
+  duration_ms: 2.7073
+  type: 'test'
+  ...
+# Subtest: 2. Navigation destination link helper formats correct Google Maps and Mapy.cz URLs
+ok 408 - 2. Navigation destination link helper formats correct Google Maps and Mapy.cz URLs
+  ---
+  duration_ms: 0.5465
+  type: 'test'
+  ...
+# Subtest: 3. Candidate update payload retains pillar number and roundabout arrow
+ok 409 - 3. Candidate update payload retains pillar number and roundabout arrow
+  ---
+  duration_ms: 0.4595
+  type: 'test'
+  ...
+# Subtest: Modul NAVIGACE - Workflow a RBAC Testy
+    # Subtest: ověřuje povolené přechody stavového automatu zakázky
+    ok 1 - ověřuje povolené přechody stavového automatu zakázky
+      ---
+      duration_ms: 42.044
+      type: 'test'
+      ...
+    # Subtest: ověřuje oprávnění pro samostatnou roli SALES
+    ok 2 - ověřuje oprávnění pro samostatnou roli SALES
+      ---
+      duration_ms: 0.5545
+      type: 'test'
+      ...
+    # Subtest: ověřuje vlastnictví nabídky pro roli SALES
+    ok 3 - ověřuje vlastnictví nabídky pro roli SALES
+      ---
+      duration_ms: 0.3767
+      type: 'test'
+      ...
+    # Subtest: fakturaci navigace chrání role, stav, Decimal výpočet a idempotence odeslání
+    ok 4 - fakturaci navigace chrání role, stav, Decimal výpočet a idempotence odeslání
+      ---
+      duration_ms: 1.8894
+      type: 'test'
+      ...
+    1..4
+ok 410 - Modul NAVIGACE - Workflow a RBAC Testy
+  ---
+  duration_ms: 46.9727
+  type: 'suite'
+  ...
+# Subtest: every original link is preserved exactly once and resolves to an existing page
+ok 411 - every original link is preserved exactly once and resolves to an existing page
+  ---
+  duration_ms: 9.8442
+  type: 'test'
+  ...
+# Subtest: all roles retain the original visibility across plans, overrides and missing organization
+ok 412 - all roles retain the original visibility across plans, overrides and missing organization
+  ---
+  duration_ms: 342.0378
+  type: 'test'
+  ...
+# Subtest: platform and organization onboarding restrictions remain isolated between requests
+ok 413 - platform and organization onboarding restrictions remain isolated between requests
+  ---
+  duration_ms: 3.8372
+  type: 'test'
+  ...
+# Subtest: nested paths choose the most specific item and hub without prefix collisions
+ok 414 - nested paths choose the most specific item and hub without prefix collisions
+  ---
+  duration_ms: 1.693
+  type: 'test'
+  ...
+# Subtest: B2B transactional endpoints never return simulated business records or successful writes
+ok 415 - B2B transactional endpoints never return simulated business records or successful writes
+  ---
+  duration_ms: 8.0772
+  type: 'test'
+  ...
+# Subtest: B2B partner state and KPIs never invent connection state or inventory totals
+ok 416 - B2B partner state and KPIs never invent connection state or inventory totals
+  ---
+  duration_ms: 5.1755
+  type: 'test'
+  ...
+# Subtest: carrier overviews exclude binary photo content and bound the default page size
+ok 417 - carrier overviews exclude binary photo content and bound the default page size
+  ---
+  duration_ms: 1.6712
+  type: 'test'
+  ...
+# Subtest: B2B inventory requires explicit sharing on both carrier and surface and never exposes private photos
+ok 418 - B2B inventory requires explicit sharing on both carrier and surface and never exposes private photos
+  ---
+  duration_ms: 11.4346
+  type: 'test'
+  ...
+# Subtest: B2B directory does not disclose tenant contact details before persistent partnership exists
+ok 419 - B2B directory does not disclose tenant contact details before persistent partnership exists
+  ---
+  duration_ms: 1.3104
+  type: 'test'
+  ...
+# [NotificationsProviderError] Provider: "failing-warehouse", Tenant: "org_test", Route: "/api/notifications", Error: Simulated database timeout in warehouseItem.findMany
+# Subtest: getSystemNotifications throws TenantContextError when called without tenant context and no organizationId
+ok 420 - getSystemNotifications throws TenantContextError when called without tenant context and no organizationId
+  ---
+  duration_ms: 12.8495
+  type: 'test'
+  ...
+# Subtest: getSystemNotifications propagates tenant context to all active providers
+ok 421 - getSystemNotifications propagates tenant context to all active providers
+  ---
+  duration_ms: 61.3082
+  type: 'test'
+  ...
+# Subtest: failure of one non-critical provider does not crash getSystemNotifications and other providers succeed
+ok 422 - failure of one non-critical provider does not crash getSystemNotifications and other providers succeed
+  ---
+  duration_ms: 2.6966
+  type: 'test'
+  ...
+# Subtest: critical security error (TenantContextError) inside a provider is never swallowed
+ok 423 - critical security error (TenantContextError) inside a provider is never swallowed
+  ---
+  duration_ms: 1.362
+  type: 'test'
+  ...
+# Subtest: all required providers are registered in ALL_NOTIFICATION_PROVIDERS
+ok 424 - all required providers are registered in ALL_NOTIFICATION_PROVIDERS
+  ---
+  duration_ms: 0.336
+  type: 'test'
+  ...
+# Subtest: route /api/notifications enforces authentication, active organization, and explicit runWithTenantContext
+ok 425 - route /api/notifications enforces authentication, active organization, and explicit runWithTenantContext
+  ---
+  duration_ms: 2.302
+  type: 'test'
+  ...
+# Subtest: route /api/notifications/unread enforces authentication, active organization, and explicit runWithTenantContext
+ok 426 - route /api/notifications/unread enforces authentication, active organization, and explicit runWithTenantContext
+  ---
+  duration_ms: 1.707
+  type: 'test'
+  ...
+# Subtest: NotificationBellCenter coordinates polling across multiple mounted instances with single timer and 401 guard
+ok 427 - NotificationBellCenter coordinates polling across multiple mounted instances with single timer and 401 guard
+  ---
+  duration_ms: 0.8887
+  type: 'test'
+  ...
+# Subtest: Canonical Occupancy Availability Engine
+    # Subtest: Date Overlap Calculation (Inclusive OOH Standard)
+        # Subtest: detects overlap on touching edge dates: 1.10.–15.10. and 15.10.–20.10.
+        ok 1 - detects overlap on touching edge dates: 1.10.–15.10. and 15.10.–20.10.
+          ---
+          duration_ms: 44.1158
+          type: 'test'
+          ...
+        # Subtest: detects no overlap for adjacent separate days: 1.10.–15.10. and 16.10.–20.10.
+        ok 2 - detects no overlap for adjacent separate days: 1.10.–15.10. and 16.10.–20.10.
+          ---
+          duration_ms: 0.621
+          type: 'test'
+          ...
+        # Subtest: detects exact identical period overlap
+        ok 3 - detects exact identical period overlap
+          ---
+          duration_ms: 0.257
+          type: 'test'
+          ...
+        # Subtest: detects partial overlap when period B starts inside period A
+        ok 4 - detects partial overlap when period B starts inside period A
+          ---
+          duration_ms: 0.2927
+          type: 'test'
+          ...
+        # Subtest: detects overlap when single day campaigns match
+        ok 5 - detects overlap when single day campaigns match
+          ---
+          duration_ms: 0.3695
+          type: 'test'
+          ...
+        # Subtest: detects no overlap when periods are completely disjoint in time
+        ok 6 - detects no overlap when periods are completely disjoint in time
+          ---
+          duration_ms: 0.388
+          type: 'test'
+          ...
+        # Subtest: returns false for invalid inverted date intervals
+        ok 7 - returns false for invalid inverted date intervals
+          ---
+          duration_ms: 0.4871
+          type: 'test'
+          ...
+        1..7
+    ok 1 - Date Overlap Calculation (Inclusive OOH Standard)
+      ---
+      duration_ms: 49.4421
+      type: 'suite'
+      ...
+    # Subtest: Technical Availability Checking
+        # Subtest: rejects surfaces marked OUT_OF_SERVICE
+        ok 1 - rejects surfaces marked OUT_OF_SERVICE
+          ---
+          duration_ms: 1.1272
+          type: 'test'
+          ...
+        # Subtest: rejects surfaces on archived carriers
+        ok 2 - rejects surfaces on archived carriers
+          ---
+          duration_ms: 0.7456
+          type: 'test'
+          ...
+        # Subtest: rejects surfaces on inactive or maintenance carriers
+        ok 3 - rejects surfaces on inactive or maintenance carriers
+          ---
+          duration_ms: 0.8645
+          type: 'test'
+          ...
+        # Subtest: accepts healthy surfaces on active non-archived carriers
+        ok 4 - accepts healthy surfaces on active non-archived carriers
+          ---
+          duration_ms: 0.3826
+          type: 'test'
+          ...
+        1..4
+    ok 2 - Technical Availability Checking
+      ---
+      duration_ms: 4.7361
+      type: 'suite'
+      ...
+    # Subtest: Status Categorization Standards
+        # Subtest: defines explicit hard blocking statuses
+        ok 1 - defines explicit hard blocking statuses
+          ---
+          duration_ms: 0.6292
+          type: 'test'
+          ...
+        # Subtest: defines explicit soft warning statuses
+        ok 2 - defines explicit soft warning statuses
+          ---
+          duration_ms: 0.3549
+          type: 'test'
+          ...
+        # Subtest: defines explicit non-blocking inactive statuses
+        ok 3 - defines explicit non-blocking inactive statuses
+          ---
+          duration_ms: 0.3585
+          type: 'test'
+          ...
+        1..3
+    ok 3 - Status Categorization Standards
+      ---
+      duration_ms: 1.7297
+      type: 'suite'
+      ...
+    # Subtest: Surface Availability Snapshot State Derivation
+        # Subtest: returns AVAILABLE when there are no occupancies at reference date
+        ok 1 - returns AVAILABLE when there are no occupancies at reference date
+          ---
+          duration_ms: 0.7011
+          type: 'test'
+          ...
+        # Subtest: prioritizes OUT_OF_SERVICE > OCCUPIED > RESERVED > NEGOTIATION
+        ok 2 - prioritizes OUT_OF_SERVICE > OCCUPIED > RESERVED > NEGOTIATION
+          ---
+          duration_ms: 0.9229
+          type: 'test'
+          ...
+        # Subtest: ignores FINISHED and CANCELLED occupancies even if date matches
+        ok 3 - ignores FINISHED and CANCELLED occupancies even if date matches
+          ---
+          duration_ms: 0.3726
+          type: 'test'
+          ...
+        1..3
+    ok 4 - Surface Availability Snapshot State Derivation
+      ---
+      duration_ms: 2.3527
+      type: 'suite'
+      ...
+    1..4
+ok 428 - Canonical Occupancy Availability Engine
+  ---
+  duration_ms: 60.2288
+  type: 'suite'
+  ...
+# Subtest: Occupancy Intelligence Audit & AI Layer
+    # Subtest: Deterministic AI Fallback Explanations
+        # Subtest: provides clear Czech explanation and recommendation for DOUBLE_BOOKING
+        ok 1 - provides clear Czech explanation and recommendation for DOUBLE_BOOKING
+          ---
+          duration_ms: 79.1984
+          type: 'test'
+          ...
+        # Subtest: provides clear Czech explanation and recommendation for STATUS_MISMATCH
+        ok 2 - provides clear Czech explanation and recommendation for STATUS_MISMATCH
+          ---
+          duration_ms: 0.4716
+          type: 'test'
+          ...
+        # Subtest: provides clear Czech explanation and recommendation for EXPIRED_OCCUPANCY
+        ok 3 - provides clear Czech explanation and recommendation for EXPIRED_OCCUPANCY
+          ---
+          duration_ms: 0.2631
+          type: 'test'
+          ...
+        # Subtest: provides clear Czech explanation and recommendation for EXPIRING_CAMPAIGN
+        ok 4 - provides clear Czech explanation and recommendation for EXPIRING_CAMPAIGN
+          ---
+          duration_ms: 0.3715
+          type: 'test'
+          ...
+        # Subtest: provides clear Czech explanation and recommendation for UNDERUTILIZED_MEDIA
+        ok 5 - provides clear Czech explanation and recommendation for UNDERUTILIZED_MEDIA
+          ---
+          duration_ms: 0.2479
+          type: 'test'
+          ...
+        1..5
+    ok 1 - Deterministic AI Fallback Explanations
+      ---
+      duration_ms: 82.8843
+      type: 'suite'
+      ...
+    # Subtest: Stable Fingerprint Generation & Deduplication Logic
+        # Subtest: produces identical fingerprints for the same logical collision regardless of item order
+        ok 1 - produces identical fingerprints for the same logical collision regardless of item order
+          ---
+          duration_ms: 0.4983
+          type: 'test'
+          ...
+        # Subtest: produces distinct fingerprints for different surfaces
+        ok 2 - produces distinct fingerprints for different surfaces
+          ---
+          duration_ms: 0.3853
+          type: 'test'
+          ...
+        # Subtest: produces distinct fingerprints for different tenants (Tenant Isolation)
+        ok 3 - produces distinct fingerprints for different tenants (Tenant Isolation)
+          ---
+          duration_ms: 0.4467
+          type: 'test'
+          ...
+        1..3
+    ok 2 - Stable Fingerprint Generation & Deduplication Logic
+      ---
+      duration_ms: 1.9305
+      type: 'suite'
+      ...
+    # Subtest: Simulation of Auto-Resolution Flow
+        # Subtest: detects when an open issue disappears in subsequent scans
+        ok 1 - detects when an open issue disappears in subsequent scans
+          ---
+          duration_ms: 1.6164
+          type: 'test'
+          ...
+        1..1
+    ok 3 - Simulation of Auto-Resolution Flow
+      ---
+      duration_ms: 2.1136
+      type: 'suite'
+      ...
+    # Subtest: Occupancy Intelligence Actions & Payload Compatibility
+        # Subtest: accepts both action and actionType in resolve request payload
+        ok 1 - accepts both action and actionType in resolve request payload
+          ---
+          duration_ms: 1.2494
+          type: 'test'
+          ...
+        # Subtest: provides fallback date range when alternatives search has null dates
+        ok 2 - provides fallback date range when alternatives search has null dates
+          ---
+          duration_ms: 2.0349
+          type: 'test'
+          ...
+        1..2
+    ok 4 - Occupancy Intelligence Actions & Payload Compatibility
+      ---
+      duration_ms: 3.6856
+      type: 'suite'
+      ...
+    1..4
+ok 429 - Occupancy Intelligence Audit & AI Layer
+  ---
+  duration_ms: 92.3483
+  type: 'suite'
+  ...
+# Subtest: deriveSurfaceOccupancyState - returns AVAILABLE when no occupancies exist
+ok 430 - deriveSurfaceOccupancyState - returns AVAILABLE when no occupancies exist
+  ---
+  duration_ms: 2.648
+  type: 'test'
+  ...
+# Subtest: deriveSurfaceOccupancyState - ignores CANCELLED and FINISHED occupancies
+ok 431 - deriveSurfaceOccupancyState - ignores CANCELLED and FINISHED occupancies
+  ---
+  duration_ms: 50.7082
+  type: 'test'
+  ...
+# Subtest: deriveSurfaceOccupancyState - correctly identifies active OCCUPIED state
+ok 432 - deriveSurfaceOccupancyState - correctly identifies active OCCUPIED state
+  ---
+  duration_ms: 0.5174
+  type: 'test'
+  ...
+# Subtest: deriveSurfaceOccupancyState - prioritizes OCCUPIED over NEGOTIATION
+ok 433 - deriveSurfaceOccupancyState - prioritizes OCCUPIED over NEGOTIATION
+  ---
+  duration_ms: 0.5025
+  type: 'test'
+  ...
+# Subtest: occupancy client components receive a server reference date for hydration-safe rendering
+ok 434 - occupancy client components receive a server reference date for hydration-safe rendering
+  ---
+  duration_ms: 7.2266
+  type: 'test'
+  ...
+# Subtest: odometer accepts whole kilometres including zero
+ok 435 - odometer accepts whole kilometres including zero
+  ---
+  duration_ms: 1.9841
+  type: 'test'
+  ...
+# Subtest: unreadable and malformed odometer results cannot overwrite the field
+ok 436 - unreadable and malformed odometer results cannot overwrite the field
+  ---
+  duration_ms: 0.3494
+  type: 'test'
+  ...
+# Subtest: respondToPublicOffer and transitionOffer enforce availability conflict check before accepting standard media offers
+ok 437 - respondToPublicOffer and transitionOffer enforce availability conflict check before accepting standard media offers
+  ---
+  duration_ms: 5.0488
+  type: 'test'
+  ...
+# Subtest: respondToPublicOffer respects selectedPointIds for Navigation Phase 1
+ok 438 - respondToPublicOffer respects selectedPointIds for Navigation Phase 1
+  ---
+  duration_ms: 2.7715
+  type: 'test'
+  ...
+# Subtest: sendTransactionalEmail and all offer notification routes scope EmailLog with organizationId
+ok 439 - sendTransactionalEmail and all offer notification routes scope EmailLog with organizationId
+  ---
+  duration_ms: 5.5249
+  type: 'test'
+  ...
+# Subtest: mediální balíček vybere konkrétní plochy podle typu a města bez duplicit
+ok 440 - mediální balíček vybere konkrétní plochy podle typu a města bez duplicit
+  ---
+  duration_ms: 4.4331
+  type: 'test'
+  ...
+# Subtest: nekompletní balíček vrátí přesný chybějící požadavek
+ok 441 - nekompletní balíček vrátí přesný chybějící požadavek
+  ---
+  duration_ms: 0.9853
+  type: 'test'
+  ...
+# Subtest: navigační bod počítá kusovou cenu, výrobu, montáž a demontáž pomocí Decimal
+ok 442 - navigační bod počítá kusovou cenu, výrobu, montáž a demontáž pomocí Decimal
+  ---
+  duration_ms: 4.0854
+  type: 'test'
+  ...
+# Subtest: audit blokuje fotografii, která není označená jako viditelná klientovi
+ok 443 - audit blokuje fotografii, která není označená jako viditelná klientovi
+  ---
+  duration_ms: 4.6065
+  type: 'test'
+  ...
+# Subtest: kompletní standardní nabídka projde auditem
+ok 444 - kompletní standardní nabídka projde auditem
+  ---
+  duration_ms: 2.3724
+  type: 'test'
+  ...
+# Subtest: audit blokuje prošlou platnost a chybějící kontakt
+ok 445 - audit blokuje prošlou platnost a chybějící kontakt
+  ---
+  duration_ms: 0.6134
+  type: 'test'
+  ...
+# Subtest: navigační nabídka vyžaduje klientský vizuál u každého bodu
+ok 446 - navigační nabídka vyžaduje klientský vizuál u každého bodu
+  ---
+  duration_ms: 0.8112
+  type: 'test'
+  ...
+# Subtest: filtruje plochy podle kódu, adresy, města, lokality a popisu bez ohledu na velikost písmen
+ok 447 - filtruje plochy podle kódu, adresy, města, lokality a popisu bez ohledu na velikost písmen
+  ---
+  duration_ms: 3.3966
+  type: 'test'
+  ...
+# Subtest: kombinuje typ, evidenční stav, GPS a serverový výsledek dostupnosti
+ok 448 - kombinuje typ, evidenční stav, GPS a serverový výsledek dostupnosti
+  ---
+  duration_ms: 0.6053
+  type: 'test'
+  ...
+# Subtest: stránkuje velký seznam a bezpečně omezí číslo stránky
+ok 449 - stránkuje velký seznam a bezpečně omezí číslo stránky
+  ---
+  duration_ms: 0.6759
+  type: 'test'
+  ...
+# Subtest: omezuje GPS plochy podle aktuálního výřezu mapy
+ok 450 - omezuje GPS plochy podle aktuálního výřezu mapy
+  ---
+  duration_ms: 0.3437
+  type: 'test'
+  ...
+# Subtest: vytvoření a úprava nabídky zachová více položek
+ok 451 - vytvoření a úprava nabídky zachová více položek
+  ---
+  duration_ms: 6.7927
+  type: 'test'
+  ...
+# Subtest: finanční výpočty používají Decimal a bezpečné zaokrouhlení
+ok 452 - finanční výpočty používají Decimal a bezpečné zaokrouhlení
+  ---
+  duration_ms: 3.836
+  type: 'test'
+  ...
+# Subtest: standardní nabídka zachová identitu vybraného databázového balíčku
+ok 453 - standardní nabídka zachová identitu vybraného databázového balíčku
+  ---
+  duration_ms: 0.3609
+  type: 'test'
+  ...
+# Subtest: ceník připočítá výrobu a služby serverově pomocí Decimal
+ok 454 - ceník připočítá výrobu a služby serverově pomocí Decimal
+  ---
+  duration_ms: 1.1019
+  type: 'test'
+  ...
+# Subtest: editace a duplikace obnoví pevnou část slevy z uložené celkové slevy
+ok 455 - editace a duplikace obnoví pevnou část slevy z uložené celkové slevy
+  ---
+  duration_ms: 0.5839
+  type: 'test'
+  ...
+# Subtest: prázdná nabídka je zamítnuta
+ok 456 - prázdná nabídka je zamítnuta
+  ---
+  duration_ms: 1.0267
+  type: 'test'
+  ...
+# Subtest: duplicitní plocha je zamítnuta
+ok 457 - duplicitní plocha je zamítnuta
+  ---
+  duration_ms: 0.6348
+  type: 'test'
+  ...
+# Subtest: OCCUPIED a RESERVED blokují nabídku
+ok 458 - OCCUPIED a RESERVED blokují nabídku
+  ---
+  duration_ms: 0.6163
+  type: 'test'
+  ...
+# Subtest: NEGOTIATION vyžaduje výslovné potvrzení a poté pokračuje
+ok 459 - NEGOTIATION vyžaduje výslovné potvrzení a poté pokračuje
+  ---
+  duration_ms: 0.7087
+  type: 'test'
+  ...
+# Subtest: createdBy je vždy odvozen ze serverového uživatele a klientský createdBy se ignoruje
+ok 460 - createdBy je vždy odvozen ze serverového uživatele a klientský createdBy se ignoruje
+  ---
+  duration_ms: 1.093
+  type: 'test'
+  ...
+# Subtest: RBAC omezuje vlastnictví SALES a převod pouze na ADMIN/MANAGER
+ok 461 - RBAC omezuje vlastnictví SALES a převod pouze na ADMIN/MANAGER
+  ---
+  duration_ms: 0.3657
+  type: 'test'
+  ...
+# Subtest: nepovolené statusové přechody jsou zamítnuty
+ok 462 - nepovolené statusové přechody jsou zamítnuty
+  ---
+  duration_ms: 0.532
+  type: 'test'
+  ...
+# Subtest: duplikace vytváří nezávislý koncept se všemi položkami
+ok 463 - duplikace vytváří nezávislý koncept se všemi položkami
+  ---
+  duration_ms: 0.5844
+  type: 'test'
+  ...
+# Subtest: veřejný token má dostatečnou entropii a v databázi se ukládá jen hash
+ok 464 - veřejný token má dostatečnou entropii a v databázi se ukládá jen hash
+  ---
+  duration_ms: 1.1478
+  type: 'test'
+  ...
+# Subtest: veřejný view model skryje interní ID, poznámku, rozpočet a e-mail autora
+ok 465 - veřejný view model skryje interní ID, poznámku, rozpočet a e-mail autora
+  ---
+  duration_ms: 0.7035
+  type: 'test'
+  ...
+# Subtest: veřejná navigace a Galerie venku neodhalí interní ID ani poznámky
+ok 466 - veřejná navigace a Galerie venku neodhalí interní ID ani poznámky
+  ---
+  duration_ms: 0.4435
+  type: 'test'
+  ...
+# Subtest: převod je idempotentní a částečný stav se zastaví před zápisy
+ok 467 - převod je idempotentní a částečný stav se zastaví před zápisy
+  ---
+  duration_ms: 0.4384
+  type: 'test'
+  ...
+# Subtest: detail nabídky nikdy nesestaví veřejný odkaz z interního ID nebo databázového hashe
+ok 468 - detail nabídky nikdy nesestaví veřejný odkaz z interního ID nebo databázového hashe
+  ---
+  duration_ms: 4.9822
+  type: 'test'
+  ...
+# Subtest: schválení cenové navigační nabídky automaticky zakládá realizační zakázku
+ok 469 - schválení cenové navigační nabídky automaticky zakládá realizační zakázku
+  ---
+  duration_ms: 0.2963
+  type: 'test'
+  ...
+# Subtest: CRM převod nabídky vyžaduje oprávněnou roli i stav ACCEPTED na všech vrstvách
+ok 470 - CRM převod nabídky vyžaduje oprávněnou roli i stav ACCEPTED na všech vrstvách
+  ---
+  duration_ms: 4.1699
+  type: 'test'
+  ...
+# Subtest: opportunity create input validates lengths, enums, dates, URLs and GPS
+ok 471 - opportunity create input validates lengths, enums, dates, URLs and GPS
+  ---
+  duration_ms: 9.4644
+  type: 'test'
+  ...
+# Subtest: opportunity filters are bounded and reject invalid enum or scores
+ok 472 - opportunity filters are bounded and reject invalid enum or scores
+  ---
+  duration_ms: 1.7789
+  type: 'test'
+  ...
+# Subtest: opportunity state machine and dismissal reason are enforced
+ok 473 - opportunity state machine and dismissal reason are enforced
+  ---
+  duration_ms: 1.2205
+  type: 'test'
+  ...
+# Subtest: article URL guard blocks loopback and private targets before fetch
+ok 474 - article URL guard blocks loopback and private targets before fetch
+  ---
+  duration_ms: 61.0984
+  type: 'test'
+  ...
+# Subtest: AI parser uses private server keys, one configured model and bounded external calls
+ok 475 - AI parser uses private server keys, one configured model and bounded external calls
+  ---
+  duration_ms: 1.8601
+  type: 'test'
+  ...
+# Subtest: opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery
+ok 476 - opportunity APIs scope tenants, rate-limit AI and restrict bulk discovery
+  ---
+  duration_ms: 10.8681
+  type: 'test'
+  ...
+# Subtest: CRM linking is serializable, tenant checked and audited without using article URL as company website
+ok 477 - CRM linking is serializable, tenant checked and audited without using article URL as company website
+  ---
+  duration_ms: 2.4794
+  type: 'test'
+  ...
+# Subtest: multi-tenant OOH scoring calculates 6 dimensions and awards points for tenant target region
+ok 478 - multi-tenant OOH scoring calculates 6 dimensions and awards points for tenant target region
+  ---
+  duration_ms: 33.2247
+  type: 'test'
+  ...
+# Subtest: parser does not contain hardcoded SeePOINT or MS region and accepts nullable city
+ok 479 - parser does not contain hardcoded SeePOINT or MS region and accepts nullable city
+  ---
+  duration_ms: 3.1482
+  type: 'test'
+  ...
+# Subtest: distance calculator computes Haversine distance in kilometers accurately
+ok 480 - distance calculator computes Haversine distance in kilometers accurately
+  ---
+  duration_ms: 160.2909
+  type: 'test'
+  ...
+# Subtest: invitation lifecycle distinguishes pending, expired, accepted and revoked
+ok 481 - invitation lifecycle distinguishes pending, expired, accepted and revoked
+  ---
+  duration_ms: 2.9877
+  type: 'test'
+  ...
+# Subtest: only an organization owner can assign the owner role
+ok 482 - only an organization owner can assign the owner role
+  ---
+  duration_ms: 0.738
+  type: 'test'
+  ...
+# Subtest: activation enables only organizations with a non-expired invitation
+ok 483 - activation enables only organizations with a non-expired invitation
+  ---
+  duration_ms: 3.4533
+  type: 'test'
+  ...
+# Subtest: onboarding derives automatic steps only from the active organization evidence
+ok 484 - onboarding derives automatic steps only from the active organization evidence
+  ---
+  duration_ms: 3.1519
+  type: 'test'
+  ...
+# Subtest: onboarding remains resumable and finishes after every persisted step
+ok 485 - onboarding remains resumable and finishes after every persisted step
+  ---
+  duration_ms: 0.6304
+  type: 'test'
+  ...
+# Subtest: photo validation verifies magic bytes instead of trusting MIME or extension
+ok 486 - photo validation verifies magic bytes instead of trusting MIME or extension
+  ---
+  duration_ms: 6.7539
+  type: 'test'
+  ...
+# Subtest: photo validation rejects empty and oversized uploads and sanitizes names
+ok 487 - photo validation rejects empty and oversized uploads and sanitizes names
+  ---
+  duration_ms: 1.9979
+  type: 'test'
+  ...
+# Subtest: legacy data URL photos are decoded with the same strict validation boundary
+ok 488 - legacy data URL photos are decoded with the same strict validation boundary
+  ---
+  duration_ms: 1.5382
+  type: 'test'
+  ...
+# Subtest: mobile upload separates survey uploads from carrier field captures
+ok 489 - mobile upload separates survey uploads from carrier field captures
+  ---
+  duration_ms: 2.5308
+  type: 'test'
+  ...
+# Subtest: mobile field UI never substitutes carrier coordinates for capture coordinates
+ok 490 - mobile field UI never substitutes carrier coordinates for capture coordinates
+  ---
+  duration_ms: 3.4922
+  type: 'test'
+  ...
+# Subtest: mobile carrier discovery is bounded, searchable and resistant to stale responses
+ok 491 - mobile carrier discovery is bounded, searchable and resistant to stale responses
+  ---
+  duration_ms: 4.7405
+  type: 'test'
+  ...
+# Subtest: photo confirmation is authenticated, one-way and idempotent
+ok 492 - photo confirmation is authenticated, one-way and idempotent
+  ---
+  duration_ms: 1.7302
+  type: 'test'
+  ...
+# Subtest: installation photos share tenant storage and clean up failed writes
+ok 493 - installation photos share tenant storage and clean up failed writes
+  ---
+  duration_ms: 5.5606
+  type: 'test'
+  ...
+# Subtest: all active photo upload routes use the shared storage boundary or verified Drive logo flow
+ok 494 - all active photo upload routes use the shared storage boundary or verified Drive logo flow
+  ---
+  duration_ms: 15.7104
+  type: 'test'
+  ...
+# Subtest: standard photo upload restores the verified tenant at the route boundary
+ok 495 - standard photo upload restores the verified tenant at the route boundary
+  ---
+  duration_ms: 2.147
+  type: 'test'
+  ...
+# Subtest: profile and vehicle photos use correct types and replacement-safe storage
+ok 496 - profile and vehicle photos use correct types and replacement-safe storage
+  ---
+  duration_ms: 2.6279
+  type: 'test'
+  ...
+# Subtest: legacy content and thumbnail endpoints converge on the authorized file route
+ok 497 - legacy content and thumbnail endpoints converge on the authorized file route
+  ---
+  duration_ms: 3.3465
+  type: 'test'
+  ...
+# Subtest: deleting a photo removes the database row before best-effort object cleanup
+ok 498 - deleting a photo removes the database row before best-effort object cleanup
+  ---
+  duration_ms: 1.8411
+  type: 'test'
+  ...
+# Subtest: carrier photo count stays synchronized after gallery mutations
+ok 499 - carrier photo count stays synchronized after gallery mutations
+  ---
+  duration_ms: 3.9042
+  type: 'test'
+  ...
+# Subtest: carrier damage report validates, prepares and verifies photo uploads before closing
+ok 500 - carrier damage report validates, prepares and verifies photo uploads before closing
+  ---
+  duration_ms: 1.5745
+  type: 'test'
+  ...
+# Subtest: carrier gallery preserves and displays field capture metadata
+ok 501 - carrier gallery preserves and displays field capture metadata
+  ---
+  duration_ms: 4.5669
+  type: 'test'
+  ...
+# Subtest: Google Drive image picker loads bounded pages instead of one thousand files
+ok 502 - Google Drive image picker loads bounded pages instead of one thousand files
+  ---
+  duration_ms: 6.8192
+  type: 'test'
+  ...
+# Subtest: Photos: linking multiple photos concurrently checks and sets exactly one primary photo
+ok 503 - Photos: linking multiple photos concurrently checks and sets exactly one primary photo
+  ---
+  duration_ms: 7.1022
+  type: 'test'
+  ...
+# Subtest: Photos: linking multiple photos sequentially sets the first one as primary
+ok 504 - Photos: linking multiple photos sequentially sets the first one as primary
+  ---
+  duration_ms: 0.8419
+  type: 'test'
+  ...
+# Subtest: Planner cron reaches its secret-authenticated handler without a browser cookie
+ok 505 - Planner cron reaches its secret-authenticated handler without a browser cookie
+  ---
+  duration_ms: 9.0183
+  type: 'test'
+  ...
+# Subtest: Planner user APIs and nested cron paths still require a browser session
+ok 506 - Planner user APIs and nested cron paths still require a browser session
+  ---
+  duration_ms: 4.8249
+  type: 'test'
+  ...
+# Subtest: additive migration enforces tenant event keys, idempotency and immediate offboarding in PostgreSQL
+ok 507 - additive migration enforces tenant event keys, idempotency and immediate offboarding in PostgreSQL
+  ---
+  duration_ms: 13233.2084
+  type: 'test'
+  ...
+# Subtest: overlapping events count only once in capacity
+ok 508 - overlapping events count only once in capacity
+  ---
+  duration_ms: 2.4361
+  type: 'test'
+  ...
+# Subtest: timezone conversion handles Prague DST and rejects non-existent wall time
+ok 509 - timezone conversion handles Prague DST and rejects non-existent wall time
+  ---
+  duration_ms: 39.233
+  type: 'test'
+  ...
+# Subtest: meeting search respects all participants, buffers, lunch and forbidden times
+ok 510 - meeting search respects all participants, buffers, lunch and forbidden times
+  ---
+  duration_ms: 120.8165
+  type: 'test'
+  ...
+# Subtest: a fully occupied day has no suggested slot
+ok 511 - a fully occupied day has no suggested slot
+  ---
+  duration_ms: 51.3689
+  type: 'test'
+  ...
+# Subtest: all-day end is exclusive in calendar timezone and duplicate tombstones win
+ok 512 - all-day end is exclusive in calendar timezone and duplicate tombstones win
+  ---
+  duration_ms: 1.5511
+  type: 'test'
+  ...
+# Subtest: preferences reject invalid hours and timezone
+ok 513 - preferences reject invalid hours and timezone
+  ---
+  duration_ms: 2.7804
+  type: 'test'
+  ...
+# Subtest: every new Planner model is scoped and rejects a foreign tenant override
+ok 514 - every new Planner model is scoped and rejects a foreign tenant override
+  ---
+  duration_ms: 5.0667
+  type: 'test'
+  ...
+# Subtest: manager cannot manage another user connection or same user in other tenant
+ok 515 - manager cannot manage another user connection or same user in other tenant
+  ---
+  duration_ms: 0.3834
+  type: 'test'
+  ...
+# Subtest: FREE_BUSY projection used by UI and AI contains no title, location or provider metadata
+ok 516 - FREE_BUSY projection used by UI and AI contains no title, location or provider metadata
+  ---
+  duration_ms: 3.0302
+  type: 'test'
+  ...
+# Subtest: WORK_DETAILS never reveals private/default events; FULL requires explicit selection
+ok 517 - WORK_DETAILS never reveals private/default events; FULL requires explicit selection
+  ---
+  duration_ms: 0.5195
+  type: 'test'
+  ...
+# Subtest: cross-tenant and offboarded events are absent even for manager/AI
+ok 518 - cross-tenant and offboarded events are absent even for manager/AI
+  ---
+  duration_ms: 0.3714
+  type: 'test'
+  ...
+# Subtest: OAuth state must match cookie nonce, user, tenant and expiration
+ok 519 - OAuth state must match cookie nonce, user, tenant and expiration
+  ---
+  duration_ms: 0.8766
+  type: 'test'
+  ...
+# Subtest: Planner is opt-in per tenant, including enterprise
+ok 520 - Planner is opt-in per tenant, including enterprise
+  ---
+  duration_ms: 0.86
+  type: 'test'
+  ...
+# Subtest: create rejects foreign Offer, foreign Client and inconsistent client before writing
+ok 521 - create rejects foreign Offer, foreign Client and inconsistent client before writing
+  ---
+  duration_ms: 74.6957
+  type: 'test'
+  ...
+# Subtest: production and CRM use caller transaction and roll back together on CRM failure
+ok 522 - production and CRM use caller transaction and roll back together on CRM failure
+  ---
+  duration_ms: 5.0575
+  type: 'test'
+  ...
+# Subtest: public approval is restricted to offer, tenant, current state and cannot replay
+ok 523 - public approval is restricted to offer, tenant, current state and cannot replay
+  ---
+  duration_ms: 2.1508
+  type: 'test'
+  ...
+# Subtest: PWA manifest has a stable scope, standalone start and real square raster icons
+ok 524 - PWA manifest has a stable scope, standalone start and real square raster icons
+  ---
+  duration_ms: 84.5314
+  type: 'test'
+  ...
+# Subtest: service worker caches only a public offline shell and never authenticated pages or APIs
+ok 525 - service worker caches only a public offline shell and never authenticated pages or APIs
+  ---
+  duration_ms: 0.7982
+  type: 'test'
+  ...
+# Subtest: PWA technical files bypass auth middleware while application routes stay protected
+ok 526 - PWA technical files bypass auth middleware while application routes stay protected
+  ---
+  duration_ms: 0.4861
+  type: 'test'
+  ...
+# Subtest: install UI handles app installation, dismissal, offline state and accessible zoom
+ok 527 - install UI handles app installation, dismissal, offline state and accessible zoom
+  ---
+  duration_ms: 0.5414
+  type: 'test'
+  ...
+# Subtest: vercel.json is valid and contains sales-radar cron job
+ok 528 - vercel.json is valid and contains sales-radar cron job
+  ---
+  duration_ms: 3.685
+  type: 'test'
+  ...
+# Subtest: cron route guards execution with CRON_SECRET and admin check
+ok 529 - cron route guards execution with CRON_SECRET and admin check
+  ---
+  duration_ms: 1.9512
+  type: 'test'
+  ...
+# Subtest: notifications service supports RADAR_OPPORTUNITY and includes them for sales
+ok 530 - notifications service supports RADAR_OPPORTUNITY and includes them for sales
+  ---
+  duration_ms: 1.7213
+  type: 'test'
+  ...
+# Subtest: unread notifications route includes fresh radar opportunities in toast items
+ok 531 - unread notifications route includes fresh radar opportunities in toast items
+  ---
+  duration_ms: 1.4236
+  type: 'test'
+  ...
+# Subtest: radar settings modal clearly shows automated morning cron status and notifications
+ok 532 - radar settings modal clearly shows automated morning cron status and notifications
+  ---
+  duration_ms: 1.5095
+  type: 'test'
+  ...
+# Subtest: expired shared deadline rejects before another request can start
+ok 533 - expired shared deadline rejects before another request can start
+  ---
+  duration_ms: 3.452
+  type: 'test'
+  ...
+# Subtest: live search reports provider HTTP failures rather than a successful empty result
+ok 534 - live search reports provider HTTP failures rather than a successful empty result
+  ---
+  duration_ms: 434.286
+  type: 'test'
+  ...
+# Error parsing live search JSON: Error: Neplatný JSON.
+#     at searchLiveOpportunitiesWithGemini (C:\\Users\\42077\\Documents\\seepoint\\lib\\opportunities\\live-search-core.ts:138:53)
+#     at async waitForActual (node:assert:644:5)
+#     at async Function.rejects (node:assert:767:25)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\radar-deadline.test.ts:23:45)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Error parsing live search JSON: Error: Žádná položka neprošla validací.
+#     at searchLiveOpportunitiesWithGemini (C:\\Users\\42077\\Documents\\seepoint\\lib\\opportunities\\live-search-core.ts:204:60)
+#     at async waitForActual (node:assert:644:5)
+#     at async Function.rejects (node:assert:767:25)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\radar-deadline.test.ts:24:41)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: valid empty search remains distinct from malformed provider output
+ok 535 - valid empty search remains distinct from malformed provider output
+  ---
+  duration_ms: 14.7247
+  type: 'test'
+  ...
+# Subtest: Radar review endpoint remains usable after discovery quota and backfill quota are exhausted
+ok 536 - Radar review endpoint remains usable after discovery quota and backfill quota are exhausted
+  ---
+  duration_ms: 613.1523
+  type: 'test'
+  ...
+# Subtest: additive radar migration preserves historical opportunities and articles with tenant-safe source identity
+ok 537 - additive radar migration preserves historical opportunities and articles with tenant-safe source identity
+  ---
+  duration_ms: 12633.2794
+  type: 'test'
+  ...
+# Subtest: production semantic ingestion and manual review preserve source identity and canonical records
+    # Subtest: same URL twice -> one source and one opportunity, zero comparison calls
+    ok 1 - same URL twice -> one source and one opportunity, zero comparison calls
+      ---
+      duration_ms: 20.4034
+      type: 'test'
+      ...
+    # Subtest: two URLs, same concrete project -> two sources and one opportunity
+    ok 2 - two URLs, same concrete project -> two sources and one opportunity
+      ---
+      duration_ms: 46.8689
+      type: 'test'
+      ...
+    # Subtest: different cities -> separate; same company and city alone -> never auto merge
+    ok 3 - different cities -> separate; same company and city alone -> never auto merge
+      ---
+      duration_ms: 12.7676
+      type: 'test'
+      ...
+    # Subtest: same tender, distinct titles -> deterministic merge without provider
+    ok 4 - same tender, distinct titles -> deterministic merge without provider
+      ---
+      duration_ms: 5.8323
+      type: 'test'
+      ...
+    # Subtest: .82 confidence -> review; manual merge moves both sources; detach reverses enrichment
+    ok 5 - .82 confidence -> review; manual merge moves both sources; detach reverses enrichment
+      ---
+      duration_ms: 14.2368
+      type: 'test'
+      ...
+    # Subtest: keep separate survives recrawl and higher resolver confidence
+    ok 6 - keep separate survives recrawl and higher resolver confidence
+      ---
+      duration_ms: 8.4148
+      type: 'test'
+      ...
+    # Subtest: new investment is added without overwriting confirmed facts and sources remain
+    ok 7 - new investment is added without overwriting confirmed facts and sources remain
+      ---
+      duration_ms: 9.0428
+      type: 'test'
+      ...
+    # Subtest: provider failure retains source and creates review instead of an automatic merge
+    ok 8 - provider failure retains source and creates review instead of an automatic merge
+      ---
+      duration_ms: 6.8223
+      type: 'test'
+      ...
+    # Subtest: new article cannot override an indistinguishable pair previously kept separate
+    ok 9 - new article cannot override an indistinguishable pair previously kept separate
+      ---
+      duration_ms: 31.8304
+      type: 'test'
+      ...
+    # Subtest: conflicting exact location or identifier vetoes automatic merge
+    ok 10 - conflicting exact location or identifier vetoes automatic merge
+      ---
+      duration_ms: 12.4445
+      type: 'test'
+      ...
+    # Subtest: foreign-tenant review cannot move sources
+    ok 11 - foreign-tenant review cannot move sources
+      ---
+      duration_ms: 3.0069
+      type: 'test'
+      ...
+    # Subtest: historical preview is non-destructive and does not call paid AI
+    ok 12 - historical preview is non-destructive and does not call paid AI
+      ---
+      duration_ms: 12.3099
+      type: 'test'
+      ...
+    # Subtest: candidate retrieval bounds every database branch and returns at most ten
+    ok 13 - candidate retrieval bounds every database branch and returns at most ten
+      ---
+      duration_ms: 2.8363
+      type: 'test'
+      ...
+    1..13
+ok 538 - production semantic ingestion and manual review preserve source identity and canonical records
+  ---
+  duration_ms: 825.1259
+  type: 'test'
+  ...
+# Subtest: two differently titled articles with a shared tender identifier resolve without LLM
+ok 539 - two differently titled articles with a shared tender identifier resolve without LLM
+  ---
+  duration_ms: 5.3924
+  type: 'test'
+  ...
+# Subtest: same company and category or same company and city cannot auto merge
+ok 540 - same company and category or same company and city cannot auto merge
+  ---
+  duration_ms: 1.3978
+  type: 'test'
+  ...
+# Subtest: configured confidence boundaries: .90 auto, .82 review, .74 new
+ok 541 - configured confidence boundaries: .90 auto, .82 review, .74 new
+  ---
+  duration_ms: 3.854
+  type: 'test'
+  ...
+# Subtest: critical conflicts veto high-confidence auto merge, including an identical identifier
+ok 542 - critical conflicts veto high-confidence auto merge, including an identical identifier
+  ---
+  duration_ms: 1.9001
+  type: 'test'
+  ...
+# Subtest: different cities and distinct identifiers bypass paid comparison
+ok 543 - different cities and distinct identifiers bypass paid comparison
+  ---
+  duration_ms: 0.6095
+  type: 'test'
+  ...
+# Subtest: untrusted resolver output cannot invent candidate IDs or confidence
+ok 544 - untrusted resolver output cannot invent candidate IDs or confidence
+  ---
+  duration_ms: 0.5104
+  type: 'test'
+  ...
+# Subtest: enrichment retains investment provenance and conflicts; detach reconstruction removes its facts
+ok 545 - enrichment retains investment provenance and conflicts; detach reconstruction removes its facts
+  ---
+  duration_ms: 1.0451
+  type: 'test'
+  ...
+# Subtest: optional extraction fields stay absent; domain comes from actual URL
+ok 546 - optional extraction fields stay absent; domain comes from actual URL
+  ---
+  duration_ms: 5.5019
+  type: 'test'
+  ...
+# Subtest: request below the limit is allowed
+ok 547 - request below the limit is allowed
+  ---
+  duration_ms: 7.496
+  type: 'test'
+  ...
+# Subtest: limit produces HTTP 429 and Retry-After
+ok 548 - limit produces HTTP 429 and Retry-After
+  ---
+  duration_ms: 1.812
+  type: 'test'
+  ...
+# Subtest: different identities have separate limits
+ok 549 - different identities have separate limits
+  ---
+  duration_ms: 1.1178
+  type: 'test'
+  ...
+# Subtest: different endpoints have separate buckets
+ok 550 - different endpoints have separate buckets
+  ---
+  duration_ms: 0.8985
+  type: 'test'
+  ...
+# Subtest: block expires in the next window
+ok 551 - block expires in the next window
+  ---
+  duration_ms: 0.8468
+  type: 'test'
+  ...
+# Subtest: untrusted forwarded IP is ignored outside Vercel
+ok 552 - untrusted forwarded IP is ignored outside Vercel
+  ---
+  duration_ms: 6.4854
+  type: 'test'
+  ...
+# Subtest: forgot-password response remains generic
+ok 553 - forgot-password response remains generic
+  ---
+  duration_ms: 1.7042
+  type: 'test'
+  ...
+# Subtest: hourly, task and fixed rates are representable and individual selection is date-bound
+ok 554 - hourly, task and fixed rates are representable and individual selection is date-bound
+  ---
+  duration_ms: 2.7963
+  type: 'test'
+  ...
+# Subtest: exact WorkType overrides a general individual rate
+ok 555 - exact WorkType overrides a general individual rate
+  ---
+  duration_ms: 0.359
+  type: 'test'
+  ...
+# Subtest: validFrom and validTo boundaries are inclusive and open validTo remains selectable
+ok 556 - validFrom and validTo boundaries are inclusive and open validTo remains selectable
+  ---
+  duration_ms: 0.4303
+  type: 'test'
+  ...
+# Subtest: missing rate returns null
+ok 557 - missing rate returns null
+  ---
+  duration_ms: 0.229
+  type: 'test'
+  ...
+# Subtest: rate intervals treat endpoints as inclusive and detect open-ended conflicts
+ok 558 - rate intervals treat endpoints as inclusive and detect open-ended conflicts
+  ---
+  duration_ms: 0.5224
+  type: 'test'
+  ...
+# Subtest: amount versioning ends previous daily interval one day before new version
+ok 559 - amount versioning ends previous daily interval one day before new version
+  ---
+  duration_ms: 1.8903
+  type: 'test'
+  ...
+# Subtest: only administrators can manage worker financials
+ok 560 - only administrators can manage worker financials
+  ---
+  duration_ms: 0.4161
+  type: 'test'
+  ...
+# Subtest: AES-256-GCM encryption roundtrip encrypts and restores secret API key
+ok 561 - AES-256-GCM encryption roundtrip encrypts and restores secret API key
+  ---
+  duration_ms: 3.7081
+  type: 'test'
+  ...
+# Subtest: AES-256-GCM detects tampering and rejects compromised credentials
+ok 562 - AES-256-GCM detects tampering and rejects compromised credentials
+  ---
+  duration_ms: 1.8303
+  type: 'test'
+  ...
+# Subtest: Resend Svix webhook signature verification allows valid authentic payloads
+ok 563 - Resend Svix webhook signature verification allows valid authentic payloads
+  ---
+  duration_ms: 3.9194
+  type: 'test'
+  ...
+# Subtest: Resend Svix webhook rejects tampered payload or forged signature
+ok 564 - Resend Svix webhook rejects tampered payload or forged signature
+  ---
+  duration_ms: 0.9628
+  type: 'test'
+  ...
+# Subtest: Resend Svix webhook handles multiple comma/space separated signatures
+ok 565 - Resend Svix webhook handles multiple comma/space separated signatures
+  ---
+  duration_ms: 0.4797
+  type: 'test'
+  ...
+# Subtest: Resend domain normalization and tenant From address policy
+ok 566 - Resend domain normalization and tenant From address policy
+  ---
+  duration_ms: 0.7829
+  type: 'test'
+  ...
+# Subtest: Resend API key sanitization strips surrounding quotes and whitespace
+ok 567 - Resend API key sanitization strips surrounding quotes and whitespace
+  ---
+  duration_ms: 0.3814
+  type: 'test'
+  ...
+# [webhook] Resend webhook signature verification failed
+# Subtest: signed Resend callbacks execute lazy Prisma mutations inside the resolved tenant
+    # Subtest: concurrent delivery and domain updates remain scoped to their owners
+    ok 1 - concurrent delivery and domain updates remain scoped to their owners
+      ---
+      duration_ms: 15259.8227
+      type: 'test'
+      ...
+    # Subtest: unknown provider IDs cause no mutation
+    ok 2 - unknown provider IDs cause no mutation
+      ---
+      duration_ms: 1.2831
+      type: 'test'
+      ...
+    # Subtest: invalid signatures are rejected before ownership lookup
+    ok 3 - invalid signatures are rejected before ownership lookup
+      ---
+      duration_ms: 2.3777
+      type: 'test'
+      ...
+    1..3
+ok 568 - signed Resend callbacks execute lazy Prisma mutations inside the resolved tenant
+  ---
+  duration_ms: 15272.8985
+  type: 'test'
+  ...
+# Subtest: shell rozlišuje aktivní, organizační a platformovou roli
+ok 569 - shell rozlišuje aktivní, organizační a platformovou roli
+  ---
+  duration_ms: 548.5606
+  type: 'test'
+  ...
+# Subtest: profil vysvětluje, že přepnutí aktivní role neodebírá oprávnění
+ok 570 - profil vysvětluje, že přepnutí aktivní role neodebírá oprávnění
+  ---
+  duration_ms: 14.8842
+  type: 'test'
+  ...
+# Subtest: public graph rejects historical cross-tenant relations and planning uses real dates
+ok 571 - public graph rejects historical cross-tenant relations and planning uses real dates
+  ---
+  duration_ms: 185.7697
+  type: 'test'
+  ...
+# Subtest: module IDs, exact routes and plan entries are unique and fail closed
+ok 572 - module IDs, exact routes and plan entries are unique and fail closed
+  ---
+  duration_ms: 4.371
+  type: 'test'
+  ...
+# Subtest: disabled module, inactive membership, mismatched tenant and RBAC deny access
+ok 573 - disabled module, inactive membership, mismatched tenant and RBAC deny access
+  ---
+  duration_ms: 873.5199
+  type: 'test'
+  ...
+# Subtest: PrintProductionJob reads and writes cannot address tenant B from tenant A
+ok 574 - PrintProductionJob reads and writes cannot address tenant B from tenant A
+  ---
+  duration_ms: 1.7258
+  type: 'test'
+  ...
+# Subtest: permanent credentials survive workflow, encryption-key rotation and legacy migration
+ok 575 - permanent credentials survive workflow, encryption-key rotation and legacy migration
+  ---
+  duration_ms: 4.3368
+  type: 'test'
+  ...
+# Subtest: production runtime validation and transitions reject unsafe input
+ok 576 - production runtime validation and transitions reject unsafe input
+  ---
+  duration_ms: 1.2067
+  type: 'test'
+  ...
+# Subtest: Etapa 2: submitWorkEntries - hromadné odeslání s vlastnictvím a validním stavem
+ok 577 - Etapa 2: submitWorkEntries - hromadné odeslání s vlastnictvím a validním stavem
+  ---
+  duration_ms: 577.7743
+  type: 'test'
+  ...
+# Subtest: Etapa 2: submitWorkEntries - pokus o odeslání cizího záznamu
+ok 578 - Etapa 2: submitWorkEntries - pokus o odeslání cizího záznamu
+  ---
+  duration_ms: 1.1115
+  type: 'test'
+  ...
+# Subtest: Etapa 2: submitWorkEntries - odeslání nevhodného stavu (např. APPROVED)
+ok 579 - Etapa 2: submitWorkEntries - odeslání nevhodného stavu (např. APPROVED)
+  ---
+  duration_ms: 0.5899
+  type: 'test'
+  ...
+# Subtest: Etapa 2: lockSettlement - kontrola neuzavřených položek práce
+ok 580 - Etapa 2: lockSettlement - kontrola neuzavřených položek práce
+  ---
+  duration_ms: 1.2419
+  type: 'test'
+  ...
+# Subtest: Etapa 2: lockSettlement - kontrola neuzavřených výdajů
+ok 581 - Etapa 2: lockSettlement - kontrola neuzavřených výdajů
+  ---
+  duration_ms: 0.603
+  type: 'test'
+  ...
+# Subtest: Etapa 2: lockSettlement - úspěšné uzamčení a zápis audit logu
+ok 582 - Etapa 2: lockSettlement - úspěšné uzamčení a zápis audit logu
+  ---
+  duration_ms: 2.5103
+  type: 'test'
+  ...
+# Subtest: Etapa 2: paySettlement - idempotentní chování
+ok 583 - Etapa 2: paySettlement - idempotentní chování
+  ---
+  duration_ms: 0.8944
+  type: 'test'
+  ...
+# Subtest: Etapa 2: rejectSettlement - zamítnutí s chybějícím nebo krátkým důvodem
+ok 584 - Etapa 2: rejectSettlement - zamítnutí s chybějícím nebo krátkým důvodem
+  ---
+  duration_ms: 0.6463
+  type: 'test'
+  ...
+# Subtest: Etapa 2: addManualAdjustment - nulová částka nebo chybějící důvod
+ok 585 - Etapa 2: addManualAdjustment - nulová částka nebo chybějící důvod
+  ---
+  duration_ms: 1.411
+  type: 'test'
+  ...
+# Subtest: Etapa 2: addManualAdjustment - nelze přidat do uzamčeného vyúčtování
+ok 586 - Etapa 2: addManualAdjustment - nelze přidat do uzamčeného vyúčtování
+  ---
+  duration_ms: 1.2893
+  type: 'test'
+  ...
+# Subtest: Etapa 2: addManualAdjustment odmítne neplatnou finanční přesnost, kategorii a prázdný popis
+ok 587 - Etapa 2: addManualAdjustment odmítne neplatnou finanční přesnost, kategorii a prázdný popis
+  ---
+  duration_ms: 1.0179
+  type: 'test'
+  ...
+# Subtest: Etapa 2: rejectWorkExpense - zamítnutí s validací důvodu
+ok 588 - Etapa 2: rejectWorkExpense - zamítnutí s validací důvodu
+  ---
+  duration_ms: 0.6573
+  type: 'test'
+  ...
+# Subtest: Etapa 2: double approve WorkExpense idempotence check
+ok 589 - Etapa 2: double approve WorkExpense idempotence check
+  ---
+  duration_ms: 0.569
+  type: 'test'
+  ...
+# Subtest: Etapa 2: Settlement reject transition (SUBMITTED -> REJECTED -> SUBMITTED)
+ok 590 - Etapa 2: Settlement reject transition (SUBMITTED -> REJECTED -> SUBMITTED)
+  ---
+  duration_ms: 1.1505
+  type: 'test'
+  ...
+# Subtest: 1. Rate Selection Priority with carrierType specific matches
+ok 591 - 1. Rate Selection Priority with carrierType specific matches
+  ---
+  duration_ms: 270.1468
+  type: 'test'
+  ...
+# Subtest: 2. Time Zone month assignment (Europe/Prague boundaries)
+ok 592 - 2. Time Zone month assignment (Europe/Prague boundaries)
+  ---
+  duration_ms: 310.1603
+  type: 'test'
+  ...
+# Subtest: 3. Recalculation logic for Settlements totals
+ok 593 - 3. Recalculation logic for Settlements totals
+  ---
+  duration_ms: 1.6795
+  type: 'test'
+  ...
+# Subtest: 4. State transitions validation for WorkEntry
+ok 594 - 4. State transitions validation for WorkEntry
+  ---
+  duration_ms: 1.94
+  type: 'test'
+  ...
+# Subtest: 5. Lock-based carry-over offset during WorkEntry approval
+ok 595 - 5. Lock-based carry-over offset during WorkEntry approval
+  ---
+  duration_ms: 2.8498
+  type: 'test'
+  ...
+# Subtest: 6. Idempotent WorkExpense approval and unique SettlementAdjustment link
+ok 596 - 6. Idempotent WorkExpense approval and unique SettlementAdjustment link
+  ---
+  duration_ms: 1.3171
+  type: 'test'
+  ...
+# Subtest: 7. Complete rate priority levels (1 to 6)
+ok 597 - 7. Complete rate priority levels (1 to 6)
+  ---
+  duration_ms: 1.386
+  type: 'test'
+  ...
+# Subtest: 8. Idempotency on double approvals and carry-over edits
+ok 598 - 8. Idempotency on double approvals and carry-over edits
+  ---
+  duration_ms: 1.3564
+  type: 'test'
+  ...
+# Subtest: 9. Active RecurringAdjustment date filter rules
+ok 599 - 9. Active RecurringAdjustment date filter rules
+  ---
+  duration_ms: 0.7002
+  type: 'test'
+  ...
+# Subtest: 10. Permission restrictions on WORKER role (cannot approve work or expense)
+ok 600 - 10. Permission restrictions on WORKER role (cannot approve work or expense)
+  ---
+  duration_ms: 0.5789
+  type: 'test'
+  ...
+# Subtest: 11. Backfill of historical appliedRate and nullable rateType
+ok 601 - 11. Backfill of historical appliedRate and nullable rateType
+  ---
+  duration_ms: 0.227
+  type: 'test'
+  ...
+# Subtest: 12. Mandatory rateType check when creating new item
+ok 602 - 12. Mandatory rateType check when creating new item
+  ---
+  duration_ms: 0.7203
+  type: 'test'
+  ...
+# Subtest: 13. Idempotency of carry-over adjustment inside the same target settlement
+ok 603 - 13. Idempotency of carry-over adjustment inside the same target settlement
+  ---
+  duration_ms: 4.2606
+  type: 'test'
+  ...
+# Subtest: 14. Subsequent carry-over adjustment of same work entry in a new target settlement
+ok 604 - 14. Subsequent carry-over adjustment of same work entry in a new target settlement
+  ---
+  duration_ms: 2.9107
+  type: 'test'
+  ...
+# Subtest: 15. Transaction retry helper - success on second attempt
+ok 605 - 15. Transaction retry helper - success on second attempt
+  ---
+  duration_ms: 209.0102
+  type: 'test'
+  ...
+# Subtest: 16. Transaction retry helper - exhaustion throws ConcurrencyError
+ok 606 - 16. Transaction retry helper - exhaustion throws ConcurrencyError
+  ---
+  duration_ms: 717.7145
+  type: 'test'
+  ...
+# Subtest: 17. Transaction retry helper - other Prisma errors are thrown immediately
+ok 607 - 17. Transaction retry helper - other Prisma errors are thrown immediately
+  ---
+  duration_ms: 0.6342
+  type: 'test'
+  ...
+# Subtest: 18. SystemSettings singleton restriction
+ok 608 - 18. SystemSettings singleton restriction
+  ---
+  duration_ms: 2.0249
+  type: 'test'
+  ...
+# Subtest: 19. Build script check in package.json
+ok 609 - 19. Build script check in package.json
+  ---
+  duration_ms: 0.5695
+  type: 'test'
+  ...
+# Subtest: 20. Transition DRAFT to APPROVED is forbidden
+ok 610 - 20. Transition DRAFT to APPROVED is forbidden
+  ---
+  duration_ms: 0.2625
+  type: 'test'
+  ...
+# Subtest: 21. Separate correction of approved work in an open period
+ok 611 - 21. Separate correction of approved work in an open period
+  ---
+  duration_ms: 0.8786
+  type: 'test'
+  ...
+# Subtest: 22. Separate correction of approved work in a locked period (carry-over difference)
+ok 612 - 22. Separate correction of approved work in a locked period (carry-over difference)
+  ---
+  duration_ms: 1.352
+  type: 'test'
+  ...
+# Subtest: 23. Required reason for work entry correction
+ok 613 - 23. Required reason for work entry correction
+  ---
+  duration_ms: 0.6341
+  type: 'test'
+  ...
+# Subtest: 24. Financial origin deletion restriction (onDelete constraints checking)
+ok 614 - 24. Financial origin deletion restriction (onDelete constraints checking)
+  ---
+  duration_ms: 47.1931
+  type: 'test'
+  ...
+# Subtest: 25. InvoiceStatus enum values validation
+ok 615 - 25. InvoiceStatus enum values validation
+  ---
+  duration_ms: 2.4415
+  type: 'test'
+  ...
+# Subtest: 26. SystemSettings has no fake billing defaults
+ok 616 - 26. SystemSettings has no fake billing defaults
+  ---
+  duration_ms: 3.0873
+  type: 'test'
+  ...
+# Subtest: 27. Cumulative carry-over corrections and baseline calculations
+ok 617 - 27. Cumulative carry-over corrections and baseline calculations
+  ---
+  duration_ms: 2.2288
+  type: 'test'
+  ...
+# Subtest: 28. Removing open carry-over adjustment when correction difference is zero
+ok 618 - 28. Removing open carry-over adjustment when correction difference is zero
+  ---
+  duration_ms: 1.2906
+  type: 'test'
+  ...
+# Subtest: ShoppingPriority enum contains required priority values
+ok 619 - ShoppingPriority enum contains required priority values
+  ---
+  duration_ms: 3.1345
+  type: 'test'
+  ...
+# Subtest: Shopping item priority ranking sorts URGENT first
+ok 620 - Shopping item priority ranking sorts URGENT first
+  ---
+  duration_ms: 0.4439
+  type: 'test'
+  ...
+# Subtest: Search filter matches store, title, note and employee
+ok 621 - Search filter matches store, title, note and employee
+  ---
+  duration_ms: 0.6044
+  type: 'test'
+  ...
+# Subtest: serverová validace nákupů odmítá neplatné a nebezpečné hodnoty
+ok 622 - serverová validace nákupů odmítá neplatné a nebezpečné hodnoty
+  ---
+  duration_ms: 1.996
+  type: 'test'
+  ...
+# Subtest: platná JPEG fotografie projde omezenou validací nákupního seznamu
+ok 623 - platná JPEG fotografie projde omezenou validací nákupního seznamu
+  ---
+  duration_ms: 187.2213
+  type: 'test'
+  ...
+# Subtest: role Náhled nemůže měnit společný nákupní seznam
+ok 624 - role Náhled nemůže měnit společný nákupní seznam
+  ---
+  duration_ms: 0.5896
+  type: 'test'
+  ...
+# Subtest: filtr přiřazeno mně používá ID zaměstnance a API nesdílí interní chyby
+ok 625 - filtr přiřazeno mně používá ID zaměstnance a API nesdílí interní chyby
+  ---
+  duration_ms: 9.8328
+  type: 'test'
+  ...
+# Subtest: doplnění skladu serializuje souběžné požadavky na stejnou položku
+ok 626 - doplnění skladu serializuje souběžné požadavky na stejnou položku
+  ---
+  duration_ms: 1.5476
+  type: 'test'
+  ...
+# Subtest: volby nákupního formuláře používají existující tenantový endpoint s limity
+ok 627 - volby nákupního formuláře používají existující tenantový endpoint s limity
+  ---
+  duration_ms: 3.3739
+  type: 'test'
+  ...
+# Subtest: ikonové akce nákupního seznamu mají přístupné názvy
+ok 628 - ikonové akce nákupního seznamu mají přístupné názvy
+  ---
+  duration_ms: 2.3354
+  type: 'test'
+  ...
+# Subtest: tenant security guard internal rules pass
+ok 629 - tenant security guard internal rules pass
+  ---
+  duration_ms: 182.6473
+  type: 'test'
+  ...
+# Subtest: current repository satisfies tenant security policy
+ok 630 - current repository satisfies tenant security policy
+  ---
+  duration_ms: 5691.4519
+  type: 'test'
+  ...
+# Subtest: storage keys are namespaced by organization, resource and variant
+ok 631 - storage keys are namespaced by organization, resource and variant
+  ---
+  duration_ms: 2.4497
+  type: 'test'
+  ...
+# Subtest: storage keys neutralize path traversal and unsafe characters
+ok 632 - storage keys neutralize path traversal and unsafe characters
+  ---
+  duration_ms: 0.4939
+  type: 'test'
+  ...
+# Subtest: 1. rule-based sheet classification rozpozná české i anglické názvy listů
+ok 633 - 1. rule-based sheet classification rozpozná české i anglické názvy listů
+  ---
+  duration_ms: 3.3895
+  type: 'test'
+  ...
+# Subtest: 2. carrier matching: stejný kód nosiče vrátí MATCHED
+ok 634 - 2. carrier matching: stejný kód nosiče vrátí MATCHED
+  ---
+  duration_ms: 31.7796
+  type: 'test'
+  ...
+# Subtest: 3. carrier matching: stejný kód v jiném městě detekuje CONFLICT
+ok 635 - 3. carrier matching: stejný kód v jiném městě detekuje CONFLICT
+  ---
+  duration_ms: 0.2874
+  type: 'test'
+  ...
+# Subtest: 4. carrier matching: více blízkých kandidátů vrátí AMBIGUOUS a nesloučí naslepo
+ok 636 - 4. carrier matching: více blízkých kandidátů vrátí AMBIGUOUS a nesloučí naslepo
+  ---
+  duration_ms: 0.3584
+  type: 'test'
+  ...
+# Subtest: 5. client matching: shoda přes IČO je 100% MATCHED
+ok 637 - 5. client matching: shoda přes IČO je 100% MATCHED
+  ---
+  duration_ms: 0.4601
+  type: 'test'
+  ...
+# Subtest: 6. client matching: normalizovaný název bez právní formy a diakritiky vrátí MATCHED
+ok 638 - 6. client matching: normalizovaný název bez právní formy a diakritiky vrátí MATCHED
+  ---
+  duration_ms: 0.8956
+  type: 'test'
+  ...
+# Subtest: 7. parser: CSV buffer se bezpečně naparsuje a detekuje hlavičky a řádky
+ok 639 - 7. parser: CSV buffer se bezpečně naparsuje a detekuje hlavičky a řádky
+  ---
+  duration_ms: 2.5656
+  type: 'test'
+  ...
+# Subtest: 8. parser: prázdný buffer vyhodí kontrolovanou chybu
+ok 640 - 8. parser: prázdný buffer vyhodí kontrolovanou chybu
+  ---
+  duration_ms: 0.8094
+  type: 'test'
+  ...
+# Subtest: 9. cílová doménová pole: CARRIERS obsahuje carrierCode, city, latitude, longitude
+ok 641 - 9. cílová doménová pole: CARRIERS obsahuje carrierCode, city, latitude, longitude
+  ---
+  duration_ms: 0.6033
+  type: 'test'
+  ...
+# Subtest: 10. rule-based mapování správně rozpozná všech 10 sloupců vzorového listu OOH nosičů
+ok 642 - 10. rule-based mapování správně rozpozná všech 10 sloupců vzorového listu OOH nosičů
+  ---
+  duration_ms: 7.6466
+  type: 'test'
+  ...
+# Subtest: 11. sheet "Nosiče a reklamní plochy" je klasifikován jako CARRIERS i s obsahem ploch
+ok 643 - 11. sheet "Nosiče a reklamní plochy" je klasifikován jako CARRIERS i s obsahem ploch
+  ---
+  duration_ms: 0.2721
+  type: 'test'
+  ...
+# Subtest: 12. parseCarrierType a parseMediaType normalizují české názvy na validní enumy
+ok 644 - 12. parseCarrierType a parseMediaType normalizují české názvy na validní enumy
+  ---
+  duration_ms: 0.4157
+  type: 'test'
+  ...
+# Subtest: 13. resilientní mapování rozpozná clientName a ceníkové názvy bez chyb
+ok 645 - 13. resilientní mapování rozpozná clientName a ceníkové názvy bez chyb
+  ---
+  duration_ms: 0.2333
+  type: 'test'
+  ...
+# Subtest: 14. alternativní testovací soubor (seepoint-alternativni-vzor-ooh.xlsx) je kompletně a správně klasifikován a namapován
+ok 646 - 14. alternativní testovací soubor (seepoint-alternativni-vzor-ooh.xlsx) je kompletně a správně klasifikován a namapován
+  ---
+  duration_ms: 178.5283
+  type: 'test'
+  ...
+# Subtest: reservation dates accept strict calendar days only
+ok 647 - reservation dates accept strict calendar days only
+  ---
+  duration_ms: 3.7072
+  type: 'test'
+  ...
+# Subtest: only managers assign other employees while workers manage their own reservation
+ok 648 - only managers assign other employees while workers manage their own reservation
+  ---
+  duration_ms: 0.3791
+  type: 'test'
+  ...
+# Subtest: reservation status transitions are one-way and validated
+ok 649 - reservation status transitions are one-way and validated
+  ---
+  duration_ms: 0.3106
+  type: 'test'
+  ...
+# Subtest: vehicle status reflects current operations instead of future bookings
+ok 650 - vehicle status reflects current operations instead of future bookings
+  ---
+  duration_ms: 0.703
+  type: 'test'
+  ...
+# Subtest: reservation API enforces module access, serializable conflict checks and scoped actors
+ok 651 - reservation API enforces module access, serializable conflict checks and scoped actors
+  ---
+  duration_ms: 2.0881
+  type: 'test'
+  ...
+# Subtest: reservation UI limits employee choices and reports failed status updates
+ok 652 - reservation UI limits employee choices and reports failed status updates
+  ---
+  duration_ms: 16.1059
+  type: 'test'
+  ...
+# Subtest: vehicle overview warns about all operational document deadlines
+ok 653 - vehicle overview warns about all operational document deadlines
+  ---
+  duration_ms: 1.8686
+  type: 'test'
+  ...
+# Subtest: warehouse numeric and text inputs reject unsafe values
+ok 654 - warehouse numeric and text inputs reject unsafe values
+  ---
+  duration_ms: 2.4946
+  type: 'test'
+  ...
+# Subtest: warehouse movements update stock atomically and never clamp an over-issue to zero
+ok 655 - warehouse movements update stock atomically and never clamp an over-issue to zero
+  ---
+  duration_ms: 2.6308
+  type: 'test'
+  ...
+# Subtest: photo issue is one checked batch and unknown AI results never map to the first stock item
+ok 656 - photo issue is one checked batch and unknown AI results never map to the first stock item
+  ---
+  duration_ms: 3.334
+  type: 'test'
+  ...
+# Subtest: warehouse catalog and movement permissions are separate and enforced server-side
+ok 657 - warehouse catalog and movement permissions are separate and enforced server-side
+  ---
+  duration_ms: 12.202
+  type: 'test'
+  ...
+# Subtest: stock history cannot be silently rewritten or deleted
+ok 658 - stock history cannot be silently rewritten or deleted
+  ---
+  duration_ms: 1.8776
+  type: 'test'
+  ...
+# Subtest: mobile borrowing overview does not use fuzzy name matching or claim complete history
+ok 659 - mobile borrowing overview does not use fuzzy name matching or claim complete history
+  ---
+  duration_ms: 2.0043
+  type: 'test'
+  ...
+# Subtest: warehouse QR print action works and external QR data excludes item names
+ok 660 - warehouse QR print action works and external QR data excludes item names
+  ---
+  duration_ms: 1.9453
+  type: 'test'
+  ...
+# Subtest: warehouse AI validates bounded images, rate limits calls and hides provider errors
+ok 661 - warehouse AI validates bounded images, rate limits calls and hides provider errors
+  ---
+  duration_ms: 3.1612
+  type: 'test'
+  ...
+# Subtest: 1. hourly work amount calculation with Decimal precision
+ok 662 - 1. hourly work amount calculation with Decimal precision
+  ---
+  duration_ms: 3.3501
+  type: 'test'
+  ...
+# Subtest: 2. piece-based or task-based work amount calculation
+ok 663 - 2. piece-based or task-based work amount calculation
+  ---
+  duration_ms: 34.3624
+  type: 'test'
+  ...
+# Subtest: 3. fixed amount work representation
+ok 664 - 3. fixed amount work representation
+  ---
+  duration_ms: 0.667
+  type: 'test'
+  ...
+# Subtest: 4. resolve rate priority: EmployeeRate -> WorkOrderRate -> CompanyRate -> MANUAL
+ok 665 - 4. resolve rate priority: EmployeeRate -> WorkOrderRate -> CompanyRate -> MANUAL
+  ---
+  duration_ms: 0.5419
+  type: 'test'
+  ...
+# Subtest: 5. draft entry can be saved when rate is missing
+ok 666 - 5. draft entry can be saved when rate is missing
+  ---
+  duration_ms: 0.2147
+  type: 'test'
+  ...
+# Subtest: 6. rejection of confirmation when rate is missing
+ok 667 - 6. rejection of confirmation when rate is missing
+  ---
+  duration_ms: 0.1761
+  type: 'test'
+  ...
+# Subtest: 7. duplicate prevention logic
+ok 668 - 7. duplicate prevention logic
+  ---
+  duration_ms: 0.2358
+  type: 'test'
+  ...
+# Subtest: 8. authorized explicit additional entry by manager/admin
+ok 669 - 8. authorized explicit additional entry by manager/admin
+  ---
+  duration_ms: 0.186
+  type: 'test'
+  ...
+# Subtest: 9 & 10. rate change after WorkEntry confirmation does not affect confirmed amount
+ok 670 - 9 & 10. rate change after WorkEntry confirmation does not affect confirmed amount
+  ---
+  duration_ms: 0.4927
+  type: 'test'
+  ...
+# Subtest: 11. employee can edit their own draft entry
+ok 671 - 11. employee can edit their own draft entry
+  ---
+  duration_ms: 0.6882
+  type: 'test'
+  ...
+# Subtest: 12. employee cannot edit confirmed entry
+ok 672 - 12. employee cannot edit confirmed entry
+  ---
+  duration_ms: 0.2075
+  type: 'test'
+  ...
+# Subtest: 13. employee cannot edit another employee's entry
+ok 673 - 13. employee cannot edit another employee's entry
+  ---
+  duration_ms: 0.1734
+  type: 'test'
+  ...
+# Subtest: 14. manager or admin can confirm a draft entry
+ok 674 - 14. manager or admin can confirm a draft entry
+  ---
+  duration_ms: 0.1801
+  type: 'test'
+  ...
+# Subtest: 15. WorkTask and WorkOrder traceability
+ok 675 - 15. WorkTask and WorkOrder traceability
+  ---
+  duration_ms: 0.2319
+  type: 'test'
+  ...
+# Subtest: 16. one WorkTask performed by multiple employees has separate WorkEntry records
+ok 676 - 16. one WorkTask performed by multiple employees has separate WorkEntry records
+  ---
+  duration_ms: 0.2404
+  type: 'test'
+  ...
+# Subtest: 17. syncWorkOrderTasks updates in-place and does not delete tasks with work entries
+ok 677 - 17. syncWorkOrderTasks updates in-place and does not delete tasks with work entries
+  ---
+  duration_ms: 0.2249
+  type: 'test'
+  ...
+# Subtest: 18. WorkTask archival or change does not delete confirmed WorkEntry due to Restrict onDelete
+ok 678 - 18. WorkTask archival or change does not delete confirmed WorkEntry due to Restrict onDelete
+  ---
+  duration_ms: 0.16
+  type: 'test'
+  ...
+# Subtest: 19. resolveWorkEntryRate executes EmployeeRate priority
+ok 679 - 19. resolveWorkEntryRate executes EmployeeRate priority
+  ---
+  duration_ms: 0.8915
+  type: 'test'
+  ...
+# Subtest: 20. resolveWorkEntryRate executes WorkOrderRate fallback
+ok 680 - 20. resolveWorkEntryRate executes WorkOrderRate fallback
+  ---
+  duration_ms: 0.4341
+  type: 'test'
+  ...
+# Subtest: 21. resolveWorkEntryRate executes CompanyRate fallback
+ok 681 - 21. resolveWorkEntryRate executes CompanyRate fallback
+  ---
+  duration_ms: 0.4634
+  type: 'test'
+  ...
+# Subtest: 22. resolveWorkEntryRate returns null when no rate exists
+ok 682 - 22. resolveWorkEntryRate returns null when no rate exists
+  ---
+  duration_ms: 0.4787
+  type: 'test'
+  ...
+# Subtest: 23. Decimal-safe H:MM time conversion matches expectation without floating point errors
+ok 683 - 23. Decimal-safe H:MM time conversion matches expectation without floating point errors
+  ---
+  duration_ms: 0.9824
+  type: 'test'
+  ...
+# Subtest: 24. HOURLY, TASK, and FIXED rate calculations
+ok 684 - 24. HOURLY, TASK, and FIXED rate calculations
+  ---
+  duration_ms: 0.27
+  type: 'test'
+  ...
+# Subtest: 25. syncWorkOrderTasks works with custom TransactionClient
+ok 685 - 25. syncWorkOrderTasks works with custom TransactionClient
+  ---
+  duration_ms: 1.4698
+  type: 'test'
+  ...
+# Subtest: 26. PATCH re-resolution retains WorkOrderRate and does not incorrectly fall back to CompanyRate
+ok 686 - 26. PATCH re-resolution retains WorkOrderRate and does not incorrectly fall back to CompanyRate
+  ---
+  duration_ms: 0.6216
+  type: 'test'
+  ...
+# Subtest: výkazy: datum je striktně kalendářní a bez tichého přetečení
+ok 687 - výkazy: datum je striktně kalendářní a bez tichého přetečení
+  ---
+  duration_ms: 3.4059
+  type: 'test'
+  ...
+# Subtest: výkazy: množství podporuje desetinné číslo a H:MM bez float nepřesnosti
+ok 688 - výkazy: množství podporuje desetinné číslo a H:MM bez float nepřesnosti
+  ---
+  duration_ms: 1.8768
+  type: 'test'
+  ...
+# Subtest: výkazy: sazby jsou přesné, nezáporné a odpovídají DB měřítku
+ok 689 - výkazy: sazby jsou přesné, nezáporné a odpovídají DB měřítku
+  ---
+  duration_ms: 0.6073
+  type: 'test'
+  ...
+# Subtest: výkazy: neznámé enum hodnoty jsou odmítnuty před dotazem do DB
+ok 690 - výkazy: neznámé enum hodnoty jsou odmítnuty před dotazem do DB
+  ---
+  duration_ms: 0.5312
+  type: 'test'
+  ...
+# Subtest: sazby: pracovník vidí jen vlastní sazbu, privilegovaná role všechny
+ok 691 - sazby: pracovník vidí jen vlastní sazbu, privilegovaná role všechny
+  ---
+  duration_ms: 0.2872
+  type: 'test'
+  ...
+1..691
+# tests 787
+# suites 19
+# pass 783
+# fail 0
+# cancelled 0
+# skipped 4
+# todo 0
+# duration_ms 94489.1495

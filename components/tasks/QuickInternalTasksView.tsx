@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useOpenAiQuickTask } from './AiQuickTaskContext';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Clock, User, AlertCircle, Sparkles, MessageSquare, Trash2, X, CheckSquare, Square } from 'lucide-react';
 
@@ -31,7 +32,9 @@ export function QuickInternalTasksView({
   userRole?: string;
 }) {
   const router = useRouter();
+  const openAiQuickTask = useOpenAiQuickTask();
   const [tasks, setTasks] = useState<QuickTaskItem[]>(initialTasks);
+  useEffect(() => setTasks(initialTasks), [initialTasks]);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'COMPLETED' | 'UNRESOLVED'>('ALL');
 
   // Modal for Unresolved Reason
@@ -94,6 +97,9 @@ export function QuickInternalTasksView({
 
   return (
     <div className="space-y-4">
+      {openAiQuickTask && <button type="button" onClick={openAiQuickTask} className="flex min-h-11 items-center gap-2 rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-bold text-white">
+        <Sparkles size={18} /> AI Rychlý Úkolníček
+      </button>}
       {/* Header & Filter Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex gap-2">

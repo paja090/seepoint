@@ -3,31 +3,52 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logAIUsage } from '@/lib/ai-usage';
 import { getGeminiApiKey } from '@/lib/ai-gemini';
+import { assertOrganizationId, TenantContextError } from '@/lib/tenant-context';
+import { normalizeQuickTasks } from '@/lib/quick-task-parsing';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 40;
 
 const PREFERRED_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
 
 export async function POST(request: Request) {
+  let organizationId: string | null = null;
+  let userId: string | null = null;
+  let phase = 'parsing';
+  let usedModel = 'local-fallback';
+  const logError = (message: string, model = usedModel) => console.error('quick-task-ai', { endpoint: '/api/ai/parse-quick-tasks', organizationId, userId, phase, provider: 'gemini', model, error: message });
   try {
     const actor=await requireApiAccess('myTasks', 'myTasks');if(isApiDenied(actor))return actor;
     if (!actor) {
       return NextResponse.json({ error: 'Přihlášení vyžadováno.' }, { status: 401 });
     }
 
-    const { prompt, defaultAssigneeId } = (await request.json().catch(() => ({}))) as {
+    organizationId = actor.organizationId;
+    userId = actor.id;
+    if (!organizationId) return NextResponse.json({ error: 'Vyberte aktivní organizaci.' }, { status: 403 });
+
+    const { prompt, defaultAssigneeId, organizationId: requestedOrganizationId } = (await request.json().catch(() => ({}))) as {
+      organizationId?: string;
       prompt?: string;
       defaultAssigneeId?: string;
     };
 
+    assertOrganizationId(requestedOrganizationId, organizationId);
+    if (typeof prompt === 'string' && prompt.length > 10000) return NextResponse.json({ error: 'Zadání je příliš dlouhé.' }, { status: 400 });
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
       return NextResponse.json({ error: 'Zadejte nebo namluvte zadání úkolů.' }, { status: 400 });
     }
 
     const employees = await prisma.employee.findMany({
-      where: { isActive: true },
+      where: { isActive: true, organizationId },
       select: { id: true, firstName: true, lastName: true, position: true, userId: true },
     });
+
+    const activeEmployeeIds = new Set(employees.map(employee => employee.id));
+    if (defaultAssigneeId !== undefined && (typeof defaultAssigneeId !== 'string' || !activeEmployeeIds.has(defaultAssigneeId))) {
+      return NextResponse.json({ error: 'Vybraný zaměstnanec není aktivní v této organizaci.' }, { status: 403 });
+    }
+    if (!employees.length) return NextResponse.json({ error: 'Organizace nemá aktivního zaměstnance pro přiřazení úkolů.' }, { status: 409 });
 
     // Find current user's employee profile
     const actorEmployee = employees.find((e) => e.userId === actor.id || e.id === actor.employee?.id) || employees[0];
@@ -82,13 +103,15 @@ Vracíš POUZE platný JSON objekt ve tvaru:
 }
 Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
 
+      const signal = AbortSignal.any([request.signal, AbortSignal.timeout(25_000)]);
       for (const modelName of PREFERRED_MODELS) {
         try {
           const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+              signal,
               body: JSON.stringify({
                 contents: [
                   {
@@ -106,20 +129,22 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
             const parsed = JSON.parse(cleanJson);
             if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
               parsedTasks = parsed.tasks;
+              usedModel = modelName;
               break; // Success!
             }
-          }
+          } else { logError(`Gemini HTTP ${response.status}`, modelName); }
         } catch (e) {
-          console.error(`Error querying Gemini model ${modelName}:`, e);
+          logError(e instanceof Error ? e.message : 'Provider request failed', modelName);
+          if (signal.aborted) break;
         }
       }
 
       if (parsedTasks && parsedTasks.length > 0 && actor.organizationId) {
-        void logAIUsage({
+        await logAIUsage({
           organizationId: actor.organizationId,
           userId: actor.id,
           feature: 'ASSISTANT',
-          modelName: 'gemini-3.6-flash',
+          modelName: usedModel,
           promptTokens: 400,
           outputTokens: 200,
           costEstimateUsd: 0.001,
@@ -165,32 +190,23 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
       }
     }
 
-    // Save tasks to DB
-    const createdTasks = [];
-    for (const taskData of parsedTasks) {
-      const empId = taskData.assignedToEmployeeId || defaultAssigneeId || actorEmployee?.id || employees[0]?.id;
-      if (!empId) continue;
-
-      const created = await prisma.quickInternalTask.create({
-        data: {
-          title: taskData.title,
-          description: taskData.description || null,
-          assignedToEmployeeId: empId,
-          createdByUserId: actor.id,
-          priority: taskData.priority || 'MEDIUM',
-          dueDate: taskData.dueDate ? new Date(taskData.dueDate) : null,
-          status: 'PENDING',
-        },
+    // Validate all model output before any write; avoid partially created checklists.
+    const safeTasks = normalizeQuickTasks(parsedTasks, activeEmployeeIds, defaultAssigneeId || actorEmployee!.id);
+    if (!safeTasks.length) return NextResponse.json({ error: 'AI nevrátila platné úkoly. Upravte zadání a zkuste to znovu.' }, { status: 502 });
+    phase = 'db';
+    const activeOrganizationId = organizationId;
+    const createdTasks = await prisma.$transaction(safeTasks.map(taskData => prisma.quickInternalTask.create({
+        data: { ...taskData, organizationId: activeOrganizationId, createdByUserId: actor.id, status: 'PENDING' },
         include: {
           assignedToEmployee: { select: { id: true, firstName: true, lastName: true, position: true } },
           createdByUser: { select: { id: true, name: true, email: true } },
         },
-      });
-      createdTasks.push(created);
-    }
+      })));
 
     return NextResponse.json({ ok: true, createdCount: createdTasks.length, tasks: createdTasks });
   } catch (err: unknown) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Chyba při zpracování AI úkolů.' }, { status: 500 });
+    if (err instanceof TenantContextError) return NextResponse.json({ error: 'Organizace neodpovídá aktivnímu přihlášení.' }, { status: 403 });
+    logError(err instanceof Error ? err.message : 'Unknown error');
+    return NextResponse.json({ error: 'Úkoly se nepodařilo vytvořit. Zkuste to znovu.' }, { status: 500 });
   }
 }

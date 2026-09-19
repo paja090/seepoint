@@ -62,6 +62,9 @@ export async function loadPlanningData(date: string, options: {
       ...o.items.flatMap(i => [i.carrier, i.surface]), ...(o.navigationOrder?.points ?? []), ...(o.navigationOrder?.points.flatMap(p => [p.carrier, p.surface]) ?? [])]);
     if ((o.crmOrderId && !o.crmOrder) || (o.navigationOrderId && !o.navigationOrder) || o.items.some(i => (i.carrierId && !i.carrier) || (i.surfaceId && !i.surface))) throw new Error('Neplatná tenantová vazba zakázky.');
     if (o.navigationOrder?.points.some(p => (p.carrierId && !p.carrier) || (p.surfaceId && !p.surface))) throw new Error('Cross-tenant Navigation reference rejected.');
+    const isWorkshop = (o.planningConstraints as Record<string, unknown> | null)?.scope === 'WORKSHOP';
+    if (isWorkshop && !options.jobIds?.includes(o.id)) return [];
+
     const constraints = parseConstraints(o.planningConstraints);
     const assignedIds: string[] = [];
     let blockedReason: string | undefined;
@@ -74,14 +77,17 @@ export async function loadPlanningData(date: string, options: {
     if (constraints.requiredEmployeeIds.some(id => !employees.some(e => e.id === id))) throw new Error('Cross-tenant Worker rejected.');
     const points = o.items.map(i => i.carrier).filter(c => c !== null);
     const distinct = new Map(points.filter(coordinates).map(c => [`${c.latitude},${c.longitude}`, { latitude: c.latitude!, longitude: c.longitude! }]));
-    if (!o.navigationOrder && !usesItemExecution(o.items) && (points.length === 0 || points.some(p => !coordinates(p)) || distinct.size !== 1)) blockedReason = 'Zakázka nemá právě jednu jednoznačnou pracovní lokalitu.';
+    if (!o.navigationOrder && !usesItemExecution(o.items) && (points.length === 0 || points.some(p => !coordinates(p)) || distinct.size !== 1)) {
+      if (!o.locationNote) blockedReason = 'Zakázka nemá právě jednu jednoznačnou pracovní lokalitu.';
+    }
     if (o.crmRealizations.some(r => r.claimNote && (!usesItemExecution(o.items) || !o.items.some(i => i.crmRealizationId === r.id)))) blockedReason = 'Realizace má nevyřešený provozní problém.';
     if (!o.crmRealizations.length && !o.navigationOrder && problems.find(p => p.entityId === o.id)?.action === 'FIELD_EXECUTION_BLOCKED') blockedReason = 'Práce má nevyřešený provozní problém.';
     const base: PlanningJob = { id: o.id, sourceType: 'WORK_ORDER', sourceId: o.id, organizationId, title: o.title, workType: o.workType, priority: o.priority, status: o.status,
       scheduledAt: o.scheduledAt.toISOString(), deadlineAt: o.deadlineAt?.toISOString(), campaignDateFrom: o.campaignDateFrom?.toISOString() ?? o.navigationOrder?.rentStart?.toISOString() ?? o.navigationOrder?.crmOrder.dateFrom?.toISOString(),
       location: distinct.size === 1 ? [...distinct.values()][0] : null, serviceMinutes: o.estimatedHours == null ? null : Number(o.estimatedHours) * 60,
       constraints, blockedReason, updatedAt: o.updatedAt.toISOString() + (o.navigationOrder ? '/' + o.navigationOrder.updatedAt.toISOString() + '/' + o.navigationOrder.crmOrder.updatedAt.toISOString() : ''), clientName: o.clientName,
-      orderNumber: o.navigationOrder?.crmOrder.orderNumber ?? o.crmOrder?.orderNumber ?? null };
+      orderNumber: o.navigationOrder?.crmOrder.orderNumber ?? o.crmOrder?.orderNumber ?? null,
+      address: o.locationNote || (distinct.size === 1 && points[0] ? [points[0].address, points[0].city].filter(Boolean).join(', ') : null) };
     if (o.navigationOrder) return navigationPointJobs(base, o.navigationOrder, employees, profile.navigationPointMinutes);
     if (usesItemExecution(o.items)) return workItemJobs(base, o.items, profile, employees);
     return [base];

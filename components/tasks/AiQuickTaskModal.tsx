@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Sparkles, Mic, MicOff, Check, X, User, AlertCircle, Loader2, ListChecks } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useQuickTaskVoice } from './useQuickTaskVoice';
+import { Sparkles, Mic, MicOff, Check, X, AlertCircle, Loader2, ListChecks } from 'lucide-react';
 
 export type EmployeeOption = {
   id: string;
@@ -17,18 +18,6 @@ type CreatedQuickTask = {
   priority: string;
   assignedToEmployee?: { firstName: string; lastName: string } | null;
 };
-type SpeechResultEvent = { results: ArrayLike<{ 0: { transcript: string } }> };
-type SpeechRecognitionInstance = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  onresult: ((event: SpeechResultEvent) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-};
-type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
-
 export function AiQuickTaskModal({
   isOpen,
   onClose,
@@ -42,56 +31,36 @@ export function AiQuickTaskModal({
 }) {
   const [prompt, setPrompt] = useState('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('AUTO');
-  const [isRecording, setIsRecording] = useState(false);
+  const submittingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdTasks, setCreatedTasks] = useState<CreatedQuickTask[]>([]);
 
-  if (!isOpen) return null;
-
-  function toggleSpeechRecording() {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Váš prohlížeč nepodporuje přímé rozpoznávání hlasu. Zadejte prosím text ručně.');
-      return;
-    }
-
-    const speechWindow = window as Window & {
-      SpeechRecognition?: SpeechRecognitionConstructor;
-      webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    };
-    const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'cs-CZ';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    if (!isRecording) {
-      setIsRecording(true);
-      recognition.start();
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        setIsRecording(false);
-      };
-      recognition.onerror = () => setIsRecording(false);
-      recognition.onend = () => setIsRecording(false);
-    } else {
-      setIsRecording(false);
-    }
+  const voice = useQuickTaskVoice(isOpen, transcript => {
+    setPrompt(prev => prev ? `${prev} ${transcript}` : transcript);
+  });
+  function close() {
+    voice.cancel();
+    onClose();
   }
+
+  if (!isOpen) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || voice.busy || submittingRef.current) return;
+    submittingRef.current = true;
 
     setLoading(true);
     setError(null);
     setCreatedTasks([]);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35_000);
 
     try {
       const res = await fetch('/api/ai/parse-quick-tasks', {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
@@ -105,8 +74,10 @@ export function AiQuickTaskModal({
       setCreatedTasks(data.tasks || []);
       if (onTasksCreated) onTasksCreated();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'AI úkoly se nepodařilo zpracovat.');
+      setError(controller.signal.aborted ? 'Vytváření úkolů trvalo příliš dlouho. Před opakováním zkontrolujte seznam úkolů.' : err instanceof Error ? err.message : 'AI úkoly se nepodařilo zpracovat.');
     } finally {
+      clearTimeout(timeout);
+      submittingRef.current = false;
       setLoading(false);
     }
   }
@@ -124,15 +95,15 @@ export function AiQuickTaskModal({
               <p className="text-xs text-slate-500">Zadejte hlasem nebo textem rychlý Check-list pro dílnu</p>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Zavřít AI úkolníček" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+          <button onClick={close} aria-label="Zavřít AI úkolníček" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
             <X size={20} />
           </button>
         </div>
 
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800 flex items-center gap-2">
+        {(error || voice.error) && (
+          <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-800 flex items-center gap-2">
             <AlertCircle size={16} />
-            <span>{error}</span>
+            <span>{error || voice.error}</span>
           </div>
         )}
 
@@ -180,7 +151,7 @@ export function AiQuickTaskModal({
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={close}
                 className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-black text-white shadow-sm"
               >
                 Hotovo
@@ -194,6 +165,7 @@ export function AiQuickTaskModal({
                 Přiřadit úkoly:
               </label>
               <select
+                disabled={loading || voice.busy}
                 value={targetAssigneeId}
                 onChange={(e) => setTargetAssigneeId(e.target.value)}
                 className="input w-full p-2.5 text-xs border-slate-300 rounded-xl mb-3 font-semibold text-slate-800"
@@ -216,24 +188,29 @@ export function AiQuickTaskModal({
                 <textarea
                   rows={4}
                   required
+                  aria-label="Zadání úkolů"
+                  disabled={loading || voice.busy}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="např. Zamést halu u vrat, uklidit ponk u pily a zajet do Hornbachu pro barvu..."
                   className="input w-full p-3 text-xs border-slate-300 rounded-2xl resize-none"
                 />
 
-                <button
-                  type="button"
-                  onClick={toggleSpeechRecording}
-                  title="Spustit nahrávání hlasem"
-                  className={`absolute right-3 bottom-3 rounded-full p-2 text-xs font-bold transition shadow-sm ${
-                    isRecording
-                      ? 'bg-rose-600 text-white animate-pulse'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
+              </div>
+              <div className="mt-3 space-y-2">
+                <p role="status" aria-live="polite" className="text-sm font-bold">
+                  {voice.state === 'requestingPermission' && 'Povolte přístup k mikrofonu…'}
+                  {voice.state === 'recording' && `🔴 Poslouchám… ${String(Math.floor(voice.seconds / 60)).padStart(2, '0')}:${String(voice.seconds % 60).padStart(2, '0')}`}
+                  {voice.state === 'transcribing' && '✨ Přepisuji hlas…'}
+                </p>
+                <button type="button"
+                  onClick={() => { setError(null); if (voice.state === 'recording') voice.stop(); else void voice.start(); }}
+                  disabled={loading || voice.state === 'requestingPermission' || voice.state === 'transcribing'}
+                  className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold disabled:opacity-50 ${voice.state === 'recording' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                  {voice.state === 'recording' ? <MicOff size={20} /> : <Mic size={20} />}
+                  {voice.state === 'recording' ? 'Ukončit nahrávání' : 'Namluvit úkol'}
                 </button>
+                <p className="text-xs text-slate-500">Max. 2 minuty. Přepis můžete před vytvořením úkolů upravit.</p>
               </div>
               <span className="text-[11px] text-slate-400 mt-1 block">
                 💡 Tip: Můžete říct <i>„Sám sobě“</i> nebo napsat seznam úkolů oddělený čárkami.
@@ -243,7 +220,7 @@ export function AiQuickTaskModal({
             <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={close}
                 className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-700"
               >
                 Zrušit
@@ -251,7 +228,7 @@ export function AiQuickTaskModal({
 
               <button
                 type="submit"
-                disabled={loading || !prompt.trim()}
+                disabled={loading || voice.busy || !prompt.trim()}
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 px-5 py-2.5 text-xs font-black text-white shadow-md hover:from-fuchsia-500 hover:to-pink-500 transition disabled:opacity-50"
               >
                 {loading ? (

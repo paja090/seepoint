@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { isAiWorkspace } from '@/lib/ai-theme';
 import { Menu, LogOut, MessageSquare, PhoneCall, Sparkles } from 'lucide-react';
 import { AiQuickTaskModal } from './tasks/AiQuickTaskModal';
+import { AiQuickTaskContext } from './tasks/AiQuickTaskContext';
 import { AppNavigation } from './AppNavigation';
 import type { NavigationHub } from '@/lib/navigation';
 import { useSidebarPreference } from '@/lib/sidebar-preference';
@@ -37,11 +38,13 @@ export function ResponsiveAppShell({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isAiTaskModalOpen, setIsAiTaskModalOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const aiWorkspace = isAiWorkspace(pathname);
 
   // Close mobile drawer when route changes
   useEffect(() => {
     setMobileDrawerOpen(false);
+    setIsAiTaskModalOpen(false);
   }, [pathname]);
 
   const [collapsed, toggleSidebar] = useSidebarPreference();
@@ -54,6 +57,7 @@ export function ResponsiveAppShell({
   const initials = user.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase() || 'SP';
 
   return (
+    <AiQuickTaskContext.Provider value={() => setIsAiTaskModalOpen(true)}>
     <OfferBasketProvider>
       <div className={`flex min-h-screen max-w-full overflow-x-hidden ${aiWorkspace ? 'bg-[#090f1d]' : 'bg-slate-100'} text-slate-900 font-sans antialiased`}>
         <InAppToastNotifier />
@@ -167,7 +171,7 @@ export function ResponsiveAppShell({
 
         {/* MAIN CONTENT AREA */}
         <main className={`${aiWorkspace ? 'ai-theme ai-workspace' : ''} min-w-0 max-w-full overflow-x-hidden flex-1 pt-14 lg:pt-0 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 ${collapsed ? 'lg:pl-[60px]' : 'lg:pl-[292px]'}`}>
-          <AppTopbar user={user} canUseTeam={utilityAccess.team} />
+          <AppTopbar user={user} canUseTeam={utilityAccess.team} onAiQuickTask={() => setIsAiTaskModalOpen(true)} />
           <div className="w-full px-3 py-4 sm:px-4 sm:py-6 lg:px-8">{children}</div>
         </main>
 
@@ -175,11 +179,14 @@ export function ResponsiveAppShell({
         <OfferBasketBar />
 
         <AiQuickTaskModal
+          key={user.organizationId}
           isOpen={isAiTaskModalOpen}
           onClose={() => setIsAiTaskModalOpen(false)}
           employees={employees}
+          onTasksCreated={() => router.refresh()}
         />
       </div>
     </OfferBasketProvider>
+    </AiQuickTaskContext.Provider>
   );
 }
