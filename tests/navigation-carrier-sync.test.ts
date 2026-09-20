@@ -2,45 +2,62 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { syncNavigationPointToCarrierAndSurface } from '../lib/navigation/navigation-carrier-sync.ts';
 
-test('syncNavigationPointToCarrierAndSurface creates carrier and surface idempotently', async () => {
-  const fakeCarriers: any[] = [];
-  const fakeSurfaces: any[] = [];
+import type { Prisma } from '@prisma/client';
 
-  const mockTx: any = {
+interface FakeCarrier {
+  id: string;
+  code?: string;
+  type?: string;
+  mountingType?: string;
+  [key: string]: unknown;
+}
+
+interface FakeSurface {
+  id: string;
+  mediaType?: string;
+  destinationName?: string;
+  [key: string]: unknown;
+}
+
+test('syncNavigationPointToCarrierAndSurface creates carrier and surface idempotently', async () => {
+  const fakeCarriers: FakeCarrier[] = [];
+  const fakeSurfaces: FakeSurface[] = [];
+
+  const mockTx = {
     advertisingCarrier: {
-      findFirst: async ({ where }: any) => {
+      findFirst: async ({ where }: { where: { id?: string; code?: string } }) => {
         if (where.id) return fakeCarriers.find((c) => c.id === where.id) || null;
         if (where.code) return fakeCarriers.find((c) => c.code === where.code) || null;
         return null;
       },
-      create: async ({ data }: any) => {
-        const carrier = { id: `carrier-${fakeCarriers.length + 1}`, ...data };
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const carrier: FakeCarrier = { id: `carrier-${fakeCarriers.length + 1}`, ...data };
         fakeCarriers.push(carrier);
         return carrier;
       },
-      update: async ({ where, data }: any) => {
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
         const idx = fakeCarriers.findIndex((c) => c.id === where.id);
         if (idx !== -1) fakeCarriers[idx] = { ...fakeCarriers[idx], ...data };
         return fakeCarriers[idx];
       },
     },
     advertisingSurface: {
-      findFirst: async ({ where }: any) => {
+      findFirst: async ({ where }: { where: { id?: string } }) => {
         if (where.id) return fakeSurfaces.find((s) => s.id === where.id) || null;
         return null;
       },
-      create: async ({ data }: any) => {
-        const surface = { id: `surface-${fakeSurfaces.length + 1}`, ...data };
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const surface: FakeSurface = { id: `surface-${fakeSurfaces.length + 1}`, ...data };
         fakeSurfaces.push(surface);
         return surface;
       },
-      update: async ({ where, data }: any) => {
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
         const idx = fakeSurfaces.findIndex((s) => s.id === where.id);
         if (idx !== -1) fakeSurfaces[idx] = { ...fakeSurfaces[idx], ...data };
         return fakeSurfaces[idx];
       },
     },
-  };
+  } as unknown as Prisma.TransactionClient;
 
   const pointInput = {
     id: 'point-1',

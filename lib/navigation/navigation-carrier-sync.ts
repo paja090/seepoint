@@ -97,7 +97,7 @@ export async function syncNavigationPointToCarrierAndSurface(
   }
 
   // 2. Generate a unique code for the carrier
-  let baseCode = point.pillarNumber
+  const baseCode = point.pillarNumber
     ? `VO-${cityCode}-${sanitizeCodePart(point.pillarNumber)}`
     : `VO-${cityCode}-${(point.stableKey || point.id || 'PT').slice(-6).toUpperCase()}`;
 
