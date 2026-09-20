@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Prisma, NavigationArrowDirection } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import type { CurrentUser } from '@/lib/rbac';
 import { canAccessOffer, canManageOfferRole, OfferValidationError, parseDateOnly, serverOfferAuthor } from './domain';
 import { calculateNavigationOfferTotals, calculateNavigationPointSubtotal } from './navigation-pricing';
+import { syncNavigationOfferToOrderInTransaction } from '@/lib/ai-realization/navigation-sync';
 
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const nullable = (value: string) => value || null;
@@ -22,6 +24,17 @@ const decimal = (value: unknown, label: string, fallback = '0') => {
   try { const normalized = typeof value === 'string' || typeof value === 'number' ? String(value).trim().replace(',', '.') : ''; const result = new Prisma.Decimal(normalized || fallback); if (result.lt(0)) throw new Error(); return result.toDecimalPlaces(2); } catch { throw new OfferValidationError(`${label} musí být nezáporné číslo.`); }
 };
 const assertRole = (user: CurrentUser) => { if (!canManageOfferRole(user.role)) throw new OfferValidationError('Nemáte oprávnění spravovat nabídky.', 'FORBIDDEN'); };
+
+export type ParsedNavigationTarget = {
+  id: string;
+  stableKey: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  note: string | null;
+  photoUrl: string | null;
+};
 
 export type NavigationOfferInput = ReturnType<typeof parseNavigationOfferInput>;
 
@@ -66,7 +79,14 @@ export function parseNavigationOfferInput(raw: unknown) {
       ? coordinate(point.targetLongitude, 'longitude')
       : null;
 
+    const pointId = text(point.id) || null;
+    const pointStableKey = text(point.stableKey) || pointId || null;
+    const navTargetId = text(point.navigationTargetId) || null;
+
     return {
+      id: pointId,
+      stableKey: pointStableKey,
+      navigationTargetId: navTargetId,
       carrierId: text(point.carrierId) || null, surfaceId: text(point.surfaceId) || null, sortOrder: index,
       latitude: coordinate(point.latitude, 'latitude'), longitude: coordinate(point.longitude, 'longitude'),
       targetLatitude: pointTargetLat, targetLongitude: pointTargetLng,
@@ -109,23 +129,28 @@ export function parseNavigationOfferInput(raw: unknown) {
 
   // Parse optional multiple targets
   const rawTargets = Array.isArray(input.targets) ? input.targets : [];
-  const targets = rawTargets.map((t, idx) => {
-    if (!t || typeof t !== 'object') return null;
+  const targets: ParsedNavigationTarget[] = [];
+  for (let idx = 0; idx < rawTargets.length; idx++) {
+    const t = rawTargets[idx];
+    if (!t || typeof t !== 'object') continue;
     const tRec = t as Record<string, unknown>;
+    const tId = text(tRec.id) || `target-${idx + 1}`;
+    const tStableKey = text(tRec.stableKey) || tId;
     const tName = text(tRec.name || tRec.label || `Prodejna ${idx + 1}`);
     const tAddr = text(tRec.address);
     const tLat = coordinate(tRec.latitude, 'latitude');
     const tLng = coordinate(tRec.longitude, 'longitude');
-    return {
-      id: text(tRec.id) || `target-${idx + 1}`,
+    targets.push({
+      id: tId,
+      stableKey: tStableKey,
       name: tName,
       address: tAddr,
       latitude: tLat,
       longitude: tLng,
       note: nullable(text(tRec.note)),
       photoUrl: nullable(text(tRec.photoUrl)),
-    };
-  }).filter(Boolean);
+    });
+  }
 
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
@@ -135,6 +160,7 @@ export function parseNavigationOfferInput(raw: unknown) {
     targets: targets.length > 0 ? targets : [
       {
         id: 'target-1',
+        stableKey: 'target-1',
         name: targetName,
         address: text(input.targetAddress),
         latitude: coordinate(input.targetLatitude, 'latitude'),
@@ -171,7 +197,17 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       updatedByUserId: user.id,
     };
       if (offerId) {
-        const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { id: true, offerType: true, status: true, createdByUserId: true, campaignStrategy: true } });
+        const existing = await tx.offer.findUnique({
+          where: { id: offerId },
+          include: {
+            navigationOffer: {
+              include: {
+                targets: true,
+                points: true,
+              },
+            },
+          },
+        });
         if (!existing || existing.offerType !== 'NAVIGATION') throw new OfferValidationError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
         if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
 
@@ -185,78 +221,288 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           ...(input.dateTo !== undefined ? { dateTo: input.dateTo } : {}),
         };
 
-        const existingPoints = await tx.navigationPoint.findMany({
-          where: { navigationOffer: { offerId } },
-          select: { id: true },
-        });
-        const pointIds = existingPoints.map((p) => p.id);
-        if (pointIds.length > 0) {
-          await tx.navigationPoint.updateMany({
-            where: { id: { in: pointIds } },
-            data: { sitePhotoId: null, installedPhotoId: null },
+        let navOffer = existing.navigationOffer;
+        if (!navOffer) {
+          navOffer = await tx.navigationOffer.create({
+            data: {
+              organizationId: user.organizationId,
+              offerId,
+              city: input.city,
+              targetName: input.targetName,
+              targetAddress: nullable(input.targetAddress),
+              targetLatitude: input.targetLatitude,
+              targetLongitude: input.targetLongitude,
+              targetNote: nullable(input.targetNote),
+              targetPhotoUrl: input.targetPhotoUrl,
+              googlePlaceId: input.googlePlaceId,
+              formattedAddress: input.formattedAddress,
+              proposalMode: input.proposalMode,
+              graphicArtworkUrl: input.graphicArtworkUrl,
+              includeGraphicProof: input.includeGraphicProof,
+              clientArtworkUrl: input.clientArtworkUrl,
+              clientArtworkFileName: input.clientArtworkFileName,
+            },
+            include: { targets: true, points: true },
+          });
+        } else {
+          navOffer = await tx.navigationOffer.update({
+            where: { id: navOffer.id },
+            data: {
+              city: input.city,
+              targetName: input.targetName,
+              targetAddress: nullable(input.targetAddress),
+              targetLatitude: input.targetLatitude,
+              targetLongitude: input.targetLongitude,
+              targetNote: nullable(input.targetNote),
+              targetPhotoUrl: input.targetPhotoUrl,
+              googlePlaceId: input.googlePlaceId,
+              formattedAddress: input.formattedAddress,
+              proposalMode: input.proposalMode,
+              graphicArtworkUrl: input.graphicArtworkUrl,
+              includeGraphicProof: input.includeGraphicProof,
+              clientArtworkUrl: input.clientArtworkUrl,
+              clientArtworkFileName: input.clientArtworkFileName,
+            },
+            include: { targets: true, points: true },
           });
         }
 
-        await tx.navigationPoint.deleteMany({ where: { navigationOffer: { offerId } } });
-        const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
-        return tx.offer.update({
+        // 1. Targets Diff/Upsert
+        const existingTargets = navOffer.targets || [];
+        const targetIdMap = new Map<string, string>(); // stableKey/id -> db target id
+        const targetCoordsMap = new Map<string, string>(); // "lat,lng" -> db target id
+        const matchedTargetDbIds = new Set<string>();
+
+        for (let idx = 0; idx < input.targets.length; idx++) {
+          const t = input.targets[idx];
+          const matchedTarget = existingTargets.find(
+            (et) => (t.stableKey && et.stableKey === t.stableKey) || (t.id && et.id === t.id)
+          );
+
+          if (matchedTarget) {
+            matchedTargetDbIds.add(matchedTarget.id);
+            const updated = await tx.navigationTarget.update({
+              where: { id: matchedTarget.id },
+              data: {
+                name: t.name,
+                address: t.address || null,
+                latitude: t.latitude,
+                longitude: t.longitude,
+                note: t.note || null,
+                photoUrl: t.photoUrl || null,
+                sortOrder: idx,
+              },
+            });
+            targetIdMap.set(t.id, updated.id);
+            if (t.stableKey) targetIdMap.set(t.stableKey, updated.id);
+            targetIdMap.set(updated.id, updated.id);
+            targetIdMap.set(updated.stableKey, updated.id);
+            targetCoordsMap.set(`${t.latitude.toFixed(5)},${t.longitude.toFixed(5)}`, updated.id);
+          } else {
+            const stableKey = t.stableKey || randomUUID();
+            const created = await tx.navigationTarget.create({
+              data: {
+                organizationId: user.organizationId,
+                navigationOfferId: navOffer.id,
+                stableKey,
+                name: t.name,
+                address: t.address || null,
+                latitude: t.latitude,
+                longitude: t.longitude,
+                note: t.note || null,
+                photoUrl: t.photoUrl || null,
+                sortOrder: idx,
+              },
+            });
+            targetIdMap.set(t.id, created.id);
+            targetIdMap.set(stableKey, created.id);
+            targetIdMap.set(created.id, created.id);
+            targetCoordsMap.set(`${t.latitude.toFixed(5)},${t.longitude.toFixed(5)}`, created.id);
+          }
+        }
+
+        // Delete removed targets from offer that aren't in input targets
+        for (const et of existingTargets) {
+          if (!matchedTargetDbIds.has(et.id)) {
+            await tx.navigationTarget.delete({ where: { id: et.id } }).catch(() => null);
+          }
+        }
+
+        // 2. Points Diff/Upsert (NO deleteMany, preserves stable identities & relations)
+        const existingPoints = navOffer.points || [];
+        const matchedPointDbIds = new Set<string>();
+
+        for (let idx = 0; idx < input.points.length; idx++) {
+          const p = input.points[idx];
+          const matchedPoint = existingPoints.find(
+            (ep) => (p.stableKey && ep.stableKey === p.stableKey) || (p.id && ep.id === p.id)
+          ) || (
+            existingPoints.length === input.points.length
+              ? existingPoints.find((ep) => ep.sortOrder === idx && Math.abs(ep.latitude - p.latitude) < 0.0001 && !matchedPointDbIds.has(ep.id))
+              : undefined
+          );
+
+          let resolvedTargetId: string | null = null;
+          if (p.navigationTargetId && targetIdMap.has(p.navigationTargetId)) {
+            resolvedTargetId = targetIdMap.get(p.navigationTargetId)!;
+          } else if (p.targetLatitude != null && p.targetLongitude != null) {
+            const coordsKey = `${p.targetLatitude.toFixed(5)},${p.targetLongitude.toFixed(5)}`;
+            resolvedTargetId = targetCoordsMap.get(coordsKey) || null;
+          }
+          if (!resolvedTargetId && targetIdMap.size > 0) {
+            resolvedTargetId = Array.from(targetIdMap.values())[0] || null;
+          }
+
+          const { id: _ignoreId, ...pData } = p;
+
+          if (matchedPoint) {
+            matchedPointDbIds.add(matchedPoint.id);
+            const stableKey = matchedPoint.stableKey || p.stableKey || randomUUID();
+            await tx.navigationPoint.update({
+              where: { id: matchedPoint.id },
+              data: {
+                ...pData,
+                sortOrder: idx,
+                stableKey,
+                navigationTargetId: resolvedTargetId,
+              },
+            });
+          } else {
+            const stableKey = p.stableKey || randomUUID();
+            const created = await tx.navigationPoint.create({
+              data: {
+                ...pData,
+                organizationId: user.organizationId,
+                navigationOfferId: navOffer.id,
+                sortOrder: idx,
+                stableKey,
+                navigationTargetId: resolvedTargetId,
+              },
+            });
+            matchedPointDbIds.add(created.id);
+          }
+        }
+
+        // Delete removed points that were intentionally deleted from offer
+        for (const ep of existingPoints) {
+          if (!matchedPointDbIds.has(ep.id)) {
+            await tx.navigationPoint.delete({ where: { id: ep.id } }).catch(() => null);
+          }
+        }
+
+        const updatedOffer = await tx.offer.update({
           where: { id: offerId },
           data: {
             ...common,
             campaignStrategy: updatedStrategy,
             organizationId: user.organizationId,
-            navigationOffer: {
-              upsert: {
-                create: {
-                  organizationId: user.organizationId,
-                  city: input.city,
-                  targetName: input.targetName,
-                  targetAddress: nullable(input.targetAddress),
-                  targetLatitude: input.targetLatitude,
-                  targetLongitude: input.targetLongitude,
-                  targetNote: nullable(input.targetNote),
-                  targetPhotoUrl: input.targetPhotoUrl,
-                  googlePlaceId: input.googlePlaceId,
-                  formattedAddress: input.formattedAddress,
-                  proposalMode: input.proposalMode,
-                  graphicArtworkUrl: input.graphicArtworkUrl,
-                  includeGraphicProof: input.includeGraphicProof,
-                  clientArtworkUrl: input.clientArtworkUrl,
-                  clientArtworkFileName: input.clientArtworkFileName,
-                  points: { create: pointsWithOrg },
-                },
-                update: {
-                  city: input.city,
-                  targetName: input.targetName,
-                  targetAddress: nullable(input.targetAddress),
-                  targetLatitude: input.targetLatitude,
-                  targetLongitude: input.targetLongitude,
-                  targetNote: nullable(input.targetNote),
-                  targetPhotoUrl: input.targetPhotoUrl,
-                  googlePlaceId: input.googlePlaceId,
-                  formattedAddress: input.formattedAddress,
-                  proposalMode: input.proposalMode,
-                  graphicArtworkUrl: input.graphicArtworkUrl,
-                  includeGraphicProof: input.includeGraphicProof,
-                  clientArtworkUrl: input.clientArtworkUrl,
-                  clientArtworkFileName: input.clientArtworkFileName,
-                  points: { create: pointsWithOrg },
-                },
-              },
-            },
             events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
           },
           select: { id: true },
         });
+
+        await syncNavigationOfferToOrderInTransaction(tx, offerId, {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        });
+
+        return updatedOffer;
       }
-    const pointsWithOrg = input.points.map((p) => ({ ...p, organizationId: user.organizationId }));
-    const initialStrategy = {
-      targets: input.targets,
-      ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
-      ...(input.dateTo ? { dateTo: input.dateTo } : {}),
-    };
-    return tx.offer.create({ data: { ...common, campaignStrategy: initialStrategy, organizationId: user.organizationId, offerType: 'NAVIGATION', status: 'DRAFT', ...serverOfferAuthor(user), navigationOffer: { create: { organizationId: user.organizationId, city: input.city, targetName: input.targetName, targetAddress: nullable(input.targetAddress), targetLatitude: input.targetLatitude, targetLongitude: input.targetLongitude, targetNote: nullable(input.targetNote), targetPhotoUrl: input.targetPhotoUrl, googlePlaceId: input.googlePlaceId, formattedAddress: input.formattedAddress, proposalMode: input.proposalMode, graphicArtworkUrl: input.graphicArtworkUrl, includeGraphicProof: input.includeGraphicProof, clientArtworkUrl: input.clientArtworkUrl, clientArtworkFileName: input.clientArtworkFileName, points: { create: pointsWithOrg } } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+      // Brand new offer creation
+      const initialStrategy = {
+        targets: input.targets,
+        ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
+        ...(input.dateTo ? { dateTo: input.dateTo } : {}),
+      };
+
+      const createdOffer = await tx.offer.create({
+        data: {
+          ...common,
+          campaignStrategy: initialStrategy,
+          organizationId: user.organizationId,
+          offerType: 'NAVIGATION',
+          status: 'DRAFT',
+          ...serverOfferAuthor(user),
+          navigationOffer: {
+            create: {
+              organizationId: user.organizationId,
+              city: input.city,
+              targetName: input.targetName,
+              targetAddress: nullable(input.targetAddress),
+              targetLatitude: input.targetLatitude,
+              targetLongitude: input.targetLongitude,
+              targetNote: nullable(input.targetNote),
+              targetPhotoUrl: input.targetPhotoUrl,
+              googlePlaceId: input.googlePlaceId,
+              formattedAddress: input.formattedAddress,
+              proposalMode: input.proposalMode,
+              graphicArtworkUrl: input.graphicArtworkUrl,
+              includeGraphicProof: input.includeGraphicProof,
+              clientArtworkUrl: input.clientArtworkUrl,
+              clientArtworkFileName: input.clientArtworkFileName,
+            },
+          },
+          events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
+        },
+        include: { navigationOffer: true },
+      });
+
+      const navOfferId = createdOffer.navigationOffer!.id;
+      const targetIdMap = new Map<string, string>();
+      const targetCoordsMap = new Map<string, string>();
+
+      for (let idx = 0; idx < input.targets.length; idx++) {
+        const t = input.targets[idx];
+        const stableKey = t.stableKey || randomUUID();
+        const createdTarget = await tx.navigationTarget.create({
+          data: {
+            organizationId: user.organizationId,
+            navigationOfferId: navOfferId,
+            stableKey,
+            name: t.name,
+            address: t.address || null,
+            latitude: t.latitude,
+            longitude: t.longitude,
+            note: t.note || null,
+            photoUrl: t.photoUrl || null,
+            sortOrder: idx,
+          },
+        });
+        targetIdMap.set(t.id, createdTarget.id);
+        targetIdMap.set(stableKey, createdTarget.id);
+        targetCoordsMap.set(`${t.latitude.toFixed(5)},${t.longitude.toFixed(5)}`, createdTarget.id);
+      }
+
+      for (let idx = 0; idx < input.points.length; idx++) {
+        const p = input.points[idx];
+        let resolvedTargetId: string | null = null;
+        if (p.navigationTargetId && targetIdMap.has(p.navigationTargetId)) {
+          resolvedTargetId = targetIdMap.get(p.navigationTargetId)!;
+        } else if (p.targetLatitude != null && p.targetLongitude != null) {
+          const coordsKey = `${p.targetLatitude.toFixed(5)},${p.targetLongitude.toFixed(5)}`;
+          resolvedTargetId = targetCoordsMap.get(coordsKey) || null;
+        }
+        if (!resolvedTargetId && targetIdMap.size > 0) {
+          resolvedTargetId = Array.from(targetIdMap.values())[0] || null;
+        }
+
+        const { id: _ignoreId, ...pData } = p;
+        await tx.navigationPoint.create({
+          data: {
+            ...pData,
+            organizationId: user.organizationId,
+            navigationOfferId: navOfferId,
+            sortOrder: idx,
+            stableKey: p.stableKey || randomUUID(),
+            navigationTargetId: resolvedTargetId,
+          },
+        });
+      }
+
+      return { id: createdOffer.id };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export function parseCityGalleryOfferInput(raw: unknown) {

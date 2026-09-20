@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { syncNavigationOrderToWorkOrderInTransaction } from '@/lib/navigation/navigation-work-sync';
 
 export async function POST(req: NextRequest) {
   const authResult = await requireApiAccess('navigationProjects');
@@ -35,12 +36,13 @@ export async function POST(req: NextRequest) {
         data: updateData,
       });
 
+      const affectedPoints = await tx.navigationPoint.findMany({
+        where: { id: { in: pointIds }, navigationOrderId: { not: null } },
+        select: { navigationOrderId: true },
+      });
+      const orderIds = [...new Set(affectedPoints.flatMap((point) => point.navigationOrderId ? [point.navigationOrderId] : []))];
+
       if (plannedInstallationAt) {
-        const affectedPoints = await tx.navigationPoint.findMany({
-          where: { id: { in: pointIds }, navigationOrderId: { not: null } },
-          select: { navigationOrderId: true },
-        });
-        const orderIds = [...new Set(affectedPoints.flatMap((point) => point.navigationOrderId ? [point.navigationOrderId] : []))];
         await tx.navigationOrder.updateMany({
           where: { id: { in: orderIds } },
           data: {
@@ -59,6 +61,16 @@ export async function POST(req: NextRequest) {
             blockStatus: 'CEKA_NA_INSTALACI',
           },
         });
+      } else if (installerUserId) {
+        await tx.navigationOrder.updateMany({
+          where: { id: { in: orderIds } },
+          data: { installerUserId },
+        });
+      }
+
+      // Synchronize each affected order to WorkOrder in Plán práce (/work)
+      for (const orderId of orderIds) {
+        await syncNavigationOrderToWorkOrderInTransaction(tx, orderId);
       }
     });
 

@@ -823,6 +823,7 @@ model User {
   executedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionExecutor")
   rejectedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionRejector")
   resolvedOccupancyInsights      OccupancyInsight[]              @relation("OccupancyInsightResolvedBy")
+  navigationChangeSetsReviewed   NavigationChangeSet[]           @relation("NavigationChangeSetReviewer")
 }
 
 model UserSession {
@@ -1539,6 +1540,7 @@ model Offer {
   printProductionJobs            PrintProductionJob[]
   aiInboxMessages                AiInboxMessage[]
   occupancyInsights              OccupancyInsight[]
+  navigationChangeSets           NavigationChangeSet[]
 
   @@index([clientId])
   @@index([status, validUntil])
@@ -1729,6 +1731,7 @@ model NavigationOffer {
 
   offer                          Offer                           @relation(fields: [offerId], references: [id], onDelete: Cascade)
   points                         NavigationPoint[]
+  targets                        NavigationTarget[]
   navigationDocumentationReports NavigationDocumentationReport[]
 
   @@index([targetLatitude, targetLongitude])
@@ -1742,9 +1745,13 @@ model NavigationPoint {
   navigationOrderId String?
   carrierId         String?
   surfaceId         String?
-  installedPhotoId  String?
-  sitePhotoId       String?
-  sortOrder         Int                   @default(0)
+  installedPhotoId    String?
+  sitePhotoId         String?
+  stableKey           String?
+  sourceOfferPointKey String?
+  sourceOfferPointId  String?
+  navigationTargetId  String?
+  sortOrder           Int                   @default(0)
   latitude          Float
   longitude         Float
   address           String?
@@ -1812,6 +1819,7 @@ model NavigationPoint {
   priceAuditLogs               NavigationPriceAuditLog[]
   navigationDocumentationItems NavigationDocumentationItem[]
   convertedCandidatePoint      NavigationCandidatePoint?     @relation("CandidateConvertedPoint")
+  navigationTarget             NavigationTarget?             @relation(fields: [navigationTargetId], references: [id], onDelete: SetNull)
 
   @@index([navigationOfferId, sortOrder])
   @@index([navigationOrderId])
@@ -1820,6 +1828,9 @@ model NavigationPoint {
   @@index([latitude, longitude])
   @@index([organizationId])
   @@index([sitePhotoId])
+  @@index([stableKey])
+  @@index([sourceOfferPointKey])
+  @@index([navigationTargetId])
 }
 
 enum NavigationReportStatus {
@@ -3061,8 +3072,9 @@ model CrmOrder {
   crmTasks        CrmTask[]
   workOrders      WorkOrder[]
   navigationOrder NavigationOrder?
-  shoppingItems   CompanyShoppingItem[]
-  aiInboxMessages AiInboxMessage[]
+  shoppingItems        CompanyShoppingItem[]
+  aiInboxMessages      AiInboxMessage[]
+  navigationChangeSets NavigationChangeSet[]
 
   @@unique([organizationId, orderNumber])
   @@index([clientId])
@@ -3341,6 +3353,13 @@ enum NavigationBlockStatus {
   INTERNE_POZASTAVENO
 }
 
+enum NavigationChangeSetStatus {
+  PENDING
+  APPLIED
+  REJECTED
+  SUPERSEDED
+}
+
 model NavigationOrder {
   id                 String                 @id @default(cuid())
   organizationId     String                 @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
@@ -3381,8 +3400,66 @@ model NavigationOrder {
   surveyRoutes        SurveyRoute[]
   candidatePoints     NavigationCandidatePoint[]
   aiInboxMessages     AiInboxMessage[]
+  targets             NavigationTarget[]
+  changeSets          NavigationChangeSet[]
 
   @@index([status])
+  @@index([organizationId])
+}
+
+model NavigationTarget {
+  id                  String   @id @default(cuid())
+  organizationId      String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  stableKey           String   @default(cuid())
+  navigationOfferId   String?
+  navigationOrderId   String?
+  sourceOfferTargetId String?
+  name                String
+  address             String?
+  latitude            Float
+  longitude           Float
+  note                String?
+  photoUrl            String?
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  navigationOffer   NavigationOffer?   @relation(fields: [navigationOfferId], references: [id], onDelete: Cascade)
+  navigationOrder   NavigationOrder?   @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  sourceOfferTarget NavigationTarget?  @relation("TargetToOrderTarget", fields: [sourceOfferTargetId], references: [id], onDelete: SetNull)
+  orderTargets      NavigationTarget[] @relation("TargetToOrderTarget")
+  points            NavigationPoint[]
+
+  @@index([navigationOfferId, sortOrder])
+  @@index([navigationOrderId, sortOrder])
+  @@index([organizationId])
+  @@index([stableKey])
+  @@index([sourceOfferTargetId])
+}
+
+model NavigationChangeSet {
+  id                String                    @id @default(cuid())
+  organizationId    String                    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  offerId           String
+  crmOrderId        String
+  navigationOrderId String
+  status            NavigationChangeSetStatus @default(PENDING)
+  diff              Json
+  detectedAt        DateTime                  @default(now())
+  reviewedAt        DateTime?
+  reviewedByUserId  String?
+  appliedAt         DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  offer           Offer           @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  crmOrder        CrmOrder        @relation(fields: [crmOrderId], references: [id], onDelete: Cascade)
+  navigationOrder NavigationOrder @relation(fields: [navigationOrderId], references: [id], onDelete: Cascade)
+  reviewedByUser  User?           @relation("NavigationChangeSetReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([navigationOrderId, status])
+  @@index([crmOrderId])
+  @@index([offerId])
   @@index([organizationId])
 }
 

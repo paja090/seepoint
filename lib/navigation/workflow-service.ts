@@ -1,5 +1,6 @@
 import { NavigationOrderStatus, NavigationBlockStatus } from '@prisma/client';
 import { prisma } from '../db.ts';
+import { syncNavigationOrderToWorkOrderInTransaction } from './navigation-work-sync';
 
 export class NavigationWorkflowError extends Error {
   code: string;
@@ -259,6 +260,11 @@ export async function transitionNavigationOrderStatus(
           },
         });
       }
+    }
+
+    // Automatická synchronizace do Plánu práce (/work)
+    if (['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(targetStatus)) {
+      await syncNavigationOrderToWorkOrderInTransaction(tx, navigationOrderId);
     }
 
     return updatedNav;
