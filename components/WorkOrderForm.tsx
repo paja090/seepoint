@@ -2,7 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { agencyWorkCategories, workPriorityLabels, type WorkScope } from '@/lib/work';
+import { agencyWorkCategories, workPriorityLabels, type WorkScope, type WorkPriority } from '@/lib/work';
+import type { WorkCategory } from '@/lib/work-categories';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -38,6 +39,7 @@ type WorkOrderFormProps = {
   initialClientName?: string;
   initialCampaignDateFrom?: string;
   initialCampaignDateTo?: string;
+  categories?: WorkCategory[];
 };
 
 export function WorkOrderForm({
@@ -49,16 +51,21 @@ export function WorkOrderForm({
   initialClientName = '',
   initialCampaignDateFrom = '',
   initialCampaignDateTo = '',
+  categories,
 }: WorkOrderFormProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const allCategories = categories && categories.length > 0 ? categories : agencyWorkCategories;
+
   // Primary Scope: Workshop (internal) vs Field (on-site / travel)
   const [scope, setScope] = useState<WorkScope>(initialCarrierCode ? 'FIELD' : 'WORKSHOP');
 
   // Active Category from Agency Catalog
-  const defaultCategory = scope === 'WORKSHOP' ? 'PRINT' : 'FIELD_INSTALL';
+  const defaultCategory =
+    allCategories.find((c) => c.scope === (initialCarrierCode ? 'FIELD' : 'WORKSHOP'))?.key ||
+    (initialCarrierCode ? 'FIELD_INSTALL' : 'PRINT');
   const [activeCategory, setActiveCategory] = useState<string>(defaultCategory);
 
   // Form Fields
@@ -108,23 +115,23 @@ export function WorkOrderForm({
   const [pdfFileName, setPdfFileName] = useState('');
   const [ftdUrl, setFtdUrl] = useState('');
 
-  const availableCategories = agencyWorkCategories.filter((c) => c.scope === scope);
+  const availableCategories = allCategories.filter((c) => c.scope === scope);
 
   const selectCategory = (catKey: string) => {
     setActiveCategory(catKey);
-    const cat = agencyWorkCategories.find((c) => c.key === catKey);
+    const cat = allCategories.find((c) => c.key === catKey);
     if (!cat) return;
-    if (!title || agencyWorkCategories.some((c) => title.startsWith(c.label.slice(0, 8)))) {
+    if (!title || allCategories.some((c) => title.startsWith(c.label.slice(0, 8)))) {
       setTitle(`${cat.label}`);
     }
   };
 
   const switchScope = (newScope: WorkScope) => {
     setScope(newScope);
-    const firstCat = agencyWorkCategories.find((c) => c.scope === newScope);
+    const firstCat = allCategories.find((c) => c.scope === newScope);
     if (firstCat) {
       setActiveCategory(firstCat.key);
-      if (!title || agencyWorkCategories.some((c) => title.startsWith(c.label.slice(0, 8)))) {
+      if (!title || allCategories.some((c) => title.startsWith(c.label.slice(0, 8)))) {
         setTitle(firstCat.label);
       }
     }
@@ -197,7 +204,7 @@ export function WorkOrderForm({
     }
 
     // Find category info
-    const cat = agencyWorkCategories.find((c) => c.key === activeCategory);
+    const cat = allCategories.find((c) => c.key === activeCategory);
     const workType = cat?.defaultWorkType ?? 'INSTALLATION';
 
     // Build location note
@@ -290,9 +297,20 @@ export function WorkOrderForm({
 
       {/* 2. CATEGORY QUICK CHIPS */}
       <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-          Vyberte typ činnosti:
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+            Vyberte typ činnosti:
+          </label>
+          <a
+            href="/settings/work"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition flex items-center gap-1"
+            title="Upravit nebo přidat činnosti firmy v Nastavení"
+          >
+            ⚙️ Upravit činnosti firmy
+          </a>
+        </div>
         <div className="flex flex-wrap gap-2">
           {availableCategories.map((cat) => {
             const isSelected = activeCategory === cat.key;

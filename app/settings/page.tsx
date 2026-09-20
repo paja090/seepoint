@@ -34,6 +34,16 @@ export default async function Settings() {
 
       <div className="card mt-6 flex items-center justify-between">
         <div>
+          <h2 className="text-xl font-bold">🏭 Činnosti výroby & montáží</h2>
+          <p className="text-sm text-slate-600 mt-1">Vlastní katalog činností pro dílnu i výjezdy (tisk, DTP, polepy, montáže, zaměření) a oborové šablony.</p>
+        </div>
+        <a href="/settings/work" className="button button-primary text-sm font-bold">
+          Spravovat činnosti →
+        </a>
+      </div>
+
+      <div className="card mt-6 flex items-center justify-between">
+        <div>
           <h2 className="text-xl font-bold">✉️ Firemní e-mail & Domény</h2>
           <p className="text-sm text-slate-600 mt-1">Nastavení odesílací domény pro nabídky a notifikace s ověřením SPF a DKIM.</p>
         </div>

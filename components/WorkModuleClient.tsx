@@ -20,6 +20,7 @@ import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
 import { WorkOrderForm } from './WorkOrderForm';
 import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
+import type { WorkCategory } from '@/lib/work-categories';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -36,6 +37,7 @@ export type WorkModuleClientProps = {
   initialCampaignDateFrom?: string;
   initialCampaignDateTo?: string;
   canCreateWorkOrder: boolean;
+  categories?: WorkCategory[];
 };
 
 export function WorkModuleClient({
@@ -49,6 +51,7 @@ export function WorkModuleClient({
   initialCampaignDateFrom = '',
   initialCampaignDateTo = '',
   canCreateWorkOrder,
+  categories,
 }: WorkModuleClientProps) {
   // Open create modal automatically if redirected with initial carrier or client
   const autoOpenModal = Boolean(initialCarrierCode || initialClientName || initialCampaignDateFrom);
@@ -420,6 +423,7 @@ export function WorkModuleClient({
               initialClientName={initialClientName}
               initialCampaignDateFrom={initialCampaignDateFrom}
               initialCampaignDateTo={initialCampaignDateTo}
+              categories={categories}
             />
           </div>
         </div>
