@@ -45,7 +45,8 @@ export function mapNavigationOrderStatusToPhase(status: string): RealizationPhas
 }
 
 export function adaptNavigationPointsToRealizationItems(
-  navOrder: NavigationOrderWithPoints
+  navOrder: NavigationOrderWithPoints,
+  fallbackAssignedUserId?: string | null
 ): RealizationItemContext[] {
   return navOrder.points.map((p) => {
     const photos: RealizationPhotoContext[] = [];
@@ -77,6 +78,7 @@ export function adaptNavigationPointsToRealizationItems(
     const isInstalled = p.status === 'INSTALLED' || Boolean(p.installedPhotoId);
     const isPhotographed = Boolean(p.installedPhotoId);
     const hasDefect = Boolean(p.issueReported);
+    const assignedUserId = p.installerUserId || navOrder.installerUserId || fallbackAssignedUserId || undefined;
 
     return {
       id: p.id,
@@ -93,8 +95,9 @@ export function adaptNavigationPointsToRealizationItems(
       hasDefect,
       defectReason: p.issueNote || p.issueType || undefined,
       photos,
-      plannedDate: p.plannedInstallationAt || undefined,
+      plannedDate: p.plannedInstallationAt || navOrder.plannedInstallationAt || undefined,
       note: p.internalNote || undefined,
+      assignedUserId,
     };
   });
 }

@@ -73,10 +73,15 @@ const offerInclude = {
       },
       navigationOrder: {
         include: {
-          points: true,
+          points: {
+            include: {
+              sitePhoto: { select: { id: true, url: true } },
+              installedPhoto: { select: { id: true, url: true } },
+            },
+          },
           targets: true,
-        }
-      }
+        },
+      },
     }
   },
   printProductionJobs: true,
@@ -276,6 +281,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           }
         ],
       proposalMode: row.navigationOffer.proposalMode || 'LOCATION_SELECTION',
+      navigationOrderStatus: row.crmOrder?.navigationOrder?.status || null,
       selectionSubmitted: row.events.some((event) => {
         const metadata = event.metadata as Record<string, unknown> | null;
         return metadata?.action === 'navigation-selection'
@@ -286,8 +292,20 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       clientArtworkUrl: row.navigationOffer.clientArtworkUrl,
       clientArtworkFileName: row.navigationOffer.clientArtworkFileName,
       points: row.navigationOffer.points.map((point) => {
+        const orderPoint = row.crmOrder?.navigationOrder?.points?.find(
+          (op) =>
+            (point.stableKey && op.sourceOfferPointKey === point.stableKey) ||
+            op.sourceOfferPointId === point.id ||
+            (Math.abs(op.latitude - point.latitude) < 0.0001 && Math.abs(op.longitude - point.longitude) < 0.0001)
+        );
+
         const carrierPhoto = point.carrier?.photos?.[0];
-        const effectivePhotoId = point.sitePhotoId || point.sitePhoto?.id || point.installedPhotoId || point.installedPhoto?.id || carrierPhoto?.id || null;
+        const effectiveInstalledPhoto = orderPoint?.installedPhoto || point.installedPhoto;
+        const effectiveInstalledPhotoId = orderPoint?.installedPhotoId || point.installedPhotoId;
+        const effectiveSitePhoto = orderPoint?.sitePhoto || point.sitePhoto;
+        const effectiveSitePhotoId = orderPoint?.sitePhotoId || point.sitePhotoId;
+        const effectivePhotoId = effectiveInstalledPhotoId || effectiveInstalledPhoto?.id || effectiveSitePhotoId || effectiveSitePhoto?.id || carrierPhoto?.id || null;
+        const effectiveStatus = orderPoint?.status || point.status;
 
         let visualizedUrl = point.visualizedPhotoUrl || undefined;
         if (visualizedUrl && publicView && token && visualizedUrl.includes('/api/photos/')) {
@@ -297,18 +315,18 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         }
 
         let siteUrl: string | undefined = undefined;
-        if (point.sitePhoto) {
+        if (effectiveSitePhoto) {
           siteUrl = publicView && token
-            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhoto.id}`
-            : `/api/photos/${point.sitePhoto.id}/thumbnail`;
-        } else if (point.sitePhotoId) {
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${effectiveSitePhoto.id}`
+            : `/api/photos/${effectiveSitePhoto.id}/thumbnail`;
+        } else if (effectiveSitePhotoId) {
           siteUrl = publicView && token
-            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.sitePhotoId}`
-            : `/api/photos/${point.sitePhotoId}/thumbnail`;
-        } else if (point.installedPhoto) {
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${effectiveSitePhotoId}`
+            : `/api/photos/${effectiveSitePhotoId}/thumbnail`;
+        } else if (effectiveInstalledPhoto) {
           siteUrl = publicView && token
-            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhoto.id}`
-            : `/api/photos/${point.installedPhoto.id}/thumbnail`;
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${effectiveInstalledPhoto.id}`
+            : `/api/photos/${effectiveInstalledPhoto.id}/thumbnail`;
         } else if (carrierPhoto) {
           siteUrl = publicView && token
             ? `/api/proposals/${encodeURIComponent(token)}/photos/${carrierPhoto.id}`
@@ -316,14 +334,14 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         }
 
         let installedUrl: string | undefined = undefined;
-        if (point.installedPhoto) {
+        if (effectiveInstalledPhoto) {
           installedUrl = publicView && token
-            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhoto.id}`
-            : `/api/photos/${point.installedPhoto.id}/thumbnail`;
-        } else if (point.installedPhotoId) {
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${effectiveInstalledPhoto.id}`
+            : `/api/photos/${effectiveInstalledPhoto.id}/thumbnail`;
+        } else if (effectiveInstalledPhotoId) {
           installedUrl = publicView && token
-            ? `/api/proposals/${encodeURIComponent(token)}/photos/${point.installedPhotoId}`
-            : `/api/photos/${point.installedPhotoId}/thumbnail`;
+            ? `/api/proposals/${encodeURIComponent(token)}/photos/${effectiveInstalledPhotoId}`
+            : `/api/photos/${effectiveInstalledPhotoId}/thumbnail`;
         }
 
         return {
@@ -343,7 +361,12 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           framePrice: safeDecimal((point as unknown as { framePrice?: Prisma.Decimal | null }).framePrice),
           internalNote: publicView ? undefined : point.internalNote,
           clientNote: point.clientNote,
-          status: point.status,
+          status: effectiveStatus,
+          sitePhotoId: effectiveSitePhotoId,
+          sitePhotoUrl: siteUrl,
+          installedPhotoId: effectiveInstalledPhotoId,
+          installedPhotoUrl: installedUrl,
+          visualizedPhotoUrl: visualizedUrl,
 
           // Structured Navigation fields
           targetLatitude: point.targetLatitude,
@@ -356,11 +379,6 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           manualDistanceUnit: point.manualDistanceUnit,
           distanceSource: point.distanceSource,
           routePolyline: point.routePolyline,
-          visualizedPhotoUrl: visualizedUrl,
-          sitePhotoId: effectivePhotoId ?? undefined,
-          sitePhotoUrl: siteUrl,
-          installedPhotoId: point.installedPhotoId ?? undefined,
-          installedPhotoUrl: installedUrl,
           isSelectedByClient: point.isSelectedByClient !== false,
         };
       }),
@@ -386,21 +404,26 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       clientApprovalToken: undefined,
     } : null,
     realizationSummary: (() => {
+      const navOrder = row.crmOrder?.navigationOrder;
+      const crmOrderStatus = row.crmOrder?.status || null;
       if (row.offerType === 'NAVIGATION') {
-        const points = row.crmOrder?.navigationOrder?.points || [];
-        if (points.length === 0) return null;
+        const points = navOrder?.points || [];
+        if (points.length === 0 && !navOrder) return null;
+        const total = points.length || row.navigationOffer?.points?.length || 0;
         const installed = points.filter((p) => p.status === 'INSTALLED' || Boolean(p.installedPhotoId)).length;
         const photographed = points.filter((p) => Boolean(p.installedPhotoId)).length;
         const completed = points.filter((p) => p.status === 'INSTALLED' && Boolean(p.installedPhotoId)).length;
         return {
-          total: points.length,
+          total,
           installed,
           photographed,
           completed,
+          navigationOrderStatus: navOrder?.status || null,
+          crmOrderStatus,
         };
       }
       const realizations = row.crmOrder?.realizations || [];
-      if (realizations.length === 0) return null;
+      if (realizations.length === 0 && !crmOrderStatus) return null;
       const installedStatuses = ['INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
       const photographedStatuses = ['PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
       const completedStatuses = ['COMPLETED'];
@@ -409,6 +432,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         installed: realizations.filter((r) => installedStatuses.includes(r.status)).length,
         photographed: realizations.filter((r) => photographedStatuses.includes(r.status)).length,
         completed: realizations.filter((r) => completedStatuses.includes(r.status)).length,
+        crmOrderStatus,
       };
     })(),
   };

@@ -108,7 +108,7 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
         <QuickAccess items={quick} activeHref={active?.item[0]} />
         {hub && contextualGroups(hub).map(group => <NavigationGroup key={`${hub.id}-${group.label}`} group={group} activeHref={active?.item[0]} ai={hub.id === 'ai'} />)}
       </nav>
-      <div style={scrollStyle} className="max-h-[35vh] overflow-y-auto border-t border-slate-800 p-3">{children}</div>
+
     </aside>
     <dialog ref={dialog} aria-labelledby="mobile-navigation-title" onCancel={onClose} onClose={onClose}
       onKeyDown={event => {
