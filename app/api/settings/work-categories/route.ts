@@ -4,6 +4,8 @@ import {
   getOrganizationWorkCategories,
   saveOrganizationWorkCategories,
   applyOrganizationWorkCategoryPreset,
+} from '@/lib/work-categories-server';
+import {
   WORK_CATEGORY_PRESETS,
   type WorkCategory,
 } from '@/lib/work-categories';

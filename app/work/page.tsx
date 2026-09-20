@@ -3,7 +3,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { WorkModuleClient } from '@/components/WorkModuleClient';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import { overlapsAbsence } from '@/lib/work-absence-conflicts';
-import { getOrganizationWorkCategories } from '@/lib/work-categories';
+import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
 
 export const dynamic = 'force-dynamic';
 
