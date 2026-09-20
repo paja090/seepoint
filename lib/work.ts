@@ -11,6 +11,26 @@ export const workStatusLabels: Record<WorkOrderStatus, string> = {
   CANCELLED: 'Zrušený',
 };
 
+export type WorkScope = 'WORKSHOP' | 'FIELD';
+
+export const workScopeLabels: Record<WorkScope, string> = {
+  WORKSHOP: 'Dílna / Tisk / DTP',
+  FIELD: 'Výjezd / Montáž v terénu',
+};
+
+export const agencyWorkCategories = [
+  { key: 'PRINT', label: 'Velkoformátový tisk & Laminace', scope: 'WORKSHOP' as const, defaultWorkType: 'INSTALLATION' as const, icon: '🖨️' },
+  { key: 'DTP', label: 'Grafika & DTP příprava dat', scope: 'WORKSHOP' as const, defaultWorkType: 'OTHER' as const, icon: '🎨' },
+  { key: 'MANUFACTURE', label: 'Dílna & Kašírování desek / výroba', scope: 'WORKSHOP' as const, defaultWorkType: 'INSTALLATION' as const, icon: '🔨' },
+  { key: 'PACKAGING', label: 'Expedice & Balení zakázek', scope: 'WORKSHOP' as const, defaultWorkType: 'TRANSPORT' as const, icon: '📦' },
+  { key: 'INTERNAL', label: 'Interní provoz & Údržba strojů', scope: 'WORKSHOP' as const, defaultWorkType: 'OTHER' as const, icon: '⚙️' },
+  { key: 'FIELD_INSTALL', label: 'Montáž reklamy / banneru na fasádu', scope: 'FIELD' as const, defaultWorkType: 'INSTALLATION' as const, icon: '🪧' },
+  { key: 'FIELD_WRAPPING', label: 'Polep výlohy / polep vozidla', scope: 'FIELD' as const, defaultWorkType: 'INSTALLATION' as const, icon: '🚗' },
+  { key: 'FIELD_OOH', label: 'Výlep OOH kampaně / plakáty', scope: 'FIELD' as const, defaultWorkType: 'INSTALLATION' as const, icon: '📋' },
+  { key: 'FIELD_SURVEY', label: 'Předvýrobní zaměření na místě', scope: 'FIELD' as const, defaultWorkType: 'CHECK' as const, icon: '📐' },
+  { key: 'FIELD_SERVICE', label: 'Servis / Demontáž reklamy', scope: 'FIELD' as const, defaultWorkType: 'REPAIR' as const, icon: '🔧' },
+];
+
 export const workPriorityLabels: Record<WorkPriority, string> = {
   LOW: 'Nízká',
   NORMAL: 'Běžná',

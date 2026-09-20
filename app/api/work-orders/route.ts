@@ -3,7 +3,6 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
-import { workRequesters } from '@/lib/work';
 
 type WorkOrderInput = Record<string, unknown>;
 
@@ -95,15 +94,16 @@ export async function POST(request: Request) {
   if (ftdUrl) {
     try {
       const url = new URL(ftdUrl);
-      if (url.protocol !== 'https:' || url.hostname !== 'drive.google.com') throw new Error('invalid');
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('invalid');
     } catch {
-      return NextResponse.json({ error: 'Odkaz na fotodokumentaci musí být platná adresa složky na Google Disku.' }, { status: 400 });
+      return NextResponse.json({ error: 'Odkaz na fotodokumentaci musí být platná webová adresa (URL).' }, { status: 400 });
     }
   }
 
   const estimatedHoursText = text(input, 'estimatedHours');
   const estimatedHours = estimatedHoursText ? Number.parseFloat(estimatedHoursText) : undefined;
   const pdfUrl = text(input, 'pdfUrl');
+  const scope = text(input, 'scope') === 'WORKSHOP' ? 'WORKSHOP' : 'FIELD';
 
   const order = await prisma.workOrder.create({
     data: {
@@ -124,6 +124,7 @@ export async function POST(request: Request) {
       contactPhone: text(input, 'contactPhone'),
       locationNote: text(input, 'locationNote'),
       estimatedHours,
+      planningConstraints: { scope },
       pdfUrl,
       mediaLabel: text(input, 'mediaLabel'),
       quantity,

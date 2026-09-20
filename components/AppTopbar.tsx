@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, MessageSquare, PhoneCall } from 'lucide-react';
+import { LogOut, MessageSquare, PhoneCall, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
@@ -34,7 +34,7 @@ const pageTitles: Array<[string, string]> = [
   ['/settings', 'Nastavení'],
 ];
 
-export function AppTopbar({ user, canUseTeam = true }: { canUseTeam?: boolean; user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
+export function AppTopbar({ user, canUseTeam = true, onAiQuickTask }: { onAiQuickTask?: () => void; canUseTeam?: boolean; user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
   const pathname = usePathname();
   const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
@@ -55,6 +55,9 @@ export function AppTopbar({ user, canUseTeam = true }: { canUseTeam?: boolean; u
       </div>
 
       <div className="app-topbar-actions flex items-center gap-2.5">
+        {onAiQuickTask && <button type="button" onClick={onAiQuickTask} className="flex shrink-0 items-center gap-2 rounded-xl bg-fuchsia-600 px-3 py-2 text-xs font-bold text-white" aria-label="AI Rychlý Úkolníček">
+          <Sparkles size={16} /> AI Úkol
+        </button>}
         <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
         <WeatherClockWidget />
 

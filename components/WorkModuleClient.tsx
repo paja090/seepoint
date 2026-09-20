@@ -55,6 +55,17 @@ export function WorkModuleClient({
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
   const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
+  const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD'>('ALL');
+
+  const isWorkshopOrder = (o: WorkOrderData) => {
+    return Boolean(
+      o.locationNote?.toLowerCase().includes('dílna') ||
+      o.mediaLabel?.toLowerCase().includes('dílna') ||
+      o.mediaLabel?.toLowerCase().includes('tisk') ||
+      o.mediaLabel?.toLowerCase().includes('grafika') ||
+      (!o.carrierCode && !o.locationNote)
+    );
+  };
 
   // Dates & Stats Calculation
   const now = new Date();
@@ -83,8 +94,11 @@ export function WorkModuleClient({
   const urgentCount = openOrders.filter((o) => o.priority === 'URGENT').length;
   const invoicingCount = orders.filter((o) => o.ftdSent && !o.invoiced && o.status !== 'CANCELLED').length;
 
-  // Filter orders based on active stat tile selection
+  // Filter orders based on active stat tile selection and scope filter
   const filteredOrders = orders.filter((o) => {
+    if (scopeFilter === 'WORKSHOP' && !isWorkshopOrder(o)) return false;
+    if (scopeFilter === 'FIELD' && isWorkshopOrder(o)) return false;
+
     const d = new Date(o.scheduledAt);
     const isCompleted = ['DONE', 'CANCELLED'].includes(o.status);
 
@@ -279,7 +293,7 @@ export function WorkModuleClient({
       )}
 
       {/* MAIN VIEW CONTROLS & TABS */}
-      <div className="flex items-center justify-between border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2 sm:pb-0">
         <div className="flex gap-2">
           <button
             type="button"
@@ -305,6 +319,45 @@ export function WorkModuleClient({
           >
             <List size={18} />
             Seznam zakázek ({filteredOrders.length})
+          </button>
+        </div>
+
+        {/* Scope Switcher: All vs Workshop vs Field */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl self-start sm:self-center">
+          <button
+            type="button"
+            onClick={() => setScopeFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              scopeFilter === 'ALL'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Vše ({orders.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setScopeFilter('WORKSHOP')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              scopeFilter === 'WORKSHOP'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🏭 Dílna</span>
+            <span className="opacity-75">({orders.filter(isWorkshopOrder).length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setScopeFilter('FIELD')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              scopeFilter === 'FIELD'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🚗 Výjezdy</span>
+            <span className="opacity-75">({orders.filter((o) => !isWorkshopOrder(o)).length})</span>
           </button>
         </div>
       </div>

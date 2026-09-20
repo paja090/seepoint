@@ -5,7 +5,6 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
-import { workRequesters } from '@/lib/work';
 
 type UpdateInput = { status?: unknown; priority?: unknown; price?: unknown; ftdSent?: unknown; invoiced?: unknown };
 type EditInput = Record<string, unknown>;
@@ -42,7 +41,7 @@ function validDriveUrl(value?: string) {
   if (!value) return true;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname === 'drive.google.com';
+    return url.protocol === 'https:' || url.protocol === 'http:';
   } catch {
     return false;
   }
