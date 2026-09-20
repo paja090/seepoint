@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { nextCrmOrderNumber } from '@/lib/crm/domain';
+import { syncNavigationPointToCarrierAndSurface } from '@/lib/navigation/navigation-carrier-sync';
 
 export type HandoffActor = {
   id: string;
@@ -230,6 +231,47 @@ export async function executeNavigationHandoffInTransaction(
       resolvedTargetId = Array.from(targetMap.values())[0] || null;
     }
 
+    const carrierSync = await syncNavigationPointToCarrierAndSurface(
+      tx,
+      {
+        id: matchedOrderPoint?.id || p.id,
+        stableKey: p.stableKey,
+        carrierId: matchedOrderPoint?.carrierId || p.carrierId,
+        surfaceId: matchedOrderPoint?.surfaceId || p.surfaceId,
+        label: p.label,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        address: p.address,
+        pillarNumber: p.pillarNumber,
+        pillarType: p.pillarType,
+        navigationType: p.navigationType,
+        variant: p.variant,
+        roadSide: p.roadSide,
+        arrowDirection: p.arrowDirection || (typeof p.arrowDirectionEnum === 'string' ? p.arrowDirectionEnum : null),
+        calculatedDistanceMeters: p.calculatedDistanceMeters,
+        targetAddress,
+        targetName,
+      },
+      {
+        organizationId,
+        clientId: offer.clientId,
+        targetName,
+        city: navData?.city || targetAddress,
+        rentStart: navOrder.rentStart,
+        rentEnd: navOrder.rentEnd,
+      }
+    );
+
+    if (p.id && (!p.carrierId || !p.surfaceId)) {
+      await tx.navigationPoint.update({
+        where: { id: p.id },
+        data: {
+          carrierId: carrierSync.carrierId,
+          surfaceId: carrierSync.surfaceId,
+        },
+      });
+    }
+
     if (matchedOrderPoint) {
       // Update existing order point (preserves installedPhotoId, sitePhotoId, carrierId, status)
       await tx.navigationPoint.update({
@@ -237,6 +279,8 @@ export async function executeNavigationHandoffInTransaction(
         data: {
           sourceOfferPointKey: p.stableKey,
           sourceOfferPointId: p.id,
+          carrierId: carrierSync.carrierId,
+          surfaceId: carrierSync.surfaceId,
           navigationTargetId: resolvedTargetId,
           label: p.label,
           latitude: p.latitude,
@@ -280,7 +324,8 @@ export async function executeNavigationHandoffInTransaction(
           stableKey: randomUUID(),
           sourceOfferPointKey: p.stableKey,
           sourceOfferPointId: p.id,
-          carrierId: null,
+          carrierId: carrierSync.carrierId,
+          surfaceId: carrierSync.surfaceId,
           sortOrder: p.sortOrder,
           latitude: p.latitude,
           longitude: p.longitude,

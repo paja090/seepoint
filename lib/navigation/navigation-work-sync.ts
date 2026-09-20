@@ -119,15 +119,13 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
             }
           : undefined,
         items: {
-          create: navOrder.points
-            .filter((p) => p.carrierId)
-            .map((p) => ({
-              organizationId,
-              carrierId: p.carrierId,
-              surfaceId: p.surfaceId,
-              quantity: Number(p.quantity) || 1,
-              description: p.label,
-            })),
+          create: navOrder.points.map((p) => ({
+            organizationId,
+            carrierId: p.carrierId || null,
+            surfaceId: p.surfaceId || null,
+            quantity: Number(p.quantity) || 1,
+            description: p.pillarNumber ? `Sloup VO ${p.pillarNumber} · ${p.label}` : p.label,
+          })),
         },
       },
     });
@@ -163,20 +161,44 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
       }
     }
 
-    // Sync items: add carriers not yet present
+    // Sync items: add items for points not yet present in existingWorkOrder.items
+    const existingDescriptions = new Set(existingWorkOrder.items.map((i) => i.description).filter(Boolean));
     const existingCarrierIds = new Set(existingWorkOrder.items.map((i) => i.carrierId).filter(Boolean));
-    const newPointsWithCarrier = navOrder.points.filter((p) => p.carrierId && !existingCarrierIds.has(p.carrierId));
-    for (const p of newPointsWithCarrier) {
+    const newPoints = navOrder.points.filter((p) => {
+      if (p.carrierId && existingCarrierIds.has(p.carrierId)) return false;
+      const desc = p.pillarNumber ? `Sloup VO ${p.pillarNumber} · ${p.label}` : p.label;
+      if (existingDescriptions.has(desc) || existingDescriptions.has(p.label)) return false;
+      return true;
+    });
+    for (const p of newPoints) {
       await tx.workOrderItem.create({
         data: {
           organizationId,
           workOrderId: existingWorkOrder.id,
-          carrierId: p.carrierId,
-          surfaceId: p.surfaceId,
+          carrierId: p.carrierId || null,
+          surfaceId: p.surfaceId || null,
           quantity: Number(p.quantity) || 1,
-          description: p.label,
+          description: p.pillarNumber ? `Sloup VO ${p.pillarNumber} · ${p.label}` : p.label,
         },
       });
+    }
+
+    // Link carriers to existing items that missed them
+    for (const item of existingWorkOrder.items) {
+      if (!item.carrierId) {
+        const matchedPoint = navOrder.points.find(
+          (p) => (p.label === item.description || (p.pillarNumber && item.description?.includes(p.pillarNumber))) && p.carrierId
+        );
+        if (matchedPoint?.carrierId) {
+          await tx.workOrderItem.update({
+            where: { id: item.id },
+            data: {
+              carrierId: matchedPoint.carrierId,
+              surfaceId: matchedPoint.surfaceId,
+            },
+          });
+        }
+      }
     }
   }
 
