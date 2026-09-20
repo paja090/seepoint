@@ -211,6 +211,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     badge: 'AI Vision',
     routes: ['/warehouse'],
   },
+  {
+    id: 'aiRealization',
+    name: 'AI Řízení realizace',
+    description: 'Centrální řízení realizace zakázek, grafika, výroba, instalace, fotodokumentace a předání k fakturaci',
+    category: 'operations',
+    badge: 'AI Engine',
+    routes: ['/realization'],
+  },
 
 
   // Management
@@ -269,6 +277,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'aiInbox',
     'commercial',
     'crmIntelligence',
+    'aiRealization',
   ],
   PRO: [
     'dashboard',
@@ -297,6 +306,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'vehicles',
     'warehouse',
     'printProduction',
+    'aiRealization',
     'employees',
     'import',
   ],

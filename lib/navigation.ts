@@ -13,6 +13,9 @@ export const navigationHubs: NavigationHub[] = [
       ["/commercial","AI Obchodní centrum","briefcaseBusiness","commercial"],
       ["/ai-inbox","AI Inbox","mail","aiInbox"],
       ["/sales/opportunities","AI Obchodní radar","radar","clients"]
+    ] },
+    { label: 'AI provoz', items: [
+      ["/realization","AI Řízení realizace","workflow","realization"]
     ] }
   ] },
   { id: 'sales', label: 'Obchod & CRM', icon: 'briefcaseBusiness', groups: [
@@ -51,6 +54,7 @@ export const navigationHubs: NavigationHub[] = [
       ["/vacations","Dovolená & Volno","calendarRange","team"]
     ] },
     { label: 'Realizace', items: [
+      ["/realization","AI Řízení realizace","workflow","realization"],
       ["/work","Plán práce","briefcaseBusiness","work"],
       ["/work/route","Pracovní výjezd","route","work"],
       ["/tasks","Všechny úkoly","clipboardList","tasks"],

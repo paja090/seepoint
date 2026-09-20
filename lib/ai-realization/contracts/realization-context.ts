@@ -97,7 +97,8 @@ export type RealizationBlockerCode =
   | 'MISSING_PHOTO_DOCUMENTATION'
   | 'INCOMPLETE_INSTALLATION'
   | 'BILLING_BLOCKED'
-  | 'DEPENDENCY_BLOCKED';
+  | 'DEPENDENCY_BLOCKED'
+  | 'SCOPE_CHANGE_PENDING';
 
 export type RealizationBlockerSeverity = 'BLOCKING' | 'WARNING' | 'INFO';
 
@@ -160,6 +161,7 @@ export type RealizationContext = {
   billingReadiness: RealizationBillingReadiness;
   overallPhase: RealizationPhase;
   deadlineRisk: DeadlineRiskEvaluation;
+  hasPendingChangeSet?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };

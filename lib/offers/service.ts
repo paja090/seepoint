@@ -6,7 +6,8 @@ import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
 import { sendTransactionalEmail } from '@/lib/email';
 import { enterTenantContext, runWithTenantContext, requireTenantContext } from '@/lib/tenant-context';
-import { convertOfferToNavigationOrderInTransaction } from '@/lib/navigation/navigation-service';
+import { handoffAcceptedOfferToRealizationInTransaction } from '@/lib/ai-realization/handoff';
+import { syncNavigationOfferToOrderInTransaction } from '@/lib/ai-realization/navigation-sync';
 import {
   assertOfferTransition,
   assertAvailability,
@@ -69,6 +70,12 @@ const offerInclude = {
         include: {
           photos: true
         }
+      },
+      navigationOrder: {
+        include: {
+          points: true,
+          targets: true,
+        }
       }
     }
   },
@@ -87,6 +94,9 @@ const offerInclude = {
   charges: { orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }] },
   navigationOffer: {
     include: {
+      targets: {
+        orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+      },
       points: {
         include: {
           carrier: {
@@ -99,6 +109,7 @@ const offerInclude = {
           },
           sitePhoto: { select: { id: true, url: true } },
           installedPhoto: { select: { id: true, url: true } },
+          navigationTarget: true,
         },
         orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
       },
@@ -237,21 +248,34 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       targetLongitude: row.navigationOffer.targetLongitude,
       targetNote: row.navigationOffer.targetNote,
       targetPhotoUrl: row.navigationOffer.targetPhotoUrl,
-      targets: (
-        row.campaignStrategy &&
-        typeof row.campaignStrategy === 'object' &&
-        Array.isArray((row.campaignStrategy as Record<string, unknown>).targets)
-      ) ? (row.campaignStrategy as { targets: Array<{ id?: string; name: string; address?: string; latitude: number; longitude: number; note?: string; photoUrl?: string }> }).targets : [
-        {
-          id: 'target-1',
-          name: row.navigationOffer.targetName,
-          address: row.navigationOffer.targetAddress || undefined,
-          latitude: row.navigationOffer.targetLatitude,
-          longitude: row.navigationOffer.targetLongitude,
-          note: row.navigationOffer.targetNote || undefined,
-          photoUrl: row.navigationOffer.targetPhotoUrl || undefined,
-        }
-      ],
+      targets: (row.navigationOffer.targets && row.navigationOffer.targets.length > 0)
+        ? row.navigationOffer.targets.map((t) => ({
+            id: t.id,
+            stableKey: t.stableKey,
+            name: t.name,
+            address: t.address || undefined,
+            latitude: t.latitude,
+            longitude: t.longitude,
+            note: t.note || undefined,
+            photoUrl: t.photoUrl || undefined,
+            color: t.color || undefined,
+            sortOrder: t.sortOrder,
+          }))
+        : (
+          row.campaignStrategy &&
+          typeof row.campaignStrategy === 'object' &&
+          Array.isArray((row.campaignStrategy as Record<string, unknown>).targets)
+        ) ? (row.campaignStrategy as { targets: Array<{ id?: string; name: string; address?: string; latitude: number; longitude: number; note?: string; photoUrl?: string }> }).targets : [
+          {
+            id: 'target-1',
+            name: row.navigationOffer.targetName,
+            address: row.navigationOffer.targetAddress || undefined,
+            latitude: row.navigationOffer.targetLatitude,
+            longitude: row.navigationOffer.targetLongitude,
+            note: row.navigationOffer.targetNote || undefined,
+            photoUrl: row.navigationOffer.targetPhotoUrl || undefined,
+          }
+        ],
       proposalMode: row.navigationOffer.proposalMode || 'LOCATION_SELECTION',
       selectionSubmitted: row.events.some((event) => {
         const metadata = event.metadata as Record<string, unknown> | null;
@@ -305,6 +329,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
 
         return {
           id: point.id,
+          stableKey: point.stableKey,
+          navigationTargetId: point.navigationTargetId,
           label: point.label,
           latitude: point.latitude,
           longitude: point.longitude,
@@ -352,7 +378,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       message: event.message,
       createdAt: event.createdAt.toISOString(),
     })),
-    converted: publicView ? undefined : row.occupancies.length > 0,
+    converted: publicView ? undefined : Boolean(row.occupancies.length > 0 || row.crmOrder?.navigationOrder || row.crmOrder),
     printJob: row.printProductionJobs && row.printProductionJobs.length > 0 ? {
       id: row.printProductionJobs[0].id,
       status: row.printProductionJobs[0].status,
@@ -361,6 +387,19 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
       clientApprovalToken: undefined,
     } : null,
     realizationSummary: (() => {
+      if (row.offerType === 'NAVIGATION') {
+        const points = row.crmOrder?.navigationOrder?.points || [];
+        if (points.length === 0) return null;
+        const installed = points.filter((p) => p.status === 'INSTALLED' || Boolean(p.installedPhotoId)).length;
+        const photographed = points.filter((p) => Boolean(p.installedPhotoId)).length;
+        const completed = points.filter((p) => p.status === 'INSTALLED' && Boolean(p.installedPhotoId)).length;
+        return {
+          total: points.length,
+          installed,
+          photographed,
+          completed,
+        };
+      }
       const realizations = row.crmOrder?.realizations || [];
       if (realizations.length === 0) return null;
       const installedStatuses = ['INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED'];
@@ -897,6 +936,20 @@ export async function transitionOffer(user: CurrentUser, id: string, target: Off
       },
       include: offerInclude,
     });
+
+    if (target === 'ACCEPTED') {
+      await handoffAcceptedOfferToRealizationInTransaction(tx, id, {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      });
+      const refreshedRow = await tx.offer.findUniqueOrThrow({
+        where: { id },
+        include: offerInclude,
+      });
+      return serializeOffer(refreshedRow);
+    }
+
     return serializeOffer(row);
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
@@ -1150,40 +1203,20 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       },
     });
 
-    if (
-      target === 'ACCEPTED'
-      && row.createdByUser
-      && shouldCreateNavigationOrderAfterAcceptance({
-        offerType: row.offerType,
-        proposalMode: row.navigationOffer?.proposalMode,
-      })
-    ) {
-      await convertOfferToNavigationOrderInTransaction(tx, row.id, {
-        id: row.createdByUser.id,
-        email: row.createdByUser.email,
+    if (target === 'ACCEPTED') {
+      await handoffAcceptedOfferToRealizationInTransaction(tx, row.id, {
+        id: row.createdByUser?.id || 'public',
+        email: row.createdByUser?.email || actorEmail,
+        name: actorName,
       });
     }
 
-    // Auto-create PrintProductionJob in PREPARATION when standard media offer is accepted (Varianta A)
-    const productionOrganization = await tx.organization.findUnique({ where: { id: row.organizationId } });
-    if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA' && isModuleEnabled(productionOrganization, 'printProduction')) {
-      const existingPrintJob = await tx.printProductionJob.findFirst({ where: { offerId: row.id } });
-      if (!existingPrintJob) {
-        const createdJob = await tx.printProductionJob.create({
-          data: {
-            organizationId: row.organizationId,
-            offerId: row.id,
-            clientId: row.clientId,
-            title: row.campaignName ?? row.title,
-            campaignName: row.campaignName ?? row.title,
-            status: 'PREPARATION',
-          },
-        });
-        await auditProduction(tx, createdJob.id, { name: actorName, email: actorEmail }, null, 'PREPARATION');
-      }
-    }
+    const refreshedRow = await tx.offer.findUniqueOrThrow({
+      where: { id: row.id },
+      include: offerInclude,
+    });
 
-    return { row, status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
+    return { row: refreshedRow, status: target, message: target === 'ACCEPTED' ? 'Děkujeme, nabídka byla přijata.' : 'Vaše odmítnutí jsme zaznamenali.' };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 
   // Reserved .invalid addresses are used only by isolated Preview E2E tests.

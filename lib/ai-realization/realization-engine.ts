@@ -361,6 +361,17 @@ export function evaluateRealization(
     });
   }
 
+  if (context.hasPendingChangeSet) {
+    blockers.push({
+      code: 'SCOPE_CHANGE_PENDING',
+      severity: 'WARNING',
+      title: 'Změna nabídky čeká na posouzení',
+      message: 'K zakázce byl evidován změnový balíček z nabídky po zahájení realizace. Posuďte změnu před pokračováním.',
+      entityType: 'ORDER',
+      entityId: context.orderId,
+    });
+  }
+
   // 7. Billing Readiness Evaluation:
   const billingReadiness = evaluateBillingReadiness(context, profile);
   if (!billingReadiness.isReady && items.length > 0 && uninstalledItems.length === 0) {
@@ -467,6 +478,20 @@ export function determineRealizationNextBestActions(
       recommendedAt: new Date(),
     });
     return actions;
+  }
+
+  const scopeChangeBlocker = blockers.find((b) => b.code === 'SCOPE_CHANGE_PENDING');
+  if (scopeChangeBlocker) {
+    actions.push({
+      id: `nba-${orderId}-review-changeset`,
+      actionType: 'RESOLVE_BLOCKER',
+      priority: 'HIGH',
+      title: 'Posoudit změnu rozsahu nabídky',
+      description: scopeChangeBlocker.message,
+      targetOrderId: orderId,
+      targetUrl: `/crm/orders/${orderId}`,
+      recommendedAt: new Date(),
+    });
   }
 
   const productionBlocker = blockers.find((b) => b.code === 'DEPENDENCY_BLOCKED' && b.title.includes('Výroba'));
@@ -592,6 +617,9 @@ export async function buildRealizationContext(
         },
         navigationOrder: {
           include: {
+            changeSets: {
+              where: { status: 'PENDING' },
+            },
             points: {
               include: {
                 installedPhoto: true,
@@ -700,6 +728,7 @@ export async function buildRealizationContext(
       tasks,
       printJobs,
       photos: allPhotos,
+      hasPendingChangeSet: Boolean(crmOrder.navigationOrder?.changeSets && crmOrder.navigationOrder.changeSets.length > 0),
       createdAt: crmOrder.createdAt,
       updatedAt: crmOrder.updatedAt,
     };

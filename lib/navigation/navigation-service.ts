@@ -23,6 +23,8 @@ export class NavigationServiceError extends Error {
   }
 }
 
+import { executeNavigationHandoffInTransaction } from '@/lib/ai-realization/adapters/navigation-handoff-adapter';
+
 type NavigationOrderActor = Pick<CurrentUser, 'id' | 'email'>;
 
 async function convertOfferToNavigationOrderWithTransaction(
@@ -31,139 +33,11 @@ async function convertOfferToNavigationOrderWithTransaction(
   actorUser: NavigationOrderActor
 ) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('seepoint-crm-order-number'))`;
-
-    const offer = await tx.offer.findUnique({
-      where: { id: offerId },
-      include: {
-        navigationOffer: {
-          include: {
-            points: true,
-          },
-        },
-        crmOrder: true,
-      },
-    });
-
-    if (!offer || offer.offerType !== 'NAVIGATION') {
-      throw new NavigationServiceError('Navigační nabídka nebyla nalezena.', 'NOT_FOUND');
-    }
-
-    if (offer.crmOrder) {
-      const existingNavOrder = await tx.navigationOrder.findUnique({
-        where: { crmOrderId: offer.crmOrder.id },
-      });
-      if (existingNavOrder) return existingNavOrder;
-    }
-
-    const year = new Date().getFullYear();
-    const latestOrder = await tx.crmOrder.findFirst({
-      where: { orderNumber: { startsWith: `ZAK-${year}-` } },
-      select: { orderNumber: true },
-      orderBy: { orderNumber: 'desc' },
-    });
-    const orderNumber = nextCrmOrderNumber(year, latestOrder?.orderNumber);
-
-    const crmOrder = await tx.crmOrder.create({
-      data: {
-        organizationId: offer.organizationId,
-        orderNumber,
-        clientId: offer.clientId,
-        offerId: offer.id,
-        assignedUserId: offer.createdByUserId || actorUser.id,
-        title: `Navigační zakázka: ${offer.title}`,
-        projectType: 'NAVIGATION',
-        status: 'CONFIRMED',
-        totalPrice: offer.totalPrice ?? offer.subtotal ?? 0,
-        note: offer.note || null,
-        internalNote: offer.internalNote || null,
-      },
-    });
-
-    const navData = offer.navigationOffer;
-    const targetName = navData?.targetName || offer.title;
-    const targetAddress = navData?.targetAddress || null;
-    const targetLatitude = navData?.targetLatitude || 0;
-    const targetLongitude = navData?.targetLongitude || 0;
-    const targetNote = navData?.targetNote || null;
-
-    const navOrder = await tx.navigationOrder.create({
-      data: {
-        organizationId: offer.organizationId,
-        crmOrderId: crmOrder.id,
-        status: 'POTVRZENO_KLIENTEM',
-        blockStatus: 'CEKA_NA_OBJEDNAVKU',
-        targetName,
-        targetAddress,
-        targetLatitude,
-        targetLongitude,
-        targetNote,
-      },
-    });
-
-    const selectedPoints = navData?.points?.filter((p) => p.isSelectedByClient !== false) || [];
-    if (selectedPoints.length > 0) {
-      for (const p of selectedPoints) {
-        await tx.navigationPoint.create({
-          data: {
-            organizationId: offer.organizationId,
-            navigationOrderId: navOrder.id,
-            // Body nabídky jsou unikátní budoucí pozice. Fyzický nosič se zakládá
-            // až po skutečné montáži, nikdy se nekopíruje z nabídky.
-            carrierId: null,
-            sortOrder: p.sortOrder,
-            latitude: p.latitude,
-            longitude: p.longitude,
-            address: p.address,
-            label: p.label,
-            navigationType: p.navigationType,
-            variant: p.variant,
-            orientation: p.orientation,
-            signOrientation: p.signOrientation,
-            roadSide: p.roadSide,
-            arrowDirection: p.arrowDirection || (typeof p.arrowDirectionEnum === 'string' ? p.arrowDirectionEnum : null),
-            arrowDirectionEnum: p.arrowDirectionEnum || 'STRAIGHT',
-            pillarNumber: p.pillarNumber,
-            pillarType: p.pillarType,
-            distanceValue: p.distanceValue,
-            distanceUnit: p.distanceUnit,
-            calculatedDistanceMeters: p.calculatedDistanceMeters,
-            routePolyline: p.routePolyline,
-            targetLatitude: p.targetLatitude,
-            targetLongitude: p.targetLongitude,
-            sitePhotoId: p.sitePhotoId,
-            installedPhotoId: p.installedPhotoId,
-            quantity: p.quantity,
-            unitPrice: p.unitPrice,
-            subtotal: p.subtotal,
-            installationPrice: p.installationPrice,
-            removalPrice: p.removalPrice,
-            productionPrice: p.productionPrice,
-            internalNote: p.internalNote,
-            clientNote: p.clientNote,
-            status: 'PLANNED',
-          },
-        });
-      }
-    }
-
-    await tx.offer.update({
-      where: { id: offerId },
-      data: { status: 'ACCEPTED', acceptedAt: offer.acceptedAt || new Date() },
-    });
-
-    await tx.crmAuditLog.create({
-      data: {
-        organizationId: offer.organizationId,
-        userId: actorUser.id,
-        userEmail: actorUser.email,
-        action: 'CONVERT_OFFER_TO_NAVIGATION_ORDER',
-        entityType: 'NavigationOrder',
-        entityId: navOrder.id,
-        detailsJson: JSON.stringify({ offerId: offer.id, orderNumber }),
-      },
-    });
-
-  return navOrder;
+  const result = await executeNavigationHandoffInTransaction(tx, offerId, {
+    id: actorUser.id,
+    email: actorUser.email,
+  });
+  return result.navigationOrder;
 }
 
 export function convertOfferToNavigationOrderInTransaction(
@@ -706,6 +580,7 @@ export async function attachPointInstallationPhotos(
     const point = await tx.navigationPoint.findUnique({
       where: { id: navigationPointId, organizationId },
       include: {
+        navigationTarget: { select: { name: true } },
         navigationOrder: {
           include: {
             crmOrder: {
@@ -785,7 +660,7 @@ export async function attachPointInstallationPhotos(
             sourcePosition: point.label,
             sourceKey: surfaceSourceKey,
             directionDescription: point.orientation,
-            destinationName: point.navigationOrder.targetName,
+            destinationName: point.navigationTarget?.name || point.navigationOrder.targetName,
             orientation: point.orientation,
             status: 'OCCUPIED',
             artworkUrl:

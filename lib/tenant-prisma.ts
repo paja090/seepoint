@@ -11,6 +11,7 @@ export const TENANT_MODEL_NAMES = [
   'Vehicle', 'VehicleReservation', 'VehicleServiceRecord', 'VehicleFuelExpense',
   'EmployeeAbsence', 'ChatMessage', 'ChatRead', 'AdvertisingSurface', 'Occupancy',
   'Offer', 'SalesOpportunity', 'NavigationOffer', 'NavigationPoint',
+  'NavigationTarget', 'NavigationChangeSet',
   'NavigationDocumentationReport', 'NavigationDocumentationItem',
   'NavigationReportAuditLog', 'CityGalleryProject', 'CityGalleryFleetConfig',
   'CityGalleryOffer', 'MediaPackage', 'MediaPackageRule', 'OfferPackageSelection',
