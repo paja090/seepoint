@@ -8,6 +8,7 @@ import { NotificationBellCenter } from '@/components/notifications/NotificationB
 import { QuickSearchInput } from '@/components/QuickSearchInput';
 import { WeatherClockWidget } from '@/components/WeatherClockWidget';
 import { OrganizationSwitcher } from '@/components/OrganizationSwitcher';
+import { RoleSwitcherButton } from '@/components/RoleSwitcherButton';
 
 const pageTitles: Array<[string, string]> = [
   ['/sales/opportunities', 'AI Obchodní radar'],
@@ -59,6 +60,9 @@ export function AppTopbar({ user, canUseTeam = true, onAiQuickTask }: { onAiQuic
           <Sparkles size={16} /> AI Úkol
         </button>}
         <OrganizationSwitcher activeId={user.organizationId} organizations={user.organizations} />
+        {user.allowedRoles && user.allowedRoles.length > 1 && (
+          <RoleSwitcherButton currentRole={user.role} allowedRoles={user.allowedRoles} compact />
+        )}
         <WeatherClockWidget />
 
         <div className="h-6 w-px bg-slate-200 mx-0.5" />

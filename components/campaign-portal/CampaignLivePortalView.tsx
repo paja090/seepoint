@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { OfferView, OfferItemView } from '@/lib/offers/view-model';
 import { CampaignLiveMap } from './CampaignLiveMap';
 import { PrintApprovalModule } from './PrintApprovalModule';
@@ -25,6 +26,7 @@ import {
   ExternalLink,
   Compass,
   Navigation,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Props {
@@ -80,6 +82,7 @@ function formatDistanceText(point: { distanceSource?: string | null; manualDista
 }
 
 export function CampaignLivePortalView({ offer, publicToken }: Props) {
+  const router = useRouter();
   const [selectedPhoto, setSelectedPhoto] = useState<{
     url: string;
     title: string;
@@ -89,6 +92,21 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     isInstallation?: boolean;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    // Tichý refresh živého stavu každých 45 sekund
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [router]);
+
+  function handleRefresh() {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => setIsRefreshing(false), 800);
+  }
 
   const isNavigation = offer.offerType === 'NAVIGATION' && Boolean(offer.navigation);
   const navPoints = (offer.navigation?.points || []).filter((p) => p.isSelectedByClient !== false);
@@ -155,69 +173,286 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     : (realization ? realization.installed : installedItems.length);
 
 
+  const navOrderStatus = offer.navigation?.navigationOrderStatus || offer.realizationSummary?.navigationOrderStatus;
+  const crmOrderStatus = offer.realizationSummary?.crmOrderStatus;
+
   let liveStatus = isNavigation ? 'Příprava navigačního značení' : 'Příprava zakázky';
   let liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
   let liveStatusDot = 'bg-sky-400';
 
-  if (offer.printJob) {
-    const phase = getPrintJobPhase(offer.printJob.status);
-    if (phase) { liveStatus = phase.label; liveStatusColor = phase.color; liveStatusDot = phase.dot; }
-  }
-  if (verifiedCount > 0 && verifiedCount < totalUnits) {
-    liveStatus = isNavigation ? 'Probíhá montáž na sloupech VO' : 'Probíhá instalace v terénu';
-    liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-    liveStatusDot = 'bg-amber-400 animate-pulse';
-  } else if (verifiedCount === totalUnits && totalUnits > 0) {
-    liveStatus = isNavigation ? 'Navigační systém aktivní v terénu' : 'Kampaň aktivní v terénu';
-    liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-    liveStatusDot = 'bg-emerald-400 animate-pulse';
+  if (isNavigation && navOrderStatus) {
+    switch (navOrderStatus) {
+      case 'DOKONCENO':
+        liveStatus = 'Dokončeno – Záruční servis aktivní';
+        liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        liveStatusDot = 'bg-emerald-400';
+        break;
+      case 'FAKTUROVANO':
+      case 'PRIPRAVENO_K_FAKTURACI':
+        liveStatus = 'Instalace dokončena – Příprava fakturace';
+        liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        liveStatusDot = 'bg-emerald-400';
+        break;
+      case 'FOTODOKUMENTACE':
+        liveStatus = 'Probíhá pasportizace & fotodokumentace';
+        liveStatusColor = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40';
+        liveStatusDot = 'bg-indigo-400 animate-pulse';
+        break;
+      case 'INSTALACE':
+        liveStatus = verifiedCount > 0 ? `Probíhá montáž na sloupech VO (${verifiedCount}/${totalUnits})` : 'Probíhá montáž na sloupech VO';
+        liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        liveStatusDot = 'bg-amber-400 animate-pulse';
+        break;
+      case 'PRIPRAVENO_K_INSTALACI':
+        liveStatus = 'Předáno technikům – připraveno k instalaci';
+        liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        liveStatusDot = 'bg-amber-400';
+        break;
+      case 'TISK_VYROBA':
+        liveStatus = 'Výroba navigačních tabulí (DIBOND)';
+        liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+        liveStatusDot = 'bg-sky-400 animate-pulse';
+        break;
+      case 'SCHVALENI_GRAFIKY':
+        liveStatus = 'Korektura a schvalování grafiky';
+        liveStatusColor = 'bg-violet-500/20 text-violet-300 border-violet-500/40';
+        liveStatusDot = 'bg-violet-400 animate-pulse';
+        break;
+      case 'GRAFICKE_PODKLADY':
+        liveStatus = 'Příprava grafických podkladů';
+        liveStatusColor = 'bg-violet-500/20 text-violet-300 border-violet-500/40';
+        liveStatusDot = 'bg-violet-400';
+        break;
+      case 'POTVRZENO_KLIENTEM':
+        liveStatus = 'Nabídka potvrzena – inženýring sítě VO';
+        liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+        liveStatusDot = 'bg-sky-400';
+        break;
+      default:
+        break;
+    }
+  } else if (!isNavigation && crmOrderStatus) {
+    switch (crmOrderStatus) {
+      case 'COMPLETED':
+        liveStatus = 'Kampaň dokončena a vyhodnocena';
+        liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        liveStatusDot = 'bg-emerald-400';
+        break;
+      case 'INSTALLED':
+        liveStatus = 'Kampaň aktivní v terénu';
+        liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        liveStatusDot = 'bg-emerald-400 animate-pulse';
+        break;
+      case 'INSTALLING':
+        liveStatus = verifiedCount > 0 ? `Probíhá instalace v terénu (${verifiedCount}/${totalUnits})` : 'Probíhá instalace v terénu';
+        liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        liveStatusDot = 'bg-amber-400 animate-pulse';
+        break;
+      case 'READY_FOR_INSTALLATION':
+        liveStatus = 'Naskladněno – připraveno k výlepu';
+        liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        liveStatusDot = 'bg-amber-400';
+        break;
+      case 'IN_PRODUCTION':
+        liveStatus = 'Probíhá velkoformátový tisk';
+        liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
+        liveStatusDot = 'bg-sky-400 animate-pulse';
+        break;
+      default:
+        break;
+    }
+  } else {
+    if (offer.printJob) {
+      const phase = getPrintJobPhase(offer.printJob.status);
+      if (phase) { liveStatus = phase.label; liveStatusColor = phase.color; liveStatusDot = phase.dot; }
+    }
+    if (verifiedCount > 0 && verifiedCount < totalUnits) {
+      liveStatus = isNavigation ? 'Probíhá montáž na sloupech VO' : 'Probíhá instalace v terénu';
+      liveStatusColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      liveStatusDot = 'bg-amber-400 animate-pulse';
+    } else if (verifiedCount === totalUnits && totalUnits > 0) {
+      liveStatus = isNavigation ? 'Navigační systém aktivní v terénu' : 'Kampaň aktivní v terénu';
+      liveStatusColor = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      liveStatusDot = 'bg-emerald-400 animate-pulse';
+    }
   }
 
   const printJob = offer.printJob;
   const printStatus = printJob?.status;
-  const isApproved = ['ACCEPTED', 'CONVERTED'].includes(offer.status);
+  const isApproved = ['ACCEPTED', 'CONVERTED'].includes(offer.status) || Boolean(navOrderStatus) || Boolean(crmOrderStatus);
   const hasPrintData = printStatus === 'CLIENT_APPROVAL' || !!printJob?.artworkUrl || (isNavigation && navPoints.some((p) => Boolean(p.visualizedPhotoUrl)));
-  const isPrinting = printStatus === 'IN_PRINT';
-  const isDelivered = printStatus === 'DELIVERED_TO_WAREHOUSE';
-  const isInstalling = verifiedCount > 0 && verifiedCount < totalUnits;
-  const isInstalled = verifiedCount === totalUnits && totalUnits > 0;
+  const isPrinting = printStatus === 'IN_PRINT' || navOrderStatus === 'TISK_VYROBA' || crmOrderStatus === 'IN_PRODUCTION';
+  const isDelivered = printStatus === 'DELIVERED_TO_WAREHOUSE' || navOrderStatus === 'PRIPRAVENO_K_INSTALACI' || crmOrderStatus === 'READY_FOR_INSTALLATION';
+  const isInstalling = (verifiedCount > 0 && verifiedCount < totalUnits) || navOrderStatus === 'INSTALACE' || crmOrderStatus === 'INSTALLING';
+  const isInstalled = (verifiedCount === totalUnits && totalUnits > 0) || ['FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || ['INSTALLED', 'COMPLETED'].includes(crmOrderStatus || '');
   const isPhotographed = realization
     ? realization.photographed > 0
-    : (isNavigation ? navPoints.some((p) => Boolean(p.installedPhotoUrl)) : isInstalled);
+    : (isNavigation ? navPoints.some((p) => Boolean(p.installedPhotoUrl)) : isInstalled) || ['FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '');
   const isFullyPhotographed = isNavigation
-    ? (navPoints.length > 0 && navPoints.every((p) => Boolean(p.installedPhotoUrl)))
+    ? (navPoints.length > 0 && navPoints.every((p) => Boolean(p.installedPhotoUrl))) || ['PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '')
     : isInstalled;
-  const isCompleted = realization ? realization.completed === realization.total && realization.total > 0 : isInstalled;
+  const isCompleted = realization
+    ? realization.completed === realization.total && realization.total > 0
+    : ['DOKONCENO', 'FAKTUROVANO'].includes(navOrderStatus || '') || crmOrderStatus === 'COMPLETED';
 
   type StepStatus = 'done' | 'active' | 'pending';
 
   const standardSteps: { icon: React.ReactNode; label: string; sublabel?: string; status: StepStatus }[] = [
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Nabídka schválena', sublabel: offer.acceptedAt ? new Date(offer.acceptedAt).toLocaleDateString('cs-CZ') : undefined, status: isApproved ? 'done' : 'pending' },
-    { icon: <FileCheck className="h-4 w-4" />, label: 'Tisková data', sublabel: hasPrintData ? 'Grafika nahrána' : printJob ? 'Čeká na grafiku' : 'Čeká na spuštění výroby', status: isPrinting || isDelivered || isInstalling || isInstalled ? 'done' : hasPrintData ? 'active' : 'pending' },
-    { icon: <Printer className="h-4 w-4" />, label: 'Ve výrobě', sublabel: isPrinting ? 'Tiskne se...' : isDelivered || isInstalling || isInstalled ? 'Vytisknuto' : undefined, status: isDelivered || isInstalling || isInstalled ? 'done' : isPrinting ? 'active' : 'pending' },
-    { icon: <Package className="h-4 w-4" />, label: 'Naskladněno', sublabel: isDelivered || isInstalling || isInstalled ? 'Připraveno k výlepu' : undefined, status: isInstalling || isInstalled ? 'done' : isDelivered ? 'active' : 'pending' },
-    { icon: <MapPin className="h-4 w-4" />, label: 'Instalace', sublabel: isInstalled ? `${verifiedCount}/${totalUnits} vylepeno` : isInstalling ? `${verifiedCount}/${totalUnits} probíhá` : undefined, status: isInstalled ? 'done' : isInstalling ? 'active' : 'pending' },
-    { icon: <Camera className="h-4 w-4" />, label: 'Fotodokumentace', sublabel: isPhotographed ? 'Fotky k dispozici' : undefined, status: isCompleted ? 'done' : isPhotographed ? 'active' : 'pending' },
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Předání a report', sublabel: isCompleted ? 'Dokončeno' : undefined, status: isCompleted ? 'done' : 'pending' },
+    {
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      label: 'Nabídka schválena',
+      sublabel: offer.acceptedAt ? new Date(offer.acceptedAt).toLocaleDateString('cs-CZ') : isApproved ? 'Potvrzeno' : undefined,
+      status: isApproved ? 'done' : 'pending',
+    },
+    {
+      icon: <FileCheck className="h-4 w-4" />,
+      label: 'Tisková data',
+      sublabel: hasPrintData ? 'Grafika nahrána' : printJob ? 'Čeká na grafiku' : 'Příprava výroby',
+      status: ['IN_PRODUCTION', 'READY_FOR_INSTALLATION', 'INSTALLING', 'INSTALLED', 'COMPLETED'].includes(crmOrderStatus || '') || isPrinting || isDelivered || isInstalling || isInstalled
+        ? 'done'
+        : hasPrintData
+          ? 'active'
+          : isApproved
+            ? 'active'
+            : 'pending',
+    },
+    {
+      icon: <Printer className="h-4 w-4" />,
+      label: 'Ve výrobě',
+      sublabel: isPrinting ? 'Tiskne se...' : isDelivered || isInstalling || isInstalled ? 'Vytisknuto' : undefined,
+      status: ['READY_FOR_INSTALLATION', 'INSTALLING', 'INSTALLED', 'COMPLETED'].includes(crmOrderStatus || '') || isDelivered || isInstalling || isInstalled
+        ? 'done'
+        : isPrinting
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <Package className="h-4 w-4" />,
+      label: 'Naskladněno',
+      sublabel: isDelivered || isInstalling || isInstalled ? 'Připraveno k výlepu' : undefined,
+      status: ['INSTALLING', 'INSTALLED', 'COMPLETED'].includes(crmOrderStatus || '') || isInstalling || isInstalled
+        ? 'done'
+        : isDelivered || crmOrderStatus === 'READY_FOR_INSTALLATION'
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <MapPin className="h-4 w-4" />,
+      label: 'Instalace',
+      sublabel: isInstalled ? `${totalUnits}/${totalUnits} vylepeno` : isInstalling ? `${verifiedCount}/${totalUnits} probíhá` : undefined,
+      status: ['INSTALLED', 'COMPLETED'].includes(crmOrderStatus || '') || isInstalled
+        ? 'done'
+        : isInstalling || crmOrderStatus === 'INSTALLING'
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <Camera className="h-4 w-4" />,
+      label: 'Fotodokumentace',
+      sublabel: isPhotographed ? 'Fotky k dispozici' : undefined,
+      status: crmOrderStatus === 'COMPLETED' || isCompleted
+        ? 'done'
+        : isPhotographed
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      label: 'Předání a report',
+      sublabel: isCompleted ? 'Dokončeno' : undefined,
+      status: isCompleted ? 'done' : 'pending',
+    },
   ];
 
   const navigationSteps: { icon: React.ReactNode; label: string; sublabel?: string; status: StepStatus }[] = [
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Nabídka schválena', sublabel: offer.acceptedAt ? new Date(offer.acceptedAt).toLocaleDateString('cs-CZ') : undefined, status: isApproved ? 'done' : 'pending' },
-    { icon: <FileCheck className="h-4 w-4" />, label: 'Grafický návrh', sublabel: hasPrintData ? 'Návrhy zpracovány' : 'Příprava grafiky', status: hasPrintData || isInstalled ? 'done' : isApproved ? 'active' : 'pending' },
-    { icon: <ShieldCheck className="h-4 w-4" />, label: 'Inženýring VO', sublabel: 'Správa sítě a vytyčení', status: isInstalled || isInstalling ? 'done' : isApproved ? 'active' : 'pending' },
-    { icon: <Printer className="h-4 w-4" />, label: 'Výroba DIBOND 3 mm', sublabel: isDelivered || isInstalling || isInstalled ? 'Panely vyrobeny' : isPrinting ? 'Ve výrobě' : undefined, status: isDelivered || isInstalling || isInstalled ? 'done' : isPrinting ? 'active' : 'pending' },
-    { icon: <MapPin className="h-4 w-4" />, label: 'Montáž na sloupech', sublabel: isInstalled ? `${verifiedCount}/${totalUnits} osazeno (Bandimex)` : isInstalling ? `${verifiedCount}/${totalUnits} probíhá` : undefined, status: isInstalled ? 'done' : isInstalling ? 'active' : 'pending' },
+    {
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      label: 'Nabídka schválena',
+      sublabel: offer.acceptedAt ? new Date(offer.acceptedAt).toLocaleDateString('cs-CZ') : isApproved ? 'Potvrzeno' : undefined,
+      status: isApproved ? 'done' : 'pending',
+    },
+    {
+      icon: <FileCheck className="h-4 w-4" />,
+      label: 'Grafický návrh',
+      sublabel: ['SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || hasPrintData
+        ? 'Návrhy schváleny'
+        : navOrderStatus === 'GRAFICKE_PODKLADY'
+          ? 'Příprava grafiky'
+          : 'Příprava grafiky',
+      status: ['SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || hasPrintData || isInstalled
+        ? 'done'
+        : isApproved
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <ShieldCheck className="h-4 w-4" />,
+      label: 'Inženýring VO',
+      sublabel: 'Správa sítě a vytyčení',
+      status: ['TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isInstalled || isInstalling
+        ? 'done'
+        : isApproved
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <Printer className="h-4 w-4" />,
+      label: 'Výroba DIBOND 3 mm',
+      sublabel: ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isDelivered || isInstalling || isInstalled
+        ? 'Panely vyrobeny'
+        : isPrinting || navOrderStatus === 'TISK_VYROBA'
+          ? 'Ve výrobě'
+          : undefined,
+      status: ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isDelivered || isInstalling || isInstalled
+        ? 'done'
+        : isPrinting || navOrderStatus === 'TISK_VYROBA'
+          ? 'active'
+          : 'pending',
+    },
+    {
+      icon: <MapPin className="h-4 w-4" />,
+      label: 'Montáž na sloupech',
+      sublabel: ['FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isInstalled
+        ? `${totalUnits}/${totalUnits} osazeno (Bandimex)`
+        : navOrderStatus === 'INSTALACE' || isInstalling
+          ? `${verifiedCount}/${totalUnits} probíhá`
+          : navOrderStatus === 'PRIPRAVENO_K_INSTALACI'
+            ? 'Předáno technikovi'
+            : undefined,
+      status: ['FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isInstalled
+        ? 'done'
+        : navOrderStatus === 'INSTALACE' || navOrderStatus === 'PRIPRAVENO_K_INSTALACI' || isInstalling
+          ? 'active'
+          : 'pending',
+    },
     {
       icon: <Camera className="h-4 w-4" />,
       label: 'Pasport & Foto',
-      sublabel: isFullyPhotographed
+      sublabel: ['PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isFullyPhotographed
         ? 'Fotodokumentace hotova'
-        : isPhotographed
+        : navOrderStatus === 'FOTODOKUMENTACE' || isPhotographed
           ? `${installedNavPoints.length}/${totalUnits} vyfoceno`
           : 'Čeká na montáž v terénu',
-      status: isFullyPhotographed ? 'done' : isPhotographed ? 'active' : 'pending',
+      status: ['PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isFullyPhotographed
+        ? 'done'
+        : navOrderStatus === 'FOTODOKUMENTACE' || isPhotographed
+          ? 'active'
+          : 'pending',
     },
-    { icon: <CheckCircle2 className="h-4 w-4" />, label: 'Předání a dohled', sublabel: isCompleted && isFullyPhotographed ? 'Záruční servis aktivní' : 'Záruční servis a pasport', status: isCompleted && isFullyPhotographed ? 'done' : 'pending' },
+    {
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      label: 'Předání a dohled',
+      sublabel: ['DOKONCENO', 'FAKTUROVANO'].includes(navOrderStatus || '') || (isCompleted && isFullyPhotographed)
+        ? 'Záruční servis aktivní'
+        : navOrderStatus === 'PRIPRAVENO_K_FAKTURACI'
+          ? 'Předáno k fakturaci'
+          : 'Záruční servis a pasport',
+      status: ['DOKONCENO', 'FAKTUROVANO'].includes(navOrderStatus || '') || (isCompleted && isFullyPhotographed)
+        ? 'done'
+        : navOrderStatus === 'PRIPRAVENO_K_FAKTURACI'
+          ? 'active'
+          : 'pending',
+    },
   ];
 
   const steps = isNavigation ? navigationSteps : standardSteps;
@@ -348,6 +583,16 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                 <span className="hidden sm:inline">Původní nabídka</span>
               </a>
             )}
+            <button
+              onClick={handleRefresh}
+              type="button"
+              disabled={isRefreshing}
+              title="Aktualizovat živý stav z terénu"
+              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Aktualizovat</span>
+            </button>
             <button
               onClick={handleShare}
               type="button"

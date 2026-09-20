@@ -114,6 +114,7 @@ export type OfferView = {
     targetLatitude: number;
     targetLongitude: number;
     targetNote?: string | null;
+    navigationOrderStatus?: string | null;
     points: Array<{
       id: string;
       label: string;
@@ -165,6 +166,8 @@ export type OfferView = {
     installed: number;
     photographed: number;
     completed: number;
+    navigationOrderStatus?: string | null;
+    crmOrderStatus?: string | null;
   } | null;
 };
 

@@ -295,7 +295,10 @@ export function evaluateRealization(
 
   // 4. Installation & Worker Assignment Evaluation:
   const uninstalledItems = items.filter((i) => !i.isInstalled);
-  const unassignedItems = items.filter((i) => !i.assignedUserId && !i.isInstalled);
+  const hasOrderAssignedWorker = Boolean(
+    context.assignedUserId || (context.tasks && context.tasks.some((t) => t.assignedToName))
+  );
+  const unassignedItems = items.filter((i) => !i.assignedUserId && !hasOrderAssignedWorker && !i.isInstalled);
 
   if (unassignedItems.length > 0 && !hasPrintJobs && undeliveredPrintJobs.length === 0) {
     blockers.push({
@@ -620,6 +623,7 @@ export async function buildRealizationContext(
             changeSets: {
               where: { status: 'PENDING' },
             },
+            installerUser: { select: { id: true, name: true } },
             points: {
               include: {
                 installedPhoto: true,
@@ -636,7 +640,7 @@ export async function buildRealizationContext(
             title: true,
             status: true,
             scheduledAt: true,
-            assignments: { select: { workerName: true } },
+            assignments: { select: { userId: true, workerName: true } },
           },
         },
       },
@@ -669,7 +673,15 @@ export async function buildRealizationContext(
     // 3. Map Items using dedicated adapter (Navigation vs Standard Media)
     let items: RealizationItemContext[] = [];
     if (crmOrder.navigationOrder) {
-      items = adaptNavigationPointsToRealizationItems(crmOrder.navigationOrder as NavigationOrderWithPoints);
+      const fallbackWorker =
+        crmOrder.navigationOrder.installerUserId ||
+        crmOrder.assignedUserId ||
+        crmOrder.workOrders?.[0]?.assignments?.[0]?.userId ||
+        null;
+      items = adaptNavigationPointsToRealizationItems(
+        crmOrder.navigationOrder as NavigationOrderWithPoints,
+        fallbackWorker
+      );
     } else {
       items = adaptStandardMediaRealizationItems(
         crmOrder.realizations as CrmRealizationWithRelations[],
