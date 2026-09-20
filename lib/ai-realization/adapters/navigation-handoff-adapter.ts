@@ -98,7 +98,7 @@ export async function executeNavigationHandoffInTransaction(
   }
 
   // 2. Resolve target metadata
-  let offerTargets = navData?.targets || [];
+  const offerTargets = navData?.targets || [];
   // If targets are empty on navigationOffer, check campaignStrategy.targets JSON
   if (offerTargets.length === 0 && offer.campaignStrategy && typeof offer.campaignStrategy === 'object') {
     const strategyTargets = (offer.campaignStrategy as { targets?: Array<{ name: string; address?: string; latitude: number; longitude: number; note?: string }> }).targets;
