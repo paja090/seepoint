@@ -16,10 +16,10 @@ export interface NavigationDiffResult {
   hasChanges: boolean;
   addedTargets: Array<{ name: string; latitude: number; longitude: number }>;
   removedTargets: Array<{ id: string; name: string }>;
-  modifiedTargets: Array<{ id: string; name: string; changes: Record<string, unknown> }>;
+  modifiedTargets: Array<{ id: string; name: string; changes: Record<string, { from?: unknown; to?: unknown }> }>;
   addedPoints: Array<{ label: string; latitude: number; longitude: number; unitPrice?: unknown }>;
   removedPoints: Array<{ id: string; label: string; status: string }>;
-  modifiedPoints: Array<{ id: string; label: string; changes: Record<string, unknown> }>;
+  modifiedPoints: Array<{ id: string; label: string; changes: Record<string, { from?: unknown; to?: unknown }> }>;
 }
 
 export function computeNavigationDiff(

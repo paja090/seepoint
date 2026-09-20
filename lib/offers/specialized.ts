@@ -25,6 +25,17 @@ const decimal = (value: unknown, label: string, fallback = '0') => {
 };
 const assertRole = (user: CurrentUser) => { if (!canManageOfferRole(user.role)) throw new OfferValidationError('Nemáte oprávnění spravovat nabídky.', 'FORBIDDEN'); };
 
+export type ParsedNavigationTarget = {
+  id: string;
+  stableKey: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  note: string | null;
+  photoUrl: string | null;
+};
+
 export type NavigationOfferInput = ReturnType<typeof parseNavigationOfferInput>;
 
 export function parseNavigationOfferInput(raw: unknown) {
@@ -118,8 +129,10 @@ export function parseNavigationOfferInput(raw: unknown) {
 
   // Parse optional multiple targets
   const rawTargets = Array.isArray(input.targets) ? input.targets : [];
-  const targets = rawTargets.map((t, idx) => {
-    if (!t || typeof t !== 'object') return null;
+  const targets: ParsedNavigationTarget[] = [];
+  for (let idx = 0; idx < rawTargets.length; idx++) {
+    const t = rawTargets[idx];
+    if (!t || typeof t !== 'object') continue;
     const tRec = t as Record<string, unknown>;
     const tId = text(tRec.id) || `target-${idx + 1}`;
     const tStableKey = text(tRec.stableKey) || tId;
@@ -127,7 +140,7 @@ export function parseNavigationOfferInput(raw: unknown) {
     const tAddr = text(tRec.address);
     const tLat = coordinate(tRec.latitude, 'latitude');
     const tLng = coordinate(tRec.longitude, 'longitude');
-    return {
+    targets.push({
       id: tId,
       stableKey: tStableKey,
       name: tName,
@@ -136,8 +149,8 @@ export function parseNavigationOfferInput(raw: unknown) {
       longitude: tLng,
       note: nullable(text(tRec.note)),
       photoUrl: nullable(text(tRec.photoUrl)),
-    };
-  }).filter(Boolean);
+    });
+  }
 
   return {
     clientId, title, campaignName: text(input.campaignName) || title, contactPerson: text(input.contactPerson), contactEmail: text(input.contactEmail), contactPhone: text(input.contactPhone),
