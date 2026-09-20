@@ -123,7 +123,16 @@ export async function loadPlanningData(date: string, options: {
   const availableVehicles = vehicles.filter(v => !['SERVICE', 'OUT_OF_SERVICE', 'IN_USE'].includes(v.status) && !reservations.some(r => r.vehicleId === v.id));
   const automaticEmployees = mappedEmployees.filter(e => e.isActive && e.available && e.roles.some(r => ['WORKER', 'TECHNICIAN'].includes(r)));
   return { organizationId, date, now: options.now ?? new Date().toISOString(), profile, jobs,
-    employees: mappedEmployees, vehicles: vehicles.map(v => ({ id: v.id, organizationId, name: v.name, status: v.status === 'IN_USE' && reservations.some(r => r.vehicleId === v.id && (options.reuseReservationIds ?? []).includes(r.id) && r.status === 'ACTIVE') ? 'RESERVED' : v.status,
-      reserved: reservations.some(r => r.vehicleId === v.id && !(options.reuseReservationIds ?? []).includes(r.id)) })),
+    employees: mappedEmployees, vehicles: vehicles.map(v => {
+      const isReservedByCrew = Boolean(options.crews?.some(c => c.vehicleId === v.id && reservations.some(r => r.vehicleId === v.id && c.employeeIds.includes(r.employeeId))));
+      const externalReservations = reservations.filter(r => r.vehicleId === v.id && !(options.reuseReservationIds ?? []).includes(r.id) && !isReservedByCrew);
+      return {
+        id: v.id,
+        organizationId,
+        name: v.name,
+        status: v.status === 'IN_USE' && reservations.some(r => r.vehicleId === v.id && (options.reuseReservationIds ?? []).includes(r.id) && r.status === 'ACTIVE') ? 'RESERVED' : v.status,
+        reserved: externalReservations.length > 0,
+      };
+    }),
     crews: options.crews ?? automaticEmployees.map((e, i) => ({ id: `crew-${i + 1}`, employeeIds: [e.id], vehicleId: availableVehicles[i]?.id ?? null })) };
 }

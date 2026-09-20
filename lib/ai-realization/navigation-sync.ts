@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { executeNavigationHandoffInTransaction, type HandoffActor } from './adapters/navigation-handoff-adapter';
+import { syncNavigationPointToCarrierAndSurface } from '@/lib/navigation/navigation-carrier-sync';
 
 export const SAFE_NAVIGATION_SYNC_STATUSES = [
   'POPTAVKA',
@@ -453,6 +454,47 @@ export async function reconcileNavigationOrderFromOffer(
           resolvedTargetId = Array.from(targetMap.values())[0] || null;
         }
 
+        const carrierSync = await syncNavigationPointToCarrierAndSurface(
+          tx,
+          {
+            id: p.id,
+            stableKey: p.stableKey,
+            carrierId: p.carrierId,
+            surfaceId: p.surfaceId,
+            label: p.label,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            address: p.address,
+            pillarNumber: p.pillarNumber,
+            pillarType: p.pillarType,
+            navigationType: p.navigationType,
+            variant: p.variant,
+            roadSide: p.roadSide,
+            arrowDirection: p.arrowDirection || (typeof p.arrowDirectionEnum === 'string' ? p.arrowDirectionEnum : null),
+            calculatedDistanceMeters: p.calculatedDistanceMeters,
+            targetAddress: navOrder.targetAddress,
+            targetName: navOrder.targetName,
+          },
+          {
+            organizationId,
+            clientId: offer.clientId,
+            targetName: navOrder.targetName,
+            city: navOrder.targetAddress,
+            rentStart: navOrder.rentStart,
+            rentEnd: navOrder.rentEnd,
+          }
+        );
+
+        if (p.id && (!p.carrierId || !p.surfaceId)) {
+          await tx.navigationPoint.update({
+            where: { id: p.id },
+            data: {
+              carrierId: carrierSync.carrierId,
+              surfaceId: carrierSync.surfaceId,
+            },
+          });
+        }
+
         await tx.navigationPoint.create({
           data: {
             organizationId,
@@ -461,7 +503,8 @@ export async function reconcileNavigationOrderFromOffer(
             stableKey: randomUUID(),
             sourceOfferPointKey: p.stableKey,
             sourceOfferPointId: p.id,
-            carrierId: null,
+            carrierId: carrierSync.carrierId,
+            surfaceId: carrierSync.surfaceId,
             sortOrder: p.sortOrder,
             latitude: p.latitude,
             longitude: p.longitude,

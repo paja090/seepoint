@@ -37,6 +37,7 @@ import {
   User,
   Calendar,
   PlusCircle,
+  Navigation,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,20 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         assignments: true,
         workTasks: { include: { assignedTo: true } },
         items: { include: { carrier: true, surface: true, crmRealization: true } },
+        navigationOrder: {
+          include: {
+            targets: true,
+            points: {
+              include: {
+                carrier: true,
+                surface: true,
+                installedPhoto: true,
+                sitePhoto: true,
+              },
+              orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+            },
+          },
+        },
       },
     }),
     prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
@@ -127,6 +142,33 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     order.deadlineAt && order.deadlineAt < new Date() && !['DONE', 'CANCELLED'].includes(order.status)
   );
   const awaitsInvoice = order.ftdSent && !order.invoiced && order.status !== 'CANCELLED';
+
+  const navPoints = order.navigationOrder?.points || [];
+  const primaryTarget = order.navigationOrder?.targets?.[0];
+  const navTarget = primaryTarget || (order.navigationOrder?.targetLatitude ? {
+    name: order.navigationOrder.targetName,
+    address: order.navigationOrder.targetAddress,
+    latitude: order.navigationOrder.targetLatitude,
+    longitude: order.navigationOrder.targetLongitude,
+  } : null);
+
+  let googleMapsRouteUrl: string | null = null;
+  if (navPoints.length > 0) {
+    const origin = `${navPoints[0].latitude},${navPoints[0].longitude}`;
+    const destination = navTarget
+      ? `${navTarget.latitude},${navTarget.longitude}`
+      : `${navPoints[navPoints.length - 1].latitude},${navPoints[navPoints.length - 1].longitude}`;
+    const waypointsList = navTarget ? navPoints.slice(1) : navPoints.slice(1, -1);
+    const waypoints = waypointsList.map((p) => `${p.latitude},${p.longitude}`).join('|');
+    const params = new URLSearchParams({
+      api: '1',
+      origin,
+      destination,
+      travelmode: 'driving',
+    });
+    if (waypoints) params.set('waypoints', waypoints);
+    googleMapsRouteUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
+  }
 
   return (
     <AppShell>
@@ -271,6 +313,103 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 </div>
               )}
             </section>
+
+            {/* Navigation Installation Points & Route */}
+            {order.navigationOrder && navPoints.length > 0 && (
+              <section className="card space-y-4 border-sky-300 bg-sky-50/30">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sky-200 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-sky-800">
+                      <Navigation size={16} className="text-sky-600" /> Montážní trasa navigace
+                    </div>
+                    <h2 className="mt-0.5 text-lg font-black text-slate-950">
+                      {navPoints.length} navigačních bodů (sloupy VO)
+                    </h2>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">
+                      Cíl: <strong>{navTarget?.name || order.navigationOrder.targetName}</strong>
+                      {order.navigationOrder.targetAddress ? ` (${order.navigationOrder.targetAddress})` : ''}
+                    </p>
+                  </div>
+
+                  {googleMapsRouteUrl && (
+                    <a
+                      href={googleMapsRouteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 text-xs font-black shadow-md transition transform hover:-translate-y-0.5 shrink-0"
+                    >
+                      <MapPin size={16} />
+                      <span>Spustit celou trasu v Google Maps ↗</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {navPoints.map((point, idx) => (
+                    <div
+                      key={point.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 shadow-2xs transition hover:border-sky-400"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-xs font-black text-sky-800">
+                            {idx + 1}
+                          </span>
+                          <p className="font-extrabold text-sm text-slate-900">
+                            {point.pillarNumber ? `Sloup VO ${point.pillarNumber}` : `Bod ${idx + 1}`}: {point.label}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                            point.status === 'INSTALLED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {point.status === 'INSTALLED' ? '✓ Osazeno' : 'Čeká na montáž'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                        {point.address && <span>📍 {point.address}</span>}
+                        {point.arrowDirection && <span>🧭 Směr: <strong>{point.arrowDirection}</strong></span>}
+                        {point.calculatedDistanceMeters && (
+                          <span>📏 Vzdálenost k cíli: <strong>{point.calculatedDistanceMeters} m</strong></span>
+                        )}
+                        <span>GPS: {point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-4 text-xs font-bold pt-2 border-t border-slate-100">
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}&travelmode=driving`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sky-700 hover:underline flex items-center gap-1"
+                        >
+                          Navigovat k tomuto sloupu ↗
+                        </a>
+                        {point.carrier && (
+                          <Link
+                            href={`/carriers/${point.carrier.id}`}
+                            className="text-emerald-700 hover:underline flex items-center gap-1"
+                          >
+                            Karta nosiče ({point.carrier.code}) ↗
+                          </Link>
+                        )}
+                        {point.carrier && (
+                          <Link
+                            href={`/map?carrier=${point.carrier.id}`}
+                            className="text-slate-600 hover:underline flex items-center gap-1"
+                          >
+                            Zobrazit na mapě nosičů 🗺️
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Carrier & Media Items */}
             <section className="card space-y-3">
