@@ -39,7 +39,7 @@ export function computeNavigationDiff(
     if (!matched) {
       addedTargets.push({ name: ot.name, latitude: ot.latitude, longitude: ot.longitude });
     } else {
-      const changes: Record<string, unknown> = {};
+      const changes: Record<string, { from?: unknown; to?: unknown }> = {};
       if (matched.name !== ot.name) changes.name = { from: matched.name, to: ot.name };
       if (Math.abs(matched.latitude - ot.latitude) > 0.0001) changes.latitude = { from: matched.latitude, to: ot.latitude };
       if (Math.abs(matched.longitude - ot.longitude) > 0.0001) changes.longitude = { from: matched.longitude, to: ot.longitude };
@@ -69,7 +69,7 @@ export function computeNavigationDiff(
     if (!matched) {
       addedPoints.push({ label: op.label, latitude: op.latitude, longitude: op.longitude, unitPrice: op.unitPrice });
     } else {
-      const changes: Record<string, unknown> = {};
+      const changes: Record<string, { from?: unknown; to?: unknown }> = {};
       if (matched.label !== op.label) changes.label = { from: matched.label, to: op.label };
       if (Math.abs(matched.latitude - op.latitude) > 0.0001) changes.latitude = { from: matched.latitude, to: op.latitude };
       if (Math.abs(matched.longitude - op.longitude) > 0.0001) changes.longitude = { from: matched.longitude, to: op.longitude };
@@ -195,9 +195,7 @@ export async function syncNavigationOfferToOrderInTransaction(
         crmOrderId: offer.crmOrder!.id,
         navigationOrderId: navOrder.id,
         status: 'PENDING',
-        title: `Změna nabídky v pokročilé fázi (${navOrder.status})`,
-        description: `Byla upravena nabídka po zahájení výroby/instalace (+${diff.addedPoints.length} bodů, -${diff.removedPoints.length} bodů, ~${diff.modifiedPoints.length} upraveno).`,
-        diffJson: diff as unknown as Prisma.InputJsonValue,
+        diff: diff as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -229,7 +227,8 @@ export async function applyNavigationChangeSetInTransaction(
     data: {
       status: 'APPLIED',
       appliedAt: new Date(),
-      appliedByUserId: actor.id,
+      reviewedAt: new Date(),
+      reviewedByUserId: actor.id,
     },
   });
 

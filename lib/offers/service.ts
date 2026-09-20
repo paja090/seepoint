@@ -258,7 +258,6 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
             longitude: t.longitude,
             note: t.note || undefined,
             photoUrl: t.photoUrl || undefined,
-            color: t.color || undefined,
             sortOrder: t.sortOrder,
           }))
         : (

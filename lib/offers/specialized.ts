@@ -160,6 +160,7 @@ export function parseNavigationOfferInput(raw: unknown) {
     targets: targets.length > 0 ? targets : [
       {
         id: 'target-1',
+        stableKey: 'target-1',
         name: targetName,
         address: text(input.targetAddress),
         latitude: coordinate(input.targetLatitude, 'latitude'),

@@ -23,7 +23,7 @@ export async function GET(
         OR: [{ crmOrderId: id }, { navigationOrderId: id }, { offerId: id }],
       },
       include: {
-        appliedByUser: { select: { id: true, name: true } },
+        reviewedByUser: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

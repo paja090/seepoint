@@ -178,7 +178,6 @@ export async function executeNavigationHandoffInTransaction(
           longitude: ot.longitude,
           note: ot.note,
           photoUrl: ot.photoUrl,
-          color: ot.color,
           sortOrder: idx,
         },
       });
@@ -198,7 +197,6 @@ export async function executeNavigationHandoffInTransaction(
           longitude: ot.longitude,
           note: ot.note,
           photoUrl: ot.photoUrl,
-          color: ot.color,
           sortOrder: idx,
         },
       });

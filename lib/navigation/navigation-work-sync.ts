@@ -87,10 +87,11 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
   }
 
   // Find existing workOrder linked to this navigationOrderId
-  let workOrder = navOrder.workOrders[0] || null;
+  const existingWorkOrder = navOrder.workOrders[0] || null;
+  let workOrderId: string;
 
-  if (!workOrder) {
-    workOrder = await tx.workOrder.create({
+  if (!existingWorkOrder) {
+    const created = await tx.workOrder.create({
       data: {
         organizationId,
         navigationOrderId: navOrder.id,
@@ -124,20 +125,18 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
               organizationId,
               carrierId: p.carrierId,
               surfaceId: p.surfaceId,
-              quantity: p.quantity || 1,
+              quantity: Number(p.quantity) || 1,
               description: p.label,
             })),
         },
       },
-      include: {
-        assignments: true,
-        items: true,
-      },
     });
+    workOrderId = created.id;
   } else {
+    workOrderId = existingWorkOrder.id;
     // Update existing workOrder
     await tx.workOrder.update({
-      where: { id: workOrder.id },
+      where: { id: existingWorkOrder.id },
       data: {
         title,
         scheduledAt,
@@ -149,14 +148,14 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
 
     // Update assignment if changed and workerName exists
     if (workerName) {
-      const existingAssignment = workOrder.assignments.find(
+      const existingAssignment = existingWorkOrder.assignments.find(
         (a) => (assignedUserId && a.userId === assignedUserId) || a.workerName === workerName
       );
       if (!existingAssignment) {
         await tx.workAssignment.create({
           data: {
             organizationId,
-            workOrderId: workOrder.id,
+            workOrderId: existingWorkOrder.id,
             userId: assignedUserId,
             workerName,
           },
@@ -165,16 +164,16 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
     }
 
     // Sync items: add carriers not yet present
-    const existingCarrierIds = new Set(workOrder.items.map((i) => i.carrierId).filter(Boolean));
+    const existingCarrierIds = new Set(existingWorkOrder.items.map((i) => i.carrierId).filter(Boolean));
     const newPointsWithCarrier = navOrder.points.filter((p) => p.carrierId && !existingCarrierIds.has(p.carrierId));
     for (const p of newPointsWithCarrier) {
       await tx.workOrderItem.create({
         data: {
           organizationId,
-          workOrderId: workOrder.id,
+          workOrderId: existingWorkOrder.id,
           carrierId: p.carrierId,
           surfaceId: p.surfaceId,
-          quantity: p.quantity || 1,
+          quantity: Number(p.quantity) || 1,
           description: p.label,
         },
       });
@@ -182,9 +181,9 @@ export async function syncNavigationOrderToWorkOrderInTransaction(
   }
 
   // Generate / synchronize work tasks for employees
-  await syncWorkOrderTasks(workOrder.id, tx);
+  await syncWorkOrderTasks(workOrderId, tx);
 
-  return { workOrderId: workOrder.id };
+  return { workOrderId };
 }
 
 /**
