@@ -1,4 +1,4 @@
-import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
+export type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 
 export const workRequesters = ['MAREK', 'MIREK', 'VLAĎKA', 'SILVA', 'ZUZANA'] as const;
 
