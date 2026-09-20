@@ -50,12 +50,24 @@ export async function handoffAcceptedOfferToRealizationInTransaction(
     return { crmOrderId: offer.crmOrder?.id || '' };
   }
 
-  // Idempotent check: If CrmOrder already exists
+  // IDEMPOTENT CHECK 1: If offer.crmOrder already exists
   if (offer.crmOrder) {
     if (offer.offerType === 'NAVIGATION') {
       await syncNavigationOfferToOrderInTransaction(tx, offerId, actor);
     }
     return { crmOrderId: offer.crmOrder.id };
+  }
+
+  // IDEMPOTENT CHECK 2: doubleCheck within transaction
+  const doubleCheck = await tx.crmOrder.findFirst({
+    where: { offerId },
+    include: { navigationOrder: true, realizations: true },
+  });
+  if (doubleCheck) {
+    if (offer.offerType === 'NAVIGATION') {
+      await syncNavigationOfferToOrderInTransaction(tx, offerId, actor);
+    }
+    return { crmOrderId: doubleCheck.id };
   }
 
   if (offer.offerType === 'NAVIGATION') {

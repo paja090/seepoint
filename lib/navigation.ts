@@ -54,7 +54,6 @@ export const navigationHubs: NavigationHub[] = [
       ["/vacations","Dovolená & Volno","calendarRange","team"]
     ] },
     { label: 'Realizace', items: [
-      ["/realization","AI Řízení realizace","workflow","realization"],
       ["/work","Plán práce","briefcaseBusiness","work"],
       ["/work/route","Pracovní výjezd","route","work"],
       ["/tasks","Všechny úkoly","clipboardList","tasks"],

@@ -10,7 +10,11 @@ const original = readFileSync('docs/navigation-audit.md', 'utf8').split('\n')
   .filter(line => line.startsWith('| ') && line.includes(' | /'))
   .map(line => { const [, , href, section, module] = line.split('|').map(s => s.trim()); return { href, section: section as AppSection, module }; });
 const hrefs = (hubs: typeof navigationHubs) => hubs.flatMap(h => h.groups.flatMap(g => g.items.map(i => i[0]))).sort();
-const additions = [{ href: '/planner', section: 'planner' as AppSection, module: 'planner' }, { href: '/settings/planner', section: 'planner' as AppSection, module: 'planner' }];
+const additions = [
+  { href: '/planner', section: 'planner' as AppSection, module: 'planner' },
+  { href: '/settings/planner', section: 'planner' as AppSection, module: 'planner' },
+  { href: '/realization', section: 'realization' as AppSection, module: 'aiRealization' },
+];
 const current = [...original, ...additions];
 
 test('every original link is preserved exactly once and resolves to an existing page', () => {
