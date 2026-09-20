@@ -3,6 +3,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { WorkModuleClient } from '@/components/WorkModuleClient';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import { overlapsAbsence } from '@/lib/work-absence-conflicts';
+import { getOrganizationWorkCategories } from '@/lib/work-categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
   const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
 
-  const [orders, clients, carriers, employees] = await Promise.all([
+  const [orders, clients, carriers, employees, categories] = await Promise.all([
     prisma.workOrder.findMany({
       include: {
         assignments: true,
@@ -41,6 +42,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
       orderBy: { firstName: 'asc' },
       select: { id: true, firstName: true, lastName: true },
     }),
+    getOrganizationWorkCategories(user.organizationId),
   ]);
 
   const currentUserName = user.employee
@@ -104,6 +106,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
           initialCampaignDateFrom={initialCampaignDateFrom}
           initialCampaignDateTo={initialCampaignDateTo}
           canCreateWorkOrder={canCreateWorkOrder}
+          categories={categories}
         />
       </div>
     </AppShell>
