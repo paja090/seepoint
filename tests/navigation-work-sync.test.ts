@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Prisma } from '@prisma/client';
 import { syncNavigationOrderToWorkOrderInTransaction } from '../lib/navigation/navigation-work-sync';
 
 test('syncNavigationOrderToWorkOrderInTransaction: skips sync when no installation scheduled and not in installation phase', async () => {
@@ -15,15 +16,14 @@ test('syncNavigationOrderToWorkOrderInTransaction: skips sync when no installati
         workOrders: [],
       }),
     },
-  } as any;
+  } as unknown as Prisma.TransactionClient;
 
   const result = await syncNavigationOrderToWorkOrderInTransaction(mockTx, 'nav-1');
   assert.equal(result, null);
 });
 
 test('syncNavigationOrderToWorkOrderInTransaction: creates WorkOrder and syncs WorkTasks when installation is planned', async () => {
-  let createdWorkOrderData: any = null;
-  let syncedWorkOrderId: string | null = null;
+  let createdWorkOrderData: Record<string, unknown> | null = null;
 
   const mockTx = {
     navigationOrder: {
@@ -49,13 +49,15 @@ test('syncNavigationOrderToWorkOrderInTransaction: creates WorkOrder and syncs W
       }),
     },
     workOrder: {
-      create: async (args: any) => {
+      create: async (args: { data: Record<string, unknown> }) => {
         createdWorkOrderData = args.data;
+        const assignmentsData = args.data.assignments as { create?: Array<Record<string, unknown>> } | undefined;
+        const itemsData = args.data.items as { create?: Array<Record<string, unknown>> } | undefined;
         return {
           id: 'wo-created-1',
           ...args.data,
-          assignments: args.data.assignments?.create || [],
-          items: args.data.items?.create || [],
+          assignments: assignmentsData?.create || [],
+          items: itemsData?.create || [],
         };
       },
       findUnique: async () => ({
@@ -76,15 +78,17 @@ test('syncNavigationOrderToWorkOrderInTransaction: creates WorkOrder and syncs W
       findMany: async () => [],
       create: async () => ({}),
     },
-  } as any;
+  } as unknown as Prisma.TransactionClient;
 
   const result = await syncNavigationOrderToWorkOrderInTransaction(mockTx, 'nav-2');
   assert.ok(result);
   assert.equal(result?.workOrderId, 'wo-created-1');
-  assert.equal(createdWorkOrderData.navigationOrderId, 'nav-2');
-  assert.equal(createdWorkOrderData.title, 'Montáž navigace: Form Factory s.r.o. – Form Factory Ostrava');
-  assert.equal(createdWorkOrderData.workType, 'INSTALLATION');
-  assert.equal(createdWorkOrderData.status, 'PLANNED');
-  assert.equal(createdWorkOrderData.assignments.create[0].workerName, 'Pavel Montér');
-  assert.equal(createdWorkOrderData.items.create.length, 2);
+  assert.equal(createdWorkOrderData?.navigationOrderId, 'nav-2');
+  assert.equal(createdWorkOrderData?.title, 'Montáž navigace: Form Factory s.r.o. – Form Factory Ostrava');
+  assert.equal(createdWorkOrderData?.workType, 'INSTALLATION');
+  assert.equal(createdWorkOrderData?.status, 'PLANNED');
+  const createdAssignments = createdWorkOrderData?.assignments as { create: Array<{ workerName: string }> };
+  assert.equal(createdAssignments.create[0].workerName, 'Pavel Montér');
+  const createdItems = createdWorkOrderData?.items as { create: Array<unknown> };
+  assert.equal(createdItems.create.length, 2);
 });
