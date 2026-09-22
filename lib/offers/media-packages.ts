@@ -32,7 +32,7 @@ export function selectMediaPackageSurfaces(pkg: MediaPackageOption, surfaces: Of
     if (chosen.length < rule.quantity) {
       missing.push({
         mediaType: rule.mediaType,
-        carrierTypeId: rule.carrierTypeId,
+        ...(rule.carrierTypeId ? { carrierTypeId: rule.carrierTypeId } : {}),
         city: rule.city,
         locality: rule.locality,
         quantity: rule.quantity,
