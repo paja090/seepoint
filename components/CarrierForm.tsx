@@ -60,7 +60,15 @@ const mountingTypes: SelectOption<Carrier['mountingType']>[] = [
 
 type ApiError = { error?: string };
 
-export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; onSaved?: (carrier: Carrier) => void }) {
+export function CarrierForm({
+  carrier,
+  onSaved,
+  carrierTypes,
+}: {
+  carrier?: Partial<Carrier>;
+  onSaved?: (carrier: Carrier) => void;
+  carrierTypes?: Array<{ id: string; code: string; name: string; icon?: string | null; color?: string | null; legacyEnumValue?: string | null }>;
+}) {
   const [form, setForm] = useState<Partial<Carrier>>(carrier ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -74,6 +82,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
     const hasLongitude = Number.isFinite(form.longitude);
     const payload = {
       ...form,
+      carrierTypeId: form.carrierTypeId,
       name: form.name?.trim(),
       code: form.code?.trim(),
       city: form.city?.trim(),
@@ -128,13 +137,46 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       <input className="input" placeholder="Název" aria-label="Název" required value={form.name ?? ''} onChange={(event) => set('name', event.target.value)} />
       <input className="input" placeholder="Interní kód" aria-label="Interní kód" required value={form.code ?? ''} onChange={(event) => set('code', event.target.value)} />
       <div className="grid grid-cols-2 gap-2">
-        <select className="input" aria-label="Typ nosiče" value={form.type ?? 'BILLBOARD'} onChange={(event) => set('type', event.target.value)}>
-          <optgroup label="Nosiče SeePOINT">
-            {seepointProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
-          </optgroup>
-          <optgroup label="Ostatní / starší typy">
-            {legacyProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
-          </optgroup>
+        <select
+          className="input"
+          aria-label="Typ nosiče"
+          value={form.carrierTypeId ?? form.type ?? 'BILLBOARD'}
+          onChange={(event) => {
+            const val = event.target.value;
+            const matchedCustom = carrierTypes?.find((ct) => ct.id === val);
+            if (matchedCustom) {
+              setForm((curr) => ({
+                ...curr,
+                carrierTypeId: matchedCustom.id,
+                type: (matchedCustom.legacyEnumValue as Carrier['type']) || curr.type || 'OTHER',
+              }));
+            } else {
+              setForm((curr) => ({
+                ...curr,
+                carrierTypeId: undefined,
+                type: val as Carrier['type'],
+              }));
+            }
+          }}
+        >
+          {carrierTypes && carrierTypes.length > 0 ? (
+            <optgroup label="Typy nosičů organizace">
+              {carrierTypes.map((ct) => (
+                <option key={ct.id} value={ct.id}>
+                  {ct.icon ? `${ct.icon} ` : ''}{ct.name}
+                </option>
+              ))}
+            </optgroup>
+          ) : (
+            <>
+              <optgroup label="Nosiče SeePOINT">
+                {seepointProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
+              </optgroup>
+              <optgroup label="Ostatní / starší typy">
+                {legacyProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
+              </optgroup>
+            </>
+          )}
         </select>
         <select className="input" aria-label="Stav nosiče" value={form.status ?? 'ACTIVE'} onChange={(event) => set('status', event.target.value)}>
           {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}

@@ -6,6 +6,7 @@ import { MapView } from '@/components/MapView';
 import { PageHeader, StatCard } from '@/components/ui';
 import { parseCarrierFilters } from '@/lib/carrier-filters';
 import { getCarrierFilterOptions, getMapCarriers } from '@/lib/db';
+import { getActiveCarrierTypes } from '@/lib/carrier-type-catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,11 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
   const params = await searchParams;
   const filters = parseCarrierFilters(params);
   const selectedCarrierId = Array.isArray(params.carrier) ? params.carrier[0] : params.carrier;
-  const [{ carriers, meta }, filterOptions] = await Promise.all([getMapCarriers(filters), getCarrierFilterOptions()]);
+  const [{ carriers, meta }, filterOptions, carrierTypes] = await Promise.all([
+    getMapCarriers(filters),
+    getCarrierFilterOptions(),
+    getActiveCarrierTypes(),
+  ]);
   const selectedIndex = selectedCarrierId ? carriers.findIndex((carrier) => carrier.id === selectedCarrierId) : -1;
   const orderedCarriers = selectedIndex > 0 ? [carriers[selectedIndex], ...carriers.slice(0, selectedIndex), ...carriers.slice(selectedIndex + 1)] : carriers;
 
@@ -35,7 +40,7 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
 
       <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="xl:sticky xl:top-24 xl:self-start">
-          <CarrierFilters action="/map" filters={filters} options={filterOptions} resultCount={meta.total} />
+          <CarrierFilters action="/map" filters={filters} options={filterOptions} carrierTypes={carrierTypes} resultCount={meta.total} />
           <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
             Mapa zobrazuje <strong>{meta.returned}</strong> z <strong>{meta.total}</strong> aktivních nosičů podle filtru.
             <div className="mt-2 text-slate-500">Bez GPS: {meta.missingGpsCount} · Archivovaných celkem: {meta.archivedCount} · Limit mapy: {meta.limit}</div>

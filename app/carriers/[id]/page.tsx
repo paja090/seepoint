@@ -7,6 +7,7 @@ import { getCarrier, prisma } from '@/lib/db';
 import { isMissingDatabaseStructureError, productionMigrationMessage } from '@/lib/prisma-errors';
 import { getCarrierHistoryTimeline, listCarrierSurfaces } from '@/lib/navigation/carrier-history-service';
 import { CarrierDetailTimelineView } from '@/components/navigation/CarrierDetailTimelineView';
+import { getActiveCarrierTypes } from '@/lib/carrier-type-catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
 
   if (!carrier) notFound();
 
-  const [history, surfaces, clients, prevCarrier, nextCarrier] = await Promise.all([
+  const [history, surfaces, clients, prevCarrier, nextCarrier, carrierTypes] = await Promise.all([
     getCarrierHistoryTimeline(carrierId),
     listCarrierSurfaces(carrierId),
     prisma.client.findMany({
@@ -53,6 +54,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
       orderBy: { code: 'asc' },
       select: { id: true, code: true, name: true },
     }),
+    getActiveCarrierTypes(),
   ]);
 
   return (
@@ -71,7 +73,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
           </div>
           <div id="carrier-form" className="card scroll-mt-6">
             <h2 className="mb-4 font-bold">Upravit nosič</h2>
-            <CarrierForm carrier={carrier} />
+            <CarrierForm carrier={carrier} carrierTypes={carrierTypes} />
           </div>
         </div>
 

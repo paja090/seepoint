@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { Button, EmptyState, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { carrierTypeLabel, mediaTypeLabel, parseCarrierFilters } from '@/lib/carrier-filters';
 import { getCarrierFilterOptions, getCarriersPage } from '@/lib/db';
+import { getActiveCarrierTypes } from '@/lib/carrier-type-catalog';
 
 import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
 
@@ -22,7 +23,11 @@ const inventoryNavItems = [
 export default async function Carriers({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePageAccess('carriers');
   const filters = parseCarrierFilters(await searchParams);
-  const [{ carriers, meta }, filterOptions] = await Promise.all([getCarriersPage(filters), getCarrierFilterOptions()]);
+  const [{ carriers, meta }, filterOptions, carrierTypes] = await Promise.all([
+    getCarriersPage(filters),
+    getCarrierFilterOptions(),
+    getActiveCarrierTypes(),
+  ]);
   const nextParams = new URLSearchParams();
   Object.entries({ ...filters, page: String((meta.page ?? 1) + 1), pageSize: String(meta.pageSize) }).forEach(([key, rawValue]) => {
     const value = typeof rawValue === 'number' ? String(rawValue) : rawValue;
@@ -38,7 +43,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
         actions={<Button href="/map" variant="primary"><Plus size={16} className="mr-2" />Přidat v mapě</Button>}
       />
 
-      <CarrierFilters action="/carriers" filters={filters} options={filterOptions} resultCount={meta.total} />
+      <CarrierFilters action="/carriers" filters={filters} options={filterOptions} carrierTypes={carrierTypes} resultCount={meta.total} />
 
       <section className="mb-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <p>
@@ -87,7 +92,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                 return (
                   <tr className={carrier.archivedAt ? 'bg-slate-50 text-slate-500' : isDamaged ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50/60'} key={carrier.id}>
                     <TableCell><Link className="font-semibold text-slate-950 hover:underline" href={`/carriers/${carrier.id}`}>{carrier.code}</Link></TableCell>
-                    <TableCell><b>{carrier.name}</b><br /><span className="text-slate-500">{carrierTypeLabel(carrier.type)}</span></TableCell>
+                    <TableCell><b>{carrier.name}</b><br /><span className="text-slate-500">{carrier.carrierTypeRef?.name || carrierTypeLabel(carrier.type)}</span></TableCell>
                     <TableCell>{mediaTypes.join(', ') || 'Bez ploch'}</TableCell>
                     <TableCell>{carrier.city || '-'}</TableCell>
                     <TableCell>{[carrier.locality ?? carrier.cadastralArea, carrier.street ?? carrier.address].filter(Boolean).join(' · ') || '-'}</TableCell>

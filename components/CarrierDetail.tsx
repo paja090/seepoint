@@ -15,7 +15,16 @@ import { MapPin, Navigation, Compass, Layers, Monitor, Image, Info, QrCode, Chev
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType, MOBILE_PHOTO_DAMAGE_LABELS } from '@/lib/mobile-photo-damage';
 import { apiResponseMessage, prepareImageForUpload, validateImageFile } from '@/lib/client-image-upload';
 
-function getCarrierBadgeMeta(type: Carrier['type']) {
+function getCarrierBadgeMeta(type: Carrier['type'], carrierTypeRef?: Carrier['carrierTypeRef']) {
+  if (carrierTypeRef?.name) {
+    const icon = carrierTypeRef.icon || '📍';
+    const color = carrierTypeRef.color || '#475569';
+    return {
+      label: `${icon} ${carrierTypeRef.name}`,
+      badgeClass: 'border shadow-2xs',
+      style: { backgroundColor: `${color}18`, color: color, borderColor: `${color}55` } as React.CSSProperties,
+    };
+  }
   switch (type) {
     case 'NAVIGATION':
       return { label: '🧭 Navigační tabule (VO / Troleje)', badgeClass: 'bg-sky-100 text-sky-900 border-sky-300' };
@@ -54,7 +63,7 @@ export function CarrierDetail({
   nextCarrier?: { id: string; code: string; name: string } | null;
 }) {
   const isNavigation = carrier.type === 'NAVIGATION';
-  const badgeMeta = getCarrierBadgeMeta(carrier.type);
+  const badgeMeta = getCarrierBadgeMeta(carrier.type, carrier.carrierTypeRef);
   const { toggleSurface, isSurfaceSelected } = useOfferBasket();
 
   const [resolvingDamage, setResolvingDamage] = useState(false);
@@ -261,7 +270,10 @@ export function CarrierDetail({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black border shadow-2xs ${badgeMeta.badgeClass}`}>
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black border shadow-2xs ${badgeMeta.badgeClass}`}
+              style={badgeMeta.style}
+            >
               {badgeMeta.label}
             </span>
             <StatusBadge value={carrier.archivedAt ? 'ARCHIVED' : carrier.status} />

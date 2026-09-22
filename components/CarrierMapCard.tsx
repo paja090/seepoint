@@ -7,7 +7,16 @@ import type { Carrier } from '@/lib/types';
 import { StatusBadge } from './StatusBadge';
 import { useOfferBasket } from '@/context/OfferBasketContext';
 
-function getCarrierBadgeMeta(type: Carrier['type']) {
+function getCarrierBadgeMeta(type: Carrier['type'], carrierTypeRef?: Carrier['carrierTypeRef']) {
+  if (carrierTypeRef?.name) {
+    const icon = carrierTypeRef.icon || '📍';
+    const color = carrierTypeRef.color || '#475569';
+    return {
+      label: `${icon} ${carrierTypeRef.name}`,
+      badgeClass: 'border shadow-2xs',
+      style: { backgroundColor: `${color}18`, color: color, borderColor: `${color}55` } as React.CSSProperties,
+    };
+  }
   switch (type) {
     case 'NAVIGATION':
       return { label: '🧭 Navigační tabule', badgeClass: 'bg-sky-100 text-sky-900 border-sky-300' };
@@ -42,7 +51,7 @@ export function CarrierMapCard({
   onFocusMap: () => void;
 }) {
   const { toggleSurface, isSurfaceSelected } = useOfferBasket();
-  const badgeMeta = getCarrierBadgeMeta(carrier.type);
+  const badgeMeta = getCarrierBadgeMeta(carrier.type, carrier.carrierTypeRef);
 
   // Derive status and primary client
   const primarySurface = carrier.surfaces[0];
@@ -65,7 +74,10 @@ export function CarrierMapCard({
           <span className="rounded-md bg-slate-900 px-2.5 py-0.5 font-mono text-xs font-black text-white shadow-2xs">
             {carrier.code}
           </span>
-          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black border ${badgeMeta.badgeClass}`}>
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black border ${badgeMeta.badgeClass}`}
+            style={badgeMeta.style}
+          >
             {badgeMeta.label}
           </span>
         </div>

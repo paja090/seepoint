@@ -5,6 +5,7 @@ import { carrierTypeOptions, mediaTypeOptions, surfaceStatusOptions } from '@/li
 type CarrierFiltersProps = {
   filters: CarrierFilters;
   options: CarrierFilterOptions;
+  carrierTypes?: Array<{ id: string; code: string; name: string; icon?: string | null; color?: string | null }>;
   action: '/carriers' | '/map';
   resultCount: number;
 };
@@ -13,7 +14,7 @@ function value(value?: string) {
   return value ?? '';
 }
 
-export function CarrierFilters({ filters, options, action, resultCount }: CarrierFiltersProps) {
+export function CarrierFilters({ filters, options, carrierTypes, action, resultCount }: CarrierFiltersProps) {
   return (
     <form action={action} className="card mb-6 grid gap-3 !p-4">
       <div className={action === '/map' ? "grid gap-3" : "flex flex-col gap-3 lg:flex-row lg:items-end"}>
@@ -23,9 +24,19 @@ export function CarrierFilters({ filters, options, action, resultCount }: Carrie
         </label>
         <label className="lg:w-52">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Typ nosiče</span>
-          <select className="input" name="carrierType" defaultValue={value(filters.carrierType)}>
+          <select className="input" name="carrierType" defaultValue={value(filters.carrierTypeId || filters.carrierType)}>
             <option value="">Všechny typy</option>
-            {carrierTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            {carrierTypes && carrierTypes.length > 0
+              ? carrierTypes.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.icon ? `${option.icon} ` : ''}{option.name}
+                  </option>
+                ))
+              : carrierTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
           </select>
         </label>
         <label className="lg:w-52">
