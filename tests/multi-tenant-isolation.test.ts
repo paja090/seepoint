@@ -5,6 +5,7 @@ import { runWithTenantContext } from '../lib/tenant-context.ts';
 import { scopeTenantQuery, TENANT_MODEL_NAMES } from '../lib/tenant-prisma.ts';
 import { selectMediaPackageSurfaces } from '../lib/offers/media-packages.ts';
 import { filterOfferSurfaces } from '../lib/offers/surface-selection.ts';
+import { parseRateInput } from '../lib/worker-rates.ts';
 
 const orgA = 'org_a';
 const orgB = 'org_b';
@@ -217,3 +218,34 @@ test('filterOfferSurfaces supports dynamic carrierTypeId filter', () => {
   assert.equal(filtered.length, 1);
   assert.equal(filtered[0].id, 's2');
 });
+
+test('parseRateInput handles carrierTypeLabel correctly', () => {
+  const parsed = parseRateInput({
+    type: 'HOURLY',
+    workType: 'INSTALLATION',
+    name: 'Montáž Totemů',
+    amount: '450',
+    currency: 'CZK',
+    unit: 'hod',
+    validFrom: '2026-01-01',
+    carrierTypeLabel: 'Firemní Totem',
+  });
+  assert.equal(parsed.carrierTypeLabel, 'Firemní Totem');
+
+  const parsedWithout = parseRateInput({
+    type: 'TASK',
+    workType: 'MAINTENANCE',
+    name: 'Údržba',
+    amount: '300',
+    currency: 'CZK',
+    validFrom: '2026-01-01',
+  });
+  assert.equal(parsedWithout.carrierTypeLabel, null);
+});
+
+test('WorkEntry and SettlementItem models contain carrierTypeLabel snapshot column in schema', () => {
+  const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+  assert.match(schema, /model WorkEntry \{[\s\S]*carrierTypeLabel\s+String\?/);
+  assert.match(schema, /model SettlementItem \{[\s\S]*carrierTypeLabel\s+String\?/);
+});
+

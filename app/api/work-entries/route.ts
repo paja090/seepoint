@@ -179,7 +179,21 @@ export async function POST(request: Request) {
       // 2. Validate WorkTask and WorkOrder
       const workTask = await tx.workTask.findUnique({
         where: { id: cleanWorkTaskId },
-        include: { workOrder: true }
+        include: {
+          workOrder: {
+            include: {
+              items: {
+                include: {
+                  carrier: {
+                    include: {
+                      carrierTypeRef: { select: { id: true, name: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
       if (!workTask) {
         throw new Error('Přiřazený úkol nebyl nalezen.');
@@ -188,6 +202,10 @@ export async function POST(request: Request) {
       const workOrderId = workTask.workOrderId;
       const clientId = workTask.workOrder?.clientId || null;
       const clientName = workTask.workOrder?.clientName || null;
+      const carrier = workTask.workOrder?.items?.[0]?.carrier;
+      const carrierType = carrier?.type || null;
+      const carrierTypeId = carrier?.carrierTypeId || null;
+      const carrierTypeLabel = carrier?.carrierTypeRef?.name || carrier?.type || null;
 
       // WORKER and TECHNICIAN validation
       if (!isManagerOrAdmin) {
@@ -246,6 +264,8 @@ export async function POST(request: Request) {
         workDate: dateObj,
         remunerationMethod: cleanRemunerationMethod,
         workOrderId,
+        carrierType,
+        carrierTypeId,
       }, tx);
 
       if (cleanManualRate) {
@@ -287,6 +307,8 @@ export async function POST(request: Request) {
           clientId,
           clientName,
           workType: cleanWorkType,
+          carrierType,
+          carrierTypeLabel,
           remunerationMethod: cleanRemunerationMethod,
           quantity: finalQuantity,
           unit: finalUnit,
