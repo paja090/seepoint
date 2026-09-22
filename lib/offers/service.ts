@@ -61,7 +61,6 @@ const safeDecimal = (val: Prisma.Decimal | number | string | null | undefined, f
 const nullable = (text: string | undefined) => text || null;
 
 const offerInclude = {
-  organization: { select: { id: true, name: true, logoUrl: true } },
   client: true,
   createdByUser: { select: { id: true, name: true, email: true, role: true } },
   updatedByUser: { select: { id: true, name: true } },
@@ -177,7 +176,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     archivedAt: publicView ? undefined : row.archivedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? (row.organization?.name || 'SeePOINT') },
+    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'SeePOINT' },
     client: {
       name: row.client.name,
       logoUrl: row.client.logoDriveFileId ? publicView && token ? `/api/proposals/${encodeURIComponent(token)}/logo` : `/api/clients/${row.client.id}/logo/file` : undefined,
@@ -1288,7 +1287,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       ? `✏️ Požadavek na úpravu nabídky ${row.campaignName} od ${actorName}`
       : `💬 Nový dotaz k nabídce ${row.campaignName} od ${actorName}`;
 
-    const orgName = row.organization?.name || 'SeePOINT';
+    const orgName = 'SeePOINT';
     const emailText = `Klient reagoval na nabídku v systému ${orgName}:\n\n`
       + `Kampaň: ${row.campaignName}\n`
       + `Klient: ${row.client.name}\n`

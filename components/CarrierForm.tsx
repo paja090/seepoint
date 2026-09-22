@@ -24,23 +24,23 @@ function sides(mediaType: Surface['mediaType'], names: string[]): SurfaceDraft[]
   return names.map((name) => ({ name: `Strana ${name}`, mediaType, orientation: name }));
 }
 
-const seepointProducts: ProductOption[] = [
+const standardProducts: ProductOption[] = [
   { value: 'BILLBOARD', label: 'Billboard (A/B)', surfaces: sides('BILLBOARD', ['A', 'B']) },
+  { value: 'BIGBOARD', label: 'Bigboard', surfaces: [] },
+  { value: 'CITYLIGHT', label: 'City Light / CLV', surfaces: [] },
+  { value: 'BANNER', label: 'Banner / Plachta', surfaces: [] },
+  { value: 'FACADE', label: 'Fasáda', surfaces: [] },
+  { value: 'LED_SCREEN', label: 'LED obrazovka', surfaces: [] },
+  { value: 'OTHER', label: 'Jiný typ', surfaces: [] },
+];
+
+const legacyProducts: ProductOption[] = [
   { value: 'PROMO_BENCH', label: 'Promo lavička (A/B)', surfaces: sides('PROMO_BENCH', ['A', 'B']) },
   { value: 'PROMO_HORIZON', label: 'Promo horizont', surfaces: [{ name: 'Plocha', mediaType: 'PROMO_HORIZON' }] },
   { value: 'CITY_POSTER', label: 'City Poster (A/B)', surfaces: sides('CITY_POSTER', ['A', 'B']) },
   { value: 'NAVIGATION', label: 'Navigace', surfaces: [{ name: 'Navigace', mediaType: 'NAVIGATION_SIGN' }] },
   { value: 'PROMO_TOWER', label: 'Promo věž (A/B/C/D)', surfaces: sides('PROMO_TOWER', ['A', 'B', 'C', 'D']) },
   { value: 'PROMO_MINITOWER', label: 'Promo minivěž (A/B/C/D)', surfaces: sides('PROMO_MINITOWER', ['A', 'B', 'C', 'D']) },
-];
-
-const legacyProducts: ProductOption[] = [
-  { value: 'BIGBOARD', label: 'Bigboard', surfaces: [] },
-  { value: 'CITYLIGHT', label: 'City Light', surfaces: [] },
-  { value: 'BANNER', label: 'Banner', surfaces: [] },
-  { value: 'FACADE', label: 'Fasáda', surfaces: [] },
-  { value: 'LED_SCREEN', label: 'LED obrazovka', surfaces: [] },
-  { value: 'OTHER', label: 'Jiný typ', surfaces: [] },
 ];
 
 const statuses: SelectOption<Carrier['status']>[] = [
@@ -72,7 +72,7 @@ export function CarrierForm({
   const [form, setForm] = useState<Partial<Carrier>>(carrier ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const selectedProduct = [...seepointProducts, ...legacyProducts].find((product) => product.value === (form.type ?? 'BILLBOARD'));
+  const selectedProduct = [...standardProducts, ...legacyProducts].find((product) => product.value === (form.type ?? 'BILLBOARD'));
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -169,12 +169,14 @@ export function CarrierForm({
             </optgroup>
           ) : (
             <>
-              <optgroup label="Nosiče SeePOINT">
-                {seepointProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
+              <optgroup label="Základní typy nosičů">
+                {standardProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
               </optgroup>
-              <optgroup label="Ostatní / starší typy">
-                {legacyProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
-              </optgroup>
+              {legacyProducts.some((p) => p.value === form.type) && (
+                <optgroup label="Původní typy">
+                  {legacyProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
+                </optgroup>
+              )}
             </>
           )}
         </select>

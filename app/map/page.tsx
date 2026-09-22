@@ -48,7 +48,7 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
           </section>
         </aside>
         <section className="min-w-0">
-          <MapView initialCarriers={orderedCarriers} canEdit={canEdit} />
+          <MapView initialCarriers={orderedCarriers} canEdit={canEdit} carrierTypes={carrierTypes} />
         </section>
       </div>
     </AppShell>

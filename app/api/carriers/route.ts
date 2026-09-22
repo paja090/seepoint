@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { parseCarrierFilters } from '@/lib/carrier-filters';
-import { getCarriersPage, upsertCarrier, type SurfaceTemplate } from '@/lib/db';
+import { prisma, getCarriersPage, upsertCarrier, type SurfaceTemplate } from '@/lib/db';
 import type { Carrier, Surface } from '@/lib/types';
 
 const allowedMediaTypes = new Set<Surface['mediaType']>(['BILLBOARD', 'PROMO_BENCH', 'PROMO_HORIZON', 'CITY_POSTER', 'NAVIGATION_SIGN', 'PROMO_TOWER', 'PROMO_MINITOWER']);

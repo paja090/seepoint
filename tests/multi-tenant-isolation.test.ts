@@ -6,6 +6,7 @@ import { scopeTenantQuery, TENANT_MODEL_NAMES } from '../lib/tenant-prisma.ts';
 import { selectMediaPackageSurfaces } from '../lib/offers/media-packages.ts';
 import { filterOfferSurfaces } from '../lib/offers/surface-selection.ts';
 import { parseRateInput } from '../lib/worker-rates.ts';
+import { GENERIC_DEFAULT_CARRIER_TYPES } from '../lib/carrier-type-catalog.ts';
 
 const orgA = 'org_a';
 const orgB = 'org_b';
@@ -248,4 +249,25 @@ test('WorkEntry and SettlementItem models contain carrierTypeLabel snapshot colu
   assert.match(schema, /model WorkEntry \{[\s\S]*carrierTypeLabel\s+String\?/);
   assert.match(schema, /model SettlementItem \{[\s\S]*carrierTypeLabel\s+String\?/);
 });
+
+test('new organization default carrier types seed generic OOH types without SeePoint proprietary names', () => {
+  const codes: string[] = GENERIC_DEFAULT_CARRIER_TYPES.map((t) => t.code);
+  const names: string[] = GENERIC_DEFAULT_CARRIER_TYPES.map((t) => t.name.toLowerCase());
+
+  // Standard generic types must be present
+  assert.ok(codes.includes('BILLBOARD'));
+  assert.ok(codes.includes('CITYLIGHT'));
+  assert.ok(codes.includes('BANNER'));
+
+  // SeePoint proprietary concepts must NOT be in default seed for other tenants
+  assert.ok(!codes.includes('PROMO_BENCH'));
+  assert.ok(!codes.includes('PROMO_HORIZON'));
+  assert.ok(!codes.includes('PROMO_TOWER'));
+  assert.ok(!codes.includes('PROMO_MINITOWER'));
+  assert.ok(!codes.includes('CITY_POSTER'));
+  assert.ok(!codes.includes('NAVIGATION'));
+
+  assert.ok(!names.some((n) => n.includes('lavičk') || n.includes('promo') || n.includes('seepoint')));
+});
+
 

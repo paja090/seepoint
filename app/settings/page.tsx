@@ -34,6 +34,26 @@ export default async function Settings() {
 
       <div className="card mt-6 flex items-center justify-between">
         <div>
+          <h2 className="text-xl font-bold">🏷️ Typy reklamních nosičů</h2>
+          <p className="text-sm text-slate-600 mt-1">Vlastní typy nosičů organizace (např. Billboard, Bigboard, CLV, LED panel, Lavička) s vlastními barvami a ikonami.</p>
+        </div>
+        <a href="/settings/carrier-types" className="button button-primary text-sm font-bold">
+          Spravovat typy nosičů →
+        </a>
+      </div>
+
+      <div className="card mt-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">📦 Katalog produktů & nabídek</h2>
+          <p className="text-sm text-slate-600 mt-1">Vlastní obchodní produkty vaší společnosti navázané na typy nosičů pro nabídky a kalkulace.</p>
+        </div>
+        <a href="/settings/products" className="button button-primary text-sm font-bold">
+          Spravovat produkty →
+        </a>
+      </div>
+
+      <div className="card mt-6 flex items-center justify-between">
+        <div>
           <h2 className="text-xl font-bold">🏭 Činnosti výroby & montáží</h2>
           <p className="text-sm text-slate-600 mt-1">Vlastní katalog činností pro dílnu i výjezdy (tisk, DTP, polepy, montáže, zaměření) a oborové šablony.</p>
         </div>

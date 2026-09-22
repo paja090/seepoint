@@ -1,4 +1,4 @@
-import 'server-only';
+import type { Prisma } from '@prisma/client';
 import { prisma } from './db';
 
 export type CarrierTypeCatalogItem = {
@@ -87,3 +87,41 @@ function mapRow(row: {
     capabilities: row.capabilities as Record<string, boolean> | null,
   };
 }
+
+/** Standard generic OOH carrier types for newly created tenant organizations.
+ *  Crucial: NO SeePoint proprietary types (Promo lavička, Tower, etc.)!
+ */
+export const GENERIC_DEFAULT_CARRIER_TYPES = [
+  { code: 'BILLBOARD',   name: 'Billboard',                 icon: '🟦', color: '#2563EB', sortOrder: 1, legacyEnumValue: 'BILLBOARD' },
+  { code: 'BIGBOARD',    name: 'Bigboard',                  icon: '🟪', color: '#7C3AED', sortOrder: 2, legacyEnumValue: 'BIGBOARD' },
+  { code: 'CITYLIGHT',   name: 'Citylight / CLV',           icon: '💡', color: '#F59E0B', sortOrder: 3, legacyEnumValue: 'CITYLIGHT' },
+  { code: 'BANNER',      name: 'Reklamní plachta / Banner', icon: '🏳️', color: '#10B981', sortOrder: 4, legacyEnumValue: 'BANNER' },
+  { code: 'FACADE',      name: 'Fasáda',                    icon: '🏢', color: '#6366F1', sortOrder: 5, legacyEnumValue: 'FACADE' },
+  { code: 'LED_SCREEN',  name: 'LED / digitální plocha',     icon: '📺', color: '#EF4444', sortOrder: 6, legacyEnumValue: 'LED_SCREEN' },
+  { code: 'OTHER',       name: 'Ostatní',                   icon: '📦', color: '#9CA3AF', sortOrder: 99, legacyEnumValue: 'OTHER' },
+] as const;
+
+/** Seeds standard generic carrier types for a new tenant organization. */
+export async function seedOrganizationCarrierTypes(organizationId: string, tx?: Prisma.TransactionClient) {
+  const client = tx || prisma;
+  for (const ct of GENERIC_DEFAULT_CARRIER_TYPES) {
+    const existing = await client.organizationCarrierType.findFirst({
+      where: { organizationId, code: ct.code },
+    });
+    if (!existing) {
+      await client.organizationCarrierType.create({
+        data: {
+          organizationId,
+          code: ct.code,
+          name: ct.name,
+          icon: ct.icon,
+          color: ct.color,
+          sortOrder: ct.sortOrder,
+          legacyEnumValue: ct.legacyEnumValue,
+          active: true,
+        },
+      });
+    }
+  }
+}
+

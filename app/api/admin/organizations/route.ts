@@ -5,6 +5,7 @@ import { platformPrisma } from '@/lib/db';
 import { sendActivationEmail } from '@/lib/email';
 import { requireSuperAdmin } from '@/lib/organization';
 import { getAppUrl } from '@/lib/app-url';
+import { seedOrganizationCarrierTypes } from '@/lib/carrier-type-catalog';
 
 export async function GET() {
   try {
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       await tx.organizationInvitation.create({ data: { organizationId: organization.id, email: ownerEmail, role: 'OWNER', tokenHash, expiresAt, acceptedAt: needsActivation ? null : new Date() } });
       await tx.organizationOnboarding.create({ data: { organizationId: organization.id, currentStep: needsActivation ? 'OWNER' : 'SETTINGS', companyCompletedAt: new Date(), ownerCompletedAt: needsActivation ? null : new Date() } });
       if (needsActivation) await tx.userToken.create({ data: { userId: owner.id, type: 'ACTIVATION', tokenHash, expiresAt } });
+      await seedOrganizationCarrierTypes(organization.id, tx as any);
       return { organization, owner };
     });
     let warning: string | undefined;

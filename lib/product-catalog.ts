@@ -1,4 +1,3 @@
-import 'server-only';
 import { prisma } from './db';
 
 export type ProductCatalogItem = {
@@ -24,7 +23,7 @@ export async function getActiveProducts(): Promise<ProductCatalogItem[]> {
   const rows = await prisma.product.findMany({
     where: { active: true },
     include: {
-      carrierTypeRef: {
+      carrierType: {
         select: { id: true, code: true, name: true, icon: true, color: true },
       },
     },
@@ -37,7 +36,7 @@ export async function getActiveProducts(): Promise<ProductCatalogItem[]> {
 export async function getAllProducts(): Promise<ProductCatalogItem[]> {
   const rows = await prisma.product.findMany({
     include: {
-      carrierTypeRef: {
+      carrierType: {
         select: { id: true, code: true, name: true, icon: true, color: true },
       },
     },
@@ -51,7 +50,7 @@ export async function getProductById(id: string): Promise<ProductCatalogItem | n
   const row = await prisma.product.findUnique({
     where: { id },
     include: {
-      carrierTypeRef: {
+      carrierType: {
         select: { id: true, code: true, name: true, icon: true, color: true },
       },
     },
@@ -64,7 +63,7 @@ export async function getProductsByCarrierType(carrierTypeId: string): Promise<P
   const rows = await prisma.product.findMany({
     where: { carrierTypeId, active: true },
     include: {
-      carrierTypeRef: {
+      carrierType: {
         select: { id: true, code: true, name: true, icon: true, color: true },
       },
     },
@@ -79,7 +78,7 @@ function mapProductRow(row: {
   name: string;
   description: string | null;
   carrierTypeId: string | null;
-  carrierTypeRef?: {
+  carrierType?: {
     id: string;
     code: string;
     name: string;
@@ -96,13 +95,13 @@ function mapProductRow(row: {
     name: row.name,
     description: row.description,
     carrierTypeId: row.carrierTypeId,
-    carrierType: row.carrierTypeRef
+    carrierType: row.carrierType
       ? {
-          id: row.carrierTypeRef.id,
-          code: row.carrierTypeRef.code,
-          name: row.carrierTypeRef.name,
-          icon: row.carrierTypeRef.icon,
-          color: row.carrierTypeRef.color,
+          id: row.carrierType.id,
+          code: row.carrierType.code,
+          name: row.carrierType.name,
+          icon: row.carrierType.icon,
+          color: row.carrierType.color,
         }
       : null,
     unit: row.unit,
