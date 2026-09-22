@@ -387,7 +387,7 @@ Vrať VÝHRADNĚ platný JSON objekt v tomto formátu:
     const res = geminiResult as Record<string, unknown>;
 
     const destinationName = typeof res.destinationName === 'string' && res.destinationName.trim() ? res.destinationName.trim() : undefined;
-    let directionDescription = typeof res.directionDescription === 'string' && res.directionDescription.trim() ? res.directionDescription.trim() : undefined;
+    const directionDescription = typeof res.directionDescription === 'string' && res.directionDescription.trim() ? res.directionDescription.trim() : undefined;
     let directionArrow: '➔' | '⬅' | '⬆' | '🧭' = '🧭';
     if (res.directionArrow === '➔' || res.directionArrow === '⬅' || res.directionArrow === '⬆') {
       directionArrow = res.directionArrow;

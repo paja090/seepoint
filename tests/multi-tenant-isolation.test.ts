@@ -169,7 +169,10 @@ test('selectMediaPackageSurfaces matches by dynamic carrierTypeId first and fall
     ],
   };
 
-  const result1 = selectMediaPackageSurfaces(pkgWithCustomType as any, surfaces as any);
+  const result1 = selectMediaPackageSurfaces(
+    pkgWithCustomType as unknown as Parameters<typeof selectMediaPackageSurfaces>[0],
+    surfaces as unknown as Parameters<typeof selectMediaPackageSurfaces>[1],
+  );
   assert.equal(result1.surfaces.length, 1);
   assert.equal(result1.surfaces[0].id, 'surf_1');
 
@@ -182,7 +185,10 @@ test('selectMediaPackageSurfaces matches by dynamic carrierTypeId first and fall
     ],
   };
 
-  const result2 = selectMediaPackageSurfaces(pkgFallback as any, surfaces as any);
+  const result2 = selectMediaPackageSurfaces(
+    pkgFallback as unknown as Parameters<typeof selectMediaPackageSurfaces>[0],
+    surfaces as unknown as Parameters<typeof selectMediaPackageSurfaces>[1],
+  );
   assert.equal(result2.surfaces.length, 2);
 });
 
@@ -212,7 +218,7 @@ test('filterOfferSurfaces supports dynamic carrierTypeId filter', () => {
 
   const conflictMap = new Map();
   const filtered = filterOfferSurfaces(
-    surfaces as any,
+    surfaces as unknown as Parameters<typeof filterOfferSurfaces>[0],
     { query: '', mediaType: '', carrierTypeId: 'type_custom', status: '', availability: 'all', gpsOnly: false },
     conflictMap,
   );

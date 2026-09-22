@@ -12,7 +12,7 @@ const mediaTypes = ['NAVIGATION_SIGN', 'BILLBOARD', 'BIGBOARD', 'CITYLIGHT', 'BA
 const mountingTypes = { LIGHT_POLE: 'VO / veřejné osvětlení', TRACTION: 'Trakce', COLUMN: 'Sloupek', POLE: 'Sloup', OTHER: 'Jiné', UNKNOWN: 'Neurčeno' } as const;
 
 export function OfferPriceCatalogSettings() {
-  const [rules, setRules] = useState<Rule[]>([]); const [form, setForm] = useState<Record<string, any>>({ ...emptyRule });
+  const [rules, setRules] = useState<Rule[]>([]); const [form, setForm] = useState<Record<string, unknown>>({ ...emptyRule });
   const [message, setMessage] = useState(''); const [loading, setLoading] = useState(true);
   const [mediaFilter, setMediaFilter] = useState(''); const [segmentFilter, setSegmentFilter] = useState(''); const [categoryFilter, setCategoryFilter] = useState(''); const [validOnly, setValidOnly] = useState(false);
   const load = useCallback(async () => { setLoading(true); const response = await fetch('/api/offer-price-rules'); const data = await response.json(); if (response.ok) setRules(data); else setMessage(data.error ?? 'Ceník se nepodařilo načíst.'); setLoading(false); }, []);
