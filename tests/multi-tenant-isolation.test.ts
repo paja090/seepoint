@@ -72,3 +72,55 @@ test('all declared tenant models receive create ownership and reject client over
   assert.equal((create.data as Record<string, unknown>).organizationId, orgA);
   assert.throws(() => scoped('Offer', 'create', { data: { title: 'B', organizationId: orgB } }), /override the active organization/);
 });
+
+test('OrganizationCarrierType is tenant-scoped', () => {
+  const list = scoped('OrganizationCarrierType', 'findMany', { where: { active: true } });
+  assert.deepEqual(list.where, { active: true, organizationId: orgA });
+
+  const create = scoped('OrganizationCarrierType', 'create', { data: { code: 'LED', name: 'LED Totem' } });
+  assert.equal((create.data as Record<string, unknown>).organizationId, orgA);
+
+  assert.throws(
+    () => scoped('OrganizationCarrierType', 'create', { data: { code: 'X', name: 'X', organizationId: orgB } }),
+    /override the active organization/,
+  );
+});
+
+test('Product model is tenant-scoped and rejects cross-org overrides', () => {
+  const list = scoped('Product', 'findMany', { where: { active: true } });
+  assert.deepEqual(list.where, { active: true, organizationId: orgA });
+
+  const create = scoped('Product', 'create', { data: { code: 'P1', name: 'Product One' } });
+  assert.equal((create.data as Record<string, unknown>).organizationId, orgA);
+
+  assert.throws(
+    () => scoped('Product', 'create', { data: { code: 'X', name: 'X', organizationId: orgB } }),
+    /override the active organization/,
+  );
+});
+
+test('OrganizationCarrierType and Product are in TENANT_MODEL_NAMES', () => {
+  const names = TENANT_MODEL_NAMES as readonly string[];
+  assert.ok(names.includes('OrganizationCarrierType'), 'OrganizationCarrierType missing from TENANT_MODEL_NAMES');
+  assert.ok(names.includes('Product'), 'Product missing from TENANT_MODEL_NAMES');
+});
+
+test('OrganizationCarrierType schema has unique constraint on [organizationId, code]', () => {
+  const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+  const octBlock = schema.slice(
+    schema.indexOf('model OrganizationCarrierType {'),
+    schema.indexOf('}', schema.indexOf('model OrganizationCarrierType {')) + 1,
+  );
+  assert.match(octBlock, /@@unique\(\[organizationId, code\]\)/);
+  assert.match(octBlock, /legacyEnumValue/);
+});
+
+test('AdvertisingCarrier has carrierTypeId FK field', () => {
+  const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+  const acBlock = schema.slice(
+    schema.indexOf('model AdvertisingCarrier {'),
+    schema.indexOf('}', schema.indexOf('model AdvertisingCarrier {')) + 1,
+  );
+  assert.match(acBlock, /carrierTypeId\s+String\?/);
+  assert.match(acBlock, /carrierTypeRef/);
+});
