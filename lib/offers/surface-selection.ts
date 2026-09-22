@@ -5,6 +5,7 @@ export type SurfaceConflictSeverity = 'block' | 'warning';
 export type SurfaceFilters = {
   query: string;
   mediaType: string;
+  carrierTypeId?: string;
   status: string;
   availability: SurfaceAvailabilityFilter;
   gpsOnly: boolean;
@@ -33,7 +34,8 @@ export function filterOfferSurfaces(
     if (needle && !searchText.includes(needle)) return false;
     if (filters.source === 'own' && surface.isPartner) return false;
     if (filters.source === 'partner' && !surface.isPartner) return false;
-    if (filters.mediaType && surface.mediaType !== filters.mediaType) return false;
+    if (filters.carrierTypeId && surface.carrierTypeId !== filters.carrierTypeId && surface.carrier.carrierTypeId !== filters.carrierTypeId) return false;
+    if (filters.mediaType && surface.mediaType !== filters.mediaType && surface.carrier.type !== filters.mediaType) return false;
     if (filters.status && surface.status !== filters.status) return false;
     if (filters.gpsOnly && (surface.carrier.latitude == null || surface.carrier.longitude == null)) return false;
     if (filters.availability === 'blocked' && conflict !== 'block') return false;

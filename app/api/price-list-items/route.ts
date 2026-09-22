@@ -17,11 +17,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Název ceníkové položky je povinný.' }, { status: 400 });
     }
 
-    const carrierType = body.carrierType ? String(body.carrierType) : null;
-    const mediaType = body.mediaType ? String(body.mediaType) : null;
-    if (carrierType && !Object.values(CarrierType).includes(carrierType as CarrierType)) {
-      return NextResponse.json({ error: 'Neplatný typ nosiče.' }, { status: 400 });
+    const carrierTypeInput = body.carrierType ? String(body.carrierType) : null;
+    const carrierTypeId = body.carrierTypeId ? String(body.carrierTypeId) : null;
+    let resolvedCarrierTypeId: string | null = carrierTypeId;
+    let resolvedCarrierType: CarrierType | null = null;
+
+    if (carrierTypeInput && Object.values(CarrierType).includes(carrierTypeInput as CarrierType)) {
+      resolvedCarrierType = carrierTypeInput as CarrierType;
     }
+
+    if (resolvedCarrierTypeId) {
+      const oct = await prisma.organizationCarrierType.findUnique({
+        where: { id: resolvedCarrierTypeId },
+        select: { id: true, legacyEnumValue: true },
+      });
+      if (oct) {
+        resolvedCarrierTypeId = oct.id;
+        if (!resolvedCarrierType && oct.legacyEnumValue && Object.values(CarrierType).includes(oct.legacyEnumValue as CarrierType)) {
+          resolvedCarrierType = oct.legacyEnumValue as CarrierType;
+        }
+      }
+    } else if (resolvedCarrierType) {
+      const oct = await prisma.organizationCarrierType.findFirst({
+        where: {
+          OR: [{ legacyEnumValue: resolvedCarrierType }, { code: resolvedCarrierType }],
+          active: true,
+        },
+        select: { id: true },
+      });
+      if (oct) {
+        resolvedCarrierTypeId = oct.id;
+      }
+    }
+
+    const mediaType = body.mediaType ? String(body.mediaType) : null;
     if (mediaType && !Object.values(MediaType).includes(mediaType as MediaType)) {
       return NextResponse.json({ error: 'Neplatný typ média.' }, { status: 400 });
     }
@@ -52,7 +81,8 @@ export async function POST(request: Request) {
         name,
         identityKey,
         versionKey,
-        carrierType: carrierType as CarrierType | null,
+        carrierTypeId: resolvedCarrierTypeId,
+        carrierType: resolvedCarrierType,
         mediaType: mediaType as MediaType | null,
         rentalMonths,
         minQuantity,
@@ -104,6 +134,11 @@ export async function GET() {
   try {
     const items = await prisma.priceListItem.findMany({
       where: { isActive: true },
+      include: {
+        carrierTypeRef: {
+          select: { id: true, code: true, name: true, icon: true, color: true },
+        },
+      },
       orderBy: { name: 'asc' },
     });
     return NextResponse.json(items);

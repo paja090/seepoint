@@ -18,12 +18,28 @@ export type OfferItemView = {
   surface: {
     name: string;
     mediaType: string;
+    carrierTypeId?: string | null;
+    carrierTypeRef?: {
+      id: string;
+      code: string;
+      name: string;
+      icon: string | null;
+      color: string | null;
+    } | null;
     size?: string | null;
     orientation?: string | null;
     status?: string;
     carrier: {
       code: string;
       name: string;
+      carrierTypeId?: string | null;
+      carrierTypeRef?: {
+        id: string;
+        code: string;
+        name: string;
+        icon: string | null;
+        color: string | null;
+      } | null;
       city: string;
       locality?: string | null;
       street?: string | null;
@@ -179,6 +195,14 @@ export type OfferPriceRuleOption = {
   category: 'RENTAL' | 'PRINT' | 'INSTALLATION' | 'REMOVAL' | 'PRODUCTION' | 'SERVICE';
   label: string;
   description?: string | null;
+  carrierTypeId?: string | null;
+  carrierTypeRef?: {
+    id: string;
+    code: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+  } | null;
   mediaType?: string | null;
   mountingType?: string | null;
   pricingSegment: 'COMMERCIAL' | 'CULTURE_SPORT' | 'PUBLIC_NONPROFIT' | 'CUSTOM';
@@ -197,12 +221,40 @@ export type OfferSurfaceOption = {
   id: string;
   name: string;
   mediaType: string;
+  carrierTypeId?: string | null;
+  carrierTypeRef?: {
+    id: string;
+    code: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+  } | null;
   status: string;
   price: string;
   priceSource?: 'SURFACE' | 'CATALOG' | 'MISSING';
   currentClient?: string | null;
   photos: Array<{ id: string; url: string }>;
-  carrier: { id: string; code: string; name: string; city: string; type: string; locality?: string | null; street?: string | null; address?: string | null; latitude?: number | null; longitude?: number | null; description?: string | null };
+  carrier: {
+    id: string;
+    code: string;
+    name: string;
+    carrierTypeId?: string | null;
+    carrierTypeRef?: {
+      id: string;
+      code: string;
+      name: string;
+      icon: string | null;
+      color: string | null;
+    } | null;
+    city: string;
+    type: string;
+    locality?: string | null;
+    street?: string | null;
+    address?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    description?: string | null;
+  };
   isPartner?: boolean;
   partnerName?: string;
   partnerDiscountPercent?: number;
@@ -216,5 +268,20 @@ export type MediaPackageOption = {
   standardPrice?: string | null;
   packagePrice?: string | null;
   defaultDuration?: number | null;
-  rules: Array<{ id: string; mediaType: string; city?: string | null; locality?: string | null; quantity: number; sortOrder: number }>;
+  rules: Array<{
+    id: string;
+    mediaType: string;
+    carrierTypeId?: string | null;
+    carrierTypeRef?: {
+      id: string;
+      code: string;
+      name: string;
+      icon: string | null;
+      color: string | null;
+    } | null;
+    city?: string | null;
+    locality?: string | null;
+    quantity: number;
+    sortOrder: number;
+  }>;
 };

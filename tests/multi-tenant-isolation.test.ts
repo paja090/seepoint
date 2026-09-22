@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { runWithTenantContext } from '../lib/tenant-context.ts';
 import { scopeTenantQuery, TENANT_MODEL_NAMES } from '../lib/tenant-prisma.ts';
+import { selectMediaPackageSurfaces } from '../lib/offers/media-packages.ts';
+import { filterOfferSurfaces } from '../lib/offers/surface-selection.ts';
 
 const orgA = 'org_a';
 const orgB = 'org_b';
@@ -123,4 +125,95 @@ test('AdvertisingCarrier has carrierTypeId FK field', () => {
   );
   assert.match(acBlock, /carrierTypeId\s+String\?/);
   assert.match(acBlock, /carrierTypeRef/);
+});
+
+test('PriceListItem, OfferPriceRule, and MediaPackageRule have carrierTypeId FK fields in schema', () => {
+  const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+  assert.match(schema, /model PriceListItem\s*\{[\s\S]*?carrierTypeId\s+String\?[\s\S]*?carrierTypeRef/);
+  assert.match(schema, /model OfferPriceRule\s*\{[\s\S]*?carrierTypeId\s+String\?[\s\S]*?carrierTypeRef/);
+  assert.match(schema, /model MediaPackageRule\s*\{[\s\S]*?carrierTypeId\s+String\?[\s\S]*?carrierTypeRef/);
+});
+
+test('selectMediaPackageSurfaces matches by dynamic carrierTypeId first and falls back to mediaType', () => {
+  const surfaces = [
+    {
+      id: 'surf_1',
+      name: 'Plocha 1',
+      mediaType: 'BILLBOARD',
+      carrierTypeId: 'custom_totem_id',
+      carrier: { id: 'c1', code: 'C1', name: 'Carrier 1', city: 'Praha', type: 'BILLBOARD', carrierTypeId: 'custom_totem_id' },
+      status: 'AVAILABLE',
+      price: '5000',
+      photos: [],
+    },
+    {
+      id: 'surf_2',
+      name: 'Plocha 2',
+      mediaType: 'BILLBOARD',
+      carrierTypeId: 'other_type_id',
+      carrier: { id: 'c2', code: 'C2', name: 'Carrier 2', city: 'Praha', type: 'BILLBOARD', carrierTypeId: 'other_type_id' },
+      status: 'AVAILABLE',
+      price: '5000',
+      photos: [],
+    },
+  ];
+
+  // Rule targeting the custom carrier type
+  const pkgWithCustomType = {
+    id: 'pkg_1',
+    name: 'Balíček Totemů',
+    rules: [
+      { id: 'r1', mediaType: 'BILLBOARD', carrierTypeId: 'custom_totem_id', quantity: 1, sortOrder: 0 },
+    ],
+  };
+
+  const result1 = selectMediaPackageSurfaces(pkgWithCustomType as any, surfaces as any);
+  assert.equal(result1.surfaces.length, 1);
+  assert.equal(result1.surfaces[0].id, 'surf_1');
+
+  // Rule without carrierTypeId falls back to mediaType
+  const pkgFallback = {
+    id: 'pkg_2',
+    name: 'Balíček Billboardů',
+    rules: [
+      { id: 'r2', mediaType: 'BILLBOARD', quantity: 2, sortOrder: 0 },
+    ],
+  };
+
+  const result2 = selectMediaPackageSurfaces(pkgFallback as any, surfaces as any);
+  assert.equal(result2.surfaces.length, 2);
+});
+
+test('filterOfferSurfaces supports dynamic carrierTypeId filter', () => {
+  const surfaces = [
+    {
+      id: 's1',
+      name: 'A',
+      mediaType: 'CITY_POSTER',
+      carrierTypeId: 'type_city_poster',
+      carrier: { code: 'A1', name: 'Nosič A', city: 'Brno', type: 'CITY_POSTER', carrierTypeId: 'type_city_poster' },
+      status: 'AVAILABLE',
+      price: '1000',
+      photos: [],
+    },
+    {
+      id: 's2',
+      name: 'B',
+      mediaType: 'CITY_POSTER',
+      carrierTypeId: 'type_custom',
+      carrier: { code: 'B1', name: 'Nosič B', city: 'Brno', type: 'CITY_POSTER', carrierTypeId: 'type_custom' },
+      status: 'AVAILABLE',
+      price: '1000',
+      photos: [],
+    },
+  ];
+
+  const conflictMap = new Map();
+  const filtered = filterOfferSurfaces(
+    surfaces as any,
+    { query: '', mediaType: '', carrierTypeId: 'type_custom', status: '', availability: 'all', gpsOnly: false },
+    conflictMap,
+  );
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].id, 's2');
 });

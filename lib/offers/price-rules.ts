@@ -7,13 +7,22 @@ const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 
 export type OfferPriceRuleView = {
   id: string; code: string; category: OfferPriceCategory; label: string; description: string | null;
+  carrierTypeId?: string | null;
+  carrierTypeRef?: { id: string; code: string; name: string; icon: string | null; color: string | null } | null;
   mediaType: MediaType | null; mountingType: MountingType | null; pricingSegment: ClientPricingSegment; city: string | null;
   validFrom: Date | null; validTo: Date | null; minDurationMonths: number | null; maxDurationMonths: number | null;
   calculation: OfferPriceCalculation; unit: string; unitPrice: string; defaultSelected: boolean; active: boolean; sortOrder: number;
 };
 
-export function serializePriceRule(rule: OfferPriceRuleView | (Omit<OfferPriceRuleView, 'unitPrice'> & { unitPrice: Prisma.Decimal })) {
-  return { ...rule, unitPrice: typeof rule.unitPrice === 'string' ? rule.unitPrice : rule.unitPrice.toFixed(2), validFrom: rule.validFrom?.toISOString().slice(0, 10) ?? null, validTo: rule.validTo?.toISOString().slice(0, 10) ?? null };
+export function serializePriceRule(rule: OfferPriceRuleView | (Omit<OfferPriceRuleView, 'unitPrice'> & { unitPrice: Prisma.Decimal; carrierTypeRef?: { id: string; code: string; name: string; icon: string | null; color: string | null } | null })) {
+  return {
+    ...rule,
+    carrierTypeId: rule.carrierTypeId ?? null,
+    carrierTypeRef: rule.carrierTypeRef ?? null,
+    unitPrice: typeof rule.unitPrice === 'string' ? rule.unitPrice : rule.unitPrice.toFixed(2),
+    validFrom: rule.validFrom?.toISOString().slice(0, 10) ?? null,
+    validTo: rule.validTo?.toISOString().slice(0, 10) ?? null,
+  };
 }
 
 export function parsePriceRule(raw: unknown) {
@@ -24,6 +33,7 @@ export function parsePriceRule(raw: unknown) {
   if (!code || !label || !unit) throw new OfferValidationError('Kód, název a jednotka jsou povinné.');
   if (!Object.values(OfferPriceCategory).includes(input.category as OfferPriceCategory)) throw new OfferValidationError('Kategorie sazby není platná.');
   if (!Object.values(OfferPriceCalculation).includes(input.calculation as OfferPriceCalculation)) throw new OfferValidationError('Způsob výpočtu není platný.');
+  const carrierTypeId = text(input.carrierTypeId) || null;
   const mediaType = text(input.mediaType);
   if (mediaType && !Object.values(MediaType).includes(mediaType as MediaType)) throw new OfferValidationError('Typ média není platný.');
   const mountingType = text(input.mountingType);
@@ -44,6 +54,7 @@ export function parsePriceRule(raw: unknown) {
   if (unitPrice.lt(0)) throw new OfferValidationError('Cena nesmí být záporná.');
   return {
     code, category: input.category as OfferPriceCategory, label, description: text(input.description) || null,
+    carrierTypeId,
     mediaType: mediaType ? mediaType as MediaType : null, mountingType: mountingType ? mountingType as MountingType : null, pricingSegment: pricingSegment as ClientPricingSegment,
     city: text(input.city) || null, validFrom, validTo, minDurationMonths, maxDurationMonths,
     calculation: input.calculation as OfferPriceCalculation, unit, unitPrice: unitPrice.toDecimalPlaces(2),
@@ -53,18 +64,41 @@ export function parsePriceRule(raw: unknown) {
 }
 
 export async function listOfferPriceRules(activeOnly = false) {
-  const rules = await prisma.offerPriceRule.findMany({ where: activeOnly ? { active: true } : undefined, orderBy: [{ pricingSegment: 'asc' }, { category: 'asc' }, { sortOrder: 'asc' }, { label: 'asc' }] });
+  const rules = await prisma.offerPriceRule.findMany({
+    where: activeOnly ? { active: true } : undefined,
+    include: {
+      carrierTypeRef: {
+        select: { id: true, code: true, name: true, icon: true, color: true },
+      },
+    },
+    orderBy: [{ pricingSegment: 'asc' }, { category: 'asc' }, { sortOrder: 'asc' }, { label: 'asc' }],
+  });
   return rules.map(serializePriceRule);
 }
 
 export async function createOfferPriceRule(user: CurrentUser, raw: unknown) {
   if (user.role !== 'ADMIN') throw new OfferValidationError('Ceník může spravovat pouze administrátor.', 'FORBIDDEN');
   const data = parsePriceRule(raw);
-  return serializePriceRule(await prisma.offerPriceRule.create({ data: { ...data, createdByUserId: user.id, updatedByUserId: user.id } }));
+  return serializePriceRule(await prisma.offerPriceRule.create({
+    data: { ...data, createdByUserId: user.id, updatedByUserId: user.id },
+    include: {
+      carrierTypeRef: {
+        select: { id: true, code: true, name: true, icon: true, color: true },
+      },
+    },
+  }));
 }
 
 export async function updateOfferPriceRule(user: CurrentUser, id: string, raw: unknown) {
   if (user.role !== 'ADMIN') throw new OfferValidationError('Ceník může spravovat pouze administrátor.', 'FORBIDDEN');
   const data = parsePriceRule(raw);
-  return serializePriceRule(await prisma.offerPriceRule.update({ where: { id }, data: { ...data, updatedByUserId: user.id } }));
+  return serializePriceRule(await prisma.offerPriceRule.update({
+    where: { id },
+    data: { ...data, updatedByUserId: user.id },
+    include: {
+      carrierTypeRef: {
+        select: { id: true, code: true, name: true, icon: true, color: true },
+      },
+    },
+  }));
 }

@@ -61,6 +61,7 @@ const safeDecimal = (val: Prisma.Decimal | number | string | null | undefined, f
 const nullable = (text: string | undefined) => text || null;
 
 const offerInclude = {
+  organization: { select: { id: true, name: true, logoUrl: true } },
   client: true,
   createdByUser: { select: { id: true, name: true, email: true, role: true } },
   updatedByUser: { select: { id: true, name: true } },
@@ -89,7 +90,17 @@ const offerInclude = {
     include: {
       surface: {
         include: {
-          carrier: { include: { photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] } } },
+          carrierTypeRef: {
+            select: { id: true, code: true, name: true, icon: true, color: true },
+          },
+          carrier: {
+            include: {
+              carrierTypeRef: {
+                select: { id: true, code: true, name: true, icon: true, color: true },
+              },
+              photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+            },
+          },
           photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
         },
       },
@@ -166,7 +177,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     archivedAt: publicView ? undefined : row.archivedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'SeePOINT' },
+    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? (row.organization?.name || 'SeePOINT') },
     client: {
       name: row.client.name,
       logoUrl: row.client.logoDriveFileId ? publicView && token ? `/api/proposals/${encodeURIComponent(token)}/logo` : `/api/clients/${row.client.id}/logo/file` : undefined,
@@ -215,12 +226,16 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         surface: {
           name: item.surface.name,
           mediaType: item.surface.mediaType,
+          carrierTypeId: item.surface.carrierTypeId ?? item.surface.carrier.carrierTypeId ?? null,
+          carrierTypeRef: item.surface.carrierTypeRef ?? item.surface.carrier.carrierTypeRef ?? null,
           size: item.surface.size,
           orientation: item.surface.orientation,
           status: publicView ? undefined : item.surface.status,
           carrier: {
             code: item.surface.carrier.code,
             name: item.surface.carrier.name,
+            carrierTypeId: item.surface.carrier.carrierTypeId ?? null,
+            carrierTypeRef: item.surface.carrier.carrierTypeRef ?? null,
             city: item.surface.carrier.city,
             locality: item.surface.carrier.locality,
             street: item.surface.carrier.street,
@@ -1129,7 +1144,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     }
 
     if (target === 'ACCEPTED' && isPastValidity(row.validUntil)) {
-      throw new OfferValidationError('Platnost nabídky skončila. Kontaktujte obchodníka SeePOINT.', 'INVALID_STATUS_TRANSITION');
+      throw new OfferValidationError('Platnost nabídky skončila. Kontaktujte obchodníka.', 'INVALID_STATUS_TRANSITION');
     }
 
     // Special handling for Navigation Phase 1 (LOCATION_SELECTION):
@@ -1177,7 +1192,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       return {
         row,
         status: effectiveStatus,
-        message: 'Děkujeme! Váš výběr navigačních bodů byl schválen. Obchodník SeePOINT pro vás nyní připraví cenovou kalkulaci.',
+        message: 'Děkujeme! Váš výběr navigačních bodů byl schválen. Obchodník pro vás nyní připraví cenovou kalkulaci.',
       };
     }
 
@@ -1187,7 +1202,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       const blockingConflicts = conflicts.filter((c) => c.severity === 'block');
       if (blockingConflicts.length > 0) {
         throw new OfferValidationError(
-          `Některé reklamní plochy v nabídce jsou již v požadovaném termínu obsazeny jinou kampaní (${blockingConflicts.map((c) => `${c.carrierCode} / ${c.surfaceName}`).join(', ')}). Kontaktujte obchodníka SeePOINT pro úpravu termínu nebo výběr náhradní plochy.`,
+          `Některé reklamní plochy v nabídce jsou již v požadovaném termínu obsazeny jinou kampaní (${blockingConflicts.map((c) => `${c.carrierCode} / ${c.surfaceName}`).join(', ')}). Kontaktujte obchodníka pro úpravu termínu nebo výběr náhradní plochy.`,
           'AVAILABILITY_CONFLICT'
         );
       }
@@ -1273,7 +1288,8 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       ? `✏️ Požadavek na úpravu nabídky ${row.campaignName} od ${actorName}`
       : `💬 Nový dotaz k nabídce ${row.campaignName} od ${actorName}`;
 
-    const emailText = `Klient reagoval na nabídku v systému SeePOINT:\n\n`
+    const orgName = row.organization?.name || 'SeePOINT';
+    const emailText = `Klient reagoval na nabídku v systému ${orgName}:\n\n`
       + `Kampaň: ${row.campaignName}\n`
       + `Klient: ${row.client.name}\n`
       + `Jméno: ${actorName}\n`

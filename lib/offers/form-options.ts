@@ -14,8 +14,14 @@ export async function getOfferFormOptions() {
       include: {
         currentClient: { select: { name: true } },
         photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
+        carrierTypeRef: {
+          select: { id: true, code: true, name: true, icon: true, color: true },
+        },
         carrier: {
           include: {
+            carrierTypeRef: {
+              select: { id: true, code: true, name: true, icon: true, color: true },
+            },
             photos: { where: { type: { not: 'EXPENSE_RECEIPT' } }, orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }] },
           },
         },
@@ -25,15 +31,34 @@ export async function getOfferFormOptions() {
     }),
     prisma.offerPriceRule.findMany({
       where: { active: true },
+      include: {
+        carrierTypeRef: {
+          select: { id: true, code: true, name: true, icon: true, color: true },
+        },
+      },
       orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }, { label: 'asc' }],
     }),
     prisma.mediaPackage.findMany({
       where: { active: true },
-      include: { rules: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        rules: {
+          include: {
+            carrierTypeRef: {
+              select: { id: true, code: true, name: true, icon: true, color: true },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
       orderBy: { name: 'asc' },
     }),
     prisma.priceListItem.findMany({
       where: { isActive: true, validTo: null },
+      include: {
+        carrierTypeRef: {
+          select: { id: true, code: true, name: true, icon: true, color: true },
+        },
+      },
     }),
   ]);
 
@@ -43,10 +68,16 @@ export async function getOfferFormOptions() {
   }));
 
   const surfaceOptions: OfferSurfaceOption[] = surfaces.map((surface) => {
-    // Find catalog price from the price list items matching either mediaType or carrierType
-    const catalogItem = priceListItems.find(
-      (item) => item.mediaType === surface.mediaType || item.carrierType === surface.carrier.type
-    );
+    // Find catalog price from the price list items matching carrierTypeId, mediaType, or carrierType
+    const catalogItem = priceListItems.find((item) => {
+      if (item.carrierTypeId) {
+        return (
+          item.carrierTypeId === surface.carrierTypeId ||
+          item.carrierTypeId === surface.carrier.carrierTypeId
+        );
+      }
+      return item.mediaType === surface.mediaType || item.carrierType === surface.carrier.type;
+    });
     const resolvedPrice = surface.price?.toFixed(2)
       ?? catalogItem?.rentalPrice.toNumber().toFixed(2)
       ?? '0.00';
@@ -61,6 +92,8 @@ export async function getOfferFormOptions() {
       id: surface.id,
       name: surface.name,
       mediaType: surface.mediaType,
+      carrierTypeId: surface.carrierTypeId ?? surface.carrier.carrierTypeId ?? null,
+      carrierTypeRef: surface.carrierTypeRef ?? surface.carrier.carrierTypeRef ?? null,
       status: surface.status,
       price: resolvedPrice,
       priceSource,
@@ -75,6 +108,8 @@ export async function getOfferFormOptions() {
         id: surface.carrier.id,
         code: surface.carrier.code,
         name: surface.carrier.name,
+        carrierTypeId: surface.carrier.carrierTypeId ?? null,
+        carrierTypeRef: surface.carrier.carrierTypeRef ?? null,
         city: surface.carrier.city,
         type: surface.carrier.type,
         locality: surface.carrier.locality,
@@ -89,6 +124,8 @@ export async function getOfferFormOptions() {
 
   const pricing: OfferPriceRuleOption[] = priceRules.map((rule) => ({
     ...rule,
+    carrierTypeId: rule.carrierTypeId ?? null,
+    carrierTypeRef: rule.carrierTypeRef ?? null,
     mediaType: rule.mediaType,
     unitPrice: rule.unitPrice.toFixed(2),
     validFrom: rule.validFrom?.toISOString().slice(0, 10) ?? null,
@@ -105,6 +142,8 @@ export async function getOfferFormOptions() {
     rules: pkg.rules.map((rule) => ({
       id: rule.id,
       mediaType: rule.mediaType,
+      carrierTypeId: rule.carrierTypeId ?? null,
+      carrierTypeRef: rule.carrierTypeRef ?? null,
       city: rule.city,
       locality: rule.locality,
       quantity: rule.quantity,
@@ -120,6 +159,8 @@ export async function getOfferFormOptions() {
     priceListItems: priceListItems.map((item) => ({
       id: item.id,
       name: item.name,
+      carrierTypeId: item.carrierTypeId,
+      carrierTypeRef: item.carrierTypeRef ?? null,
       mediaType: item.mediaType,
       carrierType: item.carrierType,
       rentalPrice: item.rentalPrice.toNumber().toFixed(2),
