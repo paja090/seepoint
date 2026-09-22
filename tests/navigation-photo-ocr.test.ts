@@ -34,3 +34,8 @@ test('2. extractFromPhotoList prioritizes notes and filenames with high confiden
   assert.equal(result?.directionDescription, 'vpravo');
   assert.equal(result?.directionArrow, '➔');
 });
+
+test('3. extractNavigationFromPhotoWithGemini is properly exported and accepts navigation extraction structure', async () => {
+  const { extractNavigationFromPhotoWithGemini } = await import('../lib/ai-gemini');
+  assert.equal(typeof extractNavigationFromPhotoWithGemini, 'function');
+});

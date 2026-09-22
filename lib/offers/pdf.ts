@@ -144,21 +144,23 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
     ? { image: clientLogoDataUrl, fit: [110, 48], alignment: 'right', margin: [0, 2, 0, 0] }
     : { text: offer.client.logoLabel || offer.client.name, fontSize: 18, bold: true, color: BLUE, alignment: 'right', margin: [0, 6, 0, 0] };
 
+  const orgName = offer.rawOffer?.branding?.name || 'SeePOINT';
+
   const definition = {
-    info: { title: offer.title, author: 'SeePOINT', subject: 'Nabídka venkovní reklamní kampaně' },
+    info: { title: offer.title, author: orgName, subject: 'Nabídka venkovní reklamní kampaně' },
     pageSize: 'A4',
     pageMargins: [38, 48, 38, 48],
     defaultStyle: { font: 'Roboto', fontSize: 9, color: NAVY, lineHeight: 1.15 },
     header: () => ({
       columns: [
-        { text: 'SeePOINT  •  OUTDOOR & NAVIGAČNÍ REKLAMA', bold: true, color: BLUE, fontSize: 10 },
+        { text: `${orgName}  •  OUTDOOR & NAVIGAČNÍ REKLAMA`, bold: true, color: BLUE, fontSize: 10 },
         { text: `NABÍDKA  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
       ],
       margin: [38, 20, 38, 0],
     }),
     footer: (currentPage: number, pageCount: number) => ({
       columns: [
-        { text: 'SeePOINT  •  outdoor reklama', color: MUTED, fontSize: 7.5 },
+        { text: `${orgName}  •  outdoor reklama`, color: MUTED, fontSize: 7.5 },
         { text: `${currentPage} / ${pageCount}`, alignment: 'right', color: MUTED, fontSize: 7.5 },
       ],
       margin: [38, 0, 38, 18],
@@ -238,7 +240,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       // Graphic Artwork Proof Section in PDF (670 x 900 mm)
       ...(isNavigation && navigationData && (navigationData as unknown as Record<string, unknown>).includeGraphicProof !== false && typeof (navigationData as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl).startsWith('data:image/') ? [
         { text: 'Grafický motiv a provedení cedule (670 × 900 mm)', style: 'heading', margin: [0, 14, 0, 8] },
-        { text: 'Tiskový motiv oboustranné plástve SeePOINT pro montáž na sloupy veřejného osvětlení:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 8] },
+        { text: 'Tiskový motiv oboustranné plástve pro montáž na sloupy veřejného osvětlení:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 8] },
         { image: String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl), width: 240, alignment: 'center', margin: [0, 4, 0, 16] },
       ] : []),
       { text: 'Cenová kalkulace', style: 'heading', pageBreak: 'before' },
@@ -313,21 +315,23 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
     ];
   }) : [];
 
+  const orgName = offer.rawOffer?.branding?.name || 'SeePOINT';
+
   const definition = {
-    info: { title: `Montážní list – ${offer.title}`, author: 'SeePOINT', subject: 'Protokol instalace navigačních cedulí' },
+    info: { title: `Montážní list – ${offer.title}`, author: orgName, subject: 'Protokol instalace navigačních cedulí' },
     pageSize: 'A4',
     pageMargins: [38, 38, 38, 38],
     defaultStyle: { font: 'Roboto', fontSize: 8.5, color: NAVY, lineHeight: 1.15 },
     header: () => ({
       columns: [
-        { text: 'SeePOINT  •  MONTÁŽNÍ & INSTALAČNÍ PROTOKOL', bold: true, color: BLUE, fontSize: 9 },
+        { text: `${orgName}  •  MONTÁŽNÍ & INSTALAČNÍ PROTOKOL`, bold: true, color: BLUE, fontSize: 9 },
         { text: `DOKUMENT  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
       ],
       margin: [38, 16, 38, 0],
     }),
     footer: (currentPage: number, pageCount: number) => ({
       columns: [
-        { text: 'SeePOINT  •  montážní dokumentace pro techniky VO', color: MUTED, fontSize: 7.5 },
+        { text: `${orgName}  •  montážní dokumentace pro techniky VO`, color: MUTED, fontSize: 7.5 },
         { text: `${currentPage} / ${pageCount}`, alignment: 'right', color: MUTED, fontSize: 7.5 },
       ],
       margin: [38, 0, 38, 14],
@@ -409,7 +413,7 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
           body: [[
             { stack: [
               { text: 'PŘEDÁVACÍ PROTOKOL O DOKONČENÍ MONTÁŽE', bold: true, fontSize: 10, color: NAVY, margin: [0, 0, 0, 6] },
-              { text: 'Tento protokol stvrzuje řádnou instalaci navigačních prvků SeePOINT v souladu s vyhláškou a specifikací.', fontSize: 8, color: MUTED, margin: [0, 0, 0, 10] },
+              { text: `Tento protokol stvrzuje řádnou instalaci navigačních prvků ${orgName} v souladu s vyhláškou a specifikací.`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 10] },
               {
                 columns: [
                   { stack: [{ text: 'Montážní četa / Technik:', fontSize: 8, color: MUTED }, { text: '_______________________________', margin: [0, 4, 0, 0] }] },

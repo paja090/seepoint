@@ -24,23 +24,23 @@ function sides(mediaType: Surface['mediaType'], names: string[]): SurfaceDraft[]
   return names.map((name) => ({ name: `Strana ${name}`, mediaType, orientation: name }));
 }
 
-const seepointProducts: ProductOption[] = [
+const standardProducts: ProductOption[] = [
   { value: 'BILLBOARD', label: 'Billboard (A/B)', surfaces: sides('BILLBOARD', ['A', 'B']) },
+  { value: 'BIGBOARD', label: 'Bigboard', surfaces: [] },
+  { value: 'CITYLIGHT', label: 'City Light / CLV', surfaces: [] },
+  { value: 'BANNER', label: 'Banner / Plachta', surfaces: [] },
+  { value: 'FACADE', label: 'Fasáda', surfaces: [] },
+  { value: 'LED_SCREEN', label: 'LED obrazovka', surfaces: [] },
+  { value: 'OTHER', label: 'Jiný typ', surfaces: [] },
+];
+
+const legacyProducts: ProductOption[] = [
   { value: 'PROMO_BENCH', label: 'Promo lavička (A/B)', surfaces: sides('PROMO_BENCH', ['A', 'B']) },
   { value: 'PROMO_HORIZON', label: 'Promo horizont', surfaces: [{ name: 'Plocha', mediaType: 'PROMO_HORIZON' }] },
   { value: 'CITY_POSTER', label: 'City Poster (A/B)', surfaces: sides('CITY_POSTER', ['A', 'B']) },
   { value: 'NAVIGATION', label: 'Navigace', surfaces: [{ name: 'Navigace', mediaType: 'NAVIGATION_SIGN' }] },
   { value: 'PROMO_TOWER', label: 'Promo věž (A/B/C/D)', surfaces: sides('PROMO_TOWER', ['A', 'B', 'C', 'D']) },
   { value: 'PROMO_MINITOWER', label: 'Promo minivěž (A/B/C/D)', surfaces: sides('PROMO_MINITOWER', ['A', 'B', 'C', 'D']) },
-];
-
-const legacyProducts: ProductOption[] = [
-  { value: 'BIGBOARD', label: 'Bigboard', surfaces: [] },
-  { value: 'CITYLIGHT', label: 'City Light', surfaces: [] },
-  { value: 'BANNER', label: 'Banner', surfaces: [] },
-  { value: 'FACADE', label: 'Fasáda', surfaces: [] },
-  { value: 'LED_SCREEN', label: 'LED obrazovka', surfaces: [] },
-  { value: 'OTHER', label: 'Jiný typ', surfaces: [] },
 ];
 
 const statuses: SelectOption<Carrier['status']>[] = [
@@ -60,11 +60,19 @@ const mountingTypes: SelectOption<Carrier['mountingType']>[] = [
 
 type ApiError = { error?: string };
 
-export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; onSaved?: (carrier: Carrier) => void }) {
+export function CarrierForm({
+  carrier,
+  onSaved,
+  carrierTypes,
+}: {
+  carrier?: Partial<Carrier>;
+  onSaved?: (carrier: Carrier) => void;
+  carrierTypes?: Array<{ id: string; code: string; name: string; icon?: string | null; color?: string | null; legacyEnumValue?: string | null }>;
+}) {
   const [form, setForm] = useState<Partial<Carrier>>(carrier ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const selectedProduct = [...seepointProducts, ...legacyProducts].find((product) => product.value === (form.type ?? 'BILLBOARD'));
+  const selectedProduct = [...standardProducts, ...legacyProducts].find((product) => product.value === (form.type ?? 'BILLBOARD'));
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,6 +82,7 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
     const hasLongitude = Number.isFinite(form.longitude);
     const payload = {
       ...form,
+      carrierTypeId: form.carrierTypeId,
       name: form.name?.trim(),
       code: form.code?.trim(),
       city: form.city?.trim(),
@@ -128,13 +137,48 @@ export function CarrierForm({ carrier, onSaved }: { carrier?: Partial<Carrier>; 
       <input className="input" placeholder="Název" aria-label="Název" required value={form.name ?? ''} onChange={(event) => set('name', event.target.value)} />
       <input className="input" placeholder="Interní kód" aria-label="Interní kód" required value={form.code ?? ''} onChange={(event) => set('code', event.target.value)} />
       <div className="grid grid-cols-2 gap-2">
-        <select className="input" aria-label="Typ nosiče" value={form.type ?? 'BILLBOARD'} onChange={(event) => set('type', event.target.value)}>
-          <optgroup label="Nosiče SeePOINT">
-            {seepointProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
-          </optgroup>
-          <optgroup label="Ostatní / starší typy">
-            {legacyProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
-          </optgroup>
+        <select
+          className="input"
+          aria-label="Typ nosiče"
+          value={form.carrierTypeId ?? form.type ?? 'BILLBOARD'}
+          onChange={(event) => {
+            const val = event.target.value;
+            const matchedCustom = carrierTypes?.find((ct) => ct.id === val);
+            if (matchedCustom) {
+              setForm((curr) => ({
+                ...curr,
+                carrierTypeId: matchedCustom.id,
+                type: (matchedCustom.legacyEnumValue as Carrier['type']) || curr.type || 'OTHER',
+              }));
+            } else {
+              setForm((curr) => ({
+                ...curr,
+                carrierTypeId: undefined,
+                type: val as Carrier['type'],
+              }));
+            }
+          }}
+        >
+          {carrierTypes && carrierTypes.length > 0 ? (
+            <optgroup label="Typy nosičů organizace">
+              {carrierTypes.map((ct) => (
+                <option key={ct.id} value={ct.id}>
+                  {ct.icon ? `${ct.icon} ` : ''}{ct.name}
+                </option>
+              ))}
+            </optgroup>
+          ) : (
+            <>
+              <optgroup label="Základní typy nosičů">
+                {standardProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
+              </optgroup>
+              {legacyProducts.some((p) => p.value === form.type) && (
+                <optgroup label="Původní typy">
+                  {legacyProducts.map((product) => <option key={product.value} value={product.value}>{product.label}</option>)}
+                </optgroup>
+              )}
+            </>
+          )}
         </select>
         <select className="input" aria-label="Stav nosiče" value={form.status ?? 'ACTIVE'} onChange={(event) => set('status', event.target.value)}>
           {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}

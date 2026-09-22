@@ -39,9 +39,11 @@ function hasCoordinates(carrier: Carrier): carrier is LocatedCarrier {
 export function MapView({
   initialCarriers,
   canEdit,
+  carrierTypes,
 }: {
   initialCarriers: Carrier[];
   canEdit?: boolean;
+  carrierTypes?: Array<{ id: string; code: string; name: string; icon?: string | null; color?: string | null; legacyEnumValue?: string | null }>;
 }) {
   const [items, setItems] = useState(initialCarriers);
   const [selectedId, setSelectedId] = useState(initialCarriers[0]?.id);
@@ -285,7 +287,7 @@ export function MapView({
         <aside className="card max-h-[calc(100vh-8rem)] overflow-auto">
           {draft ? <>
             <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-xl font-bold">Nový nosič</h2><button className="text-sm text-slate-500 hover:text-slate-900" onClick={() => setDraft(undefined)}>Zrušit</button></div>
-            <CarrierForm carrier={draft} onSaved={(carrier) => { setItems((current) => [...current, carrier]); setDraft(undefined); setSelectedId(carrier.id); }} />
+            <CarrierForm carrier={draft} carrierTypes={carrierTypes} onSaved={(carrier) => { setItems((current) => [...current, carrier]); setDraft(undefined); setSelectedId(carrier.id); }} />
           </> : selected ? <>
             {editingSelectedLocation ? (
               <section className="mb-4 rounded-2xl border border-sky-200 bg-sky-50 p-4" aria-labelledby="location-editor-heading">

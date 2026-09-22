@@ -119,6 +119,14 @@ export type Carrier = {
   name: string;
   code: string;
   type: CarrierType;
+  carrierTypeId?: string;
+  carrierTypeRef?: {
+    id: string;
+    code: string;
+    name: string;
+    icon?: string;
+    color?: string;
+  };
   latitude?: number;
   longitude?: number;
   gpsStatus: GpsStatus;

@@ -58,7 +58,10 @@ function clean(value: string | string[] | undefined) {
 }
 
 export function parseCarrierFilters(searchParams: Record<string, string | string[] | undefined>): CarrierFilters {
-  const carrierType = clean(searchParams.carrierType);
+  const rawCarrierType = clean(searchParams.carrierType);
+  const isLegacyEnum = rawCarrierType && carrierTypes.has(rawCarrierType as CarrierType);
+  const carrierType = isLegacyEnum ? (rawCarrierType as CarrierType) : undefined;
+  const carrierTypeId = clean(searchParams.carrierTypeId) || (!isLegacyEnum ? rawCarrierType : undefined);
   const mediaType = clean(searchParams.mediaType);
   const surfaceStatus = clean(searchParams.surfaceStatus);
   const gps = clean(searchParams.gps);
@@ -72,7 +75,8 @@ export function parseCarrierFilters(searchParams: Record<string, string | string
 
   return {
     q: clean(searchParams.q),
-    carrierType: carrierType && carrierTypes.has(carrierType as CarrierType) ? carrierType as CarrierType : undefined,
+    carrierType,
+    carrierTypeId,
     mediaType: mediaType && mediaTypes.has(mediaType as MediaType) ? mediaType as MediaType : undefined,
     city: clean(searchParams.city),
     locality: clean(searchParams.locality),

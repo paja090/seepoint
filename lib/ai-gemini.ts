@@ -344,3 +344,97 @@ Vrať výhradně platný JSON objekt v tomto formátu:
   return [];
 }
 
+export type GeminiNavigationExtraction = {
+  destinationName?: string;
+  directionDescription?: string;
+  directionArrow?: '➔' | '⬅' | '⬆' | '🧭';
+  distanceMeters?: number;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  rawDetectedText?: string;
+};
+
+/**
+ * 4. AI Vision navigation signage OCR & Direction/Destination/Distance extraction
+ */
+export async function extractNavigationFromPhotoWithGemini(data: {
+  imageBase64OrUrl: string;
+  organizationId?: string;
+  photoId?: string;
+}): Promise<GeminiNavigationExtraction | null> {
+  const prompt = `Jsi AI specialista na rozpoznávání navigačních směrovek, tabulí a reklamních nosičů (např. navigační cedule na sloupech veřejného osvětlení).
+Analyzuj přiloženou fotografii nosiče z terénu. Na fotografii hledej navigační tabuli / směrovku a vyčti z ní:
+1. "destinationName": Název cíle, prodejny, firmy nebo značky (např. "Form Factory", "Albert", "Kaufland", "Lidl", "Shell", "Decathlon", "Autoservis" atd.). Pokud není žádný cíl zřejmý, vrať null.
+2. "directionDescription": Směr navigace slovy v češtině ("vpravo", "vlevo", "rovně", "směr centrum", apod.).
+3. "directionArrow": Šipka odpovídající směru ("➔" pro vpravo, "⬅" pro vlevo, "⬆" pro rovně / přímo, "🧭" pokud směr nelze určit).
+4. "distanceMeters": Vzdálenost v metrech jako celé číslo (např. 350 pro 350 m, 1200 pro 1.2 km). Pokud vzdálenost není uvedena, vrať null.
+5. "confidence": "HIGH" (pokud je text a šipka jasně viditelná), "MEDIUM" (pokud je část odhadnuta), nebo "LOW".
+6. "rawDetectedText": Veškerý text a symboly, které jsi na tabuli přečetl.
+
+Vrať VÝHRADNĚ platný JSON objekt v tomto formátu:
+{
+  "destinationName": "string nebo null",
+  "directionDescription": "string nebo null",
+  "directionArrow": "➔" | "⬅" | "⬆" | "🧭",
+  "distanceMeters": number nebo null,
+  "confidence": "HIGH" | "MEDIUM" | "LOW",
+  "rawDetectedText": "string"
+}`;
+
+  try {
+    const geminiResult = await callGeminiVision(prompt, data.imageBase64OrUrl);
+    if (!geminiResult || typeof geminiResult !== 'object') return null;
+
+    const res = geminiResult as Record<string, unknown>;
+
+    const destinationName = typeof res.destinationName === 'string' && res.destinationName.trim() ? res.destinationName.trim() : undefined;
+    const directionDescription = typeof res.directionDescription === 'string' && res.directionDescription.trim() ? res.directionDescription.trim() : undefined;
+    let directionArrow: '➔' | '⬅' | '⬆' | '🧭' = '🧭';
+    if (res.directionArrow === '➔' || res.directionArrow === '⬅' || res.directionArrow === '⬆') {
+      directionArrow = res.directionArrow;
+    } else if (directionDescription) {
+      const norm = directionDescription.toLowerCase();
+      if (norm.includes('vpravo') || norm.includes('doprava')) directionArrow = '➔';
+      else if (norm.includes('vlevo') || norm.includes('doleva')) directionArrow = '⬅';
+      else if (norm.includes('rovně') || norm.includes('rovne') || norm.includes('přímo') || norm.includes('primo')) directionArrow = '⬆';
+    }
+
+    let distanceMeters: number | undefined;
+    if (typeof res.distanceMeters === 'number' && Number.isFinite(res.distanceMeters) && res.distanceMeters > 0) {
+      distanceMeters = Math.round(res.distanceMeters);
+    }
+
+    const confidenceRaw = String(res.confidence || '').toUpperCase();
+    const confidence: 'HIGH' | 'MEDIUM' | 'LOW' =
+      confidenceRaw === 'HIGH' ? 'HIGH' : confidenceRaw === 'MEDIUM' ? 'MEDIUM' : 'LOW';
+
+    if (!destinationName && !directionDescription && distanceMeters === undefined) {
+      return null;
+    }
+
+    if (data.organizationId) {
+      void logAIUsage({
+        organizationId: data.organizationId,
+        feature: 'PHOTO_ANALYSIS',
+        modelName: 'gemini-3.6-flash',
+        promptTokens: 400,
+        outputTokens: 150,
+        imageCount: 1,
+        costEstimateUsd: 0.002,
+        metadata: { photoId: data.photoId, action: 'navigation-sign-ocr' },
+      });
+    }
+
+    return {
+      destinationName,
+      directionDescription,
+      directionArrow,
+      distanceMeters,
+      confidence,
+      rawDetectedText: typeof res.rawDetectedText === 'string' ? res.rawDetectedText : undefined,
+    };
+  } catch (err) {
+    console.error('Gemini navigation extraction error:', err);
+    return null;
+  }
+}
+

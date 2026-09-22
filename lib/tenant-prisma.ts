@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { assertOrganizationId, getTenantContext, requireTenantContext, runWithTenantContext } from './tenant-context';
 
 export const TENANT_MODEL_NAMES = [
+  'OrganizationCarrierType', 'Product',
   'CalendarConnection', 'ExternalCalendar', 'ExternalCalendarEvent', 'PlannerPreferences', 'PlannerBlock',
   'OrganizationFieldPlanningProfile', 'FieldPlan',
   'OrganizationOnboarding', 'IntegrationConnection',

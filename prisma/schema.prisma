@@ -541,6 +541,55 @@ model Organization {
   @@index([plan])
 }
 
+model OrganizationCarrierType {
+  id              String   @id @default(cuid())
+  organizationId  String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  code            String
+  name            String
+  description     String?
+  icon            String?
+  color           String?
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  legacyEnumValue String?
+  capabilities    Json?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  carriers       AdvertisingCarrier[]
+  surfaces       AdvertisingSurface[]
+  priceRules     OfferPriceRule[]
+  packageRules   MediaPackageRule[]
+  priceListItems PriceListItem[]
+  products       Product[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, sortOrder])
+  @@index([legacyEnumValue])
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  organizationId  String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  code            String
+  name            String
+  description     String?
+  carrierTypeId   String?
+  unit            String?  @default("plocha")
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  carrierType OrganizationCarrierType? @relation(fields: [carrierTypeId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, sortOrder])
+  @@index([carrierTypeId])
+}
+
 // Personal credentials never reuse organization-wide Drive/Gmail connections.
 model CalendarConnection {
   id                   String             @id @default(cuid())
@@ -974,6 +1023,7 @@ model EmployeeRate {
   unit            String?
   workType        WorkType?
   carrierType     CarrierType?
+  carrierTypeLabel String?
   validFrom       DateTime
   validTo         DateTime?
   note            String?
@@ -1061,6 +1111,7 @@ model AdvertisingCarrier {
   code                 String
   visibility           InventoryVisibility @default(PRIVATE)
   type                 CarrierType
+  carrierTypeId        String?
   latitude             Float?
   longitude            Float?
   gpsStatus            GpsStatus           @default(UNVERIFIED)
@@ -1088,6 +1139,7 @@ model AdvertisingCarrier {
   updatedAt            DateTime            @updatedAt
 
   importBatch                  ImportBatch?                  @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  carrierTypeRef               OrganizationCarrierType?      @relation(fields: [carrierTypeId], references: [id], onDelete: SetNull)
   surfaces                     AdvertisingSurface[]
   photos                       Photo[]
   workItems                    WorkOrderItem[]
@@ -1101,6 +1153,7 @@ model AdvertisingCarrier {
 
   @@unique([organizationId, code])
   @@unique([organizationId, sourceKey])
+  @@index([carrierTypeId])
   @@index([importBatchId])
   @@index([archivedAt])
   @@index([city, structureCode])
@@ -1200,6 +1253,7 @@ model SettlementItem {
   rateSource     RateSource?
   rateId         String?
   carrierType    CarrierType?
+  carrierTypeLabel String?
   workType       WorkType?
   note           String?
 
@@ -1390,6 +1444,7 @@ model AdvertisingSurface {
   name                 String
   visibility           InventoryVisibility @default(PRIVATE)
   mediaType            MediaType           @default(OTHER)
+  carrierTypeId        String?
   sourcePosition       String?
   directionDescription String?
   destinationName      String?
@@ -1414,6 +1469,7 @@ model AdvertisingSurface {
   currentClient    Client?                    @relation("CurrentSurfaceClient", fields: [currentClientId], references: [id], onDelete: SetNull)
   contract         NavigationContract?        @relation(fields: [contractId], references: [id], onDelete: SetNull)
   importBatch      ImportBatch?               @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  carrierTypeRef   OrganizationCarrierType?   @relation(fields: [carrierTypeId], references: [id], onDelete: SetNull)
   occupancies      Occupancy[]
   offerItems       OfferItem[]
   photos           Photo[]
@@ -1429,6 +1485,7 @@ model AdvertisingSurface {
   @@index([currentClientId])
   @@index([contractId])
   @@index([importBatchId])
+  @@index([carrierTypeId])
   @@index([mediaType, status])
   @@index([organizationId])
 }
@@ -2004,15 +2061,18 @@ model MediaPackageRule {
   organizationId String    @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
   packageId      String
   mediaType      MediaType
+  carrierTypeId  String?
   city           String?
   locality       String?
   quantity       Int
   sortOrder      Int       @default(0)
   createdAt      DateTime  @default(now())
 
-  package MediaPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  package        MediaPackage              @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  carrierTypeRef OrganizationCarrierType?  @relation(fields: [carrierTypeId], references: [id], onDelete: SetNull)
 
   @@index([packageId, sortOrder])
+  @@index([carrierTypeId])
   @@index([mediaType, city])
   @@index([organizationId])
 }
@@ -2045,6 +2105,7 @@ model OfferPriceRule {
   label             String
   description       String?
   mediaType         MediaType?
+  carrierTypeId     String?
   mountingType      MountingType?
   pricingSegment    ClientPricingSegment  @default(COMMERCIAL)
   city              String?
@@ -2064,8 +2125,9 @@ model OfferPriceRule {
   updatedAt         DateTime              @updatedAt
 
   createdBy User?         @relation("OfferPriceRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  updatedBy User?         @relation("OfferPriceRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
-  charges   OfferCharge[]
+  updatedBy      User?                   @relation("OfferPriceRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  carrierTypeRef OrganizationCarrierType? @relation(fields: [carrierTypeId], references: [id], onDelete: SetNull)
+  charges        OfferCharge[]
   items     OfferItem[]
 
   @@unique([organizationId, code])
@@ -2306,6 +2368,7 @@ model PriceListItem {
   versionKey      String
   name            String
   carrierType     CarrierType?
+  carrierTypeId   String?
   mediaType       MediaType?
   rentalMonths    Int          @default(1)
   minQuantity     Int          @default(1)
@@ -2322,11 +2385,13 @@ model PriceListItem {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  importBatch ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  importBatch    ImportBatch?             @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  carrierTypeRef OrganizationCarrierType? @relation(fields: [carrierTypeId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, versionKey])
   @@index([identityKey, validFrom, validTo])
   @@index([isActive])
+  @@index([carrierTypeId])
   @@index([importBatchId])
   @@index([organizationId])
 }
@@ -2529,6 +2594,7 @@ model WorkOrderRate {
   unit            String?
   workType        WorkType?
   carrierType     CarrierType?
+  carrierTypeLabel String?
   validFrom       DateTime
   validTo         DateTime?
   note            String?
@@ -2556,6 +2622,7 @@ model CompanyRate {
   unit            String?
   workType        WorkType?
   carrierType     CarrierType?
+  carrierTypeLabel String?
   validFrom       DateTime
   validTo         DateTime?
   note            String?
@@ -2581,6 +2648,7 @@ model WorkEntry {
   clientName         String?
   workType           WorkType
   carrierType        CarrierType?
+  carrierTypeLabel   String?
   remunerationMethod RateType
   quantity           Decimal                 @db.Decimal(10, 4)
   unit               String

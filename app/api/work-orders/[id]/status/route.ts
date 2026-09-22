@@ -31,7 +31,19 @@ export async function PATCH(
 
     const existing = await prisma.workOrder.findUnique({
       where: { id: workOrderId },
-      include: { items: { include: { carrier: true } }, assignments: true, workTasks: true },
+      include: {
+        items: {
+          include: {
+            carrier: {
+              include: {
+                carrierTypeRef: { select: { name: true } },
+              },
+            },
+          },
+        },
+        assignments: true,
+        workTasks: true,
+      },
     });
 
     if (!existing) {
@@ -56,6 +68,8 @@ export async function PATCH(
       });
 
       const firstTask = existing.workTasks[0];
+      const carrier = existing.items[0]?.carrier;
+      const carrierTypeLabel = carrier?.carrierTypeRef?.name || carrier?.type || null;
 
       if (employee && firstTask) {
         await prisma.workEntry.create({
@@ -67,6 +81,7 @@ export async function PATCH(
             clientId: existing.clientId || undefined,
             clientName: existing.clientName,
             workType: existing.workType,
+            carrierTypeLabel,
             remunerationMethod: 'HOURLY',
             quantity: 1,
             unit: 'ks',

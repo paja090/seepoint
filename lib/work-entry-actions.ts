@@ -121,6 +121,7 @@ export async function approveWorkEntry(
           rateType: entry.remunerationMethod,
           rateSource: entry.rateSource,
           carrierType: entry.carrierType,
+          carrierTypeLabel: entry.carrierTypeLabel,
           workType: entry.workType,
         },
         update: {
@@ -135,6 +136,7 @@ export async function approveWorkEntry(
           rateType: entry.remunerationMethod,
           rateSource: entry.rateSource,
           carrierType: entry.carrierType,
+          carrierTypeLabel: entry.carrierTypeLabel,
           workType: entry.workType,
         }
       });

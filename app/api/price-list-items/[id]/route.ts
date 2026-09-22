@@ -21,16 +21,49 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const name = body.name !== undefined ? String(body.name || '').trim() : existing.name;
     if (!name) return NextResponse.json({ error: 'Název ceníkové položky je povinný.' }, { status: 400 });
-    const carrierTypeInput = body.carrierType !== undefined ? body.carrierType : existing.carrierType;
     const mediaTypeInput = body.mediaType !== undefined ? body.mediaType : existing.mediaType;
-    const carrierType = carrierTypeInput === null || carrierTypeInput === '' ? null : String(carrierTypeInput);
     const mediaType = mediaTypeInput === null || mediaTypeInput === '' ? null : String(mediaTypeInput);
-    if (carrierType && !Object.values(CarrierType).includes(carrierType as CarrierType)) {
-      return NextResponse.json({ error: 'Neplatný typ nosiče.' }, { status: 400 });
-    }
     if (mediaType && !Object.values(MediaType).includes(mediaType as MediaType)) {
       return NextResponse.json({ error: 'Neplatný typ média.' }, { status: 400 });
     }
+
+    let resolvedCarrierTypeId: string | null = existing.carrierTypeId;
+    let resolvedCarrierType: CarrierType | null = existing.carrierType;
+
+    if (body.carrierTypeId !== undefined) {
+      resolvedCarrierTypeId = body.carrierTypeId ? String(body.carrierTypeId) : null;
+    }
+    if (body.carrierType !== undefined) {
+      resolvedCarrierType = body.carrierType ? (String(body.carrierType) as CarrierType) : null;
+      if (resolvedCarrierType && !Object.values(CarrierType).includes(resolvedCarrierType)) {
+        return NextResponse.json({ error: 'Neplatný typ nosiče.' }, { status: 400 });
+      }
+    }
+
+    if (body.carrierTypeId !== undefined && resolvedCarrierTypeId) {
+      const oct = await prisma.organizationCarrierType.findUnique({
+        where: { id: resolvedCarrierTypeId },
+        select: { id: true, legacyEnumValue: true },
+      });
+      if (oct) {
+        resolvedCarrierTypeId = oct.id;
+        if (body.carrierType === undefined && oct.legacyEnumValue && Object.values(CarrierType).includes(oct.legacyEnumValue as CarrierType)) {
+          resolvedCarrierType = oct.legacyEnumValue as CarrierType;
+        }
+      }
+    } else if (body.carrierType !== undefined && resolvedCarrierType && body.carrierTypeId === undefined) {
+      const oct = await prisma.organizationCarrierType.findFirst({
+        where: {
+          OR: [{ legacyEnumValue: resolvedCarrierType }, { code: resolvedCarrierType }],
+          active: true,
+        },
+        select: { id: true },
+      });
+      if (oct) {
+        resolvedCarrierTypeId = oct.id;
+      }
+    }
+
     const rentalMonths = body.rentalMonths !== undefined ? Number(body.rentalMonths) : existing.rentalMonths;
     const minQuantity = body.minQuantity !== undefined ? Number(body.minQuantity) : existing.minQuantity;
     const rentalPrice = body.rentalPrice !== undefined ? Number(body.rentalPrice) : existing.rentalPrice.toNumber();
@@ -65,7 +98,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         name,
         identityKey,
         versionKey,
-        carrierType: carrierType as CarrierType | null,
+        carrierTypeId: resolvedCarrierTypeId,
+        carrierType: resolvedCarrierType,
         mediaType: mediaType as MediaType | null,
         rentalMonths,
         minQuantity,
@@ -75,6 +109,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         validFrom: validFromDate,
         validTo,
         isActive,
+      },
+      include: {
+        carrierTypeRef: {
+          select: { id: true, code: true, name: true, icon: true, color: true },
+        },
       },
     });
 

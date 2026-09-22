@@ -93,11 +93,39 @@ export async function POST(req: Request) {
     const clientId = String(formData.get('clientId') || '').trim() || null;
     const newClientName = String(formData.get('newClientName') || '').trim().slice(0, 160) || null;
 
+    const carrierTypeId = String(formData.get('carrierTypeId') || '').trim() || null;
+    let resolvedCarrierTypeId: string | null = carrierTypeId;
+    let resolvedCarrierType: CarrierType = type;
+
+    if (resolvedCarrierTypeId) {
+      const oct = await prisma.organizationCarrierType.findUnique({
+        where: { id: resolvedCarrierTypeId },
+        select: { id: true, code: true, legacyEnumValue: true },
+      });
+      if (oct) {
+        resolvedCarrierTypeId = oct.id;
+        if (oct.legacyEnumValue && allowedCarrierTypes.has(oct.legacyEnumValue)) {
+          resolvedCarrierType = oct.legacyEnumValue as CarrierType;
+        }
+      }
+    } else {
+      const oct = await prisma.organizationCarrierType.findFirst({
+        where: {
+          OR: [{ legacyEnumValue: type }, { code: type }],
+          active: true,
+        },
+        select: { id: true },
+      });
+      if (oct) {
+        resolvedCarrierTypeId = oct.id;
+      }
+    }
+
     if (!name) {
       return jsonError('NAME_REQUIRED', 'Zadejte název nové reklamní plochy / nosiče.', 400);
     }
     if (!city) return jsonError('CITY_REQUIRED', 'Zadejte město nebo obec.', 400);
-    if (!allowedCarrierTypes.has(type)) return jsonError('INVALID_CARRIER_TYPE', 'Vyberte platný typ nosiče.', 400);
+    if (!resolvedCarrierTypeId && !allowedCarrierTypes.has(type)) return jsonError('INVALID_CARRIER_TYPE', 'Vyberte platný typ nosiče.', 400);
     if (!allowedMountingTypes.has(mountingType)) return jsonError('INVALID_MOUNTING_TYPE', 'Vyberte platný typ montáže.', 400);
 
     const coordinates = parseRequiredCoordinates(formData.get('latitude'), formData.get('longitude'));
@@ -184,7 +212,8 @@ export async function POST(req: Request) {
           organizationId,
           name,
           code,
-          type,
+          type: resolvedCarrierType,
+          carrierTypeId: resolvedCarrierTypeId,
           mountingType,
           status: 'ACTIVE',
           city,
@@ -220,6 +249,7 @@ export async function POST(req: Request) {
           data: {
             organizationId,
             carrierId: carrier.id,
+            carrierTypeId: resolvedCarrierTypeId,
             name: sc.name,
             sidePosition: sc.side,
             mediaType,

@@ -47,6 +47,15 @@ const photoMetadataSelect = {
 } satisfies Prisma.PhotoSelect;
 
 export const carrierInclude = {
+  carrierTypeRef: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      icon: true,
+      color: true,
+    },
+  },
   surfaces: {
     include: {
       currentClient: true,
@@ -70,6 +79,15 @@ export const carrierInclude = {
 
 function carrierOverviewInclude(asOf: Date, mapOnly = false) {
   return {
+    carrierTypeRef: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        icon: true,
+        color: true,
+      },
+    },
     surfaces: {
       include: {
         currentClient: true,
@@ -101,7 +119,7 @@ type OccupancyRow = Prisma.OccupancyGetPayload<Record<string, never>>;
 
 export type SurfaceTemplate = { name: string; mediaType: Surface['mediaType']; orientation?: string };
 export type CarrierArchiveInput = { archivedBy?: string; archiveReason?: string };
-export type CarrierFilters = { q?: string; carrierType?: CarrierType; mediaType?: MediaType; city?: string; locality?: string; street?: string; client?: string; surfaceStatus?: SurfaceStatus; gps?: 'missing' | 'present' | GpsStatus; photo?: 'missing' | 'present'; damage?: 'missing' | 'present'; description?: 'missing' | 'present'; occupancy?: 'missing' | 'present'; archived?: 'active' | 'archived' | 'all'; importBatchId?: string; page?: number; pageSize?: number };
+export type CarrierFilters = { q?: string; carrierType?: CarrierType; carrierTypeId?: string; mediaType?: MediaType; city?: string; locality?: string; street?: string; client?: string; surfaceStatus?: SurfaceStatus; gps?: 'missing' | 'present' | GpsStatus; photo?: 'missing' | 'present'; damage?: 'missing' | 'present'; description?: 'missing' | 'present'; occupancy?: 'missing' | 'present'; archived?: 'active' | 'archived' | 'all'; importBatchId?: string; page?: number; pageSize?: number };
 export type CarrierResultMeta = { total: number; returned: number; limit: number; page: number; pageSize: number; hasMore: boolean; missingGpsCount: number; archivedCount: number };
 export type CarrierFilterOptions = { cities: string[]; localities: string[]; streets: string[]; clients: string[]; importBatches: { id: string; label: string }[] };
 
@@ -139,6 +157,16 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
     name: carrier.name,
     code: carrier.code,
     type: carrier.type,
+    carrierTypeId: carrier.carrierTypeId ?? undefined,
+    carrierTypeRef: carrier.carrierTypeRef
+      ? {
+          id: carrier.carrierTypeRef.id,
+          code: carrier.carrierTypeRef.code,
+          name: carrier.carrierTypeRef.name,
+          icon: carrier.carrierTypeRef.icon ?? undefined,
+          color: carrier.carrierTypeRef.color ?? undefined,
+        }
+      : undefined,
     latitude: carrier.latitude ?? undefined,
     longitude: carrier.longitude ?? undefined,
     gpsStatus: carrier.gpsStatus,
@@ -251,7 +279,9 @@ export function buildCarrierWhere(filters: CarrierFilters = {}): Prisma.Advertis
   }
 
   // 2. Carrier Type
-  if (filters.carrierType) {
+  if (filters.carrierTypeId) {
+    andConditions.push({ carrierTypeId: filters.carrierTypeId });
+  } else if (filters.carrierType) {
     andConditions.push({ type: filters.carrierType });
   }
 
@@ -522,7 +552,7 @@ export async function checkOccupancyConflicts(surfaceIds: string[], dateFromInpu
   return allConflicts;
 }
 export function hasBlockingConflict(conflicts: OccupancyConflict[]) { return conflicts.some((conflict) => conflict.severity === 'block'); }
-export async function upsertCarrier(input: Partial<Carrier>, surfaceTemplates: SurfaceTemplate[] = []): Promise<Carrier> { const existing = input.id ? await prisma.advertisingCarrier.findUnique({ where: { id: input.id } }) : null; const latitude = input.latitude ?? existing?.latitude ?? null; const longitude = input.longitude ?? existing?.longitude ?? null; const data = { name: input.name ?? existing?.name ?? 'Novy nosic', code: input.code ?? existing?.code ?? `NEW-${Date.now()}`, type: input.type ?? existing?.type ?? 'BILLBOARD', latitude, longitude, gpsStatus: input.gpsStatus ?? existing?.gpsStatus ?? (latitude === null || longitude === null ? 'MISSING' : 'UNVERIFIED'), street: input.street ?? existing?.street ?? null, address: input.address ?? existing?.address ?? null, locality: input.locality ?? existing?.locality ?? null, city: input.city ?? existing?.city ?? 'Praha', region: input.region ?? existing?.region ?? null, cadastralArea: input.cadastralArea ?? existing?.cadastralArea ?? null, structureCode: input.structureCode ?? existing?.structureCode ?? null, mountingType: input.mountingType ?? existing?.mountingType ?? 'UNKNOWN', status: input.status ?? existing?.status ?? 'ACTIVE', description: input.description ?? existing?.description ?? null, placementDescription: input.placementDescription ?? existing?.placementDescription ?? null, note: input.note ?? existing?.note ?? null, sourceSystem: input.sourceSystem ?? existing?.sourceSystem ?? null, sourceSheet: input.sourceSheet ?? existing?.sourceSheet ?? null, sourceRow: input.sourceRow ?? existing?.sourceRow ?? null }; const saved = existing ? await prisma.advertisingCarrier.update({ where: { id: existing.id }, data }) : await prisma.advertisingCarrier.create({ data: { ...data, id: input.id, surfaces: surfaceTemplates.length ? { create: surfaceTemplates.map((surface) => ({ name: surface.name, mediaType: surface.mediaType, orientation: surface.orientation ?? null, status: 'AVAILABLE' })) } : undefined } }); return (await getCarrier(saved.id))!; }
+export async function upsertCarrier(input: Partial<Carrier>, surfaceTemplates: SurfaceTemplate[] = []): Promise<Carrier> { const existing = input.id ? await prisma.advertisingCarrier.findUnique({ where: { id: input.id } }) : null; const latitude = input.latitude ?? existing?.latitude ?? null; const longitude = input.longitude ?? existing?.longitude ?? null; const data = { name: input.name ?? existing?.name ?? 'Novy nosic', code: input.code ?? existing?.code ?? `NEW-${Date.now()}`, type: input.type ?? existing?.type ?? 'BILLBOARD', carrierTypeId: input.carrierTypeId ?? existing?.carrierTypeId ?? null, latitude, longitude, gpsStatus: input.gpsStatus ?? existing?.gpsStatus ?? (latitude === null || longitude === null ? 'MISSING' : 'UNVERIFIED'), street: input.street ?? existing?.street ?? null, address: input.address ?? existing?.address ?? null, locality: input.locality ?? existing?.locality ?? null, city: input.city ?? existing?.city ?? 'Praha', region: input.region ?? existing?.region ?? null, cadastralArea: input.cadastralArea ?? existing?.cadastralArea ?? null, structureCode: input.structureCode ?? existing?.structureCode ?? null, mountingType: input.mountingType ?? existing?.mountingType ?? 'UNKNOWN', status: input.status ?? existing?.status ?? 'ACTIVE', description: input.description ?? existing?.description ?? null, placementDescription: input.placementDescription ?? existing?.placementDescription ?? null, note: input.note ?? existing?.note ?? null, sourceSystem: input.sourceSystem ?? existing?.sourceSystem ?? null, sourceSheet: input.sourceSheet ?? existing?.sourceSheet ?? null, sourceRow: input.sourceRow ?? existing?.sourceRow ?? null }; const saved = existing ? await prisma.advertisingCarrier.update({ where: { id: existing.id }, data }) : await prisma.advertisingCarrier.create({ data: { ...data, id: input.id, surfaces: surfaceTemplates.length ? { create: surfaceTemplates.map((surface) => ({ name: surface.name, mediaType: surface.mediaType, orientation: surface.orientation ?? null, status: 'AVAILABLE' })) } : undefined } }); return (await getCarrier(saved.id))!; }
 export async function archiveCarrier(id: string, input: CarrierArchiveInput = {}) { await prisma.advertisingCarrier.update({ where: { id }, data: { archivedAt: new Date(), archivedBy: input.archivedBy?.trim() || null, archiveReason: input.archiveReason?.trim() || null, status: 'INACTIVE' } }); return (await getCarrier(id))!; }
 export async function restoreCarrier(id: string) { await prisma.advertisingCarrier.update({ where: { id }, data: { archivedAt: null, archivedBy: null, archiveReason: null, status: 'ACTIVE' } }); return (await getCarrier(id))!; }
 export async function deleteCarrier(id: string) { const linked = await prisma.advertisingCarrier.findUnique({ where: { id }, select: { _count: { select: { surfaces: true, photos: true, workItems: true } } } }); if (!linked) return; if (linked._count.surfaces > 0 || linked._count.photos > 0 || linked._count.workItems > 0) throw new Error('Nosic ma navazane plochy, fotky nebo praci. Pouzijte archivaci.'); await prisma.advertisingCarrier.delete({ where: { id } }); }

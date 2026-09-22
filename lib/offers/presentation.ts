@@ -135,7 +135,8 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
 
   const carriers: ProposalCarrier[] = offer.items.map((item, index) => {
     const key = mediaKey(item.surface.mediaType);
-    const meta = MEDIA_TYPE_META[key];
+    const meta = MEDIA_TYPE_META[key] || { label: item.surface.carrierTypeRef?.name || key, tone: 'blue', image: '/offer/media-city-poster.png' };
+    const label = item.surface.carrierTypeRef?.name || meta.label;
     const carrier = item.surface.carrier;
     const photos = item.surface.photos.filter((photo) => photo.isClientVisible === true);
     return {
@@ -148,7 +149,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       dimensions: item.surface.size || item.surface.orientation || 'dle specifikace plochy',
       status: item.surface.status || 'AVAILABLE',
       image: photos[0]?.url || meta.image,
-      imageAlt: photos[0]?.note || `${meta.label} ${carrier.code}`,
+      imageAlt: photos[0]?.note || `${label} ${carrier.code}`,
       latitude: carrier.latitude,
       longitude: carrier.longitude,
       mapX: 12 + ((index * 23) % 76),
@@ -210,13 +211,14 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   }
 
   const mediaMix = [...grouped].map(([key, items]): ProposalMediaType => {
-    const meta = MEDIA_TYPE_META[key];
+    const meta = MEDIA_TYPE_META[key] || { label: items[0]?.surface.carrierTypeRef?.name || key, tone: 'blue', image: '/offer/media-city-poster.png' };
+    const label = items[0]?.surface.carrierTypeRef?.name || meta.label;
     return {
       key,
-      name: meta.label,
-      description: `Vybrané plochy typu ${meta.label} v lokalitách ${[...new Set(items.map((item) => item.surface.carrier.city))].join(', ')}.`,
+      name: label,
+      description: `Vybrané plochy typu ${label} v lokalitách ${[...new Set(items.map((item) => item.surface.carrier.city))].join(', ')}.`,
       image: items.flatMap((item) => item.surface.photos).find((photo) => photo.isClientVisible === true)?.url || meta.image,
-      imageAlt: `${meta.label} v nabídce`,
+      imageAlt: `${label} v nabídce`,
       tone: meta.tone,
       surfaceCount: items.length,
       locationCount: new Set(items.map((item) => item.surface.carrier.city)).size,

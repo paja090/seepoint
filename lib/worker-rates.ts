@@ -18,6 +18,7 @@ export function parseRateInput(input: Record<string, unknown>) {
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Měna musí být třípísmenný ISO kód.');
   return { type, workType, name, amount: new Prisma.Decimal(amountText), currency, validFrom, validTo,
     unit: typeof input.unit === 'string' ? input.unit.trim() || null : null,
+    carrierTypeLabel: typeof input.carrierTypeLabel === 'string' ? input.carrierTypeLabel.trim() || null : null,
     note: typeof input.note === 'string' ? input.note.trim() || null : null };
 }
 

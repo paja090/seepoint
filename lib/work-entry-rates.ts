@@ -9,9 +9,21 @@ export async function resolveWorkEntryRate(params: {
   remunerationMethod: RateType;
   workOrderId?: string | null;
   carrierType?: CarrierType | null;
+  carrierTypeId?: string | null;
 }, tx?: Prisma.TransactionClient) {
-  const { employeeId, workType, workDate, remunerationMethod, workOrderId, carrierType } = params;
+  const { employeeId, workType, workDate, remunerationMethod, workOrderId, carrierType, carrierTypeId } = params;
   const client = tx || prisma;
+
+  let effectiveCarrierType = carrierType;
+  if (!effectiveCarrierType && carrierTypeId) {
+    const oct = await client.organizationCarrierType.findUnique({
+      where: { id: carrierTypeId },
+      select: { legacyEnumValue: true },
+    });
+    if (oct?.legacyEnumValue && Object.values(CarrierType).includes(oct.legacyEnumValue as CarrierType)) {
+      effectiveCarrierType = oct.legacyEnumValue as CarrierType;
+    }
+  }
 
   // 1. Employee-specific rate
   const employeeRates = await client.employeeRate.findMany({
@@ -29,7 +41,7 @@ export async function resolveWorkEntryRate(params: {
   });
 
   // Filter with workType and carrierType priorities
-  const resolvedEmployeeRate = selectRateAtDate(employeeRates, workType, carrierType || null, workDate);
+  const resolvedEmployeeRate = selectRateAtDate(employeeRates, workType, effectiveCarrierType || null, workDate);
   if (resolvedEmployeeRate) {
     return {
       amount: resolvedEmployeeRate.amount,
@@ -55,7 +67,7 @@ export async function resolveWorkEntryRate(params: {
       orderBy: { validFrom: 'desc' }
     });
 
-    const resolvedWorkOrderRate = selectRateAtDate(workOrderRates, workType, carrierType || null, workDate);
+    const resolvedWorkOrderRate = selectRateAtDate(workOrderRates, workType, effectiveCarrierType || null, workDate);
     if (resolvedWorkOrderRate) {
       return {
         amount: resolvedWorkOrderRate.amount,
@@ -80,7 +92,7 @@ export async function resolveWorkEntryRate(params: {
     orderBy: { validFrom: 'desc' }
   });
 
-  const resolvedCompanyRate = selectRateAtDate(companyRates, workType, carrierType || null, workDate);
+  const resolvedCompanyRate = selectRateAtDate(companyRates, workType, effectiveCarrierType || null, workDate);
   if (resolvedCompanyRate) {
     return {
       amount: resolvedCompanyRate.amount,

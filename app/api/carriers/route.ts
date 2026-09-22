@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { parseCarrierFilters } from '@/lib/carrier-filters';
-import { getCarriersPage, upsertCarrier, type SurfaceTemplate } from '@/lib/db';
+import { prisma, getCarriersPage, upsertCarrier, type SurfaceTemplate } from '@/lib/db';
 import type { Carrier, Surface } from '@/lib/types';
 
 const allowedMediaTypes = new Set<Surface['mediaType']>(['BILLBOARD', 'PROMO_BENCH', 'PROMO_HORIZON', 'CITY_POSTER', 'NAVIGATION_SIGN', 'PROMO_TOWER', 'PROMO_MINITOWER']);
@@ -35,7 +35,42 @@ export async function POST(req: Request) {
       if (!name) return NextResponse.json({ error: 'Nazev reklamni plochy nesmi byt prazdny.' }, { status: 400 });
       surfaceTemplates.push({ name, mediaType: template.mediaType, orientation: orientation || undefined });
     }
-    return NextResponse.json(await upsertCarrier({ ...carrierInput, gpsStatus: hasLatitude && hasLongitude ? carrierInput.gpsStatus ?? 'UNVERIFIED' : 'MISSING' }, surfaceTemplates), { status: 201 });
+
+    let carrierTypeId = carrierInput.carrierTypeId;
+    let carrierType = carrierInput.type;
+    if (carrierTypeId && !carrierType) {
+      const oct = await prisma.organizationCarrierType.findUnique({
+        where: { id: carrierTypeId },
+        select: { legacyEnumValue: true },
+      });
+      if (oct?.legacyEnumValue) {
+        carrierType = oct.legacyEnumValue as Carrier['type'];
+      }
+    } else if (!carrierTypeId && carrierType) {
+      const oct = await prisma.organizationCarrierType.findFirst({
+        where: {
+          OR: [{ legacyEnumValue: carrierType }, { code: carrierType }],
+          active: true,
+        },
+        select: { id: true },
+      });
+      if (oct) {
+        carrierTypeId = oct.id;
+      }
+    }
+
+    return NextResponse.json(
+      await upsertCarrier(
+        {
+          ...carrierInput,
+          type: carrierType,
+          carrierTypeId,
+          gpsStatus: hasLatitude && hasLongitude ? carrierInput.gpsStatus ?? 'UNVERIFIED' : 'MISSING',
+        },
+        surfaceTemplates,
+      ),
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return NextResponse.json({ error: 'Nosic s timto internim kodem uz existuje.' }, { status: 409 });
     console.error('[api/carriers] create failed', error);
