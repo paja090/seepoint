@@ -49,9 +49,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const updated = await prisma.$transaction(async (tx) => {
       for (const item of report.items) {
         if (!item.isVisible) continue;
+        const currentCustomDirection =
+          item.snapshot && typeof item.snapshot === 'object' && 'direction' in item.snapshot
+            ? String((item.snapshot as Record<string, unknown>).direction || '')
+            : item.navigationPoint?.orientation || null;
         const snapshotData = buildSnapshotItem({
           id: item.id,
           clientNote: item.clientNote,
+          customDirection: currentCustomDirection,
           navigationPoint: item.navigationPoint,
           carrier: item.carrier,
           selectedPhoto: item.selectedPhoto,
