@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, generateSecureToken, runPrePublishChecks } from '@/lib/navigation-documentation';
+import { buildSnapshotItem, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -34,14 +34,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const warnings = runPrePublishChecks(report.client.email, report.items, report.periodFrom);
+    const visibleWithPhoto = report.items.filter((item) => item.isVisible && item.selectedPhoto?.url);
+    if (visibleWithPhoto.length === 0) {
+      return NextResponse.json({
+        error: 'Report musí obsahovat alespoň jednu viditelnou položku s fotografií.',
+        warnings,
+      }, { status: 422 });
+    }
     const blockers = warnings.filter((warning) =>
-      warning.type === 'EMPTY_REPORT' || warning.type === 'MISSING_PHOTO' || warning.type === 'UNAPPROVED_PHOTO',
+      warning.type === 'EMPTY_REPORT' || warning.type === 'UNAPPROVED_PHOTO',
     );
     if (blockers.length > 0) {
       return NextResponse.json({ error: 'Report nesplňuje podmínky pro publikování.', warnings }, { status: 422 });
     }
 
-    const { token, hash } = generateSecureToken();
+    const { token, hash } = getDeterministicReportToken(id);
 
     // Freeze snapshot for each item
     const publishedAt = new Date();

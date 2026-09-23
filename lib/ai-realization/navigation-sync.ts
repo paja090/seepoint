@@ -26,8 +26,8 @@ export interface NavigationDiffResult {
 export function computeNavigationDiff(
   offerTargets: Array<{ id: string; stableKey?: string | null; name: string; latitude: number; longitude: number; address?: string | null }>,
   orderTargets: Array<{ id: string; sourceOfferTargetId?: string | null; stableKey?: string | null; name: string; latitude: number; longitude: number; address?: string | null }>,
-  offerPoints: Array<{ id: string; stableKey?: string | null; label: string; latitude: number; longitude: number; unitPrice?: unknown; subtotal?: unknown }>,
-  orderPoints: Array<{ id: string; sourceOfferPointKey?: string | null; sourceOfferPointId?: string | null; label: string; latitude: number; longitude: number; status: string; unitPrice?: unknown }>
+  offerPoints: Array<{ id: string; stableKey?: string | null; label: string; latitude: number; longitude: number; unitPrice?: unknown; subtotal?: unknown; variant?: string | null; navigationType?: string | null }>,
+  orderPoints: Array<{ id: string; sourceOfferPointKey?: string | null; sourceOfferPointId?: string | null; label: string; latitude: number; longitude: number; status: string; unitPrice?: unknown; variant?: string | null; navigationType?: string | null }>
 ): NavigationDiffResult {
   const addedTargets: NavigationDiffResult['addedTargets'] = [];
   const removedTargets: NavigationDiffResult['removedTargets'] = [];
@@ -76,6 +76,12 @@ export function computeNavigationDiff(
       if (Math.abs(matched.longitude - op.longitude) > 0.0001) changes.longitude = { from: matched.longitude, to: op.longitude };
       if (Number(matched.unitPrice || 0) !== Number(op.unitPrice || 0)) {
         changes.unitPrice = { from: matched.unitPrice, to: op.unitPrice };
+      }
+      if (op.variant !== undefined && matched.variant !== op.variant) {
+        changes.variant = { from: matched.variant, to: op.variant };
+      }
+      if (op.navigationType !== undefined && matched.navigationType !== op.navigationType) {
+        changes.navigationType = { from: matched.navigationType, to: op.navigationType };
       }
       if (Object.keys(changes).length > 0) {
         modifiedPoints.push({ id: matched.id, label: op.label, changes });
