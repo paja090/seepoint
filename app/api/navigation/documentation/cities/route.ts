@@ -17,9 +17,30 @@ export async function GET(request: Request) {
 
   const client = await prisma.client.findFirst({
     where: { id: clientId, organizationId: auth.organizationId, active: true },
-    select: { id: true },
+    select: { id: true, companyId: true, name: true },
   });
   if (!client) return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
+
+  const [mergeLogs, companyClients] = await Promise.all([
+    prisma.clientMergeLog.findMany({
+      where: { targetClientId: clientId },
+      select: { sourceClientId: true },
+    }),
+    client.companyId
+      ? prisma.client.findMany({
+          where: { organizationId: auth.organizationId, companyId: client.companyId },
+          select: { id: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const allClientIds = Array.from(
+    new Set([
+      clientId,
+      ...mergeLogs.map((m) => m.sourceClientId),
+      ...companyClients.map((c) => c.id),
+    ]),
+  );
 
   const citiesSet = new Set<string>();
 
@@ -28,8 +49,8 @@ export async function GET(request: Request) {
     where: {
       organizationId: auth.organizationId,
       OR: [
-        { navigationOrder: { crmOrder: { clientId } } },
-        { navigationOffer: { offer: { clientId } } },
+        { navigationOrder: { crmOrder: { clientId: { in: allClientIds } } } },
+        { navigationOffer: { offer: { clientId: { in: allClientIds } } } },
       ],
       status: { notIn: ['REMOVED', 'CANCELLED'] },
     },
@@ -65,8 +86,8 @@ export async function GET(request: Request) {
       surfaces: {
         some: {
           OR: [
-            { currentClientId: clientId },
-            { occupancies: { some: { clientId } } },
+            { currentClientId: { in: allClientIds } },
+            { occupancies: { some: { clientId: { in: allClientIds } } } },
           ],
         },
       },

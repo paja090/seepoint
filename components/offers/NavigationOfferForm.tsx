@@ -273,9 +273,14 @@ export function NavigationOfferForm({
           ? String(point.productionPrice)
           : '600';
 
-        const pointVariant = point.variant && String(point.variant).trim() && String(point.variant) !== '120x80 cm'
-          ? String(point.variant)
+        const rawVariant = point.variant && String(point.variant).trim()
+          ? String(point.variant).trim()
           : defaultCityVariant;
+        const pointVariant = rawVariant === '670x900 mm'
+          ? '670 × 900 mm'
+          : rawVariant === '120x80 cm'
+            ? '120 × 80 cm'
+            : rawVariant;
 
         const resolvedTargetId = typeof point.targetId === 'string' && point.targetId.trim()
           ? point.targetId
@@ -329,7 +334,6 @@ export function NavigationOfferForm({
           !p.variant ||
           p.variant === '670x900 mm' ||
           p.variant === '670 × 900 mm' ||
-          p.variant === '120x80 cm' ||
           p.variant.includes('půlkruh');
         return isOldDefault ? { ...p, variant: newDefaultVariant } : p;
       })
@@ -1790,6 +1794,14 @@ export function NavigationOfferForm({
                           className="rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-sky-100 hover:border-sky-300"
                         >
                           120 × 80 cm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPoints((current) => current.map((p) => ({ ...p, variant: point.variant })))}
+                          className="rounded-md border border-sky-300 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700 hover:bg-sky-100"
+                          title="Nastaví tento rozměr pro všechny navigační body v nabídce"
+                        >
+                          ↳ Použít pro všechny body
                         </button>
                       </div>
                     </div>

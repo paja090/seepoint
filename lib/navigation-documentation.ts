@@ -6,6 +6,15 @@ export function generateSecureToken() {
   return { token, hash };
 }
 
+export function getDeterministicReportToken(
+  reportId: string,
+  secret = process.env.NEXTAUTH_SECRET || process.env.CRON_SECRET || 'seepoint-navdoc-token-salt-2026',
+): { token: string; hash: string } {
+  const token = crypto.createHmac('sha256', secret).update(`navdoc:${reportId}`).digest('hex');
+  const hash = hashToken(token);
+  return { token, hash };
+}
+
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }

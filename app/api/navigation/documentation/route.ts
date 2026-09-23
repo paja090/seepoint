@@ -79,18 +79,44 @@ export async function POST(request: Request) {
       throw new NavigationDocumentationValidationError('Období reportu není platné.');
     }
 
-    const client = await prisma.client.findFirst({ where: { id: clientId, organizationId: auth.organizationId, active: true } });
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, organizationId: auth.organizationId, active: true },
+      select: { id: true, name: true, companyId: true },
+    });
     if (!client) {
       return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
     }
 
+    const [mergeLogs, companyClients] = await Promise.all([
+      prisma.clientMergeLog.findMany({
+        where: { targetClientId: clientId },
+        select: { sourceClientId: true },
+      }),
+      client.companyId
+        ? prisma.client.findMany({
+            where: { organizationId: auth.organizationId, companyId: client.companyId },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const allClientIds = Array.from(
+      new Set([
+        clientId,
+        ...mergeLogs.map((m) => m.sourceClientId),
+        ...companyClients.map((c) => c.id),
+      ]),
+    );
+
     if (offerId) {
-      const offer = await prisma.offer.findFirst({ where: { id: offerId, organizationId: auth.organizationId, clientId, archivedAt: null } });
+      const offer = await prisma.offer.findFirst({
+        where: { id: offerId, organizationId: auth.organizationId, clientId: { in: allClientIds }, archivedAt: null },
+      });
       if (!offer) return NextResponse.json({ error: 'Nabídka nepatří vybranému klientovi.' }, { status: 400 });
     }
     if (navigationOfferId) {
       const navigationOffer = await prisma.navigationOffer.findFirst({
-        where: { id: navigationOfferId, organizationId: auth.organizationId, offer: { clientId } },
+        where: { id: navigationOfferId, organizationId: auth.organizationId, offer: { clientId: { in: allClientIds } } },
       });
       if (!navigationOffer) return NextResponse.json({ error: 'Navigační nabídka nepatří vybranému klientovi.' }, { status: 400 });
     }
@@ -114,7 +140,7 @@ export async function POST(request: Request) {
         organizationId: auth.organizationId,
         navigationOrder: {
           crmOrder: {
-            clientId,
+            clientId: { in: allClientIds },
             ...(offerId ? { offerId } : {}),
           },
         },
@@ -146,7 +172,7 @@ export async function POST(request: Request) {
       points = await prisma.navigationPoint.findMany({
         where: {
           organizationId: auth.organizationId,
-          navigationOffer: { offer: { clientId, ...(offerId ? { id: offerId } : {}) } },
+          navigationOffer: { offer: { clientId: { in: allClientIds }, ...(offerId ? { id: offerId } : {}) } },
           status: { notIn: ['REMOVED', 'CANCELLED'] },
         },
         include: {
@@ -200,13 +226,14 @@ export async function POST(request: Request) {
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
 
+        const hasPhoto = availablePhotos.length > 0;
         return {
           navigationPointId: point.id,
           carrierId: point.carrierId ?? undefined,
           selectedPhotoId: availablePhotos[0]?.id ?? undefined,
           customDirection: extractDirection(point, point.carrier),
           sortOrder: index,
-          isVisible: true,
+          isVisible: hasPhoto,
         };
       });
     } else {
@@ -218,8 +245,8 @@ export async function POST(request: Request) {
           surfaces: {
             some: {
               OR: [
-                { currentClientId: clientId },
-                { occupancies: { some: { clientId } } },
+                { currentClientId: { in: allClientIds } },
+                { occupancies: { some: { clientId: { in: allClientIds } } } },
               ],
             },
           },
@@ -260,12 +287,13 @@ export async function POST(request: Request) {
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
 
+        const hasPhoto = availablePhotos.length > 0;
         return {
           carrierId: carrier.id,
           selectedPhotoId: availablePhotos[0]?.id ?? undefined,
           customDirection: extractDirection(null, carrier),
           sortOrder: index,
-          isVisible: true,
+          isVisible: hasPhoto,
         };
       });
     }

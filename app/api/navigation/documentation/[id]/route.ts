@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, runPrePublishChecks } from '@/lib/navigation-documentation';
+import { buildSnapshotItem, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
 import {
+  isPublicNavigationReportStatus,
   NavigationDocumentationValidationError,
   parseOptionalText,
   parseQuarter,
@@ -69,7 +70,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     };
   });
 
-  return NextResponse.json({ ...report, items, warnings: runPrePublishChecks(report.client.email, items, report.periodFrom) });
+  const { token, hash } = getDeterministicReportToken(report.id);
+  const isPublic = isPublicNavigationReportStatus(report.status);
+  const publicUrl = isPublic ? `/client/navigation-documentation/${token}` : null;
+
+  if (isPublic && report.publicTokenHash !== hash) {
+    await prisma.navigationDocumentationReport.update({
+      where: { id: report.id },
+      data: { publicTokenHash: hash },
+    });
+  }
+
+  return NextResponse.json({
+    ...report,
+    items,
+    token: isPublic ? token : null,
+    publicUrl,
+    warnings: runPrePublishChecks(report.client.email, items, report.periodFrom),
+  });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

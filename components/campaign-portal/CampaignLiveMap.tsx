@@ -22,6 +22,7 @@ export interface NavigationMapPointInput {
   sitePhotoUrl?: string | null;
   installedPhotoUrl?: string | null;
   navigationType?: string | null;
+  variant?: string | null;
 }
 
 export interface NavigationTargetInput {
@@ -255,11 +256,15 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
             popupAnchor: [0, -14],
           });
 
+          const rawVariant = point.variant ? point.variant.trim() : '';
+          const normalizedVariant = rawVariant === '670x900 mm' ? '670 × 900 mm' : rawVariant === '120x80 cm' ? '120 × 80 cm' : rawVariant;
+          const variantBadge = normalizedVariant ? ` · ${normalizedVariant}` : '';
+
           const popupContent = `
             <div style="font-family: sans-serif; min-width: 220px; max-width: 280px;">
               ${photo ? `<img src="${photo}" style="width: 100%; height: 115px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0;" />` : ''}
               <div style="font-size: 10px; font-weight: 800; color: #009EE2; text-transform: uppercase;">
-                ${point.pillarNumber ? `SLOUP VO ${point.pillarNumber}` : `BOD ${index + 1}`} · ${point.navigationType || 'SMĚROVÁ TABULE'}
+                ${point.pillarNumber ? `SLOUP VO ${point.pillarNumber}` : `BOD ${index + 1}`} · ${point.navigationType || 'SMĚROVÁ TABULE'}${variantBadge}
               </div>
               <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-top: 2px;">
                 ${point.address || point.label}

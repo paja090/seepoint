@@ -122,6 +122,10 @@ export function NavigationDocumentationAdmin({
           warnings: data.warnings || [],
           auditLogs: data.auditLogs || [],
         });
+        if (data.publicUrl && data.token) {
+          setPublishResult({ publicUrl: data.publicUrl, token: data.token });
+          setCurrentToken(data.token);
+        }
       }
     } finally {
       setLoadingDetail(false);
@@ -220,6 +224,12 @@ export function NavigationDocumentationAdmin({
       setSaveFeedback({ ok: false, message: 'Nejprve report zkontrolujte a publikujte. Teprve potom lze vytvořit klientský odkaz a odeslat e-mail.' });
       return;
     }
+
+    if (currentToken) {
+      setShowEmailModal(true);
+      return;
+    }
+
     setLoadingToken(true);
     setSaveFeedback(null);
 
@@ -227,7 +237,7 @@ export function NavigationDocumentationAdmin({
       const response = await fetch(`/api/navigation/documentation/${activeReportId}/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate' }),
+        body: JSON.stringify({ action: 'get' }),
       });
       const data = await response.json();
       if (response.ok && data.token) {

@@ -515,7 +515,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             title: point.label || `Sloup VO ${point.pillarNumber || idx + 1}`,
             carrierCode: point.pillarNumber ? `VO ${point.pillarNumber}` : `BOD ${idx + 1}`,
             address: point.address || offer.navigation?.city || 'Ostrava',
-            format: point.variant || point.navigationType || 'Směrová tabule',
+            format: point.variant || (offer.navigation?.city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm'),
             isInstallation: true,
             badgeText: '✓ Osazeno na sloupu VO (Proof of Play)',
             badgeColor: 'bg-emerald-500/90 text-white border-emerald-400',
@@ -975,8 +975,14 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                     const isPointInstalled = point.status === 'INSTALLED' || Boolean(point.installedPhotoUrl);
                     const arrowText = formatArrowText(point.arrowDirectionEnum);
                     const distText = formatDistanceText(point);
-                    const pointTarget = (offer.navigation?.targets || []).find((t: { id: string }) => t.id === point.navigationTargetId || t.id === point.targetId) || navTarget;
-                    const panelVariant = point.variant || (offer.navigation?.city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm');
+                    const rawVariant = point.variant || (offer.navigation?.city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm');
+                    const panelVariant = rawVariant === '670x900 mm' ? '670 × 900 mm' : rawVariant === '120x80 cm' ? '120 × 80 cm' : rawVariant;
+                    const targetId = point.navigationTargetId || point.targetId;
+                    const pointTarget =
+                      offer.navigation?.targets?.find((t) => t.id === targetId || t.stableKey === targetId) ||
+                      (offer.navigation?.targetName
+                        ? { name: offer.navigation.targetName, address: offer.navigation.targetAddress }
+                        : null);
 
                     return (
                       <tr key={point.id || idx} className="hover:bg-slate-50/50 transition">

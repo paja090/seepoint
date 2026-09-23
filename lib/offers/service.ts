@@ -358,13 +358,19 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
             : `/api/photos/${effectiveInstalledPhotoId}/thumbnail`;
         }
 
+        const cityDefaultVariant = row.navigationOffer?.city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm';
+        let effectiveVariant = point.variant || orderPoint?.variant || cityDefaultVariant;
+        if (effectiveVariant === '670x900 mm') effectiveVariant = '670 × 900 mm';
+        if (effectiveVariant === '120x80 cm') effectiveVariant = '120 × 80 cm';
+        const effectiveNavigationType = point.navigationType || orderPoint?.navigationType || 'Směrová tabule';
+
         return {
           id: point.id,
           stableKey: point.stableKey,
           navigationTargetId: point.navigationTargetId,
           targetId: point.navigationTargetId,
-          navigationType: point.navigationType,
-          variant: point.variant,
+          navigationType: effectiveNavigationType,
+          variant: effectiveVariant,
           orientation: point.orientation,
           label: point.label,
           latitude: point.latitude,
