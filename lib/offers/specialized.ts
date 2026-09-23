@@ -81,7 +81,7 @@ export function parseNavigationOfferInput(raw: unknown) {
 
     const pointId = text(point.id) || null;
     const pointStableKey = text(point.stableKey) || pointId || null;
-    const navTargetId = text(point.navigationTargetId) || null;
+    const navTargetId = text(point.navigationTargetId) || text((point as { targetId?: unknown }).targetId) || null;
 
     return {
       id: pointId,
@@ -563,7 +563,21 @@ export async function updateCityGalleryOffer(user: CurrentUser, offerId: string,
 
 export async function getSpecializedOfferOptions() {
   const [clients, projects] = await Promise.all([
-    prisma.client.findMany({ where: { active: true }, select: { id: true, name: true, contactPerson: true, email: true, phone: true }, orderBy: { name: 'asc' } }),
+    prisma.client.findMany({
+      where: { active: true },
+      select: {
+        id: true,
+        name: true,
+        contactPerson: true,
+        email: true,
+        phone: true,
+        branches: {
+          where: { active: true },
+          select: { id: true, name: true, street: true, city: true, zip: true },
+        },
+      },
+      orderBy: { name: 'asc' },
+    }),
     prisma.cityGalleryProject.findMany({ where: { status: { not: 'ARCHIVED' } }, select: { id: true, title: true, city: true, status: true }, orderBy: { updatedAt: 'desc' } }),
   ]);
   return { clients, projects };

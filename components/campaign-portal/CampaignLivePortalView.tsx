@@ -55,15 +55,33 @@ function formatArrowText(direction?: string | null): string {
       return '➡️ Doprava';
     case 'LEFT':
       return '⬅️ Doleva';
+    case 'SLANTED_RIGHT':
     case 'SLIGHT_RIGHT':
-      return '↗️ Mírně doprava';
+      return '↗️ Šikmo vpravo';
+    case 'SLANTED_LEFT':
     case 'SLIGHT_LEFT':
-      return '↖️ Mírně doleva';
+      return '↖️ Šikmo vlevo';
+    case 'U_TURN':
+      return '↩️ Otočení do protisměru';
+    case 'TWO_WAY':
+      return '↔️ Obousměrný';
+    case 'ROUNDABOUT_1':
+      return '🔄 Kruhový objezd (1. výjezd)';
+    case 'ROUNDABOUT_2':
+      return '🔄 Kruhový objezd (2. výjezd)';
+    case 'ROUNDABOUT_3':
+      return '🔄 Kruhový objezd (3. výjezd)';
+    case 'ROUNDABOUT_4':
+      return '🔄 Kruhový objezd (4. výjezd)';
+    case 'ROUNDABOUT_5':
+      return '🔄 Kruhový objezd (5. výjezd)';
     case 'ROUNDABOUT':
       return '🔄 Kruhový objezd';
     case 'STRAIGHT':
-    default:
       return '⬆️ Rovně';
+    default:
+      if (!direction) return '⬆️ Rovně';
+      return direction;
   }
 }
 
@@ -474,7 +492,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
 
   const itemsWithInstallationPhotos = items.filter((item) => (item.surface.photos ?? []).some((p) => p.isInstallation === true));
 
-  // Build photo cards list for navigation
+  // Build photo cards list for navigation - ONLY INSTALLED REALIZATION PHOTOS (Proof of Play)
   const navPhotoCards = isNavigation
     ? navPoints.flatMap((point, idx) => {
         const list: Array<{
@@ -497,38 +515,10 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             title: point.label || `Sloup VO ${point.pillarNumber || idx + 1}`,
             carrierCode: point.pillarNumber ? `VO ${point.pillarNumber}` : `BOD ${idx + 1}`,
             address: point.address || offer.navigation?.city || 'Ostrava',
-            format: point.navigationType || 'Směrová tabule',
+            format: point.variant || point.navigationType || 'Směrová tabule',
             isInstallation: true,
             badgeText: '✓ Osazeno na sloupu VO (Proof of Play)',
             badgeColor: 'bg-emerald-500/90 text-white border-emerald-400',
-            index: idx + 1,
-          });
-        }
-
-        if (point.visualizedPhotoUrl) {
-          list.push({
-            id: `visual-${point.id}`,
-            url: point.visualizedPhotoUrl,
-            title: point.label || `Sloup VO ${point.pillarNumber || idx + 1}`,
-            carrierCode: point.pillarNumber ? `VO ${point.pillarNumber}` : `BOD ${idx + 1}`,
-            address: point.address || offer.navigation?.city || 'Ostrava',
-            format: 'Vizualizace SeePOINT',
-            isInstallation: false,
-            badgeText: '🎨 Schválený grafický návrh',
-            badgeColor: 'bg-sky-500/90 text-white border-sky-400',
-            index: idx + 1,
-          });
-        } else if (!point.installedPhotoUrl && point.sitePhotoUrl) {
-          list.push({
-            id: `site-${point.id}`,
-            url: point.sitePhotoUrl,
-            title: point.label || `Sloup VO ${point.pillarNumber || idx + 1}`,
-            carrierCode: point.pillarNumber ? `VO ${point.pillarNumber}` : `BOD ${idx + 1}`,
-            address: point.address || offer.navigation?.city || 'Ostrava',
-            format: 'Zaměření sloupu VO',
-            isInstallation: false,
-            badgeText: '🧭 Zaměření sloupu VO',
-            badgeColor: 'bg-slate-700/90 text-white border-slate-600',
             index: idx + 1,
           });
         }
@@ -809,22 +799,11 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
               <div>
                 <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                  {installedNavPoints.length > 0 ? (
-                    <>
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                      Fotodokumentace realizace (Proof of Play)
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="h-5 w-5 text-sky-600" />
-                      Grafické vizualizace a pasport návrhu
-                    </>
-                  )}
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  Fotodokumentace realizace (Proof of Play)
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {installedNavPoints.length > 0
-                    ? 'Reálné kontrolní fotografie pořízené montážní četou přímo po osazení na sloupech VO v terénu.'
-                    : 'Grafické vizualizace z návrhu nabídky a zaměření sloupů VO. Ostré fotografie hotové montáže (Proof of Play) se zde zobrazí ihned po realizaci v terénu.'}
+                  Reálné kontrolní fotografie pořízené montážní četou přímo po osazení panelů na sloupech VO v terénu.
                 </p>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-bold shrink-0 border ${
@@ -944,7 +923,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
           <section className="rounded-3xl border-2 border-dashed border-slate-200 bg-white p-8 text-center print:hidden">
             <Camera className="h-10 w-10 text-slate-300 mx-auto mb-3" />
             <h2 className="text-base font-black text-slate-600">
-              {isNavigation ? 'Fotodokumentace a Pasportizace' : 'Fotodokumentace výlepu'}
+              {isNavigation ? 'Fotodokumentace realizace (Proof of Play)' : 'Fotodokumentace výlepu'}
             </h2>
             <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
               {isNavigation
@@ -983,11 +962,11 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                 <thead>
                   <tr className="border-b bg-slate-50/80 text-slate-500 font-bold uppercase text-[10px]">
                     <th className="p-3">#</th>
-                    <th className="p-3">Sloup VO & Panel</th>
+                    <th className="p-3">Sloup VO & Rozměr</th>
                     <th className="p-3">Lokalita a křižovatka</th>
-                    <th className="p-3">Směr & Vzdálenost</th>
+                    <th className="p-3">Směr šipky & Vzdálenost</th>
+                    <th className="p-3">Cíl navigace</th>
                     <th className="p-3">GPS souřadnice</th>
-                    <th className="p-3">Materiál</th>
                     <th className="p-3 text-right">Stav osazení</th>
                   </tr>
                 </thead>
@@ -996,13 +975,19 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                     const isPointInstalled = point.status === 'INSTALLED' || Boolean(point.installedPhotoUrl);
                     const arrowText = formatArrowText(point.arrowDirectionEnum);
                     const distText = formatDistanceText(point);
+                    const pointTarget = (offer.navigation?.targets || []).find((t: { id: string }) => t.id === point.navigationTargetId || t.id === point.targetId) || navTarget;
+                    const panelVariant = point.variant || (offer.navigation?.city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm');
+
                     return (
                       <tr key={point.id || idx} className="hover:bg-slate-50/50 transition">
                         <td className="p-3 font-bold text-sky-600">{idx + 1}</td>
                         <td className="p-3 font-bold text-slate-900">
                           {point.pillarNumber ? `Sloup VO ${point.pillarNumber}` : `Navigační bod #${idx + 1}`}
-                          <span className="block text-[10px] text-slate-500 font-normal">
-                            {point.navigationType || 'Směrová tabule'}
+                          <span className="block text-[11px] text-sky-700 font-bold">
+                            {panelVariant}
+                          </span>
+                          <span className="block text-[10px] text-slate-400 font-normal">
+                            {point.navigationType || 'Směrová tabule'} · DIBOND® 3 mm
                           </span>
                         </td>
                         <td className="p-3">
@@ -1010,23 +995,32 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                           <span className="block text-slate-500 text-[11px]">{offer.navigation?.city || 'Ostrava'}</span>
                         </td>
                         <td className="p-3">
-                          <span className="font-extrabold text-slate-800 block">{arrowText}</span>
-                          {distText && <span className="text-[11px] text-slate-500">{distText}</span>}
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-900 border border-sky-200 font-extrabold text-xs">
+                            {arrowText}
+                          </div>
+                          {distText && <span className="text-[11px] text-slate-500 block mt-0.5">{distText}</span>}
+                        </td>
+                        <td className="p-3">
+                          {pointTarget ? (
+                            <div>
+                              <strong className="text-slate-800 text-[11px] block">{pointTarget.name}</strong>
+                              {pointTarget.address && <span className="text-slate-400 text-[10px] block">{pointTarget.address}</span>}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
                         </td>
                         <td className="p-3 font-mono text-[11px] text-slate-600">
                           {point.latitude && point.longitude ? `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}` : '-'}
                         </td>
-                        <td className="p-3 font-medium text-slate-600">
-                          DIBOND® 3 mm · Bandimex
-                        </td>
                         <td className="p-3 text-right">
                           {isPointInstalled ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs">
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               Osazeno
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-sky-600 font-bold">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-bold text-xs">
                               <Clock className="h-3.5 w-3.5" />
                               V přípravě
                             </span>

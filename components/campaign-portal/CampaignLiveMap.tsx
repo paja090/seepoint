@@ -45,15 +45,33 @@ function formatArrowText(direction?: string | null): string {
       return '➡️ Doprava';
     case 'LEFT':
       return '⬅️ Doleva';
+    case 'SLANTED_RIGHT':
     case 'SLIGHT_RIGHT':
-      return '↗️ Mírně doprava';
+      return '↗️ Šikmo vpravo';
+    case 'SLANTED_LEFT':
     case 'SLIGHT_LEFT':
-      return '↖️ Mírně doleva';
+      return '↖️ Šikmo vlevo';
+    case 'U_TURN':
+      return '↩️ Otočení do protisměru';
+    case 'TWO_WAY':
+      return '↔️ Obousměrný';
+    case 'ROUNDABOUT_1':
+      return '🔄 Kruhový objezd (1. výjezd)';
+    case 'ROUNDABOUT_2':
+      return '🔄 Kruhový objezd (2. výjezd)';
+    case 'ROUNDABOUT_3':
+      return '🔄 Kruhový objezd (3. výjezd)';
+    case 'ROUNDABOUT_4':
+      return '🔄 Kruhový objezd (4. výjezd)';
+    case 'ROUNDABOUT_5':
+      return '🔄 Kruhový objezd (5. výjezd)';
     case 'ROUNDABOUT':
       return '🔄 Kruhový objezd';
     case 'STRAIGHT':
-    default:
       return '⬆️ Rovně';
+    default:
+      if (!direction) return '⬆️ Rovně';
+      return direction;
   }
 }
 
@@ -206,7 +224,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         validNavPoints.forEach((point, index) => {
           bounds.extend([point.latitude, point.longitude]);
 
-          const photo = point.installedPhotoUrl || point.visualizedPhotoUrl || point.sitePhotoUrl;
+          const photo = point.installedPhotoUrl;
           const isInstalled = point.status === 'INSTALLED' || Boolean(point.installedPhotoUrl);
           const arrowStr = formatArrowText(point.arrowDirectionEnum);
           const distStr = formatDistance(point);

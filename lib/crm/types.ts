@@ -69,6 +69,8 @@ export type OfferRecordItem = {
   title: string;
   campaignName?: string | null;
   status: string;
+  offerType?: string | null;
+  portalToken?: string | null;
   validUntil?: Date | string | null;
   totalPrice?: unknown;
   createdByUser?: { name: string } | null;
@@ -80,6 +82,8 @@ export type CrmOrderRecordItem = {
   title: string;
   projectType: CrmProjectType;
   status: CrmOrderStatus;
+  offerId?: string | null;
+  portalToken?: string | null;
   totalPrice?: unknown;
   assignedUser?: { name: string } | null;
   realizations?: CrmRealizationRecordItem[];
@@ -167,6 +171,23 @@ export type OccupancyRecordItem = {
   } | null;
 };
 
+export type OccupiedSurfaceItem = {
+  id: string;
+  sourceType: 'OCCUPANCY' | 'CURRENT_SURFACE' | 'NAVIGATION';
+  title: string;
+  carrierCode?: string | null;
+  mediaType: string;
+  variantOrSize?: string | null;
+  city?: string | null;
+  address?: string | null;
+  pillarNumber?: string | null;
+  dateFrom?: Date | string | null;
+  dateTo?: Date | string | null;
+  status: 'ACTIVE' | 'PLANNED' | 'EXPIRED';
+  campaignOrOrderName?: string | null;
+  portalToken?: string | null;
+};
+
 export type CrmAuditLogItem = {
   id: string;
   userId: string;
@@ -195,6 +216,7 @@ export type ClientProfileData = {
   rating?: string | null;
   note?: string | null;
   logoDriveFileId?: string | null;
+  portalToken?: string | null;
   billingStreet?: string | null;
   billingCity?: string | null;
   billingZip?: string | null;
@@ -204,6 +226,7 @@ export type ClientProfileData = {
   offers: OfferRecordItem[];
   crmOrders: CrmOrderRecordItem[];
   occupancies: OccupancyRecordItem[];
+  occupiedSurfaces?: OccupiedSurfaceItem[];
   contracts: ContractRecordItem[];
   invoices: ClientInvoiceRecordItem[];
   communications: CommunicationRecordItem[];
