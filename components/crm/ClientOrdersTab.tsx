@@ -27,6 +27,7 @@ export function ClientOrdersTab({ client }: { client: ClientProfileData }) {
               <TableHeaderCell>Cena zakázky</TableHeaderCell>
               <TableHeaderCell>Obchodník</TableHeaderCell>
               <TableHeaderCell>Realizační úkoly</TableHeaderCell>
+              <TableHeaderCell className="text-right">Portál</TableHeaderCell>
             </tr>
           </TableHead>
           <tbody>
@@ -50,6 +51,21 @@ export function ClientOrdersTab({ client }: { client: ClientProfileData }) {
                     <span className="text-xs font-medium bg-slate-100 px-2 py-1 rounded border border-slate-200">
                       {order._count?.workOrders || 0} příkazů
                     </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {order.portalToken ? (
+                      <a
+                        href={`/offer/${order.portalToken}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200 transition"
+                        title="Otevřít veřejný živý portál kampaně"
+                      >
+                        🌐 Live Portál
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 text-xs">-</span>
+                    )}
                   </TableCell>
                 </tr>
               );

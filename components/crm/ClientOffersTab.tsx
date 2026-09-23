@@ -75,6 +75,17 @@ export function ClientOffersTab({ client, canConvert }: { client: ClientProfileD
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <a href={`/offers/${offer.id}`} className="table-action">Zobrazit</a>
+                    {offer.portalToken && (
+                      <a
+                        href={`/offer/${offer.portalToken}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-2 py-1 rounded border border-sky-200 transition"
+                        title="Otevřít veřejný klientský portál"
+                      >
+                        🌐 Live Portál
+                      </a>
+                    )}
                     {canConvert && offer.status === 'ACCEPTED' && (
                       <Button
                         size="sm"

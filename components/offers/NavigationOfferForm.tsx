@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Camera, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical, Zap } from 'lucide-react';
+import { Calculator, Camera, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical, Zap, Store } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet } from '@/lib/offers/navigation-document-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
@@ -10,12 +10,21 @@ import { NavigationSignVisualizer } from '@/components/navigation-documentation/
 import { compressImageFile } from '@/lib/image-compress';
 import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
 
+type ClientBranchOption = {
+  id: string;
+  name: string;
+  street?: string | null;
+  city?: string | null;
+  zip?: string | null;
+};
+
 type ClientOption = {
   id: string;
   name: string;
   contactPerson?: string | null;
   email?: string | null;
   phone?: string | null;
+  branches?: ClientBranchOption[];
 };
 
 type DraftPoint = {
@@ -103,6 +112,7 @@ export function NavigationOfferForm({
 
   const [clientList, setClientList] = useState<ClientOption[]>(clients);
   const [clientId, setClientId] = useState(initialOffer?.clientId ?? initialClientId ?? clients[0]?.id ?? '');
+  const selectedClient = useMemo(() => clientList.find((c) => c.id === clientId), [clientList, clientId]);
   const [showClientModal, setShowClientModal] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientContact, setNewClientContact] = useState('');
@@ -241,23 +251,37 @@ export function NavigationOfferForm({
   const [internalNote, setInternalNote] = useState(initialOffer?.internalNote ?? '');
   const [clientMessage, setClientMessage] = useState(initialOffer?.clientMessage ?? '');
 
+  const initialNav = initialOffer?.navigation as unknown as Record<string, unknown> | undefined;
+  const detectedInitialCity: 'Ostrava' | 'Havířov' =
+    initialNav?.city === 'Havířov' ||
+    (activeTarget?.address && activeTarget.address.toLowerCase().includes('havířov')) ||
+    (initialOffer?.title && initialOffer.title.toLowerCase().includes('havířov'))
+      ? 'Havířov'
+      : 'Ostrava';
+
+  const defaultCityVariant = detectedInitialCity === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm';
+  const [city, setCity] = useState<'Ostrava' | 'Havířov'>(detectedInitialCity);
+
   const [points, setPoints] = useState<DraftPoint[]>(
     () =>
       navigation?.points.map((point: Record<string, unknown>) => {
-        const rawFrame = Number(point.framePrice || 0);
-        const rawProd = Number(point.productionPrice || 0);
+        // Preserve exact saved prices; fall back to catalog defaults if empty
+        const framePrice = point.framePrice !== undefined && point.framePrice !== null && String(point.framePrice).trim() !== ''
+          ? String(point.framePrice)
+          : '1960';
+        const productionPrice = point.productionPrice !== undefined && point.productionPrice !== null && String(point.productionPrice).trim() !== ''
+          ? String(point.productionPrice)
+          : '600';
 
-        let framePrice = rawFrame > 0 ? String(rawFrame) : '1960';
-        let productionPrice = '600';
+        const pointVariant = point.variant && String(point.variant).trim() && String(point.variant) !== '120x80 cm'
+          ? String(point.variant)
+          : defaultCityVariant;
 
-        if (rawProd > 0) {
-          if (rawProd === rawFrame || (rawProd >= 1800 && rawFrame === 0)) {
-            framePrice = '1960';
-            productionPrice = '600';
-          } else {
-            productionPrice = String(rawProd);
-          }
-        }
+        const resolvedTargetId = typeof point.targetId === 'string' && point.targetId.trim()
+          ? point.targetId
+          : (typeof point.navigationTargetId === 'string' && point.navigationTargetId.trim()
+              ? point.navigationTargetId
+              : (activeTarget?.id ?? undefined));
 
         return {
           id: String(point.id),
@@ -267,7 +291,7 @@ export function NavigationOfferForm({
           carrierId: (point.carrierId as string) ?? null,
           address: String(point.address ?? ''),
           navigationType: String(point.navigationType ?? 'Směrová tabule'),
-          variant: String(point.variant ?? '120x80 cm'),
+          variant: pointVariant,
           orientation: String(point.orientation ?? ''),
           quantity: String(point.quantity ?? 1),
           unitPrice: String(point.unitPrice ?? 12000),
@@ -289,22 +313,12 @@ export function NavigationOfferForm({
           sitePhotoId: typeof point.sitePhotoId === 'string' ? point.sitePhotoId : undefined,
           sitePhotoUrl: typeof point.sitePhotoUrl === 'string' ? point.sitePhotoUrl : undefined,
           isSelectedByClient: point.isSelectedByClient !== false,
-          targetId: typeof point.targetId === 'string' ? point.targetId : undefined,
+          targetId: resolvedTargetId,
           targetLatitude: typeof point.targetLatitude === 'number' ? point.targetLatitude : undefined,
           targetLongitude: typeof point.targetLongitude === 'number' ? point.targetLongitude : undefined,
         };
       }) ?? [],
   );
-
-  const initialNav = initialOffer?.navigation as unknown as Record<string, unknown> | undefined;
-  const detectedInitialCity: 'Ostrava' | 'Havířov' =
-    initialNav?.city === 'Havířov' ||
-    (activeTarget?.address && activeTarget.address.toLowerCase().includes('havířov')) ||
-    (initialOffer?.title && initialOffer.title.toLowerCase().includes('havířov'))
-      ? 'Havířov'
-      : 'Ostrava';
-
-  const [city, setCity] = useState<'Ostrava' | 'Havířov'>(detectedInitialCity);
 
   function handleCityChange(newCity: 'Ostrava' | 'Havířov') {
     setCity(newCity);
@@ -396,8 +410,6 @@ export function NavigationOfferForm({
     }
     void loadPriceCatalog();
   }, []);
-
-  const selectedClient = clientList.find((client) => client.id === clientId);
 
   // Financial summary breakdown
   const totals = useMemo(() => {
@@ -841,10 +853,12 @@ export function NavigationOfferForm({
       graphicArtworkUrl,
       includeGraphicProof,
       points: points.map((p) => {
-        const ptTarget = targets.find((t) => t.id === p.targetId) || targets[0];
+        const effectiveTargetId = p.targetId || targets[0]?.id;
+        const ptTarget = targets.find((t) => t.id === effectiveTargetId) || targets[0];
         return {
           ...p,
-          targetId: p.targetId || targets[0]?.id,
+          targetId: effectiveTargetId,
+          navigationTargetId: effectiveTargetId,
           targetLatitude: ptTarget?.latitude,
           targetLongitude: ptTarget?.longitude,
         };
@@ -1100,14 +1114,52 @@ export function NavigationOfferForm({
               <Crosshair size={18} className="text-sky-600" />
               Cílové provozovny ({targets.length})
             </h2>
-            <button
-              type="button"
-              onClick={handleAddTarget}
-              className="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs hover:bg-sky-700 transition cursor-pointer"
-              title="Přidat další pobočku / prodejnu do nabídky"
-            >
-              <Plus size={13} /> + Přidat pobočku
-            </button>
+            <div className="flex items-center gap-1.5">
+              {selectedClient?.branches && selectedClient.branches.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newTargets = [...targets];
+                    let addedCount = 0;
+                    for (const branch of selectedClient.branches || []) {
+                      const branchFullAddr = [branch.street, branch.city, branch.zip].filter(Boolean).join(', ');
+                      const exists = newTargets.some((t) => t.name.toLowerCase() === branch.name.toLowerCase());
+                      if (!exists) {
+                        newTargets.push({
+                          id: `target-branch-${branch.id}`,
+                          name: branch.name,
+                          address: branchFullAddr,
+                          latitude: activeTarget ? activeTarget.latitude + 0.005 : 49.82,
+                          longitude: activeTarget ? activeTarget.longitude + 0.005 : 15.48,
+                          note: '',
+                          photoUrl: null,
+                          color: TARGET_COLORS[newTargets.length % TARGET_COLORS.length],
+                        });
+                        addedCount++;
+                      }
+                    }
+                    if (addedCount > 0) {
+                      setTargets(newTargets);
+                      setMessage(`Přidáno ${addedCount} poboček z profilu klienta.`);
+                    } else {
+                      setMessage('Všechny pobočky klienta již v nabídce jsou.');
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 rounded-xl bg-amber-100 border border-amber-300 px-2 py-1 text-[11px] font-bold text-amber-900 shadow-2xs hover:bg-amber-200 transition cursor-pointer"
+                  title="Načíst pobočky z profilu klienta"
+                >
+                  <Store size={12} /> Z poboček klienta
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleAddTarget}
+                className="inline-flex items-center gap-1 rounded-xl bg-sky-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs hover:bg-sky-700 transition cursor-pointer"
+                title="Přidat další pobočku / prodejnu do nabídky"
+              >
+                <Plus size={13} /> + Přidat pobočku
+              </button>
+            </div>
           </div>
 
           {/* Store Tabs Switcher */}
@@ -1638,15 +1690,15 @@ export function NavigationOfferForm({
                 </label>
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {targets.length > 1 && (
+                  {targets.length > 0 && (
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-sky-950 mb-1 flex items-center justify-between">
-                        <span>🎯 Cílová pobočka pro tento bod</span>
-                        <span className="text-[10px] text-slate-500 font-normal">Trasa se počítá k této pobočce</span>
+                        <span>🎯 Cílová provozovna / prodejna</span>
+                        <span className="text-[10px] text-slate-500 font-normal">Trasa se počítá k této provozovně</span>
                       </label>
                       <select
                         className="input font-bold text-sky-900 border-sky-300 bg-sky-50/70"
-                        value={point.targetId || targets[0]?.id}
+                        value={point.targetId || targets[0]?.id || ''}
                         onChange={async (e) => {
                           const newTid = e.target.value;
                           const chosenT = targets.find((t) => t.id === newTid) || targets[0];

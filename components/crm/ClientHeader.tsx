@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClientLogoControl } from '@/components/ClientLogoControl';
 import { Button } from '@/components/ui';
-import { CLIENT_PRICING_SEGMENT_LABELS, CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS, CLIENT_SOURCE_LABELS, ClientProfileData, ClientStatus } from '@/lib/crm/types';
-import { Building2, ShieldCheck, Mail, Phone, Globe, MapPin, Plus, Edit3, Trash2, Link2, CheckSquare, MessageSquare, FilePlus, Store, AlertTriangle, TrendingUp, DollarSign, Layers } from 'lucide-react';
+import { Building2, ShieldCheck, Mail, Phone, Globe, MapPin, Plus, Edit3, Trash2, Link2, CheckSquare, MessageSquare, FilePlus, Store, AlertTriangle, TrendingUp, DollarSign, Layers, Copy, Check, ExternalLink } from 'lucide-react';
+import { ClientProfileData, CLIENT_STATUS_LABELS } from '@/lib/crm/types';
 
 export function ClientHeader({ client, canManageLifecycle }: { client: ClientProfileData; canManageLifecycle: boolean }) {
   const router = useRouter();
+  const [copiedId, setCopiedId] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [showBranchModal, setShowBranchModal] = useState(false);
@@ -255,6 +256,12 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
     }
   };
 
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(client.id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
+
   const statusObj = CLIENT_STATUS_LABELS[client.status as keyof typeof CLIENT_STATUS_LABELS] || CLIENT_STATUS_LABELS.ACTIVE;
 
   return (
@@ -298,7 +305,19 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
             )}
 
             {/* Information Meta Strip */}
-            <div className="flex items-center gap-x-4 gap-y-1.5 text-xs text-slate-300 pt-1 flex-wrap font-medium">
+            <div className="flex items-center gap-x-3.5 gap-y-1.5 text-xs text-slate-300 pt-1 flex-wrap font-medium">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 px-2 py-0.5 text-[11px] font-mono shrink-0">
+                <span className="text-slate-400">ID:</span>
+                <strong className="text-white select-all">{client.id}</strong>
+                <button
+                  type="button"
+                  onClick={handleCopyId}
+                  title="Kopírovat ID klienta pro sloučení"
+                  className="text-slate-400 hover:text-white transition p-0.5 rounded cursor-pointer"
+                >
+                  {copiedId ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                </button>
+              </span>
               {client.companyId && (
                 <span className="shrink-0">
                   IČO: <strong className="text-white font-mono">{client.companyId}</strong>
@@ -341,6 +360,19 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
 
         {/* Primary Header Action Buttons */}
         <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800">
+          {client.portalToken && (
+            <a
+              href={`/offer/${client.portalToken}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/20 transition cursor-pointer border border-sky-400/40 shrink-0"
+              title="Otevřít živý klientský portál kampaně"
+            >
+              <Globe size={13} className="text-white" />
+              <span>Klientský live portál</span>
+              <ExternalLink size={11} className="opacity-80" />
+            </a>
+          )}
           <Button onClick={() => setShowEditModal(true)} variant="secondary" className="!bg-slate-800 !text-white hover:!bg-slate-700 border-slate-700 text-xs font-bold shadow-md cursor-pointer">
             <Edit3 size={13} className="mr-1 text-sky-400" />
             <span>Upravit profil</span>
@@ -362,6 +394,18 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
 
       {/* Quick Action Bar Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-t border-slate-800/80 pt-3 scrollbar-thin">
+        {client.portalToken && (
+          <a
+            href={`/offer/${client.portalToken}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-sky-950 to-indigo-950 hover:from-sky-900 hover:to-indigo-900 text-sky-200 px-3 py-1.5 rounded-xl border border-sky-700/70 transition font-bold shrink-0"
+          >
+            <Globe size={13} className="text-sky-400" />
+            <span>Živý klientský portál</span>
+            <ExternalLink size={11} />
+          </a>
+        )}
         <button onClick={() => setShowContactModal(true)} className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-100 px-3 py-1.5 rounded-xl border border-slate-700 transition font-bold cursor-pointer shrink-0">
           <Plus size={13} className="text-emerald-400" />
           <span>Kontakt</span>
@@ -591,12 +635,29 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
             </div>
             <form onSubmit={handleMergeClient} className="space-y-3">
               <p className="text-xs text-slate-600">Všechny nabídky, zakázky, pobočky i kontakty zdrojového klienta budou sloučeny do profilu <strong>{client.name}</strong>.</p>
-              <label className="text-xs font-semibold">ID zdrojového klienta ke sloučení *
-                <input type="text" value={sourceClientId} onChange={e => setSourceClientId(e.target.value)} required placeholder="Vložte ID klienta (C-xxx nebo CUID)" className="input text-xs mt-1 font-mono" />
+              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs space-y-1.5">
+                <span className="text-purple-700 font-bold block text-[11px] uppercase tracking-wide">Cílový profil klienta (zůstane zachován):</span>
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-purple-950 font-black text-sm truncate">{client.name}</strong>
+                  <span className="inline-flex items-center gap-1 font-mono text-[11px] text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-300 shrink-0">
+                    ID: {client.id}
+                  </span>
+                </div>
+              </div>
+              <label className="text-xs font-semibold block">
+                ID zdrojového klienta ke sloučení (bude sloučen sem a archivován) *
+                <input
+                  type="text"
+                  value={sourceClientId}
+                  onChange={e => setSourceClientId(e.target.value)}
+                  required
+                  placeholder="Vložte ID zdrojového klienta (např. CUID)"
+                  className="input text-xs mt-1 font-mono w-full"
+                />
               </label>
               <div className="flex justify-end gap-2 border-t pt-3">
                 <Button type="button" variant="secondary" onClick={() => setShowMergeModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving} className="font-bold bg-purple-600 text-white">Sloučit klienta</Button>
+                <Button type="submit" disabled={saving || !sourceClientId.trim()} className="font-bold bg-purple-600 text-white hover:bg-purple-700">Sloučit klienta</Button>
               </div>
             </form>
           </div>

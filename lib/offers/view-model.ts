@@ -130,6 +130,17 @@ export type OfferView = {
     targetLatitude: number;
     targetLongitude: number;
     targetNote?: string | null;
+    targets?: Array<{
+      id: string;
+      stableKey?: string;
+      name: string;
+      address?: string | null;
+      latitude: number;
+      longitude: number;
+      note?: string | null;
+      photoUrl?: string | null;
+      sortOrder?: number;
+    }>;
     navigationOrderStatus?: string | null;
     points: Array<{
       id: string;
@@ -164,6 +175,8 @@ export type OfferView = {
       distanceSource?: string | null;
       routePolyline?: string | null;
       isSelectedByClient?: boolean;
+      targetId?: string | null;
+      navigationTargetId?: string | null;
     }>;
   } | null;
   cityGallery?: { projectId?: string | null; projectTitle?: string | null; concept?: string | null; locationBrief?: string | null; realizationNote?: string | null } | null;

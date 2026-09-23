@@ -1,7 +1,7 @@
 'use client';
 
 import { ORDER_STATUS_LABELS, ClientProfileData, OfferRecordItem, CrmOrderRecordItem } from '@/lib/crm/types';
-import { Sparkles, Building2, Lightbulb, Target, Store, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Sparkles, Building2, Lightbulb, Target, Store, MessageSquare, AlertTriangle, Globe, ExternalLink } from 'lucide-react';
 
 function FormattedClientNote({ note }: { note: string }) {
   if (!note) return null;
@@ -208,6 +208,39 @@ export function ClientOverviewTab({ client }: { client: ClientProfileData }) {
               <h4 className="font-bold text-amber-900 text-sm">Upozornění: Smlouva před koncem platnosti</h4>
               <p className="text-xs text-amber-700">Klient má {client.metrics.expiringContractsCount} smluv končících v nejbližších 30–90 dnech.</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Client Live Portal Banner */}
+      {client.portalToken && (
+        <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-sky-500/10 to-indigo-500/10 border border-emerald-300/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Globe size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-slate-900 text-sm">Aktivní Klientský Live Portál</h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  LIVE PORTÁL
+                </span>
+              </div>
+              <p className="text-xs text-slate-600">
+                Klient má dostupný interaktivní živý portál s mapou ploch, fotodokumentací realizace a stavem kampaně.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <a
+              href={`/offer/${client.portalToken}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition shadow-xs"
+            >
+              <span>Otevřít klientský portál</span>
+              <ExternalLink size={13} />
+            </a>
           </div>
         </div>
       )}
