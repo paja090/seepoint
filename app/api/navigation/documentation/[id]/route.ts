@@ -184,14 +184,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
   if (isApiDenied(auth)) return auth;
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const permanent = searchParams.get('permanent') === 'true';
+
+  if (permanent) {
+    const existing = await prisma.navigationDocumentationReport.findFirst({
+      where: { id, organizationId: auth.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.navigationDocumentationItem.deleteMany({ where: { reportId: id, organizationId: auth.organizationId } });
+      await tx.navigationReportAuditLog.deleteMany({ where: { reportId: id, organizationId: auth.organizationId } });
+      await tx.navigationDocumentationReport.deleteMany({ where: { id, organizationId: auth.organizationId } });
+    });
+
+    return NextResponse.json({ success: true, deleted: true });
+  }
+
   const result = await prisma.navigationDocumentationReport.updateMany({
     where: { id, organizationId: auth.organizationId },
     data: { status: 'ARCHIVED', publicTokenHash: null, tokenExpiresAt: new Date() },
   });
   if (result.count === 0) return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, archived: true });
 }

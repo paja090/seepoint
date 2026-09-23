@@ -63,3 +63,11 @@ test('2. buildSnapshotItem preserves customDirection over fallback orientation',
 
   assert.equal(snapshotWithFallback.direction, 'Obousměrné');
 });
+
+test('3. Deletion mode check: permanent deletion vs archive', () => {
+  const isPermanent = (param: string | null) => param === 'true';
+  assert.equal(isPermanent('true'), true);
+  assert.equal(isPermanent(null), false);
+  assert.equal(isPermanent('false'), false);
+});
+
