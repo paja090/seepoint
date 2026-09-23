@@ -152,7 +152,11 @@ export function NavigationDocumentationAdmin({
         setReports((curr) => [createdReport, ...curr]);
         setShowCreateModal(false);
         loadReportDetail(data.report.id);
+      } else {
+        alert(data.error || 'Report se nepodařilo vytvořit.');
       }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při komunikaci se serverem.');
     } finally {
       setCreating(false);
     }

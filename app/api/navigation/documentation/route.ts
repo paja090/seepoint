@@ -285,7 +285,11 @@ export async function POST(request: Request) {
         status: 'DRAFT',
         createdById: auth.id,
         items: {
-          create: itemInputs.map((item) => ({ ...item, organizationId: auth.organizationId })),
+          create: itemInputs.map(({ customDirection, ...item }) => ({
+            ...item,
+            organizationId: auth.organizationId,
+            snapshot: customDirection ? { direction: customDirection } : undefined,
+          })),
         },
         auditLogs: {
           create: {
@@ -297,8 +301,11 @@ export async function POST(request: Request) {
         },
       },
       include: {
-        client: true,
+        client: { select: { id: true, name: true, email: true } },
+        offer: { select: { id: true, campaignName: true, title: true } },
+        createdBy: { select: { id: true, name: true } },
         items: true,
+        _count: { select: { items: true } },
       },
     });
 
