@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Send,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { NavigationReportEditor, type ReportItemEdit } from '@/components/navigation-documentation/NavigationReportEditor';
 import { NavigationEmailModal } from '@/components/navigation-documentation/NavigationEmailModal';
@@ -95,6 +96,7 @@ export function NavigationDocumentationAdmin({
   const [loadingToken, setLoadingToken] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [cloning, setCloning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const filteredReports = reports.filter((r) => {
     if (filterClient && r.clientId !== filterClient) return false;
@@ -256,6 +258,33 @@ export function NavigationDocumentationAdmin({
       }
     } finally {
       setCloning(false);
+    }
+  }
+
+  async function handleDeleteReport() {
+    if (!activeReportId) return;
+    const confirmed = window.confirm('Opravdu chcete tento report trvale smazat? Tato akce je nevratná.');
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/navigation/documentation/${activeReportId}?permanent=true`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setReports((curr) => curr.filter((r) => r.id !== activeReportId));
+        setActiveReportId(null);
+        setReportDetail(null);
+        setPublishResult(null);
+        setCurrentToken(null);
+      } else {
+        alert(data.error || 'Report se nepodařilo smazat.');
+      }
+    } catch {
+      alert('Chyba při komunikaci se serverem.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -434,6 +463,17 @@ export function NavigationDocumentationAdmin({
                   >
                     <Sparkles size={15} className="text-amber-500" />
                     {cloning ? 'Vytvářím…' : 'Vytvořit další kvartál'}
+                  </button>
+
+                  <button
+                    onClick={handleDeleteReport}
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                    type="button"
+                    title="Trvale odstranit report"
+                  >
+                    <Trash2 size={15} />
+                    {deleting ? 'Mažu…' : 'Smazat'}
                   </button>
 
                   {publishResult?.publicUrl && (
