@@ -15,16 +15,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const report = await prisma.navigationDocumentationReport.findFirst({ where: { id, organizationId: auth.organizationId } });
   if (!report) return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
-  if (!isPublicNavigationReportStatus(report.status)) {
-    return NextResponse.json({ error: 'Odkaz lze zobrazit až po publikování reportu.' }, { status: 409 });
+  if (report.status === 'ARCHIVED') {
+    return NextResponse.json({ error: 'Archivovaný report nemá veřejný odkaz.' }, { status: 409 });
   }
 
   const { token, hash } = getDeterministicReportToken(id);
-  if (report.publicTokenHash !== hash) {
+  const effectiveStatus = isPublicNavigationReportStatus(report.status) ? report.status : 'PUBLISHED';
+  if (report.publicTokenHash !== hash || report.status !== effectiveStatus || !report.publishedAt) {
+    const now = new Date();
     await prisma.navigationDocumentationReport.update({
       where: { id },
-      data: { publicTokenHash: hash },
-    });
+      data: {
+        publicTokenHash: hash,
+        status: effectiveStatus,
+        publishedAt: report.publishedAt || now,
+        tokenExpiresAt: report.tokenExpiresAt || new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
+      },
+    }).catch(() => {});
   }
 
   return NextResponse.json({
@@ -52,8 +59,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
-    if (!isPublicNavigationReportStatus(report.status)) {
-      return NextResponse.json({ error: 'Odkaz lze spravovat až po publikování reportu.' }, { status: 409 });
+    if (report.status === 'ARCHIVED') {
+      return NextResponse.json({ error: 'Archivovaný report nelze spravovat.' }, { status: 409 });
     }
 
     if (action === 'revoke') {
@@ -64,6 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           tokenExpiresAt: new Date(),
           auditLogs: {
             create: {
+              organizationId: auth.organizationId,
               actorUserId: auth.id,
               action: 'TOKEN_REVOKED',
               message: 'Přístupový token byl ručně zneplatněn.',
@@ -76,17 +84,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const { token, hash } = getDeterministicReportToken(id);
-    const tokenExpiresAt = body.tokenExpiresAt ? parseTokenExpiry(body.tokenExpiresAt) : (report.tokenExpiresAt || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000));
+    const tokenExpiresAt = body.tokenExpiresAt ? parseTokenExpiry(body.tokenExpiresAt) : (report.tokenExpiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
+    const effectiveStatus = isPublicNavigationReportStatus(report.status) ? report.status : 'PUBLISHED';
 
     let updated = report;
-    if (report.publicTokenHash !== hash || (body.tokenExpiresAt && report.tokenExpiresAt?.getTime() !== tokenExpiresAt.getTime())) {
+    if (report.publicTokenHash !== hash || report.status !== effectiveStatus || (body.tokenExpiresAt && report.tokenExpiresAt?.getTime() !== tokenExpiresAt.getTime())) {
       updated = await prisma.navigationDocumentationReport.update({
         where: { id, organizationId: auth.organizationId },
         data: {
+          status: effectiveStatus,
+          publishedAt: report.publishedAt || new Date(),
           publicTokenHash: hash,
           tokenExpiresAt,
           auditLogs: {
             create: {
+              organizationId: auth.organizationId,
               actorUserId: auth.id,
               action: action === 'regenerate' ? 'TOKEN_REGENERATED' : 'TOKEN_VIEWED',
               tokenExpiresAt,

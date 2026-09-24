@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { documentationPhotoSelect } from '@/lib/navigation-documentation';
+import { buildSnapshotItem, documentationPhotoSelect, getDeterministicReportToken } from '@/lib/navigation-documentation';
 import {
   NavigationDocumentationValidationError,
   parseNavigationReportStatus,
@@ -135,6 +135,29 @@ export async function POST(request: Request) {
       return undefined;
     };
 
+    const pointInclude = {
+      installedPhoto: { select: documentationPhotoSelect },
+      sitePhoto: { select: documentationPhotoSelect },
+      carrier: {
+        include: {
+          photos: {
+            where: { isPrivate: false },
+            orderBy: [{ isClientVisible: 'desc' as const }, { isPrimary: 'desc' as const }, { createdAt: 'desc' as const }],
+            select: documentationPhotoSelect,
+          },
+          surfaces: {
+            include: {
+              photos: {
+                where: { isPrivate: false },
+                orderBy: [{ isClientVisible: 'desc' as const }, { isPrimary: 'desc' as const }, { createdAt: 'desc' as const }],
+                select: documentationPhotoSelect,
+              },
+            },
+          },
+        },
+      },
+    };
+
     // Query active navigation points for this client / offer
     let points = await prisma.navigationPoint.findMany({
       where: {
@@ -147,26 +170,7 @@ export async function POST(request: Request) {
         },
         status: { notIn: ['REMOVED', 'CANCELLED'] },
       },
-      include: {
-        carrier: {
-          include: {
-            photos: {
-              where: { isPrivate: false, isClientVisible: true },
-              orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-              select: documentationPhotoSelect,
-            },
-            surfaces: {
-              include: {
-                photos: {
-                  where: { isPrivate: false, isClientVisible: true },
-                  orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                  select: documentationPhotoSelect,
-                },
-              },
-            },
-          },
-        },
-      },
+      include: pointInclude,
       orderBy: { sortOrder: 'asc' },
       take: 250,
     });
@@ -178,26 +182,7 @@ export async function POST(request: Request) {
           navigationOffer: { offer: { clientId: { in: allClientIds }, ...(offerId ? { id: offerId } : {}) } },
           status: { notIn: ['REMOVED', 'CANCELLED'] },
         },
-        include: {
-          carrier: {
-            include: {
-              photos: {
-                where: { isPrivate: false, isClientVisible: true },
-                orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                select: documentationPhotoSelect,
-              },
-              surfaces: {
-                include: {
-                  photos: {
-                    where: { isPrivate: false, isClientVisible: true },
-                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                    select: documentationPhotoSelect,
-                  },
-                },
-              },
-            },
-          },
-        },
+        include: pointInclude,
         orderBy: { sortOrder: 'asc' },
         take: 250,
       });
@@ -218,27 +203,43 @@ export async function POST(request: Request) {
       customDirection?: string;
       sortOrder: number;
       isVisible: boolean;
+      snapshot?: object;
     }> = [];
 
     if (points.length > 0) {
       itemInputs = points.map((point, index) => {
-        const availablePhotos = [
+        const rawPhotos = [
+          ...(point.installedPhoto && !point.installedPhoto.isPrivate ? [point.installedPhoto] : []),
+          ...(point.sitePhoto && !point.sitePhoto.isPrivate ? [point.sitePhoto] : []),
           ...(point.carrier?.photos || []),
           ...((point.carrier?.surfaces || []).flatMap((surface) => surface.photos || [])),
-        ].sort((a, b) => {
+        ];
+        const uniquePhotos = Array.from(new Map(rawPhotos.map((p) => [p.id, p])).values());
+        const availablePhotos = uniquePhotos.sort((a, b) => {
           if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
           if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
 
-        const hasPhoto = availablePhotos.length > 0;
+        const selectedPhoto = availablePhotos[0] ?? null;
+        const customDirection = extractDirection(point, point.carrier);
+        const snapshot = buildSnapshotItem({
+          id: `item-${index}`,
+          clientNote: null,
+          customDirection,
+          navigationPoint: point,
+          carrier: point.carrier ?? null,
+          selectedPhoto,
+        });
+
         return {
           navigationPointId: point.id,
           carrierId: point.carrierId ?? undefined,
-          selectedPhotoId: availablePhotos[0]?.id ?? undefined,
-          customDirection: extractDirection(point, point.carrier),
+          selectedPhotoId: selectedPhoto?.id ?? undefined,
+          customDirection,
           sortOrder: index,
-          isVisible: hasPhoto,
+          isVisible: true,
+          snapshot: snapshot as unknown as object,
         };
       });
     } else {
@@ -258,14 +259,14 @@ export async function POST(request: Request) {
         },
         include: {
           photos: {
-            where: { isPrivate: false, isClientVisible: true },
+            where: { isPrivate: false },
             orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
             select: documentationPhotoSelect,
           },
           surfaces: {
             include: {
               photos: {
-                where: { isPrivate: false, isClientVisible: true },
+                where: { isPrivate: false },
                 orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
                 select: documentationPhotoSelect,
               },
@@ -294,18 +295,32 @@ export async function POST(request: Request) {
           return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
         });
 
-        const hasPhoto = availablePhotos.length > 0;
+        const selectedPhoto = availablePhotos[0] ?? null;
+        const customDirection = extractDirection(null, carrier);
+        const snapshot = buildSnapshotItem({
+          id: `item-${index}`,
+          clientNote: null,
+          customDirection,
+          navigationPoint: null,
+          carrier,
+          selectedPhoto,
+        });
+
         return {
           carrierId: carrier.id,
-          selectedPhotoId: availablePhotos[0]?.id ?? undefined,
-          customDirection: extractDirection(null, carrier),
+          selectedPhotoId: selectedPhoto?.id ?? undefined,
+          customDirection,
           sortOrder: index,
-          isVisible: hasPhoto,
+          isVisible: true,
+          snapshot: snapshot as unknown as object,
         };
       });
     }
 
-    const report = await prisma.navigationDocumentationReport.create({
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+    const createdReport = await prisma.navigationDocumentationReport.create({
       data: {
         organizationId: auth.organizationId,
         clientId,
@@ -317,13 +332,15 @@ export async function POST(request: Request) {
         periodTo,
         quarter,
         year,
-        status: 'DRAFT',
+        status: 'PUBLISHED',
+        publishedAt: now,
+        tokenExpiresAt: expiresAt,
         createdById: auth.id,
         items: {
-          create: itemInputs.map(({ customDirection, ...item }) => ({
+          create: itemInputs.map(({ customDirection, snapshot, ...item }) => ({
             ...item,
             organizationId: auth.organizationId,
-            snapshot: customDirection ? { direction: customDirection } : undefined,
+            snapshot: snapshot ?? (customDirection ? { direction: customDirection } : undefined),
           })),
         },
         auditLogs: {
@@ -331,7 +348,7 @@ export async function POST(request: Request) {
             organizationId: auth.organizationId,
             actorUserId: auth.id,
             action: 'CREATED',
-            message: `Vytvořen nový koncept fotodokumentace pro klienta ${client.name} s ${itemInputs.length} položkami.`,
+            message: `Vytvořen report fotodokumentace pro klienta ${client.name} s ${itemInputs.length} položkami a vygenerován veřejný odkaz.`,
           },
         },
       },
@@ -344,7 +361,20 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ report }, { status: 201 });
+    const { token, hash } = getDeterministicReportToken(createdReport.id);
+    const report = await prisma.navigationDocumentationReport.update({
+      where: { id: createdReport.id },
+      data: { publicTokenHash: hash },
+      include: {
+        client: { select: { id: true, name: true, email: true } },
+        offer: { select: { id: true, campaignName: true, title: true } },
+        createdBy: { select: { id: true, name: true } },
+        items: true,
+        _count: { select: { items: true } },
+      },
+    });
+
+    return NextResponse.json({ report: { ...report, token, publicUrl: `/client/navigation-documentation/${token}` } }, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof NavigationDocumentationValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

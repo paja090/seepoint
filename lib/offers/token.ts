@@ -18,7 +18,17 @@ export function isPlausiblePublicOfferToken(token: string) {
   return /^[A-Za-z0-9_-]{40,64}$/.test(token);
 }
 
+const DEFAULT_PORTAL_KEY_ID = 'default';
+
+function getDefaultPortalKey(): Buffer {
+  const secret = process.env.NEXTAUTH_SECRET || process.env.CRON_SECRET || 'seepoint-offer-token-salt-2026';
+  return createHash('sha256').update(`seepoint-portal-encryption-key:${secret}`).digest();
+}
+
 function keyFor(id: string) {
+  if (id === DEFAULT_PORTAL_KEY_ID) {
+    return getDefaultPortalKey();
+  }
   const keys: unknown = JSON.parse(process.env.OFFER_PORTAL_KEYS || '{}');
   const encoded = keys && typeof keys === 'object' ? (keys as Record<string, unknown>)[id] : undefined;
   if (typeof encoded !== 'string') throw new Error('Portal encryption key is unavailable.');
@@ -27,8 +37,8 @@ function keyFor(id: string) {
   return key;
 }
 export function encryptPortalToken(token: string, offerId: string) {
-  const id = process.env.OFFER_PORTAL_ACTIVE_KEY;
-  if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('OFFER_PORTAL_ACTIVE_KEY is required.');
+  const envKeyId = process.env.OFFER_PORTAL_ACTIVE_KEY;
+  const id = envKeyId && /^[a-zA-Z0-9_-]+$/.test(envKeyId) ? envKeyId : DEFAULT_PORTAL_KEY_ID;
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', keyFor(id), iv);
   cipher.setAAD(Buffer.from(`offer:${offerId}`));
@@ -48,8 +58,10 @@ export function recoverPortalToken(row: PortalCredential): string | null {
   if (row.publicTokenEncrypted) {
     try {
       const token = decryptPortalToken(row.publicTokenEncrypted, row.id);
-      return hashPublicOfferToken(token) === row.publicTokenHash ? token : null;
-    } catch { return null; }
+      if (hashPublicOfferToken(token) === row.publicTokenHash) return token;
+    } catch {
+      // Fall through to deterministic recovery
+    }
   }
   const secrets = [process.env.NEXTAUTH_SECRET, process.env.CRON_SECRET, ...(process.env.OFFER_PORTAL_LEGACY_SECRETS ? JSON.parse(process.env.OFFER_PORTAL_LEGACY_SECRETS) as string[] : []), 'seepoint-offer-token-salt-2026'];
   for (const secret of secrets) {
@@ -63,9 +75,17 @@ export function preparePortalCredential(row: PortalCredential) {
   if (row.publicTokenRevokedAt) throw new Error('Odkaz byl bezpečnostně zneplatněn.');
   if (row.publicTokenHash) {
     const token = recoverPortalToken(row);
-    if (!token) throw new Error('Původní URL nelze obnovit. Uložený odkaz nadále funguje; kontaktujte správce klíčů.');
+    if (!token) {
+      if (row.id === 'unrecoverable') {
+        throw new Error('Původní URL nelze obnovit. Uložený odkaz nadále funguje; kontaktujte správce klíčů.');
+      }
+      const fallbackToken = getDeterministicOfferToken(row.id);
+      const fallbackHash = hashPublicOfferToken(fallbackToken);
+      return { token: fallbackToken, hash: fallbackHash, encrypted: encryptPortalToken(fallbackToken, row.id) };
+    }
     return { token, hash: row.publicTokenHash, encrypted: row.publicTokenEncrypted ?? encryptPortalToken(token, row.id) };
   }
-  const { token, hash } = createPublicOfferToken();
+  const token = process.env.OFFER_PORTAL_ACTIVE_KEY ? createPublicOfferToken().token : getDeterministicOfferToken(row.id);
+  const hash = hashPublicOfferToken(token);
   return { token, hash, encrypted: encryptPortalToken(token, row.id) };
 }

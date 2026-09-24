@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import type { CurrentUser } from '@/lib/rbac';
 import { canAccessOffer, canManageOfferRole, OfferValidationError, parseDateOnly, serverOfferAuthor } from './domain';
 import { calculateNavigationOfferTotals, calculateNavigationPointSubtotal } from './navigation-pricing';
+import { preparePortalCredential } from './token';
 import { syncNavigationOfferToOrderInTransaction } from '@/lib/ai-realization/navigation-sync';
 
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
@@ -407,10 +408,20 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           }
         }
 
+        const credential = preparePortalCredential({
+          id: offerId,
+          publicTokenHash: existing.publicTokenRevokedAt ? null : existing.publicTokenHash,
+          publicTokenEncrypted: existing.publicTokenRevokedAt ? null : existing.publicTokenEncrypted,
+        });
+
         const updatedOffer = await tx.offer.update({
           where: { id: offerId },
           data: {
             ...common,
+            publicTokenHash: credential.hash,
+            publicTokenEncrypted: credential.encrypted,
+            publicTokenRevokedAt: null,
+            publishedAt: existing.publishedAt || new Date(),
             campaignStrategy: updatedStrategy,
             organizationId: user.organizationId,
             events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
@@ -424,7 +435,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           email: user.email,
         });
 
-        return updatedOffer;
+        return { id: updatedOffer.id, token: credential.token, path: `/offer/${credential.token}` };
       }
 
       // Brand new offer creation
@@ -442,6 +453,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           organizationId: user.organizationId,
           offerType: 'NAVIGATION',
           status: 'DRAFT',
+          publishedAt: new Date(),
           ...serverOfferAuthor(user),
           navigationOffer: {
             create: {
@@ -465,6 +477,16 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } },
         },
         include: { navigationOffer: true },
+      });
+
+      const createdCredential = preparePortalCredential({ id: createdOffer.id, publicTokenHash: null });
+      await tx.offer.update({
+        where: { id: createdOffer.id },
+        data: {
+          publicTokenHash: createdCredential.hash,
+          publicTokenEncrypted: createdCredential.encrypted,
+          publishedAt: createdOffer.publishedAt || new Date(),
+        },
       });
 
       const navOfferId = createdOffer.navigationOffer!.id;
@@ -519,7 +541,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         });
       }
 
-      return { id: createdOffer.id };
+      return { id: createdOffer.id, token: createdCredential.token, path: `/offer/${createdCredential.token}` };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
@@ -561,7 +583,10 @@ export async function createCityGalleryOffer(user: CurrentUser, raw: unknown) {
     const client = await tx.client.findFirst({ where: { id: input.clientId, organizationId: user.organizationId, active: true }, select: { id: true } });
     if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
     if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen nebo je archivovaný.');
-    return tx.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, offerType: 'CITY_GALLERY', status: 'DRAFT', contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { organizationId: user.organizationId, projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+    const created = await tx.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, offerType: 'CITY_GALLERY', status: 'DRAFT', publishedAt: new Date(), contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { organizationId: user.organizationId, projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+    const credential = preparePortalCredential({ id: created.id, publicTokenHash: null });
+    await tx.offer.update({ where: { id: created.id }, data: { publicTokenHash: credential.hash, publicTokenEncrypted: credential.encrypted, publishedAt: new Date() } });
+    return { id: created.id, token: credential.token, path: `/offer/${credential.token}` };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
@@ -569,13 +594,18 @@ export async function updateCityGalleryOffer(user: CurrentUser, offerId: string,
   assertRole(user); const input = parseCityGalleryOfferInput(raw);
   if (!user.organizationId) throw new OfferValidationError('Není vybraná aktivní organizace.', 'FORBIDDEN');
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { offerType: true, status: true, createdByUserId: true } });
+    const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { offerType: true, status: true, createdByUserId: true, publicTokenHash: true, publicTokenEncrypted: true, publicTokenRevokedAt: true, publishedAt: true } });
     if (!existing || existing.offerType !== 'CITY_GALLERY') throw new OfferValidationError('Nabídka Galerie venku nebyla nalezena.', 'NOT_FOUND');
     if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
     if (['CONVERTED', 'ARCHIVED'].includes(existing.status)) throw new OfferValidationError('Převedenou nebo archivovanou nabídku již nelze upravovat.', 'INVALID_STATUS_TRANSITION');
     const client = await tx.client.findFirst({ where: { id: input.clientId, organizationId: user.organizationId, active: true }, select: { id: true } }); if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
     if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen nebo je archivovaný.');
-    return tx.offer.update({ where: { id: offerId }, data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), subtotal: input.subtotal, totalPrice: input.subtotal, taxAmount: input.taxAmount, totalWithTax: input.totalWithTax, updatedByUserId: user.id, cityGalleryOffer: { update: { projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
+    const credential = preparePortalCredential({
+      id: offerId,
+      publicTokenHash: existing.publicTokenRevokedAt ? null : existing.publicTokenHash,
+      publicTokenEncrypted: existing.publicTokenRevokedAt ? null : existing.publicTokenEncrypted,
+    });
+    return tx.offer.update({ where: { id: offerId }, data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, publicTokenHash: credential.hash, publicTokenEncrypted: credential.encrypted, publicTokenRevokedAt: null, publishedAt: existing.publishedAt || new Date(), contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), subtotal: input.subtotal, totalPrice: input.subtotal, taxAmount: input.taxAmount, totalWithTax: input.totalWithTax, updatedByUserId: user.id, cityGalleryOffer: { update: { projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'UPDATED', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 

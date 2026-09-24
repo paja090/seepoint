@@ -61,6 +61,10 @@ export function NavigationSignVisualizer({
   const [signScale, setSignScale] = useState(1.0);
   const [signRotation, setSignRotation] = useState(0);
   const [mountType, setMountType] = useState<'pole' | 'ground_pole'>('pole');
+  // 'right' = brackets on right edge of sign (sign mounted to the left of the pole)
+  // 'left' = brackets on left edge of sign (sign mounted to the right of the pole)
+  const [mountSide, setMountSide] = useState<'right' | 'left'>('right');
+  const [mirrorGraphic, setMirrorGraphic] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ offsetX: 0, offsetY: 0 });
@@ -216,9 +220,15 @@ export function NavigationSignVisualizer({
       ctx.fillRect(-poleWidth / 2 - 2, -height / 2 + 10, poleWidth + 4, 6);
       ctx.restore();
     } else {
+      const bracketX = mountSide === 'right' ? width / 2 : -width / 2 - 16;
+      const clampStrapX = mountSide === 'right' ? width / 2 + 12 : -width / 2 - 20;
       ctx.fillStyle = '#64748B';
-      ctx.fillRect(width / 2, -height / 2 + 35, 14, 14);
-      ctx.fillRect(width / 2, height / 2 - 45, 14, 14);
+      ctx.fillRect(bracketX, -height / 2 + 35, 16, 14);
+      ctx.fillRect(bracketX, height / 2 - 45, 16, 14);
+      // Metallic band clamp accent
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(clampStrapX, -height / 2 + 32, 4, 20);
+      ctx.fillRect(clampStrapX, height / 2 - 48, 4, 20);
     }
 
     // Outer Drop Shadow
@@ -273,6 +283,9 @@ export function NavigationSignVisualizer({
       ctx.beginPath();
       ctx.roundRect(-width / 2 + 8, -height / 2 + 8, width - 16, height - 64, 8);
       ctx.clip();
+      if (mirrorGraphic) {
+        ctx.scale(-1, 1);
+      }
       ctx.drawImage(graphicImage, -width / 2 + 8, -height / 2 + 8, width - 16, height - 64);
       ctx.restore();
     } else {
@@ -312,7 +325,7 @@ export function NavigationSignVisualizer({
     ctx.fillText(`${distanceText}   ${arrow}`, 0, badgeY + badgeHeight / 2 + 1);
 
     ctx.restore();
-  }, [bgImage, graphicImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme, mountType]);
+  }, [bgImage, graphicImage, signX, signY, signScale, signRotation, signText, subText, distanceText, arrow, theme, mountType, mountSide, mirrorGraphic]);
 
   function handleSave() {
     const canvas = canvasRef.current;
@@ -472,11 +485,65 @@ export function NavigationSignVisualizer({
                         : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
-                    <span>🏗️ Samostatný słoupek</span>
+                    <span>🏗️ Samostatný sloupek</span>
                     <span className="text-[10px] font-normal opacity-80">(Do trávníku / země)</span>
                   </button>
                 </div>
               </div>
+
+              {mountType === 'pole' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-400">Strana uchycení ke sloupu (zrcadlově)</label>
+                    <button
+                      type="button"
+                      onClick={() => setMountSide((prev) => (prev === 'right' ? 'left' : 'right'))}
+                      className="text-[11px] font-bold text-sky-400 hover:text-sky-300 cursor-pointer"
+                    >
+                      🪞 Zrcadlově otočit
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMountSide('right')}
+                      className={`p-2 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                        mountSide === 'right'
+                          ? 'bg-sky-600 border-sky-400 text-white shadow-md'
+                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <span>⬅️ Cedule vlevo od sloupu</span>
+                      <span className="text-[10px] font-normal opacity-80">(Úchyt vpravo na ceduli)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMountSide('left')}
+                      className={`p-2 rounded-xl border text-xs font-bold transition flex flex-col items-center gap-0.5 cursor-pointer ${
+                        mountSide === 'left'
+                          ? 'bg-sky-600 border-sky-400 text-white shadow-md'
+                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      <span>➡️ Cedule vpravo od sloupu</span>
+                      <span className="text-[10px] font-normal opacity-80">(Úchyt vlevo na ceduli)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {graphicImage && (
+                <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs font-semibold text-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={mirrorGraphic}
+                    onChange={(e) => setMirrorGraphic(e.target.checked)}
+                    className="accent-sky-500"
+                  />
+                  <span>🪞 Zrcadlově převrátit i vložený obrázek grafiky</span>
+                </label>
+              )}
 
               <div>
                 <div className="flex justify-between text-xs font-bold text-slate-400 mb-1">

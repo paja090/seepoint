@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { platformPrisma } from '@/lib/db';
 import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
-import { runWithTenantContext } from '@/lib/tenant-context';
-import { isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
 
 export const runtime = 'nodejs';
 
@@ -21,11 +19,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
-    const report = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.navigationDocumentationReport.findUnique({
-      where: { publicTokenHash: tokenHash },
+    const report = await platformPrisma.navigationDocumentationReport.findFirst({
+      where: { id: owner.id, organizationId: owner.organizationId },
       select: {
         status: true,
-        tokenExpiresAt: true,
         client: {
           select: {
             logoDriveFileId: true,
@@ -34,14 +31,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           },
         },
       },
-    }));
+    });
 
-    if (!report || !isPublicNavigationReportStatus(report.status)) {
+    if (!report || report.status === 'ARCHIVED') {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
-    }
-
-    if (!report.tokenExpiresAt || new Date() > report.tokenExpiresAt) {
-      return NextResponse.json({ error: 'Platnost odkazu vypršela.' }, { status: 410 });
     }
 
     if (!report.client?.logoDriveFileId) {
