@@ -210,9 +210,11 @@ export async function computeGoogleRoute(
     }
 
     const durationSeconds = parseInt(route.duration?.replace('s', '') || '0', 10);
+    const rawDistance = route.distanceMeters || 0;
+    const distanceMeters = rawDistance > 0 ? Math.max(50, Math.round(rawDistance / 50) * 50) : 0;
 
     return {
-      distanceMeters: route.distanceMeters || 0,
+      distanceMeters,
       durationSeconds,
       polyline: route.polyline?.encodedPolyline || '',
       status: 'OK',

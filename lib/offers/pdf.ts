@@ -1,7 +1,11 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import pdfMake from 'pdfmake';
 import roboto from 'pdfmake/build/fonts/Roboto.js';
 import type { ProposalOffer } from './presentation';
 import { getSignedStaticMapUrl } from '@/lib/google-maps';
+import { prisma } from '@/lib/db';
+import { readStoredPhoto } from '@/lib/storage/photo-storage';
 
 const BLUE = '#009EE2';
 const NAVY = '#10253F';
@@ -22,6 +26,93 @@ function configurePdfMake() {
 
 const money = (amount: number) => `${Math.round(amount).toLocaleString('cs-CZ')} Kč`;
 const safe = (value?: string | null, fallback = '—') => value?.trim() || fallback;
+
+export async function resolveImageToDataUrl(
+  urlOrId: string | null | undefined,
+  fallbackPhotoId?: string | null
+): Promise<string | undefined> {
+  const target = (urlOrId || '').trim();
+  if (!target && !fallbackPhotoId) return undefined;
+
+  // 1. Already a data URL
+  if (target.startsWith('data:image/')) {
+    return target;
+  }
+
+  // 2. Check if there's a photo ID in the URL, target itself, or fallbackPhotoId
+  let photoId = fallbackPhotoId || null;
+  const matchPhotoUrl = target.match(/\/photos\/([A-Za-z0-9_-]{10,64})/);
+  if (matchPhotoUrl) {
+    photoId = matchPhotoUrl[1];
+  } else if (!target.startsWith('/') && !target.startsWith('http') && /^[A-Za-z0-9_-]{10,64}$/.test(target)) {
+    photoId = target;
+  }
+
+  if (photoId) {
+    try {
+      const photo = await prisma.photo.findFirst({
+        where: { id: photoId },
+        select: { id: true, driveFileId: true, fileName: true, mimeType: true, url: true, content: true, storageKey: true, storageProvider: true },
+      });
+      if (photo) {
+        const stored = await readStoredPhoto({
+          id: photo.id,
+          url: photo.url || '',
+          content: photo.content,
+          driveFileId: photo.driveFileId,
+          mimeType: photo.mimeType,
+          storageKey: photo.storageKey,
+          storageProvider: photo.storageProvider,
+        });
+        if (stored?.body) {
+          const arrayBuffer = await new Response(stored.body).arrayBuffer();
+          const mime = stored.contentType || photo.mimeType || 'image/jpeg';
+          return `data:${mime};base64,${Buffer.from(arrayBuffer).toString('base64')}`;
+        }
+        if (stored?.redirectUrl) {
+          const res = await fetch(stored.redirectUrl, { signal: AbortSignal.timeout(6000) });
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            const mime = res.headers.get('content-type') || photo.mimeType || 'image/jpeg';
+            return `data:${mime};base64,${buf.toString('base64')}`;
+          }
+        }
+      }
+    } catch {
+      // Continue to next resolution strategies
+    }
+  }
+
+  // 3. Local file in public/ directory (e.g., /offer/..., /images/...)
+  if (target.startsWith('/') && !target.startsWith('/api/')) {
+    try {
+      const cleanPath = target.replace(/^\/+/, '').split('?')[0];
+      const localFilePath = path.join(process.cwd(), 'public', cleanPath);
+      const fileBuffer = await fs.readFile(localFilePath);
+      const ext = path.extname(cleanPath).toLowerCase();
+      const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.svg' ? 'image/svg+xml' : 'image/jpeg';
+      return `data:${mime};base64,${fileBuffer.toString('base64')}`;
+    } catch {
+      // Not a local static file
+    }
+  }
+
+  // 4. Remote HTTP URL
+  if (target.startsWith('http://') || target.startsWith('https://')) {
+    try {
+      const res = await fetch(target, { signal: AbortSignal.timeout(6000) });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        const mime = res.headers.get('content-type') || 'image/jpeg';
+        return `data:${mime};base64,${buf.toString('base64')}`;
+      }
+    } catch {
+      // Fetch failed
+    }
+  }
+
+  return undefined;
+}
 
 function formatArrowDirectionPdf(arrowEnum?: string | null) {
   switch (arrowEnum) {
@@ -82,11 +173,79 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
     });
   }
 
+  // Pre-fetch photos for navigation points
+  const isNavigation = offer.offerType === 'NAVIGATION' && navigationData;
+  const resolvedPointPhotos: Array<{
+    pointIndex: number;
+    point: NonNullable<typeof navigationData>['points'][number];
+    dataUrl: string;
+    photoType: 'visualized' | 'site' | 'installed';
+  }> = [];
+
+  if (isNavigation && navigationData) {
+    for (let idx = 0; idx < navigationData.points.length; idx++) {
+      const point = navigationData.points[idx];
+      const pAny = point as unknown as Record<string, unknown>;
+
+      let dataUrl: string | undefined = undefined;
+      let photoType: 'visualized' | 'site' | 'installed' = 'visualized';
+
+      if (typeof pAny.visualizedPhotoUrl === 'string' && pAny.visualizedPhotoUrl) {
+        dataUrl = await resolveImageToDataUrl(pAny.visualizedPhotoUrl);
+        photoType = 'visualized';
+      }
+      if (!dataUrl && typeof pAny.sitePhotoUrl === 'string' && pAny.sitePhotoUrl) {
+        dataUrl = await resolveImageToDataUrl(pAny.sitePhotoUrl, pAny.sitePhotoId as string | undefined);
+        photoType = 'site';
+      }
+      if (!dataUrl && typeof pAny.installedPhotoUrl === 'string' && pAny.installedPhotoUrl) {
+        dataUrl = await resolveImageToDataUrl(pAny.installedPhotoUrl, pAny.installedPhotoId as string | undefined);
+        photoType = 'installed';
+      }
+      if (!dataUrl && pAny.sitePhotoId) {
+        dataUrl = await resolveImageToDataUrl(undefined, pAny.sitePhotoId as string);
+        photoType = 'site';
+      }
+
+      if (dataUrl) {
+        resolvedPointPhotos.push({ pointIndex: idx, point, dataUrl, photoType });
+      }
+    }
+  }
+
+  // Pre-fetch photos for standard media carriers
+  const resolvedCarrierPhotos: Array<{
+    carrierIndex: number;
+    carrier: typeof offer.carriers[0];
+    dataUrl: string;
+  }> = [];
+
+  if (!isNavigation && offer.carriers.length > 0) {
+    for (let idx = 0; idx < Math.min(18, offer.carriers.length); idx++) {
+      const carrier = offer.carriers[idx];
+      const matchingItem = offer.rawOffer?.items?.find((it) => it.surface.carrier.code === carrier.code);
+      const photoCandidate =
+        carrier.image ||
+        matchingItem?.surface.photos?.[0]?.url ||
+        null;
+      const fallbackId = matchingItem?.surface.photos?.[0]?.id || null;
+
+      const dataUrl = await resolveImageToDataUrl(photoCandidate, fallbackId);
+      if (dataUrl) {
+        resolvedCarrierPhotos.push({ carrierIndex: idx, carrier, dataUrl });
+      }
+    }
+  }
+
+  // Pre-fetch graphic artwork proof if enabled
+  let graphicProofDataUrl: string | undefined = undefined;
+  if (isNavigation && navigationData && (navigationData as unknown as Record<string, unknown>).includeGraphicProof !== false) {
+    const rawArtworkUrl = (navigationData as unknown as Record<string, unknown>).graphicArtworkUrl as string | undefined;
+    graphicProofDataUrl = await resolveImageToDataUrl(rawArtworkUrl || '/offer/navigation-proof-template.jpg');
+  }
+
   const regularPricing = offer.pricing.filter((row) => row.emphasis !== 'total');
   const total = offer.pricing.find((row) => row.emphasis === 'total')?.amount ?? offer.stats.total;
-
-  // Build table rows depending on offer type
-  const isNavigation = offer.offerType === 'NAVIGATION' && navigationData;
 
   const tableHeader = isNavigation
     ? [{ text: '#', style: 'tableHeader' }, { text: 'Navigační bod & Sloup', style: 'tableHeader' }, { text: 'Směr navedení', style: 'tableHeader' }, { text: 'Vzdálenost', style: 'tableHeader' }, { text: 'Cena', style: 'tableHeader' }]
@@ -97,10 +256,14 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
   const tableRows = isNavigation
     ? navigationData.points.slice(0, 18).map((point, index) => {
         const pAny = point as unknown as Record<string, unknown>;
+        const rawDist = pAny.calculatedDistanceMeters;
+        const distMeters = typeof rawDist === 'number' && rawDist > 0
+          ? Math.max(50, Math.round(rawDist / 50) * 50)
+          : null;
         const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
           ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-          : typeof pAny.calculatedDistanceMeters === 'number'
-            ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
+          : typeof distMeters === 'number'
+            ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`)
             : '—';
 
         const pillarStr = pAny.pillarNumber ? ` [Sloup ${pAny.pillarNumber}]` : '';
@@ -214,34 +377,100 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       ...(!isNavigation && offer.carriers.length > 18 ? [{ text: `Dalších ${offer.carriers.length - 18} ploch je uvedeno v interaktivní nabídce.`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 12] }] : []),
 
       // Visualized photos of navigation points
-      ...(isNavigation && navigationData ? [
-        ...navigationData.points
-          .filter((p) => {
-            const img = (p as unknown as Record<string, unknown>).visualizedPhotoUrl;
-            return typeof img === 'string' && img.startsWith('data:image/');
-          })
-          .map((p, idx) => {
-            const pAny = p as unknown as Record<string, unknown>;
-            const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
-              ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-              : typeof pAny.calculatedDistanceMeters === 'number'
-                ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
-                : '—';
+      ...(isNavigation && resolvedPointPhotos.length > 0 ? [
+        { text: 'Fotodokumentace vybraných navigačních lokalit', style: 'heading', pageBreak: 'before' },
+        { text: 'Pohledy na osazované sloupy veřejného osvětlení a přesné umístění navigačních médií na trase:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 10] },
+        ...resolvedPointPhotos.map(({ pointIndex, point, dataUrl }) => {
+          const pAny = point as unknown as Record<string, unknown>;
+          const rawDist = pAny.calculatedDistanceMeters;
+          const distMeters = typeof rawDist === 'number' && rawDist > 0
+            ? Math.max(50, Math.round(rawDist / 50) * 50)
+            : null;
+          const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
+            ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
+            : typeof distMeters === 'number'
+              ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`)
+              : '—';
 
-            return {
-              stack: [
-                { text: `Bod #${idx + 1}: ${p.label} (${distStr} do cíle)`, bold: true, fontSize: 9.5, color: NAVY, margin: [0, 6, 0, 4] },
-                { image: String(pAny.visualizedPhotoUrl), width: 518, margin: [0, 0, 0, 12] },
-              ],
-            };
-          }),
+          const pillarStr = pAny.pillarNumber ? `Sloup VO: ${pAny.pillarNumber}` : '';
+          const addressStr = point.address ? `📍 ${point.address}` : point.navigationType;
+          const arrowStr = formatArrowDirectionPdf(typeof pAny.arrowDirectionEnum === 'string' ? pAny.arrowDirectionEnum : null);
+
+          return {
+            unbreakable: true,
+            margin: [0, 0, 0, 14],
+            stack: [
+              {
+                table: {
+                  widths: ['*'],
+                  body: [[
+                    {
+                      stack: [
+                        {
+                          columns: [
+                            { text: `Bod #${pointIndex + 1}: ${point.label}`, bold: true, fontSize: 10, color: NAVY },
+                            { text: `${distStr} do cíle  •  ${arrowStr}`, bold: true, fontSize: 9, color: BLUE, alignment: 'right' },
+                          ],
+                        },
+                        {
+                          columns: [
+                            { text: addressStr, fontSize: 8, color: MUTED, margin: [0, 2, 0, 0] },
+                            ...(pillarStr ? [{ text: pillarStr, fontSize: 8, bold: true, color: MUTED, alignment: 'right', margin: [0, 2, 0, 0] }] : []),
+                          ],
+                        },
+                        { image: dataUrl, width: 494, margin: [0, 6, 0, 0] },
+                      ],
+                      margin: [10, 8, 10, 10],
+                    },
+                  ]],
+                },
+                layout: { fillColor: '#F8FAFC', hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0' },
+              },
+            ],
+          };
+        }),
+      ] : []),
+
+      // Photos of standard media carriers
+      ...(!isNavigation && resolvedCarrierPhotos.length > 0 ? [
+        { text: 'Fotodokumentace vybraných reklamních ploch', style: 'heading', pageBreak: 'before' },
+        { text: 'Detailní pohledy na vybrané reklamní nosiče:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 10] },
+        ...resolvedCarrierPhotos.map(({ carrierIndex, carrier, dataUrl }) => {
+          return {
+            unbreakable: true,
+            margin: [0, 0, 0, 14],
+            stack: [
+              {
+                table: {
+                  widths: ['*'],
+                  body: [[
+                    {
+                      stack: [
+                        {
+                          columns: [
+                            { text: `#${carrierIndex + 1}: ${carrier.code}`, bold: true, fontSize: 10, color: NAVY },
+                            { text: `${safe(carrier.dimensions)}  •  ${safe(carrier.mediaType)}`, bold: true, fontSize: 9, color: BLUE, alignment: 'right' },
+                          ],
+                        },
+                        { text: `📍 ${safe(carrier.city)}, ${safe(carrier.locality)}${carrier.description ? ` — ${carrier.description}` : ''}`, fontSize: 8, color: MUTED, margin: [0, 2, 0, 0] },
+                        { image: dataUrl, width: 494, margin: [0, 6, 0, 0] },
+                      ],
+                      margin: [10, 8, 10, 10],
+                    },
+                  ]],
+                },
+                layout: { fillColor: '#F8FAFC', hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0' },
+              },
+            ],
+          };
+        }),
       ] : []),
 
       // Graphic Artwork Proof Section in PDF (670 x 900 mm)
-      ...(isNavigation && navigationData && (navigationData as unknown as Record<string, unknown>).includeGraphicProof !== false && typeof (navigationData as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl).startsWith('data:image/') ? [
+      ...(graphicProofDataUrl ? [
         { text: 'Grafický motiv a provedení cedule (670 × 900 mm)', style: 'heading', margin: [0, 14, 0, 8] },
         { text: 'Tiskový motiv oboustranné plástve pro montáž na sloupy veřejného osvětlení:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 8] },
-        { image: String((navigationData as unknown as Record<string, unknown>).graphicArtworkUrl), width: 240, alignment: 'center', margin: [0, 4, 0, 16] },
+        { image: graphicProofDataUrl, width: 240, alignment: 'center', margin: [0, 4, 0, 16] },
       ] : []),
       { text: 'Cenová kalkulace', style: 'heading', pageBreak: 'before' },
       { text: 'Jednotlivé složky ceny jsou načtené z cenového katalogu a v nabídce přehledně oddělené.', color: MUTED, margin: [0, 0, 0, 12] },
@@ -294,12 +523,47 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
     });
   }
 
+  const resolvedInstallPhotos: Array<{
+    pointIndex: number;
+    point: NonNullable<typeof navigationData>['points'][number];
+    dataUrl: string;
+  }> = [];
+
+  if (navigationData) {
+    for (let idx = 0; idx < navigationData.points.length; idx++) {
+      const point = navigationData.points[idx];
+      const pAny = point as unknown as Record<string, unknown>;
+
+      let dataUrl: string | undefined = undefined;
+      if (typeof pAny.visualizedPhotoUrl === 'string' && pAny.visualizedPhotoUrl) {
+        dataUrl = await resolveImageToDataUrl(pAny.visualizedPhotoUrl);
+      }
+      if (!dataUrl && typeof pAny.sitePhotoUrl === 'string' && pAny.sitePhotoUrl) {
+        dataUrl = await resolveImageToDataUrl(pAny.sitePhotoUrl, pAny.sitePhotoId as string | undefined);
+      }
+      if (!dataUrl && typeof pAny.installedPhotoUrl === 'string' && pAny.installedPhotoUrl) {
+        dataUrl = await resolveImageToDataUrl(pAny.installedPhotoUrl, pAny.installedPhotoId as string | undefined);
+      }
+      if (!dataUrl && pAny.sitePhotoId) {
+        dataUrl = await resolveImageToDataUrl(undefined, pAny.sitePhotoId as string);
+      }
+
+      if (dataUrl) {
+        resolvedInstallPhotos.push({ pointIndex: idx, point, dataUrl });
+      }
+    }
+  }
+
   const pointRows = navigationData ? navigationData.points.map((point, index) => {
     const pAny = point as unknown as Record<string, unknown>;
+    const rawDist = pAny.calculatedDistanceMeters;
+    const distMeters = typeof rawDist === 'number' && rawDist > 0
+      ? Math.max(50, Math.round(rawDist / 50) * 50)
+      : null;
     const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
       ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-      : typeof pAny.calculatedDistanceMeters === 'number'
-        ? (pAny.calculatedDistanceMeters >= 1000 ? `${(pAny.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${pAny.calculatedDistanceMeters} m`)
+      : typeof distMeters === 'number'
+        ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`)
         : '—';
 
     const pillarStr = pAny.pillarNumber ? `Sloup ${pAny.pillarNumber}` : '—';
@@ -384,26 +648,20 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
       },
 
       // Visualized photos of points for installers
-      ...(navigationData && navigationData.points.some((p) => {
-        const img = (p as unknown as Record<string, unknown>).visualizedPhotoUrl;
-        return typeof img === 'string' && img.startsWith('data:image/');
-      }) ? [
+      ...(resolvedInstallPhotos.length > 0 ? [
         { text: 'Fotodokumentace a přesný zákres umístění cedulí', style: 'heading', pageBreak: 'before' },
-        ...navigationData.points
-          .filter((p) => {
-            const img = (p as unknown as Record<string, unknown>).visualizedPhotoUrl;
-            return typeof img === 'string' && img.startsWith('data:image/');
-          })
-          .map((p, idx) => {
-            const pAny = p as unknown as Record<string, unknown>;
-            return {
-              stack: [
-                { text: `Bod #${idx + 1}: ${p.label} (Sloup VO č. ${safe(String(pAny.pillarNumber || '—'))})`, bold: true, fontSize: 10, color: NAVY, margin: [0, 8, 0, 4] },
-                { text: `GPS: ${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}  •  Směr šipky: ${formatArrowDirectionPdf(String(pAny.arrowDirectionEnum || 'STRAIGHT'))}`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 6] },
-                { image: String(pAny.visualizedPhotoUrl), width: 518, margin: [0, 0, 0, 14] },
-              ],
-            };
-          }),
+        ...resolvedInstallPhotos.map(({ pointIndex, point, dataUrl }) => {
+          const pAny = point as unknown as Record<string, unknown>;
+          return {
+            unbreakable: true,
+            margin: [0, 0, 0, 14],
+            stack: [
+              { text: `Bod #${pointIndex + 1}: ${point.label} (Sloup VO č. ${safe(String(pAny.pillarNumber || '—'))})`, bold: true, fontSize: 10, color: NAVY, margin: [0, 8, 0, 4] },
+              { text: `GPS: ${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}  •  Směr šipky: ${formatArrowDirectionPdf(String(pAny.arrowDirectionEnum || 'STRAIGHT'))}`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 6] },
+              { image: dataUrl, width: 518, margin: [0, 0, 0, 14] },
+            ],
+          };
+        }),
       ] : []),
 
       // Protocol Confirmation Box

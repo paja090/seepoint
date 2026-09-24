@@ -552,10 +552,8 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             <div className="flex items-center gap-2 shrink-0">
               {branding?.logoUrl ? (
                 <img alt={agencyName} className="h-8 max-w-44 object-contain" src={branding.logoUrl} />
-              ) : offer.client?.logoUrl ? (
-                <img alt={`Logo ${offer.client.name}`} className="h-8 max-w-44 object-contain" src={offer.client.logoUrl} />
               ) : (
-                <img alt="SeePOINT" className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
+                <img alt={agencyName || "SeePOINT"} className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
               )}
             </div>
             <div className="h-4 w-px bg-slate-300 hidden sm:block" />

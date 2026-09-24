@@ -120,10 +120,11 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
     return `${String(point.manualDistanceValue)} ${unit} od cíle`;
   }
   if (typeof point.calculatedDistanceMeters === 'number') {
-    if (point.calculatedDistanceMeters >= 1000) {
-      return `${(point.calculatedDistanceMeters / 1000).toFixed(1).replace('.', ',')} km od cíle`;
+    const rounded = Math.max(50, Math.round(point.calculatedDistanceMeters / 50) * 50);
+    if (rounded >= 1000) {
+      return `${(rounded / 1000).toFixed(1).replace('.', ',')} km od cíle`;
     }
-    return `${point.calculatedDistanceMeters} m od cíle`;
+    return `${rounded} m od cíle`;
   }
   return 'Trasa vypočítávána';
 }
@@ -131,6 +132,20 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
 export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
   const navigation = offer.navigation;
   const effectiveProposalKey = proposalKey ?? offer.id;
+
+  const presentationSettings = (offer.campaignStrategy as Record<string, unknown> | null)?.presentationSettings as {
+    showGraphicProofBadge?: boolean;
+    showReferences?: boolean;
+    showRealizations?: boolean;
+    showPartnershipGuarantee?: boolean;
+    showAboutCompany?: boolean;
+  } | undefined;
+
+  const showGraphicProofBadge = presentationSettings?.showGraphicProofBadge !== false;
+  const showReferences = presentationSettings?.showReferences !== false;
+  const showRealizations = presentationSettings?.showRealizations !== false;
+  const showPartnershipGuarantee = presentationSettings?.showPartnershipGuarantee !== false;
+  const showAboutCompany = presentationSettings?.showAboutCompany !== false;
 
   const isDefaultSeePoint = !offer.branding?.name || offer.branding.name.toLowerCase().includes('seepoint');
   const companyName = offer.branding?.name || 'SeePOINT s.r.o.';
@@ -904,16 +919,18 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-base">Navigační systém – statutární město Havířov</h4>
                     <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                      V Havířově se využívá schválený formát panelu s horním půlkruhem (dle pasportu města Havířov). Finální grafický náhled na míru s Vaším logem a směrovými šipkami bude zpracován naším grafikem a zaslán klientovi ke schválení před výrobou.
+                      V Havířově se využívá schválený formát panelu s horním půlkruhem (dle pasportu města Havířov).
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <span className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-950/60 border border-indigo-700/50 px-3.5 py-1.5 text-xs font-bold text-indigo-300">
                       <span>📐</span> Atypický formát s horním půlkruhem
                     </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
-                      <span>✨</span> Grafická korektura před tiskem
-                    </span>
+                    {showGraphicProofBadge && (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
+                        <span>✨</span> Grafická korektura před tiskem
+                      </span>
+                    )}
                   </div>
                 </div>
               ) : isOstrava ? (
@@ -924,7 +941,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-base">Navigační systém – statutární město Ostrava</h4>
                     <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                      V Ostravě se využívá standardizovaný schválený formát panelu <strong>670 × 900 mm</strong> na sloupech veřejného osvětlení (ve správě Dopravního podniku Ostrava a Ostravských komunikací). Finální grafický náhled na míru (s Vaším logem, směrovou šipkou a kilometráží) připraví náš grafik a zašleme vám jej ke schválení před samotnou výrobou a instalací.
+                      V Ostravě se využívá standardizovaný schválený formát panelu <strong>670 × 900 mm</strong> na sloupech veřejného osvětlení (ve správě Dopravního podniku Ostrava a Ostravských komunikací).
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
@@ -934,9 +951,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 border border-slate-700 px-3.5 py-1.5 text-xs font-bold text-slate-300">
                       <span>🏙️</span> Sloupy VO (DPO / Ostrava)
                     </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
-                      <span>✨</span> Grafická korektura v ceně
-                    </span>
+                    {showGraphicProofBadge && (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
+                        <span>✨</span> Grafická korektura v ceně
+                      </span>
+                    )}
                   </div>
                   <div className="pt-2">
                     <button
@@ -956,16 +975,18 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-base">Navigační systém – {targetCity || 'lokální značení'}</h4>
                     <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                      V dané lokalitě se využívá standardní schválený formát navigačních panelů na sloupech VO dle místního pasportu. Finální grafický náhled na míru pro vás připraví grafik a zašleme ke schválení před výrobou.
+                      V dané lokalitě se využívá standardní schválený formát navigačních panelů na sloupech VO dle místního pasportu.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
                       <span>📐</span> Formát dle pasportu města
                     </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
-                      <span>✨</span> Grafická korektura v ceně
-                    </span>
+                    {showGraphicProofBadge && (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
+                        <span>✨</span> Grafická korektura v ceně
+                      </span>
+                    )}
                   </div>
                 </div>
               )
@@ -1155,453 +1176,463 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       </section>
 
       {/* 🏆 References & Realization Photo Gallery Section */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm space-y-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 font-black text-xl shadow-xs border border-emerald-100">
-              🏆
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">
-                Ukázky realizací a zkušenosti našich klientů
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                {targetCity
-                  ? `Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO (${targetCity} a okolí).`
-                  : 'Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO.'}
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800">
-            ✓ Profesionální instalace na VO
-          </span>
-        </div>
-
-        {/* Realization Stats Badges */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">400+</div>
-            <div className="text-[11px] font-semibold text-slate-500">Navigačních ploch na sloupech VO</div>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">150+</div>
-            <div className="text-[11px] font-semibold text-slate-500">Realizovaných tras a navigačních sítí</div>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-slate-900">3 mm</div>
-            <div className="text-[11px] font-semibold text-slate-500">Odolný DIBOND & UV tisk</div>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
-            <div className="text-xl md:text-2xl font-black text-emerald-700">14 dní</div>
-            <div className="text-[11px] font-semibold text-slate-500">Průměrná doba od schválení po instalaci</div>
-          </div>
-        </div>
-
-        {/* Client Testimonials Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-red-900 bg-red-100 px-2.5 py-1 rounded-lg">KFC ČR</span>
-                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+      {(showReferences || showRealizations) && (
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm space-y-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 font-black text-xl shadow-xs border border-emerald-100">
+                🏆
               </div>
-              <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Perfektní řešení příjezdové navigace k našim restauracím a Drive-Thru z hlavních městských průtahů. Řidiči odbočí přesně tam, kde mají.“
-              </p>
-            </div>
-            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Navigační síť Drive-Thru • Ostrava & okrajové sídliště
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-blue-900 bg-blue-100 px-2.5 py-1 rounded-lg">LIDL Česká republika</span>
-                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Ukázky realizací a zkušenosti našich klientů
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  {targetCity
+                    ? `Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO (${targetCity} a okolí).`
+                    : 'Více než 400+ navigačních ploch a úspěšně zřízených tras na sloupech VO.'}
+                </p>
               </div>
-              <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Rychlé technické prověření sloupů VO, spolehlivá instalace a bezchybná fotodokumentace. Vše proběhlo přesně podle plánu.“
-              </p>
             </div>
-            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Městské navádění prodejen • Havířov & Karviná
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-xs text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg">Penny Market</span>
-                <span className="text-amber-500 text-xs font-bold">★★★★★</span>
-              </div>
-              <p className="text-xs text-slate-600 italic leading-relaxed">
-                „Přehledná navigační kampaň na klíčových křižovatkách efektivně navádí řidiče z hlavních tahů přímo k našim prodejnám.“
-              </p>
-            </div>
-            <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
-              Navigační cedule Dibond • Frýdek-Místek & Karviná
-            </div>
-          </div>
-        </div>
-
-        {/* Realization Photo Gallery Showcase */}
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-950 p-5 text-white space-y-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base">📸</span>
-              <h4 className="font-bold text-sm text-white">Ukázka vybraných realizací navigačních nosičů v terénu</h4>
-            </div>
-            <span className="text-xs font-medium text-slate-400">
-              Ilustrační přehled různorodých klientů a typů instalací (400+ nosičů v síti)
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800">
+              ✓ Profesionální instalace na VO
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* 1. Penny Fryčovice */}
-            <div
-              className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
-              onClick={() => setActiveLightboxImage('/offer/real-penny-frycovice.jpg')}
-            >
-              <img
-                src="/offer/real-penny-frycovice.jpg"
-                alt="Ukázka realizace – Penny Market Fryčovice"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-xs text-red-300 bg-red-950/90 px-2.5 py-1 rounded-lg border border-red-800/60 backdrop-blur-xs">PENNY Fryčovice</span>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Instalováno na VO</span>
-                </div>
-                <div className="space-y-0.5 text-white">
-                  <p className="text-xs font-bold flex items-center justify-between">
-                    <span>📍 PENNY Market – Fryčovice (2,5 km)</span>
-                    <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
-                  </p>
-                  <p className="text-[11px] text-slate-300 font-medium">Červená směrová cedule s odrazovou šipkou na betonovém sloupu VO.</p>
-                </div>
-              </div>
+          {/* Realization Stats Badges */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+              <div className="text-xl md:text-2xl font-black text-slate-900">400+</div>
+              <div className="text-[11px] font-semibold text-slate-500">Navigačních ploch na sloupech VO</div>
             </div>
-
-            {/* 2. McDonald's */}
-            <div
-              className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
-              onClick={() => setActiveLightboxImage('/offer/real-mcdonalds.jpg')}
-            >
-              <img
-                src="/offer/real-mcdonalds.jpg"
-                alt="Ukázka realizace – McDonald's"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">McDonald&apos;s</span>
-                  <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Instalováno na VO</span>
-                </div>
-                <div className="space-y-0.5 text-white">
-                  <p className="text-xs font-bold flex items-center justify-between">
-                    <span>📍 McDonald&apos;s – Navigace k provozovně (1,4 km)</span>
-                    <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
-                  </p>
-                  <p className="text-[11px] text-slate-300 font-medium">Černá matná deska Dibond s logem a vzdáleností na sloupu veřejného osvětlení (VO).</p>
-                </div>
-              </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+              <div className="text-xl md:text-2xl font-black text-slate-900">150+</div>
+              <div className="text-[11px] font-semibold text-slate-500">Realizovaných tras a navigačních sítí</div>
             </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+              <div className="text-xl md:text-2xl font-black text-slate-900">3 mm</div>
+              <div className="text-[11px] font-semibold text-slate-500">Odolný DIBOND & UV tisk</div>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 text-center">
+              <div className="text-xl md:text-2xl font-black text-emerald-700">14 dní</div>
+              <div className="text-[11px] font-semibold text-slate-500">Průměrná doba od schválení po instalaci</div>
+            </div>
+          </div>
 
-            {/* 3. LIDL */}
-            <div
-              className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
-              onClick={() => setActiveLightboxImage('/offer/real-lidl.jpg')}
-            >
-              <img
-                src="/offer/real-lidl.jpg"
-                alt="Ukázka realizace – LIDL"
-                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-xs text-blue-300 bg-blue-950/90 px-2.5 py-1 rounded-lg border border-blue-800/60 backdrop-blur-xs">LIDL Navigace</span>
-                  <span className="text-[10px] font-bold text-sky-300 bg-sky-950/90 px-2 py-0.5 rounded border border-sky-800/60 backdrop-blur-xs">✓ Samostatný sloupek</span>
-                </div>
-                <div className="space-y-0.5 text-white">
-                  <p className="text-xs font-bold flex items-center justify-between">
-                    <span>📍 LIDL Česká republika (1,1 km)</span>
-                    <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+          {/* Client Testimonials Grid */}
+          {showReferences && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs text-red-900 bg-red-100 px-2.5 py-1 rounded-lg">KFC ČR</span>
+                    <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+                  </div>
+                  <p className="text-xs text-slate-600 italic leading-relaxed">
+                    „Perfektní řešení příjezdové navigace k našim restauracím a Drive-Thru z hlavních městských průtahů. Řidiči odbočí přesně tam, kde mají.“
                   </p>
                 </div>
+                <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+                  Navigační síť Drive-Thru • Ostrava & okrajové sídliště
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Trust & Performance Divider Strip (Breaks up heavy graphics flow) */}
-      <section className="rounded-3xl border border-slate-800/80 bg-slate-900/60 p-6 md:p-8 backdrop-blur-md shadow-xl text-center space-y-5">
-        <div className="max-w-3xl mx-auto space-y-2">
-          <span className="text-[11px] font-black uppercase tracking-widest text-sky-300 bg-sky-950/80 px-3 py-1 rounded-full border border-sky-800/60 inline-block">
-            🤝 Garance spolehlivého partnerství
-          </span>
-          <h4 className="text-lg sm:text-xl font-black text-white tracking-tight">
-            Kompletní outdoorový servis od A do Z pod jednou střechou
-          </h4>
-          <p className="text-xs text-slate-300 font-medium leading-relaxed">
-            Postaráme se o kompletní technickou realizaci – od prověření a pasportizace sloupů VO, přes velkoformátový tisk a bezpečnou montáž plošinami, až po záruční servis a fotodokumentaci.
-          </p>
-        </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs text-blue-900 bg-blue-100 px-2.5 py-1 rounded-lg">LIDL Česká republika</span>
+                    <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+                  </div>
+                  <p className="text-xs text-slate-600 italic leading-relaxed">
+                    „Rychlé technické prověření sloupů VO, spolehlivá instalace a bezchybná fotodokumentace. Vše proběhlo přesně podle plánu.“
+                  </p>
+                </div>
+                <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+                  Městské navádění prodejen • Havířov & Karviná
+                </div>
+              </div>
 
-        {/* 4 Key Trust Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-4xl mx-auto pt-3 border-t border-slate-800/80">
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
-            <span className="text-2xl font-black text-sky-400 block tracking-tight">400+</span>
-            <span className="text-[11px] font-bold text-slate-300">Aktivních ploch v síti</span>
-          </div>
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
-            <span className="text-2xl font-black text-sky-400 block tracking-tight">15+ let</span>
-            <span className="text-[11px] font-bold text-slate-300">Zkušeností v oboru</span>
-          </div>
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
-            <span className="text-2xl font-black text-sky-400 block tracking-tight">Bandimex</span>
-            <span className="text-[11px] font-bold text-slate-300">Nerezové uchycení</span>
-          </div>
-          <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
-            <span className="text-2xl font-black text-sky-400 block tracking-tight">48 hod</span>
-            <span className="text-[11px] font-bold text-slate-300">Garance servisu</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Realizátor nabídky - Conditional SeePOINT Portfolio or Multi-Tenant Technical Quality Standards */}
-      <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/95 to-sky-950/30 p-6 md:p-8 text-white shadow-2xl space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-sky-950/80 text-sky-300 border border-sky-800/60 mb-2">
-              <span>🏢 Realizátor nabídky</span>
-            </div>
-            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
-              <span>{isDefaultSeePoint ? 'O společnosti SEEPOINT s.r.o.' : `O společnosti ${companyName}`}</span>
-            </h3>
-            <p className="text-xs text-slate-300 mt-1 font-medium max-w-2xl">
-              {isDefaultSeePoint ? (
-                'Přední dodavatel outdoorové reklamy a výrobce originálních nosičů v Moravskoslezském kraji. Kromě navigačních systémů zajišťujeme kompletní reklamní servis pro malé i velké značky.'
-              ) : (
-                `Specializovaný dodavatel navigačních systémů a venkovní reklamy${targetCity ? ` pro lokalitu ${targetCity} a okolí` : ''}. Zajišťujeme kompletní technické prověření, výrobu z odolných materiálů a bezpečnou montáž na sloupech veřejného osvětlení.`
-              )}
-            </p>
-          </div>
-          {companyWebsite && (
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <a
-                href={companyWebsite.startsWith('http') ? companyWebsite : `https://${companyWebsite}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs shadow-lg shadow-sky-500/20 transition"
-              >
-                <span>🌐 Navštívit {companyWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
-              </a>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-5 space-y-3 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-xs text-amber-900 bg-amber-100 px-2.5 py-1 rounded-lg">Penny Market</span>
+                    <span className="text-amber-500 text-xs font-bold">★★★★★</span>
+                  </div>
+                  <p className="text-xs text-slate-600 italic leading-relaxed">
+                    „Přehledná navigační kampaň na klíčových křižovatkách efektivně navádí řidiče z hlavních tahů přímo k našim prodejnám.“
+                  </p>
+                </div>
+                <div className="text-[11px] font-bold text-slate-500 pt-2 border-t border-slate-200/60">
+                  Navigační cedule Dibond • Frýdek-Místek & Karviná
+                </div>
+              </div>
             </div>
           )}
-        </div>
 
-        {isDefaultSeePoint ? (
-          /* 5 Core Pillars Grid - SeePOINT Portfolio & Media Types */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* 1. Navigation */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/navigation.jpg"
-                  alt="Navigační systémy na sloupech VO a trolejí"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Městská navigace (VO)</span>
+          {/* Realization Photo Gallery Showcase */}
+          {showRealizations && (
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 to-slate-950 p-5 text-white space-y-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📸</span>
+                  <h4 className="font-bold text-sm text-white">Ukázka vybraných realizací navigačních nosičů v terénu</h4>
                 </div>
+                <span className="text-xs font-medium text-slate-400">
+                  Ilustrační přehled různorodých klientů a typů instalací (400+ nosičů v síti)
+                </span>
               </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Navigační tabule a směrové panely</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">Exkluzivní síť více než 400+ navigačních ploch na sloupech veřejného osvětlení u nejfrekventovanějších křižovatek a tahů. Dlouhodobá navigace zákazníků přímo k provozovně.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. Penny Fryčovice */}
+                <div
+                  className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+                  onClick={() => setActiveLightboxImage('/offer/real-penny-frycovice.jpg')}
+                >
+                  <img
+                    src="/offer/real-penny-frycovice.jpg"
+                    alt="Ukázka realizace – Penny Market Fryčovice"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-red-300 bg-red-950/90 px-2.5 py-1 rounded-lg border border-red-800/60 backdrop-blur-xs">PENNY Fryčovice</span>
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Instalováno na VO</span>
+                    </div>
+                    <div className="space-y-0.5 text-white">
+                      <p className="text-xs font-bold flex items-center justify-between">
+                        <span>📍 PENNY Market – Fryčovice (2,5 km)</span>
+                        <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                      </p>
+                      <p className="text-[11px] text-slate-300 font-medium">Červená směrová cedule s odrazovou šipkou na betonovém sloupu VO.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. McDonald's */}
+                <div
+                  className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+                  onClick={() => setActiveLightboxImage('/offer/real-mcdonalds.jpg')}
+                >
+                  <img
+                    src="/offer/real-mcdonalds.jpg"
+                    alt="Ukázka realizace – McDonald's"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">McDonald&apos;s</span>
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Instalováno na VO</span>
+                    </div>
+                    <div className="space-y-0.5 text-white">
+                      <p className="text-xs font-bold flex items-center justify-between">
+                        <span>📍 McDonald&apos;s – Navigace k provozovně (1,4 km)</span>
+                        <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                      </p>
+                      <p className="text-[11px] text-slate-300 font-medium">Černá matná deska Dibond s logem a vzdáleností na sloupu veřejného osvětlení (VO).</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. LIDL */}
+                <div
+                  className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+                  onClick={() => setActiveLightboxImage('/offer/real-lidl.jpg')}
+                >
+                  <img
+                    src="/offer/real-lidl.jpg"
+                    alt="Ukázka realizace – LIDL"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-blue-300 bg-blue-950/90 px-2.5 py-1 rounded-lg border border-blue-800/60 backdrop-blur-xs">LIDL Navigace</span>
+                      <span className="text-[10px] font-bold text-sky-300 bg-sky-950/90 px-2 py-0.5 rounded border border-sky-800/60 backdrop-blur-xs">✓ Samostatný sloupek</span>
+                    </div>
+                    <div className="space-y-0.5 text-white">
+                      <p className="text-xs font-bold flex items-center justify-between">
+                        <span>📍 LIDL Česká republika (1,1 km)</span>
+                        <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
+        </section>
+      )}
 
-            {/* 2. Citylight */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/citylight.jpg"
-                  alt="Prosvětlené Citylight CLV vitríny"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">💡 Prosvětlená reklama (CLV)</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">City Light Vitríny (CLV)</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">Prestižní svítící vitríny na klíčových městských tepnách, u zastávek MHD a v pěších zónách. Zajišťují nepřetržitou viditelnost a dominanci vašich motivů ve dne i v noci.</p>
-              </div>
+      {/* Trust & Performance Divider Strip (Breaks up heavy graphics flow) */}
+      {showPartnershipGuarantee && (
+        <section className="rounded-3xl border border-slate-800/80 bg-slate-900/60 p-6 md:p-8 backdrop-blur-md shadow-xl text-center space-y-5">
+          <div className="max-w-3xl mx-auto space-y-2">
+            <span className="text-[11px] font-black uppercase tracking-widest text-sky-300 bg-sky-950/80 px-3 py-1 rounded-full border border-sky-800/60 inline-block">
+              🤝 Garance spolehlivého partnerství
+            </span>
+            <h4 className="text-lg sm:text-xl font-black text-white tracking-tight">
+              Kompletní outdoorový servis od A do Z pod jednou střechou
+            </h4>
+            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+              Postaráme se o kompletní technickou realizaci – od prověření a pasportizace sloupů VO, přes velkoformátový tisk a bezpečnou montáž plošinami, až po záruční servis a fotodokumentaci.
+            </p>
+          </div>
+
+          {/* 4 Key Trust Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-4xl mx-auto pt-3 border-t border-slate-800/80">
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
+              <span className="text-2xl font-black text-sky-400 block tracking-tight">400+</span>
+              <span className="text-[11px] font-bold text-slate-300">Aktivních ploch v síti</span>
             </div>
-
-            {/* 3. Promo Tower */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/promo-tower.jpg"
-                  alt="Promo věže a velkoplošné konstrukce"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🗼 Promo věže & Dominanty</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Promo věže & věžní konstrukce</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">Nepřehlédnutelné velkoplošné čtyřstranné věže a horizontální nosiče situované u nákupních zón, kruhových objezdů a vstupů do měst. Zásah tisíců řidičů denně.</p>
-              </div>
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
+              <span className="text-2xl font-black text-sky-400 block tracking-tight">15+ let</span>
+              <span className="text-[11px] font-bold text-slate-300">Zkušeností v oboru</span>
             </div>
-
-            {/* 4. City Poster */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/city-poster.jpg"
-                  alt="City Poster CLP plakátové vitríny"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🖼️ City Poster & Vitríny</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">City Poster (CLP) & A0 bannery</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">Městské plakátové vitríny a kampaňové plochy v těsné blízkosti poštám, úřadům, zdravotnickým zařízením a obchodním centrům pro cílenou regionální komunikaci.</p>
-              </div>
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
+              <span className="text-2xl font-black text-sky-400 block tracking-tight">Bandimex</span>
+              <span className="text-[11px] font-bold text-slate-300">Nerezové uchycení</span>
             </div>
-
-            {/* 5. Full Service & Manufacturing */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md lg:col-span-2 flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/promo-bench.jpg"
-                  alt="Vlastní výroba, velkoformátový tisk a servis na klíč"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end justify-between">
-                  <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">🪑 Mobiliář & Kompletní výroba na klíč</span>
-                  <span className="font-bold text-[10px] text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60">⚡ Servis do 48 hod</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Vlastní tiskárna, zámečnictví & servis na klíč</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">Disponujeme vlastní moderní tiskárnou, výrobou Dibond desek i montážními plošinami. Zabezpečíme technické prověření lokalit, profesionální instalaci i bleskovou servisní údržbu či čištění do 48 hodin.</p>
-              </div>
+            <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/70 text-center space-y-1 hover:border-sky-700/50 transition">
+              <span className="text-2xl font-black text-sky-400 block tracking-tight">48 hod</span>
+              <span className="text-[11px] font-bold text-slate-300">Garance servisu</span>
             </div>
           </div>
-        ) : (
-          /* 4 Core Pillars Grid - Other Tenants: Universal Technical Standards */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. Navigation */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/navigation.jpg"
-                  alt="Navigační panely na sloupech VO"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Městská navigace (VO)</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Cílené směrové panely</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                  Umístění na sloupech veřejného osvětlení u frekventovaných křižovatek a příjezdových tras. Dlouhodobě navádí řidiče i chodce přímo k vaší provozovně.
-                </p>
-              </div>
-            </div>
+        </section>
+      )}
 
-            {/* 2. Dibond 3 mm */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/offer/real-mcdonalds.jpg"
-                  alt="Odolné hliníkové panely DIBOND"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">🛡️ DIBOND® sendvič (3 mm)</span>
-                </div>
+      {/* Realizátor nabídky - Conditional SeePOINT Portfolio or Multi-Tenant Technical Quality Standards */}
+      {showAboutCompany && (
+        <section className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/95 to-sky-950/30 p-6 md:p-8 text-white shadow-2xl space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-sky-950/80 text-sky-300 border border-sky-800/60 mb-2">
+                <span>🏢 Realizátor nabídky</span>
               </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Extrémní tvarová stálost</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                  Vysoce odolné hliníkové kompozitní desky s polyethylenovým jádrem, UV vytvrzovaným tiskem a ochrannou laminací proti povětrnosti i slunci.
-                </p>
-              </div>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+                <span>{isDefaultSeePoint ? 'O společnosti SEEPOINT s.r.o.' : `O společnosti ${companyName}`}</span>
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 font-medium max-w-2xl">
+                {isDefaultSeePoint ? (
+                  'Přední dodavatel outdoorové reklamy a výrobce originálních nosičů v Moravskoslezském kraji. Kromě navigačních systémů zajišťujeme kompletní reklamní servis pro malé i velké značky.'
+                ) : (
+                  `Specializovaný dodavatel navigačních systémů a venkovní reklamy${targetCity ? ` pro lokalitu ${targetCity} a okolí` : ''}. Zajišťujeme kompletní technické prověření, výrobu z odolných materiálů a bezpečnou montáž na sloupech veřejného osvětlení.`
+                )}
+              </p>
             </div>
-
-            {/* 3. Bandimex uchycení */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/offer/real-penny-frycovice.jpg"
-                  alt="Nerezové upínací pásky Bandimex"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🔩 Uchycení Bandimex</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Certifikovaná montáž</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                  Pevné stažení nerezovými páskami Bandimex zamezuje protáčení panelu ve větru a garantuje bezpečné uchycení bez poškození sloupu VO.
-                </p>
-              </div>
-            </div>
-
-            {/* 4. Fotodokumentace & Servis */}
-            <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-              <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                <img
-                  src="/images/media-types/promo-bench.jpg"
-                  alt="Fotodokumentace a servis"
-                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                  <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">📸 Pasport & Servis</span>
-                </div>
-              </div>
-              <div className="p-4 pt-0 space-y-1 flex-1">
-                <h4 className="text-sm font-extrabold text-white">Fotodokumentace a dohled</h4>
-                <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                  Po montáži obdržíte detailní fotodokumentaci osazených ploch. V průběhu kampaně poskytujeme záruční servis a technickou kontrolu.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Contact Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80 text-xs font-semibold text-slate-300">
-          <div className="flex items-center gap-1.5">
-            {companyAddress ? <span>📍 {companyAddress}</span> : <span>📍 Specializovaný dodavatel navigační reklamy</span>}
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {companyPhone && <span>📞 {companyPhone}</span>}
-            {companyEmail && <span>✉️ {companyEmail}</span>}
             {companyWebsite && (
-              <a
-                href={companyWebsite.startsWith('http') ? companyWebsite : `https://${companyWebsite}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sky-400 font-bold hover:underline"
-              >
-                {companyWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}
-              </a>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <a
+                  href={companyWebsite.startsWith('http') ? companyWebsite : `https://${companyWebsite}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs shadow-lg shadow-sky-500/20 transition"
+                >
+                  <span>🌐 Navštívit {companyWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}</span>
+                </a>
+              </div>
             )}
           </div>
-        </div>
-      </section>
+
+          {isDefaultSeePoint ? (
+            /* 5 Core Pillars Grid - SeePOINT Portfolio & Media Types */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* 1. Navigation */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/navigation.jpg"
+                    alt="Navigační systémy na sloupech VO a trolejí"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Městská navigace (VO)</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Navigační tabule a směrové panely</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Exkluzivní síť více než 400+ navigačních ploch na sloupech veřejného osvětlení u nejfrekventovanějších křižovatek a tahů. Dlouhodobá navigace zákazníků přímo k provozovně.</p>
+                </div>
+              </div>
+
+              {/* 2. Citylight */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/citylight.jpg"
+                    alt="Prosvětlené Citylight CLV vitríny"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">💡 Prosvětlená reklama (CLV)</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">City Light Vitríny (CLV)</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Prestižní svítící vitríny na klíčových městských tepnách, u zastávek MHD a v pěších zónách. Zajišťují nepřetržitou viditelnost a dominanci vašich motivů ve dne i v noci.</p>
+                </div>
+              </div>
+
+              {/* 3. Promo Tower */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/promo-tower.jpg"
+                    alt="Promo věže a velkoplošné konstrukce"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🗼 Promo věže & Dominanty</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Promo věže & věžní konstrukce</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Nepřehlédnutelné velkoplošné čtyřstranné věže a horizontální nosiče situované u nákupních zón, kruhových objezdů a vstupů do měst. Zásah tisíců řidičů denně.</p>
+                </div>
+              </div>
+
+              {/* 4. City Poster */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/city-poster.jpg"
+                    alt="City Poster CLP plakátové vitríny"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🖼️ City Poster & Vitríny</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">City Poster (CLP) & A0 bannery</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Městské plakátové vitríny a kampaňové plochy v těsné blízkosti poštám, úřadům, zdravotnickým zařízením a obchodním centrům pro cílenou regionální komunikaci.</p>
+                </div>
+              </div>
+
+              {/* 5. Full Service & Manufacturing */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md lg:col-span-2 flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/promo-bench.jpg"
+                    alt="Vlastní výroba, velkoformátový tisk a servis na klíč"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end justify-between">
+                    <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">🪑 Mobiliář & Kompletní výroba na klíč</span>
+                    <span className="font-bold text-[10px] text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60">⚡ Servis do 48 hod</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Vlastní tiskárna, zámečnictví & servis na klíč</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">Disponujeme vlastní moderní tiskárnou, výrobou Dibond desek i montážními plošinami. Zabezpečíme technické prověření lokalit, profesionální instalaci i bleskovou servisní údržbu či čištění do 48 hodin.</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* 4 Core Pillars Grid - Other Tenants: Universal Technical Standards */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Navigation */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/navigation.jpg"
+                    alt="Navigační panely na sloupech VO"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Městská navigace (VO)</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Cílené směrové panely</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                    Umístění na sloupech veřejného osvětlení u frekventovaných křižovatek a příjezdových tras. Dlouhodobě navádí řidiče i chodce přímo k vaší provozovně.
+                  </p>
+                </div>
+              </div>
+
+              {/* 2. Dibond 3 mm */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/offer/real-mcdonalds.jpg"
+                    alt="Odolné hliníkové panely DIBOND"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">🛡️ DIBOND® sendvič (3 mm)</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Extrémní tvarová stálost</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                    Vysoce odolné hliníkové kompozitní desky s polyethylenovým jádrem, UV vytvrzovaným tiskem a ochrannou laminací proti povětrnosti i slunci.
+                  </p>
+                </div>
+              </div>
+
+              {/* 3. Bandimex uchycení */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/offer/real-penny-frycovice.jpg"
+                    alt="Nerezové upínací pásky Bandimex"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🔩 Uchycení Bandimex</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Certifikovaná montáž</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                    Pevné stažení nerezovými páskami Bandimex zamezuje protáčení panelu ve větru a garantuje bezpečné uchycení bez poškození sloupu VO.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4. Fotodokumentace & Servis */}
+              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
+                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
+                  <img
+                    src="/images/media-types/promo-bench.jpg"
+                    alt="Fotodokumentace a servis"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
+                    <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">📸 Pasport & Servis</span>
+                  </div>
+                </div>
+                <div className="p-4 pt-0 space-y-1 flex-1">
+                  <h4 className="text-sm font-extrabold text-white">Fotodokumentace a dohled</h4>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                    Po montáži obdržíte detailní fotodokumentaci osazených ploch. V průběhu kampaně poskytujeme záruční servis a technickou kontrolu.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Contact Strip */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80 text-xs font-semibold text-slate-300">
+            <div className="flex items-center gap-1.5">
+              {companyAddress ? <span>📍 {companyAddress}</span> : <span>📍 Specializovaný dodavatel navigační reklamy</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              {companyPhone && <span>📞 {companyPhone}</span>}
+              {companyEmail && <span>✉️ {companyEmail}</span>}
+              {companyWebsite && (
+                <a
+                  href={companyWebsite.startsWith('http') ? companyWebsite : `https://${companyWebsite}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-400 font-bold hover:underline"
+                >
+                  {companyWebsite.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                </a>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Photo Lightbox Modal */}
       {activeLightboxImage && (

@@ -99,12 +99,10 @@ export default async function PublicOfferPage({ params, searchParams }: { params
                   {offer.client?.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img alt={`Logo ${offer.client.name}`} className="h-full w-full object-contain p-2" src={offer.client.logoUrl} />
-                  ) : offer.branding?.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt={`Logo ${offer.branding.name}`} className="h-full w-full object-contain p-2" src={offer.branding.logoUrl} />
                   ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img alt="SeePOINT" className="h-full w-full object-contain p-2" src="/seepoint-logo.svg" />
+                    <span className="text-lg font-black text-slate-400">
+                      {offer.client?.name?.slice(0, 2).toUpperCase() || 'KL'}
+                    </span>
                   )}
                 </span>
                 <div className="min-w-0">

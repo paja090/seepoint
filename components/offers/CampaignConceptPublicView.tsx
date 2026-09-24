@@ -97,10 +97,8 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
           <div className="flex items-center gap-3">
             {offer.branding?.logoUrl ? (
               <img alt={brandName} className="h-8 max-w-44 object-contain" src={offer.branding.logoUrl} />
-            ) : offer.client?.logoUrl ? (
-              <img alt={`Logo ${offer.client.name}`} className="h-8 max-w-44 object-contain" src={offer.client.logoUrl} />
             ) : (
-              <img alt="SeePOINT" className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
+              <img alt={brandName || "SeePOINT"} className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
             )}
             <span className="hidden sm:inline-block h-4 w-px bg-slate-800" />
             <span className="hidden sm:inline-block text-xs font-bold text-slate-400">

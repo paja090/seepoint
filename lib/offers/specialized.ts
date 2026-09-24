@@ -98,13 +98,17 @@ export function parseNavigationOfferInput(raw: unknown) {
       // New structured fields
       pillarNumber: nullable(text(point.pillarNumber)),
       pillarType: nullable(text(point.pillarType)),
-      calculatedDistanceMeters: typeof point.calculatedDistanceMeters === 'number' ? point.calculatedDistanceMeters : null,
+      calculatedDistanceMeters: typeof point.calculatedDistanceMeters === 'number' && point.calculatedDistanceMeters > 0
+        ? Math.max(50, Math.round(point.calculatedDistanceMeters / 50) * 50)
+        : null,
       manualDistanceValue: manualDistanceVal,
       manualDistanceUnit: manualDistUnit,
       distanceSource: distSource,
       routePolyline: nullable(text(point.routePolyline)),
       routeProvider: 'GOOGLE_ROUTES' as const,
-      routeDistanceMeters: typeof point.routeDistanceMeters === 'number' ? point.routeDistanceMeters : null,
+      routeDistanceMeters: typeof point.routeDistanceMeters === 'number' && point.routeDistanceMeters > 0
+        ? Math.max(50, Math.round(point.routeDistanceMeters / 50) * 50)
+        : null,
       routeDurationSeconds: typeof point.routeDurationSeconds === 'number' ? point.routeDurationSeconds : null,
       routeTravelMode: 'DRIVING' as const,
       routeCalculatedAt: point.routeCalculatedAt ? new Date(String(point.routeCalculatedAt)) : new Date(),
@@ -126,6 +130,17 @@ export function parseNavigationOfferInput(raw: unknown) {
   }
   const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
   const city = text(input.city) === 'Havířov' ? 'Havířov' : (text(input.targetAddress).toLowerCase().includes('havířov') ? 'Havířov' : 'Ostrava');
+
+  const rawPres = (input.presentationSettings && typeof input.presentationSettings === 'object' && !Array.isArray(input.presentationSettings))
+    ? (input.presentationSettings as Record<string, unknown>)
+    : null;
+  const presentationSettings = rawPres ? {
+    showGraphicProofBadge: rawPres.showGraphicProofBadge !== false,
+    showReferences: rawPres.showReferences !== false,
+    showRealizations: rawPres.showRealizations !== false,
+    showPartnershipGuarantee: rawPres.showPartnershipGuarantee !== false,
+    showAboutCompany: rawPres.showAboutCompany !== false,
+  } : undefined;
 
   // Parse optional multiple targets
   const rawTargets = Array.isArray(input.targets) ? input.targets : [];
@@ -175,6 +190,7 @@ export function parseNavigationOfferInput(raw: unknown) {
     includeGraphicProof: input.includeGraphicProof !== false,
     clientArtworkUrl: nullable(text(input.clientArtworkUrl)),
     clientArtworkFileName: nullable(text(input.clientArtworkFileName)),
+    presentationSettings,
     points,
   };
 }
@@ -217,6 +233,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         const updatedStrategy = {
           ...existingStrategy,
           targets: input.targets,
+          ...(input.presentationSettings ? { presentationSettings: input.presentationSettings } : {}),
           ...(input.dateFrom !== undefined ? { dateFrom: input.dateFrom } : {}),
           ...(input.dateTo !== undefined ? { dateTo: input.dateTo } : {}),
         };
@@ -413,6 +430,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
       // Brand new offer creation
       const initialStrategy = {
         targets: input.targets,
+        ...(input.presentationSettings ? { presentationSettings: input.presentationSettings } : {}),
         ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
         ...(input.dateTo ? { dateTo: input.dateTo } : {}),
       };

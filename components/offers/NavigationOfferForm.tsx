@@ -165,9 +165,35 @@ export function NavigationOfferForm({
   const [campaignName, setCampaignName] = useState(initialOffer?.campaignName ?? '');
   const [validUntil, setValidUntil] = useState(initialOffer?.validUntil ?? '');
 
-  const initialStrategy = initialOffer?.campaignStrategy as { dateFrom?: string; dateTo?: string } | null | undefined;
+  const initialStrategy = initialOffer?.campaignStrategy as {
+    dateFrom?: string;
+    dateTo?: string;
+    presentationSettings?: {
+      showGraphicProofBadge?: boolean;
+      showReferences?: boolean;
+      showRealizations?: boolean;
+      showPartnershipGuarantee?: boolean;
+      showAboutCompany?: boolean;
+    };
+  } | null | undefined;
   const [dateFrom, setDateFrom] = useState(initialStrategy?.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(initialStrategy?.dateTo ?? '');
+
+  const [showGraphicProofBadge, setShowGraphicProofBadge] = useState<boolean>(
+    initialStrategy?.presentationSettings?.showGraphicProofBadge ?? false
+  );
+  const [showReferences, setShowReferences] = useState<boolean>(
+    initialStrategy?.presentationSettings?.showReferences ?? true
+  );
+  const [showRealizations, setShowRealizations] = useState<boolean>(
+    initialStrategy?.presentationSettings?.showRealizations ?? true
+  );
+  const [showPartnershipGuarantee, setShowPartnershipGuarantee] = useState<boolean>(
+    initialStrategy?.presentationSettings?.showPartnershipGuarantee ?? true
+  );
+  const [showAboutCompany, setShowAboutCompany] = useState<boolean>(
+    initialStrategy?.presentationSettings?.showAboutCompany ?? true
+  );
 
   const campaignDurationDays = useMemo(() => {
     if (!dateFrom || !dateTo) return null;
@@ -483,8 +509,9 @@ export function NavigationOfferForm({
               const polyStr = typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points;
 
               if (distMeters && polyStr) {
+                const roundedMeters = Math.max(50, Math.round(distMeters / 50) * 50);
                 return resolve({
-                  calculatedDistanceMeters: distMeters,
+                  calculatedDistanceMeters: roundedMeters,
                   routePolyline: polyStr,
                 });
               }
@@ -551,8 +578,9 @@ export function NavigationOfferForm({
       if (res.ok) {
         const data = (await res.json()) as { status: string; distanceMeters: number; polyline: string };
         if (data.status === 'OK' && data.distanceMeters > 0) {
+          const roundedMeters = Math.max(50, Math.round(data.distanceMeters / 50) * 50);
           return {
-            calculatedDistanceMeters: data.distanceMeters,
+            calculatedDistanceMeters: roundedMeters,
             routePolyline: data.polyline,
           };
         }
@@ -567,6 +595,16 @@ export function NavigationOfferForm({
   }
 
   async function reverseGeocodeLocation(lat: number, lng: number): Promise<string | undefined> {
+    try {
+      const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      if (res.ok) {
+        const data = (await res.json()) as { address?: string };
+        if (data.address) return data.address;
+      }
+    } catch {
+      /* fallback */
+    }
+
     try {
       const googleMaps = window.google?.maps;
       if (googleMaps?.Geocoder) {
@@ -856,6 +894,13 @@ export function NavigationOfferForm({
       proposalMode,
       graphicArtworkUrl,
       includeGraphicProof,
+      presentationSettings: {
+        showGraphicProofBadge,
+        showReferences,
+        showRealizations,
+        showPartnershipGuarantee,
+        showAboutCompany,
+      },
       points: points.map((p) => {
         const effectiveTargetId = p.targetId || targets[0]?.id;
         const ptTarget = targets.find((t) => t.id === effectiveTargetId) || targets[0];
@@ -1109,6 +1154,87 @@ export function NavigationOfferForm({
               </a>
             </div>
           )}
+        </section>
+
+        {/* Visibility of sections for client (Prezentace nabídky) */}
+        <section className="card space-y-4 border-2 border-slate-200 bg-white shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span>👁️</span> Viditelnost sekcí a prvků pro klienta
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Zvolte, které části nabídky uvidí klient na svém odkazu. Nechtěné prvky lze kdykoliv skrýt.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={showGraphicProofBadge}
+                onChange={(e) => setShowGraphicProofBadge(e.target.checked)}
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">Odznak „Grafická korektura v ceně“</span>
+                <span className="text-[11px] text-slate-500">Zobrazit štítek ✨ Grafická korektura v ceně u technických parametrů (lze vypnout).</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={showReferences}
+                onChange={(e) => setShowReferences(e.target.checked)}
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">Klientské reference</span>
+                <span className="text-[11px] text-slate-500">Hodnocení a citace klientů (KFC, LIDL, Penny).</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={showRealizations}
+                onChange={(e) => setShowRealizations(e.target.checked)}
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">Ukázky realizací</span>
+                <span className="text-[11px] text-slate-500">Fotogalerie vybraných realizací navigačních nosičů v terénu.</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={showPartnershipGuarantee}
+                onChange={(e) => setShowPartnershipGuarantee(e.target.checked)}
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">Garance spolehlivého partnerství</span>
+                <span className="text-[11px] text-slate-500">Metriky 400+ ploch v síti, 15+ let zkušeností, Bandimex, 48h servis.</span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                checked={showAboutCompany}
+                onChange={(e) => setShowAboutCompany(e.target.checked)}
+              />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">O společnosti (Realizátor)</span>
+                <span className="text-[11px] text-slate-500">Představení dodavatele SEEPOINT a přehled médií.</span>
+              </div>
+            </label>
+          </div>
         </section>
 
         {/* Target Stores / Destinations (Multiple branches supported) */}
