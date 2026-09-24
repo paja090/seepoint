@@ -253,18 +253,26 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
 
   const tableWidths = isNavigation ? [18, '*', 110, 80, 70] : [18, '*', 105, 78];
 
+  const formatPointDistancePdf = (pAny: Record<string, unknown>) => {
+    const rawManual =
+      pAny.manualDistanceValue !== undefined && pAny.manualDistanceValue !== null
+        ? String(pAny.manualDistanceValue).trim().replace(',', '.')
+        : '';
+    if ((pAny.distanceSource === 'MANUAL' || rawManual !== '') && rawManual !== '' && Number(rawManual) > 0) {
+      return `${String(pAny.manualDistanceValue).trim()} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`;
+    }
+    const rawDist = pAny.calculatedDistanceMeters;
+    const distMeters = typeof rawDist === 'number' && rawDist > 0 ? Math.max(50, Math.round(rawDist / 50) * 50) : null;
+    if (typeof distMeters === 'number') {
+      return distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`;
+    }
+    return '—';
+  };
+
   const tableRows = isNavigation
     ? navigationData.points.slice(0, 18).map((point, index) => {
         const pAny = point as unknown as Record<string, unknown>;
-        const rawDist = pAny.calculatedDistanceMeters;
-        const distMeters = typeof rawDist === 'number' && rawDist > 0
-          ? Math.max(50, Math.round(rawDist / 50) * 50)
-          : null;
-        const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
-          ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-          : typeof distMeters === 'number'
-            ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`)
-            : '—';
+        const distStr = formatPointDistancePdf(pAny);
 
         const pillarStr = pAny.pillarNumber ? ` [Sloup ${pAny.pillarNumber}]` : '';
         const streetStr = point.address ? `📍 ${point.address}` : point.navigationType;
@@ -382,15 +390,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         { text: 'Pohledy na osazované sloupy veřejného osvětlení a přesné umístění navigačních médií na trase:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 10] },
         ...resolvedPointPhotos.map(({ pointIndex, point, dataUrl }) => {
           const pAny = point as unknown as Record<string, unknown>;
-          const rawDist = pAny.calculatedDistanceMeters;
-          const distMeters = typeof rawDist === 'number' && rawDist > 0
-            ? Math.max(50, Math.round(rawDist / 50) * 50)
-            : null;
-          const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
-            ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-            : typeof distMeters === 'number'
-              ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`)
-              : '—';
+          const distStr = formatPointDistancePdf(pAny);
 
           const pillarStr = pAny.pillarNumber ? `Sloup VO: ${pAny.pillarNumber}` : '';
           const addressStr = point.address ? `📍 ${point.address}` : point.navigationType;

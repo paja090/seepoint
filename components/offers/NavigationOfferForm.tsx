@@ -1696,7 +1696,169 @@ export function NavigationOfferForm({
               <p className="text-xs mt-1">Klikněte tlačítkem myši do mapy výše pro umístění prvního navigačního bodu na trase.</p>
             </div>
           ) : (
-            points.map((point, index) => (
+            <>
+              {/* Quick Editable Table of Navigation Points (Manual Distance, Arrow, Pillar, Price) */}
+              <div className="overflow-hidden rounded-2xl border-2 border-sky-200 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 bg-sky-50/80 px-4 py-3">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                      <span>📋</span> Rychlá tabulka navigačních bodů a vzdáleností
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Zde můžete přímo v tabulce ručně vepsat přesnou vzdálenost do cíle (m / km), upravit šipku, číslo sloupu nebo cenu.
+                    </p>
+                  </div>
+                  <span className="rounded-lg bg-white border border-sky-200 px-2.5 py-1 text-[11px] font-bold text-sky-900">
+                    ✏️ Zápis do pole „Ruční vzdálenost“ automaticky přepne bod na ruční hodnotu
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-[920px] w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                      <tr>
+                        <th className="px-3 py-2.5 w-12">#</th>
+                        <th className="px-3 py-2.5">Navigační bod & Ulice</th>
+                        <th className="px-3 py-2.5 w-28">Číslo sloupu</th>
+                        <th className="px-3 py-2.5 w-44">Směr šipky</th>
+                        <th className="px-3 py-2.5 w-64">Vzdálenost do cíle (Ručně)</th>
+                        <th className="px-3 py-2.5 w-36">Výsledná hodnota</th>
+                        <th className="px-3 py-2.5 w-36 text-right">Pronájem (Kč/rok)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {points.map((pt, idx) => {
+                        const manualTrimmed = (pt.manualDistanceValue || '').trim().replace(',', '.');
+                        const isManualActive = (pt.distanceSource === 'MANUAL' || Boolean(manualTrimmed)) && Boolean(manualTrimmed) && Number(manualTrimmed) > 0;
+                        const effectiveDistText = isManualActive
+                          ? `${pt.manualDistanceValue.trim()} ${pt.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
+                          : pt.calculatedDistanceMeters
+                          ? pt.calculatedDistanceMeters >= 1000
+                            ? `${(pt.calculatedDistanceMeters / 1000).toFixed(1).replace('.', ',')} km`
+                            : `${pt.calculatedDistanceMeters} m`
+                          : pt.realDistanceText || 'Nepočítáno';
+
+                        return (
+                          <tr key={`table-${pt.id}`} className={isManualActive ? 'bg-amber-50/30 hover:bg-amber-50/60' : 'hover:bg-slate-50/80'}>
+                            <td className="px-3 py-2 font-mono font-black text-sky-900">#{idx + 1}</td>
+                            <td className="px-3 py-2">
+                              <input
+                                className="input py-1 px-2 text-xs font-bold text-slate-900 w-full"
+                                value={pt.label}
+                                onChange={(e) => updatePoint(pt.id, { label: e.target.value })}
+                                placeholder="Název navigačního bodu"
+                              />
+                              {pt.address && <p className="mt-0.5 text-[10px] text-slate-500 truncate max-w-xs">📍 {pt.address}</p>}
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                className="input py-1 px-2 text-xs font-mono w-full"
+                                value={pt.pillarNumber || ''}
+                                onChange={(e) => updatePoint(pt.id, { pillarNumber: e.target.value })}
+                                placeholder="např. 4021"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                className="input py-1 px-2 text-xs font-semibold w-full"
+                                value={pt.arrowDirectionEnum || 'STRAIGHT'}
+                                onChange={(e) => updatePoint(pt.id, { arrowDirectionEnum: e.target.value as DraftPoint['arrowDirectionEnum'] })}
+                              >
+                                <option value="STRAIGHT">⬆️ Rovně</option>
+                                <option value="LEFT">⬅️ Vlevo</option>
+                                <option value="RIGHT">➡️ Vpravo</option>
+                                <option value="SLANTED_LEFT">↖️ Šikmo vlevo</option>
+                                <option value="SLANTED_RIGHT">↗️ Šikmo vpravo</option>
+                                <option value="U_TURN">↩️ Otočení</option>
+                                <option value="TWO_WAY">↔️ Obousměrný</option>
+                                <option value="ROUNDABOUT_1">🔄 Kruháč 1. výjezd</option>
+                                <option value="ROUNDABOUT_2">🔄 Kruháč 2. výjezd</option>
+                                <option value="ROUNDABOUT_3">🔄 Kruháč 3. výjezd</option>
+                                <option value="ROUNDABOUT_4">🔄 Kruháč 4. výjezd</option>
+                                <option value="ROUNDABOUT_5">🔄 Kruháč 5. výjezd</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <input
+                                  className={`input py-1 px-2 text-xs font-bold flex-1 ${isManualActive ? 'border-amber-400 bg-white text-amber-950 ring-1 ring-amber-300' : ''}`}
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder={pt.calculatedDistanceMeters ? `${pt.calculatedDistanceMeters} (auto)` : 'např. 350'}
+                                  value={pt.manualDistanceValue || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const numStr = val.trim().replace(',', '.').replace(/[^0-9.]/g, '');
+                                    updatePoint(pt.id, {
+                                      manualDistanceValue: val,
+                                      distanceSource: numStr && Number(numStr) > 0 ? 'MANUAL' : 'CALCULATED',
+                                      manualDistanceUnit: pt.manualDistanceUnit || 'METERS',
+                                    });
+                                  }}
+                                />
+                                <select
+                                  className="input py-1 px-1.5 text-xs font-bold w-16"
+                                  value={pt.manualDistanceUnit || 'METERS'}
+                                  onChange={(e) =>
+                                    updatePoint(pt.id, {
+                                      manualDistanceUnit: e.target.value as DraftPoint['manualDistanceUnit'],
+                                      ...(pt.manualDistanceValue?.trim() ? { distanceSource: 'MANUAL' } : {}),
+                                    })
+                                  }
+                                >
+                                  <option value="METERS">m</option>
+                                  <option value="KILOMETERS">km</option>
+                                </select>
+                                {isManualActive && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updatePoint(pt.id, { distanceSource: 'CALCULATED', manualDistanceValue: '' })}
+                                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100"
+                                    title="Vrátit automaticky vypočtenou vzdálenost z Google Maps"
+                                  >
+                                    ↺ Auto
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold border ${
+                                  isManualActive
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                }`}
+                              >
+                                {isManualActive ? '✏️' : '⚡'} {effectiveDistText}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <input
+                                className="input py-1 px-2 text-xs font-bold text-right w-28 ml-auto"
+                                type="number"
+                                min="0"
+                                step="100"
+                                value={pt.unitPrice}
+                                onChange={(e) => updatePoint(pt.id, { unitPrice: e.target.value })}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {points.map((point, index) => {
+                const manualTrim = (point.manualDistanceValue || '').trim().replace(',', '.');
+                const isPointManual = (point.distanceSource === 'MANUAL' || Boolean(manualTrim)) && Boolean(manualTrim) && Number(manualTrim) > 0;
+                const badgeDistText = isPointManual
+                  ? `${point.manualDistanceValue.trim()} ${point.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'} (ručně)`
+                  : point.calculatedDistanceMeters
+                  ? `${point.calculatedDistanceMeters >= 1000 ? `${(point.calculatedDistanceMeters / 1000).toFixed(1).replace('.', ',')} km` : `${point.calculatedDistanceMeters} m`} (Google)`
+                  : point.realDistanceText || '';
+
+                return (
               <div className="card space-y-4 border border-slate-200 bg-white p-5 shadow-sm" key={point.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1744,9 +1906,9 @@ export function NavigationOfferForm({
 
                     <h3 className="font-extrabold text-slate-900 text-sm ml-1">{point.label}</h3>
 
-                    {point.realDistanceText && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-200">
-                        <Compass size={13} /> {point.realDistanceText}
+                    {badgeDistText && (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${isPointManual ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>
+                        <Compass size={13} /> {badgeDistText}
                       </span>
                     )}
                   </div>
@@ -1933,49 +2095,75 @@ export function NavigationOfferForm({
                     </div>
                   </Field>
 
-                  {/* Distance Source & Values */}
+                  {/* Distance Source & Values (Always Editable Manual Distance + Google Auto Info) */}
                   <div>
                     <label className="block text-xs font-bold text-slate-800 mb-1">Zdroj zobrazované vzdálenosti</label>
                     <select
                       className="input"
-                      value={point.distanceSource || 'CALCULATED'}
-                      onChange={(e) => updatePoint(point.id, { distanceSource: e.target.value as DraftPoint['distanceSource'] })}
+                      value={isPointManual ? 'MANUAL' : (point.distanceSource || 'CALCULATED')}
+                      onChange={(e) => {
+                        const nextSource = e.target.value as DraftPoint['distanceSource'];
+                        updatePoint(point.id, {
+                          distanceSource: nextSource,
+                          ...(nextSource === 'CALCULATED' ? { manualDistanceValue: '' } : {}),
+                        });
+                      }}
                     >
                       <option value="CALCULATED">⚡ Automaticky z Google Routes API</option>
                       <option value="MANUAL">✏️ Ručně nastavená vzdálenost</option>
                     </select>
                   </div>
 
-                  {point.distanceSource === 'MANUAL' ? (
-                    <div>
-                      <label className="block text-xs font-bold text-amber-800 mb-1">Ruční hodnota a jednotka</label>
-                      <div className="flex gap-1">
-                        <input
-                          className="input flex-1"
-                          type="number"
-                          placeholder="250"
-                          value={point.manualDistanceValue || ''}
-                          onChange={(e) => updatePoint(point.id, { manualDistanceValue: e.target.value })}
-                        />
-                        <select
-                          className="input w-20 text-xs font-bold"
-                          value={point.manualDistanceUnit || 'METERS'}
-                          onChange={(e) => updatePoint(point.id, { manualDistanceUnit: e.target.value as DraftPoint['manualDistanceUnit'] })}
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900 mb-1">
+                      Vzdálenost na ceduli (lze rovnou přepsat ručně)
+                    </label>
+                    <div className="flex gap-1">
+                      <input
+                        className={`input flex-1 font-bold ${isPointManual ? 'border-amber-400 bg-amber-50/40 text-amber-950' : ''}`}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters} (z Google)` : 'např. 350'}
+                        value={point.manualDistanceValue || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const numStr = val.trim().replace(',', '.').replace(/[^0-9.]/g, '');
+                          updatePoint(point.id, {
+                            manualDistanceValue: val,
+                            distanceSource: numStr && Number(numStr) > 0 ? 'MANUAL' : 'CALCULATED',
+                            manualDistanceUnit: point.manualDistanceUnit || 'METERS',
+                          });
+                        }}
+                      />
+                      <select
+                        className="input w-20 text-xs font-bold"
+                        value={point.manualDistanceUnit || 'METERS'}
+                        onChange={(e) =>
+                          updatePoint(point.id, {
+                            manualDistanceUnit: e.target.value as DraftPoint['manualDistanceUnit'],
+                            ...(point.manualDistanceValue?.trim() ? { distanceSource: 'MANUAL' } : {}),
+                          })
+                        }
+                      >
+                        <option value="METERS">m</option>
+                        <option value="KILOMETERS">km</option>
+                      </select>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 font-medium">
+                        ⚡ Google trasa: <strong>{point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters} m` : 'Nepočítáno'}</strong>
+                      </span>
+                      {isPointManual && (
+                        <button
+                          type="button"
+                          onClick={() => updatePoint(point.id, { distanceSource: 'CALCULATED', manualDistanceValue: '' })}
+                          className="text-sky-700 font-bold hover:underline cursor-pointer"
                         >
-                          <option value="METERS">m</option>
-                          <option value="KILOMETERS">km</option>
-                        </select>
-                      </div>
+                          ↺ Vrátit Google vzdálenost
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">Vypočtená trasování z Google</label>
-                      <div className="input bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-between">
-                        <span>{point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters} m` : 'Nepočítáno'}</span>
-                        <span className="text-[10px] text-slate-400">Routes API</span>
-                      </div>
-                    </div>
-                  )}
+                  </div>
 
                   <Field label="Počet ks">
                     <input className="input" min="0.01" step="0.01" type="number" value={point.quantity} onChange={(e) => updatePoint(point.id, { quantity: e.target.value })} />
@@ -2070,7 +2258,9 @@ export function NavigationOfferForm({
                   </div>
                 </div>
               </div>
-            ))
+                );
+              })}
+            </>
           )}
         </section>
       </main>
@@ -2080,7 +2270,16 @@ export function NavigationOfferForm({
         <NavigationSignVisualizer
           initialSignText={targets.find((t) => t.id === activePointForVisualizer.targetId)?.name || targets[0]?.name || activePointForVisualizer.label}
           subText={activePointForVisualizer.navigationType || 'Směrová tabule'}
-          distanceText={activePointForVisualizer.realDistanceText || (activePointForVisualizer.calculatedDistanceMeters ? (activePointForVisualizer.calculatedDistanceMeters >= 1000 ? `${(activePointForVisualizer.calculatedDistanceMeters / 1000).toFixed(1)} km` : `${activePointForVisualizer.calculatedDistanceMeters} m`) : '1,1 km')}
+          distanceText={
+            activePointForVisualizer.manualDistanceValue?.trim()
+              ? `${activePointForVisualizer.manualDistanceValue.trim()} ${activePointForVisualizer.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
+              : activePointForVisualizer.realDistanceText ||
+                (activePointForVisualizer.calculatedDistanceMeters
+                  ? activePointForVisualizer.calculatedDistanceMeters >= 1000
+                    ? `${(activePointForVisualizer.calculatedDistanceMeters / 1000).toFixed(1).replace('.', ',')} km`
+                    : `${activePointForVisualizer.calculatedDistanceMeters} m`
+                  : '1,1 km')
+          }
           arrowDirectionEnum={activePointForVisualizer.arrowDirectionEnum}
           orientation={activePointForVisualizer.orientation}
           pointLabel={activePointForVisualizer.label}

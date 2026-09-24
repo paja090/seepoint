@@ -115,9 +115,13 @@ export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
 }
 
 export function formatDistanceBadge(point: Record<string, unknown>) {
-  if (point.distanceSource === 'MANUAL' && point.manualDistanceValue) {
+  const rawManual =
+    point.manualDistanceValue !== undefined && point.manualDistanceValue !== null
+      ? String(point.manualDistanceValue).trim().replace(',', '.')
+      : '';
+  if ((point.distanceSource === 'MANUAL' || rawManual !== '') && rawManual !== '' && Number(rawManual) > 0) {
     const unit = point.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm';
-    return `${String(point.manualDistanceValue)} ${unit} od cíle`;
+    return `${String(point.manualDistanceValue).trim()} ${unit} od cíle`;
   }
   if (typeof point.calculatedDistanceMeters === 'number') {
     const rounded = Math.max(50, Math.round(point.calculatedDistanceMeters / 50) * 50);
@@ -131,7 +135,89 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
 
 export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
   const navigation = offer.navigation;
-  const effectiveProposalKey = proposalKey ?? offer.id;
+  const effectiveProposalKey = proposalKey ?? offer.portalToken ?? offer.id;
+  const isInternalOfferPage = Boolean(offer.id);
+
+  const [distanceEdits, setDistanceEdits] = useState<
+    Record<
+      string,
+      {
+        value: string;
+        unit: 'METERS' | 'KILOMETERS';
+        source: 'MANUAL' | 'CALCULATED';
+        saving?: boolean;
+        saved?: boolean;
+      }
+    >
+  >(() => {
+    const map: Record<string, { value: string; unit: 'METERS' | 'KILOMETERS'; source: 'MANUAL' | 'CALCULATED' }> = {};
+    for (const pt of navigation?.points || []) {
+      const pObj = pt as unknown as Record<string, unknown>;
+      const rawVal = pObj.manualDistanceValue !== undefined && pObj.manualDistanceValue !== null ? String(pObj.manualDistanceValue) : '';
+      map[pt.id] = {
+        value: rawVal,
+        unit: pObj.manualDistanceUnit === 'KILOMETERS' ? 'KILOMETERS' : 'METERS',
+        source: pObj.distanceSource === 'MANUAL' || (rawVal !== '' && Number(rawVal) > 0) ? 'MANUAL' : 'CALCULATED',
+      };
+    }
+    return map;
+  });
+
+  function getPointWithDistanceOverride(point: Record<string, unknown>): Record<string, unknown> {
+    const id = String(point.id || '');
+    const override = distanceEdits[id];
+    if (!override) return point;
+    const cleanVal = override.value.trim().replace(',', '.').replace(/[^0-9.]/g, '');
+    const hasManual = cleanVal !== '' && Number(cleanVal) > 0 && override.source === 'MANUAL';
+    return {
+      ...point,
+      distanceSource: hasManual ? 'MANUAL' : 'CALCULATED',
+      manualDistanceValue: hasManual ? override.value.trim() : null,
+      manualDistanceUnit: override.unit,
+    };
+  }
+
+  async function saveInlineDistance(pointId: string, overrideResetToAuto = false) {
+    if (!offer.id) return;
+    const current = distanceEdits[pointId] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
+    const nextValue = overrideResetToAuto ? '' : current.value;
+    const cleanNum = nextValue.trim().replace(',', '.').replace(/[^0-9.]/g, '');
+    const nextSource: 'MANUAL' | 'CALCULATED' = !overrideResetToAuto && cleanNum !== '' && Number(cleanNum) > 0 ? 'MANUAL' : 'CALCULATED';
+
+    setDistanceEdits((prev) => ({
+      ...prev,
+      [pointId]: { ...current, value: nextValue, source: nextSource, saving: true, saved: false },
+    }));
+
+    try {
+      const res = await fetch(`/api/offers/${encodeURIComponent(offer.id)}/navigation-distance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pointId,
+          manualDistanceValue: nextValue,
+          manualDistanceUnit: current.unit,
+          distanceSource: nextSource,
+        }),
+      });
+      if (res.ok) {
+        setDistanceEdits((prev) => ({
+          ...prev,
+          [pointId]: { ...prev[pointId], value: nextValue, source: nextSource, saving: false, saved: true },
+        }));
+      } else {
+        setDistanceEdits((prev) => ({
+          ...prev,
+          [pointId]: { ...prev[pointId], saving: false },
+        }));
+      }
+    } catch {
+      setDistanceEdits((prev) => ({
+        ...prev,
+        [pointId]: { ...prev[pointId], saving: false },
+      }));
+    }
+  }
 
   const presentationSettings = (offer.campaignStrategy as Record<string, unknown> | null)?.presentationSettings as {
     showGraphicProofBadge?: boolean;
@@ -655,7 +741,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
                     <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200">
                       <Compass size={13} className="text-sky-600" />
-                      {formatDistanceBadge(pObj)}
+                      {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
                     </span>
 
                     {Boolean(pObj.pillarNumber) && (
@@ -730,7 +816,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-400">Položkový rozpočet</p>
               <h2 className="mt-1 text-xl font-black" id="navigation-pricing-heading">Kompletní cenová nabídka</h2>
-              <p className="mt-1 text-sm text-slate-300">Přehled ceny vybraných navigačních bodů ({activePoints.length} z {navigation.points.length}).</p>
+              <p className="mt-1 text-sm text-slate-300">Přehled ceny a vzdáleností vybraných navigačních bodů ({activePoints.length} z {navigation.points.length}).</p>
             </div>
             <div className="rounded-2xl bg-slate-900 border border-slate-800 px-4 py-2.5 sm:text-right shrink-0">
               <p className="text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">Živý přepočet: {activePoints.length} z {navigation.points.length} bodů</p>
@@ -739,10 +825,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-[950px] w-full text-left text-sm">
+            <table className="min-w-[1050px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-5 py-3">Navigační bod</th>
+                  <th className="px-3 py-3">Vzdálenost do cíle</th>
                   <th className="px-3 py-3 text-right">Počet</th>
                   <th className="px-3 py-3 text-right">Pronájem (rok / měs)</th>
                   <th className="px-3 py-3 text-right">Výroba rámu</th>
@@ -753,24 +840,85 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {priceRows.map(({ point, quantity, rental, frame, production, installation, removal, subtotal }) => (
-                  <tr key={point.id}>
-                    <td className="px-5 py-4">
-                      <p className="font-bold text-slate-900">{point.label}</p>
-                      <p className="mt-1 text-xs text-slate-500">{point.navigationType}{point.variant ? ` · ${point.variant}` : ''}</p>
-                    </td>
-                    <td className="px-3 py-4 text-right font-semibold text-slate-700">{quantity.toLocaleString('cs-CZ')} ks</td>
-                    <td className="px-3 py-4 text-right text-slate-700">
-                      <div className="font-bold">{money(rental)}</div>
-                      <div className="text-[10px] text-sky-700 font-semibold">{money(Math.round(rental / 12))}/měs</div>
-                    </td>
-                    <td className="px-3 py-4 text-right text-slate-700">{money(frame)}</td>
-                    <td className="px-3 py-4 text-right text-slate-700">{money(production)}</td>
-                    <td className="px-3 py-4 text-right text-slate-700">{money(installation)}</td>
-                    <td className="px-3 py-4 text-right text-slate-700">{money(removal)}</td>
-                    <td className="px-5 py-4 text-right font-black text-slate-950">{money(subtotal)}</td>
-                  </tr>
-                ))}
+                {priceRows.map(({ point, quantity, rental, frame, production, installation, removal, subtotal }) => {
+                  const pObj = point as unknown as Record<string, unknown>;
+                  const effectivePoint = getPointWithDistanceOverride(pObj);
+                  const editState = distanceEdits[point.id] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
+                  return (
+                    <tr key={point.id}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-slate-900">{point.label}</p>
+                        <p className="mt-1 text-xs text-slate-500">{point.navigationType}{point.variant ? ` · ${point.variant}` : ''}</p>
+                      </td>
+                      <td className="px-3 py-4">
+                        <div className="space-y-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-900 border border-sky-200">
+                            <Compass size={13} className="text-sky-600" />
+                            {formatDistanceBadge(effectivePoint)}
+                          </span>
+                          {isInternalOfferPage && (
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="Ručně (např. 350)"
+                                className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-900 focus:border-sky-500 focus:outline-hidden"
+                                value={editState.value}
+                                onChange={(e) =>
+                                  setDistanceEdits((prev) => ({
+                                    ...prev,
+                                    [point.id]: {
+                                      ...editState,
+                                      value: e.target.value,
+                                      source: e.target.value.trim() ? 'MANUAL' : 'CALCULATED',
+                                      saved: false,
+                                    },
+                                  }))
+                                }
+                              />
+                              <select
+                                className="rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-xs font-bold text-slate-800"
+                                value={editState.unit}
+                                onChange={(e) =>
+                                  setDistanceEdits((prev) => ({
+                                    ...prev,
+                                    [point.id]: {
+                                      ...editState,
+                                      unit: e.target.value as 'METERS' | 'KILOMETERS',
+                                      source: editState.value.trim() ? 'MANUAL' : editState.source,
+                                      saved: false,
+                                    },
+                                  }))
+                                }
+                              >
+                                <option value="METERS">m</option>
+                                <option value="KILOMETERS">km</option>
+                              </select>
+                              <button
+                                type="button"
+                                disabled={editState.saving}
+                                onClick={() => void saveInlineDistance(point.id)}
+                                className="rounded-lg bg-sky-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-sky-700 disabled:opacity-50 cursor-pointer"
+                              >
+                                {editState.saving ? '…' : editState.saved ? '✓' : 'Uložit'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 text-right font-semibold text-slate-700">{quantity.toLocaleString('cs-CZ')} ks</td>
+                      <td className="px-3 py-4 text-right text-slate-700">
+                        <div className="font-bold">{money(rental)}</div>
+                        <div className="text-[10px] text-sky-700 font-semibold">{money(Math.round(rental / 12))}/měs</div>
+                      </td>
+                      <td className="px-3 py-4 text-right text-slate-700">{money(frame)}</td>
+                      <td className="px-3 py-4 text-right text-slate-700">{money(production)}</td>
+                      <td className="px-3 py-4 text-right text-slate-700">{money(installation)}</td>
+                      <td className="px-3 py-4 text-right text-slate-700">{money(removal)}</td>
+                      <td className="px-5 py-4 text-right font-black text-slate-950">{money(subtotal)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -793,17 +941,103 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       ) : null}
 
       {isLocationSelectionPhase ? (
-        <section className="rounded-3xl border border-sky-200 bg-sky-50/60 p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-900 px-6 py-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Kalkulace a rozpočet</p>
-              <h3 className="mt-1 text-lg font-black text-slate-900">Cena bude doplněna v další fázi</h3>
-              <p className="mt-1 text-sm text-slate-600">V této 1. fázi schvalujete pouze výběr navigačních bodů a trasu bez cenových závazků. Přesnou cenovou kalkulaci pro vás připravíme ihned po potvrzení výběru.</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-400">Přehled navigačních bodů</p>
+              <h3 className="mt-0.5 text-lg font-black">Tabulka navigačních bodů a vzdáleností ({navigation.points.length})</h3>
             </div>
-            <div className="rounded-2xl bg-white border border-sky-200 px-4 py-3 text-center sm:text-right shrink-0">
-              <span className="text-xs font-bold text-sky-800">Fáze 1 – Návrh rozmístění</span>
-              <p className="text-sm font-black text-slate-900 mt-0.5">ZDARMA / Nezávazně</p>
+            <div className="rounded-2xl bg-sky-950/80 border border-sky-800 px-4 py-2 text-center sm:text-right shrink-0">
+              <span className="text-xs font-bold text-sky-300">Fáze 1 – Návrh rozmístění</span>
+              <p className="text-xs font-black text-white mt-0.5">Cena bude doplněna v další fázi</p>
             </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[760px] w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 w-14">#</th>
+                  <th className="px-5 py-3">Navigační bod & Lokalita</th>
+                  <th className="px-4 py-3">Směr navedení</th>
+                  <th className="px-4 py-3">Vzdálenost do cíle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {navigation.points.map((point, idx) => {
+                  const pObj = point as unknown as Record<string, unknown>;
+                  const effectivePoint = getPointWithDistanceOverride(pObj);
+                  const editState = distanceEdits[point.id] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
+                  return (
+                    <tr key={`phase1-row-${point.id}`}>
+                      <td className="px-5 py-3.5 font-mono font-black text-sky-800">#{idx + 1}</td>
+                      <td className="px-5 py-3.5">
+                        <p className="font-bold text-slate-900">{point.label}</p>
+                        {point.address && <p className="text-xs text-slate-500 mt-0.5">📍 {point.address}</p>}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="space-y-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-900 border border-sky-200">
+                            <Compass size={13} className="text-sky-600" />
+                            {formatDistanceBadge(effectivePoint)}
+                          </span>
+                          {isInternalOfferPage && (
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="Ručně (např. 350)"
+                                className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-900 focus:border-sky-500 focus:outline-hidden"
+                                value={editState.value}
+                                onChange={(e) =>
+                                  setDistanceEdits((prev) => ({
+                                    ...prev,
+                                    [point.id]: {
+                                      ...editState,
+                                      value: e.target.value,
+                                      source: e.target.value.trim() ? 'MANUAL' : 'CALCULATED',
+                                      saved: false,
+                                    },
+                                  }))
+                                }
+                              />
+                              <select
+                                className="rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-xs font-bold text-slate-800"
+                                value={editState.unit}
+                                onChange={(e) =>
+                                  setDistanceEdits((prev) => ({
+                                    ...prev,
+                                    [point.id]: {
+                                      ...editState,
+                                      unit: e.target.value as 'METERS' | 'KILOMETERS',
+                                      source: editState.value.trim() ? 'MANUAL' : editState.source,
+                                      saved: false,
+                                    },
+                                  }))
+                                }
+                              >
+                                <option value="METERS">m</option>
+                                <option value="KILOMETERS">km</option>
+                              </select>
+                              <button
+                                type="button"
+                                disabled={editState.saving}
+                                onClick={() => void saveInlineDistance(point.id)}
+                                className="rounded-lg bg-sky-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-sky-700 disabled:opacity-50 cursor-pointer"
+                              >
+                                {editState.saving ? '…' : editState.saved ? '✓ Uloženo' : 'Uložit'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </section>
       ) : null}
