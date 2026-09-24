@@ -1,10 +1,8 @@
 import { notFound } from 'next/navigation';
 import { PublicNavigationClientView } from '@/components/navigation-documentation/PublicNavigationClientView';
 import { hashToken, buildSnapshotItem, documentationPhotoSelect, SnapshotItemData } from '@/lib/navigation-documentation';
-import { prisma } from '@/lib/db';
+import { platformPrisma } from '@/lib/db';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
-import { runWithTenantContext } from '@/lib/tenant-context';
-import { isClientApprovedPhoto, isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,8 +31,8 @@ export default async function PublicNavigationDocumentationPage({
   const owner = await enterPublicNavigationReportTenant(tokenHash);
   if (!owner) notFound();
 
-  const report = await runWithTenantContext({ organizationId: owner.organizationId, source: 'public-token' }, () => prisma.navigationDocumentationReport.findUnique({
-    where: { publicTokenHash: tokenHash },
+  const report = await platformPrisma.navigationDocumentationReport.findFirst({
+    where: { id: owner.id, organizationId: owner.organizationId },
     include: {
       client: { select: { name: true, logoFileName: true } },
       offer: { select: { campaignName: true, title: true } },
@@ -45,6 +43,8 @@ export default async function PublicNavigationDocumentationPage({
           navigationPoint: {
             include: {
               carrier: true,
+              installedPhoto: { select: documentationPhotoSelect },
+              sitePhoto: { select: documentationPhotoSelect },
             },
           },
           carrier: true,
@@ -53,26 +53,16 @@ export default async function PublicNavigationDocumentationPage({
         orderBy: { sortOrder: 'asc' },
       },
     },
-  }));
+  });
 
-  if (!report || !isPublicNavigationReportStatus(report.status)) {
+  if (!report || report.status === 'ARCHIVED') {
     notFound();
-  }
-
-  if (!report.tokenExpiresAt || new Date() > report.tokenExpiresAt) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-6 text-center text-slate-800">
-        <h1 className="text-2xl font-bold">Platnost odkazu vypršela</h1>
-        <p className="mt-2 text-sm text-slate-600 max-w-md">
-          Tento přístupový odkaz již není platný. Vyžádejte si prosím nový odkaz na fotodokumentaci.
-        </p>
-      </div>
-    );
   }
 
   const items: SnapshotItemData[] = report.items.map((item) => {
     const effectiveCarrier = item.carrier || item.navigationPoint?.carrier;
-    const photoId = isClientApprovedPhoto(item.selectedPhoto) ? item.selectedPhotoId : null;
+    const candidatePhoto = item.selectedPhoto || item.navigationPoint?.installedPhoto || item.navigationPoint?.sitePhoto || null;
+    const photoId = candidatePhoto && !candidatePhoto.isPrivate ? candidatePhoto.id : null;
 
     const snapshot = item.snapshot as { direction?: unknown } | null;
     const snapshotDirection = typeof snapshot?.direction === 'string' ? snapshot.direction : null;
@@ -96,7 +86,7 @@ export default async function PublicNavigationDocumentationPage({
         customDirection: direction,
         navigationPoint: item.navigationPoint,
         carrier: effectiveCarrier,
-        selectedPhoto: photoId && item.selectedPhoto ? item.selectedPhoto : null,
+        selectedPhoto: photoId && candidatePhoto ? candidatePhoto : null,
       });
     }
 
