@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
+import { documentationPhotoSelect } from '@/lib/navigation-documentation';
 import {
   NavigationDocumentationValidationError,
   parseNavigationReportStatus,
@@ -152,12 +153,14 @@ export async function POST(request: Request) {
             photos: {
               where: { isPrivate: false, isClientVisible: true },
               orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+              select: documentationPhotoSelect,
             },
             surfaces: {
               include: {
                 photos: {
                   where: { isPrivate: false, isClientVisible: true },
                   orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                  select: documentationPhotoSelect,
                 },
               },
             },
@@ -181,12 +184,14 @@ export async function POST(request: Request) {
               photos: {
                 where: { isPrivate: false, isClientVisible: true },
                 orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                select: documentationPhotoSelect,
               },
               surfaces: {
                 include: {
                   photos: {
                     where: { isPrivate: false, isClientVisible: true },
                     orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                    select: documentationPhotoSelect,
                   },
                 },
               },
@@ -255,12 +260,14 @@ export async function POST(request: Request) {
           photos: {
             where: { isPrivate: false, isClientVisible: true },
             orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+            select: documentationPhotoSelect,
           },
           surfaces: {
             include: {
               photos: {
                 where: { isPrivate: false, isClientVisible: true },
                 orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                select: documentationPhotoSelect,
               },
             },
           },

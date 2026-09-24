@@ -19,6 +19,17 @@ export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+export const documentationPhotoSelect = {
+  id: true,
+  url: true,
+  isClientVisible: true,
+  isPrivate: true,
+  isPrimary: true,
+  createdAt: true,
+  carrierId: true,
+  surfaceId: true,
+} as const;
+
 export type SnapshotItemData = {
   id: string;
   pointCode: string;

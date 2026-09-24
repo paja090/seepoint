@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { hashToken, buildSnapshotItem, SnapshotItemData } from '@/lib/navigation-documentation';
+import { hashToken, buildSnapshotItem, documentationPhotoSelect, SnapshotItemData } from '@/lib/navigation-documentation';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { isClientApprovedPhoto, isPublicNavigationReportStatus } from '@/lib/navigation-documentation-policy';
@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
         include: {
           navigationPoint: true,
           carrier: true,
-          selectedPhoto: true,
+          selectedPhoto: { select: documentationPhotoSelect },
         },
         orderBy: { sortOrder: 'asc' },
       },
