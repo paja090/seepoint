@@ -1,6 +1,7 @@
 import { isModuleEnabled } from '@/lib/organization-modules';
 import { auditProduction } from '@/lib/production/production-service';
 import { assertTenantResult } from '@/lib/tenant-result';
+import { enrichClientLogoFromSiblings, fetchClientLogoAsset, hasResolvableClientLogo } from '@/lib/client-logo';
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
 import { platformPrisma, prisma } from '@/lib/db';
@@ -195,7 +196,15 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'SeePOINT' },
     client: {
       name: row.client.name,
-      logoUrl: row.client.logoDriveFileId ? publicView && token ? `/api/proposals/${encodeURIComponent(token)}/logo` : `/api/clients/${row.client.id}/logo/file` : undefined,
+      logoUrl: hasResolvableClientLogo({
+        logoDriveFileId: row.client.logoDriveFileId,
+        website: row.client.website,
+        email: row.contactEmail ?? row.client.email,
+      })
+        ? publicView && token
+          ? `/api/proposals/${encodeURIComponent(token)}/logo`
+          : `/api/clients/${row.client.id}/logo/file`
+        : undefined,
       companyId: publicView ? undefined : row.client.companyId,
       contactPerson: row.contactPerson ?? row.client.contactPerson,
       email: row.contactEmail ?? row.client.email,
@@ -733,6 +742,7 @@ export async function listOffers(user: CurrentUser, filters: URLSearchParams) {
 export async function getOffer(user: CurrentUser, id: string) {
   const row = await getOfferRow(prisma, id);
   assertAccess(user, row);
+  await enrichClientLogoFromSiblings(row.client);
   if (!row.publicTokenRevokedAt) {
     const expectedToken = getDeterministicOfferToken(row.id);
     const expectedHash = hashPublicOfferToken(expectedToken);
@@ -1107,37 +1117,50 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
 export async function getPublicRow(token: string) {
   if (!token || typeof token !== 'string') throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   const cleanToken = token.trim();
-  if (!isPlausiblePublicOfferToken(cleanToken)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
-  const tokenHash = hashPublicOfferToken(cleanToken);
+  const isPlausibleToken = isPlausiblePublicOfferToken(cleanToken);
+  const isPlausibleId = /^[a-zA-Z0-9_-]{20,64}$/.test(cleanToken);
+  if (!isPlausibleToken && !isPlausibleId) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
 
-  let row = await platformPrisma.offer.findUnique({
-    where: { publicTokenHash: tokenHash },
-    include: offerInclude,
-  });
+  let row: OfferRow | null = null;
 
-  if (!row) {
-    const candidates = await platformPrisma.offer.findMany({
-      where: { publicTokenRevokedAt: null },
-      select: { id: true, publishedAt: true },
+  if (isPlausibleToken) {
+    const tokenHash = hashPublicOfferToken(cleanToken);
+    row = await platformPrisma.offer.findUnique({
+      where: { publicTokenHash: tokenHash },
+      include: offerInclude,
     });
-    const matched = candidates.find((c) => getDeterministicOfferToken(c.id) === cleanToken);
-    if (matched) {
-      let encrypted: string | null = null;
-      try {
-        encrypted = encryptPortalToken(cleanToken, matched.id);
-      } catch {
-        encrypted = null;
-      }
-      row = await platformPrisma.offer.update({
-        where: { id: matched.id },
-        data: {
-          publicTokenHash: tokenHash,
-          ...(encrypted ? { publicTokenEncrypted: encrypted } : {}),
-          publishedAt: matched.publishedAt || new Date(),
-        },
-        include: offerInclude,
+
+    if (!row) {
+      const candidates = await platformPrisma.offer.findMany({
+        where: { publicTokenRevokedAt: null },
+        select: { id: true, publishedAt: true },
       });
+      const matched = candidates.find((c) => getDeterministicOfferToken(c.id) === cleanToken);
+      if (matched) {
+        let encrypted: string | null = null;
+        try {
+          encrypted = encryptPortalToken(cleanToken, matched.id);
+        } catch {
+          encrypted = null;
+        }
+        row = await platformPrisma.offer.update({
+          where: { id: matched.id },
+          data: {
+            publicTokenHash: tokenHash,
+            ...(encrypted ? { publicTokenEncrypted: encrypted } : {}),
+            publishedAt: matched.publishedAt || new Date(),
+          },
+          include: offerInclude,
+        });
+      }
     }
+  }
+
+  if (!row && isPlausibleId) {
+    row = await platformPrisma.offer.findFirst({
+      where: { id: cleanToken, publicTokenRevokedAt: null },
+      include: offerInclude,
+    });
   }
 
   if (!row || row.publicTokenRevokedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
@@ -1153,6 +1176,7 @@ export async function getPublicRow(token: string) {
   const organization = await platformPrisma.organization.findUnique({ where: { id: row.organizationId } });
   if (!organization?.isActive) throw new OfferValidationError('Portál není dostupný.', 'NOT_FOUND');
   enterTenantContext({ organizationId: row.organizationId, source: 'public-token' });
+  await enrichClientLogoFromSiblings(row.client);
   return row;
 }
 
@@ -1179,10 +1203,25 @@ export async function getPublicOffer(token: string) {
   return { ...serializeOffer(row, { publicToken: token, publicView: true }), branding: organization };
 }
 
-export async function getPublicClientLogo(token: string) {
+export async function getPublicClientLogo(token: string, options?: { pdfCompatibleOnly?: boolean }) {
   const row = await getPublicRow(token);
-  if (!row.client.logoDriveFileId) throw new OfferValidationError('Logo klienta nebylo nalezeno.', 'NOT_FOUND');
-  return { driveFileId: row.client.logoDriveFileId, fileName: row.client.logoFileName, mimeType: row.client.logoMimeType };
+  const asset = await fetchClientLogoAsset(
+    {
+      id: row.client.id,
+      organizationId: row.organizationId,
+      name: row.client.name,
+      normalizedName: row.client.normalizedName,
+      companyId: row.client.companyId,
+      logoDriveFileId: row.client.logoDriveFileId,
+      logoFileName: row.client.logoFileName,
+      logoMimeType: row.client.logoMimeType,
+      website: row.client.website,
+      email: row.contactEmail ?? row.client.email,
+    },
+    options
+  );
+  if (!asset) throw new OfferValidationError('Logo klienta nebylo nalezeno.', 'NOT_FOUND');
+  return asset;
 }
 
 export async function respondToPublicOffer(token: string, raw: unknown) {

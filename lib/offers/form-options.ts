@@ -1,12 +1,13 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
+import { hasResolvableClientLogo } from '@/lib/client-logo';
 import type { MediaPackageOption, OfferClientOption, OfferPriceRuleOption, OfferSurfaceOption } from './view-model';
 
 export async function getOfferFormOptions() {
   const [clients, surfaces, priceRules, packages, priceListItems] = await Promise.all([
     prisma.client.findMany({
       where: { active: true },
-      select: { id: true, name: true, companyId: true, contactPerson: true, email: true, phone: true, note: true, logoDriveFileId: true },
+      select: { id: true, name: true, companyId: true, contactPerson: true, email: true, phone: true, note: true, logoDriveFileId: true, website: true },
       orderBy: { name: 'asc' },
     }),
     prisma.advertisingSurface.findMany({
@@ -62,9 +63,11 @@ export async function getOfferFormOptions() {
     }),
   ]);
 
-  const clientOptions: OfferClientOption[] = clients.map(({ logoDriveFileId, ...client }) => ({
+  const clientOptions: OfferClientOption[] = clients.map(({ logoDriveFileId, website, ...client }) => ({
     ...client,
-    logoUrl: logoDriveFileId ? `/api/clients/${client.id}/logo/file` : undefined,
+    logoUrl: hasResolvableClientLogo({ logoDriveFileId, website, email: client.email })
+      ? `/api/clients/${client.id}/logo/file`
+      : undefined,
   }));
 
   const surfaceOptions: OfferSurfaceOption[] = surfaces.map((surface) => {

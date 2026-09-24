@@ -59,11 +59,26 @@ export function parseNavigationOfferInput(raw: unknown) {
     const subtotal = calculateNavigationPointSubtotal({ quantity, unitPrice, installationPrice, removalPrice, productionPrice, framePrice });
     
     // Parse new Google Maps structured fields
-    const manualDistanceVal = point.manualDistanceValue !== undefined && point.manualDistanceValue !== null && point.manualDistanceValue !== '' 
-      ? decimal(point.manualDistanceValue, `Ruční vzdálenost bodu ${index + 1}`) 
-      : null;
-    const manualDistUnit = text(point.manualDistanceUnit) === 'KILOMETERS' ? ('KILOMETERS' as const) : text(point.manualDistanceUnit) === 'METERS' ? ('METERS' as const) : null;
-    const distSource = text(point.distanceSource) === 'MANUAL' ? ('MANUAL' as const) : ('CALCULATED' as const);
+    const rawManualStr =
+      point.manualDistanceValue !== undefined && point.manualDistanceValue !== null
+        ? String(point.manualDistanceValue).trim().replace(',', '.').replace(/[^0-9.]/g, '')
+        : '';
+    const manualDistanceVal =
+      rawManualStr !== ''
+        ? decimal(rawManualStr, `Ruční vzdálenost bodu ${index + 1}`)
+        : null;
+    const hasManualDistance = Boolean(manualDistanceVal && manualDistanceVal.gt(0));
+    const manualDistUnit =
+      text(point.manualDistanceUnit) === 'KILOMETERS'
+        ? ('KILOMETERS' as const)
+        : text(point.manualDistanceUnit) === 'METERS' || hasManualDistance
+        ? ('METERS' as const)
+        : null;
+    const distSource =
+      (text(point.distanceSource) === 'MANUAL' && hasManualDistance) ||
+      (hasManualDistance && text(point.distanceSource) !== 'CALCULATED')
+        ? ('MANUAL' as const)
+        : ('CALCULATED' as const);
     
     const validArrows = [
       'LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT', 'U_TURN', 'TWO_WAY',

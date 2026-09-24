@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { createOfferPdf } from '@/lib/offers/pdf';
 import { toProposalOffer } from '@/lib/offers/presentation';
@@ -14,12 +13,8 @@ const filename = (title: string) => `${title.toLowerCase().normalize('NFD').repl
 
 async function loadClientLogo(token: string): Promise<string | undefined> {
   try {
-    const logo = await getPublicClientLogo(token);
-    if (!['image/png', 'image/jpeg'].includes(logo.mimeType ?? '')) return undefined;
-    const file = await downloadPhotoFromGoogleDrive(logo.driveFileId);
-    if (!file.ok) return undefined;
-    const bytes = await new Response(file.body).arrayBuffer();
-    return `data:${logo.mimeType};base64,${Buffer.from(bytes).toString('base64')}`;
+    const logo = await getPublicClientLogo(token, { pdfCompatibleOnly: true });
+    return logo.dataUri;
   } catch {
     return undefined;
   }

@@ -57,8 +57,22 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             <ArrowLeft aria-hidden="true" size={16} />
             Zpět na nabídky
           </Link>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">{offer.campaignName}</h1>
-          <p className="mt-2 text-sm text-slate-500">{offer.client.name} · vytvořil {offer.createdBy.name}</p>
+          <div className="flex items-center gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+              {offer.client.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt={`Logo ${offer.client.name}`} className="h-full w-full object-contain p-2" src={offer.client.logoUrl} />
+              ) : (
+                <span className="text-base font-black text-slate-400">
+                  {offer.client.name?.slice(0, 2).toUpperCase() || 'KL'}
+                </span>
+              )}
+            </span>
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">{offer.campaignName}</h1>
+              <p className="mt-1.5 text-sm text-slate-500">{offer.client.name} · vytvořil {offer.createdBy.name}</p>
+            </div>
+          </div>
         </div>
         <StatusBadge value={offer.status} />
       </header>
@@ -66,8 +80,8 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
       <OfferWorkflowStepper converted={offer.converted} events={offer.events} status={offer.status} />
 
       {offer.offerType === 'STANDARD_MEDIA' || !offer.offerType
-        ? <OfferProposal offer={toProposalOffer(offer)} variant="internal" />
-        : <SpecializedOfferSummary offer={offer} />}
+        ? <OfferProposal offer={toProposalOffer(offer)} token={offer.portalToken ?? offer.id} variant="internal" />
+        : <SpecializedOfferSummary offer={offer} proposalKey={offer.portalToken ?? offer.id} />}
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6 lg:grid-cols-2">
