@@ -267,7 +267,39 @@ export function AiOfferGeneratorModal({
                 <label className="text-xs font-bold">Adresa cíle<input className="input mt-1" value={targetAddress} onChange={(event) => setTargetAddress(event.target.value)} placeholder="Ulice a číslo, město" /></label>
               </div>
               <label className="block text-xs font-bold">Co je pro trasu důležité? <span className="font-normal text-slate-500">(nepovinné)</span><textarea className="input mt-1 min-h-16" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Např. zachytit příjezd od centra a z dálnice" /></label>
-              <div><span className="text-xs font-bold">Kolik bodů navrhnout?</span><div className="mt-2 flex gap-2">{[4, 6, 8].map((count) => <button key={count} type="button" onClick={() => setQuantity(count)} className={`min-w-14 rounded-lg border px-3 py-2 text-sm font-black ${quantity === count ? 'border-sky-400 bg-sky-500/20 text-sky-200' : 'border-slate-700 bg-slate-900'}`}>{count}</button>)}</div></div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold">Kolik bodů navrhnout? (až 15 bodů)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Vlastní:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={15}
+                      value={quantity}
+                      onChange={(e) => {
+                        const val = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 1));
+                        setQuantity(val);
+                      }}
+                      className="w-16 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-center text-xs font-black text-white"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[4, 6, 8, 10, 12, 15].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setQuantity(count)}
+                      className={`min-w-12 rounded-lg border px-3 py-1.5 text-xs font-black transition ${
+                        quantity === count ? 'border-sky-400 bg-sky-500/20 text-sky-200' : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-600'
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </section>
           </> : <>
             <section><label className="text-sm font-black uppercase tracking-wide text-amber-400">Co klient potřebuje?<textarea className="input mt-2 min-h-24 normal-case tracking-normal text-white" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="Popište kampaň, lokalitu a očekávání klienta." /></label></section>

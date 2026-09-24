@@ -273,7 +273,7 @@ export function GoogleNavigationOfferMap({
       /left|vlevo/i.test(maneuver) ? 'LEFT' : /right|vpravo/i.test(maneuver) ? 'RIGHT' : 'STRAIGHT';
     const directions = ['severu', 'severovýchodu', 'východu', 'jihovýchodu', 'jihu', 'jihozápadu', 'západu', 'severozápadu'];
     const radiusMeters = Math.max(1, maxRadiusKm) * 1000;
-    const routeCount = Math.min(8, Math.max(4, suggestionCount));
+    const routeCount = Math.min(16, Math.max(4, suggestionCount));
     const latDelta = radiusMeters / 111_320;
     const lngDelta = radiusMeters / (111_320 * Math.max(0.2, Math.cos(target.latitude * Math.PI / 180)));
     const origins = Array.from({ length: routeCount }, (_, index) => {
@@ -327,6 +327,8 @@ export function GoogleNavigationOfferMap({
         const rawPolyline = route?.overview_polyline;
         const routePolyline = typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points;
         const instruction = candidate.instruction || `rozhodovací místo při příjezdu od ${candidate.direction}`;
+        const rawDist = route?.legs[0]?.distance?.value ?? candidate.distanceMeters;
+        const roundedDist = Math.max(50, Math.round(rawDist / 50) * 50);
         return {
           id: `route-point-${candidate.routeIndex + 1}-${candidate.stepIndex + 1}`,
           title: `Rozhodovací bod: ${instruction.slice(0, 90)}`,
@@ -338,9 +340,9 @@ export function GoogleNavigationOfferMap({
             /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd/i.test(`${instruction} ${candidate.maneuver ?? ''}`)
               ? 'Řidič zde mění směr nebo volí další část trasy.'
               : 'Bod leží na důležitém úseku příjezdové trasy.',
-            `${Math.round(candidate.distanceMeters)} m před cílem.`,
+            `${roundedDist} m před cílem.`,
           ],
-          distanceMeters: route?.legs[0]?.distance?.value ?? candidate.distanceMeters,
+          distanceMeters: roundedDist,
           routeDurationSeconds: route?.legs[0]?.duration?.value,
           routePolyline,
           arrowDirection: arrowFor(candidate.maneuver),
