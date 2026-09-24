@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
+import { buildSnapshotItem, documentationPhotoSelect, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
 import {
   isPublicNavigationReportStatus,
   NavigationDocumentationValidationError,
@@ -25,19 +25,19 @@ const reportInclude = {
         include: {
           carrier: {
             include: {
-              photos: { where: clientPhotoWhere, orderBy: photoOrder },
-              surfaces: { include: { photos: { where: clientPhotoWhere, orderBy: photoOrder } } },
+              photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
+              surfaces: { include: { photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect } } },
             },
           },
         },
       },
       carrier: {
         include: {
-          photos: { where: clientPhotoWhere, orderBy: photoOrder },
-          surfaces: { include: { photos: { where: clientPhotoWhere, orderBy: photoOrder } } },
+          photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
+          surfaces: { include: { photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect } } },
         },
       },
-      selectedPhoto: true,
+      selectedPhoto: { select: documentationPhotoSelect },
     },
     orderBy: { sortOrder: 'asc' as const },
     take: 250,

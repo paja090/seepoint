@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { PublicNavigationClientView } from '@/components/navigation-documentation/PublicNavigationClientView';
-import { hashToken, buildSnapshotItem, SnapshotItemData } from '@/lib/navigation-documentation';
+import { hashToken, buildSnapshotItem, documentationPhotoSelect, SnapshotItemData } from '@/lib/navigation-documentation';
 import { prisma } from '@/lib/db';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
@@ -48,7 +48,7 @@ export default async function PublicNavigationDocumentationPage({
             },
           },
           carrier: true,
-          selectedPhoto: true,
+          selectedPhoto: { select: documentationPhotoSelect },
         },
         orderBy: { sortOrder: 'asc' },
       },

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
+import { buildSnapshotItem, documentationPhotoSelect, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -18,7 +18,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           include: {
             navigationPoint: true,
             carrier: true,
-            selectedPhoto: true,
+            selectedPhoto: { select: documentationPhotoSelect },
           },
           orderBy: { sortOrder: 'asc' },
         },
