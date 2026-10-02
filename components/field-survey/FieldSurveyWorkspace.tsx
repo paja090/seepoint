@@ -23,6 +23,13 @@ export function FieldSurveyWorkspace({
     setPoints((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }
 
+  function handlePointDeleted(pointId: string) {
+    setPoints((prev) => prev.filter((p) => p.id !== pointId));
+    if (selectedPointId === pointId) {
+      setSelectedPointId(undefined);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Horní lišta s akcemi */}
@@ -99,6 +106,7 @@ export function FieldSurveyWorkspace({
               userRole={userRole}
               onClose={() => setSelectedPointId(undefined)}
               onPointUpdated={handlePointUpdated}
+              onPointDeleted={handlePointDeleted}
             />
           ) : (
             <div className="card text-center py-10 space-y-2">

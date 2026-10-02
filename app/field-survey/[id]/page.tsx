@@ -47,6 +47,7 @@ export default async function FieldSurveyDetailPage({
       cadastralArea: p.parcelData.cadastralArea,
       municipality: p.parcelData.municipality,
       confidence: p.parcelData.confidence,
+      sourceUrl: p.parcelData.sourceUrl,
     } : null,
     ownerData: p.ownerData ? {
       ownerName: p.ownerData.ownerName,
@@ -62,6 +63,13 @@ export default async function FieldSurveyDetailPage({
       status: p.aiAnalysis.status,
       suggestedType: p.aiAnalysis.suggestedType,
       isUsable: p.aiAnalysis.isUsable,
+      locationDesc: p.aiAnalysis.locationDesc,
+      visibility: p.aiAnalysis.visibility,
+      orientation: p.aiAnalysis.orientation,
+      surroundings: p.aiAnalysis.surroundings,
+      obstacles: p.aiAnalysis.obstacles,
+      placementChar: p.aiAnalysis.placementChar,
+      errorMessage: p.aiAnalysis.errorMessage,
       confirmedAt: p.aiAnalysis.confirmedAt?.toISOString() ?? null,
     } : null,
   }));

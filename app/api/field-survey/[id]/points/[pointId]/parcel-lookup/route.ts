@@ -69,3 +69,46 @@ export async function POST(
       : (result.errorMessage ?? 'Parcela nebyla ověřena. Doplňte parcelní číslo ručně.'),
   });
 }
+
+/**
+ * PUT /api/field-survey/[id]/points/[pointId]/parcel-lookup
+ * Ruční zadání nebo oprava parcelních dat.
+ */
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ id: string; pointId: string }> }
+) {
+  const { pointId } = await params;
+
+  const auth = await requireApiAccess('fieldSurvey');
+  if (isApiDenied(auth)) return auth;
+  const organizationId = auth.organizationId || auth.membership?.organizationId;
+  if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);
+  enterTenantContext({ organizationId, userId: auth.id, source: 'session' });
+
+  let body: Record<string, string>;
+  try {
+    body = (await req.json()) as Record<string, string>;
+  } catch {
+    return jsonError('INVALID_JSON', 'Neplatná data požadavku.', 400);
+  }
+
+  const { parcelNumber, cadastralArea, municipality, lv, sourceUrl } = body;
+
+  const parcel = await upsertFieldSurveyParcel(pointId, {
+    parcelNumber: parcelNumber?.trim() || undefined,
+    cadastralArea: cadastralArea?.trim() || undefined,
+    municipality: municipality?.trim() || undefined,
+    lv: lv?.trim() || undefined,
+    source: 'MANUAL',
+    sourceUrl: sourceUrl?.trim() || undefined,
+    confidence: 'VERIFIED',
+    verifiedByUserId: auth.id,
+  });
+
+  return NextResponse.json({
+    success: true,
+    parcel,
+    message: 'Parcelní data byla ručně uložena.',
+  });
+}

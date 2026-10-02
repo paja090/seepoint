@@ -1,24 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { SurveyPointItem } from './FieldSurveyMapView';
+import { processPhotoForUpload } from '@/lib/client-photo-processing';
 
 export function FieldSurveyPointDetail({
   point,
   userRole,
   onClose,
   onPointUpdated,
+  onPointDeleted,
 }: {
   point: SurveyPointItem;
   userRole: string;
   onClose: () => void;
   onPointUpdated: (updatedPoint: SurveyPointItem) => void;
+  onPointDeleted?: (pointId: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'parcel' | 'owner' | 'contact' | 'ai' | 'convert'>('overview');
   const [isLookingUpParcel, setIsLookingUpParcel] = useState(false);
   const [parcelMessage, setParcelMessage] = useState('');
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
+
+  // Point deletion state
+  const [isDeletingPoint, setIsDeletingPoint] = useState(false);
+  const [deletePointError, setDeletePointError] = useState('');
+
+  // Photo management state
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const addPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Manual parcel form state
+  const [isEditingParcelManual, setIsEditingParcelManual] = useState(false);
+  const [manualParcelNumber, setManualParcelNumber] = useState(point.parcelData?.parcelNumber ?? '');
+  const [manualCadastralArea, setManualCadastralArea] = useState(point.parcelData?.cadastralArea ?? '');
+  const [manualMunicipality, setManualMunicipality] = useState(point.parcelData?.municipality ?? '');
+  const [manualLv, setManualLv] = useState('');
+  const [isSavingManualParcel, setIsSavingManualParcel] = useState(false);
 
   // Owner form state
   const [ownerName, setOwnerName] = useState(point.ownerData?.ownerName ?? '');
@@ -41,6 +61,156 @@ export function FieldSurveyPointDetail({
   const [conversionResult, setConversionResult] = useState<string | null>(null);
 
   const canConvert = userRole === 'ADMIN' || userRole === 'MANAGER';
+
+  // Smazání celé plochy (průzkumného bodu)
+  async function handleDeletePoint() {
+    const desc = point.address ? `${point.surfaceType} (${point.address})` : point.surfaceType;
+    if (!confirm(`Opravdu chcete smazat plochu "${desc}" včetně všech fotografií a údajů? Tuto akci nelze vrátit.`)) {
+      return;
+    }
+    setIsDeletingPoint(true);
+    setDeletePointError('');
+    try {
+      const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Chyba při mazání plochy.' })) as { error?: string };
+        setDeletePointError(err.error || 'Plochu se nepodařilo smazat.');
+        return;
+      }
+      if (onPointDeleted) {
+        onPointDeleted(point.id);
+      }
+      onClose();
+    } catch {
+      setDeletePointError('Chyba při komunikaci se serverem.');
+    } finally {
+      setIsDeletingPoint(false);
+    }
+  }
+
+  // Přidání fotografie z detailu (s automatickou optimalizací)
+  async function handleAddPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const rawFile = e.target.files?.[0];
+    if (!rawFile) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      let fileToUpload = rawFile;
+      try {
+        const { file: optimized } = await processPhotoForUpload(rawFile, {
+          maxDimension: 1920,
+          maxBytes: 1.5 * 1024 * 1024,
+          initialQuality: 0.82,
+        });
+        fileToUpload = optimized;
+      } catch (optErr) {
+        console.warn('Optimalizace fotografie selhala, použiji originál', optErr);
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+
+      const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/photos`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        alert('Fotografii se nepodařilo nahrát.');
+        return;
+      }
+
+      const data = await res.json() as { photo?: SurveyPointItem['photos'][number] };
+      if (data.photo) {
+        onPointUpdated({
+          ...point,
+          photos: [...(point.photos || []), data.photo],
+        });
+      }
+    } catch {
+      alert('Chyba při komunikaci se serverem při nahrávání fotografie.');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  }
+
+  // Smazání fotografie z bodu
+  async function handleDeletePhoto(photoId: string) {
+    if (!confirm('Opravdu chcete smazat tuto fotografii?')) return;
+    setDeletingPhotoId(photoId);
+    try {
+      const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/photos?photoId=${encodeURIComponent(photoId)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        onPointUpdated({
+          ...point,
+          photos: point.photos.filter((p) => p.id !== photoId),
+        });
+      } else {
+        alert('Fotografii se nepodařilo smazat.');
+      }
+    } catch {
+      alert('Chyba při komunikaci se serverem.');
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  }
+
+  // Ruční uložení parcelních dat
+  async function handleSaveManualParcel(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSavingManualParcel(true);
+    setParcelMessage('');
+    try {
+      const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/parcel-lookup`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parcelNumber: manualParcelNumber,
+          cadastralArea: manualCadastralArea,
+          municipality: manualMunicipality,
+          lv: manualLv,
+        }),
+      });
+      const data = await res.json() as { success: boolean; message: string; parcel?: SurveyPointItem['parcelData'] };
+      setParcelMessage(data.message || (data.success ? 'Parcela byla ručně uložena.' : 'Uložení selhalo.'));
+      if (data.success && data.parcel) {
+        onPointUpdated({ ...point, parcelData: data.parcel, status: 'PARCEL_FOUND' });
+        setIsEditingParcelManual(false);
+      }
+    } catch {
+      setParcelMessage('Chyba při komunikaci se serverem.');
+    } finally {
+      setIsSavingManualParcel(false);
+    }
+  }
+
+  // Aplikace typu navrženého AI
+  async function handleApplyAiSuggestion() {
+    if (!point.aiAnalysis?.suggestedType) return;
+    try {
+      const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          surfaceType: point.aiAnalysis.suggestedType,
+        }),
+      });
+      if (res.ok) {
+        onPointUpdated({
+          ...point,
+          surfaceType: point.aiAnalysis.suggestedType as SurveyPointItem['surfaceType'],
+        });
+        setAiMessage(`Typ plochy byl změněn na ${point.aiAnalysis.suggestedType}.`);
+      }
+    } catch {
+      setAiMessage('Nepodařilo se aplikovat návrh typu.');
+    }
+  }
 
   // Vyhledání parcely
   async function handleParcelLookup() {
@@ -168,15 +338,32 @@ export function FieldSurveyPointDetail({
             Zaznamenal {point.createdBy?.name} · {new Date(point.createdAt).toLocaleDateString('cs-CZ')}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-slate-400 hover:text-slate-700 text-lg font-bold px-2 py-1 rounded-lg"
-          aria-label="Zavřít detail"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleDeletePoint()}
+            disabled={isDeletingPoint}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-red-200 transition disabled:opacity-50"
+            title="Smazat tuto plochu z průzkumu"
+          >
+            {isDeletingPoint ? 'Mažu…' : '🗑️ Smazat plochu'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-lg font-bold px-2 py-1 rounded-lg"
+            aria-label="Zavřít detail"
+          >
+            ✕
+          </button>
+        </div>
       </div>
+
+      {deletePointError && (
+        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+          ❌ {deletePointError}
+        </div>
+      )}
 
       {/* Navigační taby */}
       <div className="flex gap-1 border-b border-slate-100 pb-2 overflow-x-auto text-xs font-medium">
@@ -206,25 +393,69 @@ export function FieldSurveyPointDetail({
       {/* TAB 1: PŘEHLED & FOTO */}
       {activeTab === 'overview' && (
         <div className="space-y-4 text-sm">
+          {/* Hlavička sekce fotografií */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Fotografie ({point.photos?.length || 0})
+            </span>
+            <input
+              ref={addPhotoInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => void handleAddPhoto(e)}
+            />
+            <button
+              type="button"
+              onClick={() => addPhotoInputRef.current?.click()}
+              disabled={isUploadingPhoto}
+              className="px-2.5 py-1 text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition disabled:opacity-50"
+            >
+              {isUploadingPhoto ? 'Nahrávám…' : '+ Přidat foto'}
+            </button>
+          </div>
+
           {/* Fotogalerie */}
           {point.photos?.length > 0 ? (
             <div className="space-y-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={point.photos[0].url}
-                alt="Fotografie bodu"
-                className="w-full h-48 rounded-xl object-cover border border-slate-200"
-              />
+              <div className="relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={point.photos[0].url}
+                  alt="Fotografie bodu"
+                  className="w-full h-48 rounded-xl object-cover border border-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleDeletePhoto(point.photos[0].id)}
+                  disabled={deletingPhotoId === point.photos[0].id}
+                  className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-2 py-1 rounded-lg opacity-80 group-hover:opacity-100 shadow transition"
+                  title="Smazat tuto fotografii"
+                >
+                  {deletingPhotoId === point.photos[0].id ? '…' : '🗑️ Smazat foto'}
+                </button>
+              </div>
+
               {point.photos.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto">
+                <div className="flex gap-2 overflow-x-auto pt-1">
                   {point.photos.slice(1).map((photo, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={photo.id || i}
-                      src={photo.url}
-                      alt={`Foto ${i + 2}`}
-                      className="h-16 w-16 rounded-lg object-cover border border-slate-200"
-                    />
+                    <div key={photo.id || i} className="relative group flex-none">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photo.url}
+                        alt={`Foto ${i + 2}`}
+                        className="h-16 w-16 rounded-lg object-cover border border-slate-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleDeletePhoto(photo.id)}
+                        disabled={deletingPhotoId === photo.id}
+                        className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full h-5 w-5 text-xs font-bold flex items-center justify-center opacity-90 shadow transition"
+                        title="Smazat foto"
+                      >
+                        ×
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -275,6 +506,19 @@ export function FieldSurveyPointDetail({
               </div>
             )}
           </div>
+
+          {/* Smazání plochy na spodku */}
+          <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
+            <span className="text-slate-400">Správa plochy:</span>
+            <button
+              type="button"
+              onClick={() => void handleDeletePoint()}
+              disabled={isDeletingPoint}
+              className="text-red-600 hover:text-red-700 hover:underline font-semibold"
+            >
+              Odstranit tuto plochu z průzkumu
+            </button>
+          </div>
         </div>
       )}
 
@@ -282,31 +526,114 @@ export function FieldSurveyPointDetail({
       {activeTab === 'parcel' && (
         <div className="space-y-3 text-sm">
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
-            <strong>Geodatová vrstva:</strong> AI parcelní čísla nevymýšlí. Parcela pochází výhradně z katastrálního zdroje nebo ručního zadání.
+            <strong>Geodatová vrstva:</strong> Data pochází z oficiálního katastru nemovitostí ČR (ČÚZK RÚIAN) nebo ručního zadání. AI parcelní čísla nevymýšlí.
           </div>
 
           {point.parcelData?.parcelNumber ? (
-            <div className="rounded-xl bg-slate-50 p-3 space-y-1 text-xs">
-              <div><span className="font-semibold text-slate-700">Parcelní číslo:</span> <strong className="text-slate-900">{point.parcelData.parcelNumber}</strong></div>
-              {point.parcelData.cadastralArea && <div><span className="font-semibold text-slate-700">Katastrální území:</span> {point.parcelData.cadastralArea}</div>}
-              {point.parcelData.municipality && <div><span className="font-semibold text-slate-700">Obec:</span> {point.parcelData.municipality}</div>}
-              <div><span className="font-semibold text-slate-700">Ověření:</span> <span className="font-bold text-sky-700">{point.parcelData.confidence}</span></div>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-700">Parcelní číslo:</span>
+                <strong className="text-slate-900 font-mono text-sm">{point.parcelData.parcelNumber}</strong>
+              </div>
+              {point.parcelData.cadastralArea && (
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-700">Katastrální území:</span>
+                  <span className="text-slate-900">{point.parcelData.cadastralArea}</span>
+                </div>
+              )}
+              {point.parcelData.municipality && (
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-slate-700">Obec:</span>
+                  <span className="text-slate-900">{point.parcelData.municipality}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-slate-700">Stav ověření:</span>
+                <span className="font-bold text-sky-700">{point.parcelData.confidence}</span>
+              </div>
+              {point.parcelData.sourceUrl && (
+                <div className="pt-2 border-t border-slate-200">
+                  <a
+                    href={point.parcelData.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 font-semibold text-xs border border-sky-200 transition"
+                  >
+                    🏛️ Otevřít v Nahlížení do katastru nemovitostí (ČÚZK) ↗
+                  </a>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-xs text-slate-500">K tomuto bodu zatím nejsou přiřazena parcelní data.</p>
           )}
 
-          <button
-            type="button"
-            onClick={() => void handleParcelLookup()}
-            disabled={isLookingUpParcel}
-            className="w-full btn btn-primary text-xs py-2.5"
-          >
-            {isLookingUpParcel ? 'Zjišťuji parcelu…' : '🔍 Vyhledat parcelu pro GPS'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void handleParcelLookup()}
+              disabled={isLookingUpParcel}
+              className="flex-1 btn btn-primary text-xs py-2.5"
+            >
+              {isLookingUpParcel ? 'Zjišťuji parcelu…' : '🔍 Vyhledat parcelu pro GPS'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsEditingParcelManual((prev) => !prev)}
+              className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+            >
+              {isEditingParcelManual ? 'Zavřít úpravu' : '✏️ Zadat ručně'}
+            </button>
+          </div>
+
+          {isEditingParcelManual && (
+            <form onSubmit={handleSaveManualParcel} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+              <div className="font-bold text-slate-800">Ruční zadání parcelních dat</div>
+              <div>
+                <label className="block text-slate-600 mb-0.5">Parcelní číslo *</label>
+                <input
+                  type="text"
+                  required
+                  value={manualParcelNumber}
+                  onChange={(e) => setManualParcelNumber(e.target.value)}
+                  placeholder="Např. 2379/7"
+                  className="input w-full"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-slate-600 mb-0.5">Katastrální území</label>
+                  <input
+                    type="text"
+                    value={manualCadastralArea}
+                    onChange={(e) => setManualCadastralArea(e.target.value)}
+                    placeholder="Např. Moravská Ostrava"
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 mb-0.5">Obec</label>
+                  <input
+                    type="text"
+                    value={manualMunicipality}
+                    onChange={(e) => setManualMunicipality(e.target.value)}
+                    placeholder="Např. Ostrava"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={isSavingManualParcel}
+                className="w-full btn btn-primary py-2 text-xs font-semibold disabled:opacity-50"
+              >
+                {isSavingManualParcel ? 'Ukládám…' : 'Uložit parcelní data'}
+              </button>
+            </form>
+          )}
 
           {parcelMessage && (
-            <p className="text-xs text-slate-600 bg-slate-100 p-2.5 rounded-lg">{parcelMessage}</p>
+            <p className="text-xs text-slate-700 bg-slate-100 p-2.5 rounded-lg">{parcelMessage}</p>
           )}
         </div>
       )}
@@ -401,13 +728,95 @@ export function FieldSurveyPointDetail({
           </div>
 
           {point.aiAnalysis ? (
-            <div className="rounded-xl bg-slate-50 p-3 space-y-1.5">
-              <div><span className="font-semibold text-slate-700">Stav:</span> <strong>{point.aiAnalysis.status}</strong></div>
-              {point.aiAnalysis.suggestedType && (
-                <div><span className="font-semibold text-slate-700">Návrh typu:</span> {point.aiAnalysis.suggestedType}</div>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-700">Stav analýzy:</span>
+                <span className={`px-2 py-0.5 rounded font-bold ${
+                  point.aiAnalysis.status === 'DONE' ? 'bg-emerald-100 text-emerald-800' :
+                  point.aiAnalysis.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                  'bg-slate-200 text-slate-700'
+                }`}>
+                  {point.aiAnalysis.status}
+                </span>
+              </div>
+
+              {point.aiAnalysis.status === 'FAILED' && (
+                <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs">
+                  <p className="font-semibold">⚠️ AI analýza selhala</p>
+                  <p className="mt-0.5">{point.aiAnalysis.errorMessage || 'AI služba nebyla schopna fotografii vyhodnotit. Zkontrolujte API klíč.'}</p>
+                </div>
               )}
+
+              {point.aiAnalysis.suggestedType && (
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                  <span className="font-semibold text-slate-700">Návrh typu plochy:</span>
+                  <div className="flex items-center gap-2">
+                    <strong className="px-2 py-0.5 bg-sky-100 text-sky-800 rounded">{point.aiAnalysis.suggestedType}</strong>
+                    {point.surfaceType !== point.aiAnalysis.suggestedType && (
+                      <button
+                        type="button"
+                        onClick={() => void handleApplyAiSuggestion()}
+                        className="text-xs font-semibold text-sky-600 hover:underline"
+                        title="Změnit typ plochy na návrh AI"
+                      >
+                        Použít typ
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {point.aiAnalysis.isUsable !== null && point.aiAnalysis.isUsable !== undefined && (
-                <div><span className="font-semibold text-slate-700">Využitelné pro reklamu:</span> {point.aiAnalysis.isUsable ? 'Ano' : 'Ne'}</div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-700">Využitelné pro reklamu:</span>
+                  <span className={`font-bold px-2 py-0.5 rounded ${
+                    point.aiAnalysis.isUsable ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {point.aiAnalysis.isUsable ? 'Ano' : 'Ne'}
+                  </span>
+                </div>
+              )}
+
+              {point.aiAnalysis.locationDesc && (
+                <div>
+                  <span className="font-semibold text-slate-700">Popis místa:</span>
+                  <p className="text-slate-900 mt-0.5 bg-white p-2 rounded border border-slate-200">{point.aiAnalysis.locationDesc}</p>
+                </div>
+              )}
+
+              {point.aiAnalysis.visibility && (
+                <div>
+                  <span className="font-semibold text-slate-700">Viditelnost:</span>
+                  <p className="text-slate-900 mt-0.5 bg-white p-2 rounded border border-slate-200">{point.aiAnalysis.visibility}</p>
+                </div>
+              )}
+
+              {point.aiAnalysis.orientation && (
+                <div>
+                  <span className="font-semibold text-slate-700">Orientace k provozu:</span>
+                  <p className="text-slate-900 mt-0.5 bg-white p-2 rounded border border-slate-200">{point.aiAnalysis.orientation}</p>
+                </div>
+              )}
+
+              {point.aiAnalysis.surroundings && (
+                <div>
+                  <span className="font-semibold text-slate-700">Okolí:</span>
+                  <p className="text-slate-900 mt-0.5 bg-white p-2 rounded border border-slate-200">{point.aiAnalysis.surroundings}</p>
+                </div>
+              )}
+
+              {point.aiAnalysis.obstacles && (
+                <div>
+                  <span className="font-semibold text-slate-700">Překážky:</span>
+                  <p className="text-slate-900 mt-0.5 bg-white p-2 rounded border border-slate-200">{point.aiAnalysis.obstacles}</p>
+                </div>
+              )}
+
+              {point.aiAnalysis.placementChar && (
+                <div>
+                  <span className="font-semibold text-slate-700">Umístění:</span>
+                  <p className="text-slate-900 mt-0.5 bg-white p-2 rounded border border-slate-200">{point.aiAnalysis.placementChar}</p>
+                </div>
               )}
             </div>
           ) : (
@@ -420,11 +829,11 @@ export function FieldSurveyPointDetail({
             disabled={isAiAnalyzing || point.photos?.length === 0}
             className="w-full btn btn-primary py-2.5 disabled:opacity-50"
           >
-            {isAiAnalyzing ? 'Analyzuji fotografii…' : '🤖 Spustit AI analýzu'}
+            {isAiAnalyzing ? 'Analyzuji fotografii…' : point.aiAnalysis ? '🤖 Znovu spustit AI analýzu' : '🤖 Spustit AI analýzu'}
           </button>
 
           {aiMessage && (
-            <p className="text-slate-600 bg-slate-100 p-2.5 rounded-lg">{aiMessage}</p>
+            <p className="text-slate-700 bg-slate-100 p-2.5 rounded-lg">{aiMessage}</p>
           )}
         </div>
       )}

@@ -47,24 +47,35 @@ export async function runFieldSurveyAiAnalysis(
     });
   }
 
-  // 1. Získáme binární data fotografie
-  const stored = await readStoredPhoto(photo);
-  if (!stored?.body) {
-    return upsertFieldSurveyAiAnalysis(surveyPointId, {
-      status: 'FAILED',
-      errorMessage: 'Nepodařilo se načíst data fotografie pro AI analýzu.',
-    });
+  // 1. Získáme binární data fotografie (buď z direct DB content, nebo ze storage)
+  let base64Data: string;
+  let mimeType = photo.mimeType || 'image/jpeg';
+
+  if (photo.content && photo.content.byteLength > 0) {
+    base64Data = Buffer.from(photo.content).toString('base64');
+  } else {
+    const stored = await readStoredPhoto(photo);
+    if (!stored?.body) {
+      return upsertFieldSurveyAiAnalysis(surveyPointId, {
+        status: 'FAILED',
+        errorMessage: 'Nepodařilo se načíst data fotografie pro AI analýzu.',
+      });
+    }
+    const arrayBuf = await new Response(stored.body).arrayBuffer();
+    base64Data = Buffer.from(arrayBuf).toString('base64');
+    if (stored.contentType) mimeType = stored.contentType;
   }
 
-  const arrayBuf = await new Response(stored.body).arrayBuffer();
-  const base64Data = Buffer.from(arrayBuf).toString('base64');
-  const mimeType = stored.contentType || photo.mimeType || 'image/jpeg';
-
-  const modelsToTry = [
+  const configuredModels = [
     process.env.GEMINI_VISION_MODEL,
-    'gemini-2.5-flash',
-    'gemini-1.5-flash',
-  ].filter((m): m is string => Boolean(m?.trim()));
+    process.env.GEMINI_VISION_FALLBACK_MODEL,
+  ]
+    .map((m) => m?.trim())
+    .filter((m): m is string => Boolean(m));
+
+  const modelsToTry = configuredModels.length > 0
+    ? configuredModels
+    : ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
 
   let lastError = 'Neznámá chyba AI';
 
@@ -99,7 +110,9 @@ export async function runFieldSurveyAiAnalysis(
       });
 
       if (!res.ok) {
-        lastError = `Gemini HTTP ${res.status}`;
+        const errorText = await res.text().catch(() => '');
+        console.warn(`[field-survey/ai] Model ${model} returned HTTP ${res.status}`, errorText.slice(0, 200));
+        lastError = `Gemini HTTP ${res.status}: ${errorText.slice(0, 100)}`;
         continue;
       }
 
@@ -107,24 +120,40 @@ export async function runFieldSurveyAiAnalysis(
         candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
       };
 
-      const text = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) {
+      const rawText = responseJson.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
         lastError = 'Prázdná odpověď AI';
         continue;
       }
 
-      const parsed = JSON.parse(text) as FieldSurveyAiResult;
+      // Robustní parsování JSONu – odstranění ```json ... ``` markdown bloků
+      let cleanText = rawText.trim();
+      if (cleanText.includes('```')) {
+        cleanText = cleanText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
+      }
+      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanText = jsonMatch[0];
+      }
+
+      const parsed = JSON.parse(cleanText) as Partial<FieldSurveyAiResult>;
+
+      const validTypes = ['ACKO', 'TOWER', 'BANNER', 'PLOT', 'OTHER'] as const;
+      const rawType = String(parsed.suggestedType ?? '').toUpperCase();
+      const suggestedType = validTypes.includes(rawType as typeof validTypes[number])
+        ? (rawType as typeof validTypes[number])
+        : 'OTHER';
 
       return await upsertFieldSurveyAiAnalysis(surveyPointId, {
         status: 'DONE',
-        suggestedType: parsed.suggestedType,
-        isUsable: parsed.isUsable,
-        locationDesc: parsed.locationDesc,
-        visibility: parsed.visibility,
-        orientation: parsed.orientation,
-        surroundings: parsed.surroundings,
-        obstacles: parsed.obstacles,
-        placementChar: parsed.placementChar,
+        suggestedType,
+        isUsable: typeof parsed.isUsable === 'boolean' ? parsed.isUsable : true,
+        locationDesc: parsed.locationDesc?.slice(0, 500) || '',
+        visibility: parsed.visibility?.slice(0, 500) || '',
+        orientation: parsed.orientation?.slice(0, 500) || '',
+        surroundings: parsed.surroundings?.slice(0, 500) || '',
+        obstacles: parsed.obstacles?.slice(0, 500) || '',
+        placementChar: parsed.placementChar?.slice(0, 500) || '',
         rawResponse: parsed,
       });
     } catch (err) {
