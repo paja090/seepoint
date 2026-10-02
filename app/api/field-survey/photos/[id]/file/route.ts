@@ -31,7 +31,13 @@ export async function GET(
   try {
     const { id } = await params;
     const photo = await prisma.fieldSurveyPhoto.findFirst({
-      where: { id, organizationId: user.organizationId },
+      where: {
+        organizationId: user.organizationId,
+        OR: [
+          { id },
+          { url: { contains: id } },
+        ],
+      },
       select: {
         id: true,
         url: true,

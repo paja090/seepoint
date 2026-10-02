@@ -22,6 +22,7 @@ export type SurveyPointItem = {
     cadastralArea?: string | null;
     municipality?: string | null;
     confidence: string;
+    sourceUrl?: string | null;
   } | null;
   ownerData?: {
     ownerName?: string | null;
@@ -37,6 +38,13 @@ export type SurveyPointItem = {
     status: string;
     suggestedType?: string | null;
     isUsable?: boolean | null;
+    locationDesc?: string | null;
+    visibility?: string | null;
+    orientation?: string | null;
+    surroundings?: string | null;
+    obstacles?: string | null;
+    placementChar?: string | null;
+    errorMessage?: string | null;
     confirmedAt?: string | Date | null;
   } | null;
 };

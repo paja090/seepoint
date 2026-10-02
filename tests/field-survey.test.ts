@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseRequiredCoordinates } from '../lib/mobile-photo-upload.ts';
-import { ManualParcelProvider, createParcelLookupProvider } from '../lib/field-survey/parcel-lookup.ts';
+import { ManualParcelProvider, CuzkRuianProvider, createParcelLookupProvider } from '../lib/field-survey/parcel-lookup.ts';
 import {
   exportFieldSurveyGeoJson,
   exportFieldSurveyKml,
@@ -85,14 +85,19 @@ test('field survey: parcel lookup provider default never hallucinates and return
   assert.match(result.errorMessage || '', /ručně/);
 });
 
-test('field survey: factory returns ManualParcelProvider when CUZK_WFS_URL is not set', () => {
-  const originalEnv = process.env.CUZK_WFS_URL;
-  delete process.env.CUZK_WFS_URL;
+test('field survey: factory returns CuzkRuianProvider by default and ManualParcelProvider when MANUAL_PARCEL_ONLY is set', () => {
+  const originalEnv = process.env.MANUAL_PARCEL_ONLY;
+  delete process.env.MANUAL_PARCEL_ONLY;
   try {
-    const provider = createParcelLookupProvider();
-    assert.equal(provider.name, 'MANUAL');
+    const defaultProvider = createParcelLookupProvider();
+    assert.equal(defaultProvider.name, 'RUIAN');
+
+    process.env.MANUAL_PARCEL_ONLY = 'true';
+    const manualProvider = createParcelLookupProvider();
+    assert.equal(manualProvider.name, 'MANUAL');
   } finally {
-    if (originalEnv) process.env.CUZK_WFS_URL = originalEnv;
+    if (originalEnv) process.env.MANUAL_PARCEL_ONLY = originalEnv;
+    else delete process.env.MANUAL_PARCEL_ONLY;
   }
 });
 
@@ -193,4 +198,85 @@ test('field survey: conversion idempotency contract guarantees no duplicate carr
   const secondCall = simulateConvert(existingPoint);
   assert.equal(secondCall.alreadyConverted, true);
   assert.equal(secondCall.carrierId, 'carrier_already_exists');
+});
+
+test('field survey: CuzkRuianProvider parses ArcGIS REST identify results and builds KN link', async () => {
+  // Mock fetch simulating ČÚZK ArcGIS identify response
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const urlStr = String(url);
+      if (urlStr.includes('RUIAN/MapServer/identify')) {
+        return new Response(JSON.stringify({
+          results: [
+            {
+              layerId: 5,
+              layerName: 'Parcela',
+              attributes: {
+                'Číslo parcely': '2379/7',
+                'Jednoznačný identifikátor parcely': '612314807',
+                'Kód druhu pozemku': '14',
+                'Výměra parcely': '150',
+              },
+            },
+            {
+              layerId: 7,
+              layerName: 'Katastrální území',
+              attributes: {
+                'Název katastrálního území': 'Moravská Ostrava',
+              },
+            },
+            {
+              layerId: 12,
+              layerName: 'Obec',
+              attributes: {
+                'Název obce': 'Ostrava',
+              },
+            },
+          ],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url);
+    }) as typeof fetch;
+
+    const provider = new CuzkRuianProvider();
+    const result = await provider.lookup(49.835, 18.275);
+
+    assert.equal(result.found, true);
+    assert.equal(result.parcelNumber, '2379/7');
+    assert.equal(result.cadastralArea, 'Moravská Ostrava');
+    assert.equal(result.municipality, 'Ostrava');
+    assert.equal(result.confidence, 'VERIFIED');
+    assert.ok(result.sourceUrl?.includes('nahlizenidokn.cuzk.cz'));
+    assert.ok(result.sourceUrl?.includes('612314807'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('field survey: AI vision response sanitization strips markdown fences and extracts JSON', () => {
+  const geminiResponseWithFences = `\`\`\`json
+{
+  "suggestedType": "ACKO",
+  "isUsable": true,
+  "locationDesc": "Roh ulice Nádražní a 28. října",
+  "visibility": "Výborná z obou směrů",
+  "orientation": "Čelní k vozovce",
+  "surroundings": "Komerční zóna",
+  "obstacles": "Žádné",
+  "placementChar": "Volné prostranství"
+}
+\`\`\``;
+
+  let cleanText = geminiResponseWithFences.trim();
+  if (cleanText.includes('```')) {
+    cleanText = cleanText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
+  }
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) cleanText = jsonMatch[0];
+
+  const parsed = JSON.parse(cleanText);
+  assert.equal(parsed.suggestedType, 'ACKO');
+  assert.equal(parsed.isUsable, true);
+  assert.equal(parsed.visibility, 'Výborná z obou směrů');
 });

@@ -45,58 +45,90 @@ export class ManualParcelProvider implements ParcelLookupProvider {
 }
 
 // ------------------------------------
-// ČÚZK RÚIAN WFS Provider (připraveno pro budoucí aktivaci)
-// Vyžaduje CUZK_WFS_URL v prostředí
+// ČÚZK RÚIAN ArcGIS REST Provider – bezplatná veřejná služba ČÚZK
+// Funguje kdekoliv v ČR dle WGS-84 souřadnic bez nutnosti API klíče
 // ------------------------------------
 export class CuzkRuianProvider implements ParcelLookupProvider {
   readonly name = 'RUIAN';
-  private readonly wfsUrl: string;
+  private readonly baseUrl: string;
 
-  constructor(wfsUrl: string) {
-    this.wfsUrl = wfsUrl;
+  constructor(customUrl?: string) {
+    this.baseUrl = customUrl || 'https://ags.cuzk.cz/arcgis/rest/services/RUIAN/MapServer/identify';
   }
 
   async lookup(lat: number, lng: number): Promise<ParcelLookupResult> {
     try {
-      // WFS GetFeature request na ČÚZK RÚIAN – parcely KN
-      const buffer = 0.00005; // ~5 m
-      const bbox = `${lng - buffer},${lat - buffer},${lng + buffer},${lat + buffer}`;
-      const url = new URL(this.wfsUrl);
-      url.searchParams.set('SERVICE', 'WFS');
-      url.searchParams.set('VERSION', '2.0.0');
-      url.searchParams.set('REQUEST', 'GetFeature');
-      url.searchParams.set('TYPENAMES', 'KN:Parcela');
-      url.searchParams.set('BBOX', `${bbox},EPSG:4326`);
-      url.searchParams.set('SRSNAME', 'EPSG:4326');
-      url.searchParams.set('outputFormat', 'application/json');
-      url.searchParams.set('count', '1');
+      const delta = 0.005;
+      const params = new URLSearchParams({
+        f: 'json',
+        geometryType: 'esriGeometryPoint',
+        geometry: JSON.stringify({ x: lng, y: lat }),
+        sr: '4326',
+        layers: 'all:1,5,7,12', // 1=AdresniMisto, 5=Parcela, 7=KatastralniUzemi, 12=Obec
+        tolerance: '5',
+        mapExtent: `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`,
+        imageDisplay: '800,600,96',
+        returnGeometry: 'false',
+      });
 
-      const response = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+      const response = await fetch(`${this.baseUrl}?${params.toString()}`, {
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(10_000),
+      });
+
       if (!response.ok) {
         return {
           found: false,
           source: 'RUIAN',
           confidence: 'UNVERIFIED',
-          errorMessage: `ČÚZK WFS vrátil HTTP ${response.status}`,
+          errorMessage: `ČÚZK RÚIAN služba vrátila HTTP ${response.status}`,
         };
       }
 
-      const data = await response.json() as { features?: Array<{ properties?: Record<string, unknown> }> };
-      const feature = data.features?.[0];
-      if (!feature?.properties) {
-        return { found: false, source: 'RUIAN', confidence: 'UNVERIFIED' };
+      const data = await response.json() as {
+        results?: Array<{
+          layerId: number;
+          layerName: string;
+          attributes?: Record<string, string>;
+        }>;
+      };
+
+      const parcel = data.results?.find((r) => r.layerId === 5);
+      const ku = data.results?.find((r) => r.layerId === 7);
+      const obec = data.results?.find((r) => r.layerId === 12);
+
+      const parcelNumber = parcel?.attributes?.['Číslo parcely'] || parcel?.attributes?.['Kmenové parcelní číslo'];
+      const parcelId = parcel?.attributes?.['Jednoznačný identifikátor parcely'];
+      const kuName = ku?.attributes?.['Název katastrálního území'];
+      const obecName = obec?.attributes?.['Název obce'];
+
+      if (!parcelNumber) {
+        return {
+          found: false,
+          source: 'RUIAN',
+          confidence: 'UNVERIFIED',
+          errorMessage: 'Na zadaných souřadnicích nebyla nalezena parcela v katastru nemovitostí ČR.',
+        };
       }
 
-      const props = feature.properties;
+      const sourceUrl = parcelId
+        ? `https://nahlizenidokn.cuzk.cz/ZobrazitObjekt.aspx?typ=par&id=${encodeURIComponent(parcelId)}`
+        : `https://nahlizenidokn.cuzk.cz/ZobrazitMapu.aspx?y=${lat}&x=${lng}`;
+
       return {
         found: true,
-        parcelNumber: String(props['KmenoveCislo'] ?? props['KmenoveCisloParcely'] ?? ''),
-        cadastralArea: String(props['NazevKatastralnihoUzemi'] ?? ''),
-        municipality: String(props['NazevObce'] ?? ''),
+        parcelNumber: String(parcelNumber),
+        cadastralArea: kuName ? String(kuName) : undefined,
+        municipality: obecName ? String(obecName) : undefined,
         source: 'RUIAN',
-        sourceUrl: `https://nahlizenidokn.cuzk.cz/ZobrazitMapu/Parcela`,
+        sourceUrl,
         confidence: 'VERIFIED',
-        rawData: props,
+        rawData: {
+          parcelId,
+          landType: parcel?.attributes?.['Kód druhu pozemku'],
+          usage: parcel?.attributes?.['Způsob využití pozemku'],
+          area: parcel?.attributes?.['Výměra parcely'],
+        },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Neznámá chyba';
@@ -104,19 +136,18 @@ export class CuzkRuianProvider implements ParcelLookupProvider {
         found: false,
         source: 'RUIAN',
         confidence: 'UNVERIFIED',
-        errorMessage: `ČÚZK WFS selhal: ${message}`,
+        errorMessage: `ČÚZK RÚIAN dotaz selhal: ${message}`,
       };
     }
   }
 }
 
 // ------------------------------------
-// Factory – vrátí aktivního providera dle env
+// Factory – vrátí aktivního providera (RÚIAN ČÚZK REST defaultně)
 // ------------------------------------
 export function createParcelLookupProvider(): ParcelLookupProvider {
-  const wfsUrl = process.env.CUZK_WFS_URL?.trim();
-  if (wfsUrl) {
-    return new CuzkRuianProvider(wfsUrl);
+  if (process.env.MANUAL_PARCEL_ONLY === 'true') {
+    return new ManualParcelProvider();
   }
-  return new ManualParcelProvider();
+  return new CuzkRuianProvider(process.env.CUZK_WFS_URL?.trim());
 }

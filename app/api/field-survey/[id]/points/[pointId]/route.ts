@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { enterTenantContext } from '@/lib/tenant-context';
-import { getFieldSurveyPoint, updateFieldSurveyPoint } from '@/lib/field-survey/data';
+import { getFieldSurveyPoint, updateFieldSurveyPoint, deleteFieldSurveyPoint } from '@/lib/field-survey/data';
 import type { FieldSurveySurfaceType, FieldSurveyPointStatus } from '@prisma/client';
 
 export const runtime = 'nodejs';
@@ -78,5 +78,29 @@ export async function PATCH(
     }
     console.error('[field-survey/points/[pointId]] Chyba při aktualizaci bodu', error);
     return jsonError('DATABASE_ERROR', 'Průzkumný bod se nepodařilo aktualizovat.', 500);
+  }
+}
+
+/** DELETE /api/field-survey/[id]/points/[pointId] – smazání průzkumného bodu */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string; pointId: string }> }
+) {
+  const { pointId } = await params;
+  const auth = await requireApiAccess('fieldSurvey');
+  if (isApiDenied(auth)) return auth;
+  const organizationId = auth.organizationId || auth.membership?.organizationId;
+  if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);
+  enterTenantContext({ organizationId, userId: auth.id, source: 'session' });
+
+  try {
+    const deleted = await deleteFieldSurveyPoint(pointId);
+    return NextResponse.json({ success: true, point: deleted });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('access denied')) {
+      return jsonError('ACCESS_DENIED', 'Průzkumný bod nebyl nalezen nebo nemáte přístup.', 403);
+    }
+    console.error('[field-survey/points/[pointId]] Chyba při mazání bodu', error);
+    return jsonError('DATABASE_ERROR', 'Průzkumný bod se nepodařilo smazat.', 500);
   }
 }

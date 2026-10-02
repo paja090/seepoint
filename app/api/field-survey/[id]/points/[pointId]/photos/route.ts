@@ -81,13 +81,14 @@ export async function POST(
   let photo: Awaited<ReturnType<typeof createFieldSurveyPhotoRecord>>;
   try {
     photo = await createFieldSurveyPhotoRecord({
+      id: photoId,
       surveyPointId: pointId,
       url: `/api/field-survey/photos/${photoId}/file`,
       driveFileId: stored.driveFileId,
       storageKey: stored.storageKey,
       storageProvider: stored.storageProvider,
       contentChecksum: stored.contentChecksum,
-      content: stored.storageProvider === 'DATABASE' ? Buffer.from(stored.bytes) : null,
+      content: Buffer.from(stored.bytes),
       fileName,
       mimeType: validatedPhoto.mimeType,
       size: stored.bytes.byteLength,

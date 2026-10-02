@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { enterTenantContext } from '@/lib/tenant-context';
-import { getFieldSurvey, updateFieldSurvey } from '@/lib/field-survey/data';
+import { getFieldSurvey, updateFieldSurvey, deleteFieldSurvey } from '@/lib/field-survey/data';
 import type { FieldSurveyStatus } from '@prisma/client';
 
 export const runtime = 'nodejs';
@@ -70,5 +70,29 @@ export async function PATCH(
       return jsonError('ACCESS_DENIED', 'Průzkumná akce nebyla nalezena nebo nemáte přístup.', 403);
     }
     return jsonError('DATABASE_ERROR', 'Průzkumnou akci se nepodařilo aktualizovat.', 500);
+  }
+}
+
+/** DELETE /api/field-survey/[id] – smazání celé průzkumné akce */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const auth = await requireApiAccess('fieldSurvey');
+  if (isApiDenied(auth)) return auth;
+  const organizationId = auth.organizationId || auth.membership?.organizationId;
+  if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);
+  enterTenantContext({ organizationId, userId: auth.id, source: 'session' });
+
+  try {
+    const deleted = await deleteFieldSurvey(id);
+    return NextResponse.json({ success: true, survey: deleted });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('access denied')) {
+      return jsonError('ACCESS_DENIED', 'Průzkumná akce nebyla nalezena nebo nemáte přístup.', 403);
+    }
+    console.error('[field-survey/[id]] Chyba při mazání akce', error);
+    return jsonError('DATABASE_ERROR', 'Průzkumnou akci se nepodařilo smazat.', 500);
   }
 }

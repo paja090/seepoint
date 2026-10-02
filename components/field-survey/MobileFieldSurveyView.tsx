@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { processPhotoForUpload } from '@/lib/client-photo-processing';
 
 // ==========================================
 // MOBILNÍ VIEW PRO TERÉNNÍ PRŮZKUM PLOCH
@@ -52,6 +53,7 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
   const [gps, setGps] = useState<GpsState>({ status: 'IDLE' });
   const [upload, setUpload] = useState<UploadState>({ status: 'IDLE' });
   const [save, setSave] = useState<SaveState>({ status: 'IDLE' });
+  const [isCompressing, setIsCompressing] = useState(false);
   const [note, setNote] = useState('');
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [completedPoints, setCompletedPoints] = useState<CompletedPoint[]>([]);
@@ -120,16 +122,39 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
     }
   }, []);
 
-  // Výběr fotografie a preview
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = [...(e.target.files ?? [])];
-    if (!files.length) return;
-    const newPhotos = files.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setPhotos((prev) => [...prev, ...newPhotos].slice(0, 10)); // max 10 fotek
-    e.target.value = '';
+  // Výběr fotografie s automatickou klientskou kompresí (max 1920px, JPEG ~350 KB)
+  // Zabraňuje selhání uploadu velkých fotek z moderních mobilních fotoaparátů (Vercel 4.5 MB limit)
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const rawFiles = [...(e.target.files ?? [])];
+    if (!rawFiles.length) return;
+
+    setIsCompressing(true);
+    try {
+      const processed: { file: File; preview: string }[] = [];
+      for (const rawFile of rawFiles) {
+        try {
+          const { file: optimized } = await processPhotoForUpload(rawFile, {
+            maxDimension: 1920,
+            maxBytes: 1.5 * 1024 * 1024,
+            initialQuality: 0.82,
+          });
+          processed.push({
+            file: optimized,
+            preview: URL.createObjectURL(optimized),
+          });
+        } catch (err) {
+          console.warn('Optimalizace fotografie selhala, použiji původní soubor', err);
+          processed.push({
+            file: rawFile,
+            preview: URL.createObjectURL(rawFile),
+          });
+        }
+      }
+      setPhotos((prev) => [...prev, ...processed].slice(0, 10)); // max 10 fotek
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
   }
 
   function removePhoto(index: number) {
@@ -137,6 +162,22 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
       URL.revokeObjectURL(prev[index].preview);
       return prev.filter((_, i) => i !== index);
     });
+  }
+
+  async function handleDeletePoint(pointId: string) {
+    if (!confirm('Opravdu chcete smazat tento bod průzkumu včetně fotografií?')) return;
+    try {
+      const res = await fetch(`/api/field-survey/${surveyId}/points/${pointId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        alert('Bod se nepodařilo smazat.');
+        return;
+      }
+      setCompletedPoints((prev) => prev.filter((p) => p.id !== pointId));
+    } catch {
+      alert('Chyba při komunikaci se serverem.');
+    }
   }
 
   async function handleSave() {
@@ -170,12 +211,27 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
       const pointData = await pointResponse.json() as { point: { id: string } };
       const pointId = pointData.point.id;
 
-      // 2. Nahrajeme fotografie (paralelně, max 3 najednou)
+      // 2. Nahrajeme fotografie (s kontrolou velikosti)
       let uploadWarning: string | undefined;
       for (const photo of photos) {
         setUpload({ status: 'UPLOADING' });
+
+        let fileToUpload = photo.file;
+        if (fileToUpload.size > 3.5 * 1024 * 1024) {
+          try {
+            const { file: recompressed } = await processPhotoForUpload(fileToUpload, {
+              maxDimension: 1280,
+              maxBytes: 1.5 * 1024 * 1024,
+              initialQuality: 0.72,
+            });
+            fileToUpload = recompressed;
+          } catch {
+            // pokračujeme s původním souborem
+          }
+        }
+
         const formData = new FormData();
-        formData.append('file', photo.file);
+        formData.append('file', fileToUpload);
 
         const photoResponse = await fetch(`/api/field-survey/${surveyId}/points/${pointId}/photos`, {
           method: 'POST',
@@ -183,8 +239,16 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
         });
 
         if (!photoResponse.ok) {
-          const err = await photoResponse.json().catch(() => ({ error: 'Chyba při nahrávání fotografie.' })) as { error?: string };
-          throw new Error(err.error ?? 'Fotografii se nepodařilo nahrát.');
+          let errorMsg = 'Fotografii se nepodařilo nahrát.';
+          try {
+            const err = await photoResponse.json();
+            if (err.error) errorMsg = err.error;
+          } catch {
+            if (photoResponse.status === 413) {
+              errorMsg = 'Fotografie překračuje povolenou velikost serveru. Aplikace ji zmenší.';
+            }
+          }
+          throw new Error(errorMsg);
         }
 
         const photoData = await photoResponse.json() as { warning?: string };
@@ -323,10 +387,18 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
             </div>
           )}
 
+          {isCompressing && (
+            <div className="flex items-center gap-2 p-3 mt-2 rounded-xl bg-sky-950 border border-sky-800 text-sky-300 text-xs animate-pulse">
+              <span>🔄</span>
+              <span>Optimalizuji fotografii pro spolehlivé uložení…</span>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="w-full rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400 hover:border-sky-600 hover:text-sky-400 transition"
+            disabled={isCompressing}
+            className="w-full rounded-2xl border-2 border-dashed border-slate-700 p-5 text-center text-slate-400 hover:border-sky-600 hover:text-sky-400 transition disabled:opacity-50"
           >
             <span className="block text-3xl mb-1">📷</span>
             <span className="block text-sm font-semibold">
@@ -402,15 +474,16 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
         <button
           type="button"
           onClick={() => void handleSave()}
-          disabled={!isReady || isSaving}
+          disabled={!isReady || isSaving || isCompressing}
           className={`w-full rounded-2xl py-4 text-base font-bold transition ${
-            isReady && !isSaving
+            isReady && !isSaving && !isCompressing
               ? 'bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-white shadow-lg'
               : 'bg-slate-800 text-slate-500 cursor-not-allowed'
           }`}
         >
           {isSaving
             ? upload.status === 'UPLOADING' ? '📤 Nahrávám fotografie…' : '💾 Ukládám bod…'
+            : isCompressing ? '🔄 Zpracovávám fotografie…'
             : !selectedType ? '← Vyberte typ plochy'
             : gps.status !== 'OK' ? '← Čekám na GPS…'
             : photos.length === 0 ? '← Přidejte fotografii'
@@ -435,7 +508,16 @@ export function MobileFieldSurveyView({ surveyId, surveyName }: { surveyId: stri
                       {p.address && <div className="text-xs text-slate-400 truncate">{p.address}</div>}
                       <div className="text-xs text-slate-500 font-mono">{p.lat.toFixed(5)}, {p.lng.toFixed(5)}</div>
                     </div>
-                    <div className="text-xs text-slate-500">{p.photos} foto</div>
+                    <div className="text-xs text-slate-500 mr-1">{p.photos} foto</div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePoint(p.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                      title="Smazat tento bod"
+                      aria-label="Smazat bod"
+                    >
+                      🗑️
+                    </button>
                   </li>
                 );
               })}

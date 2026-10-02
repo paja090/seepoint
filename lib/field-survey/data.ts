@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { requireTenantContext } from '@/lib/tenant-context';
+import { deleteStoredPhoto } from '@/lib/storage/photo-storage';
 import type { FieldSurveySurfaceType, FieldSurveyPointStatus, FieldSurveyGpsSource, Prisma } from '@prisma/client';
 
 export type FieldSurveyListItem = Prisma.FieldSurveyGetPayload<{
@@ -167,7 +168,21 @@ export async function listFieldSurveyPoints(options: {
       parcelData: true,
       ownerData: true,
       contactData: true,
-      aiAnalysis: { select: { status: true, suggestedType: true, isUsable: true, confirmedAt: true } },
+      aiAnalysis: {
+        select: {
+          status: true,
+          suggestedType: true,
+          isUsable: true,
+          confirmedAt: true,
+          locationDesc: true,
+          visibility: true,
+          orientation: true,
+          surroundings: true,
+          obstacles: true,
+          placementChar: true,
+          errorMessage: true,
+        },
+      },
     },
   });
 }
@@ -215,6 +230,7 @@ export async function updateFieldSurveyPoint(id: string, input: UpdateSurveyPoin
 
 /** Připojí fotografii k průzkumnému bodu */
 export async function createFieldSurveyPhotoRecord(input: {
+  id?: string;
   surveyPointId: string;
   url: string;
   driveFileId?: string | null;
@@ -241,6 +257,7 @@ export async function createFieldSurveyPhotoRecord(input: {
 
   return prisma.fieldSurveyPhoto.create({
     data: {
+      ...(input.id ? { id: input.id } : {}),
       organizationId,
       surveyPointId: input.surveyPointId,
       url: input.url,
@@ -267,6 +284,57 @@ export async function deleteFieldSurveyPhoto(photoId: string) {
   if (!photo) throw new Error('Photo not found or access denied.');
   await prisma.fieldSurveyPhoto.delete({ where: { id: photoId } });
   return photo;
+}
+
+/** Smaže průzkumný bod včetně všech podřízených dat a fotografií */
+export async function deleteFieldSurveyPoint(pointId: string) {
+  const { organizationId } = requireTenantContext();
+  const point = await prisma.fieldSurveyPoint.findFirst({
+    where: { id: pointId, organizationId },
+    include: { photos: true },
+  });
+  if (!point) throw new Error('Survey point not found or access denied.');
+
+  // Smažeme fyzické soubory fotografií
+  for (const photo of point.photos) {
+    try {
+      await deleteStoredPhoto({
+        driveFileId: photo.driveFileId,
+        storageProvider: photo.storageProvider,
+      });
+    } catch {
+      // pokus o úklid ze storage
+    }
+  }
+
+  // Transakčně smažeme relační data a bod
+  await prisma.$transaction([
+    prisma.fieldSurveyPhoto.deleteMany({ where: { surveyPointId: pointId } }),
+    prisma.fieldSurveyParcel.deleteMany({ where: { surveyPointId: pointId } }),
+    prisma.fieldSurveyOwner.deleteMany({ where: { surveyPointId: pointId } }),
+    prisma.fieldSurveyContact.deleteMany({ where: { surveyPointId: pointId } }),
+    prisma.fieldSurveyAiAnalysis.deleteMany({ where: { surveyPointId: pointId } }),
+    prisma.fieldSurveyPoint.delete({ where: { id: pointId } }),
+  ]);
+
+  return point;
+}
+
+/** Smaže celou průzkumnou akci včetně všech jejích bodů */
+export async function deleteFieldSurvey(surveyId: string) {
+  const { organizationId } = requireTenantContext();
+  const survey = await prisma.fieldSurvey.findFirst({
+    where: { id: surveyId, organizationId },
+    include: { points: { select: { id: true } } },
+  });
+  if (!survey) throw new Error('Survey not found or access denied.');
+
+  for (const pt of survey.points) {
+    await deleteFieldSurveyPoint(pt.id);
+  }
+
+  await prisma.fieldSurvey.delete({ where: { id: surveyId } });
+  return survey;
 }
 
 /** Uloží nebo aktualizuje parcelní data (pouze z externího zdroje, ne AI) */
