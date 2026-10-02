@@ -12,9 +12,9 @@ export function CreateOrganizationForm() {
     try {
       const body = Object.fromEntries(new FormData(form).entries());
       const response = await fetch('/api/admin/organizations', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-      const payload = await response.json() as { error?: string; warning?: string; activationUrl?: string; organization?: { id: string } };
+      const payload = await response.json() as { error?: string; warning?: string; message?: string; activationUrl?: string; organization?: { id: string } };
       setResult(response.ok
-        ? { message: payload.warning || 'Organizace byla založena.', organizationId: payload.organization?.id, activationUrl: payload.activationUrl }
+        ? { message: payload.warning || payload.message || 'Organizace byla založena.', organizationId: payload.organization?.id, activationUrl: payload.activationUrl }
         : { message: payload.error || 'Založení selhalo.' });
       if (response.ok) form.reset();
     } catch {

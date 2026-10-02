@@ -76,16 +76,11 @@ export function preparePortalCredential(row: PortalCredential) {
   if (row.publicTokenHash) {
     const token = recoverPortalToken(row);
     if (!token) {
-      if (row.id === 'unrecoverable') {
-        throw new Error('Původní URL nelze obnovit. Uložený odkaz nadále funguje; kontaktujte správce klíčů.');
-      }
-      const fallbackToken = getDeterministicOfferToken(row.id);
-      const fallbackHash = hashPublicOfferToken(fallbackToken);
-      return { token: fallbackToken, hash: fallbackHash, encrypted: encryptPortalToken(fallbackToken, row.id) };
+      throw new Error('Původní URL nelze obnovit. Uložený odkaz nadále funguje; kontaktujte správce klíčů.');
     }
     return { token, hash: row.publicTokenHash, encrypted: row.publicTokenEncrypted ?? encryptPortalToken(token, row.id) };
   }
-  const token = process.env.OFFER_PORTAL_ACTIVE_KEY ? createPublicOfferToken().token : getDeterministicOfferToken(row.id);
+  const token = createPublicOfferToken().token;
   const hash = hashPublicOfferToken(token);
   return { token, hash, encrypted: encryptPortalToken(token, row.id) };
 }

@@ -20,7 +20,6 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SeePOINT</p>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">{title}</h1>
         {description && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>}
       </div>

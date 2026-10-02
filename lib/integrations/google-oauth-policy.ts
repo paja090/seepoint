@@ -14,7 +14,7 @@ const ALLOWED_GMAIL_TOKEN_SCOPES = new Set([
   'https://www.googleapis.com/auth/gmail.readonly',
 ]);
 
-export function assertGoogleTokenScopes(provider: IntegrationProvider, scopes: string[]) {
+export function assertGoogleTokenScopes(provider: IntegrationProvider, scopes: string[], gmailSend = false) {
   if (provider === 'GOOGLE_DRIVE') {
     const unexpected = scopes.filter((scope) => !ALLOWED_GOOGLE_DRIVE_TOKEN_SCOPES.has(scope));
     if (unexpected.length) throw new Error('Google vrátil širší oprávnění, než SeePoint požaduje. Připojení bylo odmítnuto.');
@@ -25,10 +25,13 @@ export function assertGoogleTokenScopes(provider: IntegrationProvider, scopes: s
   }
 
   if (provider === 'GMAIL') {
-    const unexpected = scopes.filter((scope) => !ALLOWED_GMAIL_TOKEN_SCOPES.has(scope));
+    const unexpected = scopes.filter((scope) => !ALLOWED_GMAIL_TOKEN_SCOPES.has(scope) && !(gmailSend && scope === 'https://www.googleapis.com/auth/gmail.send'));
     if (unexpected.length) throw new Error('Google vrátil širší oprávnění, než SeePoint požaduje. Připojení bylo odmítnuto.');
     if (!scopes.includes('https://www.googleapis.com/auth/gmail.readonly')) {
       throw new Error('Google neudělil požadované oprávnění gmail.readonly.');
+    }
+    if (gmailSend && !scopes.includes('https://www.googleapis.com/auth/gmail.send')) {
+      throw new Error('Google neudělil oprávnění k odesílání. Původní připojení zůstává zachováno.');
     }
     return;
   }

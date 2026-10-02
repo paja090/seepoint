@@ -1,4 +1,6 @@
 'use client';
+import { OfferBrandMark } from '@/components/offer/OfferBrandMark';
+
 
 import { useState } from 'react';
 import { Download, Mail, Menu, Phone, Share2, X } from 'lucide-react';
@@ -22,7 +24,7 @@ export function PublicOfferHeader({
       <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-4 px-4 py-3 lg:px-6">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img alt={branding?.name || 'SeePOINT'} className="h-9 max-w-44 object-contain" src={branding?.logoUrl || '/seepoint-logo.svg'} />
+          <OfferBrandMark branding={branding} />
           <span className="hidden border-l border-slate-200 pl-3 text-sm font-medium text-slate-500 sm:inline">
             Nabídka reklamní kampaně
           </span>

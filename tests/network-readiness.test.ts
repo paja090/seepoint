@@ -16,8 +16,9 @@ test('B2B transactional endpoints never return simulated business records or suc
 test('B2B partner state and KPIs never invent connection state or inventory totals', () => {
   const partners = read('app/api/network/partners/route.ts');
   const view = read('components/network/NetworkHubView.tsx');
-  assert.match(partners, /status: 'AVAILABLE'/);
-  assert.match(partners, /sharedSurfacesCount: 0/);
+  assert.match(partners, /configured: false/);
+  assert.match(partners, /partners: \[\]/);
+  assert.doesNotMatch(partners, /organization\.findMany|platformPrisma/);
   assert.doesNotMatch(partners, /index % 2|12 \+ index|Simulated active connection/);
   assert.doesNotMatch(view, /partnerSurfacesCount \+ 24/);
   assert.match(view, /NETWORK_BETA_MESSAGE/);

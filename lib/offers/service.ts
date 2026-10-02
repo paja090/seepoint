@@ -28,7 +28,7 @@ import {
   type OfferInput,
   type OfferStatusValue,
 } from './domain';
-import { preparePortalCredential, recoverPortalToken, hashPublicOfferToken, isPlausiblePublicOfferToken, getDeterministicOfferToken, encryptPortalToken } from './token';
+import { preparePortalCredential, recoverPortalToken, hashPublicOfferToken, isPlausiblePublicOfferToken } from './token';
 import type { OfferView } from './view-model';
 import { offerReadinessChecks, type OfferConflictView } from './workflow';
 import { findAvailableSurfaces } from '@/lib/occupancy/availability-service';
@@ -184,8 +184,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     discountAmount: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.discountAmount),
     taxAmount: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.taxAmount),
     totalWithTax: publicView && ((row as Record<string, unknown>).isNoPriceConcept || (row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION')) ? undefined : value(row.totalWithTax ?? row.totalPrice),
-    hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash || !row.publicTokenRevokedAt),
-    portalToken: publicView ? undefined : (recoverPortalToken(row) ?? (!row.publicTokenRevokedAt ? getDeterministicOfferToken(row.id) : undefined)),
+    hasPublicLink: publicView ? undefined : Boolean(row.publicTokenHash && row.publishedAt && !row.publicTokenRevokedAt),
+    portalToken: publicView ? undefined : (recoverPortalToken(row) ?? undefined),
     publishedAt: row.publishedAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     acceptedAt: row.acceptedAt?.toISOString() ?? null,
@@ -193,7 +193,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     archivedAt: publicView ? undefined : row.archivedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'SeePOINT' },
+    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'Obchodní kontakt' },
     client: {
       name: row.client.name,
       logoUrl: hasResolvableClientLogo({
@@ -743,28 +743,10 @@ export async function getOffer(user: CurrentUser, id: string) {
   const row = await getOfferRow(prisma, id);
   assertAccess(user, row);
   await enrichClientLogoFromSiblings(row.client);
-  if (!row.publicTokenRevokedAt) {
-    const expectedToken = getDeterministicOfferToken(row.id);
-    const expectedHash = hashPublicOfferToken(expectedToken);
-    const expectedEncrypted = encryptPortalToken(expectedToken, row.id);
-    if (row.publicTokenHash !== expectedHash || !row.publishedAt || !row.publicTokenEncrypted) {
-      const publishedAt = row.publishedAt || new Date();
-      await prisma.offer.update({
-        where: { id: row.id },
-        data: {
-          publicTokenHash: expectedHash,
-          publicTokenEncrypted: expectedEncrypted,
-          publishedAt,
-        },
-      });
-      row.publicTokenHash = expectedHash;
-      row.publicTokenEncrypted = expectedEncrypted;
-      row.publishedAt = publishedAt;
-    }
-  }
   const organization = await prisma.organization.findUnique({
     where: { id: row.organizationId },
     select: {
+      id: true,
       name: true,
       logoUrl: true,
       primaryColor: true,
@@ -1117,61 +1099,13 @@ export async function prepareOfferDelivery(user: CurrentUser, id: string, emailD
 export async function getPublicRow(token: string) {
   if (!token || typeof token !== 'string') throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   const cleanToken = token.trim();
-  const isPlausibleToken = isPlausiblePublicOfferToken(cleanToken);
-  const isPlausibleId = /^[a-zA-Z0-9_-]{20,64}$/.test(cleanToken);
-  if (!isPlausibleToken && !isPlausibleId) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
-
-  let row: OfferRow | null = null;
-
-  if (isPlausibleToken) {
-    const tokenHash = hashPublicOfferToken(cleanToken);
-    row = await platformPrisma.offer.findUnique({
-      where: { publicTokenHash: tokenHash },
-      include: offerInclude,
-    });
-
-    if (!row) {
-      const candidates = await platformPrisma.offer.findMany({
-        where: { publicTokenRevokedAt: null },
-        select: { id: true, publishedAt: true },
-      });
-      const matched = candidates.find((c) => getDeterministicOfferToken(c.id) === cleanToken);
-      if (matched) {
-        let encrypted: string | null = null;
-        try {
-          encrypted = encryptPortalToken(cleanToken, matched.id);
-        } catch {
-          encrypted = null;
-        }
-        row = await platformPrisma.offer.update({
-          where: { id: matched.id },
-          data: {
-            publicTokenHash: tokenHash,
-            ...(encrypted ? { publicTokenEncrypted: encrypted } : {}),
-            publishedAt: matched.publishedAt || new Date(),
-          },
-          include: offerInclude,
-        });
-      }
-    }
-  }
-
-  if (!row && isPlausibleId) {
-    row = await platformPrisma.offer.findFirst({
-      where: { id: cleanToken, publicTokenRevokedAt: null },
-      include: offerInclude,
-    });
-  }
-
-  if (!row || row.publicTokenRevokedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
-  if (!row.publishedAt) {
-    const now = new Date();
-    await platformPrisma.offer.update({
-      where: { id: row.id },
-      data: { publishedAt: now },
-    }).catch(() => {});
-    row.publishedAt = now;
-  }
+  if (!isPlausiblePublicOfferToken(cleanToken)) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
+  const tokenHash = hashPublicOfferToken(cleanToken);
+  const row = await platformPrisma.offer.findUnique({
+    where: { publicTokenHash: tokenHash },
+    include: offerInclude,
+  });
+  if (!row || row.publicTokenRevokedAt || !row.publishedAt) throw new OfferValidationError('Nabídka nebyla nalezena.', 'NOT_FOUND');
   assertTenantResult(row, row.organizationId);
   const organization = await platformPrisma.organization.findUnique({ where: { id: row.organizationId } });
   if (!organization?.isActive) throw new OfferValidationError('Portál není dostupný.', 'NOT_FOUND');
@@ -1185,6 +1119,7 @@ export async function getPublicOffer(token: string) {
   const organization = await platformPrisma.organization.findUnique({
     where: { id: row.organizationId },
     select: {
+      id: true,
       name: true,
       logoUrl: true,
       primaryColor: true,
@@ -1394,7 +1329,9 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
   // Asynchronously send notification email to salesperson / agency team
   if (!suppressPreviewTestEmail) try {
     const row = result.row;
-    const recipientEmail = row.createdByUser?.email || row.contactEmail || process.env.EMAIL_BCC || 'info@seepoint.cz';
+    const organization = await runWithTenantContext({ organizationId: row.organizationId, source: 'public-token' }, () => prisma.organization.findUnique({ where: { id: row.organizationId }, select: { name: true, email: true } }));
+    const recipientEmail = row.createdByUser?.email || organization?.email;
+    if (!recipientEmail) throw new Error('Organizace nemá kontaktní e-mail pro oznámení.');
     const isNavPhase1 = row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION';
     const actionLabel = isNavPhase1 && action === 'accept'
       ? 'SCHVÁLEN NÁVRH LOKALIT (FÁZE 1 – K NACENĚNÍ)'
@@ -1416,7 +1353,7 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       ? `✏️ Požadavek na úpravu nabídky ${row.campaignName} od ${actorName}`
       : `💬 Nový dotaz k nabídce ${row.campaignName} od ${actorName}`;
 
-    const orgName = 'SeePOINT';
+    const orgName = organization?.name || 'Dodavatel nabídky';
     const emailText = `Klient reagoval na nabídku v systému ${orgName}:\n\n`
       + `Kampaň: ${row.campaignName}\n`
       + `Klient: ${row.client.name}\n`

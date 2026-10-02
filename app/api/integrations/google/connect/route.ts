@@ -16,6 +16,10 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const requestedProvider = url.searchParams.get('provider')?.toUpperCase();
     const provider = requestedProvider === 'GMAIL' ? 'GMAIL' : 'GOOGLE_DRIVE';
+    const gmailSend = provider === 'GMAIL' && url.searchParams.get('send') === 'true';
+    if (gmailSend && context.organizationId === 'org_seepoint_default') {
+      return NextResponse.json({ error: 'SeePoint používá stávající odesílací konfiguraci. Nové tenantové odesílání ji nemění.' }, { status: 409 });
+    }
     const config = googleOAuthConfiguration();
     const nonce = createOAuthNonce();
     const verifier = createPkceVerifier();
@@ -28,9 +32,11 @@ export async function GET(request: Request) {
       nonce,
       verifier,
       expiresAt: Date.now() + 10 * 60 * 1000,
+      gmailSend,
     }, config.stateSecret);
     const response = NextResponse.redirect(googleAuthorizationUrl({
       clientId: config.clientId,
+      gmailSend,
       redirectUri,
       state,
       verifier,

@@ -74,7 +74,7 @@ interface ActiveUser {
 }
 
 const channels = [
-  { id: 'general', label: '📢 Celý Tým SeePOINT', description: 'Všeobecný firemní chat a oficiální oznamy' },
+  { id: 'general', label: '📢 Celý tým', description: 'Všeobecný firemní chat a oficiální oznamy' },
   { id: 'installations', label: '🛠️ Montáže & Zakázky', description: 'Diskuze k výjezdům, montážím a fotkám z terénu' },
   { id: 'vehicles', label: '🚗 Auta, Vozíky & Závady', description: 'Benzín, nafta, servisy a hlásení poruch vozidel' },
   { id: 'sales', label: '🏷️ Obchod & Nabídky', description: 'Dotazy k rezervacím nosičů a klientům' },

@@ -301,7 +301,7 @@ export const ORDER_STATUS_LABELS: Record<CrmOrderStatus, { label: string; badge:
 
 export const PROJECT_TYPE_LABELS: Record<CrmProjectType, string> = {
   NAVIGATION: 'Navigace',
-  CITY_GALLERY: 'Galerie venku',
+  CITY_GALLERY: 'Výstavní projekt',
   BENCH: 'Lavičky',
   CITY_POSTER: 'City postery',
   CLV: 'CLV (City Light Vitríny)',

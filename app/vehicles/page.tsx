@@ -107,7 +107,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Auta, Vozíky & Flotila</h1>
           <p className="mt-1 text-sm text-slate-500 font-medium">
-            Kompletní evidence vozového parku SeePOINT (auta, dodávky, billboardové vozíky, STK, rezervace a dálniční známky).
+            Kompletní evidence vozového parku vaší organizace (auta, dodávky, billboardové vozíky, STK, rezervace a dálniční známky).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export default async function VehiclesPage({ searchParams }: { searchParams: Pro
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
           <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Dodávky & Van</span>
           <p className="mt-1 text-2xl font-black text-emerald-900">{vansCount}</p>
-          <span className="text-[10px] text-emerald-700 font-semibold">Renault Master, Trafic, H1</span>
+          <span className="text-[10px] text-emerald-700 font-semibold">užitková vozidla ve vaší evidenci</span>
         </div>
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-2xs">
           <span className="text-[11px] font-bold uppercase text-amber-800 tracking-wider">Doklady k řešení</span>

@@ -169,10 +169,10 @@ export function ManagerDashboard({
               <span>Nejžádanější město</span>
             </div>
             <p className="text-sm font-semibold text-white">
-              {topCities[0]?.city || 'Ostrava'} vykazuje obsazenost {topCities[0]?.percent || 0} %
+              {topCities[0] ? `${topCities[0].city} vykazuje obsazenost ${topCities[0].percent} %` : 'Zatím nejsou evidované lokality'}
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              Celkem {topCities[0]?.occupied || 0} obsazených ploch z {topCities[0]?.total || 0} v lokalitě.
+              {topCities[0] ? `Celkem ${topCities[0].occupied} obsazených ploch z ${topCities[0].total} v lokalitě.` : 'Přehled se zobrazí po přidání reklamních ploch.'}
             </p>
           </div>
 

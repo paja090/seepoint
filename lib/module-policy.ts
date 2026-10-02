@@ -5,7 +5,7 @@ export const SECTION_MODULES: Partial<Record<AppSection, string>> = {
   map: 'carriers', clients: 'crm', billing: 'crm', navigationProjects: 'navigation',
   navigationContracts: 'navigation', navigationContacts: 'navigation', navigationDocumentation: 'navigation',
   team: 'employees', mySettlements: 'settlements', workEntries: 'work', myWorkEntries: 'work',
-  realization: 'aiRealization',
+  realization: 'aiRealization', fieldSurvey: 'carriers',
 };
 const MODULE_SECTIONS: Record<string, AppSection> = {
   crm: 'clients', navigation: 'navigationProjects', mobileSurveys: 'carriers',

@@ -47,7 +47,7 @@ function dateOnly(value: unknown, label: string) {
 
 export function parseCityGalleryProjectStatus(value: unknown) {
   if (typeof value !== 'string' || !Object.values(CityGalleryProjectStatus).includes(value as CityGalleryProjectStatus)) {
-    throw new CityGalleryValidationError('Neplatný stav projektu Galerie venku.');
+    throw new CityGalleryValidationError('Neplatný stav výstavního projektu.');
   }
   return value as CityGalleryProjectStatus;
 }

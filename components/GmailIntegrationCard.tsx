@@ -85,7 +85,7 @@ export function GmailIntegrationCard({
           <div>
             <h2 className="text-xl font-bold text-slate-900">Gmail – AI Inbox</h2>
             <p className="text-sm text-slate-500">
-              Automatické načítání poptávek a e-mailů klientů pro SeePoint AI Inbox s read-only přístupem.
+              Načítání poptávek a e-mailů klientů pro AI Inbox. Odesílání lze samostatně zapnout ve Firemním e-mailu.
             </p>
           </div>
         </div>
@@ -192,8 +192,8 @@ export function GmailIntegrationCard({
         <ShieldCheck size={16} className="text-emerald-600 shrink-0 mt-0.5" />
         <div>
           <span>
-            Bezpečnost: Používá se minimální oprávnění <code className="bg-slate-200/80 px-1 py-0.5 rounded text-slate-700">gmail.readonly</code>.
-            SeePoint nemá přístup k mazání e-mailů ani jejich odesílání bez vědomí uživatele.
+            Pro načítání pošty se používá oprávnění gmail.readonly.
+            Mazání pošty není povolené. Odesílání vyžaduje samostatný souhlas ve Firemním e-mailu.
           </span>
         </div>
       </div>

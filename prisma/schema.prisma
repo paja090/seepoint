@@ -873,6 +873,14 @@ model User {
   rejectedAiInboxActions         AiInboxAction[]                 @relation("AiInboxActionRejector")
   resolvedOccupancyInsights      OccupancyInsight[]              @relation("OccupancyInsightResolvedBy")
   navigationChangeSetsReviewed   NavigationChangeSet[]           @relation("NavigationChangeSetReviewer")
+
+  // FieldSurvey relations
+  createdFieldSurveys            FieldSurvey[]                   @relation("FieldSurveyCreatedBy")
+  createdFieldSurveyPoints       FieldSurveyPoint[]              @relation("FieldSurveyPointCreatedBy")
+  convertedFieldSurveyPoints     FieldSurveyPoint[]              @relation("FieldSurveyPointConvertedBy")
+  verifiedFieldSurveyParcels     FieldSurveyParcel[]             @relation("FieldSurveyParcelVerifiedBy")
+  verifiedFieldSurveyOwners      FieldSurveyOwner[]              @relation("FieldSurveyOwnerVerifiedBy")
+  confirmedFieldSurveyAiAnalyses FieldSurveyAiAnalysis[]         @relation("FieldSurveyAiConfirmedBy")
 }
 
 model UserSession {
@@ -1150,6 +1158,7 @@ model AdvertisingCarrier {
   historyLogs                  CarrierHistoryLog[]
   candidatePoints              NavigationCandidatePoint[]
   occupancyInsights            OccupancyInsight[]
+  fieldSurveyPoints            FieldSurveyPoint[]            @relation("FieldSurveyPointCarrier")
 
   @@unique([organizationId, code])
   @@unique([organizationId, sourceKey])
@@ -4338,4 +4347,272 @@ model OccupancyInsight {
 }
 
 
+// ==========================================
+// TERÉNNÍ PRŮZKUM PLOCH (FIELD SURVEY)
+// Zcela oddělená doména od Photo/Carrier/NavigationSurvey
+// ==========================================
 
+enum FieldSurveyStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+/// Typy reklamních ploch při průzkumu (rozšiřitelné přidáním hodnot)
+enum FieldSurveySurfaceType {
+  ACKO
+  TOWER
+  BANNER
+  PLOT
+  OTHER
+}
+
+enum FieldSurveyPointStatus {
+  NEW
+  REVIEWED
+  PARCEL_FOUND
+  OWNER_FOUND
+  CONTACT_FOUND
+  INTERESTING
+  REJECTED
+  CONVERTED
+}
+
+enum FieldSurveyGpsSource {
+  DEVICE
+  EXIF
+  MANUAL
+}
+
+enum FieldSurveyParcelConfidence {
+  VERIFIED
+  APPROXIMATE
+  UNVERIFIED
+}
+
+enum FieldSurveyContactVerification {
+  VERIFIED
+  UNVERIFIED
+  NOT_FOUND
+}
+
+enum FieldSurveyAiStatus {
+  PENDING
+  ANALYZING
+  DONE
+  FAILED
+  SKIPPED
+}
+
+/// Průzkumná akce – skupina bodů průzkumu (např. "Ostrava – říjen 2026")
+model FieldSurvey {
+  id              String            @id @default(cuid())
+  organizationId  String            @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  name            String
+  description     String?
+  status          FieldSurveyStatus @default(ACTIVE)
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User               @relation("FieldSurveyCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  points    FieldSurveyPoint[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([createdByUserId])
+  @@index([createdAt])
+}
+
+/// Jeden průzkumný bod – konkrétní reklamní plocha v terénu
+/// NENÍ AdvertisingCarrier ani NavigationCandidatePoint
+model FieldSurveyPoint {
+  id                  String                   @id @default(cuid())
+  organizationId      String                   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  surveyId            String
+  surfaceType         FieldSurveySurfaceType   @default(OTHER)
+  status              FieldSurveyPointStatus   @default(NEW)
+
+  // GPS (povinné – bez GPS nelze bod vytvořit)
+  latitude            Float
+  longitude           Float
+  gpsAccuracyMeters   Float?
+  gpsSource           FieldSurveyGpsSource     @default(DEVICE)
+  capturedAt          DateTime                 @default(now())
+
+  // Adresa (reverse geocoding – volitelné)
+  address             String?
+
+  // Pracovník
+  createdByUserId     String
+
+  // Poznámka pracovníka
+  note                String?
+
+  // Převod na skutečný nosič (idempotentní – @unique zabraňuje duplicitě)
+  convertedCarrierId   String?                 @unique
+  convertedAt          DateTime?
+  convertedByUserId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  survey          FieldSurvey            @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  createdBy       User                   @relation("FieldSurveyPointCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  convertedBy     User?                  @relation("FieldSurveyPointConvertedBy", fields: [convertedByUserId], references: [id], onDelete: SetNull)
+  convertedCarrier AdvertisingCarrier?   @relation("FieldSurveyPointCarrier", fields: [convertedCarrierId], references: [id], onDelete: SetNull)
+
+  photos      FieldSurveyPhoto[]
+  parcelData  FieldSurveyParcel?
+  ownerData   FieldSurveyOwner?
+  contactData FieldSurveyContact?
+  aiAnalysis  FieldSurveyAiAnalysis?
+
+  @@index([organizationId])
+  @@index([organizationId, surveyId])
+  @@index([surveyId, status])
+  @@index([surveyId, surfaceType])
+  @@index([createdByUserId])
+  @@index([latitude, longitude])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Fotografie průzkumného bodu – STRIKTNĚ ODDĚLENÉ od modelu Photo
+/// Nesmí se zobrazit v galerii nosičů, fotodokumentaci ani kampaních
+model FieldSurveyPhoto {
+  id              String   @id @default(cuid())
+  organizationId  String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  surveyPointId   String
+  url             String
+  driveFileId     String?
+  storageKey      String?
+  storageProvider String   @default("GOOGLE_DRIVE")
+  contentChecksum String?
+  content         Bytes?
+  fileName        String?
+  mimeType        String?
+  size            Int?
+  note            String?
+  sortOrder       Int      @default(0)
+
+  createdAt DateTime @default(now())
+
+  surveyPoint FieldSurveyPoint @relation(fields: [surveyPointId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([surveyPointId])
+  @@index([surveyPointId, sortOrder])
+}
+
+/// Parcelní data z důvěryhodného geodatového zdroje (NIKDY z AI)
+model FieldSurveyParcel {
+  id               String                       @id @default(cuid())
+  organizationId   String                       @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  surveyPointId    String                       @unique
+  parcelNumber     String?
+  cadastralArea    String?
+  municipality     String?
+  lv               String?                      // List vlastnictví – pokud dostupný
+  source           String?                      // MANUAL | RUIAN | CUZK | OTHER
+  sourceUrl        String?
+  confidence       FieldSurveyParcelConfidence  @default(UNVERIFIED)
+  verifiedAt       DateTime?
+  verifiedByUserId String?
+  rawData          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  surveyPoint  FieldSurveyPoint @relation(fields: [surveyPointId], references: [id], onDelete: Cascade)
+  verifiedBy   User?            @relation("FieldSurveyParcelVerifiedBy", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([surveyPointId])
+}
+
+/// Vlastník pozemku – ODDĚLENÉ od kontaktu
+/// AI NESMÍ vymýšlet vlastníka
+model FieldSurveyOwner {
+  id               String   @id @default(cuid())
+  organizationId   String   @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  surveyPointId    String   @unique
+  ownerName        String?
+  ownerType        String?  // INDIVIDUAL | COMPANY | MUNICIPALITY | STATE | UNKNOWN
+  source           String?
+  verifiedAt       DateTime?
+  verifiedByUserId String?
+  note             String?
+  rawData          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  surveyPoint  FieldSurveyPoint @relation(fields: [surveyPointId], references: [id], onDelete: Cascade)
+  verifiedBy   User?            @relation("FieldSurveyOwnerVerifiedBy", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([surveyPointId])
+}
+
+/// Kontaktní údaje pro obchodní oslovení – ODDĚLENÉ od vlastníka
+/// AI NESMÍ vymýšlet jméno, telefon nebo e-mail
+model FieldSurveyContact {
+  id                 String                          @id @default(cuid())
+  organizationId     String                          @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  surveyPointId      String                          @unique
+  company            String?
+  contactPerson      String?
+  phone              String?
+  email              String?
+  website            String?
+  note               String?
+  sourceType         String?                         // MANUAL | REGISTER | OTHER
+  verificationStatus FieldSurveyContactVerification  @default(NOT_FOUND)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  surveyPoint FieldSurveyPoint @relation(fields: [surveyPointId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([surveyPointId])
+}
+
+/// AI analýza fotografie průzkumného bodu
+/// Výsledky jsou NÁVRHY, nikoli ověřené fakty
+/// Pracovník musí výsledek potvrdit / upravit
+model FieldSurveyAiAnalysis {
+  id                 String              @id @default(cuid())
+  organizationId     String              @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  surveyPointId      String              @unique
+  status             FieldSurveyAiStatus @default(PENDING)
+
+  // AI návrhy – všechny označeny jako neověřené
+  suggestedType      String?   // návrh typu plochy
+  isUsable           Boolean?  // je pravděpodobně reklamně využitelná?
+  locationDesc       String?   // popis místa
+  visibility         String?   // viditelnost
+  orientation        String?   // orientace
+  surroundings       String?   // okolí
+  obstacles          String?   // překážky
+  placementChar      String?   // charakter umístění
+
+  rawResponse        Json?     // surová odpověď AI pro budoucí rozšíření
+  errorMessage       String?
+
+  // Potvrzení pracovníkem
+  confirmedAt        DateTime?
+  confirmedByUserId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  surveyPoint   FieldSurveyPoint @relation(fields: [surveyPointId], references: [id], onDelete: Cascade)
+  confirmedBy   User?            @relation("FieldSurveyAiConfirmedBy", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([surveyPointId])
+  @@index([status])
+}

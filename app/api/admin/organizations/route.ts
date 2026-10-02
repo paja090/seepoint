@@ -45,8 +45,11 @@ export async function POST(request: Request) {
       const delivery = await sendActivationEmail(ownerEmail, activationUrl);
       if (delivery.status === 'skipped') warning = 'Preview: organizace vznikla, ale aktivační e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.';
     } catch { warning = 'Organizace vznikla, ale aktivační e-mail se nepodařilo odeslat.'; }
+    const message = needsActivation
+      ? warning || 'Organizace byla založena. Aktivační e-mail byl odeslán na adresu vlastníka.'
+      : 'Organizace byla založena a přiřazena k existujícímu aktivnímu účtu vlastníka. Aktivační e-mail se v tomto případě neposílá.';
     const exposeActivationUrl = process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV !== 'production';
-    return NextResponse.json({ ok: true, organization: result.organization, warning, ...(exposeActivationUrl && needsActivation ? { activationUrl } : {}) }, { status: 201 });
+    return NextResponse.json({ ok: true, organization: result.organization, warning, message, activationRequired: needsActivation, ...(exposeActivationUrl && needsActivation ? { activationUrl } : {}) }, { status: 201 });
   } catch (error) {
     if (typeof error === 'object' && error && 'code' in error && error.code === 'P2002') return NextResponse.json({ error: 'Slug nebo jiný unikátní údaj už existuje.' }, { status: 409 });
     return NextResponse.json({ error: 'Organizaci se nepodařilo vytvořit.' }, { status: 500 });

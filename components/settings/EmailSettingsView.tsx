@@ -422,7 +422,7 @@ export function EmailSettingsView({
                           type="email"
                           value={editReplyTo}
                           onChange={(e) => setEditReplyTo(e.target.value)}
-                          placeholder="např. obchod@seepoint.cz"
+                          placeholder="např. obchod@vase-firma.cz"
                           className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-purple-500"
                         />
                       </div>
@@ -525,7 +525,7 @@ export function EmailSettingsView({
                   required
                   value={domainInput}
                   onChange={(e) => setDomainInput(e.target.value)}
-                  placeholder="např. seepoint.cz nebo outdoorabc.cz"
+                  placeholder="např. vase-firma.cz"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500"
                 />
                 <p className="text-[11px] text-slate-400">Bez http:// a www, pouze doména.</p>
@@ -540,7 +540,7 @@ export function EmailSettingsView({
                   required
                   value={senderNameInput}
                   onChange={(e) => setSenderNameInput(e.target.value)}
-                  placeholder="např. SeePoint nebo Outdoor ABC"
+                  placeholder="Název vaší společnosti"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500"
                 />
               </div>
@@ -554,7 +554,7 @@ export function EmailSettingsView({
                   required
                   value={fromEmailInput}
                   onChange={(e) => setFromEmailInput(e.target.value)}
-                  placeholder="např. nabidky@seepoint.cz"
+                  placeholder="např. nabidky@vase-firma.cz"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500"
                 />
                 <p className="text-[11px] text-slate-400">Musí patřit k výše uvedené doméně.</p>
@@ -568,7 +568,7 @@ export function EmailSettingsView({
                   type="email"
                   value={replyToInput}
                   onChange={(e) => setReplyToInput(e.target.value)}
-                  placeholder="např. obchod@seepoint.cz (nepovinné)"
+                  placeholder="např. obchod@vase-firma.cz (nepovinné)"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500"
                 />
                 <p className="text-[11px] text-slate-400">Kam mají chodit odpovědi klientů na nabídky.</p>
@@ -580,7 +580,7 @@ export function EmailSettingsView({
                     Resend API klíč (Full access)
                   </label>
                   <span className="text-[11px] text-purple-400 font-medium">
-                    Volitelné – zadejte zde, pokud ještě neproběhl redeploy Vercelu
+                    Volitelné – klíč vašeho firemního účtu Resend
                   </span>
                 </div>
                 <input
@@ -591,7 +591,7 @@ export function EmailSettingsView({
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/60 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-purple-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-400">
-                  Máte-li nový klíč z Resend.com (Full access), můžete jej zadat sem. Systém načte DNS záznamy přímo bez čekání na propagaci proměnných ve Vercelu.
+                  Pro správu odesílací domény můžete zadat klíč svého účtu Resend s oprávněním Full access.
                 </p>
               </div>
             </div>
@@ -712,7 +712,7 @@ export function EmailSettingsView({
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center gap-2">
             <Send className="h-5 w-5 text-purple-400" />
-            <h3 className="text-base font-bold text-white">Nedávno odeslané e-maily (EmailLog)</h3>
+            <h3 className="text-base font-bold text-white">Nedávno odeslané e-maily</h3>
           </div>
           <span className="text-xs text-slate-500">Posledních 15 zpráv</span>
         </div>

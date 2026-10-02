@@ -638,15 +638,16 @@ export function GoogleNavigationOfferMap({
       <div className="space-y-2">
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-center justify-between">
           <span className="flex items-center gap-1.5 font-bold">
-            <AlertCircle size={16} className="text-amber-600 shrink-0" /> Google Maps API klíč není nakonfigurován. Aktivován zobrazení v OpenStreetMap (Leaflet).
+            <AlertCircle size={16} className="text-amber-600 shrink-0" /> Zobrazení náhradní mapy OpenStreetMap.
           </span>
         </div>
         <NavigationPointMap
           target={target ? { latitude: target.latitude, longitude: target.longitude, label: target.label } : undefined}
           points={points}
+          readOnly={readOnly}
           mode={mode}
           onMapClick={onMapClick}
-          onPointMove={(id, lat, lng) => onPointMove(id, lat, lng)}
+          onPointMove={(id, lat, lng) => { if (!readOnly) onPointMove(id, lat, lng); }}
           userLocation={userLocation}
           selectedPointId={selectedPointId}
           onPointClick={onPointClick}
@@ -658,7 +659,7 @@ export function GoogleNavigationOfferMap({
   return (
     <div className="space-y-3">
       {/* Places Autocomplete Search Box */}
-      {!compact && <div className="relative">
+      {!compact && !readOnly && <div className="relative">
         <div className="flex items-center rounded-xl border border-slate-300 bg-white shadow-xs focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-500/20">
           <Search size={16} className="ml-3 text-slate-400 shrink-0" />
           <input
@@ -692,7 +693,7 @@ export function GoogleNavigationOfferMap({
       </div>}
 
       {/* Mode Status Indicator */}
-      {!compact && <div className={`rounded-xl px-3 py-2 text-xs font-bold flex items-center justify-between ${
+      {!compact && !readOnly && <div className={`rounded-xl px-3 py-2 text-xs font-bold flex items-center justify-between ${
         mode === 'target' ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-sky-50 text-sky-800 border border-sky-200'
       }`}>
         <span>

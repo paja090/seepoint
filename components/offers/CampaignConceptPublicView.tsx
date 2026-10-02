@@ -1,5 +1,7 @@
 'use client';
 
+import { OfferBrandMark } from '@/components/offer/OfferBrandMark';
+
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Sparkles, MapPin, Target, Layers, Calendar, CheckCircle2, PhoneCall, Mail } from 'lucide-react';
@@ -25,9 +27,9 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestForm, setRequestForm] = useState({ name: '', email: '', message: 'Mám zájem o zpracování cenové nabídky na tento koncept.' });
-  const brandName = offer.branding?.name || 'SeePOINT';
-  const brandEmail = offer.branding?.email || 'info@seepoint.cz';
-  const brandPhone = offer.branding?.phone || '+420 778 089 099';
+  const brandName = offer.branding?.name || 'Dodavatel nabídky';
+  const brandEmail = offer.branding?.email || '';
+  const brandPhone = offer.branding?.phone || '';
 
   const rawPhases = (offer as unknown as Record<string, unknown>).campaignPhases;
   const phases: CampaignPhase[] = Array.isArray(rawPhases)
@@ -95,11 +97,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
       <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-4 sm:px-6 py-3.5 shadow-lg">
         <div className="mx-auto max-w-6xl flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {offer.branding?.logoUrl ? (
-              <img alt={brandName} className="h-8 max-w-44 object-contain" src={offer.branding.logoUrl} />
-            ) : (
-              <img alt={brandName || "SeePOINT"} className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
-            )}
+            <OfferBrandMark branding={offer.branding} />
             <span className="hidden sm:inline-block h-4 w-px bg-slate-800" />
             <span className="hidden sm:inline-block text-xs font-bold text-slate-400">
               Nezávazný koncept OOH kampaně
@@ -107,13 +105,13 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
           </div>
 
           <div className="flex items-center gap-2">
-            <a
+            {brandPhone && <a
               href={`tel:${brandPhone.replace(/\s/g, '')}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 font-bold text-xs border border-purple-800/60 transition"
             >
               <PhoneCall className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{brandPhone}</span>
-            </a>
+            </a>}
           </div>
         </div>
       </header>
@@ -146,7 +144,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                 🔒 Koncept bez cen (Informační)
               </span>
               <p className="text-[10px] text-slate-400 font-medium">
-                Garantovaná dostupnost sítě SeePOINT
+                Vybrané reklamní plochy
               </p>
             </div>
           </div>
@@ -337,8 +335,8 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
           <section className="space-y-4">
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 space-y-3 shadow-xl">
               <div className="px-2 pt-2">
-                <h3 className="text-base font-black text-white">Mapa vybraných nosičů SeePOINT</h3>
-                <p className="text-xs text-slate-400 font-medium">Na mapě jsou zobrazeny výhradně reálné, dostupné reklamní nosiče ze sítě SeePOINT.</p>
+                <h3 className="text-base font-black text-white">Mapa vybraných nosičů</h3>
+                <p className="text-xs text-slate-400 font-medium">Na mapě jsou zobrazeny výhradně reálné, dostupné reklamní nosiče v nabídce.</p>
               </div>
 
               <div className="rounded-2xl overflow-hidden border border-slate-800 min-h-[450px]">
@@ -433,7 +431,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                 <span>Chci zpracovat cenovou nabídku</span>
               </button>
             ) : (
-              <a
+              brandEmail && <a
                 href={`mailto:${brandEmail}?subject=Zájem%20o%20nacenění%20kampaně`}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white text-slate-950 font-black text-xs sm:text-sm shadow-xl hover:bg-slate-100 transition transform active:scale-95"
               >
@@ -442,13 +440,13 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
               </a>
             )}
 
-            <a
+            {brandPhone && <a
               href={`tel:${brandPhone.replace(/\s/g, '')}`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-950/80 hover:bg-purple-900 text-purple-200 font-extrabold text-xs sm:text-sm border border-purple-700/60 shadow-lg transition"
             >
               <PhoneCall className="w-4 h-4" />
               <span>Zavolat obchodníkovi ({brandPhone})</span>
-            </a>
+            </a>}
           </div>
         </section>
       </main>
@@ -461,7 +459,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
               <h3 className="text-xl font-black text-slate-900">Zpracování nabídky</h3>
               <button onClick={() => setShowRequestModal(false)} className="text-slate-400 hover:text-slate-600 transition">✕</button>
             </div>
-            <p className="text-sm text-slate-600 mb-6">Máte zájem o tento koncept? Nechte nám kontakt a obchodník SeePOINT Vám připraví přesnou cenovou kalkulaci.</p>
+            <p className="text-sm text-slate-600 mb-6">Máte zájem o tento koncept? Nechte nám kontakt a váš obchodník Vám připraví přesnou cenovou kalkulaci.</p>
             
             <form onSubmit={handleRequestSubmit} className="space-y-4 text-slate-900">
               <div>

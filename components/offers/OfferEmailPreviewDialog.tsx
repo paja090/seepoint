@@ -1,10 +1,12 @@
 'use client';
 
 import { Mail, X } from 'lucide-react';
-import Image from 'next/image';
+import { OfferBrandMark } from '@/components/offer/OfferBrandMark';
+import type { OfferBranding } from '@/lib/offers/branding';
 import { formatCzechBusinessSalutation } from '@/lib/czech-salutation';
 
 export type OfferEmailPreviewData = {
+  branding?: OfferBranding;
   recipient: string;
   campaignName: string;
   contactName: string;
@@ -64,7 +66,7 @@ export function OfferEmailPreviewDialog({
           </div>
           <div className="p-4 sm:p-8">
             <div className="mx-auto max-w-2xl rounded-2xl bg-white p-7 shadow-sm sm:p-9">
-              <Image alt="SeePOINT – Outdoor reklama" className="mb-6 h-auto w-48 max-w-full" height={64} src="/seepoint-logo.svg" width={190} />
+              <div className="mb-6"><OfferBrandMark branding={data.branding} className="h-auto w-48 max-w-full" /></div>
               <h3 className="text-2xl font-black leading-tight text-slate-950">{data.campaignName}</h3>
               <p className="mt-5 text-sm text-slate-800">Dobrý den, {formatCzechBusinessSalutation(data.contactName)},</p>
               <p className="mt-4 whitespace-pre-line text-sm leading-6 text-slate-700">{previewMessage || 'Doplňte hlavní text e-mailu.'}</p>
@@ -72,10 +74,10 @@ export function OfferEmailPreviewDialog({
               {data.validUntil ? <p className="mt-5 text-sm text-slate-600">Nabídka je platná do <strong>{data.validUntil}</strong>.</p> : null}
               <span className="mt-7 inline-flex rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white">Otevřít nabídku</span>
               <div className="mt-8 flex items-center gap-4 border-t border-slate-200 pt-6">
-                <span className="grid size-14 shrink-0 place-items-center rounded-full bg-slate-950 text-lg font-bold text-white">{initials || 'SP'}</span>
+                <span className="grid size-14 shrink-0 place-items-center rounded-full bg-slate-950 text-lg font-bold text-white">{initials || 'OK'}</span>
                 <div>
                   <p className="font-bold text-slate-950">{data.salespersonName}</p>
-                  <p className="text-xs text-slate-500">Obchodní kontakt SeePOINT</p>
+                  <p className="text-xs text-slate-500">Obchodní kontakt</p>
                   <p className="mt-1 text-sm text-sky-700">{data.salespersonEmail}</p>
                 </div>
               </div>

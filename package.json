@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint .",
     "security:tenant": "node scripts/check-tenant-security.mjs",
-    "test": "npx tsx --test tests/*.test.ts",
+    "test": "npx tsx --require ./tests/helpers/server-only.cjs --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",

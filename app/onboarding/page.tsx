@@ -50,7 +50,7 @@ export default async function OnboardingPage() {
       {checklist}
       {canCreateOrganization ? (
         <section className={checklist ? 'mt-8' : undefined}>
-          <div className="mb-4"><h2 className="text-2xl font-bold">Založit novou organizaci</h2><p className="mt-1 text-sm text-slate-600">Pouze platformní SUPER_ADMIN. OWNER obdrží bezpečnou aktivační pozvánku.</p></div>
+          <div className="mb-4"><h2 className="text-2xl font-bold">Založit novou organizaci</h2><p className="mt-1 text-sm text-slate-600">Pouze platformní SUPER_ADMIN. Nový vlastník obdrží aktivační pozvánku. Existující aktivní účet získá přístup přímo, bez aktivačního e-mailu.</p></div>
           <CreateOrganizationForm />
         </section>
       ) : null}

@@ -19,12 +19,8 @@ const REGIONS = [
 export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
   const [timeStr, setTimeStr] = useState<string>('');
   const [dateStr, setDateStr] = useState<string>('');
-  const [regionIndex, setRegionIndex] = useState<number>(0);
-  const [weather, setWeather] = useState<WeatherData | null>({
-    temperature: 21,
-    weatherCode: 1,
-    cityName: 'Ostrava',
-  });
+  const [regionIndex, setRegionIndex] = useState<number | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   // Live Clock & Date Update
   useEffect(() => {
@@ -53,6 +49,7 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
 
   // Fetch Open-Meteo Weather for selected Czech region
   useEffect(() => {
+    if (regionIndex === null) return;
     const region = REGIONS[regionIndex];
     let isMounted = true;
 
@@ -72,7 +69,7 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
           }
         }
       } catch {
-        // Keep existing fallback weather state on network offline
+        // Leave unavailable weather empty; never invent a temperature.
       }
     }
 
@@ -93,7 +90,8 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
   };
 
   const cycleRegion = () => {
-    setRegionIndex((prev) => (prev + 1) % REGIONS.length);
+    setWeather(null);
+    setRegionIndex((prev) => prev === null ? 0 : (prev + 1) % REGIONS.length);
   };
 
   if (compact) {
@@ -103,12 +101,12 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
         className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-2.5 py-1 text-[11px] text-slate-300 font-bold hover:bg-slate-800 transition"
         title="Přepnout region počasí"
       >
-        <span className="font-mono font-black text-white">{timeStr || '00:00'}</span>
+        <span className="font-mono font-black text-white">{timeStr || '—'}</span>
         <span className="text-slate-600">·</span>
         <span className="flex items-center gap-1">
           {weather && getWeatherIcon(weather.weatherCode)}
-          <span className="text-emerald-400 font-black">{weather?.temperature ?? 20}°C</span>
-          <span className="text-[10px] text-slate-400">{weather?.cityName ?? 'Ostrava'}</span>
+          <span className="text-emerald-400 font-black">{weather ? `${weather.temperature}°C` : '—'}</span>
+          <span className="text-[10px] text-slate-400">{weather?.cityName ?? (regionIndex === null ? 'Vybrat město' : REGIONS[regionIndex].name)}</span>
         </span>
       </button>
     );
@@ -119,10 +117,10 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
       {/* Clock & Date */}
       <div className="flex items-center gap-2 border-r border-slate-200 pr-3">
         <span className="font-mono font-black text-slate-950 text-sm tracking-tight">
-          {timeStr || '00:00:00'}
+          {timeStr || '—'}
         </span>
         <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-lg border border-slate-200">
-          {dateStr || 'Po 1.1.'}
+          {dateStr || '—'}
         </span>
       </div>
 
@@ -133,10 +131,10 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
         className="flex items-center gap-1.5 font-bold hover:bg-white hover:shadow-xs px-2 py-1 rounded-xl transition cursor-pointer"
       >
         {weather && getWeatherIcon(weather.weatherCode)}
-        <span className="text-slate-900 font-extrabold">{weather?.temperature ?? 20}°C</span>
+        <span className="text-slate-900 font-extrabold">{weather ? `${weather.temperature}°C` : '—'}</span>
         <span className="text-slate-500 text-[11px] flex items-center gap-0.5">
           <MapPin size={10} className="text-rose-500" />
-          {weather?.cityName ?? 'Ostrava'}
+          {weather?.cityName ?? (regionIndex === null ? 'Vybrat město' : REGIONS[regionIndex].name)}
         </span>
       </button>
     </div>

@@ -252,7 +252,7 @@ export async function getClient360(
   const lastInboundMsg = inboxMessages[0];
   const lastInboundDate = lastInboundMsg ? lastInboundMsg.receivedAt : null;
   const lastCommDate = crmCommunications[0] ? crmCommunications[0].createdAt : null;
-  const lastContactDate = [lastInboundDate, lastCommDate, client.lastActivityAt]
+  const lastContactDate = [lastInboundDate, lastCommDate]
     .filter((d): d is Date => d instanceof Date)
     .sort((a, b) => b.getTime() - a.getTime())[0] || null;
 
@@ -270,6 +270,7 @@ export async function getClient360(
   // -------------------------------------------------------------------------
   // Deterministic Relationship Health Evaluation
   // -------------------------------------------------------------------------
+  const hasRelationshipHistory = Boolean(lastContactDate) || offers.length > 0 || allRealizations.length > 0 || invoices.length > 0 || activeCampaigns.length > 0;
   const reasons: string[] = [];
   let status: ClientRelationshipHealth = 'HEALTHY';
   let healthScore = 85;
@@ -306,12 +307,12 @@ export async function getClient360(
   }
 
   if (reasons.length === 0) {
-    reasons.push('Všechny kampaně, nabídky i platby probíhají bez zaznamenaných rizik.');
+    reasons.push(hasRelationshipHistory ? 'Všechny kampaně, nabídky i platby probíhají bez zaznamenaných rizik.' : 'Nedostatek historie pro vyhodnocení vztahu.');
   }
 
   const relationship: ClientRelationshipSummary = {
-    status,
-    healthScore: Math.max(0, Math.min(100, healthScore)),
+    status: hasRelationshipHistory ? status : 'UNKNOWN',
+    healthScore: hasRelationshipHistory ? Math.max(0, Math.min(100, healthScore)) : null,
     reasons,
     lastContactDate,
     daysSinceLastContact,

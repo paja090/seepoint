@@ -208,7 +208,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
               <label className="relative"><span className="sr-only">Hledat nabídku</span><Search className="absolute left-3 top-3 text-slate-400" size={18} /><input className="input pl-10" defaultValue={value('q')} name="q" placeholder="Nabídka, kampaň nebo klient" /></label>
               <select aria-label="Klient" className="input" defaultValue={value('clientId')} name="clientId"><option value="">Všichni klienti</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
               <select aria-label="Stav nabídky" className="input" defaultValue={value('status')} name="status"><option value="">Všechny stavy</option><option value="DRAFT">Koncept</option><option value="SENT">Odeslaná</option><option value="ACCEPTED">Přijatá</option><option value="REJECTED">Odmítnutá</option><option value="EXPIRED">Expirovaná</option></select>
-              <select aria-label="Typ nabídky" className="input" defaultValue={value('type')} name="type"><option value="">Všechny typy</option><option value="STANDARD_MEDIA">Standardní média</option><option value="NAVIGATION">Navigace</option><option value="CITY_GALLERY">Galerie venku</option></select>
+              <select aria-label="Typ nabídky" className="input" defaultValue={value('type')} name="type"><option value="">Všechny typy</option><option value="STANDARD_MEDIA">Standardní média</option><option value="NAVIGATION">Navigace</option><option value="CITY_GALLERY">Výstavní projekt</option></select>
               <select aria-label="Obchodník" className="input" defaultValue={value('createdByUserId')} disabled={user.role === 'SALES'} name="createdByUserId"><option value="">Všichni obchodníci</option>{salespeople.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
               <button className="btn-primary" type="submit">Filtrovat</button>
             </div>
@@ -232,7 +232,7 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
                 <tbody>{rows.map((offer) => (
                   <tr className="hover:bg-slate-50" key={offer.id}>
                     <TableCell><b>{offer.client.name}</b><br /><span className="text-slate-500">{offer.campaignName}</span></TableCell>
-                    <TableCell>{offer.offerType === 'NAVIGATION' ? 'Navigace' : offer.offerType === 'CITY_GALLERY' ? 'Galerie venku' : 'Standardní média'}</TableCell>
+                    <TableCell>{offer.offerType === 'NAVIGATION' ? 'Navigace' : offer.offerType === 'CITY_GALLERY' ? 'Výstavní projekt' : 'Standardní média'}</TableCell>
                     <TableCell>{offer.createdBy.name}</TableCell>
                     <TableCell>{offer.validUntil ? new Date(`${offer.validUntil}T00:00:00Z`).toLocaleDateString('cs-CZ') : 'Neuvedena'}</TableCell>
                     <TableCell>{offer.offerType === 'NAVIGATION' ? offer.navigation?.points.length ?? 0 : offer.offerType === 'CITY_GALLERY' ? 1 : offer.items.length}<div className="mt-1 text-xs text-slate-500">{offer.offerType === 'NAVIGATION' ? offer.navigation?.targetName : offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.projectTitle || 'Koncept' : [...new Set(offer.items.map((item) => item.groupLabel))].slice(0, 3).join(' · ')}</div></TableCell>

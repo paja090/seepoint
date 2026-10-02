@@ -5,6 +5,7 @@ import { SectionHeading } from './SectionHeading';
 
 export function ReferencesSection({ offer }: { offer: ProposalOffer }) {
   if (offer.references.length === 0) return null;
+  if (offer.references.length === 0) return null;
   return (
     <section aria-labelledby="references-heading">
       <SectionHeading

@@ -31,6 +31,8 @@ export const TENANT_MODEL_NAMES = [
   'ImportProfile', 'ImportBatchSheet', 'ImportRow', 'OrganizationEmailSettings', 'EmailLog',
   'AiInboxMessage', 'AiInboxAttachment', 'AiInboxAction',
   'OrganizationOccupancyAIProfile', 'OccupancyInsight',
+  'FieldSurvey', 'FieldSurveyPoint', 'FieldSurveyPhoto', 'FieldSurveyParcel',
+  'FieldSurveyOwner', 'FieldSurveyContact', 'FieldSurveyAiAnalysis',
 ] as const;
 
 // Platform identity bootstrap must resolve memberships before tenant context exists.

@@ -30,7 +30,7 @@ export function ResponsiveAppShell({
   utilityAccess,
 }: {
   children: React.ReactNode;
-  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; avatarUrl?: string | null; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> };
+  user: { id: string; name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; avatarUrl?: string | null; organizationId: string; organizationName: string; organizationLogoUrl: string | null; organizations: Array<{ id: string; name: string; slug: string }> };
   employees?: Array<{ id: string; firstName: string; lastName: string; position: string | null }>;
   visibleHubs: NavigationHub[];
   utilityAccess: { photos: boolean; team: boolean };
@@ -75,7 +75,7 @@ export function ResponsiveAppShell({
             </button>
 
             <Link href="/dashboard" className="flex items-center gap-2">
-              <img src="/seepoint-logo.svg" alt="SeePOINT Outdoor reklama" className="h-7 w-auto max-w-[90px]" />
+              {user.organizationLogoUrl ? <img src={user.organizationLogoUrl} alt={user.organizationName} className="h-7 w-auto max-w-[90px]" /> : <span className="max-w-[130px] truncate text-sm font-bold text-white">{user.organizationName}</span>}
             </Link>
           </div>
 
@@ -100,7 +100,7 @@ export function ResponsiveAppShell({
             {utilityAccess.team && <Link
               href="/team"
               className="hidden h-9 w-9 place-items-center rounded-full bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition sm:grid"
-              title="📞 Kontakty týmu SeePOINT"
+              title={`📞 Kontakty týmu ${user.organizationName}`}
             >
               <PhoneCall size={17} />
             </Link>}

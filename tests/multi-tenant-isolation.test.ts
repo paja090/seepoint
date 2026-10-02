@@ -66,6 +66,10 @@ test('public offers resolve tenant only by an opaque token and never by offer id
   assert.doesNotMatch(service, /\{ id: cleanToken \}/);
   assert.doesNotMatch(service, /publicTokenHash: cleanToken/);
   assert.doesNotMatch(service, /publicTokenHash: \{ startsWith:/);
+  assert.doesNotMatch(service, /id: cleanToken|isPlausibleId|candidates\.find/);
+  const publicLookup = service.slice(service.indexOf('export async function getPublicRow'), service.indexOf('export async function getPublicOffer'));
+  assert.doesNotMatch(publicLookup, /offer\.update|offer\.findMany|offer\.findFirst/);
+  assert.match(publicLookup, /!row\.publishedAt/);
   assert.doesNotMatch(service, /token: id, path: `\/offer\/\$\{id\}`/);
   assert.ok((service.match(/preparePortalCredential\(existing\)/g) ?? []).length >= 2);
 });

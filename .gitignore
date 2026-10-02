@@ -15,6 +15,7 @@ seepoint-drive-integration-*.json
 data/*.xlsx
 reports/carriers-2026-*.json
 reports/carriers-2026-*.csv
+reports/*.png
 
 # Local hardening verification artifacts (never credentials or test browser output)
 tmp-hardening-*.log

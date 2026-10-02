@@ -4,8 +4,8 @@ import './globals.css';
 import './ai-theme.css';
 
 export const metadata: Metadata = {
-  title: 'SeePOINT Outdoor Reklama',
-  description: 'Interní systém pro správu reklamních nosičů, montáží, vozidel a nabídek SeePOINT',
+  title: 'SeePoint OS',
+  description: 'Systém pro správu reklamních nosičů, montáží, vozidel a nabídek',
   manifest: '/manifest.json',
   icons: {
     icon: '/seepoint-app-icon.svg',

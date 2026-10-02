@@ -455,7 +455,7 @@ export function WorkEntriesManager({ employees, initialEntries }: WorkEntriesMan
         <div>
           <h1 className="text-3xl font-bold">Odvedená práce</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Správa a schvalování záznamů odvedené práce zaměstnanců SeePoint.
+            Správa a schvalování záznamů odvedené práce zaměstnanců vaší organizace.
           </p>
         </div>
         <button

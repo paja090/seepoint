@@ -33,7 +33,7 @@ export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictV
   const validityReady = Boolean(offer.validUntil && offer.validUntil >= today);
   const calculationReady = isNoPrice || Number(offer.totalWithTax ?? 0) > 0;
   const common: OfferReadinessCheck[] = [
-    { id: 'client', label: 'Klient a kontakt', detail: contactReady ? 'Klient je vyplněn.' : 'Doplňte název klienta.', status: contactReady ? 'ok' : 'error' },
+    { id: 'client', label: 'Klient a kontakt', detail: contactReady ? (isNoPrice ? 'Nezávazný koncept nevyžaduje kontaktní e-mail.' : 'Klient a kontaktní e-mail jsou vyplněny.') : !offer.client.name ? 'Doplňte název klienta.' : !offer.contactEmail ? 'Doplňte kontaktní e-mail příjemce nabídky.' : 'Opravte kontaktní e-mail příjemce nabídky.', status: contactReady ? 'ok' : 'error' },
     { id: 'validity', label: 'Platnost nabídky', detail: validityReady ? `Nabídka je platná do ${offer.validUntil}.` : 'Doplňte budoucí nebo dnešní datum platnosti nabídky.', status: validityReady ? 'ok' : 'error' },
     { id: 'calculation', label: 'Kalkulace nabídky', detail: isNoPrice ? 'Nezávazný koncept bez cen (připraveno k odeslání).' : calculationReady ? 'Celková cena včetně DPH je připravena.' : 'Celková cena nabídky musí být vyšší než nula.', status: calculationReady ? 'ok' : 'error' },
   ];
@@ -59,7 +59,7 @@ export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictV
     const locationReady = Boolean(offer.cityGallery?.locationBrief?.trim());
     return [
       ...common,
-      { id: 'concept', label: 'Koncept projektu', detail: conceptReady ? 'Koncept Galerie venku je popsaný.' : 'Doplňte koncept projektu.', status: conceptReady ? 'ok' : 'error' },
+      { id: 'concept', label: 'Koncept projektu', detail: conceptReady ? 'Koncept výstavního projektu je popsaný.' : 'Doplňte koncept projektu.', status: conceptReady ? 'ok' : 'error' },
       { id: 'location', label: 'Lokalita projektu', detail: locationReady ? 'Lokalita nebo prostor realizace je popsaný.' : 'Doplňte zadání lokality.', status: locationReady ? 'ok' : 'error' },
     ];
   }

@@ -47,6 +47,7 @@ export function OfferApproval({ offer, conflicts }: { offer: OfferView; conflict
         <aside className="lg:sticky lg:top-24 lg:self-start"><OfferSendControl
           canSend={canSend}
           emailPreview={{
+            branding: offer.branding,
             recipient: offer.contactEmail || offer.client.email || '',
             campaignName: offer.campaignName,
             contactName: offer.contactPerson || offer.client.contactPerson || offer.client.name,

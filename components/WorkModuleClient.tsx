@@ -121,7 +121,7 @@ export function WorkModuleClient({
         <div>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-800">
-              <Briefcase size={12} /> Provoz SeePOINT
+              <Briefcase size={12} /> Firemní provoz
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">

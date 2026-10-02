@@ -1,3 +1,4 @@
+import { offerBrandLogo, offerBrandName } from '@/lib/offers/branding';
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { sendOfferEmail } from '@/lib/email';
@@ -49,6 +50,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const salespersonName = employee
       ? `${employee.firstName} ${employee.lastName}`
       : salesperson?.name || auth.name;
+    const branding = await prisma.organization.findUnique({ where: { id: auth.organizationId! }, select: { id: true, name: true, logoUrl: true } });
+    const logoUrl = offerBrandLogo(branding);
     const emailDelivery = await sendOfferEmail({
       to: recipient,
       subject: subject || undefined,
@@ -58,11 +61,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       validUntil: delivery.offer.validUntil,
       publicUrl,
       locationSelection: delivery.offer.offerType === 'NAVIGATION' && delivery.offer.navigation?.proposalMode === 'LOCATION_SELECTION',
-      logoUrl: new URL('/seepoint-logo.svg', request.url).toString(),
+      logoUrl: logoUrl ? new URL(logoUrl, request.url).toString() : '',
+      organizationName: offerBrandName(branding),
       salespersonName,
       salespersonEmail: salesperson?.email || auth.email,
       salespersonPhone: employee?.phone,
-      salespersonRole: 'Obchodní kontakt SeePOINT',
+      salespersonRole: 'Obchodní kontakt',
       salespersonPhotoUrl: employee?.photos[0]
         ? new URL(`/api/proposals/${encodeURIComponent(delivery.token)}/salesperson-photo`, request.url).toString()
         : null,

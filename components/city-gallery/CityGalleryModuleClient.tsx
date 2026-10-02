@@ -216,7 +216,7 @@ export function CityGalleryModuleClient({
         if (data.projects) setProjects(data.projects);
         if (data.fleet) setFleet(data.fleet);
       } catch (error) {
-        setActionError(error instanceof Error ? error.message : 'Data Galerie venku se nepodařilo obnovit.');
+        setActionError(error instanceof Error ? error.message : 'Data výstavního projektu se nepodařilo obnovit.');
       }
       router.refresh();
     });
@@ -255,7 +255,7 @@ export function CityGalleryModuleClient({
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-                Galerie VENKU <span className="text-fuchsia-400">City Gallery</span>
+                Výstavní &amp; Promo sítě
               </h1>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
                 Správa alokace nosičů, záborů veřejného prostranství a dálkové logistiky po celé ČR
@@ -292,7 +292,7 @@ export function CityGalleryModuleClient({
             <span className="text-[11px] text-slate-400 font-bold block">Celkový fond nosičů</span>
             <div className="mt-1 flex items-baseline gap-2">
               <strong className="text-2xl font-black text-white">{fleet.totalFleet}</strong>
-              <span className="text-xs text-slate-500">ks (120×180 cm)</span>
+              <span className="text-xs text-slate-500">ks</span>
             </div>
           </div>
 
@@ -705,7 +705,7 @@ export function CityGalleryModuleClient({
           <MapPin size={36} className="mx-auto text-fuchsia-600" />
           <h3 className="font-bold text-slate-900 text-base">Přehled aktivních výstav podle měst</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Souhrn měst, ve kterých jsou právě aktivně alokované nosiče Galerie VENKU.
+            Souhrn měst, ve kterých jsou právě aktivně alokované nosiče vaší organizace.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-3 pt-4 max-w-3xl mx-auto">
@@ -735,7 +735,7 @@ export function CityGalleryModuleClient({
               <div>
                 <h3 className="text-xl font-black text-slate-900 flex items-center gap-2" id="new-city-gallery-title">
                   <Plus className="h-5 w-5 text-fuchsia-600" />
-                  <span>Nová výstava / Výjezd Galerie VENKU</span>
+                  <span>Nová výstava / Výjezd</span>
                 </h3>
                 <p className="text-xs text-slate-500">Zadejte lokalitu, zábor prostranství a alokaci nosičů</p>
               </div>
@@ -936,7 +936,7 @@ export function CityGalleryModuleClient({
                   <Settings className="h-5 w-5 text-fuchsia-600" />
                   <span>Správa celkového fondu nosičů</span>
                 </h3>
-                <p className="text-xs text-slate-500">Úprava celkového počtu nosičů City Gallery Galerie VENKU</p>
+                <p className="text-xs text-slate-500">Úprava celkového počtu výstavních nosičů organizace</p>
               </div>
               <button aria-label="Zavřít správu fondu nosičů" onClick={() => setIsFleetModalOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100" type="button">
                 <X size={20} />
@@ -961,7 +961,7 @@ export function CityGalleryModuleClient({
                   className="input h-10 text-xs w-full font-bold text-lg text-fuchsia-700"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Zadejte celkový počet fyzických nosičů, které vlastní Galerie VENKU.
+                  Zadejte celkový počet fyzických nosičů, které vlastní vaše organizace.
                 </span>
               </div>
 

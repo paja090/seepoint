@@ -28,7 +28,7 @@ export function NewOfferSelectorClient({
               ✨ Vygenerovat nabídku pomocí AI Copilota
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Zadejte rozpočet, město nebo cíl. AI vybere ideální dostupné reklamní plochy či navigační body a připraví celou nabídku během 3 vteřin.
+              Zadejte rozpočet, město nebo cíl. AI vybere ideální dostupné reklamní plochy či navigační body a připraví celou nabídku k následné kontrole.
             </p>
           </div>
 
@@ -91,9 +91,9 @@ export function NewOfferSelectorClient({
           <span className="grid size-14 place-items-center rounded-2xl bg-purple-50 text-purple-700 ring-1 ring-purple-200">
             <GalleryHorizontalEnd size={27} />
           </span>
-          <h2 className="mt-6 text-xl font-semibold text-slate-950">Galerie venku / City Gallery</h2>
+          <h2 className="mt-6 text-xl font-semibold text-slate-950">Výstavní projekt</h2>
           <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">
-            Samostatná nabídka pro projekt, lokalitu nebo připravovanou realizaci Galerie venku.
+            Samostatná nabídka pro projekt, lokalitu nebo připravovanou realizaci výstavy.
           </p>
           <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-950">
             Pokračovat manuálně <ArrowRight className="transition group-hover:translate-x-1" size={16} />

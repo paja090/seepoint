@@ -37,7 +37,7 @@ export function OfferActionDialog({ action, offerStatus, onClose, onReject, toke
   if (!action) return null;
   const activeConfig = isLocationSelection && action === 'approve' ? {
     title: 'Potvrdit výběr lokalit navigace',
-    description: 'Potvrďte navržený výběr navigačních bodů a trasu k nacenění. Nejedná se o cenový závazek – obchodník SeePOINT pro vás následně připraví přesnou cenovou kalkulaci.',
+    description: 'Potvrďte navržený výběr navigačních bodů a trasu k nacenění. Nejedná se o cenový závazek – váš obchodník pro vás následně připraví přesnou cenovou kalkulaci.',
     submitLabel: 'Odeslat potvrzení výběru',
     Icon: CheckCircle2,
     accent: 'bg-emerald-600 hover:bg-emerald-700',

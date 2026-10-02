@@ -145,12 +145,14 @@ export function parseNavigationOfferInput(raw: unknown) {
     throw new OfferValidationError('Konec kampaně (do) nemůže předcházet začátku (od).');
   }
   const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
-  const city = text(input.city) === 'Havířov' ? 'Havířov' : (text(input.targetAddress).toLowerCase().includes('havířov') ? 'Havířov' : 'Ostrava');
+  const city = text(input.city);
+  if (city.length > 120) throw new OfferValidationError('Název města může mít maximálně 120 znaků.');
 
   const rawPres = (input.presentationSettings && typeof input.presentationSettings === 'object' && !Array.isArray(input.presentationSettings))
     ? (input.presentationSettings as Record<string, unknown>)
     : null;
   const presentationSettings = rawPres ? {
+    cityConfirmed: Boolean(city) && rawPres.cityConfirmed === true,
     showGraphicProofBadge: rawPres.showGraphicProofBadge !== false,
     showReferences: rawPres.showReferences !== false,
     showRealizations: rawPres.showRealizations !== false,
@@ -597,7 +599,7 @@ export async function createCityGalleryOffer(user: CurrentUser, raw: unknown) {
   return prisma.$transaction(async (tx) => {
     const client = await tx.client.findFirst({ where: { id: input.clientId, organizationId: user.organizationId, active: true }, select: { id: true } });
     if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
-    if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen nebo je archivovaný.');
+    if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Výstavní projekt nebyl nalezen nebo je archivovaný.');
     const created = await tx.offer.create({ data: { clientId: input.clientId, title: input.title, campaignName: input.campaignName, organizationId: user.organizationId, offerType: 'CITY_GALLERY', status: 'DRAFT', publishedAt: new Date(), contactPerson: nullable(input.contactPerson), contactEmail: nullable(input.contactEmail), contactPhone: nullable(input.contactPhone), validUntil: input.validUntil ? parseDateOnly(input.validUntil, 'Platnost nabídky') : null, internalNote: nullable(input.internalNote), clientMessage: nullable(input.clientMessage), taxRate: new Prisma.Decimal(21), subtotal: input.subtotal, discountAmount: new Prisma.Decimal(0), taxAmount: input.taxAmount, totalPrice: input.subtotal, totalWithTax: input.totalWithTax, ...serverOfferAuthor(user), cityGalleryOffer: { create: { organizationId: user.organizationId, projectId: input.projectId || null, concept: nullable(input.concept), locationBrief: nullable(input.locationBrief), realizationNote: nullable(input.realizationNote) } }, events: { create: { type: 'CREATED', toStatus: 'DRAFT', actorUserId: user.id, actorName: user.name, organizationId: user.organizationId } } }, select: { id: true } });
     const credential = preparePortalCredential({ id: created.id, publicTokenHash: null });
     await tx.offer.update({ where: { id: created.id }, data: { publicTokenHash: credential.hash, publicTokenEncrypted: credential.encrypted, publishedAt: new Date() } });
@@ -610,11 +612,11 @@ export async function updateCityGalleryOffer(user: CurrentUser, offerId: string,
   if (!user.organizationId) throw new OfferValidationError('Není vybraná aktivní organizace.', 'FORBIDDEN');
   return prisma.$transaction(async (tx) => {
     const existing = await tx.offer.findUnique({ where: { id: offerId }, select: { offerType: true, status: true, createdByUserId: true, publicTokenHash: true, publicTokenEncrypted: true, publicTokenRevokedAt: true, publishedAt: true } });
-    if (!existing || existing.offerType !== 'CITY_GALLERY') throw new OfferValidationError('Nabídka Galerie venku nebyla nalezena.', 'NOT_FOUND');
+    if (!existing || existing.offerType !== 'CITY_GALLERY') throw new OfferValidationError('Nabídka výstavního projektu nebyla nalezena.', 'NOT_FOUND');
     if (!canAccessOffer(user, existing.createdByUserId)) throw new OfferValidationError('K nabídce nemáte přístup.', 'FORBIDDEN');
     if (['CONVERTED', 'ARCHIVED'].includes(existing.status)) throw new OfferValidationError('Převedenou nebo archivovanou nabídku již nelze upravovat.', 'INVALID_STATUS_TRANSITION');
     const client = await tx.client.findFirst({ where: { id: input.clientId, organizationId: user.organizationId, active: true }, select: { id: true } }); if (!client) throw new OfferValidationError('Vybraný klient neexistuje nebo není aktivní.');
-    if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Projekt Galerie venku nebyl nalezen nebo je archivovaný.');
+    if (input.projectId && !await tx.cityGalleryProject.findFirst({ where: { id: input.projectId, organizationId: user.organizationId, status: { not: 'ARCHIVED' } }, select: { id: true } })) throw new OfferValidationError('Výstavní projekt nebyl nalezen nebo je archivovaný.');
     const credential = preparePortalCredential({
       id: offerId,
       publicTokenHash: existing.publicTokenRevokedAt ? null : existing.publicTokenHash,

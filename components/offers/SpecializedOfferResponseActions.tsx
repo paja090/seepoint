@@ -22,12 +22,12 @@ export function SpecializedOfferResponseActions({ status, token, isLocationSelec
       <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
         <div className="mx-auto max-w-3xl text-center">
           <h2 className="text-2xl font-black text-slate-950">
-            {isLocationSelection ? 'Vyhovuje vám tento navigační návrh?' : 'Vyhovuje vám tato navigační nabídka?'}
+            {isLocationSelection ? 'Vyhovuje vám tento navigační návrh?' : 'Vyhovuje vám tato nabídka?'}
           </h2>
           <p className="mt-2 text-sm text-slate-600">
             {isLocationSelection
-              ? 'Potvrzením schválíte výběr bodů a trasu bez cenových závazků. SeePOINT následně připraví přesnou cenovou nabídku.'
-              : 'Schválením potvrdíte zájem o realizaci. SeePOINT následně připraví zakázku a termín montáže.'}
+              ? 'Potvrzením schválíte výběr bodů a trasu bez cenových závazků. Dodavatel následně připraví přesnou cenovou nabídku.'
+              : 'Schválením potvrdíte zájem o realizaci. Dodavatel následně připraví zakázku a termín montáže.'}
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <button className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 cursor-pointer" onClick={() => setAction('approve')} type="button">
@@ -41,7 +41,7 @@ export function SpecializedOfferResponseActions({ status, token, isLocationSelec
               <HelpCircle size={18} />Mám dotaz
             </button>
           </div>
-          <p className="mt-3 text-xs text-slate-500">Požadavek na úpravu ani dotaz nabídku neschválí. Zpráva se uloží k nabídce pro obchodníka SeePOINT.</p>
+          <p className="mt-3 text-xs text-slate-500">Požadavek na úpravu ani dotaz nabídku neschválí. Zpráva se uloží k nabídce pro vašeho obchodníka.</p>
         </div>
       </section>
       <OfferActionDialog action={action} offerStatus={status} onClose={() => setAction(null)} onReject={() => setAction('reject')} token={token} isLocationSelection={isLocationSelection} />

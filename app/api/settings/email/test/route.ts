@@ -6,6 +6,7 @@ import { isValidEmailAddress } from '@/lib/email-policy';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
+import { tenantGmailSender } from '@/lib/integrations/gmail-sender';
 
 export const runtime = 'nodejs';
 
@@ -46,14 +47,15 @@ export async function POST(request: Request) {
           where: { organizationId: user.organizationId },
         });
 
-        if (!settings) {
+        const gmail = await tenantGmailSender(user.organizationId);
+        if (!settings && !gmail) {
           return NextResponse.json(
             { error: 'Nejprve připojte firemní doménu.' },
             { status: 400 }
           );
         }
 
-        if (settings.status !== 'VERIFIED') {
+        if (!gmail && settings?.status !== 'VERIFIED') {
           return NextResponse.json(
             { error: 'Nejprve ověřte firemní doménu. Test musí použít jejího skutečného odesílatele.' },
             { status: 409 }
@@ -63,9 +65,9 @@ export async function POST(request: Request) {
         const result = await sendTenantTestEmail({
           organizationId: user.organizationId,
           to: targetEmail,
-          senderName: settings.senderName,
-          fromEmail: settings.fromEmail,
-          replyTo: settings.replyTo || undefined,
+          senderName: gmail ? gmail.accountEmail! : settings!.senderName,
+          fromEmail: gmail ? gmail.accountEmail! : settings!.fromEmail,
+          replyTo: gmail ? gmail.accountEmail! : settings!.replyTo || undefined,
         });
 
         if (result.status === 'skipped') {
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
           );
         }
 
-        await prisma.organizationEmailSettings.update({
+        if (settings && !gmail) await prisma.organizationEmailSettings.update({
           where: { id: settings.id },
           data: { lastTestedAt: new Date() },
         });

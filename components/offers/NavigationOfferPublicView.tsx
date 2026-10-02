@@ -1,5 +1,7 @@
 'use client';
 
+import { hasSeePointPortfolio, navigationPresentation, offerBrandName } from '@/lib/offers/branding';
+
 import { useState } from 'react';
 import {
   Store,
@@ -225,28 +227,23 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
     showRealizations?: boolean;
     showPartnershipGuarantee?: boolean;
     showAboutCompany?: boolean;
+    cityConfirmed?: boolean;
   } | undefined;
 
   const showGraphicProofBadge = presentationSettings?.showGraphicProofBadge !== false;
-  const showReferences = presentationSettings?.showReferences !== false;
-  const showRealizations = presentationSettings?.showRealizations !== false;
-  const showPartnershipGuarantee = presentationSettings?.showPartnershipGuarantee !== false;
-  const showAboutCompany = presentationSettings?.showAboutCompany !== false;
+  const { showReferences, showRealizations, showPartnershipGuarantee, showAboutCompany } = navigationPresentation(offer.branding, presentationSettings);
+  const isDefaultSeePoint = hasSeePointPortfolio(offer.branding);
+  const companyName = offerBrandName(offer.branding);
+  const companyEmail = offer.branding?.email || '';
+  const companyPhone = offer.branding?.phone || '';
+  const companyWebsite = offer.branding?.website || '';
+  const companyAddress = [offer.branding?.street, offer.branding?.city, offer.branding?.postalCode].filter(Boolean).join(', ');
 
-  const isDefaultSeePoint = !offer.branding?.name || offer.branding.name.toLowerCase().includes('seepoint');
-  const companyName = offer.branding?.name || 'SeePOINT s.r.o.';
-  const companyEmail = offer.branding?.email || (isDefaultSeePoint ? 'info@seepoint.cz' : '');
-  const companyPhone = offer.branding?.phone || (isDefaultSeePoint ? '+420 778 089 099' : '');
-  const companyWebsite = offer.branding?.website || (isDefaultSeePoint ? 'https://seepoint.cz' : '');
-  const companyAddress = [offer.branding?.street, offer.branding?.city, offer.branding?.postalCode].filter(Boolean).join(', ')
-    || (isDefaultSeePoint ? 'Fráni Šrámka 1209/5, 709 00 Ostrava-Mariánské Hory' : '');
-  const companyLogo = offer.branding?.logoUrl || (isDefaultSeePoint ? '/seepoint-logo.svg' : '');
-
-  const rawCity = String((navigation as unknown as Record<string, unknown>)?.city || '').trim();
-  const searchCity = (offer.title + ' ' + (navigation?.targetAddress || '')).toLowerCase();
-  const isHavirov = rawCity.toLowerCase() === 'havířov' || searchCity.includes('havířov');
-  const isOstrava = rawCity.toLowerCase() === 'ostrava' || searchCity.includes('ostrava');
-  const targetCity = rawCity || (isHavirov ? 'Havířov' : isOstrava ? 'Ostrava' : '');
+  const targetCity = presentationSettings?.cityConfirmed === true
+    ? String((navigation as unknown as Record<string, unknown>)?.city || '').trim()
+    : '';
+  const isHavirov = targetCity.toLowerCase() === 'havířov';
+  const isOstrava = targetCity.toLowerCase() === 'ostrava';
 
   const isLocationSelectionPhase = (navigation as unknown as Record<string, unknown>).proposalMode !== 'PRICED_QUOTE';
   const showOfferPdf = canDownloadOfferPdf(offer);
@@ -528,7 +525,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 backdrop-blur-xs min-w-[200px]">
               <div className="text-xs font-bold text-slate-400">Celkový počet bodů trasy</div>
               <div className="mt-1 text-2xl font-black text-white">{navigation.points.length} navigačních cedulí</div>
-              <div className="mt-1 text-xs text-sky-400 font-semibold">📍 Google Maps Routes API</div>
+
             </div>
 
             {offer.campaignStrategy?.dateFrom && offer.campaignStrategy?.dateTo ? (
@@ -625,6 +622,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
 
           <GoogleNavigationOfferMap
+            readOnly
             target={target}
             targets={targets.map((t) => ({
               id: t.id,
@@ -1209,12 +1207,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-base">Navigační systém – {targetCity || 'lokální značení'}</h4>
                     <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-                      V dané lokalitě se využívá standardní schválený formát navigačních panelů na sloupech VO dle místního pasportu.
+                      Formát panelu a způsob umístění je nutné ověřit podle požadavků konkrétní lokality.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                     <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
-                      <span>📐</span> Formát dle pasportu města
+                      <span>📐</span> Formát k ověření pro danou lokalitu
                     </span>
                     {showGraphicProofBadge && (
                       <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
@@ -1648,7 +1646,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 {isDefaultSeePoint ? (
                   'Přední dodavatel outdoorové reklamy a výrobce originálních nosičů v Moravskoslezském kraji. Kromě navigačních systémů zajišťujeme kompletní reklamní servis pro malé i velké značky.'
                 ) : (
-                  `Specializovaný dodavatel navigačních systémů a venkovní reklamy${targetCity ? ` pro lokalitu ${targetCity} a okolí` : ''}. Zajišťujeme kompletní technické prověření, výrobu z odolných materiálů a bezpečnou montáž na sloupech veřejného osvětlení.`
+                  'Kontaktní údaje dodavatele této nabídky.'
                 )}
               </p>
             </div>
@@ -1760,95 +1758,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 </div>
               </div>
             </div>
-          ) : (
-            /* 4 Core Pillars Grid - Other Tenants: Universal Technical Standards */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* 1. Navigation */}
-              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                  <img
-                    src="/images/media-types/navigation.jpg"
-                    alt="Navigační panely na sloupech VO"
-                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                    <span className="font-extrabold text-xs text-sky-300 bg-sky-950/90 px-2.5 py-1 rounded-lg border border-sky-800/60 backdrop-blur-xs">🧭 Městská navigace (VO)</span>
-                  </div>
-                </div>
-                <div className="p-4 pt-0 space-y-1 flex-1">
-                  <h4 className="text-sm font-extrabold text-white">Cílené směrové panely</h4>
-                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                    Umístění na sloupech veřejného osvětlení u frekventovaných křižovatek a příjezdových tras. Dlouhodobě navádí řidiče i chodce přímo k vaší provozovně.
-                  </p>
-                </div>
-              </div>
-
-              {/* 2. Dibond 3 mm */}
-              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                  <img
-                    src="/offer/real-mcdonalds.jpg"
-                    alt="Odolné hliníkové panely DIBOND"
-                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                    <span className="font-extrabold text-xs text-amber-300 bg-amber-950/90 px-2.5 py-1 rounded-lg border border-amber-800/60 backdrop-blur-xs">🛡️ DIBOND® sendvič (3 mm)</span>
-                  </div>
-                </div>
-                <div className="p-4 pt-0 space-y-1 flex-1">
-                  <h4 className="text-sm font-extrabold text-white">Extrémní tvarová stálost</h4>
-                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                    Vysoce odolné hliníkové kompozitní desky s polyethylenovým jádrem, UV vytvrzovaným tiskem a ochrannou laminací proti povětrnosti i slunci.
-                  </p>
-                </div>
-              </div>
-
-              {/* 3. Bandimex uchycení */}
-              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                  <img
-                    src="/offer/real-penny-frycovice.jpg"
-                    alt="Nerezové upínací pásky Bandimex"
-                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                    <span className="font-extrabold text-xs text-teal-300 bg-teal-950/90 px-2.5 py-1 rounded-lg border border-teal-800/60 backdrop-blur-xs">🔩 Uchycení Bandimex</span>
-                  </div>
-                </div>
-                <div className="p-4 pt-0 space-y-1 flex-1">
-                  <h4 className="text-sm font-extrabold text-white">Certifikovaná montáž</h4>
-                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                    Pevné stažení nerezovými páskami Bandimex zamezuje protáčení panelu ve větru a garantuje bezpečné uchycení bez poškození sloupu VO.
-                  </p>
-                </div>
-              </div>
-
-              {/* 4. Fotodokumentace & Servis */}
-              <div className="group rounded-2xl border border-slate-800 bg-slate-950/80 overflow-hidden space-y-3 hover:border-sky-500/60 transition shadow-md flex flex-col justify-between">
-                <div className="relative h-36 w-full overflow-hidden bg-slate-900">
-                  <img
-                    src="/images/media-types/promo-bench.jpg"
-                    alt="Fotodokumentace a servis"
-                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent p-3 flex items-end">
-                    <span className="font-extrabold text-xs text-emerald-300 bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-800/60 backdrop-blur-xs">📸 Pasport & Servis</span>
-                  </div>
-                </div>
-                <div className="p-4 pt-0 space-y-1 flex-1">
-                  <h4 className="text-sm font-extrabold text-white">Fotodokumentace a dohled</h4>
-                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                    Po montáži obdržíte detailní fotodokumentaci osazených ploch. V průběhu kampaně poskytujeme záruční servis a technickou kontrolu.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          ) : null}
 
           {/* Contact Strip */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800/80 text-xs font-semibold text-slate-300">
             <div className="flex items-center gap-1.5">
-              {companyAddress ? <span>📍 {companyAddress}</span> : <span>📍 Specializovaný dodavatel navigační reklamy</span>}
+              {companyAddress ? <span>📍 {companyAddress}</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-4">
               {companyPhone && <span>📞 {companyPhone}</span>}

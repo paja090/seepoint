@@ -34,6 +34,7 @@ export const navigationHubs: NavigationHub[] = [
     { label: 'Evidence', items: [
       ["/map","Mapa nosičů","map","map"],
       ["/carriers","Evidence nosičů","panelsTopLeft","carriers"],
+      ["/field-survey","Terénní průzkum ploch","camera","fieldSurvey"],
       ["/mobile-surveys","Průzkum lokalit","mapPinned","navigationProjects"]
     ] },
     { label: 'Plánování', items: [

@@ -210,7 +210,7 @@ export async function confirmAiOffer(user: CurrentUser, raw: unknown) {
   let offerId: string;
   if (preview.offerType === 'NAVIGATION') offerId = await confirmNavigation(user, request, client, preview);
   else if (preview.offerType === 'CITY_GALLERY') {
-    const offer = await createCityGalleryOffer(user, { clientId: client.id, title: `AI Galerie venku – ${request.city || client.name}`, campaignName: request.prompt, concept: request.prompt, locationBrief: request.city, subtotal: 0 });
+    const offer = await createCityGalleryOffer(user, { clientId: client.id, title: `AI Výstavní projekt – ${request.city || client.name}`, campaignName: request.prompt, concept: request.prompt, locationBrief: request.city, subtotal: 0 });
     offerId = offer.id;
     await prisma.offer.update({ where: { id: offerId }, data: { pricingSegment: client.pricingSegment } });
   } else offerId = await confirmStandard(user, request, client, preview);
