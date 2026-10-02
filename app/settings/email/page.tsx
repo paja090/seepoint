@@ -2,11 +2,18 @@ import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
 import { EmailSettingsView } from '@/components/settings/EmailSettingsView';
+import { GmailSendingPanel } from '@/components/settings/GmailSendingPanel';
+import { tenantGmailSender } from '@/lib/integrations/gmail-sender';
+import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EmailSettingsPage() {
   const user = await requirePageAccess('settings');
+  let gmailEmail: string | null = null;
+  let gmailError: string | null = null;
+  try { gmailEmail = (await runWithTenantContext({ organizationId: user.organizationId, userId: user.id, source: 'session' }, () => tenantGmailSender(user.organizationId)))?.accountEmail || null; }
+  catch (error) { gmailError = error instanceof Error ? error.message : 'Gmail se nepodařilo načíst.'; }
 
   const [settings, recentLogs] = await Promise.all([
     prisma.organizationEmailSettings.findUnique({
@@ -107,6 +114,7 @@ export default async function EmailSettingsPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {user.organizationId !== 'org_seepoint_default' && <GmailSendingPanel accountEmail={gmailEmail} error={gmailError} />}
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Firemní e-mail & DNS</h1>
           <p className="mt-2 text-sm text-slate-600">

@@ -21,11 +21,13 @@ export function NavigationPointMap({
   onPointMove,
   selectedPointId,
   onPointClick,
+  readOnly = false,
 }: {
   target?: { latitude: number; longitude: number; label: string; color?: string };
   targets?: Array<{ latitude: number; longitude: number; label: string; color?: string }>;
   points: NavigationMapPoint[];
   mode: 'target' | 'point';
+  readOnly?: boolean;
   onMapClick: (latitude: number, longitude: number) => void;
   onPointMove: (id: string, latitude: number, longitude: number) => void;
   userLocation?: { latitude: number; longitude: number };
@@ -36,6 +38,8 @@ export function NavigationPointMap({
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
   const clickRef = useRef(onMapClick);
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
   const moveRef = useRef(onPointMove);
   const pointClickRef = useRef(onPointClick);
 
@@ -53,7 +57,7 @@ export function NavigationPointMap({
         maxZoom: 19,
       }).addTo(map);
 
-      map.on('click', (event) => clickRef.current(event.latlng.lat, event.latlng.lng));
+      map.on('click', (event) => { if (!readOnlyRef.current) clickRef.current(event.latlng.lat, event.latlng.lng); });
       mapRef.current = map;
 
       // Render all 12 official Ostrava restricted advertising zones from GeoJSON
@@ -225,7 +229,7 @@ export function NavigationPointMap({
 
         const marker = L.marker([point.latitude, point.longitude], {
           icon: pointIcon,
-          draggable: true,
+          draggable: !readOnly,
           title: point.label,
           zIndexOffset: isSelected ? 1500 : 500 - index,
         });
@@ -235,6 +239,7 @@ export function NavigationPointMap({
         });
 
         marker.on('dragend', () => {
+          if (readOnlyRef.current) return;
           const pos = marker.getLatLng();
           moveRef.current(point.id, pos.lat, pos.lng);
         });
@@ -263,7 +268,7 @@ export function NavigationPointMap({
         map.fitBounds(bounds.pad(0.35), { maxZoom: 16, animate: false });
       }
     });
-  }, [points, target, selectedPointId]);
+  }, [points, target, selectedPointId, readOnly]);
 
   // Pan to selected point when it changes
   useEffect(() => {
@@ -275,11 +280,11 @@ export function NavigationPointMap({
 
   return (
     <div>
-      <div className={`mb-2 rounded-xl px-3 py-2 text-xs font-bold ${mode === 'target' ? 'bg-rose-100 text-rose-800' : 'bg-sky-100 text-sky-800'}`}>
+      {!readOnly && <div className={`mb-2 rounded-xl px-3 py-2 text-xs font-bold ${mode === 'target' ? 'bg-rose-100 text-rose-800' : 'bg-sky-100 text-sky-800'}`}>
         {mode === 'target'
           ? '📍 Kliknutím do mapy určíte cílovou prodejnu (červený špendlík 🏬).'
           : '📍 Kliknutím do mapy přidáte nový navigační bod. Body lze přesouvat tažením myší.'}
-      </div>
+      </div>}
       <div aria-label="Mapa plánování navigace" className="h-[520px] overflow-hidden rounded-2xl border-2 border-slate-200 bg-slate-100 shadow-inner" ref={element} />
     </div>
   );

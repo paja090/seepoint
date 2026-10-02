@@ -1,8 +1,9 @@
 import crypto from 'node:crypto';
 import { formatCzechBusinessSalutation } from '@/lib/czech-salutation';
-import { isValidEmailAddress, isValidEmailIdempotencyKey, skippedEmailEnvironment } from '@/lib/email-policy';
+import { emailBccRecipients, offerBccRecipients, isValidEmailAddress, isValidEmailIdempotencyKey, skippedEmailEnvironment } from '@/lib/email-policy';
 import { prisma } from '@/lib/db';
 import { decryptTenantCredential } from '@/lib/email-encryption';
+import { tenantGmailSender, sendThroughTenantGmail } from '@/lib/integrations/gmail-sender';
 
 export type EmailAttachment = {
   filename: string;
@@ -131,6 +132,7 @@ export async function sendOfferEmail(input: {
   publicUrl: string;
   locationSelection: boolean;
   logoUrl: string;
+  organizationName?: string;
   salespersonName: string;
   salespersonEmail: string;
   salespersonPhone?: string | null;
@@ -140,7 +142,7 @@ export async function sendOfferEmail(input: {
   organizationId?: string;
   metadata?: Record<string, unknown>;
 }): Promise<EmailDeliveryResult> {
-  const subject = input.subject?.trim() || `Nabídka SeePOINT – ${input.campaignName}`;
+  const subject = input.subject?.trim() || `Nabídka ${input.organizationName || ''} – ${input.campaignName}`;
   const safeSalutation = escapeHtml(formatCzechBusinessSalutation(input.contactName));
   const safeCampaign = escapeHtml(input.campaignName);
   const clientMessage = (input.clientMessage || 'Připravili jsme pro Vás novou nabídku.')
@@ -152,11 +154,11 @@ export async function sendOfferEmail(input: {
   const safeSalespersonName = escapeHtml(input.salespersonName);
   const safeSalespersonEmail = escapeHtml(input.salespersonEmail);
   const safeSalespersonPhone = input.salespersonPhone ? escapeHtml(input.salespersonPhone) : '';
-  const safeSalespersonRole = escapeHtml(input.salespersonRole || 'Obchodní kontakt SeePOINT');
+  const safeSalespersonRole = escapeHtml(input.salespersonRole || 'Obchodní kontakt');
   const initials = input.salespersonName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const salespersonAvatar = input.salespersonPhotoUrl
     ? `<img src="${escapeHtml(input.salespersonPhotoUrl)}" width="64" height="64" alt="${safeSalespersonName}" style="display:block;width:64px;height:64px;border-radius:999px;object-fit:cover;border:2px solid #bae6fd">`
-    : `<div style="width:64px;height:64px;border-radius:999px;background:#0f172a;color:#ffffff;font-size:20px;font-weight:700;line-height:64px;text-align:center">${escapeHtml(initials || 'SP')}</div>`;
+    : `<div style="width:64px;height:64px;border-radius:999px;background:#0f172a;color:#ffffff;font-size:20px;font-weight:700;line-height:64px;text-align:center">${escapeHtml(initials || 'OK')}</div>`;
   const validity = input.validUntil
     ? `<p style="margin:0 0 20px;color:#475569">Nabídka je platná do <strong>${escapeHtml(input.validUntil)}</strong>.</p>`
     : '';
@@ -164,9 +166,7 @@ export async function sendOfferEmail(input: {
     ? '<p style="margin:0 0 20px;padding:12px 16px;border-radius:10px;background:#fff7ed;color:#9a3412"><strong>Nezávazná fáze bez cen:</strong> nejprve si vyberete vhodné navigační body. Přesnou cenovou nabídku obdržíte až po jejich odsouhlasení.</p>'
     : '';
 
-  const bccEmails = Array.from(
-    new Set([input.salespersonEmail, process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean))
-  );
+  const bccEmails = offerBccRecipients(input, process.env.EMAIL_BCC);
 
   return sendEmail({
     to: input.to,
@@ -174,7 +174,7 @@ export async function sendOfferEmail(input: {
     subject,
     html: `<div style="margin:0;background:#f1f5f9;padding:32px 16px;font-family:Arial,sans-serif;color:#0f172a">
       <div style="max-width:640px;margin:0 auto;border-radius:16px;background:#ffffff;padding:32px;box-shadow:0 1px 3px rgba(15,23,42,.12)">
-        <img src="${safeLogoUrl}" width="190" alt="SeePOINT – Outdoor reklama" style="display:block;width:190px;max-width:100%;height:auto;margin:0 0 22px">
+        ${safeLogoUrl ? `<img src="${safeLogoUrl}" width="190" alt="${escapeHtml(input.organizationName || 'Dodavatel nabídky')}" style="display:block;width:190px;max-width:100%;height:auto;margin:0 0 22px">` : `<p style="font-weight:700">${escapeHtml(input.organizationName || 'Dodavatel nabídky')}</p>`}
         <h1 style="margin:0 0 20px;font-size:26px;line-height:1.25">${safeCampaign}</h1>
         <p style="margin:0 0 16px">Dobrý den, ${safeSalutation},</p>
         <p style="margin:0 0 20px;white-space:pre-line;color:#334155">${safeMessage}</p>
@@ -225,14 +225,14 @@ export async function sendTenantTestEmail(input: {
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:580px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px">
         <h2 style="margin-top:0;color:#059669">✓ Testovací e-mail byl úspěšně odeslán</h2>
-        <p>Tento e-mail potvrzuje, že firemní doména a odesílací infrastruktura v Seepoint OS jsou správně nakonfigurovány a ověřeny.</p>
+        <p>Tento e-mail ověřuje odesílání ze schránky vaší organizace prostřednictvím Seepoint OS.</p>
         <table style="width:100%;font-size:13px;margin:20px 0;border-collapse:collapse">
           <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 0;color:#64748b">Odesílatel:</td><td style="padding:6px 0;font-weight:bold">${safeName} &lt;${safeFrom}&gt;</td></tr>
           <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 0;color:#64748b">Odpovědět komu (Reply-To):</td><td style="padding:6px 0;font-weight:bold">${safeReplyTo}</td></tr>
           <tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 0;color:#64748b">Příjemce:</td><td style="padding:6px 0;font-weight:bold">${escapeHtml(input.to)}</td></tr>
           <tr><td style="padding:6px 0;color:#64748b">Datum:</td><td style="padding:6px 0">${new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })}</td></tr>
         </table>
-        <p style="font-size:12px;color:#94a3b8;margin-bottom:0">Odesláno prostřednictvím Seepoint OS & Resend Multi-Tenant API.</p>
+        <p style="font-size:12px;color:#94a3b8;margin-bottom:0">Odesláno prostřednictvím Seepoint OS.</p>
       </div>
     `,
     webhookBody: { template: 'test' },
@@ -266,6 +266,22 @@ async function sendEmail(input: {
   }
 
   const defaultFrom = 'SeePOINT <info@seepoint.cz>';
+  // A tenant's explicitly authorized Gmail takes precedence over platform transports.
+  const gmailSender = input.organizationId ? await tenantGmailSender(input.organizationId) : null;
+  if (gmailSender && input.organizationId) {
+    const bcc = emailBccRecipients(input);
+    validateEmailInput({ ...input, bcc });
+    const skipped = skippedEmailProvider();
+    if (skipped) return { status: 'skipped', provider: skipped };
+    const sent = await sendThroughTenantGmail(input.organizationId, { to: input.to, bcc, subject: input.subject, html: input.html, attachments });
+    await prisma.emailLog.create({ data: {
+      organizationId: input.organizationId, providerMessageId: sent.messageId,
+      recipient: input.to, from: sent.from, subject: input.subject,
+      template: String(input.webhookBody.template || 'general'), status: 'SENT',
+      metadata: { ...input.metadata, provider: 'gmail' },
+    } }).catch(() => console.warn('[email] Gmail sent, but delivery log could not be saved.'));
+    return { status: 'sent', provider: 'gmail', messageId: sent.messageId };
+  }
   let rawFrom = process.env.EMAIL_FROM?.trim() || defaultFrom;
   const fromName = process.env.EMAIL_FROM_NAME?.trim();
   if (fromName && !rawFrom.includes('<') && !rawFrom.includes('>')) {
@@ -285,9 +301,7 @@ async function sendEmail(input: {
       if (emailSettings && emailSettings.status === 'VERIFIED') {
         tenantSenderVerified = true;
         from = `${emailSettings.senderName} <${emailSettings.fromEmail}>`;
-        if (emailSettings.replyTo) {
-          replyTo = emailSettings.replyTo;
-        }
+        replyTo = emailSettings.replyTo || (input.organizationId === 'org_seepoint_default' ? replyTo : emailSettings.fromEmail);
         if (emailSettings.encryptedSendingApiKey) {
           try {
             resendApiKey = decryptTenantCredential(emailSettings.encryptedSendingApiKey);
@@ -306,17 +320,16 @@ async function sendEmail(input: {
   }
 
   if (from.length > 320 || /[\r\n]/.test(from)) throw new Error('Adresa odesílatele není platná.');
-  const bccList = Array.isArray(input.bcc)
-    ? input.bcc.filter(Boolean)
-    : input.bcc
-    ? [input.bcc]
-    : [process.env.EMAIL_BCC || 'info@seepoint.cz'].filter(Boolean);
+  const bccList = emailBccRecipients(input, process.env.EMAIL_BCC);
   validateEmailInput({ to: input.to, bcc: bccList, subject: input.subject, html: input.html, idempotencyKey: input.idempotencyKey });
 
   const skippedProvider = skippedEmailProvider();
   if (skippedProvider) {
     console.info(`[email] Delivery skipped in ${skippedProvider} environment`, { template: input.webhookBody.template });
     return { status: 'skipped', provider: skippedProvider };
+  }
+  if (input.organizationId && input.organizationId !== 'org_seepoint_default' && (!tenantSenderVerified || !resendApiKey)) {
+    throw new Error('Nejprve nastavte a ověřte odesílatele e-mailů vaší organizace.');
   }
   ensureEmailConfigured();
 

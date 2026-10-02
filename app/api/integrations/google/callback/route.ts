@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       redirectUri: googleOAuthRedirectUri(request),
     });
     const grantedScopes = token.scope?.split(' ').filter(Boolean) ?? [];
-    assertGoogleTokenScopes(state.provider, grantedScopes);
+    assertGoogleTokenScopes(state.provider, grantedScopes, state.gmailSend === true);
     const account = await googleAccount(token.access_token!);
     await runWithTenantContext(
       { organizationId: state.organizationId, userId: state.userId, source: 'session' },
@@ -62,6 +62,7 @@ export async function GET(request: Request) {
         accountEmail: account.email,
         refreshToken: token.refresh_token,
         scopes: grantedScopes,
+        gmailSend: state.gmailSend === true,
         expiresIn: token.expires_in,
       }),
     );

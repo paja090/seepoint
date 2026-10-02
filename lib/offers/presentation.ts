@@ -1,3 +1,4 @@
+import { hasSeePointPortfolio } from './branding';
 import type { OfferView } from './view-model';
 
 export type ProposalMediaTypeKey =
@@ -124,6 +125,7 @@ function formatDistance(meters: number): string {
 }
 
 export function toProposalOffer(offer: OfferView): ProposalOffer {
+  const portfolioImage = (path: string) => hasSeePointPortfolio(offer.branding) ? path : '/placeholder.svg';
   const fromValues = offer.items.map((item) => item.dateFrom).filter(Boolean) as string[];
   const toValues = offer.items.map((item) => item.dateTo).filter(Boolean) as string[];
   const from = fromValues.sort()[0] ?? null;
@@ -148,7 +150,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       description: item.clientDescription || carrier.description || item.surface.name,
       dimensions: item.surface.size || item.surface.orientation || 'dle specifikace plochy',
       status: item.surface.status || 'AVAILABLE',
-      image: photos[0]?.url || meta.image,
+      image: photos[0]?.url || portfolioImage(meta.image),
       imageAlt: photos[0]?.note || `${label} ${carrier.code}`,
       latitude: carrier.latitude,
       longitude: carrier.longitude,
@@ -168,8 +170,8 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         distStr = `🚗 ${formatDistance(roadM)} po silnici`;
       }
 
-      const carrierPhotos = (point as { carrier?: { photos?: Array<{ url: string; isClientVisible?: boolean }> } }).carrier?.photos?.filter((p) => p.isClientVisible !== false) || [];
-      const photoUrl = carrierPhotos[0]?.url || MEDIA_TYPE_META.NAVIGATION_SIGN.image;
+      const carrierPhotos = (point as { carrier?: { photos?: Array<{ url: string; isClientVisible?: boolean }> } }).carrier?.photos?.filter((p) => p.isClientVisible === true) || [];
+      const photoUrl = carrierPhotos[0]?.url || portfolioImage(MEDIA_TYPE_META.NAVIGATION_SIGN.image);
 
       carriers.push({
         id: point.id,
@@ -217,7 +219,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       key,
       name: label,
       description: `Vybrané plochy typu ${label} v lokalitách ${[...new Set(items.map((item) => item.surface.carrier.city))].join(', ')}.`,
-      image: items.flatMap((item) => item.surface.photos).find((photo) => photo.isClientVisible === true)?.url || meta.image,
+      image: items.flatMap((item) => item.surface.photos).find((photo) => photo.isClientVisible === true)?.url || portfolioImage(meta.image),
       imageAlt: `${label} v nabídce`,
       tone: meta.tone,
       surfaceCount: items.length,
@@ -231,7 +233,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       key: 'NAVIGATION_SIGN',
       name: 'Navigační trasa',
       description: `Vytipovaný plán navigačních bodů a směrovek k cíli ${offer.navigation.targetName}.`,
-      image: MEDIA_TYPE_META.NAVIGATION_SIGN.image,
+      image: portfolioImage(MEDIA_TYPE_META.NAVIGATION_SIGN.image),
       imageAlt: 'Plánované navigační body',
       tone: 'orange',
       surfaceCount: offer.navigation.points.length,
@@ -243,10 +245,10 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   if (offer.offerType === 'CITY_GALLERY') {
     mediaMix.push({
       key: 'OTHER',
-      name: 'Galerie venku',
+      name: 'Výstavní projekt',
       description: offer.cityGallery?.concept || 'Koncept venkovní galerie připravený podle zadání klienta.',
-      image: MEDIA_TYPE_META.OTHER.image,
-      imageAlt: 'Koncept Galerie venku',
+      image: portfolioImage(MEDIA_TYPE_META.OTHER.image),
+      imageAlt: 'Koncept výstavního projektu',
       tone: 'purple',
       surfaceCount: 1,
       locationCount: offer.cityGallery?.locationBrief ? 1 : 0,
@@ -261,15 +263,15 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     status: (['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'].includes(offer.status) ? offer.status : 'DRAFT') as ProposalStatus,
     title: offer.campaignName || offer.title,
     subtitle: offer.title,
-    intro: offer.clientMessage || offer.campaignGoal || 'Návrh navigační a reklamní kampaně vytipovaný pro vaši provozovnu.',
+    intro: offer.clientMessage || offer.campaignGoal || (offer.offerType === 'CITY_GALLERY' ? 'Návrh výstavního projektu podle zadání klienta.' : 'Návrh reklamní kampaně podle zadání klienta.'),
     campaignFrom: asDate(from),
     campaignTo: asDate(to),
     campaignDays,
     validUntil: asDate(offer.validUntil),
     cities,
     client: { id: offer.clientId ?? 'client', name: offer.client.name, logoLabel: offer.client.name.slice(0, 2).toUpperCase(), logoUrl: offer.client.logoUrl, contactPerson: offer.contactPerson || offer.client.contactPerson || '', email: offer.contactEmail || offer.client.email || '' },
-    salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt SeePOINT', phone: '', email: offer.createdBy.email || '', avatar: undefined },
-    heroImage: offer.offerType === 'NAVIGATION' ? '/offer/media-navigation.png' : offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png',
+    salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt', phone: '', email: offer.createdBy.email || '', avatar: undefined },
+    heroImage: carriers[0]?.image || portfolioImage(offer.offerType === 'NAVIGATION' ? '/offer/media-navigation.png' : offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png'),
     heroImageAlt: `Navigační kampaň pro ${offer.campaignName || offer.title}`,
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible === true).length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
@@ -372,7 +374,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
 
       const pricingRows: Array<{ label: string; amount: number; emphasis?: 'discount' | 'subtotal' | 'total'; note?: string }> = [
         {
-          label: offer.offerType === 'CITY_GALLERY' ? 'Projekt Galerie venku' : 'Pronájem reklamních ploch',
+          label: offer.offerType === 'CITY_GALLERY' ? 'Výstavní projekt' : 'Pronájem reklamních ploch',
           amount: offer.offerType === 'CITY_GALLERY' ? number(offer.subtotal) : rentalTotal,
           note: offer.offerType === 'CITY_GALLERY' ? offer.cityGallery?.locationBrief || 'Individuální realizace' : `${offer.items.length} vybraných ploch`,
         },
@@ -420,19 +422,19 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
 
       return pricingRows;
     })(),
-    benefits: [
+    benefits: hasSeePointPortfolio(offer.branding) ? [
       { id: 'reach', icon: 'reach', title: 'Vytipované trasy', description: 'Trasa a navigační body jsou přesně naplánovány pro nejlepší viditelnost k vaší prodejně.' },
       { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Navigační cedule trvale navádějí řidiče i chodce po celou dobu kampaně.' },
       { id: 'locations', icon: 'pin', title: 'Vzdálenost k prodejně', description: 'U každého bodu uvádíme přesnou vzdálenost a orientaci směru k cíli.' },
       { id: 'traffic', icon: 'traffic', title: 'Hustá doprava', description: 'Umístění na frekventovaných křižovatkách a kruhových objezdech.' },
       { id: 'brand', icon: 'brand', title: 'Posílení značky', description: 'Jasná identifikace provozovny zvyšuje návštěvnost prodejny.' },
       { id: 'documentation', icon: 'camera', title: 'Kvartální fotodokumentace', description: 'Pravidelné dokládání stavu a fotografie všech zřízených nosičů.' },
-    ],
-    references: [
+    ] : [],
+    references: hasSeePointPortfolio(offer.branding) ? [
       { id: 'ref-1', company: 'Globus ČR', logoLabel: 'GLOBUS', testimonial: 'Dlouhodobá spolupráce na navigační reklamě a promo plochách u našich hypermarketů funguje perfektně.', cooperation: 'Dlouhodobá navigační kampaň', campaigns: 14 },
       { id: 'ref-2', company: 'Kaufland Česká republika', logoLabel: 'KAUFLAND', testimonial: 'Rychlá realizace navigačních tabulí a perfektní fotodokumentace každého kvartálu.', cooperation: 'Navigační cedule a CLV', campaigns: 22 },
       { id: 'ref-3', company: 'Decathlon CZ', logoLabel: 'DECATHLON', testimonial: 'Přehledná nabídka s přesnou mapou trasy k prodejně nám pomohla navést zákazníky přímo z křižovatek.', cooperation: 'Navádění k prodejnám', campaigns: 8 },
-    ],
+    ] : [],
     caseStudies: [],
     conditions: [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },

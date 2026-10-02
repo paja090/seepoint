@@ -24,7 +24,6 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   // membership count before allowing an organizational admin to replace one.
   ['app/api/employees/[id]/account/route.ts', 2],
   ['app/api/network/inventory/route.ts', 2],
-  ['app/api/network/partners/route.ts', 2],
   ['app/api/organization/invitations/[id]/route.ts', 6],
   ['app/api/organization/invitations/route.ts', 6],
   ['app/api/onboarding/route.ts', 7],
@@ -38,7 +37,7 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/client/navigation-documentation/[token]/page.tsx', 2],
   ['lib/auth.ts', 7],
   ['lib/db.ts', 6],
-  ['lib/offers/service.ts', 8],
+  ['lib/offers/service.ts', 4],
   ['lib/organization-usage.ts', 3],
   ['lib/public-tenant.ts', 8],
   ['lib/tenant-request-context.ts', 2],

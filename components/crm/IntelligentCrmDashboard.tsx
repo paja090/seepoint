@@ -117,7 +117,7 @@ export function IntelligentCrmDashboard({
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-bold text-indigo-300 border border-indigo-500/30">
               <Sparkles size={14} className="text-emerald-400" />
-              <span>Chytrý Obchodní Asistent SeePOINT</span>
+              <span>Chytrý Obchodní Asistent</span>
             </div>
             <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
               CRM Dashboard & Komerční Potenciál

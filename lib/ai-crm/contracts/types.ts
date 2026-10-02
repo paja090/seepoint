@@ -24,7 +24,7 @@ export type CrmInsightType =
 
 export type CrmInsightPriority = 'CRITICAL' | 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
 
-export type ClientRelationshipHealth = 'HEALTHY' | 'ATTENTION' | 'AT_RISK' | 'INACTIVE';
+export type ClientRelationshipHealth = 'UNKNOWN' | 'HEALTHY' | 'ATTENTION' | 'AT_RISK' | 'INACTIVE';
 
 export type CrmActionType =
   | 'FOLLOW_UP_CLIENT'
@@ -91,7 +91,7 @@ export interface CrmAttentionItem {
 
 export interface ClientRelationshipSummary {
   status: ClientRelationshipHealth;
-  healthScore: number; // 0-100
+  healthScore: number | null; // 0-100, null when no relationship history exists
   reasons: string[];
   lastContactDate?: Date | null;
   daysSinceLastContact?: number | null;

@@ -43,7 +43,8 @@ export type AppSection =
   | 'aiInbox'
   | 'aiOccupancy'
   | 'realization'
-  | 'commercial';
+  | 'commercial'
+  | 'fieldSurvey';
 
 const permissions: Record<AppRole, AppSection[]> = {
   ADMIN: [
@@ -77,6 +78,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'aiOccupancy',
     'realization',
     'commercial',
+    'fieldSurvey',
   ],
   MANAGER: [
     'dashboard',
@@ -107,6 +109,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'aiOccupancy',
     'realization',
     'commercial',
+    'fieldSurvey',
   ],
   SALES: [
     'dashboard',
@@ -132,6 +135,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'aiOccupancy',
     'realization',
     'commercial',
+    'fieldSurvey',
   ],
   TECHNICIAN: [
     'dashboard',
@@ -149,6 +153,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'team',
     'printProduction',
     'realization',
+    'fieldSurvey',
   ],
   WORKER: [
     'dashboard',
@@ -161,6 +166,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'navigationProjects',
     'team',
     'realization',
+    'fieldSurvey',
   ],
   ACCOUNTANT: [
     'dashboard',

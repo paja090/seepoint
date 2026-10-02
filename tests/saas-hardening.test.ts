@@ -77,10 +77,24 @@ test('permanent credentials survive workflow, encryption-key rotation and legacy
     const migrated = preparePortalCredential({ id: 'legacy', publicTokenHash: hashPublicOfferToken(legacy) });
     assert.equal(migrated.token, legacy);
     assert.equal(migrated.hash, hashPublicOfferToken(legacy));
-    assert.throws(() => preparePortalCredential({ id: 'unrecoverable', publicTokenHash: first.hash }));
+    assert.throws(() => preparePortalCredential({ id: 'any-unrecoverable-offer', publicTokenHash: first.hash }));
   } finally {
     if (saved.keys === undefined) delete process.env.OFFER_PORTAL_KEYS; else process.env.OFFER_PORTAL_KEYS = saved.keys;
     if (saved.active === undefined) delete process.env.OFFER_PORTAL_ACTIVE_KEY; else process.env.OFFER_PORTAL_ACTIVE_KEY = saved.active;
+  }
+});
+
+test('new portal credentials remain random without an explicit active encryption key', () => {
+  const active = process.env.OFFER_PORTAL_ACTIVE_KEY;
+  try {
+    delete process.env.OFFER_PORTAL_ACTIVE_KEY;
+    const first = preparePortalCredential({ id: 'same-offer', publicTokenHash: null });
+    const second = preparePortalCredential({ id: 'same-offer', publicTokenHash: null });
+    assert.notEqual(first.token, second.token);
+    assert.equal(recoverPortalToken({ id: 'same-offer', publicTokenHash: first.hash, publicTokenEncrypted: first.encrypted }), first.token);
+  } finally {
+    if (active === undefined) delete process.env.OFFER_PORTAL_ACTIVE_KEY;
+    else process.env.OFFER_PORTAL_ACTIVE_KEY = active;
   }
 });
 test('production runtime validation and transitions reject unsafe input', () => {

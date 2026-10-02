@@ -56,7 +56,7 @@ export default async function ClientProfilePage({
   const tabs = [
     { id: 'overview', icon: '📊', name: 'Přehled' },
     { id: 'contacts', icon: '👥', name: 'Kontakty', count: client.contacts?.length || 0 },
-    { id: 'branches', icon: '🏬', name: 'Pobočky MS Kraj', count: client.branches?.length || 0 },
+    { id: 'branches', icon: '🏬', name: 'Pobočky', count: client.branches?.length || 0 },
     { id: 'offers', icon: '📄', name: 'Nabídky', count: client.offers?.length || 0 },
     { id: 'orders', icon: '🛒', name: 'Zakázky', count: client.crmOrders?.length || 0 },
     { id: 'realizations', icon: '🛠️', name: 'Realizace' },

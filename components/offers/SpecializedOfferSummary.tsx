@@ -14,7 +14,7 @@ export function SpecializedOfferSummary({ offer, proposalKey }: { offer: OfferVi
             <GalleryHorizontalEnd size={21} />
           </span>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.16em] text-fuchsia-700">Galerie venku</p>
+            <p className="text-xs font-semibold uppercase tracking-[.16em] text-fuchsia-700">Výstavní projekt</p>
             <h2 className="text-xl font-semibold">{offer.cityGallery?.projectTitle || offer.campaignName}</h2>
           </div>
         </div>

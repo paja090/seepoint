@@ -37,11 +37,6 @@ export type OfferTemplate = {
     styleTitle: string;
     layoutType: 'MAP_PHOTO_SPLIT' | 'PHOTO_HERO' | 'ROUTE_MAP' | 'GRID_CATALOG';
   };
-  samplePricing: {
-    fromCzk: number;
-    billingPeriod: string;
-    includes: string[];
-  };
   createOfferUrl: string;
 };
 
@@ -51,7 +46,7 @@ export const OFFER_TEMPLATES: OfferTemplate[] = [
     category: 'STANDARD',
     title: 'Billboardová síť (Kampaň na tazích)',
     subtitle: 'Standardní euroformáty 5,1 × 2,4 m u hlavních komunikací a křižovatek',
-    badge: 'Nejpopulárnější',
+    badge: 'Vzorový koncept',
     description: 'Osvědčený koncept pro masové zasažení řidičů a cestujících. Kombinace frekventovaných příjezdových tahů a městských okruhů.',
     targetAudience: 'Řidiči, dojíždějící, retailoví zákazníci, masový trh',
     typicalDuration: '1 – 3 měsíce',
@@ -70,11 +65,6 @@ export const OFFER_TEMPLATES: OfferTemplate[] = [
       heroImage: '/offer/hero-campaign.png',
       styleTitle: 'Interaktivní mapa + Detailní karty s fotkami z terénu',
       layoutType: 'MAP_PHOTO_SPLIT',
-    },
-    samplePricing: {
-      fromCzk: 7900,
-      billingPeriod: 'měsíc / plocha',
-      includes: ['Nájem reklamního prostoru', 'Garance viditelnosti', 'Základní fotodokumentace výlepu'],
     },
     createOfferUrl: '/offers/new/standard?type=BILLBOARD',
   },
@@ -103,11 +93,6 @@ export const OFFER_TEMPLATES: OfferTemplate[] = [
       styleTitle: 'Katalogový list s fotkami laviček a pěší mapou',
       layoutType: 'GRID_CATALOG',
     },
-    samplePricing: {
-      fromCzk: 2900,
-      billingPeriod: 'měsíc / lavička',
-      includes: ['Dlouhodobý pronájem', 'Pravidelná kontrola a údržba', 'Výroba a montáž desky'],
-    },
     createOfferUrl: '/offers/new/standard?type=PROMO_BENCH',
   },
   {
@@ -133,11 +118,6 @@ export const OFFER_TEMPLATES: OfferTemplate[] = [
       heroImage: '/offer/media-clv.png',
       styleTitle: 'Světelná prezentace s vizualizací CLV vitríny',
       layoutType: 'PHOTO_HERO',
-    },
-    samplePricing: {
-      fromCzk: 4500,
-      billingPeriod: '14 dní / vitrína',
-      includes: ['Podsvícená vitrína', 'Tisk na prosvětlovací CLV papír', 'Instalace'],
     },
     createOfferUrl: '/offers/new/standard?type=CITYLIGHT',
   },
@@ -166,11 +146,6 @@ export const OFFER_TEMPLATES: OfferTemplate[] = [
       styleTitle: 'Exkluzivní Portfolio s dominantní fotkou plochy',
       layoutType: 'PHOTO_HERO',
     },
-    samplePricing: {
-      fromCzk: 18000,
-      billingPeriod: 'měsíc / plocha',
-      includes: ['Exkluzivita na prémiovém štítě budovy', 'Noční osvětlení', 'Statické posouzení a revize'],
-    },
     createOfferUrl: '/offers/new/standard?type=FACADE',
   },
   {
@@ -190,17 +165,12 @@ export const OFFER_TEMPLATES: OfferTemplate[] = [
     features: [
       'Přehledná mapa trasy s vyznačenými směrovými šipkami (rovně / doprava)',
       'Vzdálenost po silnici v metrech / kilometrech k cíli',
-      'Povolení od města, správy komunikací a Policie ČR v ceně',
+      'Podmínky povolení a jejich cenu je nutné ověřit pro konkrétní místo',
     ],
     visualPreview: {
       heroImage: '/offer/media-navigation.png',
       styleTitle: 'Interaktivní trasa s šipkami a fotkami sloupů VO',
       layoutType: 'ROUTE_MAP',
-    },
-    samplePricing: {
-      fromCzk: 1200,
-      billingPeriod: 'měsíc / tabule (roční smlouva)',
-      includes: ['Pronájem sloupu VO', 'Kompletní legislativa a povolení', 'Výroba oboustranné směrovky'],
     },
     createOfferUrl: '/offers/new/navigation',
   },
@@ -373,17 +343,9 @@ export function OfferTemplatesCatalogView({
                   ))}
                 </div>
 
-                {/* Pricing Hint */}
-                <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs">
-                  <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">
-                    Orientační sazba:
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <strong className="text-base font-black text-slate-900">
-                      od {template.samplePricing.fromCzk.toLocaleString('cs-CZ')} Kč
-                    </strong>
-                    <span className="text-[11px] text-slate-500">/ {template.samplePricing.billingPeriod}</span>
-                  </div>
+                {/* Pricing is determined by the organization's own catalog. */}
+                <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs text-slate-600">
+                  Cenu a zahrnuté služby doplňte podle vlastního firemního ceníku a konkrétního zadání.
                 </div>
               </div>
 

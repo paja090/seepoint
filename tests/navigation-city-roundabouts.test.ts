@@ -31,7 +31,7 @@ test('1. parseNavigationOfferInput recognizes roundabout exit directions', () =>
   assert.equal(parsed.points[5].arrowDirectionEnum, 'ROUNDABOUT');
 });
 
-test('2. parseNavigationOfferInput recognizes Havířov city and fallback detection', () => {
+test('2. parseNavigationOfferInput preserves explicit cities without guessing missing city', () => {
   const inputWithCity = {
     clientId: 'test-client',
     title: 'Navigace Havířov',
@@ -47,7 +47,7 @@ test('2. parseNavigationOfferInput recognizes Havířov city and fallback detect
   const parsed1 = parseNavigationOfferInput(inputWithCity);
   assert.equal(parsed1.city, 'Havířov');
 
-  // Detection from targetAddress when city is not explicitly passed
+  // An address alone must not silently select a municipal specification.
   const inputWithAddress = {
     clientId: 'test-client',
     title: 'Navigace',
@@ -60,5 +60,11 @@ test('2. parseNavigationOfferInput recognizes Havířov city and fallback detect
     ],
   };
   const parsed2 = parseNavigationOfferInput(inputWithAddress);
-  assert.equal(parsed2.city, 'Havířov');
+  assert.equal(parsed2.city, '');
+  const other = parseNavigationOfferInput({ ...inputWithAddress, city: 'Golčův Jeníkov', presentationSettings: { cityConfirmed: true } });
+  assert.equal(other.city, 'Golčův Jeníkov');
+  assert.equal(other.presentationSettings?.cityConfirmed, true);
+  const empty = parseNavigationOfferInput({ ...inputWithAddress, targetAddress: '', presentationSettings: { cityConfirmed: true } });
+  assert.equal(empty.city, '');
+  assert.equal(empty.presentationSettings?.cityConfirmed, false);
 });

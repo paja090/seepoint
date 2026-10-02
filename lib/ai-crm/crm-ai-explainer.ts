@@ -141,7 +141,7 @@ function buildExplanationPrompt(data: Client360Data): string {
 
 FAKTA Z DATABÁZE:
 - Klient: ${data.identity.name} (${data.identity.clientType}, segment: ${data.identity.pricingSegment})
-- Stav vztahu: ${data.intelligence.relationship.status} (skóre: ${data.intelligence.relationship.healthScore}/100)
+- Stav vztahu: ${data.intelligence.relationship.status} (skóre: ${data.intelligence.relationship.healthScore == null ? 'nehodnoceno' : `${data.intelligence.relationship.healthScore}/100`})
 - Otevřené nabídky: ${data.business.activeOffersCount} (hodnota: ${data.business.activeOffersValueCz} Kč)
 - Aktivní kampaně: ${data.campaigns.activeCampaigns.length} (blízko konce: ${data.campaigns.expiringIn30DaysCount})
 - Blokované realizace: ${data.realization.blockedCount}

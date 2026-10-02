@@ -8,3 +8,7 @@ reports
 scratch
 tmp
 *.tsbuildinfo
+.env*
+seepoint-drive-integration-*.json
+test-results
+playwright-report

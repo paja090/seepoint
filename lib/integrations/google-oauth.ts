@@ -2,7 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { IntegrationProvider } from '@prisma/client';
 import { getAppUrl } from '@/lib/app-url';
 import { prisma } from '@/lib/db';
-import { requireTenantContext } from '@/lib/tenant-context';
+import { getTenantContext, requireTenantContext } from '@/lib/tenant-context';
+import { resolveRequestTenantContext } from '@/lib/tenant-request-context';
 import { decryptIntegrationSecret, encryptIntegrationSecret } from './integration-crypto';
 
 export const GOOGLE_OAUTH_STATE_COOKIE = 'seepoint_google_oauth_state';
@@ -11,8 +12,11 @@ export const GOOGLE_OAUTH_VERIFIER_COOKIE = 'seepoint_google_oauth_verifier';
 type GoogleCredentials = { refreshToken: string };
 
 export async function connectedGoogleAccessToken(provider: IntegrationProvider, connectionId?: string) {
+  const context = getTenantContext() ?? await resolveRequestTenantContext();
+  if (!context) throw new Error('Pro přístup k připojení je vyžadována organizace.');
+  const { organizationId } = context;
   const connection = await prisma.integrationConnection.findFirst({
-    where: connectionId ? { id: connectionId } : { provider },
+    where: { organizationId, provider, ...(connectionId ? { id: connectionId } : {}) },
     select: { id: true, status: true, credentialsEncrypted: true, provider: true },
   });
   if (!connection || connection.status === 'REVOKED') return null;
@@ -116,12 +120,12 @@ export function googleOAuthRedirectUri(request: Request) {
   return new URL('/api/integrations/google/callback', `${origin}/`).toString();
 }
 
-export function googleScopes(provider: IntegrationProvider) {
+export function googleScopes(provider: IntegrationProvider, gmailSend = false) {
   if (provider === 'GOOGLE_DRIVE') {
     return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file'];
   }
   if (provider === 'GMAIL') {
-    return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly'];
+    return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly', ...(gmailSend ? ['https://www.googleapis.com/auth/gmail.send'] : [])];
   }
   throw new Error('Tato Google integrace zatím není podporovaná.');
 }
@@ -134,7 +138,7 @@ export function pkceChallenge(verifier: string) {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
-export function googleAuthorizationUrl(input: { clientId: string; redirectUri: string; state: string; verifier: string; provider: IntegrationProvider }) {
+export function googleAuthorizationUrl(input: { clientId: string; redirectUri: string; state: string; verifier: string; provider: IntegrationProvider; gmailSend?: boolean }) {
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.search = new URLSearchParams({
     client_id: input.clientId,
@@ -142,7 +146,7 @@ export function googleAuthorizationUrl(input: { clientId: string; redirectUri: s
     response_type: 'code',
     access_type: 'offline',
     prompt: 'consent',
-    scope: googleScopes(input.provider).join(' '),
+    scope: googleScopes(input.provider, input.gmailSend).join(' '),
     state: input.state,
     code_challenge: pkceChallenge(input.verifier),
     code_challenge_method: 'S256',
@@ -180,7 +184,7 @@ export async function googleAccount(accessToken: string) {
   return { id: data.sub, email: data.email };
 }
 
-export async function saveGoogleConnection(input: { provider: IntegrationProvider; accountId: string; accountEmail: string; refreshToken?: string; scopes: string[]; expiresIn?: number }) {
+export async function saveGoogleConnection(input: { provider: IntegrationProvider; accountId: string; accountEmail: string; refreshToken?: string; scopes: string[]; expiresIn?: number; gmailSend?: boolean }) {
   const { organizationId } = requireTenantContext();
   const config = googleOAuthConfiguration();
   const existing = input.provider === 'GMAIL'
@@ -198,6 +202,10 @@ export async function saveGoogleConnection(input: { provider: IntegrationProvide
     accountEmail: input.accountEmail,
     credentialsEncrypted: encryptIntegrationSecret({ refreshToken }, config.encryptionKey),
     scopes: input.scopes,
+    ...(input.provider === 'GMAIL' ? { settings: {
+      ...(existing?.settings && typeof existing.settings === 'object' && !Array.isArray(existing.settings) ? existing.settings : {}),
+      sendingEnabled: input.gmailSend === true && input.scopes.includes('https://www.googleapis.com/auth/gmail.send'),
+    } } : {}),
     connectedAt: new Date(),
     expiresAt: input.expiresIn ? new Date(Date.now() + input.expiresIn * 1000) : null,
     lastCheckedAt: new Date(),

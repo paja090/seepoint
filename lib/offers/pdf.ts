@@ -175,6 +175,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
 
   // Pre-fetch photos for navigation points
   const isNavigation = offer.offerType === 'NAVIGATION' && navigationData;
+  const isExhibition = offer.offerType === 'CITY_GALLERY';
   const resolvedPointPhotos: Array<{
     pointIndex: number;
     point: NonNullable<typeof navigationData>['points'][number];
@@ -298,7 +299,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
   ]);
 
   const nextSteps = [
-    ['1', 'Schválení nabídky', 'Klient potvrdí nabídku a plochy se převedou do závazné rezervace.'],
+    ['1', 'Schválení nabídky', isExhibition ? 'Rozsah, cenu a termín realizace je nutné potvrdit s dodavatelem.' : 'Klient potvrdí nabídku a plochy se převedou do závazné rezervace.'],
     ['2', 'Podklady a grafika', 'Klient nahraje podklady; tým zkontroluje formáty a připraví výrobu.'],
     ['3', 'Realizace kampaně', 'Vznikne plán práce s úkoly pro tisk, instalaci a následnou deinstalaci.'],
     ['4', 'Fotodokumentace a faktura', 'Po realizaci klient obdrží fotografie kampaně a fakturu.'],
@@ -315,16 +316,16 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
     ? { image: clientLogoDataUrl, fit: [110, 48], alignment: 'right', margin: [0, 2, 0, 0] }
     : { text: offer.client.logoLabel || offer.client.name, fontSize: 18, bold: true, color: BLUE, alignment: 'right', margin: [0, 6, 0, 0] };
 
-  const orgName = offer.rawOffer?.branding?.name || 'SeePOINT';
+  const orgName = offer.rawOffer?.branding?.name || 'Dodavatel nabídky';
 
   const definition = {
-    info: { title: offer.title, author: orgName, subject: 'Nabídka venkovní reklamní kampaně' },
+    info: { title: offer.title, author: orgName, subject: isExhibition ? 'Nabídka výstavního projektu' : 'Nabídka venkovní reklamní kampaně' },
     pageSize: 'A4',
     pageMargins: [38, 48, 38, 48],
     defaultStyle: { font: 'Roboto', fontSize: 9, color: NAVY, lineHeight: 1.15 },
     header: () => ({
       columns: [
-        { text: `${orgName}  •  OUTDOOR & NAVIGAČNÍ REKLAMA`, bold: true, color: BLUE, fontSize: 10 },
+        { text: `${orgName}  •  ${isExhibition ? 'VÝSTAVNÍ PROJEKT' : 'OUTDOOR & NAVIGAČNÍ REKLAMA'}`, bold: true, color: BLUE, fontSize: 10 },
         { text: `NABÍDKA  •  ${offer.id}`, alignment: 'right', color: MUTED, fontSize: 8 },
       ],
       margin: [38, 20, 38, 0],
@@ -342,7 +343,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
           widths: ['*', 118],
           body: [[
             { stack: [
-              { text: isNavigation ? 'NAVIGAČNÍ REKLAMNÍ KAMPAŇ' : 'NABÍDKA REKLAMNÍ KAMPANĚ', color: BLUE, bold: true, fontSize: 9 },
+              { text: isNavigation ? 'NAVIGAČNÍ REKLAMNÍ KAMPAŇ' : isExhibition ? 'NABÍDKA VÝSTAVNÍHO PROJEKTU' : 'NABÍDKA REKLAMNÍ KAMPANĚ', color: BLUE, bold: true, fontSize: 9 },
               { text: offer.title, fontSize: 25, bold: true, color: NAVY, margin: [0, 8, 0, 4] },
               { text: offer.subtitle, fontSize: 11, color: MUTED },
             ], margin: [16, 16, 8, 16] },
@@ -356,7 +357,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       {
         columns: [
           { stack: [{ text: 'KAMPAŇ', style: 'eyebrow' }, { text: `${offer.campaignFrom} – ${offer.campaignTo}`, bold: true }, { text: `${offer.campaignDays} dní`, color: MUTED, fontSize: 8 }] },
-          { stack: [{ text: 'ROZSAH', style: 'eyebrow' }, { text: `${offer.stats.carriers} ${isNavigation ? 'bodů' : 'ploch'}`, bold: true }, { text: `${offer.stats.locations} lokalit`, color: MUTED, fontSize: 8 }] },
+          { stack: [{ text: 'ROZSAH', style: 'eyebrow' }, { text: isExhibition ? 'Výstavní projekt' : `${offer.stats.carriers} ${isNavigation ? 'bodů' : 'ploch'}`, bold: true }, { text: `${offer.stats.locations} lokalit`, color: MUTED, fontSize: 8 }] },
           { stack: [{ text: 'PLATNOST', style: 'eyebrow' }, { text: offer.validUntil, bold: true }, { text: 'do tohoto data', color: MUTED, fontSize: 8 }] },
         ],
         columnGap: 10,
@@ -369,6 +370,14 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         ...(staticMapDataUrl && staticMapDataUrl.startsWith('data:image/') ? [{ image: staticMapDataUrl, width: 518, margin: [0, 4, 0, 16] }] : []),
       ] : []),
 
+      ...(isExhibition ? [
+        { text: 'Koncept výstavního projektu', style: 'heading' },
+        { text: offer.rawOffer?.cityGallery?.concept || 'Bude doplněno', margin: [0, 0, 0, 14] },
+        { text: 'Lokalita a zadání prostoru', style: 'heading' },
+        { text: offer.rawOffer?.cityGallery?.locationBrief || 'Bude doplněno', margin: [0, 0, 0, 14] },
+        { text: 'Realizace', style: 'heading' },
+        { text: offer.rawOffer?.cityGallery?.realizationNote || 'Bude doplněno', margin: [0, 0, 0, 14] },
+      ] : [
       { text: isNavigation ? 'Vytipované navigační body na trase' : 'Vybrané reklamní plochy', style: 'heading' },
       {
         table: {
@@ -382,6 +391,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         layout: { fillColor: (rowIndex: number) => rowIndex === 0 ? NAVY : rowIndex % 2 === 0 ? '#F8FAFC' : null, hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0', paddingTop: () => 6, paddingBottom: () => 6 },
         margin: [0, 0, 0, 8],
       },
+      ]),
       ...(!isNavigation && offer.carriers.length > 18 ? [{ text: `Dalších ${offer.carriers.length - 18} ploch je uvedeno v interaktivní nabídce.`, fontSize: 8, color: MUTED, margin: [0, 0, 0, 12] }] : []),
 
       // Visualized photos of navigation points
@@ -473,7 +483,7 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         { image: graphicProofDataUrl, width: 240, alignment: 'center', margin: [0, 4, 0, 16] },
       ] : []),
       { text: 'Cenová kalkulace', style: 'heading', pageBreak: 'before' },
-      { text: 'Jednotlivé složky ceny jsou načtené z cenového katalogu a v nabídce přehledně oddělené.', color: MUTED, margin: [0, 0, 0, 12] },
+      { text: isExhibition ? 'Cena výstavního projektu podle zadání nabídky.' : 'Jednotlivé složky ceny jsou načtené z cenového katalogu a v nabídce přehledně oddělené.', color: MUTED, margin: [0, 0, 0, 12] },
       {
         table: { widths: ['*', 120], body: [...pricingRows, [{ text: 'CELKEM VČETNĚ DPH', bold: true, color: '#FFFFFF', fontSize: 11 }, { text: money(total), bold: true, color: '#FFFFFF', alignment: 'right', fontSize: 12 }]] },
         layout: { fillColor: (rowIndex: number, node: { table: { body: unknown[] } }) => rowIndex === node.table.body.length - 1 ? BLUE : rowIndex % 2 === 0 ? '#F8FAFC' : null, hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0', paddingTop: () => 8, paddingBottom: () => 8 },
@@ -579,7 +589,7 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
     ];
   }) : [];
 
-  const orgName = offer.rawOffer?.branding?.name || 'SeePOINT';
+  const orgName = offer.rawOffer?.branding?.name || 'Dodavatel nabídky';
 
   const definition = {
     info: { title: `Montážní list – ${offer.title}`, author: orgName, subject: 'Protokol instalace navigačních cedulí' },

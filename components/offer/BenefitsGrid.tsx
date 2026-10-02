@@ -12,11 +12,12 @@ const iconMap: Record<ProposalBenefit['icon'], typeof Users> = {
 };
 
 export function BenefitsGrid({ offer }: { offer: ProposalOffer }) {
+  if (offer.benefits.length === 0) return null;
   return (
     <section aria-labelledby="benefits-heading">
       <SectionHeading
         id="benefits-heading"
-        eyebrow="Proč SeePOINT"
+        eyebrow="Přínosy nabídky"
         title="Co vám kampaň přinese"
         description="Silné stránky venkovní reklamy, na kterých je návrh postaven."
       />

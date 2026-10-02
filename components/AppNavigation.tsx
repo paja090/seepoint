@@ -37,7 +37,7 @@ function QuickAccess({ items, activeHref }: { items: NavItem[]; activeHref?: str
 export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen, onOpen, onClose, user, logout, children, utilityAccess }: {
   hubs: NavigationHub[]; pathname: string; collapsed: boolean; onToggle: () => void;
   mobileOpen: boolean; onOpen: () => void; onClose: () => void;
-  user: { name: string; avatarUrl?: string | null }; logout: () => Promise<void>;
+  user: { name: string; organizationName: string; avatarUrl?: string | null }; logout: () => Promise<void>;
   children: React.ReactNode; utilityAccess: { photos: boolean; team: boolean };
 }) {
   const active = findActiveNavigation(hubs, pathname);
@@ -86,7 +86,7 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
   };
   return <>
     <nav aria-label="Hlavní huby" className="fixed inset-y-0 left-0 z-50 hidden w-[60px] flex-col items-center gap-2 border-r border-slate-800 bg-slate-950 py-3 lg:flex">
-      <Link href="/profile" aria-label="SeePoint – můj profil" title="SeePoint OS" className={`mb-5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-400 text-sm font-black text-slate-950 ${focusClass}`}>SP</Link>
+      <Link href="/profile" aria-label={`${user.organizationName} – můj profil`} title={user.organizationName} className={`mb-5 grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-400 text-sm font-black text-slate-950 ${focusClass}`}>{user.organizationName.slice(0, 2).toUpperCase()}</Link>
       {hubs.filter(h => h.id !== 'management').map(railButton)}
       <button type="button" onClick={onToggle} aria-label={collapsed ? 'Rozbalit navigaci' : 'Sbalit navigaci'} aria-expanded={!collapsed} aria-controls="context-sidebar" title={collapsed ? 'Rozbalit navigaci' : 'Sbalit navigaci'} className={`grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-slate-800 ${focusClass}`}>
         {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -101,7 +101,7 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
     </nav>
     <aside id="context-sidebar" aria-label="Kontextová navigace" className={`fixed inset-y-0 left-[60px] z-40 w-[232px] flex-col border-r border-slate-800 bg-slate-950 ${collapsed ? 'hidden' : 'hidden lg:flex'}`}>
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800 px-4">
-        <h2 className="text-sm font-semibold text-white">{hub?.label ?? 'SeePoint OS'}</h2>
+        <h2 className="text-sm font-semibold text-white">{hub?.label ?? user.organizationName}</h2>
         <button type="button" onClick={onToggle} aria-label="Sbalit navigaci" className={`rounded p-2 text-slate-400 hover:text-white ${focusClass}`}><ChevronLeft size={16} /></button>
       </div>
       <nav aria-label={hub?.label} style={scrollStyle} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
@@ -125,8 +125,8 @@ export function AppNavigation({ hubs, pathname, collapsed, onToggle, mobileOpen,
       <div className="flex h-full flex-col" onClick={event => { if ((event.target as HTMLElement).closest('a')) onClose(); }}>
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800 px-4">
           <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-400 text-xs font-black text-slate-950">SP</span>
-            <h2 id="mobile-navigation-title" className="font-semibold text-white">SeePoint OS</h2>
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-400 text-xs font-black text-slate-950">{user.organizationName.slice(0, 2).toUpperCase()}</span>
+            <h2 id="mobile-navigation-title" className="font-semibold text-white">{user.organizationName}</h2>
           </div>
           <button type="button" autoFocus onClick={onClose} aria-label="Zavřít menu" className={`grid h-11 w-11 place-items-center rounded-lg ${focusClass}`}><X size={20} /></button>
         </div>

@@ -20,6 +20,7 @@ const pageTitles: Array<[string, string]> = [
   ['/crm/intelligence', 'AI CRM Intelligence'],
   ['/map', 'Mapa nosičů'],
   ['/carriers', 'Evidence nosičů'],
+  ['/field-survey', 'Terénní průzkum ploch'],
   ['/occupancy', 'Obsazenost ploch'],
   ['/clients', 'Klienti'],
   ['/offers', 'Nabídky'],
@@ -35,9 +36,9 @@ const pageTitles: Array<[string, string]> = [
   ['/settings', 'Nastavení'],
 ];
 
-export function AppTopbar({ user, canUseTeam = true, onAiQuickTask }: { onAiQuickTask?: () => void; canUseTeam?: boolean; user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
+export function AppTopbar({ user, canUseTeam = true, onAiQuickTask }: { onAiQuickTask?: () => void; canUseTeam?: boolean; user: { name: string; email: string; role: AppRole; allowedRoles?: AppRole[]; organizationRoleLabel: string; isPlatformSuperAdmin: boolean; organizationId: string; organizationName: string; organizations: Array<{ id: string; name: string; slug: string }> } }) {
   const pathname = usePathname();
-  const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'SeePOINT';
+  const title = pageTitles.find(([href]) => pathname === href || pathname.startsWith(`${href}/`))?.[1] ?? 'Pracovní prostor';
   const initials = user.name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'SP';
   async function logout() { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; }
 
@@ -45,7 +46,7 @@ export function AppTopbar({ user, canUseTeam = true, onAiQuickTask }: { onAiQuic
     <header className="app-topbar sticky top-0 z-30 hidden lg:flex min-h-16 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-5 backdrop-blur-md shadow-2xs">
       <div className="app-topbar-title min-w-0 flex items-center gap-2">
         <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200 shrink-0">
-          SeePoint OS
+          {user.organizationName}
         </span>
         <span className="text-slate-300">/</span>
         <h1 className="truncate text-base font-bold text-slate-900 tracking-tight">{title}</h1>
@@ -81,7 +82,7 @@ export function AppTopbar({ user, canUseTeam = true, onAiQuickTask }: { onAiQuic
         {canUseTeam && <Link
           href="/team"
           className="flex items-center justify-center h-9 w-9 rounded-xl border border-slate-200 bg-white text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition shrink-0"
-          title="📞 Telefonní seznam týmu SeePOINT"
+          title={`📞 Telefonní seznam týmu ${user.organizationName}`}
         >
           <PhoneCall size={16} />
         </Link>}

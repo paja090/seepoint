@@ -184,7 +184,7 @@ export function VacationPlannerClient({ currentUser, employees, initialAbsences 
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/40">
               <Sparkles size={14} />
-              <span>SeePOINT Plánovač Volna & Dovolené</span>
+              <span>Plánovač Volna & Dovolené</span>
             </div>
             <h1 className="mt-3 text-2xl sm:text-3xl font-black text-white">
               Dovolená & Přítomnost Týmu 🌴
@@ -233,7 +233,7 @@ export function VacationPlannerClient({ currentUser, employees, initialAbsences 
         {absentToday.length === 0 ? (
           <div className="py-6 text-center text-slate-500">
             <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-1" />
-            <p className="text-sm font-bold text-slate-800">Všichni pracovníci jsou dnes v práci!</p>
+            <p className="text-sm font-bold text-slate-800">Dnes nejsou evidované žádné absence.</p>
             <p className="text-xs text-slate-400">Žádné hlášené dovolené nebo neschopenky pro dnešní den.</p>
           </div>
         ) : (

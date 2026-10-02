@@ -3,6 +3,7 @@
 import { AlertTriangle, CheckCircle2, Copy, ExternalLink, Eye, LoaderCircle, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { offerBrandName } from '@/lib/offers/branding';
 import { OfferEmailPreviewDialog, type OfferEmailPreviewData } from './OfferEmailPreviewDialog';
 
 export function OfferSendControl({ offerId, canSend, emailPreview, initialMessage, missingCount, status }: { offerId: string; canSend: boolean; emailPreview: OfferEmailPreviewData; initialMessage: string; missingCount: number; status: string }) {
@@ -10,7 +11,7 @@ export function OfferSendControl({ offerId, canSend, emailPreview, initialMessag
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [publicUrl, setPublicUrl] = useState('');
-  const [emailSubject, setEmailSubject] = useState(`Nabídka SeePOINT – ${emailPreview.campaignName}`);
+  const [emailSubject, setEmailSubject] = useState(`Nabídka ${offerBrandName(emailPreview.branding)} – ${emailPreview.campaignName}`);
   const [emailMessage, setEmailMessage] = useState(initialMessage);
   const [previewOpen, setPreviewOpen] = useState(false);
   const alreadySent = status === 'SENT';

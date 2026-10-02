@@ -48,6 +48,8 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
         isPlatformSuperAdmin: user.platformRole === 'SUPER_ADMIN',
         avatarUrl,
         organizationId: user.organizationId || '',
+        organizationName: user.organization?.name || 'Pracovní prostor',
+        organizationLogoUrl: user.organization?.logoUrl || (user.organizationId === 'org_seepoint_default' ? '/seepoint-logo.svg' : null),
         organizations: (user.memberships || []).map((membership) => ({
           id: membership.organization.id,
           name: membership.organization.name,

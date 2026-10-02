@@ -117,7 +117,7 @@ export default async function ProfilePage() {
 
               <p className="text-sm font-medium text-slate-300 flex items-center justify-center md:justify-start gap-2">
                 <Briefcase size={16} className="text-sky-400" />
-                {employee?.position || 'Člen týmu SeePOINT'}
+                {employee?.position || `Člen týmu ${user.organization?.name || 'organizace'}`}
               </p>
 
               <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs text-slate-300 border-t border-white/10">

@@ -26,11 +26,7 @@ export default async function Settings() {
     <AppShell>
       <h1 className="text-3xl font-bold mb-6">Nastavení</h1>
       {hasModuleAccess(user, 'planner', 'planner') && <div className="card mb-6"><a href="/settings/planner" className="font-bold text-sky-700">Calendar & Planner →</a><p className="text-sm text-slate-600">Osobní kalendáře, pracovní doba a soustředěná práce.</p></div>}
-      <div className="card space-y-3">
-        <p>Google Maps API: <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code></p>
-        <p>Databáze: <code>DATABASE_URL</code> pro PostgreSQL.</p>
-        <p>Fotky: lokálně v <code>public/uploads</code>, připraveno pro výměnu za S3/GCS storage adapter.</p>
-      </div>
+      <p className="text-sm text-slate-600">Katalogy, ceníky a firemní sazby platí pouze pro vaši aktuální organizaci.</p>
 
       <div className="card mt-6 flex items-center justify-between">
         <div>

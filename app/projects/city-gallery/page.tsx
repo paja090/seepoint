@@ -22,12 +22,12 @@ export default async function CityGalleryProjectsPage() {
     }),
   ]);
 
-  const totalFleet = fleetConfig?.totalFrames ?? 24;
+  const totalFleet = fleetConfig?.totalFrames ?? 0;
   const maintenanceCount = fleetConfig?.maintenanceCount ?? 0;
 
   const projects = projectsRaw.map((p) => ({
     id: p.id,
-    title: p.title || 'Výstava Galerie VENKU',
+    title: p.title || 'Výstava',
     status: p.status || 'DRAFT',
     city: p.city || 'Ostrava',
     locality: p.locality || null,

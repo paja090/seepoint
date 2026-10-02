@@ -1,5 +1,7 @@
 'use client';
 
+import { hasSeePointPortfolio } from '@/lib/offers/branding';
+
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calculator, Camera, Compass, Crosshair, MapPin, Plus, Save, Search, Trash2, Image as ImageIcon, UserPlus, X, RefreshCw, Upload, ArrowUp, ArrowDown, GripVertical, Zap, Store } from 'lucide-react';
@@ -102,13 +104,16 @@ export function NavigationOfferForm({
   clients,
   initialClientId,
   initialOffer,
+  organizationId,
 }: {
   clients: ClientOption[];
   initialClientId?: string;
   initialOffer?: OfferView;
+  organizationId?: string;
 }) {
   const router = useRouter();
   const navigation = initialOffer?.navigation;
+  const ownPortfolio = hasSeePointPortfolio(initialOffer?.branding ?? { id: organizationId, name: '' });
 
   const [clientList, setClientList] = useState<ClientOption[]>(clients);
   const [clientId, setClientId] = useState(initialOffer?.clientId ?? initialClientId ?? clients[0]?.id ?? '');
@@ -174,6 +179,7 @@ export function NavigationOfferForm({
       showRealizations?: boolean;
       showPartnershipGuarantee?: boolean;
       showAboutCompany?: boolean;
+      cityConfirmed?: boolean;
     };
   } | null | undefined;
   const [dateFrom, setDateFrom] = useState(initialStrategy?.dateFrom ?? '');
@@ -183,13 +189,13 @@ export function NavigationOfferForm({
     initialStrategy?.presentationSettings?.showGraphicProofBadge ?? false
   );
   const [showReferences, setShowReferences] = useState<boolean>(
-    initialStrategy?.presentationSettings?.showReferences ?? true
+    ownPortfolio && (initialStrategy?.presentationSettings?.showReferences ?? true)
   );
   const [showRealizations, setShowRealizations] = useState<boolean>(
-    initialStrategy?.presentationSettings?.showRealizations ?? true
+    ownPortfolio && (initialStrategy?.presentationSettings?.showRealizations ?? true)
   );
   const [showPartnershipGuarantee, setShowPartnershipGuarantee] = useState<boolean>(
-    initialStrategy?.presentationSettings?.showPartnershipGuarantee ?? true
+    ownPortfolio && (initialStrategy?.presentationSettings?.showPartnershipGuarantee ?? true)
   );
   const [showAboutCompany, setShowAboutCompany] = useState<boolean>(
     initialStrategy?.presentationSettings?.showAboutCompany ?? true
@@ -278,15 +284,9 @@ export function NavigationOfferForm({
   const [clientMessage, setClientMessage] = useState(initialOffer?.clientMessage ?? '');
 
   const initialNav = initialOffer?.navigation as unknown as Record<string, unknown> | undefined;
-  const detectedInitialCity: 'Ostrava' | 'Havířov' =
-    initialNav?.city === 'Havířov' ||
-    (activeTarget?.address && activeTarget.address.toLowerCase().includes('havířov')) ||
-    (initialOffer?.title && initialOffer.title.toLowerCase().includes('havířov'))
-      ? 'Havířov'
-      : 'Ostrava';
-
-  const defaultCityVariant = detectedInitialCity === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm';
-  const [city, setCity] = useState<'Ostrava' | 'Havířov'>(detectedInitialCity);
+  const detectedInitialCity = initialStrategy?.presentationSettings?.cityConfirmed === true ? String(initialNav?.city || '') : '';
+  const defaultCityVariant = detectedInitialCity === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : detectedInitialCity === 'Ostrava' ? '670 × 900 mm' : '';
+  const [city, setCity] = useState(detectedInitialCity);
 
   const [points, setPoints] = useState<DraftPoint[]>(
     () =>
@@ -294,10 +294,10 @@ export function NavigationOfferForm({
         // Preserve exact saved prices; fall back to catalog defaults if empty
         const framePrice = point.framePrice !== undefined && point.framePrice !== null && String(point.framePrice).trim() !== ''
           ? String(point.framePrice)
-          : '1960';
+          : '';
         const productionPrice = point.productionPrice !== undefined && point.productionPrice !== null && String(point.productionPrice).trim() !== ''
           ? String(point.productionPrice)
-          : '600';
+          : '';
 
         const rawVariant = point.variant && String(point.variant).trim()
           ? String(point.variant).trim()
@@ -325,11 +325,11 @@ export function NavigationOfferForm({
           variant: pointVariant,
           orientation: String(point.orientation ?? ''),
           quantity: String(point.quantity ?? 1),
-          unitPrice: String(point.unitPrice ?? 12000),
+          unitPrice: String(point.unitPrice ?? ''),
           framePrice,
           productionPrice,
-          installationPrice: String(point.installationPrice ?? 800),
-          removalPrice: String(point.removalPrice ?? 600),
+          installationPrice: String(point.installationPrice ?? ''),
+          removalPrice: String(point.removalPrice ?? ''),
           internalNote: String(point.internalNote ?? ''),
           clientNote: String(point.clientNote ?? ''),
           arrowDirectionEnum: (point.arrowDirectionEnum as DraftPoint['arrowDirectionEnum']) || 'STRAIGHT',
@@ -351,9 +351,9 @@ export function NavigationOfferForm({
       }) ?? [],
   );
 
-  function handleCityChange(newCity: 'Ostrava' | 'Havířov') {
+  function handleCityChange(newCity: string) {
     setCity(newCity);
-    const newDefaultVariant = newCity === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm';
+    const newDefaultVariant = newCity === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : newCity === 'Ostrava' ? '670 × 900 mm' : '';
     setPoints((current) =>
       current.map((p) => {
         const isOldDefault =
@@ -387,21 +387,21 @@ export function NavigationOfferForm({
 
   // Default price list items fetched from Settings
   const [catalogDefaults, setCatalogDefaults] = useState({
-    rentalPrice: '12000',
-    framePrice: '1960',
-    productionPrice: '600',
-    installationPrice: '800',
-    removalPrice: '600',
+    rentalPrice: '',
+    framePrice: '',
+    productionPrice: '',
+    installationPrice: '',
+    removalPrice: '',
   });
 
   useEffect(() => {
     async function loadPriceCatalog() {
       try {
-        let rental = '12000';
-        let frame = '1960';
-        let production = '600';
-        let installation = '800';
-        let removal = '600';
+        let rental = '';
+        let frame = '';
+        let production = '';
+        let installation = '';
+        let removal = '';
 
         // 1. Check Offer Price Rules catalog first
         const resRules = await fetch('/api/offer-price-rules');
@@ -413,11 +413,11 @@ export function NavigationOfferForm({
           const rInst = rules.find((r) => r.category === 'INSTALLATION' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
           const rRem = rules.find((r) => r.category === 'REMOVAL' && (r.mediaType === 'NAVIGATION_SIGN' || !r.mediaType))?.unitPrice;
 
-          if (rRental !== undefined) rental = String(rRental);
-          if (rFrame !== undefined) frame = String(rFrame);
-          if (rProd !== undefined && rProd < 1800) production = String(rProd);
-          if (rInst !== undefined) installation = String(rInst);
-          if (rRem !== undefined) removal = String(rRem);
+          if (rRental != null) rental = String(rRental);
+          if (rFrame != null) frame = String(rFrame);
+          if (rProd != null) production = String(rProd);
+          if (rInst != null) installation = String(rInst);
+          if (rRem != null) removal = String(rRem);
         }
 
         // 2. Fallback to Price List Items
@@ -426,8 +426,8 @@ export function NavigationOfferForm({
           const items = (await resItems.json()) as Array<{ carrierType?: string; mediaType?: string; rentalPrice?: number; productionPrice?: number }>;
           const navItem = items.find((i) => i.carrierType === 'NAVIGATION' || i.mediaType === 'NAVIGATION_SIGN');
           if (navItem) {
-            if (navItem.rentalPrice) rental = String(navItem.rentalPrice);
-            if (navItem.productionPrice && navItem.productionPrice < 1800 && String(navItem.productionPrice) !== frame) {
+            if (rental === '' && navItem.rentalPrice != null) rental = String(navItem.rentalPrice);
+            if (production === '' && navItem.productionPrice != null) {
               production = String(navItem.productionPrice);
             }
           }
@@ -435,7 +435,7 @@ export function NavigationOfferForm({
 
         setCatalogDefaults({ rentalPrice: rental, framePrice: frame, productionPrice: production, installationPrice: installation, removalPrice: removal });
       } catch {
-        /* fallback to defaults */
+        /* Keep missing prices empty; never borrow prices from another organization. */
       }
     }
     void loadPriceCatalog();
@@ -709,7 +709,7 @@ export function NavigationOfferForm({
         longitude,
         address: address || '',
         navigationType: 'Směrová tabule',
-        variant: city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm',
+        variant: city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : city === 'Ostrava' ? '670 × 900 mm' : '',
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
@@ -751,7 +751,7 @@ export function NavigationOfferForm({
         longitude: lng,
         address: '',
         navigationType: 'Směrová tabule',
-        variant: city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm',
+        variant: city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : city === 'Ostrava' ? '670 × 900 mm' : '',
         orientation: 'Obousměrný (A/B)',
         quantity: '1',
         unitPrice: catalogDefaults.rentalPrice,
@@ -859,6 +859,9 @@ export function NavigationOfferForm({
       return setMessage('Zadejte název cílového místa / prodejny.');
     }
 
+    if (proposalMode === 'PRICED_QUOTE' && points.some((point) => [point.unitPrice, point.framePrice, point.productionPrice, point.installationPrice, point.removalPrice].some((price) => price.trim() === '' || !Number.isFinite(Number(price)) || Number(price) < 0))) {
+      return setMessage('Doplňte vlastní ceny u všech bodů. Pokud se položka neúčtuje, zadejte výslovně 0.');
+    }
     setSaving(true);
     setMessage('');
 
@@ -895,6 +898,7 @@ export function NavigationOfferForm({
       graphicArtworkUrl,
       includeGraphicProof,
       presentationSettings: {
+        cityConfirmed: Boolean(city.trim()),
         showGraphicProofBadge,
         showReferences,
         showRealizations,
@@ -990,14 +994,7 @@ export function NavigationOfferForm({
           </Field>
 
           <Field label="Město navigačního systému">
-            <select
-              className="input font-bold text-sky-900 bg-sky-50/50 border-sky-300"
-              value={city}
-              onChange={(e) => handleCityChange(e.target.value as 'Ostrava' | 'Havířov')}
-            >
-              <option value="Ostrava">🏙️ Ostrava (standardní rozměr 670 × 900 mm)</option>
-              <option value="Havířov">🏙️ Havířov (atypický tvar s horním půlkruhem)</option>
-            </select>
+            <input className="input" value={city} maxLength={120} placeholder="Zadejte skutečné město nebo ponechte prázdné" onChange={(e) => handleCityChange(e.target.value)} />
           </Field>
 
           <Field label="Platnost nabídky do">
@@ -1082,6 +1079,8 @@ export function NavigationOfferForm({
             </button>
           </div>
         </div>
+
+        {proposalMode === 'PRICED_QUOTE' && <p className="text-sm text-slate-600">Ceny se přebírají pouze z ceníku vaší organizace. Chybějící sazby doplňte; neúčtované položky označte nulou.</p>}
 
         {/* AI Graphic Artwork Motiv Uploader & Proof Toggle */}
         <section className="card space-y-3 border-2 border-sky-200 bg-sky-50/40">
@@ -1183,6 +1182,7 @@ export function NavigationOfferForm({
               </div>
             </label>
 
+            {ownPortfolio && <>
             <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
               <input
                 type="checkbox"
@@ -1222,6 +1222,7 @@ export function NavigationOfferForm({
               </div>
             </label>
 
+            </>}
             <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition cursor-pointer">
               <input
                 type="checkbox"
@@ -1231,7 +1232,7 @@ export function NavigationOfferForm({
               />
               <div>
                 <span className="text-xs font-bold text-slate-900 block">O společnosti (Realizátor)</span>
-                <span className="text-[11px] text-slate-500">Představení dodavatele SEEPOINT a přehled médií.</span>
+                <span className="text-[11px] text-slate-500">Název a kontaktní údaje vaší organizace.</span>
               </div>
             </label>
           </div>
@@ -1344,7 +1345,7 @@ export function NavigationOfferForm({
               <Field label="Název provozovny">
                 <input
                   className="input"
-                  placeholder="Např. Showroom SeePOINT Brno"
+                  placeholder="Např. Showroom Brno"
                   value={activeTarget.name}
                   onChange={(e) => updateActiveTarget({ name: e.target.value })}
                 />

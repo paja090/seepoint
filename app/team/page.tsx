@@ -31,7 +31,7 @@ export default async function TeamPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-300 ring-1 ring-emerald-500/40">
                 <Sparkles size={14} />
-                <span>Tým SeePOINT & Kontakty v terénu</span>
+                <span>Tým & Kontakty v terénu</span>
               </div>
               <h1 className="mt-3 text-2xl sm:text-3xl font-black text-white">
                 Kontakty & Telefonní Seznam Týmu
@@ -92,7 +92,7 @@ export default async function TeamPage() {
                       {fullName}
                     </h3>
                     <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                      {positionsList.length > 0 ? positionsList.join(' · ') : 'Člen týmu SeePOINT'}
+                      {positionsList.length > 0 ? positionsList.join(' · ') : 'Člen týmu'}
                     </p>
                   </div>
 

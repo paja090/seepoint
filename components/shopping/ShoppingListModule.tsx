@@ -559,28 +559,12 @@ export function ShoppingListModule({
                 NÁKUPY
               </h1>
               <p className="text-xs sm:text-sm font-medium text-slate-400">
-                Firemní nákupní seznam SeePOINT
+                Firemní nákupní seznam
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Team preview avatars */}
-            <div className="hidden sm:flex items-center -space-x-2 overflow-hidden py-1">
-              <div className="inline-block h-8 w-8 rounded-full ring-2 ring-[#151F32] bg-blue-500 flex items-center justify-center font-bold text-xs text-white">
-                P
-              </div>
-              <div className="inline-block h-8 w-8 rounded-full ring-2 ring-[#151F32] bg-emerald-500 flex items-center justify-center font-bold text-xs text-white">
-                E
-              </div>
-              <div className="inline-block h-8 w-8 rounded-full ring-2 ring-[#151F32] bg-amber-500 flex items-center justify-center font-bold text-xs text-white">
-                T
-              </div>
-              <div className="inline-block h-8 w-8 rounded-full ring-2 ring-[#151F32] bg-slate-700 flex items-center justify-center font-semibold text-2xs text-slate-300">
-                +3
-              </div>
-            </div>
-
             {isEmbeddedModal && onCloseModal && (
               <button
                 type="button"

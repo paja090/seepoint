@@ -19,6 +19,11 @@ import {
 import type { Client360Data } from '@/lib/ai-crm/contracts/types';
 
 const healthBadges = {
+  UNKNOWN: {
+    bg: 'bg-slate-500/10 border-slate-500/30 text-slate-400',
+    icon: Clock,
+    label: 'Zatím nevyhodnoceno',
+  },
   HEALTHY: {
     bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
     icon: CheckCircle2,
@@ -112,7 +117,7 @@ export function ClientCrmIntelligenceCard({ clientId }: { clientId: string }) {
   if (!data) return null;
 
   const rel = data.intelligence.relationship;
-  const healthConfig = healthBadges[rel.status] || healthBadges.HEALTHY;
+  const healthConfig = healthBadges[rel.status] || healthBadges.UNKNOWN;
   const HealthIcon = healthConfig.icon;
   const topAction = data.intelligence.nextBestActions[0];
 
@@ -129,7 +134,7 @@ export function ClientCrmIntelligenceCard({ clientId }: { clientId: string }) {
               <h3 className="font-black text-base tracking-tight text-white">AI CRM Intelligence</h3>
               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${healthConfig.bg}`}>
                 <HealthIcon size={12} />
-                {healthConfig.label} ({rel.healthScore} b.)
+                {healthConfig.label}{rel.healthScore != null ? ` (${rel.healthScore} b.)` : ''}
               </span>
             </div>
             <p className="text-xs text-slate-400">

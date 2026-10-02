@@ -67,6 +67,7 @@ export type OfferChargeView = {
 
 export type OfferView = {
   branding?: {
+    id?: string;
     name: string;
     logoUrl?: string | null;
     primaryColor?: string | null;

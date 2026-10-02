@@ -127,7 +127,7 @@ export function AnalyticsDashboard({
           📊 Finanční & Provozní Analýza
         </span>
         <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">
-          Analytics & Přehled Kapacity SeePOINT
+          Analytics & Přehled Kapacity
         </h1>
         <p className="mt-1 text-sm font-semibold text-slate-500">
           Analýza vytíženosti reklamních nosičů a evidovaného měsíčního nájemného bez dopočítaných odhadů.

@@ -1,5 +1,7 @@
 'use client';
 
+import { OfferBrandMark } from '@/components/offer/OfferBrandMark';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { OfferView, OfferItemView } from '@/lib/offers/view-model';
@@ -139,7 +141,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const clientName = offer.client?.name || 'Klient';
   const campaignTitle = offer.campaignName || offer.title || (isNavigation ? `Navigační systém pro ${offer.navigation?.targetName || 'klienta'}` : 'Venkovní reklamní kampaň');
   const branding = offer.branding;
-  const agencyName = branding?.name || 'SeePOINT';
+  const agencyName = branding?.name || 'Dodavatel nabídky';
   const realization = offer.realizationSummary;
 
   const strategy = offer.campaignStrategy as { dateFrom?: string; dateTo?: string } | null | undefined;
@@ -550,11 +552,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex items-center gap-2 shrink-0">
-              {branding?.logoUrl ? (
-                <img alt={agencyName} className="h-8 max-w-44 object-contain" src={branding.logoUrl} />
-              ) : (
-                <img alt={agencyName || "SeePOINT"} className="h-8 w-auto object-contain" src="/seepoint-logo.svg" />
-              )}
+              <OfferBrandMark branding={branding} />
             </div>
             <div className="h-4 w-px bg-slate-300 hidden sm:block" />
             <span className="text-xs font-bold text-slate-600 truncate hidden sm:inline">

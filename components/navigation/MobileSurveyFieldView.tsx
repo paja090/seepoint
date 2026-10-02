@@ -820,7 +820,7 @@ export function MobileSurveyFieldView({
               <div className="bg-amber-50 p-3.5 rounded-2xl border border-amber-300 space-y-2 text-xs">
                 <div className="flex items-center gap-1.5 text-amber-900 font-bold">
                   <AlertTriangle size={15} className="text-amber-600 shrink-0" />
-                  <span>V blízkosti se nachází existující nosič SeePoint!</span>
+                  <span>V blízkosti se nachází existující nosič vaší organizace!</span>
                 </div>
                 <p className="text-amber-800 text-[11px]">
                   Kód: <strong>{nearbyAlertCarrier.code}</strong> ({nearbyAlertCarrier.name}) – vzdálenost cca {Math.round(nearbyAlertCarrier.distanceKm * 1000)} m.
@@ -1097,7 +1097,7 @@ export function MobileSurveyFieldView({
                   <select value={formOwnership} onChange={(e) => setFormOwnership(e.target.value)} className="input text-xs mt-1">
                     <option value="CITY_MUNICIPALITY">Město / Obec</option>
                     <option value="PRIVATE_OWNER">Soukromník</option>
-                    <option value="SEEPOINT">SeePoint</option>
+                    <option value="SEEPOINT">Naše organizace</option>
                     <option value="OTHER">Jiné</option>
                     <option value="UNKNOWN">Nezjištěno</option>
                   </select>

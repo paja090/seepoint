@@ -32,11 +32,11 @@ type Preview = {
 };
 
 const segmentLabels: Record<PricingSegment, string> = { COMMERCIAL: 'Komerční', CULTURE_SPORT: 'Kultura / Sport', PUBLIC_NONPROFIT: 'Veřejný / neziskový', CUSTOM: 'Individuální' };
-const typeLabels: Record<OfferType, string> = { STANDARD_MEDIA: 'Standardní reklamní kampaň', NAVIGATION: 'Navigační systém', CITY_GALLERY: 'Galerie venku' };
+const typeLabels: Record<OfferType, string> = { STANDARD_MEDIA: 'Standardní reklamní kampaň', NAVIGATION: 'Navigační systém', CITY_GALLERY: 'Výstavní projekt' };
 const typeCards: Array<{ value: OfferType; icon: typeof Compass; text: string }> = [
   { value: 'NAVIGATION', icon: Compass, text: 'AI vyhledá silná místa na příjezdových trasách.' },
   { value: 'STANDARD_MEDIA', icon: Image, text: 'Billboardy, citylighty a další reklamní plochy.' },
-  { value: 'CITY_GALLERY', icon: Sparkles, text: 'Projektové nabídky Galerie venku.' },
+  { value: 'CITY_GALLERY', icon: Sparkles, text: 'Nabídky výstavních projektů.' },
 ];
 
 export type PreFillData = {

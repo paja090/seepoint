@@ -641,6 +641,23 @@ export function MobilePhotoFieldAppView() {
           </div>
           <ChevronRight size={18} className="text-emerald-300 group-hover:translate-x-1 transition" />
         </Link>
+
+        {/* Quick Switcher Banner to Advertising Field Survey */}
+        <Link
+          href="/mobile-field-survey"
+          className="mt-2.5 flex items-center justify-between rounded-2xl bg-gradient-to-r from-purple-950 via-slate-900 to-indigo-950 p-3 text-xs font-bold text-white border border-purple-700/50 shadow-md hover:border-purple-400 active:scale-[0.99] transition group"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 bg-purple-500/20 text-purple-300 rounded-xl border border-purple-500/30">
+              <Camera size={18} />
+            </div>
+            <div>
+              <span className="block font-black text-purple-200">🔍 Terénní průzkum nových reklamních ploch</span>
+              <span className="text-[11px] text-purple-300/80 font-medium">Rychlé focení Aček, towerů, bannerů a plotů v terénu</span>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-purple-300 group-hover:translate-x-1 transition" />
+        </Link>
       </div>
 
       {/* Global Success Alert after Creating Carrier */}
