@@ -93,6 +93,7 @@ export async function exportFieldSurveyXlsx(points: PointForExport[], surveyName
     { header: 'AI typ návrh', key: 'aiType', width: 16 },
     { header: 'AI využitelná', key: 'aiUsable', width: 14 },
     { header: 'Poznámka', key: 'note', width: 50 },
+    { header: 'Fotografie', key: 'photos', width: 45 },
     { header: 'Datum', key: 'createdAt', width: 20 },
     { header: 'Autor', key: 'author', width: 24 },
   ];
@@ -124,6 +125,7 @@ export async function exportFieldSurveyXlsx(points: PointForExport[], surveyName
       aiType: p.aiAnalysis?.suggestedType ?? '',
       aiUsable: p.aiAnalysis?.isUsable === true ? 'Ano' : p.aiAnalysis?.isUsable === false ? 'Ne' : '',
       note: p.note ?? '',
+      photos: p.photos?.map((ph) => ph.url).join(' | ') ?? '',
       createdAt: p.createdAt.toLocaleDateString('cs-CZ'),
       author: p.createdBy.name,
     });

@@ -597,8 +597,20 @@ export function FieldSurveyPointDetail({
                 <img
                   src={point.photos[0].url}
                   alt="Fotografie bodu"
-                  className="w-full h-48 rounded-xl object-cover border border-slate-200"
+                  onClick={() => window.open(point.photos[0].url, '_blank')}
+                  className="w-full h-48 rounded-xl object-cover border border-slate-200 cursor-pointer"
+                  title="Kliknutím otevřete fotografii v plném rozlišení"
                 />
+                <a
+                  href={point.photos[0].url}
+                  download={`field-survey-${point.photos[0].id}.jpg`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute top-2 left-2 bg-slate-900/80 hover:bg-slate-900 text-white text-xs font-semibold px-2.5 py-1 rounded-lg opacity-85 group-hover:opacity-100 shadow transition flex items-center gap-1"
+                  title="Stáhnout fotografii v plném rozlišení"
+                >
+                  ⬇️ Stáhnout foto
+                </a>
                 <button
                   type="button"
                   onClick={() => void handleDeletePhoto(point.photos[0].id)}
@@ -618,8 +630,20 @@ export function FieldSurveyPointDetail({
                       <img
                         src={photo.url}
                         alt={`Foto ${i + 2}`}
-                        className="h-16 w-16 rounded-lg object-cover border border-slate-200"
+                        onClick={() => window.open(photo.url, '_blank')}
+                        className="h-16 w-16 rounded-lg object-cover border border-slate-200 cursor-pointer"
+                        title="Kliknutím otevřete v plném rozlišení"
                       />
+                      <a
+                        href={photo.url}
+                        download={`field-survey-${photo.id || i + 2}.jpg`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="absolute bottom-0.5 left-0.5 bg-slate-900/80 text-white rounded p-1 text-[10px] opacity-0 group-hover:opacity-100 shadow transition"
+                        title="Stáhnout"
+                      >
+                        ⬇️
+                      </a>
                       <button
                         type="button"
                         onClick={() => void handleDeletePhoto(photo.id)}
