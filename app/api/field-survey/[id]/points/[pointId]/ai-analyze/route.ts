@@ -20,7 +20,7 @@ export async function POST(
 ) {
   const { pointId } = await params;
 
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);
@@ -69,7 +69,7 @@ export async function PATCH(
 ) {
   const { pointId } = await params;
 
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);

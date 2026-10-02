@@ -22,7 +22,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: surveyId } = await params;
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);
@@ -59,7 +59,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: surveyId } = await params;
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);

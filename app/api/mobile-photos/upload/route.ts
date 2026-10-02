@@ -35,8 +35,11 @@ function jsonError(code: string, error: string, status: number) {
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireApiAccess('navigationProjects');
-    if (isApiDenied(auth)) return auth;
+    let auth = await requireApiAccess('navigationProjects');
+    if (isApiDenied(auth)) {
+      auth = await requireApiAccess('carriers');
+      if (isApiDenied(auth)) return auth;
+    }
     const user = auth;
     const limited = await enforcePhotoUploadRateLimit(req, user);
     if (limited) return limited;

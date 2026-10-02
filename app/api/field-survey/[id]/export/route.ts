@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { id: surveyId } = await params;
 
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) {

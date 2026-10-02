@@ -26,7 +26,7 @@ export async function POST(
 ) {
   const { pointId } = await params;
 
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
 
   // Rate limit – sdílíme existující infrastrukturu
@@ -137,7 +137,7 @@ export async function DELETE(
   const photoId = url.searchParams.get('photoId');
   if (!photoId) return jsonError('PHOTO_ID_REQUIRED', 'Identifikátor fotografie je povinný.', 400);
 
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
   const organizationId = auth.organizationId || auth.membership?.organizationId;
   if (!organizationId) return jsonError('TENANT_REQUIRED', 'Organizace nebyla nalezena.', 400);

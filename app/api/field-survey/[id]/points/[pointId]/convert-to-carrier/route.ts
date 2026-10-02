@@ -24,7 +24,7 @@ export async function POST(
 ) {
   const { pointId } = await params;
 
-  const auth = await requireApiAccess('carriers', 'fieldSurvey');
+  const auth = await requireApiAccess('fieldSurvey');
   if (isApiDenied(auth)) return auth;
 
   // Konverzi smí provést pouze ADMIN nebo MANAGER
