@@ -20,8 +20,11 @@ function surfaceSide(surface: { sidePosition: string | null; sourcePosition: str
 }
 
 export async function GET(req: Request) {
-  const auth = await requireApiAccess('navigationProjects');
-  if (isApiDenied(auth)) return auth;
+  let auth = await requireApiAccess('navigationProjects');
+  if (isApiDenied(auth)) {
+    auth = await requireApiAccess('carriers');
+    if (isApiDenied(auth)) return auth;
+  }
   try {
     const requestUrl = new URL(req.url);
     const latParam = requestUrl.searchParams.get('lat');

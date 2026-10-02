@@ -344,6 +344,9 @@ export function isModuleEnabled(
   moduleId: string
 ): boolean {
   if (!organization) return false;
+  if (moduleId === 'fieldSurvey') {
+    return isModuleEnabled(organization, 'carriers');
+  }
   const enabledMap = getOrganizationEnabledModules(organization);
   return enabledMap[moduleId] ?? false;
 }

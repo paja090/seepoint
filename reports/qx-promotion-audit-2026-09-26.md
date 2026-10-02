@@ -302,3 +302,34 @@ Implementace Gmail MIME/odesílání vychází z https://developers.google.com/w
 Uživatel schválil produkční nasazení s podmínkou zachovat e-mail SeePointu. Přidána výslovná výjimka org_seepoint_default: tenantový Gmail transport se vůbec nevyhledává ani neaktivuje, nové UI se pro SeePoint nezobrazuje a connect?send=true je pro něj odmítnuto. Zachováno stávající odesílání Resend/webhook/platformní Gmail, původní interní BCC a fallback Reply-To SeePointu. Ostatní organizace platformní BCC nedostávají. Nové Gmail odesílání navíc vyžaduje sendingEnabled=true uložené pouze po explicitním OAuth send flow; starší granty samy nic nepřepnou. Nastavení AI Inboxu tento příznak zachovává.
 
 30 cílených testů Gmail/Resend/OAuth a tenantové politiky prošlo; po doplnění ochrany kopií prošlo dalších 17 relevantních testů, typecheck a tenant-security guard. Před nasazením UI SeePointu potvrzuje ověřenou doménu seepoint.cz a Reply-To info@seepoint.cz. Produkční build zahájen s výslovným souhlasem uživatele, bez změny env proměnných a DNS.
+
+Produkční nasazení dokončeno: dpl_9ne8kEQwpfswsCeF4bYhzLrKZShL, READY, https://seepoint.vercel.app (deployment https://seepoint-qzrdmaf87-pavels-projects-073588fb.vercel.app), build přibližně 2 minuty, Next.js 15.5.25, necommitovaný pracovní strom. Bez migrace a bez změn DNS/env. Po nasazení ověřen skutečný test původního SeePoint odesílání: UI potvrdilo odeslání z info@seepoint.cz na subert.pvel@gmail.com a Gmail konektor nezávisle potvrdil doručenou zprávu INBOX, message id 1a0fb13a7e051089, čas 2026-10-02T05:26:03Z. Reply-To info@seepoint.cz zůstalo zachované. Screenshot reports/seepoint-email-after-deploy-2026-10-02.png. Vercel logs s filtrem error za 10 minut vrátil No logs found; není to záruka neexistence všech chyb.
+
+QX připojení pro Gmail send bylo nejprve zablokováno nedostupnou automatickou kontrolou kvůli limitu využití (akce neprovedena). Po uživatelově pokračuj ověřena obnovená dostupnost, standardní opakování přes stejný nástroj uspělo. Vybrán pouze účet qxpromotion101@gmail.com. Google zobrazuje bezpečnostní varování Google tuto aplikaci neověřil. Varování neobejito, krok předán uživateli. Screenshot reports/qx-gmail-send-consent-2026-10-02.png. Nové oprávnění gmail.send ani dokončení callbacku zatím nepotvrzeno; zpráva přes QX aplikační Gmail zatím neodeslána.
+
+### Dokončení živého QX Gmail odesílání – 2. 10. 2026 14:06 Europe/Prague
+
+Po uživatelově hotovo ověřen callback google=connected a aktivní odesílací schránka qxpromotion101@gmail.com v organizaci QX promotion. Z nového produkčního UI odeslána jedna testovací zpráva na výslovně povolenou adresu subert.pvel@gmail.com. UI potvrdilo odeslání. Gmail konektor nezávisle potvrdil přijetí v INBOX, message id 1a0fc827cb984d51, čas 2026-10-02T12:06:43Z (14:06:43 Europe/Prague), from qxpromotion101@gmail.com, to pouze subert.pvel@gmail.com, bez CC/BCC. Screenshot reports/qx-gmail-send-success-2026-10-02.png. V logu i cílové schránce byla již dřívější zpráva v 08:22:56, její odeslání agent v tomto kroku neprovedl; nový test ověřuje aktuální připojení po souhlasu uživatele.
+
+Potvrzené živé výsledky: Drive upload/download s kontrolou obsahu a odmítnutím anonymního čtení, Gmail příjem do AI Inboxu, přenos a odstranění události v Planneru, Gmail odesílání přímo ze SeePointu a zachované původní odesílání SeePoint z info@seepoint.cz. Nejde o záruku funkčnosti každé stránky či všech kombinací oprávnění. Testovací nabídky nebyly odesílány, Gmail přílohy byly ověřeny automatickým MIME testem, nikoli živou nabídkou klientovi. Heslo Google zůstává to, které nastavil uživatel; agent aktuální heslo nezná.
+
+## 2026-10-02 – Produkční QX ADMIN po nasazení Gmailu
+
+- Sedm produkčních API kontrol prošlo: přihlášení, vlastní klient a nabídka 200; seznam organizací, existující cizí klient/nabídka a pokus přepnout na SeePoint 404. Výsledek: scratch/qx-admin-production-api-results-2026-10-02.json. Kontroly používají skutečná existující cizí ID, do výstupu nepřenášejí jejich obsah.
+- V produkčním prohlížeči přihlášen samostatný testovací QX ADMIN. Dashboard nabízí pouze QX promotion, přepínač organizace je deaktivovaný, sekce Platforma SeePoint není přístupná.
+- Firemní e-mail zobrazuje pouze qxpromotion101@gmail.com a dvě QX testovací zprávy; nezobrazuje doménu ani testovací zprávu kanonické firmy SeePoint.
+- Členové: pouze vlastník a testovací QX ADMIN. Integrace: QX Gmail a Drive.
+- Onboarding je průvodce aktivní QX organizací (3/5), nikoli správa ostatních firem.
+- B2B síť: 0 partnerů, 0 ploch, žádné cizí názvy firem. UI výslovně uvádí, že jde jen o katalog; partnerství, holdy, poptávky, fotodokumentace, notifikace a vyúčtování nemají aktivní perzistentní workflow. Tyto funkce nelze označit za hotové. Katalog je navržen pro výslovně publikované MARKETPLACE plochy, proto není absolutním zákazem veškerého mezifiremního sdílení.
+- Důkazy: reports/qx-admin-production-email-2026-10-02.png a reports/qx-admin-production-network-2026-10-02.png.
+- Prohlížeč zůstává v testovacím QX ADMIN účtu. Nebyly odeslány další e-maily ani změněny firemní konfigurace. Audit není důkazem úplného pokrytí všech rolí, stránek a zápisových workflow.
+
+## 2026-10-02 – Nastavení a zápis do katalogu pod produkčním QX ADMIN
+
+- Nastavení firmy: název QX promotion; žádná cizí adresa, bankovní účet, kontakt ani logo. Skutečné fakturační údaje nejsou vyplněné; během auditu nebyly nahrazeny smyšlenými údaji.
+- Systémová nastavení: prázdné ceníky a sazby. Drobnost k úpravě: components/PriceListSettings.tsx:166 obsahuje konkrétní placeholder „PROMO Lavičky Ostrava“. Nejde o načtený cizí záznam, ale doporučeno nahradit neutrálním příkladem. Zatím nezměněno a nenasazeno.
+- Typy nosičů: obecný výchozí katalog. Živě vytvořena položka QX_AUDIT_20261002, následně přejmenována na „TEST QX – katalog ověřen 2026-10-02“ a deaktivována tlačítkem stavu. Obnovení stránky potvrdilo trvalý nový název a stav Neaktivní; vazby na inventář 0. Testovací položka zůstává pro dohledatelnost neaktivní. Důkaz reports/qx-catalog-write-test-2026-10-02.png.
+- Produktový katalog: prázdný, žádné cizí produkty.
+- Pracovní činnosti: 9 obecných činností a oborové šablony, bez cizích firemních údajů. Nastavení nebylo měněno.
+- Calendar & Planner: testovací ADMIN nemá žádný připojený Google účet; připojení vlastníka se správně nezobrazuje jako jeho vlastní. Tato kontrola ověřuje seznam připojení, nikoli všechny možnosti sdílení událostí.
+- Funkční omezení přímo v UI: AI doporučení v Planneru nejsou aktivní a schůzky se automaticky nepřesouvají.
