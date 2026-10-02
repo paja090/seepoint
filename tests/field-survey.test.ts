@@ -280,3 +280,32 @@ test('field survey: AI vision response sanitization strips markdown fences and e
   assert.equal(parsed.isUsable, true);
   assert.equal(parsed.visibility, 'Výborná z obou směrů');
 });
+
+test('field survey: ARES entity search parses response and formats candidate addresses', async () => {
+  const mockAresJson = {
+    ekonomickeSubjekty: [
+      {
+        ico: '61974757',
+        obchodniJmeno: 'Dopravní podnik Ostrava a.s.',
+        pravniForma: '121',
+        sidlo: {
+          textovaAdresa: 'Poděbradova 494/2, Moravská Ostrava, 70200 Ostrava',
+          nazevObce: 'Ostrava',
+          psc: 70200,
+        },
+      },
+    ],
+  };
+
+  const parsed = mockAresJson.ekonomickeSubjekty.map((item) => ({
+    ico: item.ico,
+    name: item.obchodniJmeno,
+    address: item.sidlo?.textovaAdresa,
+    city: item.sidlo?.nazevObce,
+  }));
+
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].ico, '61974757');
+  assert.equal(parsed[0].name, 'Dopravní podnik Ostrava a.s.');
+  assert.equal(parsed[0].city, 'Ostrava');
+});

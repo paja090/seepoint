@@ -110,6 +110,16 @@ export function FieldSurveyPointDetail({
   const [ownerName, setOwnerName] = useState(point.ownerData?.ownerName ?? '');
   const [ownerType, setOwnerType] = useState(point.ownerData?.ownerType ?? 'UNKNOWN');
   const [isSavingOwner, setIsSavingOwner] = useState(false);
+  const [isSearchingAres, setIsSearchingAres] = useState(false);
+  const [aresCandidates, setAresCandidates] = useState<Array<{
+    ico: string;
+    name: string;
+    address: string;
+    city?: string;
+    zip?: string;
+    legalForm?: string;
+  }>>([]);
+  const [aresMessage, setAresMessage] = useState('');
 
   // Contact form state
   const [contactCompany, setContactCompany] = useState(point.contactData?.company ?? '');
@@ -372,6 +382,48 @@ export function FieldSurveyPointDetail({
     } finally {
       setIsAiAnalyzing(false);
     }
+  }
+
+  // Vyhledání v ARES pro ověření firmy/obce a dohledání kontaktů
+  async function handleAresLookup() {
+    if (!ownerName.trim()) return;
+    setIsSearchingAres(true);
+    setAresMessage('Vyhledávám v registru ARES…');
+    setAresCandidates([]);
+    try {
+      const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/owner-ares`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: ownerName.trim() }),
+      });
+      const data = await res.json() as {
+        success: boolean;
+        message?: string;
+        candidates?: typeof aresCandidates;
+      };
+      if (data.success && data.candidates && data.candidates.length > 0) {
+        setAresCandidates(data.candidates);
+        setAresMessage(data.message || `Nalezeno ${data.candidates.length} subjektů v ARES.`);
+      } else {
+        setAresMessage(data.message || 'V registru ARES nebyl nalezen žádný odpovídající subjekt.');
+      }
+    } catch {
+      setAresMessage('Chyba při komunikaci s registrem ARES.');
+    } finally {
+      setIsSearchingAres(false);
+    }
+  }
+
+  // Aplikace vybraného subjektu z ARES
+  function handleSelectAresCandidate(c: typeof aresCandidates[0]) {
+    setOwnerName(c.name);
+    const isMun = c.name.toLowerCase().includes('město') || c.name.toLowerCase().includes('obec');
+    setOwnerType(isMun ? 'MUNICIPALITY' : 'COMPANY');
+    if (!contactCompany) {
+      setContactCompany(c.name);
+    }
+    setAresMessage(`Vybrán subjekt ${c.name} (IČO ${c.ico}, ${c.address}). Uložte formulář pro potvrzení.`);
+    setAresCandidates([]);
   }
 
   // Uložení vlastníka
@@ -807,17 +859,78 @@ export function FieldSurveyPointDetail({
       {/* TAB 3: VLASTNÍK */}
       {activeTab === 'owner' && (
         <form onSubmit={handleSaveOwner} className="space-y-3 text-xs">
-          <p className="text-slate-500">Vlastník pozemku nebo objektu, na kterém plocha stojí.</p>
+          <p className="text-slate-500">
+            Vlastník pozemku nebo objektu, na kterém plocha stojí. Jméno a adresu zjistíte v katastru (iKatastr / ČÚZK).
+          </p>
+
+          {point.parcelData?.municipality && !ownerName && (
+            <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-between">
+              <span className="text-slate-700 font-medium">Pozemek dle katastru:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setOwnerName(`Město ${point.parcelData?.municipality}`);
+                  setOwnerType('MUNICIPALITY');
+                  if (!contactCompany) {
+                    setContactCompany(`Město ${point.parcelData?.municipality} - majetkový odbor`);
+                  }
+                }}
+                className="px-2.5 py-1 bg-white text-sky-800 hover:bg-sky-100 border border-sky-300 rounded-lg font-bold text-xs shadow-sm transition"
+              >
+                🏛️ Nastavit: Město {point.parcelData.municipality}
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Jméno / Název vlastníka</label>
-            <input
-              type="text"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="Např. Statutární město Ostrava, Dopravní podnik..."
-              className="input w-full"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="Např. Dopravní podnik, Skanska, Město Ostrava..."
+                className="input flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => void handleAresLookup()}
+                disabled={isSearchingAres || !ownerName.trim()}
+                className="px-3 py-2 text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 rounded-xl hover:bg-sky-100 disabled:opacity-50 transition flex items-center gap-1"
+                title="Dohledat firmu v registru ARES"
+              >
+                {isSearchingAres ? 'Hledám…' : '🔍 ARES'}
+              </button>
+            </div>
           </div>
+
+          {aresCandidates.length > 0 && (
+            <div className="p-3 bg-sky-50/70 border border-sky-200 rounded-xl space-y-2">
+              <span className="font-bold text-sky-900 block">Nalezeno v registru ARES:</span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {aresCandidates.map((c) => (
+                  <div key={c.ico} className="p-2 bg-white rounded-lg border border-slate-200 flex justify-between items-center text-xs">
+                    <div>
+                      <div className="font-bold text-slate-900">{c.name}</div>
+                      <div className="text-slate-500 font-mono text-[11px]">IČO: {c.ico} | {c.address}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAresCandidate(c)}
+                      className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-semibold text-xs transition"
+                    >
+                      Použít
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {aresMessage && (
+            <p className="text-xs text-slate-700 bg-slate-100 p-2 rounded-lg">{aresMessage}</p>
+          )}
+
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Typ vlastníka</label>
             <select
