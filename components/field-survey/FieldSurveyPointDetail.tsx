@@ -4,6 +4,72 @@ import { useState, useRef } from 'react';
 import type { SurveyPointItem } from './FieldSurveyMapView';
 import { processPhotoForUpload } from '@/lib/client-photo-processing';
 
+/**
+ * Přímý klientský dotaz na bezplatné veřejné ArcGIS REST API ČÚZK RÚIAN.
+ * Běží přímo z prohlížeče uživatele (s českou IP a plnou CORS podporou),
+ * čímž obchází případné firewallové blokace zahraničních cloudových serverů (Vercel).
+ */
+async function fetchCuzkParcelDirect(lat: number, lng: number): Promise<{
+  found: boolean;
+  parcelNumber?: string;
+  cadastralArea?: string;
+  municipality?: string;
+  sourceUrl?: string;
+  errorMessage?: string;
+}> {
+  try {
+    const delta = 0.005;
+    const params = new URLSearchParams({
+      f: 'json',
+      geometryType: 'esriGeometryPoint',
+      geometry: JSON.stringify({ x: lng, y: lat }),
+      sr: '4326',
+      layers: 'all:1,5,7,12',
+      tolerance: '5',
+      mapExtent: `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`,
+      imageDisplay: '800,600,96',
+      returnGeometry: 'false',
+    });
+
+    const res = await fetch(
+      `https://ags.cuzk.cz/arcgis/rest/services/RUIAN/MapServer/identify?${params.toString()}`
+    );
+    if (!res.ok) {
+      return { found: false, errorMessage: `ČÚZK RÚIAN vrátil HTTP ${res.status}` };
+    }
+    const data = (await res.json()) as {
+      results?: Array<{
+        layerId: number;
+        layerName: string;
+        attributes?: Record<string, string>;
+      }>;
+    };
+    const parcel = data.results?.find((r) => r.layerId === 5);
+    const ku = data.results?.find((r) => r.layerId === 7);
+    const obec = data.results?.find((r) => r.layerId === 12);
+
+    const parcelNumber = parcel?.attributes?.['Číslo parcely'] || parcel?.attributes?.['Kmenové parcelní číslo'];
+    if (!parcelNumber) {
+      return { found: false, errorMessage: 'Na zadaných GPS souřadnicích nebyla nalezena parcela v ČÚZK.' };
+    }
+
+    const kuName = ku?.attributes?.['Název katastrálního území'];
+    const obecName = obec?.attributes?.['Název obce'];
+    const ikatastrUrl = `https://www.ikatastr.cz/#kde=${lat},${lng},18&info=${lat},${lng}&mapa=letecka&vrstvy=parcelybudovy`;
+
+    return {
+      found: true,
+      parcelNumber: String(parcelNumber),
+      cadastralArea: kuName ? String(kuName) : undefined,
+      municipality: obecName ? String(obecName) : undefined,
+      sourceUrl: ikatastrUrl,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Neznámá chyba';
+    return { found: false, errorMessage: `ČÚZK přímé spojení selhalo: ${message}` };
+  }
+}
+
 export function FieldSurveyPointDetail({
   point,
   userRole,
@@ -212,21 +278,77 @@ export function FieldSurveyPointDetail({
     }
   }
 
-  // Vyhledání parcely
+  // Vyhledání parcely (s automatickým přímým klientským fallbackem pro případ výpadku spojení server-ČÚZK)
   async function handleParcelLookup() {
     setIsLookingUpParcel(true);
-    setParcelMessage('');
+    setParcelMessage('Zjišťuji parcelu z katastru nemovitostí ČR…');
     try {
+      // 1. Zkusíme server-side lookup
       const res = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/parcel-lookup`, {
         method: 'POST',
       });
-      const data = await res.json() as { success: boolean; message: string; parcel?: SurveyPointItem['parcelData'] };
-      setParcelMessage(data.message || (data.success ? 'Parcela byla zjištěna.' : 'Zjišťování selhalo.'));
-      if (data.success && data.parcel) {
+      const data = await res.json() as {
+        success: boolean;
+        found?: boolean;
+        message: string;
+        parcel?: SurveyPointItem['parcelData'];
+      };
+
+      if (data.success && data.found && data.parcel?.parcelNumber) {
+        setParcelMessage(data.message || `Parcela ${data.parcel.parcelNumber} nalezena.`);
         onPointUpdated({ ...point, parcelData: data.parcel, status: 'PARCEL_FOUND' });
+        return;
       }
+
+      // 2. Klientský fallback: Pokud server ČÚZK z cloudu neodpověděl, dotážeme se přímo z prohlížeče
+      setParcelMessage('Zkouším přímé spojení s ČÚZK RÚIAN z Vašeho prohlížeče…');
+      const direct = await fetchCuzkParcelDirect(point.latitude, point.longitude);
+      if (direct.found && direct.parcelNumber) {
+        const putRes = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/parcel-lookup`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            parcelNumber: direct.parcelNumber,
+            cadastralArea: direct.cadastralArea,
+            municipality: direct.municipality,
+            sourceUrl: direct.sourceUrl,
+          }),
+        });
+        const putData = await putRes.json() as { success: boolean; message: string; parcel?: SurveyPointItem['parcelData'] };
+        if (putData.success && putData.parcel) {
+          setParcelMessage(`Parcela ${direct.parcelNumber} byla úspěšně zjištěna z ČÚZK RÚIAN.`);
+          onPointUpdated({ ...point, parcelData: putData.parcel, status: 'PARCEL_FOUND' });
+          return;
+        }
+      }
+
+      setParcelMessage(data.message || direct.errorMessage || 'Parcela nebyla na těchto souřadnicích v ČÚZK nalezena. Můžete ji zadat ručně.');
     } catch {
-      setParcelMessage('Chyba při komunikaci se serverem.');
+      // 3. Fallback při chybě spojení se serverem
+      try {
+        const direct = await fetchCuzkParcelDirect(point.latitude, point.longitude);
+        if (direct.found && direct.parcelNumber) {
+          const putRes = await fetch(`/api/field-survey/${point.surveyId}/points/${point.id}/parcel-lookup`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              parcelNumber: direct.parcelNumber,
+              cadastralArea: direct.cadastralArea,
+              municipality: direct.municipality,
+              sourceUrl: direct.sourceUrl,
+            }),
+          });
+          const putData = await putRes.json() as { success: boolean; parcel?: SurveyPointItem['parcelData'] };
+          if (putData.success && putData.parcel) {
+            setParcelMessage(`Parcela ${direct.parcelNumber} nalezena přes přímé spojení.`);
+            onPointUpdated({ ...point, parcelData: putData.parcel, status: 'PARCEL_FOUND' });
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+      setParcelMessage('Chyba při komunikaci s katastrem nemovitostí. Můžete parcelní číslo zadat ručně.');
     } finally {
       setIsLookingUpParcel(false);
     }
@@ -533,12 +655,42 @@ export function FieldSurveyPointDetail({
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2 text-xs">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-700">Parcelní číslo:</span>
-                <strong className="text-slate-900 font-mono text-sm">{point.parcelData.parcelNumber}</strong>
+                <div className="flex items-center gap-2">
+                  <strong className="text-slate-900 font-mono text-sm">{point.parcelData.parcelNumber}</strong>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator?.clipboard?.writeText) {
+                        navigator.clipboard.writeText(point.parcelData?.parcelNumber || '').catch(() => {});
+                      }
+                      setParcelMessage(`Číslo parcely ${point.parcelData?.parcelNumber} bylo zkopírováno do schránky.`);
+                    }}
+                    className="px-2 py-0.5 text-xs text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded font-medium transition"
+                    title="Kopírovat parcelní číslo"
+                  >
+                    📋 Kopírovat
+                  </button>
+                </div>
               </div>
               {point.parcelData.cadastralArea && (
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-slate-700">Katastrální území:</span>
-                  <span className="text-slate-900">{point.parcelData.cadastralArea}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-900">{point.parcelData.cadastralArea}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (navigator?.clipboard?.writeText) {
+                          navigator.clipboard.writeText(point.parcelData?.cadastralArea || '').catch(() => {});
+                        }
+                        setParcelMessage(`Katastrální území ${point.parcelData?.cadastralArea} bylo zkopírováno do schránky.`);
+                      }}
+                      className="px-2 py-0.5 text-xs text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded font-medium transition"
+                      title="Kopírovat katastrální území"
+                    >
+                      📋 Kopírovat
+                    </button>
+                  </div>
                 </div>
               )}
               {point.parcelData.municipality && (
@@ -551,18 +703,32 @@ export function FieldSurveyPointDetail({
                 <span className="font-semibold text-slate-700">Stav ověření:</span>
                 <span className="font-bold text-sky-700">{point.parcelData.confidence}</span>
               </div>
-              {point.parcelData.sourceUrl && (
-                <div className="pt-2 border-t border-slate-200">
-                  <a
-                    href={point.parcelData.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 font-semibold text-xs border border-sky-200 transition"
-                  >
-                    🏛️ Otevřít v Nahlížení do katastru nemovitostí (ČÚZK) ↗
-                  </a>
-                </div>
-              )}
+              <div className="pt-2 border-t border-slate-200 flex flex-wrap gap-2">
+                <a
+                  href={`https://www.ikatastr.cz/#kde=${point.latitude},${point.longitude},18&info=${point.latitude},${point.longitude}&mapa=letecka&vrstvy=parcelybudovy`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs border border-emerald-200 transition shadow-sm"
+                >
+                  🗺️ Otevřít v iKatastr.cz (interaktivní mapa parcel) ↗
+                </a>
+                <a
+                  href="https://nahlizenidokn.cuzk.cz/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 font-semibold text-xs border border-sky-200 transition shadow-sm"
+                >
+                  🏛️ Nahlížení do KN (ČÚZK) ↗
+                </a>
+                <a
+                  href={`https://mapy.cz/zakladni?x=${point.longitude}&y=${point.latitude}&z=19&base=ophoto`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 text-slate-700 hover:bg-slate-100 font-semibold text-xs border border-slate-200 transition"
+                >
+                  📍 Mapy.cz ↗
+                </a>
+              </div>
             </div>
           ) : (
             <p className="text-xs text-slate-500">K tomuto bodu zatím nejsou přiřazena parcelní data.</p>
