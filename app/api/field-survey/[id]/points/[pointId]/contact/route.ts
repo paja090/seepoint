@@ -55,7 +55,7 @@ export async function PUT(
       verificationStatus: status,
     });
     return NextResponse.json({ success: true, contact });
-  } catch (error) {
+  } catch {
     return jsonError('DATABASE_ERROR', 'Kontaktní údaje se nepodařilo uložit.', 500);
   }
 }

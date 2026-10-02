@@ -4,9 +4,7 @@ import { enterTenantContext } from '@/lib/tenant-context';
 import { validatePhotoFile, PhotoValidationError } from '@/lib/photo-validation';
 import { storeTenantPhoto, deleteStoredPhoto } from '@/lib/storage/photo-storage';
 import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
-import { tenantStorageKey } from '@/lib/storage/tenant-storage-key';
 import { createFieldSurveyPhotoRecord, deleteFieldSurveyPhoto, getFieldSurveyPoint } from '@/lib/field-survey/data';
-import { stablePhotoUrl } from '@/lib/mobile-photo-upload';
 
 export const runtime = 'nodejs';
 
@@ -129,12 +127,15 @@ export async function POST(
   }, { status: 201 });
 }
 
-/** DELETE /api/field-survey/[id]/points/[pointId]/photos/[photoId] */
+/** DELETE /api/field-survey/[id]/points/[pointId]/photos?photoId=... */
 export async function DELETE(
-  _req: Request,
-  { params }: { params: Promise<{ id: string; pointId: string; photoId: string }> }
+  req: Request,
+  { params }: { params: Promise<{ id: string; pointId: string }> }
 ) {
-  const { photoId } = await params;
+  await params;
+  const url = new URL(req.url);
+  const photoId = url.searchParams.get('photoId');
+  if (!photoId) return jsonError('PHOTO_ID_REQUIRED', 'Identifikátor fotografie je povinný.', 400);
 
   const auth = await requireApiAccess('carriers', 'fieldSurvey');
   if (isApiDenied(auth)) return auth;

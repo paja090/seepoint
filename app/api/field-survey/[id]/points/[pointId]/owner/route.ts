@@ -44,7 +44,7 @@ export async function PUT(
       verifiedByUserId: auth.id,
     });
     return NextResponse.json({ success: true, owner });
-  } catch (error) {
+  } catch {
     return jsonError('DATABASE_ERROR', 'Vlastníka se nepodařilo uložit.', 500);
   }
 }

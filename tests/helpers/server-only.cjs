@@ -1,3 +1,4 @@
+/* eslint-disable */
 // Node tests execute server code. Next provides this marker through its bundler;
 // the standalone Node runner needs the equivalent server-side no-op.
 const Module = require('node:module');

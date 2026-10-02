@@ -6,12 +6,15 @@ import {
   exportFieldSurveyGeoJson,
   exportFieldSurveyKml,
   exportFieldSurveyXlsx,
+  type PointForExport,
 } from '../lib/field-survey/export.ts';
 import { canAccess, type AppRole } from '../lib/rbac.ts';
 import { tenantStorageKey } from '../lib/storage/tenant-storage-key.ts';
 
+type MockPoint = PointForExport & Record<string, unknown>;
+
 // Mock data pro testování exportu a modelových operací
-function createMockPoint(overrides: Partial<any> = {}) {
+function createMockPoint(overrides: Partial<MockPoint> = {}): MockPoint {
   return {
     id: 'fsp_test_123',
     surveyId: 'survey_1',

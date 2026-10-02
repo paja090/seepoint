@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { redirect } from 'next/navigation';
@@ -7,7 +8,7 @@ import { createFieldSurvey } from '@/lib/field-survey/data';
 export const dynamic = 'force-dynamic';
 
 export default async function NewFieldSurveyPage() {
-  const user = await requirePageAccess('fieldSurvey');
+  await requirePageAccess('fieldSurvey');
 
   async function createSurveyAction(formData: FormData) {
     'use server';
@@ -68,9 +69,9 @@ export default async function NewFieldSurveyPage() {
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <a href="/field-survey" className="btn border border-slate-200 text-slate-700">
+            <Link href="/field-survey" className="btn border border-slate-200 text-slate-700">
               Zrušit
-            </a>
+            </Link>
             <button type="submit" className="btn btn-primary">
               Vytvořit a otevřít
             </button>

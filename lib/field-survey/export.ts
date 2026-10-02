@@ -1,6 +1,5 @@
 import 'server-only';
 import ExcelJS from 'exceljs';
-import type { FieldSurveyPoint, FieldSurveyPhoto, FieldSurveyParcel, FieldSurveyOwner, FieldSurveyContact, FieldSurveyAiAnalysis } from '@prisma/client';
 
 // ==========================================
 // EXPORT VRSTVA PRO TERÉNNÍ PRŮZKUM
@@ -24,6 +23,8 @@ export type PointForExport = {
     parcelNumber?: string | null;
     cadastralArea?: string | null;
     municipality?: string | null;
+    confidence?: string | null;
+    source?: string | null;
   } | null;
   ownerData?: {
     ownerName?: string | null;
@@ -67,7 +68,8 @@ export async function exportFieldSurveyXlsx(points: PointForExport[], surveyName
   workbook.creator = 'SeePoint OS';
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet('Průzkum ploch', {
+  const sheetName = (surveyName || 'Průzkum').replace(/[*?:/[\]]/g, '').slice(0, 31) || 'Průzkum';
+  const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: 'frozen', ySplit: 1 }],
   });
 

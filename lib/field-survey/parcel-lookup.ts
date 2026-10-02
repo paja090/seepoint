@@ -33,6 +33,7 @@ export interface ParcelLookupProvider {
 export class ManualParcelProvider implements ParcelLookupProvider {
   readonly name = 'MANUAL';
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async lookup(_lat: number, _lng: number): Promise<ParcelLookupResult> {
     return {
       found: false,
