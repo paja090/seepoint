@@ -247,8 +247,8 @@ test('field survey: CuzkRuianProvider parses ArcGIS REST identify results and bu
     assert.equal(result.cadastralArea, 'Moravská Ostrava');
     assert.equal(result.municipality, 'Ostrava');
     assert.equal(result.confidence, 'VERIFIED');
-    assert.ok(result.sourceUrl?.includes('nahlizenidokn.cuzk.cz'));
-    assert.ok(result.sourceUrl?.includes('612314807'));
+    assert.ok(result.sourceUrl?.includes('ikatastr.cz'));
+    assert.ok(result.sourceUrl?.includes('49.835'));
   } finally {
     globalThis.fetch = originalFetch;
   }

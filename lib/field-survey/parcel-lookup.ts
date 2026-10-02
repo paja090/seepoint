@@ -111,9 +111,8 @@ export class CuzkRuianProvider implements ParcelLookupProvider {
         };
       }
 
-      const sourceUrl = parcelId
-        ? `https://nahlizenidokn.cuzk.cz/ZobrazitObjekt.aspx?typ=par&id=${encodeURIComponent(parcelId)}`
-        : `https://nahlizenidokn.cuzk.cz/ZobrazitMapu.aspx?y=${lat}&x=${lng}`;
+      // Odkaz na iKatastr.cz funguje bleskově a bez bot-ochrany / CAPTCHA (na rozdíl od Nahlížení do KN)
+      const sourceUrl = `https://www.ikatastr.cz/#kde=${lat},${lng},18&info=${lat},${lng}&mapa=letecka&vrstvy=parcelybudovy`;
 
       return {
         found: true,
