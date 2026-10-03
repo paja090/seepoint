@@ -163,7 +163,7 @@ export function PriceListSettings({ initialPrices }: { initialPrices: PriceListI
             required
             value={form.name}
             onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))}
-            placeholder="PROMO Lavičky Ostrava"
+            placeholder="Např. pronájem reklamní plochy"
             disabled={saving}
           />
         </label>

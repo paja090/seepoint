@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
-import { listImagesInFolderPage, GoogleDriveConfigurationError, isGoogleDriveMockEnabled } from '@/lib/google-drive';
+import { listImagesInFolderPage, resolveTenantPhotoFolderId, GoogleDriveConfigurationError, isGoogleDriveMockEnabled } from '@/lib/google-drive';
 import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
@@ -28,7 +28,12 @@ export async function GET(request: Request) {
         const requestedLimit = Number.parseInt(url.searchParams.get('limit') ?? '100', 10);
         const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 100)) : 100;
         const pageToken = url.searchParams.get('pageToken')?.trim() || undefined;
-        const page = await listImagesInFolderPage(folderId || 'mock-folder-id', { pageSize: limit, pageToken });
+        const tenantFolderId = await resolveTenantPhotoFolderId(auth.organizationId);
+        const page = await listImagesInFolderPage(tenantFolderId, {
+          pageSize: limit,
+          pageToken,
+          organizationId: auth.organizationId,
+        });
         return NextResponse.json(page);
       } catch (error) {
         console.error('Failed to list Google Drive images:', error);

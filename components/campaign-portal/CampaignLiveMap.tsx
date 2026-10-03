@@ -138,12 +138,13 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         mapInstanceRef.current = null;
       }
 
-      // Default center fallback: Ostrava
-      let centerLat = 49.8209;
-      let centerLng = 18.2625;
-      let zoom = 12;
+      // Empty campaigns do not imply a location for the organization.
+      let centerLat = 20;
+      let centerLng = 0;
+      let zoom = 2;
 
       if (isNavigation && validNavPoints.length > 0) {
+        zoom = 12;
         centerLat = validNavPoints.reduce((sum, p) => sum + p.latitude, 0) / validNavPoints.length;
         centerLng = validNavPoints.reduce((sum, p) => sum + p.longitude, 0) / validNavPoints.length;
       } else if (target && typeof target.latitude === 'number' && typeof target.longitude === 'number') {
@@ -151,6 +152,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         centerLng = target.longitude;
         zoom = 13;
       } else if (pointsWithGps.length > 0) {
+        zoom = 12;
         centerLat = pointsWithGps.reduce((sum, p) => sum + p.surface.carrier.latitude!, 0) / pointsWithGps.length;
         centerLng = pointsWithGps.reduce((sum, p) => sum + p.surface.carrier.longitude!, 0) / pointsWithGps.length;
       }

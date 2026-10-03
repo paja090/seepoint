@@ -990,7 +990,7 @@ export function NavigationOfferForm({
           </Field>
 
           <Field label="Název kampaně / prodejny">
-            <input className="input" placeholder="Např. Navigace Koupelny Ostrava" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} />
+            <input className="input" placeholder="Např. Navigace – název klienta" value={campaignName} onChange={(e) => setCampaignName(e.target.value)} />
           </Field>
 
           <Field label="Město navigačního systému">

@@ -23,7 +23,7 @@ Pro zajištění stability, bezpečnosti a automatického serverového přístup
 
 1. **Žádné klientské tokeny:** Google access token ani privátní klíč service accountu se nikdy nesmí dostat do prohlížeče.
 2. **Omezení přístupu:** API endpointy `/api/photos/[id]/content` a `/api/photos/[id]/thumbnail` provádějí kompletní kontrolu session a oprávnění uživatele. Nepřihlášený nebo neoprávněný uživatel soubor nestáhne ani při znalosti interního ID.
-3. **Předcházení injektážím:** Uživatel nemůže podstrčit libovolné `driveFileId` z cizího disku. Při propojování se volá funkce `verifyFileInFolder`, která ověřuje, zda soubor leží přímo v povolené firemní složce (`GOOGLE_DRIVE_FOLDER_ID`).
+3. **Předcházení injektážím a multi-tenant izolace:** Uživatel nemůže podstrčit libovolné `driveFileId` z cizího disku ani z jiné organizace. Každá organizace má vyhrazenou podsložku `organizations__${organizationId}` a soubory jsou označeny metadaty `appProperties: { seepointOrganizationId: organizationId }`. Při výběru i propojování (`/api/google-drive/images` a `/api/photos/link`) se striktně ověřuje tenantní příslušnost souboru přes `verifyFileInTenantStorage`.
 
 ---
 

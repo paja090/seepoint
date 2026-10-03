@@ -27,6 +27,7 @@ interface MockFile {
   content: Buffer;
   thumbnailLink?: string;
   parents: string[];
+  organizationId?: string;
 }
 
 const defaultMockFiles: MockFile[] = [
@@ -77,12 +78,55 @@ function getMockDriveFiles() {
     const map = new Map<string, MockFile>();
     defaultMockFiles.forEach(file => {
       const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
-      file.parents = [folderId];
-      map.set(file.id, file);
+      map.set(file.id, { ...file, parents: [folderId] });
     });
     globalForMockDrive.mockDriveFiles = map;
   }
   return globalForMockDrive.mockDriveFiles;
+}
+
+function seedTenantMockFilesIfEmpty(organizationId: string, folderId: string) {
+  const map = getMockDriveFiles();
+  for (const file of map.values()) {
+    if (file.organizationId === organizationId || file.parents.includes(folderId)) {
+      return;
+    }
+  }
+  const demoFiles: MockFile[] = [
+    {
+      id: `mock-${organizationId}-1`,
+      name: 'billboard-plakat-reklama.jpg',
+      mimeType: 'image/jpeg',
+      size: 1024 * 500,
+      content: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
+      thumbnailLink: 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=150&h=150&fit=crop',
+      parents: [folderId],
+      organizationId,
+    },
+    {
+      id: `mock-${organizationId}-2`,
+      name: 'citylight-plakat-vecer.png',
+      mimeType: 'image/png',
+      size: 1024 * 750,
+      content: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'),
+      thumbnailLink: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=150&h=150&fit=crop',
+      parents: [folderId],
+      organizationId,
+    },
+    {
+      id: `mock-${organizationId}-3`,
+      name: 'led-obrazovka-den.webp',
+      mimeType: 'image/webp',
+      size: 1024 * 320,
+      content: Buffer.from('UklGRhoAAABXRUJQVlA4TCEAAAAvAAAAEP8IEP8HAP8HAP8HAP8HAP8HAP8HAP8HAP8HAP8=', 'base64'),
+      thumbnailLink: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=150&h=150&fit=crop',
+      parents: [folderId],
+      organizationId,
+    },
+  ];
+  for (const f of demoFiles) {
+    map.set(f.id, f);
+  }
 }
 
 export function isGoogleDriveMockEnabled() {
@@ -196,9 +240,21 @@ async function getAccessToken() {
   );
 }
 
-async function getOrCreatePhotoFolder(accessToken: string) {
+export async function resolveTenantPhotoFolderId(orgId?: string): Promise<string> {
+  const organizationId = orgId || getTenantContext()?.organizationId;
+  const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+
+  if (isGoogleDriveMockEnabled()) {
+    return organizationId ? `${rootFolderId}/organizations/${organizationId}` : rootFolderId;
+  }
+
+  const accessToken = await getAccessToken();
+  return getOrCreatePhotoFolder(accessToken, organizationId);
+}
+
+export async function getOrCreatePhotoFolder(accessToken: string, orgId?: string) {
   const configuredRoot = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (configuredRoot) return getOrCreateOrganizationPhotoFolder(accessToken, configuredRoot);
+  if (configuredRoot) return getOrCreateOrganizationPhotoFolder(accessToken, configuredRoot, orgId);
 
   const query = [
     `mimeType = '${DRIVE_FOLDER_MIME_TYPE}'`,
@@ -220,7 +276,7 @@ async function getOrCreatePhotoFolder(accessToken: string) {
   if (!listResponse.ok) {
     throw new Error(`Google Drive folder lookup failed: ${listData.error?.message ?? listResponse.statusText}`);
   }
-  if (listData.files?.[0]?.id) return getOrCreateOrganizationPhotoFolder(accessToken, listData.files[0].id);
+  if (listData.files?.[0]?.id) return getOrCreateOrganizationPhotoFolder(accessToken, listData.files[0].id, orgId);
 
   const createResponse = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
     method: 'POST',
@@ -240,15 +296,16 @@ async function getOrCreatePhotoFolder(accessToken: string) {
     throw new Error(`Google Drive folder creation failed: ${createData.error?.message ?? createResponse.statusText}`);
   }
 
-  return getOrCreateOrganizationPhotoFolder(accessToken, createData.id);
+  return getOrCreateOrganizationPhotoFolder(accessToken, createData.id, orgId);
 }
 
-async function getOrCreateOrganizationPhotoFolder(accessToken: string, rootFolderId: string) {
-  const { organizationId } = requireTenantContext();
+export async function getOrCreateOrganizationPhotoFolder(accessToken: string, rootFolderId: string, orgId?: string) {
+  const organizationId = orgId || getTenantContext()?.organizationId || requireTenantContext().organizationId;
+  const escapedOrgId = organizationId.replaceAll("'", '');
   const query = [
     `mimeType = '${DRIVE_FOLDER_MIME_TYPE}'`,
     `'${rootFolderId}' in parents`,
-    `appProperties has { key='seepointOrganizationId' and value='${organizationId.replaceAll("'", '')}' }`,
+    `appProperties has { key='seepointOrganizationId' and value='${escapedOrgId}' }`,
     'trashed = false',
   ].join(' and ');
   const params = new URLSearchParams({ q: query, spaces: 'drive', pageSize: '1', fields: 'files(id)' });
@@ -280,6 +337,7 @@ export async function uploadPhotoToGoogleDrive(file: File, fileName: string, pho
       size: file.size,
       content: buffer,
       parents: [folderId],
+      organizationId,
       thumbnailLink: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=150&h=150&fit=crop',
     };
     getMockDriveFiles().set(mockFileId, newMockFile);
@@ -354,6 +412,7 @@ export async function uploadDocumentToGoogleDrive(file: File, fileName: string, 
       size: file.size,
       content: buffer,
       parents: [folderId],
+      organizationId,
     });
     return { id: mockFileId, name: fileName, mimeType: file.type, size: file.size };
   }
@@ -433,32 +492,59 @@ export async function deletePhotoFromGoogleDrive(fileId: string) {
 
 export async function listImagesInFolderPage(
   folderId: string,
-  options: { pageSize?: number; pageToken?: string } = {},
+  options: { pageSize?: number; pageToken?: string; organizationId?: string } = {},
 ): Promise<GoogleDriveFilePage> {
   const pageSize = Math.max(1, Math.min(options.pageSize ?? 100, 200));
+  const organizationId = options.organizationId || getTenantContext()?.organizationId;
+  const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || 'mock-folder-id';
+
+  // If a tenant context is active and folderId is the global root or default, resolve to the tenant's dedicated folder
+  let targetFolderId = folderId;
+  if (organizationId && (folderId === rootFolderId || folderId === 'mock-folder-id' || folderId === 'root')) {
+    targetFolderId = await resolveTenantPhotoFolderId(organizationId);
+  }
+
   if (isGoogleDriveMockEnabled()) {
     const list: GoogleDriveFile[] = [];
-    getMockDriveFiles().forEach(file => {
-      if (file.parents.includes(folderId)) {
-        list.push({
-          id: file.id,
-          name: file.name,
-          mimeType: file.mimeType,
-          size: file.size,
-          thumbnailLink: file.thumbnailLink,
-        });
+    const filesMap = getMockDriveFiles();
+
+    if (organizationId) {
+      seedTenantMockFilesIfEmpty(organizationId, targetFolderId);
+    }
+
+    filesMap.forEach(file => {
+      if (organizationId) {
+        // Enforce strict multi-tenant boundary: file MUST belong to this organization!
+        const belongsToTenant = file.parents.includes(targetFolderId) || file.organizationId === organizationId;
+        const belongsToOtherTenant = Boolean(file.organizationId && file.organizationId !== organizationId);
+        if (!belongsToTenant || belongsToOtherTenant) return;
+      } else {
+        if (!file.parents.includes(targetFolderId)) return;
       }
+
+      list.push({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size,
+        thumbnailLink: file.thumbnailLink,
+      });
     });
+
     const offset = Math.max(0, Number.parseInt(options.pageToken ?? '0', 10) || 0);
     const files = list.slice(offset, offset + pageSize);
     return { files, nextPageToken: offset + files.length < list.length ? String(offset + files.length) : null };
   }
 
   const accessToken = await getAccessToken();
-  const query = `'${folderId}' in parents and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'image/webp') and trashed = false`;
+  const escapedOrgId = organizationId ? organizationId.replaceAll("'", '') : '';
+  const query = organizationId
+    ? `('${targetFolderId}' in parents or appProperties has { key='seepointOrganizationId' and value='${escapedOrgId}' }) and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'image/webp') and trashed = false`
+    : `'${targetFolderId}' in parents and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'image/webp') and trashed = false`;
+
   const params = new URLSearchParams({
     q: query,
-    fields: 'nextPageToken, files(id, name, mimeType, size, thumbnailLink)',
+    fields: 'nextPageToken, files(id, name, mimeType, size, thumbnailLink, parents, appProperties)',
     pageSize: String(pageSize),
     supportsAllDrives: 'true',
     includeItemsFromAllDrives: 'true',
@@ -469,7 +555,15 @@ export async function listImagesInFolderPage(
     cache: 'no-store',
   });
   const data = (await response.json()) as {
-    files?: Array<{ id: string; name: string; mimeType: string; size?: string; thumbnailLink?: string }>;
+    files?: Array<{
+      id: string;
+      name: string;
+      mimeType: string;
+      size?: string;
+      thumbnailLink?: string;
+      parents?: string[];
+      appProperties?: Record<string, string>;
+    }>;
     nextPageToken?: string;
     error?: { message?: string };
   };
@@ -478,8 +572,18 @@ export async function listImagesInFolderPage(
     throw new Error(`Google Drive list failed: ${data.error?.message ?? response.statusText}`);
   }
 
+  const filteredFiles = (data.files ?? []).filter(file => {
+    if (!organizationId) return true;
+    // Strict post-filtering: if tagged with an org, must match this org
+    if (file.appProperties?.seepointOrganizationId) {
+      return file.appProperties.seepointOrganizationId === organizationId;
+    }
+    // If not tagged, must be inside the tenant's dedicated folder
+    return file.parents?.includes(targetFolderId) ?? false;
+  });
+
   return {
-    files: (data.files ?? []).map(file => ({
+    files: filteredFiles.map(file => ({
       id: file.id,
       name: file.name,
       mimeType: file.mimeType,
@@ -494,7 +598,46 @@ export async function listImagesInFolder(folderId: string): Promise<GoogleDriveF
   return (await listImagesInFolderPage(folderId, { pageSize: 200 })).files;
 }
 
+export async function verifyFileInTenantStorage(fileId: string, organizationId?: string): Promise<boolean> {
+  const orgId = organizationId || getTenantContext()?.organizationId || requireTenantContext().organizationId;
+  const tenantFolderId = await resolveTenantPhotoFolderId(orgId);
+
+  if (isGoogleDriveMockEnabled()) {
+    const file = getMockDriveFiles().get(fileId);
+    if (!file) return false;
+    if (file.organizationId && file.organizationId !== orgId) return false;
+    return file.parents.includes(tenantFolderId) || file.organizationId === orgId;
+  }
+
+  const accessToken = await getAccessToken();
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,parents,appProperties&supportsAllDrives=true`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    },
+  );
+
+  if (!response.ok) return false;
+  const data = (await response.json()) as {
+    parents?: string[];
+    appProperties?: Record<string, string>;
+  };
+
+  if (data.appProperties?.seepointOrganizationId) {
+    return data.appProperties.seepointOrganizationId === orgId;
+  }
+
+  return data.parents?.includes(tenantFolderId) ?? false;
+}
+
 export async function verifyFileInFolder(fileId: string, folderId: string): Promise<boolean> {
+  const activeTenant = getTenantContext()?.organizationId;
+  const rootFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+  if (activeTenant && rootFolderId && (folderId === rootFolderId || folderId === 'mock-folder-id')) {
+    return verifyFileInTenantStorage(fileId, activeTenant);
+  }
+
   if (isGoogleDriveMockEnabled()) {
     const file = getMockDriveFiles().get(fileId);
     return file?.parents.includes(folderId) ?? false;

@@ -245,6 +245,11 @@ export function WorkRoutePlanner({
       </header>
 
       {/* Profile Settings Modal */}
+      {loaded && !loaded.profile && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Nejdříve otevřete Nastavení depa a zadejte výchozí místo a místo návratu své firmy.
+        </p>
+      )}
       {settingsOpen && (
         <PlanningProfileForm
           navigation={navigation}

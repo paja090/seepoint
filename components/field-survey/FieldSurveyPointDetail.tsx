@@ -131,7 +131,7 @@ export function FieldSurveyPointDetail({
   // Carrier conversion state
   const [carrierCode, setCarrierCode] = useState(`CAR-${point.surfaceType}-${point.id.slice(-5).toUpperCase()}`);
   const [carrierName, setCarrierName] = useState(`Nosič ${point.address || point.surfaceType}`);
-  const [carrierCity, setCarrierCity] = useState(point.parcelData?.municipality || 'Ostrava');
+  const [carrierCity, setCarrierCity] = useState(point.parcelData?.municipality || '');
   const [carrierType, setCarrierType] = useState('BILLBOARD');
   const [isConverting, setIsConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<string | null>(null);
@@ -849,7 +849,7 @@ export function FieldSurveyPointDetail({
                     type="text"
                     value={manualCadastralArea}
                     onChange={(e) => setManualCadastralArea(e.target.value)}
-                    placeholder="Např. Moravská Ostrava"
+                    placeholder="Název katastrálního území"
                     className="input w-full"
                   />
                 </div>
@@ -859,7 +859,7 @@ export function FieldSurveyPointDetail({
                     type="text"
                     value={manualMunicipality}
                     onChange={(e) => setManualMunicipality(e.target.value)}
-                    placeholder="Např. Ostrava"
+                    placeholder="Název obce"
                     className="input w-full"
                   />
                 </div>
@@ -913,7 +913,7 @@ export function FieldSurveyPointDetail({
                 type="text"
                 value={ownerName}
                 onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="Např. Dopravní podnik, Skanska, Město Ostrava..."
+                placeholder="Název vlastníka nebo organizace"
                 className="input flex-1"
               />
               <button

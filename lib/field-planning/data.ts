@@ -1,20 +1,16 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
-import { coordinates, dayInZone, defaultPlanningProfile, parseConstraints, parseProfile, profileForNavigation, zonedTime } from './profile';
+import { coordinates, dayInZone, parseConstraints, parseProfile, profileForNavigation, zonedTime } from './profile';
 import { navigationAvailable } from './capabilities';
 import { workItemJobs, usesItemExecution } from './item-jobs';
 import { navigationPointJobs } from './navigation-jobs';
 import type { PlanningJob, PlanningInput, PlanningProfile, CrewInput } from './contracts';
 
-export async function loadProfile(db: Prisma.TransactionClient = prisma): Promise<PlanningProfile> {
+export async function loadProfile(db: Prisma.TransactionClient = prisma): Promise<PlanningProfile | null> {
   const { organizationId } = requireTenantContext();
   const row = await db.organizationFieldPlanningProfile.findUnique({ where: { organizationId } });
-  if (!row) {
-    const org = await db.organization.findUnique({ where: { id: organizationId }, select: { city: true, country: true } });
-    const profile = defaultPlanningProfile({ country: org?.country ?? 'CZ' });
-    return profileForNavigation(profile, await navigationAvailable(db));
-  }
+  if (!row) return null;
   const profile = parseProfile(row.configuration);
   return profileForNavigation(profile, await navigationAvailable(db));
 }
@@ -23,6 +19,7 @@ export async function loadPlanningData(date: string, options: {
 } = {}, db: Prisma.TransactionClient = prisma): Promise<PlanningInput> {
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(db);
+  if (!profile) throw new Error('Nejdříve nastavte vlastní depo v Nastavení depa.');
   const navigation = await navigationAvailable(db);
   if (!navigation && options.jobIds?.some(id => id.startsWith('navigation-point:'))) throw new Error('FORBIDDEN: Navigation není aktivní.');
   if (!profile.enabled) throw new Error('Plánování výjezdů je v profilu organizace vypnuto.');

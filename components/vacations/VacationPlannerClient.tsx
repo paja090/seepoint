@@ -277,7 +277,7 @@ export function VacationPlannerClient({ currentUser, employees, initialAbsences 
           <div className="py-12 text-center text-slate-400">
             <CalendarIcon className="mx-auto h-10 w-10 text-slate-300 mb-2" />
             <p className="text-sm font-semibold">Zatím nebyly vloženy žádné dovolené.</p>
-            <p className="text-xs text-slate-400 mt-0.5">Vložte první žádost o volno tlačítkem nahoře.</p>
+            <p className="text-xs text-slate-400 mt-0.5">{selectedEmployeeId ? 'Vložte první žádost o volno tlačítkem nahoře.' : 'Pro zadání volna je potřeba dostupný zaměstnanecký profil. Obraťte se na správce své organizace.'}</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100 overflow-x-auto">
