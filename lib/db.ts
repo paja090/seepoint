@@ -229,25 +229,6 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
             id: upcomingReservation.clientId ?? `client-${upcomingReservation.id}`,
             name: upcomingReservation.clientName,
           };
-        } else if (surface.status === 'AVAILABLE' || surface.currentClientId === null) {
-          // Explicitly available or cleared in database
-          derivedStatus = 'AVAILABLE';
-          derivedClientId = undefined;
-          derivedClient = undefined;
-        } else if (surface.occupancies.length > 0) {
-          // If all occupancies are finished or cancelled: surface is definitively AVAILABLE
-          const hasAnyActiveOrUpcoming = surface.occupancies.some((o) =>
-            ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(o.status)
-          );
-          if (!hasAnyActiveOrUpcoming) {
-            derivedStatus = 'AVAILABLE';
-            derivedClientId = undefined;
-            derivedClient = undefined;
-          } else if (carrier.type !== 'NAVIGATION') {
-            derivedStatus = 'AVAILABLE';
-            derivedClientId = undefined;
-            derivedClient = undefined;
-          }
         } else if (surface.currentClient && surface.status === 'OCCUPIED') {
           // Direct surface assignment without separate occupancy table records
           derivedStatus = 'OCCUPIED';
@@ -256,7 +237,9 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
             id: surface.currentClient.id,
             name: surface.currentClient.name,
           };
-        } else if (carrier.type !== 'NAVIGATION') {
+        } else {
+          // No active campaign, no upcoming reservation, no assigned client:
+          // The surface is definitively AVAILABLE
           derivedStatus = 'AVAILABLE';
           derivedClientId = undefined;
           derivedClient = undefined;

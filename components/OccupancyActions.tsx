@@ -72,7 +72,7 @@ export function OccupancyActions({
   const currentSurface = surfaces.find((s) => s.id === surfaceId) || surfaces[0];
   const activeOccupancy = currentSurface?.activeOccupancy ?? (surfaceId === surfaces[0]?.id ? initialActiveOccupancy : undefined);
 
-  const [bookingStatus, setBookingStatus] = useState<'OCCUPIED' | 'RESERVED' | 'NEGOTIATION'>('OCCUPIED');
+  const [bookingStatus, setBookingStatus] = useState<'AVAILABLE' | 'OCCUPIED' | 'RESERVED' | 'NEGOTIATION'>('OCCUPIED');
   const [clientId, setClientId] = useState('');
   const [clientName, setClientName] = useState('');
   const [campaignName, setCampaignName] = useState('');
@@ -199,8 +199,8 @@ export function OccupancyActions({
             <div className="flex flex-wrap gap-1.5 mt-1">
               {surfaces.map((s) => {
                 const isSelected = s.id === surfaceId;
-                const isOcc = s.activeOccupancy?.status === 'OCCUPIED' || s.status === 'OCCUPIED';
-                const isRes = s.activeOccupancy?.status === 'RESERVED' || s.status === 'RESERVED';
+                const isOcc = s.status === 'OCCUPIED';
+                const isRes = s.status === 'RESERVED';
 
                 return (
                   <button
@@ -233,11 +233,7 @@ export function OccupancyActions({
 
           <div className="text-right">
             <span className="text-[10px] font-bold text-slate-500 uppercase block">Aktuální stav plochy</span>
-            {activeOccupancy ? (
-              <StatusBadge value={activeOccupancy.status} />
-            ) : (
-              <StatusBadge value="AVAILABLE" />
-            )}
+            <StatusBadge value={currentSurface?.status || 'AVAILABLE'} />
           </div>
         </div>
       )}
@@ -341,8 +337,19 @@ export function OccupancyActions({
             {activeOccupancy ? 'Nová budoucí rezervace na tuto plochu' : 'Zadat obsazenost / rezervaci plochy'}
           </h4>
 
-          {/* Status selector (OCCUPIED vs RESERVED vs NEGOTIATION) */}
+          {/* Status selector (AVAILABLE vs OCCUPIED vs RESERVED vs NEGOTIATION) */}
           <div className="flex rounded-xl bg-slate-200/80 p-0.5 text-2xs font-extrabold">
+            <button
+              type="button"
+              onClick={() => setBookingStatus('AVAILABLE')}
+              className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                bookingStatus === 'AVAILABLE'
+                  ? 'bg-slate-900 text-white shadow-2xs font-black'
+                  : 'text-slate-700 hover:text-slate-950'
+              }`}
+            >
+              ⚪ Volná
+            </button>
             <button
               type="button"
               onClick={() => setBookingStatus('OCCUPIED')}
@@ -379,23 +386,47 @@ export function OccupancyActions({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 text-xs">
-          {surfaces.length > 1 && (
-            <label>
-              <span className="mb-1 block font-bold uppercase tracking-wide text-slate-600 text-[11px]">Reklamní plocha</span>
-              <select
-                className="input w-full"
-                value={surfaceId}
-                onChange={(event) => handleSurfaceSelect(event.target.value)}
+        {bookingStatus === 'AVAILABLE' ? (
+          <div className="rounded-2xl border border-slate-300 bg-white p-4 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2 text-slate-950">
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+              <span className="font-bold text-xs">
+                Nastavit plochu <strong>{currentSurface?.name}</strong> jako VOLNOU k okamžitému pronájmu
+              </span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Plocha bude označena jako volná k okamžitému pronájmu pro nové klienty. Případné stávající rezervace a vazba na klienta budou zrušeny a plocha se ihned uvolní v přehledu obsazenosti i v mapě.
+            </p>
+            <div className="pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void runAction('free')}
+                className="flex items-center gap-1.5 font-black text-xs px-4 py-2.5 rounded-xl shadow-xs bg-slate-900 hover:bg-slate-800 text-white transition cursor-pointer disabled:opacity-50"
               >
-                {surfaces.map((surface) => (
-                  <option key={surface.id} value={surface.id}>
-                    {surface.name} {surface.activeOccupancy ? `(Obsazeno: ${surface.activeOccupancy.clientName})` : '(Volná)'}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+                {saving ? 'Ukládám…' : '🚪 Potvrdit: Označit plochu jako VOLNOU'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-3 md:grid-cols-2 text-xs">
+              {surfaces.length > 1 && (
+                <label>
+                  <span className="mb-1 block font-bold uppercase tracking-wide text-slate-600 text-[11px]">Reklamní plocha</span>
+                  <select
+                    className="input w-full"
+                    value={surfaceId}
+                    onChange={(event) => handleSurfaceSelect(event.target.value)}
+                  >
+                    {surfaces.map((surface) => (
+                      <option key={surface.id} value={surface.id}>
+                        {surface.name} {surface.status === 'OCCUPIED' && surface.activeOccupancy ? `(Obsazeno: ${surface.activeOccupancy.clientName})` : '(Volná)'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
           <label className={surfaces.length === 1 ? 'md:col-span-2' : ''}>
             <span className="mb-1 block font-bold uppercase tracking-wide text-slate-600 text-[11px]">Klient *</span>
@@ -543,6 +574,8 @@ export function OccupancyActions({
             )}
           </button>
         </div>
+      </>
+    )}
 
         {conflicts.some((conflict) => conflict.severity === 'warning') && (
           <button

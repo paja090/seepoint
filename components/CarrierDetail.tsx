@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Carrier, Client, Occupancy } from '@/lib/types';
+import type { Carrier, Client, Occupancy, SurfaceStatus } from '@/lib/types';
 import { mediaTypeLabel, carrierTypeLabel } from '@/lib/carrier-filters';
 import { CarrierArchiveActions } from './CarrierArchiveActions';
 import { LocationMiniMap } from './LocationMiniMap';
@@ -150,7 +150,7 @@ export function CarrierDetail({
     const directOcc: Occupancy | undefined =
       !activeOcc &&
       !upcomingOcc &&
-      (surface.status === 'OCCUPIED' || Boolean(surface.currentClient))
+      Boolean(surface.currentClient)
         ? {
             id: `direct-${surface.id}`,
             surfaceId: surface.id,
@@ -165,26 +165,30 @@ export function CarrierDetail({
           }
         : undefined;
 
+    const finalActiveOcc = activeOcc ?? upcomingOcc ?? directOcc ?? null;
+    const computedStatus: SurfaceStatus =
+      surface.status === 'OUT_OF_SERVICE'
+        ? 'OUT_OF_SERVICE'
+        : finalActiveOcc?.status === 'RESERVED'
+        ? 'RESERVED'
+        : finalActiveOcc
+        ? 'OCCUPIED'
+        : 'AVAILABLE';
+
     return {
       id: surface.id,
       name: surface.name,
       price: surface.price,
-      status: surface.status,
+      status: computedStatus,
       currentClient: surface.currentClient,
-      activeOccupancy: activeOcc ?? upcomingOcc ?? directOcc ?? null,
+      activeOccupancy: finalActiveOcc,
     };
   });
 
   const totalSurfacesCount = carrier.surfaces.length;
-  const occupiedSurfacesCount = carrier.surfaces.filter(
-    (s) => s.status === 'OCCUPIED' || Boolean(s.currentClient) || s.occupancies.some((o) => o.status === 'OCCUPIED' && o.dateFrom <= todayStr && o.dateTo >= todayStr)
-  ).length;
-  const reservedSurfacesCount = carrier.surfaces.filter(
-    (s) => s.status === 'RESERVED' || s.occupancies.some((o) => o.status === 'RESERVED' && o.dateTo >= todayStr)
-  ).length;
-  const availableSurfacesCount = carrier.surfaces.filter(
-    (s) => s.status === 'AVAILABLE' && !s.currentClient && !s.occupancies.some((o) => ['OCCUPIED', 'RESERVED'].includes(o.status) && o.dateTo >= todayStr)
-  ).length;
+  const occupiedSurfacesCount = surfaceOccupancyList.filter((s) => s.status === 'OCCUPIED').length;
+  const reservedSurfacesCount = surfaceOccupancyList.filter((s) => s.status === 'RESERVED').length;
+  const availableSurfacesCount = surfaceOccupancyList.filter((s) => s.status === 'AVAILABLE').length;
 
   const currentSelectedSurface = surfaceOccupancyList.find((s) => s.id === selectedSurfaceId) || surfaceOccupancyList[0];
   const primaryCampaign = currentSelectedSurface?.activeOccupancy ?? undefined;
@@ -599,8 +603,9 @@ export function CarrierDetail({
               {carrier.surfaces.map((s) => {
                 const sInfo = surfaceOccupancyList.find((item) => item.id === s.id);
                 const isSelected = s.id === selectedSurfaceId;
-                const isOcc = sInfo?.activeOccupancy?.status === 'OCCUPIED' || s.status === 'OCCUPIED';
-                const isRes = sInfo?.activeOccupancy?.status === 'RESERVED' || s.status === 'RESERVED';
+                const statusValue = sInfo?.status ?? 'AVAILABLE';
+                const isOcc = statusValue === 'OCCUPIED';
+                const isRes = statusValue === 'RESERVED';
 
                 return (
                   <button
