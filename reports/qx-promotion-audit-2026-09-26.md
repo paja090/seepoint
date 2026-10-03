@@ -418,3 +418,34 @@ Potvrzené živé výsledky: Drive upload/download s kontrolou obsahu a odmítnu
 - Produkční nasazení READY: dpl_BYooCsxBZEAExqncJ4XJ8pwskCvn, https://seepoint-zc1t5hmle-pavels-projects-073588fb.vercel.app, alias https://seepoint.vercel.app.
 - Živě po obnovení pod QX ADMIN ověřena prázdná mapa průzkumu: neutrální světový výřez, žádné tlačítko ostravských zón, žádné body, identita QX promotion. Snímek reports/qx-survey-map-fixed-2026-10-03.png.
 - Omezení: změna klientské mapy kampaně a výchozího města převodu ověřena kódem, typy a produkčním buildem; skutečná klientská kampaň ani převod bodu na nosič v této dávce nevytvořeny. Nejde o potvrzení kompletní bezpečnosti všech stránek.
+
+## 2026-10-03 – Filtry průzkumu lokalit
+
+- Živě pod QX ADMIN ověřen seznam /mobile-surveys: obsahoval pouze známou QX testovací navigační nabídku se dvěma body. Není to úplný důkaz tenant izolace celého modulu.
+- Reprodukována chyba: filtr Čeká na supervizi zobrazoval stejnou nabídku se dvěma schválenými body. Nabídky se do výsledků přidávaly bez ohledu na filtr. Oprava je do pendingReview nepřidává, protože nemají kandidátský supervizní workflow.
+- Moje projekty filtruje nabídky podle autora nebo přiděleného montážníka bodů. U zakázek se již nepřepisuje textové hledání druhou OR podmínkou; opraveno ve stránce i GET /api/navigation/surveys.
+- Chybové odpovědi stránky a API nyní neukazují surové databázové zprávy. Podrobnosti zůstávají v serverovém logu.
+- npm run security:tenant, npm run typecheck a git diff --check prošly. Bez změny uložených záznamů či rolí.
+- Další nález k následné kontrole: OfferMap a NavigationPointMap nadále automaticky přidávají veřejnou ostravskou geografickou vrstvu. Jde o regionální nastavení, nikoli samo o sobě prokázaný únik firemních dat. Tato dávka ji nemění.
+- Produkční nasazení dpl_4dC3CVFBHuptsUVRLgGSxBdiUn4J READY, https://seepoint-ie0794f2h-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app. Build prošel.
+- Živě po nasazení: Čeká na supervizi prázdné; Všechny projekty stále obsahují původní QX testovací nabídku se 2 body; Moje projekty pro audit ADMIN prázdné. Screenshot reports/qx-survey-filter-fixed-2026-10-03.png.
+- Doplňkově /navigation/installations: TEST QX – audit ADMIN, všechny počty 0, problémová sekce prázdná. Žádná montáž nebyla vytvořena nebo změněna. Pozitivní přiřazení nabídky ani supervize reálného kandidáta nebyly v této dávce testovány.
+
+## 2026-10-03 – Detail navigace, výstavy a městský inventář
+
+- Živě detail průzkumu QX: správný testovací cíl, dva známé testovací body v mapě i seznamu. Žádné cizí klientské názvy v tomto pohledu.
+- Výstavní & Promo sítě: 0 projektů a 0 kusů fondu. Nový formulář měl skutečně předvyplněnou Ostravu a regionální příklady. Opraveno: prázdné povinné město při otevření i resetu, neutrální názvy a pořadatel, chybějící město projektu už není nahrazováno Ostravou. Typecheck a diff --check prošly.
+- Městský inventář: 1 nosič OST-BG-7963 – Výškovická – Bigboard (cmusdmww40005l704yqkgvc1m). Uživatel výslovně potvrdil, že jej založil pro QX. Není evidován jako únik. Stránka má explicitní organizationId filtr.
+- Veřejná ostravská geografická vrstva v OfferMap, NavigationPointMap a GoogleNavigationOfferMap zůstává k další opravě. Nezaměňovat s cizími firemními daty. Výchozí schválený stav nabídky v průzkumu je synteticky mapovaný v API; nebyl zde prováděn skutečný proces supervize.
+- Nasazení dpl_CHcRoUfuuqCJe8d7mK4QvkTMKwFg READY, https://seepoint-qz4o0blh2-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app. Produkční build prošel.
+- Živě otevřen nový formulář po reloadu: město prázdné, název/lokalita/pořadatel neutrální. Formulář zrušen bez vytvoření projektu. Důkaz reports/qx-gallery-city-default-fixed-2026-10-03.png.
+
+## 2026-10-03 – Volitelné regionální mapové vrstvy
+
+- NavigationPointMap a OfferMap: ostravský GeoJSON se již nepřidává automaticky do mapy; je dostupný v ovladači vrstev pod výslovným názvem Ostrava – zóny omezení reklamy.
+- GoogleNavigationOfferMap: regionální polygony jsou ve výchozím stavu vypnuté a ovládá je viditelný checkbox. Změna není oprávněním ani zápisem do firemních dat.
+- Náhradní NavigationPointMap nově překreslí body po asynchronní inicializaci mapy (mapReady) a při změně targets. Google fallback předává všechny targets místo pouze prvního cíle.
+- Typecheck a git diff --check prošly. Výchozí český pohled prázdné navigační mapy a geografické filtrování automatických návrhů tras tato dávka nemění.
+- Nasazení dpl_53SNWSd7vc9w2DBkjjQfJe7Zx2K3 READY, https://seepoint-hsn6emk3w-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app; produkční build prošel.
+- Živě QX testovací průzkum po reloadu: přepínač regionální vrstvy výchozí nezaškrtnutý; zaškrtnutí a odškrtnutí funguje, oba testovací markery i cíl zůstaly v DOM a mapa zachovala výřez. Vrstva ponechána vypnutá. Screenshot reports/qx-navigation-layer-fixed-2026-10-03.png.
+- Limity: vlastní ostravské polygony leží mimo tento testovací výřez, jejich geometrie nebyla vizuálně ověřena. Leaflet fallback a OfferMap prošly kódovou a typovou kontrolou, nebyly v této dávce samostatně živě otevřeny. Nebyl proveden zápis navigačních bodů.

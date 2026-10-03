@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Carrier, Client } from '@/lib/types';
+import type { Carrier, Client, Occupancy, SurfaceStatus } from '@/lib/types';
 import { mediaTypeLabel, carrierTypeLabel } from '@/lib/carrier-filters';
 import { CarrierArchiveActions } from './CarrierArchiveActions';
 import { LocationMiniMap } from './LocationMiniMap';
@@ -130,8 +130,69 @@ export function CarrierDetail({
       campaign.dateFrom > todayStr
   );
 
-  const primaryCampaign = activeCampaigns[0] ?? upcomingCampaigns[0];
-  const daysToEnd = primaryCampaign
+  const [selectedSurfaceId, setSelectedSurfaceId] = useState(carrier.surfaces[0]?.id ?? '');
+
+  const surfaceOccupancyList = carrier.surfaces.map((surface) => {
+    const activeOcc = surface.occupancies.find(
+      (o) =>
+        ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(o.status) &&
+        o.dateFrom <= todayStr &&
+        o.dateTo >= todayStr
+    );
+    const upcomingOcc = !activeOcc
+      ? surface.occupancies.find(
+          (o) =>
+            ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(o.status) &&
+            o.dateFrom > todayStr
+        )
+      : undefined;
+
+    const directOcc: Occupancy | undefined =
+      !activeOcc &&
+      !upcomingOcc &&
+      Boolean(surface.currentClient)
+        ? {
+            id: `direct-${surface.id}`,
+            surfaceId: surface.id,
+            clientId: surface.currentClient?.id ?? undefined,
+            clientName: surface.currentClient?.name ?? 'Klient',
+            campaignName: 'Aktivní pronájem plochy',
+            dateFrom: todayStr,
+            dateTo: todayStr,
+            status: 'OCCUPIED' as const,
+            price: surface.price ?? undefined,
+            note: surface.note ?? undefined,
+          }
+        : undefined;
+
+    const finalActiveOcc = activeOcc ?? upcomingOcc ?? directOcc ?? null;
+    const computedStatus: SurfaceStatus =
+      surface.status === 'OUT_OF_SERVICE'
+        ? 'OUT_OF_SERVICE'
+        : finalActiveOcc?.status === 'RESERVED'
+        ? 'RESERVED'
+        : finalActiveOcc
+        ? 'OCCUPIED'
+        : 'AVAILABLE';
+
+    return {
+      id: surface.id,
+      name: surface.name,
+      price: surface.price,
+      status: computedStatus,
+      currentClient: surface.currentClient,
+      activeOccupancy: finalActiveOcc,
+    };
+  });
+
+  const totalSurfacesCount = carrier.surfaces.length;
+  const occupiedSurfacesCount = surfaceOccupancyList.filter((s) => s.status === 'OCCUPIED').length;
+  const reservedSurfacesCount = surfaceOccupancyList.filter((s) => s.status === 'RESERVED').length;
+  const availableSurfacesCount = surfaceOccupancyList.filter((s) => s.status === 'AVAILABLE').length;
+
+  const currentSelectedSurface = surfaceOccupancyList.find((s) => s.id === selectedSurfaceId) || surfaceOccupancyList[0];
+  const primaryCampaign = currentSelectedSurface?.activeOccupancy ?? undefined;
+  const daysToEnd = primaryCampaign?.dateTo
     ? Math.ceil((new Date(`${primaryCampaign.dateTo}T00:00:00.000Z`).getTime() - Date.now()) / 86_400_000)
     : undefined;
 
@@ -503,35 +564,101 @@ export function CarrierDetail({
           />
         </section>
       ) : (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+        <section id="occupancy-section" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs scroll-mt-6">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <h3 className="font-bold text-slate-950 text-sm">Aktuální Kampaň & Obsazenost Plochy</h3>
-              <p className="text-xs text-slate-500">Přímá rezervace nebo prodloužení pronájmu pro obchodníka.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-bold text-slate-950 text-sm">Aktuální Kampaň & Obsazenost Ploch</h3>
+                {totalSurfacesCount > 1 && (
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                    {occupiedSurfacesCount === totalSurfacesCount
+                      ? `🟢 Plně obsazeno (${occupiedSurfacesCount}/${totalSurfacesCount})`
+                      : availableSurfacesCount === totalSurfacesCount
+                      ? `⚪ Plně volné (${totalSurfacesCount}/${totalSurfacesCount})`
+                      : `🟡 Částečně obsazeno (${occupiedSurfacesCount + reservedSurfacesCount}/${totalSurfacesCount} ploch)`}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {totalSurfacesCount > 1
+                  ? `Tento nosič má ${totalSurfacesCount} samostatné reklamní plochy. Zvolte plochu pro zobrazení a správu kampaně.`
+                  : 'Přímá rezervace nebo zadání obsazenosti pro obchodníka.'}
+              </p>
             </div>
-            {primaryCampaign ? <StatusBadge value={primaryCampaign.status} /> : <StatusBadge value="AVAILABLE" />}
+            {primaryCampaign ? (
+              <StatusBadge value={primaryCampaign.status} />
+            ) : currentSelectedSurface ? (
+              <StatusBadge value={currentSelectedSurface.status || 'AVAILABLE'} />
+            ) : (
+              <StatusBadge value="AVAILABLE" />
+            )}
           </div>
 
+          {/* 🧭 Multi-surface selector buttons */}
+          {totalSurfacesCount > 1 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-2xl bg-slate-100/80 p-2 border border-slate-200">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
+                Zvolená plocha:
+              </span>
+              {carrier.surfaces.map((s) => {
+                const sInfo = surfaceOccupancyList.find((item) => item.id === s.id);
+                const isSelected = s.id === selectedSurfaceId;
+                const statusValue = sInfo?.status ?? 'AVAILABLE';
+                const isOcc = statusValue === 'OCCUPIED';
+                const isRes = statusValue === 'RESERVED';
+
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSurfaceId(s.id)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-950 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-300'
+                    }`}
+                  >
+                    <span>{s.name}</span>
+                    <span
+                      className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                        isOcc
+                          ? isSelected ? 'bg-emerald-500 text-slate-950' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : isRes
+                          ? isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {isOcc ? 'Obsazeno' : isRes ? 'Rezervace' : 'Volná'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {primaryCampaign ? (
-            <div className="grid gap-2 text-xs md:grid-cols-2 rounded-xl bg-slate-50 p-3 border border-slate-200">
-              <p><b>Klient:</b> {primaryCampaign.clientName}</p>
+            <div className="grid gap-2 text-xs md:grid-cols-2 rounded-xl bg-slate-50 p-3.5 border border-slate-200">
+              <p><b>Plocha:</b> <strong className="text-slate-950">{currentSelectedSurface?.name}</strong></p>
+              <p><b>Klient:</b> <strong className="text-slate-950">{primaryCampaign.clientName}</strong></p>
               <p><b>Kampaň:</b> {primaryCampaign.campaignName}</p>
-              <p><b>Plocha:</b> {primaryCampaign.surface}</p>
               <p><b>Termín:</b> {primaryCampaign.dateFrom} – {primaryCampaign.dateTo}</p>
               <p><b>Do konce:</b> {daysToEnd !== undefined ? `${daysToEnd} dnů` : 'neuvedeno'}</p>
-              {primaryCampaign.price && <p><b>Cena:</b> {primaryCampaign.price.toLocaleString('cs-CZ')} Kč</p>}
-              {primaryCampaign.note && <p className="md:col-span-2"><b>Poznámka:</b> {primaryCampaign.note}</p>}
+              {primaryCampaign.price && <p><b>Cena:</b> {primaryCampaign.price.toLocaleString('cs-CZ')} Kč/měs.</p>}
+              {primaryCampaign.note && <p className="md:col-span-2 text-slate-600 italic"><b>Poznámka:</b> {primaryCampaign.note}</p>}
             </div>
           ) : (
             <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
-              ✓ Na tomto nosiči je plocha plně volná k okamžité rezervaci.
+              ✓ Na ploše {currentSelectedSurface ? `"${currentSelectedSurface.name}"` : ''} je prostor plně volný k okamžité rezervaci nebo obsazení.
             </p>
           )}
 
           <OccupancyActions
             activeOccupancy={primaryCampaign}
             clients={clients}
-            surfaces={carrier.surfaces.map((surface) => ({ id: surface.id, name: surface.name, price: surface.price }))}
+            surfaces={surfaceOccupancyList}
+            selectedSurfaceId={selectedSurfaceId}
+            onSurfaceChange={setSelectedSurfaceId}
+            isNavigation={carrier.type === 'NAVIGATION'}
           />
         </section>
       )}
@@ -565,16 +692,19 @@ export function CarrierDetail({
                 (surface.photos || []).some((p) => p.type === 'DAMAGE') ||
                 surface.note?.includes('ZÁVADA');
 
+              const surfaceInfo = surfaceOccupancyList.find((item) => item.id === surface.id);
+              const activeOcc = surfaceInfo?.activeOccupancy;
+
               return (
                 <div
-                  className={`rounded-xl border p-3 flex items-center justify-between gap-2 transition ${
+                  className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition ${
                     isSurfaceDamaged
                       ? 'border-rose-400 bg-rose-50/70 ring-1 ring-rose-200'
                       : 'border-slate-200 bg-slate-50'
                   }`}
                   key={surface.id}
                 >
-                  <div>
+                  <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5">
                       <p className="font-bold text-slate-950">{surface.name}</p>
                       {isSurfaceDamaged && (
@@ -584,16 +714,21 @@ export function CarrierDetail({
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-500 mt-0.5">
-                      {mediaTypeLabel(surface.mediaType)} · Klient: <strong className="text-slate-800">{surface.currentClient?.name ?? 'bez klienta'}</strong>
+                    <p className="text-slate-500">
+                      {mediaTypeLabel(surface.mediaType)} · Klient: <strong className="text-slate-800">{surface.currentClient?.name ?? activeOcc?.clientName ?? 'bez klienta (volná)'}</strong>
                     </p>
+                    {activeOcc && (
+                      <p className="text-[11px] font-mono text-emerald-800 font-semibold">
+                        📅 {activeOcc.dateFrom} – {activeOcc.dateTo} ({activeOcc.campaignName})
+                      </p>
+                    )}
                     {surface.note && (
-                      <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-1 italic">
+                      <p className="text-[11px] text-slate-600 line-clamp-1 italic">
                         {surface.note}
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <StatusBadge value={surface.status} />
 
                     {/* Quick action: resolve damage / restore to service directly on the damaged surface */}
@@ -608,6 +743,53 @@ export function CarrierDetail({
                         <CheckCircle2 size={13} />
                         <span>{resolvingDamage ? 'Ukládám...' : 'Označit opravené'}</span>
                       </button>
+                    )}
+
+                    {/* Quick action to switch and book or manage this surface */}
+                    {!isNavigation && (
+                      <div className="flex items-center gap-1.5">
+                        {(surface.status === 'OCCUPIED' || Boolean(surface.currentClient) || Boolean(activeOcc)) && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm(`Opravdu chcete uvolnit plochu "${surface.name}" a označit ji jako volnou k okamžitému pronájmu?`)) return;
+                              try {
+                                const res = await fetch('/api/occupancy', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ surfaceId: surface.id, action: 'free', updatedBy: 'SALES' }),
+                                });
+                                if (!res.ok) {
+                                  const data = (await res.json()) as { error?: string };
+                                  throw new Error(data.error || 'Nepodařilo se uvolnit plochu.');
+                                }
+                                window.location.reload();
+                              } catch (e) {
+                                alert(e instanceof Error ? e.message : 'Chyba při uvolnění plochy');
+                              }
+                            }}
+                            className="rounded-lg px-2.5 py-1 text-[11px] font-extrabold border border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 transition cursor-pointer"
+                            title="Okamžitě uvolnit tuto plochu (zrušit pronájem a označit jako volnou)"
+                          >
+                            🚪 Uvolnit
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSurfaceId(surface.id);
+                            document.getElementById('occupancy-section')?.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition cursor-pointer ${
+                            surface.status === 'AVAILABLE' && !surface.currentClient
+                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 hover:bg-emerald-200'
+                              : 'bg-slate-200 text-slate-800 hover:bg-slate-300'
+                          }`}
+                          title={surface.status === 'AVAILABLE' && !surface.currentClient ? 'Obsadit nebo rezervovat tuto plochu' : 'Spravovat nájem této plochy'}
+                        >
+                          {surface.status === 'AVAILABLE' && !surface.currentClient ? '➕ Obsadit' : '⚙️ Spravovat'}
+                        </button>
+                      </div>
                     )}
 
                     <button

@@ -28,10 +28,12 @@ export async function GET(request: Request) {
     }
 
     if (filter === 'my') {
-      whereCondition.OR = [
-        { installerUserId: currentUser.id },
-        { candidatePoints: { some: { createdByUserId: currentUser.id } } },
-      ];
+      whereCondition.AND = [{
+        OR: [
+          { installerUserId: currentUser.id },
+          { candidatePoints: { some: { createdByUserId: currentUser.id } } },
+        ],
+      }];
     } else if (filter === 'pendingReview') {
       whereCondition.candidatePoints = {
         some: { supervisionStatus: 'PENDING_REVIEW' },
@@ -118,7 +120,7 @@ export async function GET(request: Request) {
   } catch (error: unknown) {
     console.error('Error fetching navigation surveys:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Chyba při načítání průzkumů.' },
+      { error: 'Chyba při načítání průzkumů.' },
       { status: 500 }
     );
   }

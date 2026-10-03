@@ -183,13 +183,15 @@ export async function PATCH(request: Request) {
   try {
     const input = await request.json();
     const id = typeof input.id === 'string' ? input.id : '';
+    const surfaceId = typeof input.surfaceId === 'string' ? input.surfaceId : '';
     const action = typeof input.action === 'string' ? input.action : '';
-    if (!id) return NextResponse.json({ error: 'Chybi ID obsazenosti.' }, { status: 400 });
+    if (!id && !surfaceId) return NextResponse.json({ error: 'Chybí ID obsazenosti nebo reklamní plochy.' }, { status: 400 });
     if (action !== 'extend' && action !== 'finish' && action !== 'free') {
-      return NextResponse.json({ error: 'Neplatna akce obsazenosti.' }, { status: 400 });
+      return NextResponse.json({ error: 'Neplatná akce obsazenosti.' }, { status: 400 });
     }
 
     const occupancy = await updateOccupancyAction(id, action, {
+      surfaceId: surfaceId || undefined,
       dateTo: typeof input.dateTo === 'string' ? input.dateTo : undefined,
       updatedBy: typeof input.updatedBy === 'string' ? input.updatedBy : undefined,
     });

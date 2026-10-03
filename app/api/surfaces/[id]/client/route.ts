@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
-import { prisma } from '@/lib/db';
+import { prisma, syncSurfaceOccupancyState } from '@/lib/db';
 
 function normalizeClientName(value: string) {
   return value
@@ -90,13 +90,24 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       if (!existing) return null;
 
       if (!clientName) {
+        await transaction.occupancy.updateMany({
+          where: {
+            surfaceId,
+            status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+          },
+          data: {
+            status: 'CANCELLED',
+            dateTo: new Date(),
+          },
+        });
+
         const surface = await transaction.advertisingSurface.update({
           where: { id: surfaceId },
           data: {
             currentClientId: null,
-            status: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(existing.status)
-              ? 'AVAILABLE'
-              : existing.status,
+            currentRentStart: null,
+            currentRentEnd: null,
+            status: existing.status === 'OUT_OF_SERVICE' ? 'OUT_OF_SERVICE' : 'AVAILABLE',
             ...(destinationName !== undefined ? { destinationName } : {}),
             ...(distanceMeters !== undefined ? { distanceMeters } : {}),
             ...(directionDescription !== undefined ? { directionDescription } : {}),
@@ -152,6 +163,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     });
 
     if (!result) return NextResponse.json({ error: 'Navigace nebyla nalezena.' }, { status: 404 });
+    await syncSurfaceOccupancyState(surfaceId);
     return NextResponse.json({
       id: result.surface.id,
       currentClientId: result.surface.currentClientId,

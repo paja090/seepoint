@@ -77,7 +77,7 @@ export function CityGalleryModuleClient({
 
   // Form states for new project
   const [formTitle, setFormTitle] = useState('');
-  const [formCity, setFormCity] = useState('Ostrava');
+  const [formCity, setFormCity] = useState('');
   const [formLocality, setFormLocality] = useState('');
   const [formAddress, setFormAddress] = useState('');
   const [formFrameCount, setFormFrameCount] = useState(6);
@@ -224,7 +224,7 @@ export function CityGalleryModuleClient({
 
   function resetForm() {
     setFormTitle('');
-    setFormCity('Ostrava');
+    setFormCity('');
     setFormLocality('');
     setFormAddress('');
     setFormFrameCount(6);
@@ -615,7 +615,7 @@ export function CityGalleryModuleClient({
                     <tr key={p.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-3.5 px-4 font-bold text-slate-900">{p.title}</td>
                       <td className="py-3.5 px-4 font-semibold text-slate-700">
-                        {p.city || 'Ostrava'} {p.locality ? `· ${p.locality}` : ''}
+                        {p.city || 'Město neuvedeno'} {p.locality ? `· ${p.locality}` : ''}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-slate-600">{p.permitNumber || 'Vřízení/Rozhodnutí v procesu'}</td>
                       <td className="py-3.5 px-4 font-semibold">
@@ -758,7 +758,7 @@ export function CityGalleryModuleClient({
                   required
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="např. Ostrava v proměnách času"
+                  placeholder="Název výstavy"
                   className="input h-10 text-xs w-full"
                 />
               </div>
@@ -771,7 +771,7 @@ export function CityGalleryModuleClient({
                     required
                     value={formCity}
                     onChange={(e) => setFormCity(e.target.value)}
-                    placeholder="např. Ostrava, Praha, Plzeň"
+                    placeholder="Název města"
                     className="input h-10 text-xs w-full"
                   />
                 </div>
@@ -781,7 +781,7 @@ export function CityGalleryModuleClient({
                     type="text"
                     value={formLocality}
                     onChange={(e) => setFormLocality(e.target.value)}
-                    placeholder="např. Masarykovo náměstí"
+                    placeholder="Název náměstí, parku nebo jiné lokality"
                     className="input h-10 text-xs w-full"
                   />
                 </div>
@@ -899,7 +899,7 @@ export function CityGalleryModuleClient({
                     type="text"
                     value={formOrganizerName}
                     onChange={(e) => setFormOrganizerName(e.target.value)}
-                    placeholder="Městský obvod Ostrava-Jih"
+                    placeholder="Název pořadatele nebo městského obvodu"
                     className="input h-9 text-xs w-full"
                   />
                 </div>

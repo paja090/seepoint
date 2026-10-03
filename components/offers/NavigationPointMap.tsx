@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
 
@@ -37,6 +37,7 @@ export function NavigationPointMap({
   const element = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<LayerGroup | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const clickRef = useRef(onMapClick);
   const readOnlyRef = useRef(readOnly);
   readOnlyRef.current = readOnly;
@@ -60,9 +61,9 @@ export function NavigationPointMap({
       map.on('click', (event) => { if (!readOnlyRef.current) clickRef.current(event.latlng.lat, event.latlng.lng); });
       mapRef.current = map;
 
-      // Render all 12 official Ostrava restricted advertising zones from GeoJSON
+      // Public regional reference layer, available only on explicit selection.
       try {
-        L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
+        const restrictedZones = L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
           style: {
             color: '#dc2626',
             fillColor: '#ef4444',
@@ -76,12 +77,14 @@ export function NavigationPointMap({
               sticky: true,
             });
           },
-        }).addTo(map);
+        });
+        L.control.layers({}, { 'Ostrava – zóny omezení reklamy': restrictedZones }).addTo(map);
       } catch {
         // Ignore if geometry fails
       }
 
       layerRef.current = L.layerGroup().addTo(map);
+      setMapReady(true);
     });
 
     return () => {
@@ -268,7 +271,7 @@ export function NavigationPointMap({
         map.fitBounds(bounds.pad(0.35), { maxZoom: 16, animate: false });
       }
     });
-  }, [points, target, selectedPointId, readOnly]);
+  }, [points, target, targets, selectedPointId, readOnly, mapReady]);
 
   // Pan to selected point when it changes
   useEffect(() => {

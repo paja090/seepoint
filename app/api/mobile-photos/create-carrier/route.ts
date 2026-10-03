@@ -247,6 +247,24 @@ export async function POST(req: Request) {
         ];
       }
 
+      let resolvedClientName = newClientName;
+      if (targetClientId && !resolvedClientName) {
+        const found = await tx.client.findUnique({
+          where: { id: targetClientId },
+          select: { name: true },
+        });
+        if (found) resolvedClientName = found.name;
+      }
+      resolvedClientName = resolvedClientName || 'Klient';
+
+      const isLongTermNav = resolvedCarrierType === 'NAVIGATION';
+      const durationDays = isLongTermNav ? 365 : 30; // 1 year for navigation, 1 month for billboard/bench/city poster
+      const rentStart = new Date();
+      const rentEnd = new Date(Date.now() + durationDays * 86_400_000);
+      const campaignName = isLongTermNav
+        ? `Dlouhodobý pronájem – ${resolvedClientName}`
+        : `Měsíční kampaň – ${resolvedClientName}`;
+
       for (const sc of surfaceConfigs) {
         const surface = await tx.advertisingSurface.create({
           data: {
@@ -259,9 +277,27 @@ export async function POST(req: Request) {
             size: surfaceSize,
             status: targetClientId ? 'OCCUPIED' : 'AVAILABLE',
             currentClientId: targetClientId,
+            currentRentStart: targetClientId ? rentStart : null,
+            currentRentEnd: targetClientId ? rentEnd : null,
           },
         });
         createdSurfaces.push(surface);
+
+        if (targetClientId) {
+          await tx.occupancy.create({
+            data: {
+              organizationId,
+              surfaceId: surface.id,
+              clientId: targetClientId,
+              clientName: resolvedClientName,
+              campaignName,
+              dateFrom: rentStart,
+              dateTo: rentEnd,
+              status: 'OCCUPIED',
+              createdBy: workerName,
+            },
+          });
+        }
       }
 
       // 3. Create Photo
@@ -291,7 +327,15 @@ export async function POST(req: Request) {
         },
       });
 
-      return { carrier, surfaces: createdSurfaces, photo };
+      return {
+        carrier,
+        surfaces: createdSurfaces,
+        photo,
+        resolvedClientName,
+        campaignName,
+        rentStart,
+        rentEnd,
+      };
       }).catch(async (error) => {
       await deleteStoredPhoto(stored).catch((cleanupError) => console.error('[mobile-photos/create-carrier] Úklid souboru po chybě DB selhal', cleanupError));
       throw error;
@@ -328,10 +372,10 @@ export async function POST(req: Request) {
           name: s.name,
           side: s.sidePosition as 'SIDE_A' | 'SIDE_B' | null,
           status: s.status,
-          currentClient: null,
-          currentCampaign: null,
-          occupiedFrom: null,
-          occupiedUntil: null,
+          currentClient: targetClientId ? { id: targetClientId, name: result.resolvedClientName } : null,
+          currentCampaign: targetClientId ? { id: s.id, name: result.campaignName } : null,
+          occupiedFrom: targetClientId ? result.rentStart.toISOString() : null,
+          occupiedUntil: targetClientId ? result.rentEnd.toISOString() : null,
           latestPhotoUrl: photoUrl,
           artworkUrl: null,
         })),

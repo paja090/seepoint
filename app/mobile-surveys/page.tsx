@@ -1,7 +1,6 @@
 import { requirePageAccess } from '@/lib/page-auth';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
 import { Compass, MapPin, Search, Plus, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
@@ -25,8 +24,7 @@ export default async function MobileSurveysPage({
 }: {
   searchParams: Promise<{ search?: string; filter?: string }>;
 }) {
-  await requirePageAccess('navigationProjects', 'mobileSurveys');
-  const user = await getCurrentUser();
+  const user = await requirePageAccess('navigationProjects', 'mobileSurveys');
   const { search = '', filter = 'all' } = await searchParams;
 
   let orders: SurveyListItem[] = [];
@@ -44,10 +42,12 @@ export default async function MobileSurveysPage({
     }
 
     if (filter === 'my' && user) {
-      whereCondition.OR = [
-        { installerUserId: user.id },
-        { candidatePoints: { some: { createdByUserId: user.id } } },
-      ];
+      whereCondition.AND = [{
+        OR: [
+          { installerUserId: user.id },
+          { candidatePoints: { some: { createdByUserId: user.id } } },
+        ],
+      }];
     } else if (filter === 'pendingReview') {
       whereCondition.candidatePoints = {
         some: { supervisionStatus: 'PENDING_REVIEW' },
@@ -71,9 +71,15 @@ export default async function MobileSurveysPage({
       take: 50,
     });
 
-    const navOffers = await prisma.offer.findMany({
+    // Offer points have no candidate supervision workflow. Only order candidates
+    // can be pending review; do not append every offer to this filtered list.
+    const navOffers = filter === 'pendingReview' ? [] : await prisma.offer.findMany({
       where: {
         offerType: 'NAVIGATION',
+        ...(filter === 'my' ? { AND: [{ OR: [
+          { createdByUserId: user.id },
+          { navigationOffer: { points: { some: { installerUserId: user.id } } } },
+        ] }] } : {}),
         ...(search.trim()
           ? {
               OR: [
@@ -119,7 +125,7 @@ export default async function MobileSurveysPage({
     orders = [...navOrders, ...mappedOffers].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   } catch (err: unknown) {
     console.error('Error loading mobile surveys:', err);
-    fetchError = err instanceof Error ? err.message : 'Nepodařilo se načíst průzkumy z databáze.';
+    fetchError = 'Nepodařilo se načíst průzkumy. Zkuste stránku obnovit.';
   }
 
   return (
@@ -185,7 +191,7 @@ export default async function MobileSurveysPage({
         {fetchError && (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl text-xs font-semibold flex items-center gap-2">
             <AlertCircle size={18} className="shrink-0 text-rose-600" />
-            <span>Chyba při komunikaci s databází: {fetchError}</span>
+            <span>{fetchError}</span>
           </div>
         )}
 
@@ -194,8 +200,8 @@ export default async function MobileSurveysPage({
           {orders.length === 0 && !fetchError ? (
             <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center space-y-2">
               <Compass size={32} className="mx-auto text-slate-400" />
-              <h3 className="font-extrabold text-slate-800 text-sm">Žádné zakázky pro průzkum nenalezeny</h3>
-              <p className="text-xs text-slate-500">Pro zadaný filtr nebyly v databázi nalezeny žádné navigační zakázky.</p>
+              <h3 className="font-extrabold text-slate-800 text-sm">Žádné projekty pro průzkum nenalezeny</h3>
+              <p className="text-xs text-slate-500">Zvolenému filtru neodpovídá žádný projekt.</p>
             </div>
           ) : (
             orders.map((o) => {

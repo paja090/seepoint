@@ -52,9 +52,9 @@ export function OfferMap({
       const map = L.map(element.current, { scrollWheelZoom: false }).fitBounds(bounds.pad(0.3), { maxZoom: 16 });
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
 
-      // Render all 12 official Ostrava restricted advertising zones from GeoJSON
+      // Public regional reference layer, available only on explicit selection.
       try {
-        L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
+        const restrictedZones = L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
           style: {
             color: '#dc2626',
             fillColor: '#ef4444',
@@ -68,7 +68,8 @@ export function OfferMap({
               sticky: true,
             });
           },
-        }).addTo(map);
+        });
+        L.control.layers({}, { 'Ostrava – zóny omezení reklamy': restrictedZones }).addTo(map);
       } catch {
         // Ignore if geometry fails
       }

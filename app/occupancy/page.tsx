@@ -202,11 +202,14 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
     ]);
 
     // Active blocking occupancies (where campaign end date is today or in the future)
-    const activeOccupiedSurfaceIds = new Set(
-      dbRows
+    const activeOccupiedSurfaceIds = new Set([
+      ...dbRows
         .filter((r) => ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(r.status) && new Date(r.dateTo) >= today)
-        .map((r) => r.surfaceId)
-    );
+        .map((r) => r.surfaceId),
+      ...filteredSurfaces
+        .filter((s) => s.status === 'OCCUPIED' || Boolean(s.currentClientId))
+        .map((s) => s.id),
+    ]);
 
     // Filter out expired campaigns unless specifically filtering by FINISHED
     const activeDbRows = selectedStatus === 'FINISHED'

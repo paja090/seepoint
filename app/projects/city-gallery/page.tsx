@@ -29,7 +29,7 @@ export default async function CityGalleryProjectsPage() {
     id: p.id,
     title: p.title || 'Výstava',
     status: p.status || 'DRAFT',
-    city: p.city || 'Ostrava',
+    city: p.city || null,
     locality: p.locality || null,
     address: p.address || null,
     description: p.description || null,

@@ -128,6 +128,7 @@ export function GoogleNavigationOfferMap({
   const [sessionToken, setSessionToken] = useState<string>(() => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `st-${Date.now()}`);
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [showRestrictedZones, setShowRestrictedZones] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
@@ -475,7 +476,7 @@ export function GoogleNavigationOfferMap({
     });
 
     // Render Ostrava Municipal Heritage & Restricted Advertising Zones (Nařízení č. 2/2020 a č. 11/2019)
-    if (googleMaps.Polygon) {
+    if (showRestrictedZones && googleMaps.Polygon) {
       try {
         const features = (OSTRAVA_RESTRICTED_ZONES_GEOJSON?.features ?? []) as Array<{
           geometry?: { coordinates?: number[][][] };
@@ -619,7 +620,7 @@ export function GoogleNavigationOfferMap({
     if (!selectedPointId && (points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick]);
+  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick, showRestrictedZones]);
 
   // Center/Pan smoothly to selected point when it changes
   useEffect(() => {
@@ -643,6 +644,7 @@ export function GoogleNavigationOfferMap({
         </div>
         <NavigationPointMap
           target={target ? { latitude: target.latitude, longitude: target.longitude, label: target.label } : undefined}
+          targets={targets}
           points={points}
           readOnly={readOnly}
           mode={mode}
@@ -707,6 +709,10 @@ export function GoogleNavigationOfferMap({
       </div>}
 
       {/* Interactive Google Map Container */}
+      <label className="flex items-center gap-2 text-xs text-slate-600">
+        <input type="checkbox" checked={showRestrictedZones} onChange={(event) => setShowRestrictedZones(event.target.checked)} />
+        Ostrava – zóny omezení reklamy (volitelná mapová vrstva)
+      </label>
       <div
         ref={containerRef}
         aria-label="Google mapa plánování navigace"
