@@ -154,7 +154,7 @@ export function OccupancyActions({
   }
 
   async function runAction(action: 'extend' | 'finish' | 'free') {
-    if (!activeOccupancy) return;
+    if (!currentSurface && !activeOccupancy) return;
     setSaving(true);
     setMessage('');
     setConflicts([]);
@@ -162,7 +162,13 @@ export function OccupancyActions({
       const response = await fetch('/api/occupancy', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: activeOccupancy.id, action, dateTo, updatedBy: 'SALES' }),
+        body: JSON.stringify({
+          id: activeOccupancy?.id,
+          surfaceId: currentSurface?.id || surfaceId,
+          action,
+          dateTo,
+          updatedBy: 'SALES',
+        }),
       });
       await parseResponse(response);
       setMessage(
@@ -237,72 +243,96 @@ export function OccupancyActions({
       )}
 
       {/* 📋 Active occupancy management actions if surface is currently occupied or reserved */}
-      {activeOccupancy ? (
-        <div className="rounded-2xl border border-emerald-300/80 bg-emerald-50/60 p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2">
-            <div className="flex items-center gap-2">
-              <span className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <h4 className="text-xs font-black uppercase tracking-wider text-emerald-950">
-                Aktivní nájem plochy {currentSurface?.name}: {activeOccupancy.clientName}
-              </h4>
-            </div>
-            <span className="font-mono text-xs font-bold text-emerald-900 bg-white/80 px-2.5 py-0.5 rounded-lg border border-emerald-200">
-              {activeOccupancy.dateFrom} – {activeOccupancy.dateTo}
-            </span>
-          </div>
+      {(() => {
+        const isOccupiedOrActive = Boolean(
+          activeOccupancy ||
+          currentSurface?.status === 'OCCUPIED' ||
+          Boolean(currentSurface?.currentClient)
+        );
+        const displayClientName =
+          activeOccupancy?.clientName ||
+          currentSurface?.currentClient?.name ||
+          'Klient';
+        const displayCampaignName =
+          activeOccupancy?.campaignName ||
+          (isNavigation ? 'Dlouhodobý pronájem navigace' : 'Aktivní kampaň');
+        const displayDateRange =
+          activeOccupancy?.dateFrom && activeOccupancy?.dateTo
+            ? `${activeOccupancy.dateFrom} – ${activeOccupancy.dateTo}`
+            : 'Trvalý / dlouhodobý nájem';
+        const displayPrice = activeOccupancy?.price ?? currentSurface?.price;
 
-          <div className="grid gap-2 text-xs sm:grid-cols-2 text-slate-800">
-            <p><b>Klient:</b> {activeOccupancy.clientName}</p>
-            <p><b>Kampaň:</b> {activeOccupancy.campaignName}</p>
-            {activeOccupancy.price && <p><b>Cena:</b> {activeOccupancy.price.toLocaleString('cs-CZ')} Kč/měs.</p>}
-            {activeOccupancy.note && <p className="sm:col-span-2 text-slate-600 italic"><b>Poznámka:</b> {activeOccupancy.note}</p>}
-          </div>
+        if (isOccupiedOrActive) {
+          return (
+            <div className="rounded-2xl border border-emerald-300/80 bg-emerald-50/60 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                    Aktivní nájemce plochy {currentSurface?.name}: {displayClientName}
+                  </h4>
+                </div>
+                <span className="font-mono text-xs font-bold text-emerald-900 bg-white/80 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                  {displayDateRange}
+                </span>
+              </div>
 
-          {/* Quick extension / termination buttons */}
-          <div className="pt-2 border-t border-emerald-200/80 flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-2xs font-bold text-slate-600 uppercase">Prodloužit do:</span>
-              <input
-                type="date"
-                className="rounded-lg border border-slate-300 bg-white p-1 text-xs font-mono"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
+              <div className="grid gap-2 text-xs sm:grid-cols-2 text-slate-800">
+                <p><b>Klient:</b> {displayClientName}</p>
+                <p><b>Kampaň:</b> {displayCampaignName}</p>
+                {displayPrice && <p><b>Cena:</b> {displayPrice.toLocaleString('cs-CZ')} Kč/měs.</p>}
+                {activeOccupancy?.note && <p className="sm:col-span-2 text-slate-600 italic"><b>Poznámka:</b> {activeOccupancy.note}</p>}
+              </div>
+
+              {/* Quick extension / termination buttons */}
+              <div className="pt-2 border-t border-emerald-200/80 flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-2xs font-bold text-slate-600 uppercase">Prodloužit do:</span>
+                  <input
+                    type="date"
+                    className="rounded-lg border border-slate-300 bg-white p-1 text-xs font-mono"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void runAction('extend')}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 text-xs shadow-xs transition cursor-pointer"
+                >
+                  ✓ Prodloužit
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void runAction('finish')}
+                  className="rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 text-xs shadow-xs transition cursor-pointer"
+                  title="Ukončí kampaň k dnešnímu dni"
+                >
+                  Ukončit kampaň
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void runAction('free')}
+                  className="rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold px-3 py-1.5 text-xs transition cursor-pointer"
+                  title="Označí plochu ihned jako volnou k okamžité rezervaci a vymaže klienta"
+                >
+                  🚪 Uvolnit plochu (Označit jako volné)
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void runAction('extend')}
-              className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 text-xs shadow-xs transition cursor-pointer"
-            >
-              ✓ Prodloužit
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void runAction('finish')}
-              className="rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 text-xs shadow-xs transition cursor-pointer"
-              title="Ukončí kampaň k dnešnímu dni"
-            >
-              Ukončit kampaň
-            </button>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void runAction('free')}
-              className="rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 font-bold px-3 py-1.5 text-xs transition cursor-pointer"
-              title="Označí plochu ihned jako volnou k okamžité rezervaci"
-            >
-              🚪 Uvolnit plochu (Označit jako volné)
-            </button>
+          );
+        }
+
+        return (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+            <span>Plocha <strong>{currentSurface?.name}</strong> je volná k okamžité rezervaci nebo obsazení novým klientem.</span>
           </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-          <span>Plocha <strong>{currentSurface?.name}</strong> je volná k okamžité rezervaci nebo obsazení novým klientem.</span>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 📝 Booking / Reservation Form */}
       <div className="space-y-3 pt-2">

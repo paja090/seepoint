@@ -229,9 +229,21 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
             id: upcomingReservation.clientId ?? `client-${upcomingReservation.id}`,
             name: upcomingReservation.clientName,
           };
+        } else if (surface.status === 'AVAILABLE' || surface.currentClientId === null) {
+          // Explicitly available or cleared in database
+          derivedStatus = 'AVAILABLE';
+          derivedClientId = undefined;
+          derivedClient = undefined;
         } else if (surface.occupancies.length > 0) {
-          // Campaign ended and no upcoming reservation: Bench/Billboard/CLP automatically becomes AVAILABLE & clears client
-          if (carrier.type !== 'NAVIGATION') {
+          // If all occupancies are finished or cancelled: surface is definitively AVAILABLE
+          const hasAnyActiveOrUpcoming = surface.occupancies.some((o) =>
+            ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(o.status)
+          );
+          if (!hasAnyActiveOrUpcoming) {
+            derivedStatus = 'AVAILABLE';
+            derivedClientId = undefined;
+            derivedClient = undefined;
+          } else if (carrier.type !== 'NAVIGATION') {
             derivedStatus = 'AVAILABLE';
             derivedClientId = undefined;
             derivedClient = undefined;
@@ -629,30 +641,125 @@ export async function upsertOccupancy(input: Partial<Occupancy> & { surfaceId: s
 
 export type OccupancyAction = 'extend' | 'finish' | 'free';
 
-export async function updateOccupancyAction(id: string, action: OccupancyAction, input: { dateTo?: string; updatedBy?: string } = {}) {
+export async function updateOccupancyAction(
+  id: string,
+  action: OccupancyAction,
+  input: { dateTo?: string; updatedBy?: string; surfaceId?: string } = {}
+) {
   return prisma.$transaction(async (transaction) => {
-    const existing = await transaction.occupancy.findUnique({ where: { id }, include: { surface: true } });
-    if (!existing) throw new Error('Zaznam obsazenosti nebyl nalezen.');
+    const existing = id ? await transaction.occupancy.findUnique({ where: { id }, include: { surface: true } }) : null;
+    const surfaceId = existing?.surfaceId || input.surfaceId;
+    if (!existing && !surfaceId) throw new Error('Záznam obsazenosti ani plocha nebyla nalezena.');
+
     if (action === 'extend') {
+      if (!existing) throw new Error('Záznam obsazenosti nebyl nalezen.');
       const dateTo = parseDateInput(input.dateTo);
-      if (!dateTo) throw new Error('Zadejte platne datum prodlouzeni.');
-      if (dateTo < existing.dateFrom) throw new Error('Datum do musi byt po zacatku kampane.');
+      if (!dateTo) throw new Error('Zadejte platné datum prodloužení.');
+      if (dateTo < existing.dateFrom) throw new Error('Datum do musí být po začátku kampaně.');
       const conflicts = await checkOccupancyConflicts([existing.surfaceId], dateOnly(existing.dateFrom)!, dateOnly(dateTo)!, existing.id);
       if (hasBlockingConflict(conflicts)) {
-        const error = new Error('Kampan nelze prodlouzit kvuli obsazene nebo rezervovane plose.');
+        const error = new Error('Kampaň nelze prodloužit kvůli obsazené nebo rezervované ploše.');
         (error as Error & { conflicts?: OccupancyConflict[] }).conflicts = conflicts;
         throw error;
       }
-      const occupancy = await transaction.occupancy.update({ where: { id }, data: { dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy } });
+      const occupancy = await transaction.occupancy.update({
+        where: { id: existing.id },
+        data: { dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy },
+      });
       await syncSurfaceOccupancyState(existing.surfaceId, transaction);
       return serializeOccupancy(occupancy);
     }
+
     const now = new Date();
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const nextStatus = action === 'free' ? 'CANCELLED' : 'FINISHED';
-    const occupancy = await transaction.occupancy.update({ where: { id }, data: { status: nextStatus, dateTo: existing.dateTo > today ? today : existing.dateTo, updatedBy: clean(input.updatedBy) ?? existing.updatedBy } });
-    await syncSurfaceOccupancyState(existing.surfaceId, transaction);
-    return serializeOccupancy(occupancy);
+
+    if (action === 'free') {
+      if (surfaceId) {
+        // Cancel all active, reserved, or negotiation occupancies on this surface
+        await transaction.occupancy.updateMany({
+          where: {
+            surfaceId,
+            status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+          },
+          data: {
+            status: 'CANCELLED',
+            dateTo: today,
+            updatedBy: clean(input.updatedBy) ?? undefined,
+          },
+        });
+
+        // Explicitly free the advertising surface in the database
+        await transaction.advertisingSurface.update({
+          where: { id: surfaceId },
+          data: {
+            status: 'AVAILABLE',
+            currentClientId: null,
+            currentRentStart: null,
+            currentRentEnd: null,
+          },
+        });
+
+        await syncSurfaceOccupancyState(surfaceId, transaction);
+      } else if (existing) {
+        await transaction.occupancy.update({
+          where: { id: existing.id },
+          data: {
+            status: 'CANCELLED',
+            dateTo: existing.dateTo > today ? today : existing.dateTo,
+            updatedBy: clean(input.updatedBy) ?? existing.updatedBy,
+          },
+        });
+        await syncSurfaceOccupancyState(existing.surfaceId, transaction);
+      }
+
+      const updated = existing
+        ? await transaction.occupancy.findUnique({ where: { id: existing.id } })
+        : null;
+
+      return updated
+        ? serializeOccupancy(updated)
+        : {
+            id: `free-${surfaceId}`,
+            surfaceId: surfaceId!,
+            campaignName: 'Uvolněno',
+            dateFrom: today.toISOString().slice(0, 10),
+            dateTo: today.toISOString().slice(0, 10),
+            status: 'AVAILABLE' as const,
+          };
+    }
+
+    // action === 'finish'
+    const nextStatus = 'FINISHED';
+    if (existing) {
+      const occupancy = await transaction.occupancy.update({
+        where: { id: existing.id },
+        data: {
+          status: nextStatus,
+          dateTo: existing.dateTo > today ? today : existing.dateTo,
+          updatedBy: clean(input.updatedBy) ?? existing.updatedBy,
+        },
+      });
+      await syncSurfaceOccupancyState(existing.surfaceId, transaction);
+      return serializeOccupancy(occupancy);
+    } else if (surfaceId) {
+      await transaction.occupancy.updateMany({
+        where: { surfaceId, status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] } },
+        data: { status: 'FINISHED', dateTo: today, updatedBy: clean(input.updatedBy) ?? undefined },
+      });
+      await transaction.advertisingSurface.update({
+        where: { id: surfaceId },
+        data: { status: 'AVAILABLE', currentClientId: null, currentRentStart: null, currentRentEnd: null },
+      });
+      await syncSurfaceOccupancyState(surfaceId, transaction);
+      return {
+        id: `finish-${surfaceId}`,
+        surfaceId,
+        campaignName: 'Ukončeno',
+        dateFrom: today.toISOString().slice(0, 10),
+        dateTo: today.toISOString().slice(0, 10),
+        status: 'FINISHED' as const,
+      };
+    }
   });
 }
 export { carrierMapColor };
