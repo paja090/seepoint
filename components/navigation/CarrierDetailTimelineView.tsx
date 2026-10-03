@@ -247,8 +247,20 @@ export function CarrierDetailTimelineView({
                       </button>
                     </div>
                   ) : (
-                    <span className="rounded-xl bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-800 border border-emerald-200">
-                      {s.currentClient ? 'Obsazeno' : 'Volná k pronájmu'}
+                    <span
+                      className={`rounded-xl px-2.5 py-1 text-[10px] font-black border ${
+                        s.status === 'OCCUPIED' || (Boolean(s.currentClient) && s.status !== 'AVAILABLE')
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : s.status === 'RESERVED'
+                          ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {s.status === 'OCCUPIED' || (Boolean(s.currentClient) && s.status !== 'AVAILABLE')
+                        ? 'Obsazeno'
+                        : s.status === 'RESERVED'
+                        ? 'Rezervováno'
+                        : 'Volná k pronájmu'}
                     </span>
                   )}
                 </div>

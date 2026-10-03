@@ -498,6 +498,20 @@ export function getSurfaceAvailabilityState(
   });
 
   if (active.length === 0) {
+    const upcoming = occupancies
+      .filter((occ) => ['OCCUPIED', 'RESERVED'].includes(occ.status) && new Date(occ.dateFrom).getTime() > refTime)
+      .sort((a, b) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime())[0];
+
+    if (upcoming) {
+      return {
+        status: 'RESERVED',
+        currentClientId: upcoming.clientId ?? null,
+        currentRentStart: new Date(upcoming.dateFrom),
+        currentRentEnd: new Date(upcoming.dateTo),
+        activeOccupancyId: upcoming.id,
+      };
+    }
+
     return {
       status: 'AVAILABLE',
       currentClientId: null,

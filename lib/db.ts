@@ -229,8 +229,22 @@ function serializeCarrier(carrier: CarrierRow): Carrier {
             id: upcomingReservation.clientId ?? `client-${upcomingReservation.id}`,
             name: upcomingReservation.clientName,
           };
-        } else if (carrier.type !== 'NAVIGATION') {
+        } else if (surface.occupancies.length > 0) {
           // Campaign ended and no upcoming reservation: Bench/Billboard/CLP automatically becomes AVAILABLE & clears client
+          if (carrier.type !== 'NAVIGATION') {
+            derivedStatus = 'AVAILABLE';
+            derivedClientId = undefined;
+            derivedClient = undefined;
+          }
+        } else if (surface.currentClient && surface.status === 'OCCUPIED') {
+          // Direct surface assignment without separate occupancy table records
+          derivedStatus = 'OCCUPIED';
+          derivedClientId = surface.currentClient.id;
+          derivedClient = {
+            id: surface.currentClient.id,
+            name: surface.currentClient.name,
+          };
+        } else if (carrier.type !== 'NAVIGATION') {
           derivedStatus = 'AVAILABLE';
           derivedClientId = undefined;
           derivedClient = undefined;
@@ -576,10 +590,24 @@ export async function syncSurfaceOccupancyState(surfaceId: string, client: Prism
 
 export async function upsertOccupancy(input: Partial<Occupancy> & { surfaceId: string }): Promise<Occupancy> {
   const existing = input.id ? await prisma.occupancy.findUnique({ where: { id: input.id } }) : null;
+  const rawClientId = typeof input.clientId === 'string' ? input.clientId.trim() : input.clientId;
+  let resolvedClientId = rawClientId ? rawClientId : (existing?.clientId ?? null);
+  const clientName = clean(input.clientName) ?? existing?.clientName ?? 'Klient';
+
+  if (!resolvedClientId && clientName && clientName !== 'Klient') {
+    const foundClient = await prisma.client.findFirst({
+      where: { name: { equals: clientName, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (foundClient) {
+      resolvedClientId = foundClient.id;
+    }
+  }
+
   const data = {
     surfaceId: input.surfaceId,
-    clientId: input.clientId ?? existing?.clientId ?? null,
-    clientName: input.clientName ?? existing?.clientName ?? 'Klient',
+    clientId: resolvedClientId,
+    clientName,
     campaignName: input.campaignName ?? existing?.campaignName ?? 'Kampan',
     dateFrom: input.dateFrom ? new Date(input.dateFrom) : existing?.dateFrom ?? new Date(),
     dateTo: input.dateTo ? new Date(input.dateTo) : existing?.dateTo ?? new Date(),
