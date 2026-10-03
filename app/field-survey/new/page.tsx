@@ -50,7 +50,7 @@ export default async function NewFieldSurveyPage() {
               type="text"
               required
               maxLength={200}
-              placeholder="Např. Ostrava – Centrum a Poruba 2026"
+              placeholder="Např. Průzkum centra města"
               className="input w-full"
             />
           </div>

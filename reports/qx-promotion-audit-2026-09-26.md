@@ -333,3 +333,88 @@ Potvrzené živé výsledky: Drive upload/download s kontrolou obsahu a odmítnu
 - Pracovní činnosti: 9 obecných činností a oborové šablony, bez cizích firemních údajů. Nastavení nebylo měněno.
 - Calendar & Planner: testovací ADMIN nemá žádný připojený Google účet; připojení vlastníka se správně nezobrazuje jako jeho vlastní. Tato kontrola ověřuje seznam připojení, nikoli všechny možnosti sdílení událostí.
 - Funkční omezení přímo v UI: AI doporučení v Planneru nejsou aktivní a schůzky se automaticky nepřesouvají.
+
+## 2026-10-02 – Provozní stránky a sklad pod produkčním QX ADMIN
+
+- Planner Dnes: prázdný plán bez cizích událostí. Tým: pouze Pavel Šubert a TEST QX – audit ADMIN. Moje úkoly: 0 interních i klientských úkolů.
+- Telefonní seznam: 0 aktivních členů týmu. Zdroj app/team/page.tsx čerpá z employee, zatímco Planner z členství; QX má 2 přihlašovací členy, ale nemá zaměstnanecké profily. Nejde o zjištěný únik, ale UI nevysvětluje rozdíl a postrádá užitečný prázdný stav.
+- Odvedená práce: 0 záznamů, žádní pracovníci ve filtru. Vozidla: 0 vozidel, bez cizích SPZ či názvů. Ověřeno zobrazení, nikoli celé zápisové workflow těchto modulů.
+- Sklad: před testem 0 položek a pohybů. Vytvořena jasně označená položka TEST QX – audit skladu 2026-10-02, SKU QX-AUDIT-20261002, cena 0, zásoba 0, poznámka zakazující použití pro skutečné zakázky.
+- Výdej 1 ks z nulové zásoby odmítnut hláškou Nedostatek materiálu na skladě. Aktuálně je k dispozici pouze 0 ks. Po zrušení formuláře a obnovení stránky položka přetrvává se zásobou 0 a pohyby 0. Důkaz reports/qx-warehouse-validation-2026-10-02.png. Testovací položka zůstává v evidenci; nebyla smazána.
+- AI skladové funkce, příjem/výdej skutečného materiálu a vazba na zakázku nejsou tímto testem ověřeny.
+- Dočasný limit ovládacího nástroje vyřešen po obnovení běžného přístupu; nešlo o chybu aplikace. Občasné timeouty browser ovládání byly dořešeny kontrolou aktuálního stavu, nikoli opakováním zápisu.
+
+## 2026-10-02 – Nákupy, výroba, vyúčtování a testovací zaměstnanec
+
+- Nákupy: 0 položek, formulář nenabízí žádné cizí zaměstnance ani zakázky. Formulář zrušen bez zápisu.
+- Výroba: 0 tiskových objednávek. Formulář nabízí pouze dvě existující testovací zakázky QX, žádné cizí. Formulář zrušen, nic neobjednáno.
+- Firemní vyúčtování: 0 záznamů. Osobní vyúčtování původně správně hlásilo chybějící zaměstnanecký profil.
+- Dovolené před profilem: tlačítko zakázané, ale prázdný stav přesto vybízí k vložení žádosti tlačítkem nahoře. UX závada, zatím neopravena.
+- Vytvořen evidenční zaměstnanec TEST QX audit ADMIN, id cmur8ts530000l804xgldp81a, e-mail existujícího testovacího QX ADMIN; checkbox Povolit přístup do aplikace ponechán vypnutý. Bez hesla, telefonu, osobních údajů, sazeb nebo finančních dokladů. Výslovná poznámka, že nejde o skutečného zaměstnance. Role evidenčního profilu Administrátor odpovídá stávající roli účtu.
+- Po založení osobní vyúčtování rozpozná zaměstnance přes shodný e-mail; telefonní seznam ukazuje 1 testovacího zaměstnance; formulář volna je dostupný a nabízí pouze tento QX profil. Žádná absence nebyla uložena ani schválena.
+- Nalezen nesoulad: detail zaměstnance tvrdí Účet zatím není vytvořen, přestože existuje přihlašovací účet stejného e-mailu. POST /api/employees vytváří přímou vazbu userId jen při allowAccess, kdežto osobní vyúčtování používá i e-mailový fallback. Nesoulad zatím neopraven; nepoužito tlačítko Povolit přístup ani odeslání pozvánky.
+- Důkazy reports/qx-employee-profile-2026-10-02.png a reports/qx-test-employee-team-2026-10-02.png. Testovací evidenční profil zůstává aktivní pro další ověření workflow.
+
+## 2026-10-02 – Opravy textů po auditu zaměstnaneckého profilu
+
+- AccountAdmin nyní popisuje chybějící přímé propojení profilu s účtem, netvrdí, že účet neexistuje. Vysvětluje, že povolení přístupu může propojit existující účet a nastavit role podle zaměstnance, nebo vytvořit nový účet s pozvánkou.
+- Formulář zaměstnance výslovně říká, že samotný e-mail nevytvoří ani přímo nepropojí přihlašovací účet. Automatické propojování nebylo přidáno; oprava je pouze v textu, nesoulad přímé vazby a e-mailového fallbacku zůstává architektonickou vlastností.
+- Prázdné dovolené bez dostupného zaměstnance vysvětlují nutnost zaměstnaneckého profilu místo výzvy ke kliknutí na zakázané tlačítko.
+- Ceník používá neutrální příklad pronájmu reklamní plochy místo PROMO Lavičky Ostrava.
+- Kontroly npm run typecheck, npm run security:tenant a git diff --check prošly. Změny nemění API, data, role, e-mailový transport ani schéma databáze.
+- Nasazeno do produkce: dpl_3e3H91jfJKRyKPMRQ1fQ2sCsGYkR, https://seepoint-gi51ow1y1-pavels-projects-073588fb.vercel.app, READY, alias https://seepoint.vercel.app. Produkční build prošel.
+- Živé ověření detailu testovacího zaměstnance na hlavní adrese potvrdilo nový text o chybějícím přímém propojení a vysvětlení důsledků povolení přístupu. Screenshot reports/qx-account-copy-fixed-2026-10-02.png. Účet nebyl během této opravy propojován ani měněn.
+
+## 2026-10-02 – Audit výjezdů a oprava implicitního depa
+
+- Osobní evidence práce rozpoznává testovací zaměstnanecký profil. Formulář však vyžaduje ruční WorkTask CUID místo výběru úkolu; UX překážka zapsána, dosud neopravena. Žádný záznam práce nebyl vytvořen.
+- Plán práce prázdný, bez cizích zakázek. Dispečink nabízí pouze testovacího zaměstnance QX a žádné vozidlo.
+- Nález: nastavení depa nabízelo pevná města Ostrava/Praha/Brno, výchozí backend profil bez uložené konfigurace používal ostravské souřadnice 49.8346,18.2820. Nešlo o únik databázového záznamu jiné firmy, ale o nevhodné společné výchozí nastavení pro nové organizace.
+- Oprava: neexistující profil vrací null; loadPlanningData odmítne výpočet bez konfigurace. UI vysvětluje nutnost nastavit vlastní depo. Odstraněna funkce defaultPlanningProfile s implicitní Ostravou.
+- Formulář má povinné GPS výjezdu a návratu bez předvyplněného města. Zachovává uložený návratový bod; dříve jej při uložení přepisoval výjezdním bodem. Tlačítko umožňuje explicitně zkopírovat výjezd pro návrat.
+- Nezměněny uložené databázové profily ani oprávnění. Existující uložená depa se nečistí ani nehádají.
+- 53 cílených testů plánování včetně nového odmítnutí plánování bez profilu prošlo; typecheck a tenant security guard prošly.
+- Nasazení dpl_2RgqHexCS2vbwLaRpEd7TAGqeMcg READY, https://seepoint-qarorygy2-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app. Produkční build úspěšný.
+- Živé ověření QX: výzva k nastavení vlastního depa, plánování deaktivované, všechna čtyři GPS pole prázdná, žádná města jako předvolby. Screenshot reports/qx-depot-empty-fixed-2026-10-02.png. Žádná konfigurace depa ani trasa nebyla během ověření uložena.
+
+## 2026-10-02 – Mobilní trasa, úkoly, nosiče a mapa
+
+- Mobilní trasa /my-route se otevřela s prázdným stavem, žádné cizí zastávky. Neověřuje skutečné přiřazení k posádce: testovací profil nemá přímou vazbu userId a tato část ji používá; shoda e-mailu tedy není důkazem fungujícího celého výjezdu.
+- Všechny úkoly: 0 interních i zakázkových úkolů. Stavové filtry stále používají technické anglické hodnoty TODO/IN_PROGRESS apod.
+- Evidence nosičů: 0 nosičů; typy pouze obecné aktivní typy QX. Deaktivovaný testovací typ není v nabídce. Města, lokality a klientské filtry neobsahují cizí hodnoty.
+- Obsazenost: 0 kampaní. Rychlá rezervace nabízí jen TEST QX – kontrola izolace; žádný nosič. Formulář zrušen bez zápisu. Zbylé konkrétní placeholdery Ostrava, Praha a Kampaň Jaro 2026 - Koupelny Ostrava jsou statický text, ne cizí načtené záznamy; k neutralizaci.
+- Mapa: 0 nosičů i klientských hodnot. Přesto nabízí statickou regionální vrstvu Zákaz reklamy Ostrava (12 zón). Zdroj MapView.tsx ji přidává obecně. Není to důkaz úniku privátních firemních dat; jde o nepersonalizovanou regionální funkci, jejíž vhodnost a výchozí zobrazení je třeba upravit.
+- Mapa a evidence obsahují implementační texty (server-side, samostatný mapový dotaz, Výchozí limit mapy není 500), které nepatří do běžného uživatelského vysvětlení. Dosud neopravováno.
+- Důkaz reports/qx-map-audit-2026-10-02.png. Žádné nové rezervace, nosiče ani pracovní záznamy během této části auditu nevznikly.
+
+## 2026-10-02 – Hlavní mapa a neutrální popisky
+
+- MapView: prázdná mapa má obecný pohled [20,0], zoom 2; načtené nosiče nadále určují přiblížení pomocí fitBounds. Ostravská vrstva je ve výchozím stavu vypnutá a přepínač se zobrazuje pouze při vlastních načtených nosičích s městem Ostrava. Vrstva se při inicializaci již nepřidává automaticky do mapy.
+- Upraveny technické popisky hlavní mapy a evidence nosičů na uživatelské vysvětlení. Zobrazovaný limit zůstal jako užitečný údaj.
+- Neutralizovány placeholdery měst v obsazenosti a konkrétní kampaně Koupelny Ostrava v rezervaci a navigační nabídce.
+- Kontroly typecheck, tenant security guard a git diff --check prošly. Bez změny databáze nebo API.
+- Následná kontrola stále nutná: FieldSurveyMapView má podle zdrojového kódu vlastní ostravský fallback a zapnutou regionální vrstvu; CampaignLiveMap má také ostravský fallback. Tato změna opravuje hlavní MapView, nikoli všechny mapové komponenty.
+- Nasazeno dpl_AVuwPD84GQ2wqawZYk3oVx96Vnv7 READY, https://seepoint-55jw54821-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app. Produkční build prošel.
+- Živé DOM a vizuální ověření QX potvrdilo nový popis, žádný ostravský přepínač a odstraněné server-side popisky. Screenshot reports/qx-main-map-fixed-2026-10-02.png.
+- Vizuální follow-up: při aktuální šířce prohlížeče vnořené sloupce ponechávají mapě příliš úzký prostor; upravit responzivní rozložení. CarrierFilters stále vizuálně ukazuje placeholder Např. Ostrava, který DOM snapshot v comboboxu nezahrnoval. Tyto dvě věci nejsou touto změnou opraveny.
+
+## 2026-10-03 – Responzivní rozložení hlavní mapy
+
+- Vnější sloupec filtrů se používá až od 2xl a má 280 px; při menší šířce jsou filtry nad mapou v několika sloupcích.
+- Mapa a detail používají auto-fit podle dostupné šířky kontejneru s minimem 28rem na sloupec. Tím se eliminuje úzký mapový pruh způsobený vnořenými pevnými sloupci.
+- Vnitřní lišta filtrů zalamuje ovládací prvky. Placeholder města je neutrální Název města.
+- Jde o změnu zobrazení, nikoli dat či oprávnění.
+- TypeScript a git diff --check prošly. Nasazení dpl_Geau93LLzKLLY6fpjMvmkxE4A4Fy READY, https://seepoint-heeoehz8j-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app.
+- Živé vizuální ověření při stejné šířce okna jako nález: mapa má 458 px na šířku (dříve úzký pruh), vyhledávání a filtry jsou čitelné. Screenshot reports/qx-map-layout-fixed-2026-10-03.png. Další mobilní šířky v této části nebyly samostatně ověřeny.
+
+## 2026-10-03 – Mapy terénního průzkumu a klientské kampaně
+
+- Založena prázdná testovací akce TEST QX – kontrola mapy průzkumu 2026-10-03, id cmus3wxfe0001ia04w103w9no. Bez bodů, fotografií a skutečných lokalit; ponechána k ověření.
+- FieldSurveyMapView: odstraněn ostravský výchozí střed, prázdná mapa má obecný pohled. Ostravská vrstva se nepřidává při inicializaci, je standardně vypnutá; přepínač je dostupný jen pro vlastní body s adresou/obcí Ostrava.
+- CampaignLiveMap: odstraněn ostravský výchozí střed pro prázdnou kampaň; skutečné body a cíl nadále určují polohu a přiblížení.
+- Převod průzkumného bodu na nosič: chybějící obec se již nevydává za Ostravu, pole zůstává prázdné. Backend vyžaduje city při převodu.
+- Neutralizovány příklady názvu průzkumu, obce, katastru a vlastníka. Bez změn reálných záznamů a bez nových přístupových oprávnění.
+- Ověření: npm run typecheck prošlo; všech 12 testů tests/field-survey.test.ts prošlo; git diff --check bez chyb (pouze upozornění LF/CRLF).
+- Produkční nasazení READY: dpl_BYooCsxBZEAExqncJ4XJ8pwskCvn, https://seepoint-zc1t5hmle-pavels-projects-073588fb.vercel.app, alias https://seepoint.vercel.app.
+- Živě po obnovení pod QX ADMIN ověřena prázdná mapa průzkumu: neutrální světový výřez, žádné tlačítko ostravských zón, žádné body, identita QX promotion. Snímek reports/qx-survey-map-fixed-2026-10-03.png.
+- Omezení: změna klientské mapy kampaně a výchozího města převodu ověřena kódem, typy a produkčním buildem; skutečná klientská kampaň ani převod bodu na nosič v této dávce nevytvořeny. Nejde o potvrzení kompletní bezpečnosti všech stránek.

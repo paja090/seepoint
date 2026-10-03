@@ -28,18 +28,18 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
     <AppShell>
       <PageHeader
         title="Mapa nosičů"
-        description="Mapa načítá aktivní nosiče s GPS přes samostatný mapový dotaz. Filtry zůstávají server-side a metadata ukazují skutečný rozsah výsledku."
+        description="Prohlížejte reklamní nosiče své firmy podle polohy, klienta a obsazenosti."
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={<MapPinned size={20} />} label="Zobrazeno na mapě" tone="green" value={meta.returned} description={`z ${meta.total} aktivních nosičů podle filtru`} />
-        <StatCard icon={<Search size={20} />} label="Limit mapy" tone="blue" value={meta.limit} description="Výchozí limit mapy není 500." />
-        <StatCard icon={<AlertTriangle size={20} />} label="Bez GPS" tone="purple" value={meta.missingGpsCount} description="Tyto nosiče nemají marker, dokud nedostanou polohu." />
-        <StatCard label="Archivované" tone="zinc" value={meta.archivedCount} description="Archivované nosiče jsou mimo výchozí mapový dotaz." />
+        <StatCard icon={<Search size={20} />} label="Limit mapy" tone="blue" value={meta.limit} description="Maximální počet současně zobrazených nosičů. Pro menší oblast použijte filtry." />
+        <StatCard icon={<AlertTriangle size={20} />} label="Bez GPS" tone="purple" value={meta.missingGpsCount} description="Pro zobrazení na mapě doplňte polohu nosiče." />
+        <StatCard label="Archivované" tone="zinc" value={meta.archivedCount} description="Archivované nosiče zobrazíte změnou filtru Archiv." />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="xl:sticky xl:top-24 xl:self-start">
+      <div className="grid gap-6 2xl:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="2xl:sticky 2xl:top-24 2xl:self-start">
           <CarrierFilters action="/map" filters={filters} options={filterOptions} carrierTypes={carrierTypes} resultCount={meta.total} />
           <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
             Mapa zobrazuje <strong>{meta.returned}</strong> z <strong>{meta.total}</strong> aktivních nosičů podle filtru.

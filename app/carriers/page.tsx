@@ -39,7 +39,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
       <ProjectSubNav items={inventoryNavItems} />
       <PageHeader
         title="Reklamní nosiče"
-        description="Databázově filtrovaný seznam nosičů. Tabulka je stránkovaná, ale celkový počet se počítá nad celou databází."
+        description="Reklamní nosiče vaší firmy. Vyhledejte je podle místa, typu, klienta nebo obsazenosti."
         actions={<Button href="/map" variant="primary"><Plus size={16} className="mr-2" />Přidat v mapě</Button>}
       />
 

@@ -86,7 +86,11 @@ export function FieldSurveyMapView({
   onSelectPoint: (point: SurveyPointItem) => void;
 }) {
   const [mapReady, setMapReady] = useState(false);
-  const [showRestrictedZones, setShowRestrictedZones] = useState(true);
+  const [showRestrictedZones, setShowRestrictedZones] = useState(false);
+  const hasOstravaPoints = points.some(point =>
+    point.parcelData?.municipality?.trim().toLocaleLowerCase('cs') === 'ostrava' ||
+    /\bostrava\b/i.test(point.address ?? '')
+  );
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [query, setQuery] = useState('');
@@ -127,11 +131,11 @@ export function FieldSurveyMapView({
 
       const initialCenter: [number, number] = points[0]
         ? [points[0].latitude, points[0].longitude]
-        : [49.835, 18.275]; // Ostrava default
+        : [20, 0];
 
       const map = L.map(mapElementRef.current, {
         center: initialCenter,
-        zoom: 13,
+        zoom: points.length ? 13 : 2,
         scrollWheelZoom: true,
       });
 
@@ -140,7 +144,7 @@ export function FieldSurveyMapView({
         maxZoom: 19,
       }).addTo(map);
 
-      const restrictedLayer = L.layerGroup().addTo(map);
+      const restrictedLayer = L.layerGroup();
       const markerLayer = L.layerGroup().addTo(map);
 
       // Načtení ostravských zón omezení
@@ -184,12 +188,12 @@ export function FieldSurveyMapView({
     const map = mapRef.current;
     const restrictedLayer = restrictedLayerRef.current;
     if (!map || !restrictedLayer) return;
-    if (showRestrictedZones) {
+    if (showRestrictedZones && hasOstravaPoints) {
       if (!map.hasLayer(restrictedLayer)) map.addLayer(restrictedLayer);
     } else {
       if (map.hasLayer(restrictedLayer)) map.removeLayer(restrictedLayer);
     }
-  }, [showRestrictedZones]);
+  }, [showRestrictedZones, hasOstravaPoints, mapReady]);
 
   // Vykreslení markerů pro body průzkumu
   useEffect(() => {
@@ -279,9 +283,10 @@ export function FieldSurveyMapView({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          {hasOstravaPoints && <button
             type="button"
             onClick={() => setShowRestrictedZones((prev) => !prev)}
+            aria-pressed={showRestrictedZones}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border transition text-xs ${
               showRestrictedZones
                 ? 'bg-red-50 text-red-700 border-red-200'
@@ -290,8 +295,8 @@ export function FieldSurveyMapView({
             title="Přepnout zobrazení zón zákazu reklamy (Ostrava)"
           >
             <span className={`h-2 w-2 rounded-full ${showRestrictedZones ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`} />
-            <span>Zákaz reklamy (12 zón)</span>
-          </button>
+            <span>Zákaz reklamy Ostrava (12 zón)</span>
+          </button>}
           <span className="text-xs font-semibold text-slate-600 px-2">
             {filteredPoints.length} {filteredPoints.length === 1 ? 'bod' : filteredPoints.length <= 4 ? 'body' : 'bodů'}
           </span>

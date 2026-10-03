@@ -45,7 +45,7 @@ export default async function FieldSurveyListPage() {
             <span className="text-4xl">🗺️</span>
             <h2 className="text-lg font-bold text-slate-900">Zatím nebyl vytvořen žádný průzkum</h2>
             <p className="text-sm text-slate-500 max-w-md mx-auto">
-              Vytvořte první průzkumnou akci (např. &ldquo;Ostrava – centrum 2026&rdquo;) a začněte zaznamenávat body v terénu mobilem.
+              Vytvořte první průzkumnou akci (např. &ldquo;Průzkum centra města&rdquo;) a začněte zaznamenávat body v terénu mobilem.
             </p>
             <Link href="/field-survey/new" className="btn btn-primary text-sm inline-block">
               Vytvořit průzkumnou akci

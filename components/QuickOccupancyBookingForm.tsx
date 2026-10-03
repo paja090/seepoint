@@ -174,7 +174,7 @@ export function QuickOccupancyBookingForm({
               </label>
               <input
                 className="input w-full text-xs font-bold"
-                placeholder="Např. Kampaň Jaro 2026 - Koupelny Ostrava"
+                placeholder="Např. Jarní kampaň – název klienta"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
                 required

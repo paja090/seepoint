@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isGoogleDriveMockEnabled, listImagesInFolder, verifyFileInFolder, uploadPhotoToGoogleDrive, downloadPhotoFromGoogleDrive, resolveGoogleDriveAccessToken } from '../lib/google-drive.ts';
+import {
+  isGoogleDriveMockEnabled,
+  listImagesInFolder,
+  listImagesInFolderPage,
+  verifyFileInFolder,
+  verifyFileInTenantStorage,
+  uploadPhotoToGoogleDrive,
+  downloadPhotoFromGoogleDrive,
+  resolveGoogleDriveAccessToken,
+  resolveTenantPhotoFolderId,
+} from '../lib/google-drive.ts';
+import { runWithTenantContext } from '../lib/tenant-context.ts';
 
 // Cast process.env to allow modification of NODE_ENV in tests
 const env = process.env as Record<string, string | undefined>;
@@ -215,4 +226,117 @@ test('9. OAuth error remains visible when no fallback is configured', async () =
     ),
     /expired or revoked/,
   );
+});
+
+test('10. Multi-tenant isolation: listImagesInFolderPage only returns files belonging to active organization', async () => {
+  const originalNodeEnv = env.NODE_ENV;
+  const originalMockEnabled = env.GOOGLE_DRIVE_MOCK_ENABLED;
+
+  try {
+    env.NODE_ENV = 'development';
+    env.GOOGLE_DRIVE_MOCK_ENABLED = 'true';
+
+    // Upload a photo for organization A
+    const dummyFileA = new File(['content org A'], 'photo-agency-a.jpg', { type: 'image/jpeg' });
+    const uploadedA = await runWithTenantContext(
+      { organizationId: 'org-agency-a', userId: 'user-a', source: 'session' },
+      async () => uploadPhotoToGoogleDrive(dummyFileA, 'photo-agency-a.jpg', 'photo-id-a'),
+    );
+
+    // Upload a photo for organization B
+    const dummyFileB = new File(['content org B'], 'photo-agency-b.jpg', { type: 'image/jpeg' });
+    const uploadedB = await runWithTenantContext(
+      { organizationId: 'org-agency-b', userId: 'user-b', source: 'session' },
+      async () => uploadPhotoToGoogleDrive(dummyFileB, 'photo-agency-b.jpg', 'photo-id-b'),
+    );
+
+    // List images as Organization A
+    const listA = await runWithTenantContext(
+      { organizationId: 'org-agency-a', userId: 'user-a', source: 'session' },
+      async () => {
+        const folder = await resolveTenantPhotoFolderId('org-agency-a');
+        return listImagesInFolderPage(folder, { organizationId: 'org-agency-a' });
+      },
+    );
+
+    // List images as Organization B
+    const listB = await runWithTenantContext(
+      { organizationId: 'org-agency-b', userId: 'user-b', source: 'session' },
+      async () => {
+        const folder = await resolveTenantPhotoFolderId('org-agency-b');
+        return listImagesInFolderPage(folder, { organizationId: 'org-agency-b' });
+      },
+    );
+
+    // Org A must see its own file
+    assert.ok(listA.files.some(f => f.id === uploadedA.id));
+    // Org A must NEVER see Org B's file
+    assert.equal(listA.files.some(f => f.id === uploadedB.id), false, 'Agency A must not see Agency B files');
+
+    // Org B must see its own file
+    assert.ok(listB.files.some(f => f.id === uploadedB.id));
+    // Org B must NEVER see Org A's file
+    assert.equal(listB.files.some(f => f.id === uploadedA.id), false, 'Agency B must not see Agency A files');
+  } finally {
+    env.NODE_ENV = originalNodeEnv;
+    env.GOOGLE_DRIVE_MOCK_ENABLED = originalMockEnabled;
+  }
+});
+
+test('11. Multi-tenant isolation: verifyFileInTenantStorage strictly enforces organization ownership', async () => {
+  const originalNodeEnv = env.NODE_ENV;
+  const originalMockEnabled = env.GOOGLE_DRIVE_MOCK_ENABLED;
+
+  try {
+    env.NODE_ENV = 'development';
+    env.GOOGLE_DRIVE_MOCK_ENABLED = 'true';
+
+    // Upload a photo for organization A
+    const dummyFileA = new File(['content A'], 'org-a.png', { type: 'image/png' });
+    const uploadedA = await runWithTenantContext(
+      { organizationId: 'org-tenant-a', userId: 'user-1', source: 'session' },
+      async () => uploadPhotoToGoogleDrive(dummyFileA, 'org-a.png', 'p-a-1'),
+    );
+
+    // Upload a photo for organization B
+    const dummyFileB = new File(['content B'], 'org-b.png', { type: 'image/png' });
+    const uploadedB = await runWithTenantContext(
+      { organizationId: 'org-tenant-b', userId: 'user-2', source: 'session' },
+      async () => uploadPhotoToGoogleDrive(dummyFileB, 'org-b.png', 'p-b-1'),
+    );
+
+    // Org A verification
+    assert.equal(await verifyFileInTenantStorage(uploadedA.id, 'org-tenant-a'), true);
+    assert.equal(await verifyFileInTenantStorage(uploadedB.id, 'org-tenant-a'), false, 'Org A cannot verify Org B file');
+
+    // Org B verification
+    assert.equal(await verifyFileInTenantStorage(uploadedB.id, 'org-tenant-b'), true);
+    assert.equal(await verifyFileInTenantStorage(uploadedA.id, 'org-tenant-b'), false, 'Org B cannot verify Org A file');
+
+    // Non-existent file
+    assert.equal(await verifyFileInTenantStorage('non-existent-file-id', 'org-tenant-a'), false);
+  } finally {
+    env.NODE_ENV = originalNodeEnv;
+    env.GOOGLE_DRIVE_MOCK_ENABLED = originalMockEnabled;
+  }
+});
+
+test('12. resolveTenantPhotoFolderId scopes folder path per tenant in mock mode', async () => {
+  const originalNodeEnv = env.NODE_ENV;
+  const originalMockEnabled = env.GOOGLE_DRIVE_MOCK_ENABLED;
+
+  try {
+    env.NODE_ENV = 'development';
+    env.GOOGLE_DRIVE_MOCK_ENABLED = 'true';
+
+    const folderA = await resolveTenantPhotoFolderId('org-tenant-100');
+    assert.match(folderA, /organizations\/org-tenant-100/);
+
+    const folderB = await resolveTenantPhotoFolderId('org-tenant-200');
+    assert.match(folderB, /organizations\/org-tenant-200/);
+    assert.notEqual(folderA, folderB);
+  } finally {
+    env.NODE_ENV = originalNodeEnv;
+    env.GOOGLE_DRIVE_MOCK_ENABLED = originalMockEnabled;
+  }
 });

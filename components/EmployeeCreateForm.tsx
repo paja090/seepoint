@@ -52,7 +52,7 @@ export function EmployeeCreateForm({ canCreate }: EmployeeCreateFormProps) {
         <form className="mt-5 grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit}>
           <label>Jméno<input className="input mt-1" name="firstName" required placeholder="Např. Pavel" /></label>
           <label>Příjmení<input className="input mt-1" name="lastName" required placeholder="Např. Novák" /></label>
-          <label>E-mail<input className="input mt-1" name="email" type="email" placeholder="jmeno@vase-firma.cz" /><span className="mt-1 block text-xs text-slate-500">Pro propojení zaměstnance s jeho přihlašovacím účtem použijte stejný e-mail.</span></label>
+          <label>E-mail<input className="input mt-1" name="email" type="email" placeholder="jmeno@vase-firma.cz" /><span className="mt-1 block text-xs text-slate-500">Použijte e-mail pracovníka. Samotné vyplnění e-mailu nevytvoří ani přímo nepropojí přihlašovací účet; přístup se spravuje samostatně.</span></label>
           <label>Telefon<input className="input mt-1" name="phone" type="tel" /></label>
           <label>Pozice<input className="input mt-1" name="positions" placeholder="Technik, obchodník, pracovník montáže…" /><span className="mt-1 block text-xs text-slate-500">Více pozic oddělte čárkou.</span></label>
           <label>Role<select className="input mt-1" name="role" defaultValue="WORKER">{roles.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}</select></label>

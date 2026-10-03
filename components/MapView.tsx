@@ -56,7 +56,8 @@ export function MapView({
   const [pendingLocation, setPendingLocation] = useState<PendingLocation>();
   const [locationSaving, setLocationSaving] = useState(false);
   const [locationError, setLocationError] = useState('');
-  const [showRestrictedZones, setShowRestrictedZones] = useState(true);
+  const [showRestrictedZones, setShowRestrictedZones] = useState(false);
+  const hasOstravaCarriers = items.some(carrier => carrier.city?.trim().toLocaleLowerCase('cs') === 'ostrava');
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
@@ -102,12 +103,12 @@ export function MapView({
     async function initializeMap() {
       const L = await import('leaflet');
       if (cancelled || !mapElementRef.current || mapRef.current) return;
-      const map = L.map(mapElementRef.current, { center: [49.835, 18.275], zoom: 12, scrollWheelZoom: true });
+      const map = L.map(mapElementRef.current, { center: [20, 0], zoom: 2, scrollWheelZoom: true });
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19,
       }).addTo(map);
 
-      const restrictedLayer = L.layerGroup().addTo(map);
+      const restrictedLayer = L.layerGroup();
       const markerLayer = L.layerGroup().addTo(map);
 
       // Render all 12 official Ostrava restricted advertising zones from GeoJSON
@@ -161,12 +162,12 @@ export function MapView({
     const map = mapRef.current;
     const restrictedLayer = restrictedLayerRef.current;
     if (!map || !restrictedLayer) return;
-    if (showRestrictedZones) {
+    if (showRestrictedZones && hasOstravaCarriers) {
       if (!map.hasLayer(restrictedLayer)) map.addLayer(restrictedLayer);
     } else {
       if (map.hasLayer(restrictedLayer)) map.removeLayer(restrictedLayer);
     }
-  }, [showRestrictedZones]);
+  }, [showRestrictedZones, hasOstravaCarriers, mapReady]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -251,16 +252,17 @@ export function MapView({
 
   return (
     <div className="space-y-4">
-      <section className="card flex flex-col gap-4 !p-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
+      <section className="card flex flex-col gap-4 !p-4">
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap">
           <label className="flex-1"><span className="sr-only">Hledat nosič</span><input className="input" type="search" placeholder="Hledat podle místa, sloupu nebo klienta" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
           <label><span className="sr-only">Filtrovat podle stavu</span><select className="input min-w-44" value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label><span className="sr-only">Filtrovat podle klienta</span><select className="input min-w-52" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}><option value={ALL_CLIENTS}>Všichni klienti</option><option value={WITHOUT_CLIENT}>Bez klienta</option>{clientNames.map((clientName) => <option key={clientName} value={clientName}>{clientName}</option>)}</select></label>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
-          <button
+          {hasOstravaCarriers && <button
             type="button"
             onClick={() => setShowRestrictedZones((prev) => !prev)}
+            aria-pressed={showRestrictedZones}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
               showRestrictedZones
                 ? 'bg-red-50 text-red-700 border-red-200 shadow-xs'
@@ -270,13 +272,13 @@ export function MapView({
           >
             <span className={`h-2 w-2 rounded-full ${showRestrictedZones ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`} />
             <span>Zákaz reklamy Ostrava (12 zón)</span>
-          </button>
+          </button>}
           {legend.map((item) => <span key={item.label} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />{item.label}</span>)}
           <strong className="text-slate-900">{carrierCountLabel(filteredItems.length)}</strong>
           {missingGpsCount > 0 && <strong className="text-amber-700">{missingGpsCount} bez GPS</strong>}
         </div>
       </section>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 28rem), 1fr))' }}>
         <section className="relative min-h-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm isolate z-0">
           <div ref={mapElementRef} className="h-[calc(100vh-12rem)] min-h-[520px] w-full" role="application" aria-label="Mapa reklamních nosičů" />
           {!mapReady && <div className="absolute inset-0 grid place-items-center bg-slate-100 text-sm text-slate-500 z-10">Načítám mapu…</div>}

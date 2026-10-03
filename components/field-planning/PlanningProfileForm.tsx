@@ -19,25 +19,10 @@ export function PlanningProfileForm({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Friendly presets for depot city
-  const [cityPreset, setCityPreset] = useState<'OSTRAVA' | 'PRAHA' | 'BRNO' | 'CUSTOM'>('OSTRAVA');
-  const [lat, setLat] = useState(initial?.depot.latitude ?? 49.8346);
-  const [lng, setLng] = useState(initial?.depot.longitude ?? 18.2820);
-
-  const applyPreset = (preset: 'OSTRAVA' | 'PRAHA' | 'BRNO') => {
-    setCityPreset(preset);
-    if (preset === 'OSTRAVA') {
-      setLat(49.8346);
-      setLng(18.2820);
-    } else if (preset === 'PRAHA') {
-      setLat(50.0755);
-      setLng(14.4378);
-    } else if (preset === 'BRNO') {
-      setLat(49.1951);
-      setLng(16.6068);
-    }
-  };
-
+  const [lat, setLat] = useState(initial ? String(initial.depot.latitude) : '');
+  const [lng, setLng] = useState(initial ? String(initial.depot.longitude) : '');
+  const [endLat, setEndLat] = useState(initial ? String(initial.endLocation.latitude) : '');
+  const [endLng, setEndLng] = useState(initial ? String(initial.endLocation.longitude) : '');
   async function save(form: FormData) {
     setBusy(true);
     setError('');
@@ -52,7 +37,7 @@ export function PlanningProfileForm({
       timezone: initial?.timezone ?? 'Europe/Prague',
       country: initial?.country ?? country ?? 'CZ',
       depot: { latitude: Number(lat), longitude: Number(lng) },
-      endLocation: { latitude: Number(lat), longitude: Number(lng) },
+      endLocation: { latitude: Number(endLat), longitude: Number(endLng) },
       workdayStart: start,
       workdayEnd: end,
       breakMinutes: breakMins,
@@ -133,43 +118,15 @@ export function PlanningProfileForm({
             </div>
             <p className="text-xs text-slate-500">Odkud posádky ráno vyjíždějí a kam se vrací.</p>
 
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => applyPreset('OSTRAVA')}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
-                  cityPreset === 'OSTRAVA'
-                    ? 'bg-sky-700 text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                Ostrava (Základna)
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('PRAHA')}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
-                  cityPreset === 'PRAHA'
-                    ? 'bg-sky-700 text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                Praha
-              </button>
-              <button
-                type="button"
-                onClick={() => applyPreset('BRNO')}
-                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
-                  cityPreset === 'BRNO'
-                    ? 'bg-sky-700 text-white shadow-sm'
-                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                Brno
-              </button>
+            <div className="grid grid-cols-2 gap-3">
+              <label>Šířka výjezdu<input className="input" type="number" step="any" min={-90} max={90} required value={lat} onChange={e => setLat(e.target.value)} /></label>
+              <label>Délka výjezdu<input className="input" type="number" step="any" min={-180} max={180} required value={lng} onChange={e => setLng(e.target.value)} /></label>
+              <label>Šířka návratu<input className="input" type="number" step="any" min={-90} max={90} required value={endLat} onChange={e => setEndLat(e.target.value)} /></label>
+              <label>Délka návratu<input className="input" type="number" step="any" min={-180} max={180} required value={endLng} onChange={e => setEndLng(e.target.value)} /></label>
             </div>
+            <button type="button" className="text-sm text-sky-700 underline" onClick={() => { setEndLat(lat); setEndLng(lng); }}>Návrat na stejné místo jako výjezd</button>
+            <p className="text-xs text-slate-500">Zadejte GPS souřadnice svého depa. Žádné město není předvyplněné.</p>
           </div>
-
           {/* Pracovní doba a přestávka */}
           <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">

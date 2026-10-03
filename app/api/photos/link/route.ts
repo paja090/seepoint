@@ -4,7 +4,7 @@ import type { PhotoType } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { requireTenantContext } from '@/lib/tenant-context';
-import { verifyFileInFolder, isGoogleDriveMockEnabled } from '@/lib/google-drive';
+import { verifyFileInTenantStorage, isGoogleDriveMockEnabled } from '@/lib/google-drive';
 
 export const runtime = 'nodejs';
 const LINKABLE_PHOTO_TYPES = new Set(['LOCATION', 'CARRIER', 'SURFACE', 'CAMPAIGN', 'INSTALLATION', 'CONTROL', 'DAMAGE', 'CHECK', 'ARCHIVE']);
@@ -56,21 +56,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Fotografie musí mít nejvýše 4 MB.' }, { status: 413 });
     }
 
-    // Verify folder placement securely
+    // Verify file tenant placement securely
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     const mockEnabled = isGoogleDriveMockEnabled();
 
-    if (!mockEnabled) {
-      if (!folderId) {
-        return NextResponse.json({ error: 'Google Drive složka není nakonfigurovaná.' }, { status: 503 });
-      }
-      const isValidFolder = await verifyFileInFolder(driveFileId, folderId);
-      if (!isValidFolder) {
-        return NextResponse.json(
-          { error: 'Zvolený soubor se nenachází v povolené firemní složce Google Drive.' },
-          { status: 403 }
-        );
-      }
+    if (!mockEnabled && !folderId) {
+      return NextResponse.json({ error: 'Google Drive složka není nakonfigurovaná.' }, { status: 503 });
+    }
+
+    const isValidTenantFile = await verifyFileInTenantStorage(driveFileId, auth.organizationId);
+    if (!isValidTenantFile) {
+      return NextResponse.json(
+        { error: 'Zvolený soubor se nenachází v povolené firemní složce Google Drive.' },
+        { status: 403 }
+      );
     }
 
     // Check for duplicates

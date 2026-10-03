@@ -156,9 +156,9 @@ export function AccountAdmin({
       {!status ? (
         <div className="mt-5 space-y-4">
           <div className="rounded-2xl bg-amber-50 p-4 border border-amber-200 text-amber-900 text-sm">
-            <p className="font-bold">Účet zatím není vytvořen.</p>
+            <p className="font-bold">Profil zaměstnance není přímo propojený s přihlašovacím účtem.</p>
             <p className="text-xs text-amber-800 mt-0.5">
-              Po povolení přístupu bude pracovníkovi odeslána pozvánka s odkazem pro nastavení hesla.
+              Účet se stejným e-mailem už může existovat. Povolení přístupu jej propojí s tímto profilem a nastaví jeho role podle zaměstnance. Pokud účet neexistuje, vytvoří se a odešle se pozvánka.
             </p>
           </div>
 

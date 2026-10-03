@@ -17,7 +17,7 @@ function value(value?: string) {
 export function CarrierFilters({ filters, options, carrierTypes, action, resultCount }: CarrierFiltersProps) {
   return (
     <form action={action} className="card mb-6 grid gap-3 !p-4">
-      <div className={action === '/map' ? "grid gap-3" : "flex flex-col gap-3 lg:flex-row lg:items-end"}>
+      <div className={action === '/map' ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-1" : "flex flex-col gap-3 lg:flex-row lg:items-end"}>
         <label className="flex-1">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Hledání</span>
           <input className="input" name="q" placeholder="Kód, název, adresa, klient…" type="search" defaultValue={value(filters.q)} />
@@ -55,10 +55,10 @@ export function CarrierFilters({ filters, options, carrierTypes, action, resultC
         </label>
       </div>
 
-      <div className={action === '/map' ? "grid gap-3" : "grid gap-3 md:grid-cols-2 xl:grid-cols-4"}>
+      <div className={action === '/map' ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-1" : "grid gap-3 md:grid-cols-2 xl:grid-cols-4"}>
         <label>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Město</span>
-          <input className="input" list={`${action}-cities`} name="city" defaultValue={value(filters.city)} placeholder="Např. Ostrava" />
+          <input className="input" list={`${action}-cities`} name="city" defaultValue={value(filters.city)} placeholder="Název města" />
           <datalist id={`${action}-cities`}>{options.cities.map((item) => <option key={item} value={item} />)}</datalist>
         </label>
         <label>
@@ -78,7 +78,7 @@ export function CarrierFilters({ filters, options, carrierTypes, action, resultC
         </label>
       </div>
 
-      <div className={action === '/map' ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-1" : "grid gap-3 md:grid-cols-2 xl:grid-cols-6"}>
+      <div className={action === '/map' ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-1" : "grid gap-3 md:grid-cols-2 xl:grid-cols-6"}>
         <label>
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Archiv</span>
           <select className="input" name="archived" defaultValue={filters.archived ?? 'active'}>
