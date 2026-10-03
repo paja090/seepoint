@@ -50,7 +50,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Zakázka nebyla nalezena' }, { status: 404 });
     }
 
-    if (usesItemExecution(existing.items)) return NextResponse.json({ error: 'Dokončete jednotlivé položky přes Moje trasa dnes.' }, { status: 409 });
+    const hasNavOrder = Boolean(existing.navigationOrderId);
+    const allItemsDone = existing.items.length > 0 && existing.items.every((i) => ['DONE', 'CANCELLED'].includes(i.executionStatus || ''));
+
+    if (usesItemExecution(existing.items) && !hasNavOrder && !allItemsDone) {
+      return NextResponse.json({ error: 'Dokončete jednotlivé položky přes Moje trasa dnes.' }, { status: 409 });
+    }
 
     // Update WorkOrder status & FTD status if DONE
     const updated = await prisma.workOrder.update({
@@ -60,6 +65,43 @@ export async function PATCH(
         ftdSent: status === 'DONE' ? true : existing.ftdSent,
       },
     });
+
+    if (status === 'DONE') {
+      // Synchronize all items of this work order to DONE
+      if (existing.items.length > 0) {
+        await prisma.workOrderItem.updateMany({
+          where: { workOrderId, executionStatus: { not: 'CANCELLED' } },
+          data: { executionStatus: 'DONE', completedAt: new Date() },
+        });
+      }
+
+      // Synchronize all tasks of this work order to DONE
+      await prisma.workTask.updateMany({
+        where: { workOrderId, status: { not: 'CANCELLED' } },
+        data: { status: 'DONE' },
+      });
+
+      // If linked to navigation order, check if all points are installed and advance status
+      if (existing.navigationOrderId) {
+        const navOrder = await prisma.navigationOrder.findUnique({
+          where: { id: existing.navigationOrderId },
+          include: { points: true },
+        });
+        if (navOrder && ['PRIPRAVENO_K_INSTALACI', 'INSTALACE'].includes(navOrder.status)) {
+          const allPointsInstalled = navOrder.points.length > 0 && navOrder.points.every((p) => p.status === 'INSTALLED');
+          if (allPointsInstalled) {
+            await prisma.navigationOrder.update({
+              where: { id: navOrder.id },
+              data: {
+                status: 'FOTODOKUMENTACE',
+                blockStatus: 'CEKA_NA_FAKTURACI',
+                installedAt: new Date(),
+              },
+            });
+          }
+        }
+      }
+    }
 
     // If DONE, automatically create WorkEntry in Odvedená práce if employee found and workTask exists
     if (status === 'DONE') {

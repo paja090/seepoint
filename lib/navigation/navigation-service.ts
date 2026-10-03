@@ -708,6 +708,25 @@ export async function attachPointInstallationPhotos(
       },
     });
 
+    // Synchronize linked WorkOrderItem for work order / work plan
+    await tx.workOrderItem.updateMany({
+      where: {
+        organizationId,
+        workOrder: { navigationOrderId },
+        OR: [
+          { surfaceId: surface.id },
+          { carrierId },
+          { description: { contains: point.label } },
+        ],
+      },
+      data: {
+        carrierId,
+        surfaceId: surface.id,
+        executionStatus: 'DONE',
+        completedAt: new Date(),
+      },
+    });
+
     return { photo: installedPhoto, carrierId, surfaceId: surface.id };
   };
   return transaction ? install(transaction) : prisma.$transaction(install);

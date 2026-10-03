@@ -68,7 +68,23 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     const saved = await prisma.$transaction(async (tx) => {
       const current = await tx.workOrder.findUniqueOrThrow({ where: { id }, include: { items: true } });
-      if (usesItemExecution(current.items) && input.status !== current.status) throw new Error('FIELD_ITEM_STATE: Stav této zakázky se řídí dokončením jednotlivých pracovních položek.');
+      const hasNavOrder = Boolean(current.navigationOrderId);
+      const allItemsDone = current.items.length > 0 && current.items.every((i) => ['DONE', 'CANCELLED'].includes(i.executionStatus || ''));
+      if (usesItemExecution(current.items) && input.status !== current.status && !hasNavOrder && !allItemsDone) {
+        throw new Error('FIELD_ITEM_STATE: Stav této zakázky se řídí dokončením jednotlivých pracovních položek.');
+      }
+      if (input.status === 'DONE') {
+        if (current.items.length > 0) {
+          await tx.workOrderItem.updateMany({
+            where: { workOrderId: id, executionStatus: { not: 'CANCELLED' } },
+            data: { executionStatus: 'DONE', completedAt: new Date() },
+          });
+        }
+        await tx.workTask.updateMany({
+          where: { workOrderId: id, status: { not: 'CANCELLED' } },
+          data: { status: 'DONE' },
+        });
+      }
       const updated = await tx.workOrder.update({
         where: { id },
         data: {
