@@ -82,7 +82,10 @@ async function handleCronExecution(request: Request) {
         for (const item of syncResult.ingested) {
           if (item.message.id && (!item.isDuplicate || item.message.processingStatus === 'INGESTED')) {
             try {
-              await processAiInboxMessage(conn.organizationId, item.message.id);
+              await runWithTenantContext(
+                { organizationId: conn.organizationId, source: 'session' },
+                () => processAiInboxMessage(conn.organizationId, item.message.id)
+              );
             } catch (pErr) {
               console.warn(`[Cron AI Inbox] Chyba analýzy zprávy ${item.message.id}:`, pErr);
             }

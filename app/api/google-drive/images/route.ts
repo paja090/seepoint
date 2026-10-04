@@ -4,6 +4,7 @@ import { listImagesInFolderPage, resolveTenantPhotoFolderId, GoogleDriveConfigur
 import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const auth = await requireApiAccess('carriers');

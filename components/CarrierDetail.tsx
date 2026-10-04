@@ -119,15 +119,15 @@ export function CarrierDetail({
   const activeCampaigns = campaigns.filter(
     (campaign) =>
       ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(campaign.status) &&
-      campaign.dateFrom <= todayStr &&
-      campaign.dateTo >= todayStr
+      String(campaign.dateFrom).slice(0, 10) <= todayStr &&
+      String(campaign.dateTo).slice(0, 10) >= todayStr
   );
 
   // Upcoming reservation in the future (dateFrom > today)
   const upcomingCampaigns = campaigns.filter(
     (campaign) =>
       ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(campaign.status) &&
-      campaign.dateFrom > todayStr
+      String(campaign.dateFrom).slice(0, 10) > todayStr
   );
 
   const [selectedSurfaceId, setSelectedSurfaceId] = useState(carrier.surfaces[0]?.id ?? '');
@@ -136,14 +136,14 @@ export function CarrierDetail({
     const activeOcc = surface.occupancies.find(
       (o) =>
         ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(o.status) &&
-        o.dateFrom <= todayStr &&
-        o.dateTo >= todayStr
+        String(o.dateFrom).slice(0, 10) <= todayStr &&
+        String(o.dateTo).slice(0, 10) >= todayStr
     );
     const upcomingOcc = !activeOcc
       ? surface.occupancies.find(
           (o) =>
             ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(o.status) &&
-            o.dateFrom > todayStr
+            String(o.dateFrom).slice(0, 10) > todayStr
         )
       : undefined;
 
