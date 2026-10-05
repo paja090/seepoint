@@ -186,7 +186,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     const clientSlug = sanitizeFileName(report.client?.name || 'klient');
     const filename = `Fotodokumentace-navigaci-${clientSlug}-${report.year}.zip`;
 
-    return new Response(zipBuffer, {
+    return new Response(new Uint8Array(zipBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',
