@@ -31,6 +31,7 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/onboarding/page.tsx', 5],
   ['app/settings/company/page.tsx', 2],
   ['app/settings/members/page.tsx', 3],
+  ['app/api/client/navigation-documentation/[token]/download-zip/route.ts', 2],
   ['app/api/client/navigation-documentation/[token]/logo/route.ts', 2],
   ['app/api/client/navigation-documentation/[token]/photos/[photoId]/route.ts', 3],
   ['app/api/client/navigation-documentation/[token]/route.ts', 2],
@@ -80,6 +81,7 @@ const API_ROUTE_EXCEPTIONS = new Set([
   // Public lead capture from marketing landing page.
   'app/api/leads/demo/route.ts',
   // Public token services resolve ownership before entering tenant context.
+  'app/api/client/navigation-documentation/[token]/download-zip/route.ts',
   'app/api/client/navigation-documentation/[token]/logo/route.ts',
   'app/api/client/navigation-documentation/[token]/photos/[photoId]/route.ts',
   'app/api/client/navigation-documentation/[token]/route.ts',

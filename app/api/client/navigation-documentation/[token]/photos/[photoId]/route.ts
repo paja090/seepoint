@@ -69,12 +69,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       return NextResponse.json({ error: 'Fotografie není dostupná.' }, { status: 404 });
     }
 
+    const urlObj = new URL(request.url);
+    const isDownload = urlObj.searchParams.get('download') === '1';
+    const disposition = isDownload
+      ? `attachment; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? `foto-${photoId}.jpg`)}`
+      : 'inline';
+
     // 1. Direct Binary Content in Database
     if (photo.content && photo.content.length > 0) {
       return new Response(photo.content, {
         status: 200,
         headers: {
           'Content-Type': photo.mimeType ?? 'image/jpeg',
+          'Content-Disposition': disposition,
           'Cache-Control': 'public, max-age=86400, immutable',
           'X-Content-Type-Options': 'nosniff',
         },
@@ -91,6 +98,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           status: 200,
           headers: {
             'Content-Type': mime,
+            'Content-Disposition': disposition,
             'Cache-Control': 'public, max-age=86400, immutable',
           },
         });
@@ -105,6 +113,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           status: 200,
           headers: {
             'Content-Type': photo.mimeType ?? file.headers.get('Content-Type') ?? 'image/jpeg',
+            'Content-Disposition': disposition,
             'Cache-Control': 'public, max-age=86400, immutable',
             'X-Content-Type-Options': 'nosniff',
           },
