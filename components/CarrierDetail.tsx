@@ -307,7 +307,7 @@ export function CarrierDetail({
           )}
 
           <div className="text-center px-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Listování v evidenci (Klávesy ← / →)</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 hidden sm:block">Listování v evidenci (Klávesy ← / →)</span>
             <span className="text-xs font-black text-amber-400 font-mono">{carrier.code}</span>
           </div>
 

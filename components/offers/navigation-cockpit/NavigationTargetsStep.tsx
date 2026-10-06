@@ -232,10 +232,10 @@ export function NavigationTargetsStep({
         {/* Active Target Editor Details */}
         {activeTarget && (
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2 truncate">
                 <span>Úprava provozovny:</span>
-                <span className="text-sky-800 font-bold">{activeTarget.name}</span>
+                <span className="text-sky-800 font-bold truncate">{activeTarget.name}</span>
               </h3>
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-semibold text-slate-600">Barva špendlíku:</span>

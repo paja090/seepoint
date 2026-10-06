@@ -33,16 +33,18 @@ export function CarrierPreviewCard({
       <div className="relative h-44 w-full overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img alt={carrier.imageAlt} className="h-full w-full object-cover" src={carrier.image || '/placeholder.svg'} />
-        <span
-          className={`absolute left-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white ${tone.bg}`}
-        >
-          {meta.label}
-        </span>
-        <span
-          className={`absolute right-3 top-3 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${status.className}`}
-        >
-          {status.label}
-        </span>
+        <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2 pointer-events-none">
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white truncate max-w-[60%] ${tone.bg}`}
+          >
+            {meta.label}
+          </span>
+          <span
+            className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${status.className}`}
+          >
+            {status.label}
+          </span>
+        </div>
         {isSelected && (
           <span className="absolute bottom-2 left-3 inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 text-[11px] font-black text-slate-950 shadow-md">
             <CheckCircle size={12} /> Zvoleno na mapě

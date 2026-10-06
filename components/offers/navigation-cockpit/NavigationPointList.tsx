@@ -79,7 +79,7 @@ export function NavigationPointList({
           >
             {/* Top row: Order, label, carrier chip */}
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span
                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg font-black text-xs text-white shadow-2xs"
                   style={{ backgroundColor: vis.color }}
@@ -87,7 +87,7 @@ export function NavigationPointList({
                   #{index + 1}
                 </span>
 
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h4 className="text-xs font-extrabold text-slate-900 truncate">
                     {pt.label}
                   </h4>
@@ -147,7 +147,7 @@ export function NavigationPointList({
             </div>
 
             {/* Bottom action bar */}
-            <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px]">
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[11px]">
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -175,7 +175,7 @@ export function NavigationPointList({
                 </button>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={(e) => {
