@@ -389,6 +389,11 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         if (effectiveVariant === '120x80 cm') effectiveVariant = '120 × 80 cm';
         const effectiveNavigationType = point.navigationType || orderPoint?.navigationType || 'Směrová tabule';
 
+        const pointSnapshot = point.priceSnapshot && typeof point.priceSnapshot === 'object' && !Array.isArray(point.priceSnapshot)
+          ? (point.priceSnapshot as Record<string, unknown>)
+          : null;
+        const pointColor = typeof pointSnapshot?.color === 'string' && pointSnapshot.color ? pointSnapshot.color : null;
+
         return {
           id: point.id,
           stableKey: point.stableKey,
@@ -429,6 +434,7 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           distanceSource: point.distanceSource,
           routePolyline: point.routePolyline,
           isSelectedByClient: point.isSelectedByClient !== false,
+          color: pointColor,
         };
       }),
     } : null,
@@ -829,19 +835,10 @@ export async function updateOffer(user: CurrentUser, id: string, raw: unknown) {
     await tx.offerItem.deleteMany({ where: { offerId: id } });
     await tx.offerCharge.deleteMany({ where: { offerId: id } });
     await tx.offerPackageSelection.deleteMany({ where: { offerId: id } });
-    const credential = preparePortalCredential({
-      id,
-      publicTokenHash: existing.publicTokenRevokedAt ? null : existing.publicTokenHash,
-      publicTokenEncrypted: existing.publicTokenRevokedAt ? null : existing.publicTokenEncrypted,
-    });
     const row = await tx.offer.update({
       where: { id },
       data: {
         ...offerData(input, user, calculated),
-        publicTokenHash: credential.hash,
-        publicTokenEncrypted: credential.encrypted,
-        publicTokenRevokedAt: null,
-        publishedAt: existing.publishedAt || new Date(),
         items: { create: calculated.items.map((item, idx) => itemData(item, idx, user)) },
         charges: { create: calculated.charges.map((charge) => chargeData(charge, user)) },
         packageSelections: packageSelection ? { create: { ...packageSelection, organizationId: user.organizationId } } : undefined,

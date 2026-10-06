@@ -178,6 +178,7 @@ export type OfferView = {
       isSelectedByClient?: boolean;
       targetId?: string | null;
       navigationTargetId?: string | null;
+      color?: string | null;
     }>;
   } | null;
   cityGallery?: { projectId?: string | null; projectTitle?: string | null; concept?: string | null; locationBrief?: string | null; realizationNote?: string | null } | null;

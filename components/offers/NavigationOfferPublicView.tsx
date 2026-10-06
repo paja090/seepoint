@@ -26,6 +26,7 @@ import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
 import { canUploadNavigationArtwork } from '@/lib/offers/navigation-artwork-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
+import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 
 const money = (val: string | number | null | undefined) =>
   new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(
@@ -132,7 +133,7 @@ export function formatDistanceBadge(point: Record<string, unknown>) {
     }
     return `${rounded} m od cíle`;
   }
-  return 'Trasa vypočítávána';
+  return 'Vzdálenost zatím neuvedena';
 }
 
 export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
@@ -647,6 +648,8 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 targetId: typeof pObj.targetId === 'string' ? pObj.targetId : undefined,
                 targetLatitude: typeof pObj.targetLatitude === 'number' ? pObj.targetLatitude : undefined,
                 targetLongitude: typeof pObj.targetLongitude === 'number' ? pObj.targetLongitude : undefined,
+                color: typeof pObj.color === 'string' ? pObj.color : undefined,
+                navigationType: p.navigationType,
               };
             })}
             mode="point"
@@ -709,9 +712,30 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         #{index + 1}
                       </span>
                       <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{point.label}</h4>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-bold text-slate-900 text-sm">{point.label}</h4>
+                          {(() => {
+                            const vis = getPointPinVisual({
+                              color: typeof pObj.color === 'string' ? pObj.color : undefined,
+                              navigationType: point.navigationType,
+                            });
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border shadow-2xs"
+                                style={{
+                                  backgroundColor: `${vis.color}15`,
+                                  borderColor: `${vis.color}45`,
+                                  color: vis.color,
+                                }}
+                              >
+                                <span>{vis.icon}</span>
+                                <span>{vis.label}</span>
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {point.navigationType}{point.variant ? ` · ${point.variant}` : ''}
+                          {point.variant ? `Rozměr / varianta: ${point.variant}` : point.navigationType}
                         </p>
                       </div>
                     </div>

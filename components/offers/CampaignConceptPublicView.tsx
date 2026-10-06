@@ -4,7 +4,7 @@ import { OfferBrandMark } from '@/components/offer/OfferBrandMark';
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Sparkles, MapPin, Target, Layers, Calendar, CheckCircle2, PhoneCall, Mail } from 'lucide-react';
+import { Sparkles, MapPin, Target, Layers, Calendar, PhoneCall, Mail } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import type { CampaignPhase } from '@/lib/opportunities/types';
 
@@ -27,36 +27,13 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestForm, setRequestForm] = useState({ name: '', email: '', message: 'Mám zájem o zpracování cenové nabídky na tento koncept.' });
-  const brandName = offer.branding?.name || 'Dodavatel nabídky';
   const brandEmail = offer.branding?.email || '';
   const brandPhone = offer.branding?.phone || '';
 
   const rawPhases = (offer as unknown as Record<string, unknown>).campaignPhases;
   const phases: CampaignPhase[] = Array.isArray(rawPhases)
     ? (rawPhases as CampaignPhase[])
-    : [
-        {
-          phase: 'TEASER',
-          name: 'Před-otvírací fáze (Teaser)',
-          timeframe: '2–3 týdny před otevřením',
-          recommendedMediaTypes: ['CITY_POSTER', 'PROMO_BENCH'],
-          description: 'Budování povědomí o příchodu značky a vyvolání prvotního zájmu obyvatel v širším okolí.',
-        },
-        {
-          phase: 'OPENING',
-          name: 'Fáze slavnostního otevření',
-          timeframe: 'Týden otevření',
-          recommendedMediaTypes: ['CITY_POSTER', 'NAVIGATION_SIGN', 'PROMO_BENCH'],
-          description: 'Intenzivní lokální kampaň s přímou navigací zákazníků z hlavních příjezdových křižovatek k novému objektu.',
-        },
-        {
-          phase: 'FOLLOW_UP',
-          name: 'Stabilizační fáze (Follow-up)',
-          timeframe: '1–2 týdny po otevření',
-          recommendedMediaTypes: ['PROMO_BENCH', 'CITY_POSTER'],
-          description: 'Upevnění návyku zákazníků navštěvovat novou pobočku v rezidenčních a spádových čtvrtích.',
-        },
-      ];
+    : [];
 
   // Group items by media type
   const mediaGroups = offer.items.reduce<Record<string, ItemType[]>>((acc: Record<string, ItemType[]>, item: ItemType) => {
@@ -128,11 +105,11 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
-                {offer.client.name} — <span className="text-purple-300">Návrh lokální OOH kampaně</span>
+                {offer.client.name} — <span className="text-purple-300">{offer.title || 'Nezávazný koncept kampaně'}</span>
               </h1>
 
               <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-                Nezávazný koncept venkovní komunikace připravený přímo pro spuštění nové provozovny v regionu.
+                Nezávazný návrh k projednání. Rozsah, termíny a cenu upřesní dodavatel podle vašeho zadání.
               </p>
             </div>
 
@@ -160,12 +137,12 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
               <span className="text-lg font-black text-purple-300">{Object.keys(mediaGroups).length} kategorie</span>
             </div>
             <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/60 space-y-0.5">
-              <span className="text-[10px] font-bold text-slate-400 block">Doporučená délka</span>
-              <span className="text-lg font-black text-white">1–3 měsíce</span>
+              <span className="text-[10px] font-bold text-slate-400 block">Navržené fáze</span>
+              <span className="text-lg font-black text-white">{phases.length || 'Zatím neuvedeny'}</span>
             </div>
             <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/60 space-y-0.5">
-              <span className="text-[10px] font-bold text-slate-400 block">Regionální Zásah</span>
-              <span className="text-lg font-black text-emerald-400">100% MS Kraj</span>
+              <span className="text-[10px] font-bold text-slate-400 block">Lokality kampaně</span>
+              <span className="text-lg font-black text-emerald-400">Dle vybraných ploch</span>
             </div>
           </div>
         </section>
@@ -180,7 +157,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
             </div>
             <h3 className="text-lg font-black text-white">Proč tento návrh vznikl</h3>
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              V souvislosti s plánovaným otevřením nové provozovny jsme připravili nezávazný návrh lokální venkovní kampaně. Cílem je zasáhnout klíčovou spádovou oblast a vyvolat maximální zájem zákazníků.
+              Tento koncept slouží k projednání navržených lokalit a rozsahu kampaně před přípravou cenové nabídky.
             </p>
           </div>
 
@@ -190,20 +167,9 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
               <Target className="w-4 h-4" />
               <span>Hlavní cíle kampaně</span>
             </div>
-            <ul className="space-y-2 text-xs sm:text-sm text-slate-300 font-medium">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Oznámení termínu otevření nové prodejny / pobočky</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Vyvolání vysoké návštěvnosti během prvního měsíce</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Navedení řidičů přímo k parkovišti z hlavních křižovatek</span>
-              </li>
-            </ul>
+            <p className="whitespace-pre-wrap text-xs sm:text-sm text-slate-300 font-medium">
+              {offer.campaignGoal?.trim() || 'Cíl kampaně zatím nebyl doplněn.'}
+            </p>
           </div>
         </section>
 
@@ -292,10 +258,12 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
             {/* Strategy Summary Block */}
             <div className="rounded-3xl border border-purple-800/60 bg-gradient-to-br from-purple-950/50 via-slate-900 to-indigo-950/60 p-6 sm:p-8 text-white shadow-2xl space-y-3">
               <span className="text-xs font-extrabold text-purple-300 uppercase tracking-wider block">
-                🧠 Proč právě tato kombinace?
+                Rozsah návrhu
               </span>
               <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
-                City Postery budují široké povědomí o novém podniku v klíčových městských částech. Reklamní lavičky zaručují opakovaný kontakt se značkou v rezidenčních zónách a navigační desky na sloupech VO zachytí zákazníka přímo v poslední fázi jeho cesty k provozovně.
+                {offer.items.length > 0
+                  ? 'Přehled obsahuje plochy vybrané do této nabídky. Jejich dostupnost v požadovaném termínu a podmínky realizace je nutné potvrdit před objednáním.'
+                  : 'Do konceptu zatím nebyly přidány reklamní plochy.'}
               </p>
             </div>
           </section>
@@ -307,7 +275,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 space-y-6 shadow-xl">
               <div className="border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-black text-white">Harmonogram a fáze kampaně</h3>
-                <p className="text-xs text-slate-400 font-medium">Navržený průběh komunikace pro maximální zásah zákazníků před i po otevření.</p>
+                <p className="text-xs text-slate-400 font-medium">{phases.length ? 'Fáze uvedené v této nabídce.' : 'Harmonogram zatím nebyl doplněn.'}</p>
               </div>
 
               <div className="space-y-6 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-purple-900/60">
@@ -336,7 +304,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
             <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-4 space-y-3 shadow-xl">
               <div className="px-2 pt-2">
                 <h3 className="text-base font-black text-white">Mapa vybraných nosičů</h3>
-                <p className="text-xs text-slate-400 font-medium">Na mapě jsou zobrazeny výhradně reálné, dostupné reklamní nosiče v nabídce.</p>
+                <p className="text-xs text-slate-400 font-medium">Mapa zobrazuje plochy této nabídky s vyplněnými souřadnicemi. Dostupnost je nutné ověřit pro požadovaný termín.</p>
               </div>
 
               <div className="rounded-2xl overflow-hidden border border-slate-800 min-h-[450px]">
@@ -353,7 +321,9 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                           label: item.customTitle || item.surface.name,
                           latitude: item.surface.carrier.latitude,
                           longitude: item.surface.carrier.longitude,
-                          calculatedDistanceMeters: undefined,
+                          navigationType: item.surface.mediaType,
+                          carrierType: item.surface.carrier.carrierTypeRef?.code || item.surface.mediaType,
+                          color: item.surface.carrier.carrierTypeRef?.color || undefined,
                         }]
                       : []
                   ))}
@@ -368,7 +338,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
         <section className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 space-y-6 shadow-xl">
           <div className="space-y-1">
             <span className="text-[11px] font-black uppercase tracking-wider text-purple-400">Průvodce realizací</span>
-            <h2 className="text-xl sm:text-2xl font-black text-white">Jak probíhá daleký postup a realizace?</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-white">Jaký je další postup?</h2>
             <p className="text-xs sm:text-sm text-slate-400 font-medium">Od schválení nezávazného konceptu k aktivním reklamním plochám v terénu.</p>
           </div>
 
@@ -388,7 +358,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                 2
               </div>
               <h3 className="font-bold text-white text-sm">Příprava cenové kalkulace</h3>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">Obchodník pro vybrané plochy připraví ceníkovou kalkulaci se započtením slev a rozpočtu.</p>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Dodavatel upřesní cenu a podmínky podle vybraného rozsahu a termínů.</p>
             </div>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-3 relative overflow-hidden">
@@ -397,7 +367,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                 3
               </div>
               <h3 className="font-bold text-white text-sm">Povolení & Výroba grafiky</h3>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">Zajistíme úřední zábor a stavební souhlasy (např. u VO) a vytiskneme kampaňové materiály.</p>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Před realizací je potřeba ověřit požadovaná povolení, grafické podklady a odpovědnost za jejich zajištění.</p>
             </div>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-3 relative overflow-hidden">
@@ -406,7 +376,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                 4
               </div>
               <h3 className="font-bold text-white text-sm">Instalace & Fotodokumentace</h3>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium">Tým montážníků osadí plochy v terénu a zašleme vám kompletní klientský fotoreport.</p>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium">Způsob instalace a případná fotodokumentace se řídí odsouhlaseným rozsahem zakázky.</p>
             </div>
           </div>
         </section>
@@ -417,7 +387,7 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
             Máte zájem o nacenění nebo úpravu tohoto konceptu?
           </h3>
           <p className="text-xs sm:text-sm text-purple-200 font-medium max-w-2xl mx-auto">
-            Rádi pro vás připravíme kompletní ceníkový kalkulační rozpočet včetně vyřízení úředních povolení a instalace na klíč.
+            Požádejte dodavatele o upřesnění rozsahu, termínů a cenové kalkulace.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

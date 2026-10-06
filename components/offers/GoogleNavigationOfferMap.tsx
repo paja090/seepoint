@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Search, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, MapPin, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
+import { getPointPinColor, getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 
 declare global {
   interface Window {
@@ -139,6 +140,27 @@ export function GoogleNavigationOfferMap({
   useEffect(() => {
     callbacksRef.current = { onMapClick, onTargetSelect, readOnly };
   }, [onMapClick, onTargetSelect, readOnly]);
+
+  const activeCategories = useMemo(() => {
+    const catMap = new Map<string, { id: string; label: string; icon: string; color: string; count: number }>();
+    points.forEach((p) => {
+      const vis = getPointPinVisual(p);
+      const key = `${vis.category.id}-${vis.color}`;
+      const existing = catMap.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        catMap.set(key, {
+          id: key,
+          label: p.color ? (p.navigationType || vis.category.label) : vis.category.label,
+          icon: vis.icon,
+          color: vis.color,
+          count: 1,
+        });
+      }
+    });
+    return Array.from(catMap.values());
+  }, [points]);
 
   useEffect(() => {
     if ((!apiKey || loadError) && target && suggestionCount && onSuggestedPoints && suggestionKeyRef.current !== 'maps-unavailable') {
@@ -476,7 +498,7 @@ export function GoogleNavigationOfferMap({
     });
 
     // Render Ostrava Municipal Heritage & Restricted Advertising Zones (Nařízení č. 2/2020 a č. 11/2019)
-    if (showRestrictedZones && googleMaps.Polygon) {
+    if (!readOnly && showRestrictedZones && googleMaps.Polygon) {
       try {
         const features = (OSTRAVA_RESTRICTED_ZONES_GEOJSON?.features ?? []) as Array<{
           geometry?: { coordinates?: number[][][] };
@@ -512,25 +534,28 @@ export function GoogleNavigationOfferMap({
       bounds.extend(pointPos);
       const isSelected = selectedPointId === point.id;
 
+      const pinColor = getPointPinColor(point);
+      const visual = getPointPinVisual(point);
+
       const marker = new googleMaps.Marker({
         position: pointPos,
         map,
-        title: point.label,
+        title: `${visual.icon} #${index + 1} ${point.label} (${visual.label})`,
         draggable: !readOnly,
         zIndex: isSelected ? 99999 : 100 + index,
         label: {
           text: `#${index + 1}`,
-          color: isSelected ? '#ffffff' : '#000000',
+          color: '#ffffff',
           fontWeight: '900',
-          fontSize: isSelected ? '14px' : '13px',
+          fontSize: isSelected ? '13px' : '11px',
         },
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-          fillColor: isSelected ? '#ea580c' : '#0284c7',
+          fillColor: isSelected ? '#ea580c' : pinColor,
           fillOpacity: 1,
           strokeColor: isSelected ? '#fde047' : '#ffffff',
           strokeWeight: isSelected ? 3.5 : 2,
-          scale: isSelected ? 2.3 : 1.8,
+          scale: isSelected ? 2.4 : 1.9,
           anchor: new googleMaps.Point(12, 22),
         },
       });
@@ -709,15 +734,35 @@ export function GoogleNavigationOfferMap({
       </div>}
 
       {/* Interactive Google Map Container */}
-      <label className="flex items-center gap-2 text-xs text-slate-600">
+      {!readOnly && <label className="flex items-center gap-2 text-xs text-slate-600">
         <input type="checkbox" checked={showRestrictedZones} onChange={(event) => setShowRestrictedZones(event.target.checked)} />
         Ostrava – zóny omezení reklamy (volitelná mapová vrstva)
-      </label>
+      </label>}
       <div
         ref={containerRef}
         aria-label="Google mapa plánování navigace"
         className={`${compact ? 'h-[330px] md:h-[390px]' : 'h-[520px]'} w-full rounded-2xl border-2 border-slate-200 bg-slate-100 shadow-inner overflow-hidden`}
       />
+
+      {/* Carrier Types & Pin Colors Legend */}
+      {activeCategories.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs shadow-2xs">
+          <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <Layers size={13} className="text-slate-400" /> Typy nosičů na mapě:
+          </span>
+          {activeCategories.map((cat) => (
+            <span
+              key={cat.id}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-slate-800 border shadow-2xs"
+              style={{ borderColor: `${cat.color}60` }}
+            >
+              <span className="h-2.5 w-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: cat.color }} />
+              <span>{cat.icon} {cat.label}</span>
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 font-black">{cat.count}×</span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

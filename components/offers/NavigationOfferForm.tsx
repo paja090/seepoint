@@ -11,6 +11,7 @@ import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 import { compressImageFile } from '@/lib/image-compress';
 import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
+import { NAVIGATION_CARRIER_TYPES, CARRIER_PIN_COLORS, getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 
 type ClientBranchOption = {
   id: string;
@@ -52,6 +53,7 @@ type DraftPoint = {
   sitePhotoUrl?: string;
   isSelectedByClient?: boolean;
   carrierId?: string | null;
+  color?: string;
 
   // New structured fields
   arrowDirectionEnum:
@@ -347,6 +349,7 @@ export function NavigationOfferForm({
           targetId: resolvedTargetId,
           targetLatitude: typeof point.targetLatitude === 'number' ? point.targetLatitude : undefined,
           targetLongitude: typeof point.targetLongitude === 'number' ? point.targetLongitude : undefined,
+          color: typeof (point as { color?: string }).color === 'string' ? (point as { color?: string }).color : undefined,
         };
       }) ?? [],
   );
@@ -1907,6 +1910,23 @@ export function NavigationOfferForm({
 
                     <h3 className="font-extrabold text-slate-900 text-sm ml-1">{point.label}</h3>
 
+                    {(() => {
+                      const vis = getPointPinVisual(point);
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold border shadow-2xs"
+                          style={{
+                            backgroundColor: `${vis.color}18`,
+                            borderColor: `${vis.color}50`,
+                            color: vis.color,
+                          }}
+                        >
+                          <span className="h-2 w-2 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: vis.color }} />
+                          <span>{vis.icon} {vis.category.shortLabel || vis.label}</span>
+                        </span>
+                      );
+                    })()}
+
                     {badgeDistText && (
                       <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${isPointManual ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>
                         <Compass size={13} /> {badgeDistText}
@@ -2055,9 +2075,136 @@ export function NavigationOfferForm({
                     <input className="input" placeholder="např. Sloup veřejného osvětlení" value={point.pillarType || ''} onChange={(e) => updatePoint(point.id, { pillarType: e.target.value })} />
                   </Field>
 
-                  <Field label="Typ navigačního nosiče">
-                    <input className="input" value={point.navigationType} onChange={(e) => updatePoint(point.id, { navigationType: e.target.value })} />
-                  </Field>
+                  {/* Typ nosiče & barevné označení na mapě */}
+                  <div className="md:col-span-2 xl:col-span-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-3">
+                    {(() => {
+                      const pinVis = getPointPinVisual(point);
+                      return (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-900">🏷️ Typ nosiče a barva špendlíku na mapě</span>
+                              <span className="text-[11px] text-slate-500">
+                                (Pro Tower, Áčko, Citylight, Billboard apod. lze nastavit odlišnou barvu špendlíku)
+                              </span>
+                            </div>
+                            <div
+                              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold border shadow-xs"
+                              style={{
+                                backgroundColor: `${pinVis.color}18`,
+                                borderColor: `${pinVis.color}45`,
+                                color: pinVis.color,
+                              }}
+                            >
+                              <span className="h-2.5 w-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: pinVis.color }} />
+                              <span>{pinVis.icon} {point.navigationType || pinVis.label}</span>
+                              <span className="font-mono text-[10px] opacity-80">{pinVis.color}</span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="block text-[11px] font-semibold text-slate-600 mb-1.5">Rychlá volba typu nosiče:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {NAVIGATION_CARRIER_TYPES.map((cat) => {
+                                const isCurrent = pinVis.category.id === cat.id;
+                                return (
+                                  <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => {
+                                      updatePoint(point.id, {
+                                        navigationType: cat.defaultName,
+                                        color: cat.color,
+                                      });
+                                    }}
+                                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border transition cursor-pointer ${
+                                      isCurrent
+                                        ? 'bg-white shadow-xs font-bold border-slate-400 text-slate-900 ring-2 ring-offset-1'
+                                        : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-white hover:border-slate-300'
+                                    }`}
+                                    style={{ borderColor: isCurrent ? cat.color : undefined, boxShadow: isCurrent ? `0 0 0 2px ${cat.color}40` : undefined }}
+                                  >
+                                    <span>{cat.icon}</span>
+                                    <span>{cat.shortLabel}</span>
+                                    <span
+                                      className="h-2 w-2 rounded-full"
+                                      style={{ backgroundColor: cat.color }}
+                                    />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Název / specifikace typu nosiče
+                              </label>
+                              <input
+                                className="input text-xs"
+                                placeholder="např. Reklamní věž (Tower), Směrová tabule..."
+                                value={point.navigationType}
+                                onChange={(e) => updatePoint(point.id, { navigationType: e.target.value })}
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-semibold text-slate-700">
+                                  Barva špendlíku na mapě
+                                </label>
+                                {point.color && (
+                                  <button
+                                    type="button"
+                                    onClick={() => updatePoint(point.id, { color: undefined })}
+                                    className="text-[10px] text-sky-700 hover:underline font-normal cursor-pointer"
+                                  >
+                                    Obnovit výchozí ({pinVis.category.shortLabel})
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {CARRIER_PIN_COLORS.slice(0, 8).map((c) => {
+                                  const isSelected = (point.color || pinVis.color).toLowerCase() === c.value.toLowerCase();
+                                  return (
+                                    <button
+                                      key={c.value}
+                                      type="button"
+                                      onClick={() => updatePoint(point.id, { color: c.value })}
+                                      title={c.label}
+                                      className={`h-6 w-6 rounded-full border-2 transition transform hover:scale-110 cursor-pointer ${
+                                        isSelected ? 'ring-2 ring-offset-2 ring-slate-800 scale-105 border-white' : 'border-white shadow-xs'
+                                      }`}
+                                      style={{ backgroundColor: c.value }}
+                                    />
+                                  );
+                                })}
+                                <label
+                                  className="relative inline-flex items-center justify-center h-6 w-6 rounded-full border border-slate-300 bg-white cursor-pointer shadow-xs hover:border-slate-400 overflow-hidden"
+                                  title="Vlastní barva"
+                                >
+                                  <input
+                                    type="color"
+                                    value={point.color || pinVis.color}
+                                    onChange={(e) => updatePoint(point.id, { color: e.target.value })}
+                                    className="absolute -inset-2 w-10 h-10 cursor-pointer opacity-0"
+                                  />
+                                  <span
+                                    className="h-4 w-4 rounded-full border border-slate-200"
+                                    style={{ backgroundColor: point.color || pinVis.color }}
+                                  />
+                                </label>
+                                <span className="font-mono text-xs text-slate-600 font-medium">
+                                  {point.color || pinVis.color}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
 
                   <Field label="Rozměr / varianta">
                     <div className="space-y-1.5">
