@@ -33,8 +33,8 @@ function applyPointAction(
   const now = new Date('2026-10-06T12:00:00Z');
   const wasCompleted = point.status === 'COMPLETED';
 
-  let nextPoint = { ...point };
-  let nextCampaign = { ...campaign };
+  const nextPoint = { ...point };
+  const nextCampaign = { ...campaign };
 
   if (action === 'START') {
     nextPoint.status = 'IN_PROGRESS';
@@ -75,7 +75,7 @@ function applyPointAction(
 }
 
 test('Field Execution Lifecycle: START -> COMPLETE increments campaign counter', () => {
-  let point: MockPoint = {
+  const point: MockPoint = {
     id: 'pt-1',
     campaignId: 'camp-1',
     status: 'ASSIGNED',

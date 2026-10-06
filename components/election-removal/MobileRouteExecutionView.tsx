@@ -109,8 +109,8 @@ export function MobileRouteExecutionView({
       setPoints((prev) =>
         prev.map((pt) => (pt.id === pointId ? { ...pt, ...data.point } : pt))
       );
-    } catch (err: any) {
-      alert(err.message || 'Chyba při ukládání stavu.');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při ukládání stavu.');
     }
   };
 
@@ -146,8 +146,8 @@ export function MobileRouteExecutionView({
 
       setReportingIssuePointId(null);
       setIssueNote('');
-    } catch (err: any) {
-      alert(err.message || 'Chyba při hlášení problému.');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při hlášení problému.');
     } finally {
       setIsSubmittingIssue(false);
     }
@@ -211,8 +211,8 @@ export function MobileRouteExecutionView({
           };
         })
       );
-    } catch (err: any) {
-      alert(err.message || 'Chyba při nahrávání fotografie.');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při nahrávání fotografie.');
     } finally {
       setIsUploadingPhoto(false);
       setUploadingPhotoPointId(null);

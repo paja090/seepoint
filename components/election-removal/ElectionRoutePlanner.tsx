@@ -190,8 +190,10 @@ export function ElectionRoutePlanner({
 
       setPlanningInput(data.planningInput);
       setPlanningResult(data.planningResult);
-    } catch (err: any) {
-      setCalculationError(err.message || 'Chyba při výpočtu plánu.');
+    } catch (err: unknown) {
+      setCalculationError(
+        err instanceof Error ? err.message : 'Chyba při výpočtu plánu.'
+      );
     } finally {
       setIsCalculating(false);
     }
@@ -225,8 +227,10 @@ export function ElectionRoutePlanner({
       startTransition(() => {
         router.push(`/election-removal/${campaign.id}`);
       });
-    } catch (err: any) {
-      setApprovalError(err.message || 'Chyba při ukládání plánu.');
+    } catch (err: unknown) {
+      setApprovalError(
+        err instanceof Error ? err.message : 'Chyba při ukládání plánu.'
+      );
       setIsApproving(false);
     }
   };

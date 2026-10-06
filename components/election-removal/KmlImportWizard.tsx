@@ -95,8 +95,10 @@ export function KmlImportWizard() {
       setLayerMappings(initialMappings);
 
       setStep('configure');
-    } catch (err: any) {
-      setParseError(err.message || 'Nastala chyba při zpracování souboru.');
+    } catch (err: unknown) {
+      setParseError(
+        err instanceof Error ? err.message : 'Nastala chyba při zpracování souboru.'
+      );
     } finally {
       setIsParsing(false);
     }
@@ -256,8 +258,10 @@ export function KmlImportWizard() {
       startTransition(() => {
         router.push(`/election-removal/${data.campaignId}`);
       });
-    } catch (err: any) {
-      setSaveError(err.message || 'Chyba při ukládání volební kampaně.');
+    } catch (err: unknown) {
+      setSaveError(
+        err instanceof Error ? err.message : 'Chyba při ukládání volební kampaně.'
+      );
       setIsSaving(false);
     }
   };
