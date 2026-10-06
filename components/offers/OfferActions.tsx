@@ -99,7 +99,7 @@ export function OfferActions({
         </button>
 
         {isNavigationLocationSelection && navigationSelectionSubmitted ? (
-          <a className={primaryButton} href={`/offers/${offerId}/navigation/edit`}>
+          <a className={primaryButton} href={`/offers/${offerId}/navigation/edit?mode=pricing`}>
             <FilePenLine aria-hidden="true" size={17} />
             Připravit cenovou nabídku (fáze 2)
           </a>

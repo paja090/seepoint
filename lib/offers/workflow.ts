@@ -29,13 +29,14 @@ function clientVisiblePhotos(offer: OfferView) {
 export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictView[] = [], today = new Date().toISOString().slice(0, 10)): OfferReadinessCheck[] {
   const type = offer.offerType ?? 'STANDARD_MEDIA';
   const isNoPrice = (offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept === true;
-  const contactReady = isNoPrice || Boolean(offer.client.name && offer.contactEmail && emailPattern.test(offer.contactEmail));
+  const isNavigationLocationSelection = type === 'NAVIGATION' && offer.navigation?.proposalMode !== 'PRICED_QUOTE';
+  const contactReady = isNoPrice || isNavigationLocationSelection || Boolean(offer.client.name && offer.contactEmail && emailPattern.test(offer.contactEmail));
   const validityReady = Boolean(offer.validUntil && offer.validUntil >= today);
-  const calculationReady = isNoPrice || Number(offer.totalWithTax ?? 0) > 0;
+  const calculationReady = isNoPrice || isNavigationLocationSelection || Number(offer.totalWithTax ?? 0) > 0;
   const common: OfferReadinessCheck[] = [
     { id: 'client', label: 'Klient a kontakt', detail: contactReady ? (isNoPrice ? 'Nezávazný koncept nevyžaduje kontaktní e-mail.' : 'Klient a kontaktní e-mail jsou vyplněny.') : !offer.client.name ? 'Doplňte název klienta.' : !offer.contactEmail ? 'Doplňte kontaktní e-mail příjemce nabídky.' : 'Opravte kontaktní e-mail příjemce nabídky.', status: contactReady ? 'ok' : 'error' },
     { id: 'validity', label: 'Platnost nabídky', detail: validityReady ? `Nabídka je platná do ${offer.validUntil}.` : 'Doplňte budoucí nebo dnešní datum platnosti nabídky.', status: validityReady ? 'ok' : 'error' },
-    { id: 'calculation', label: 'Kalkulace nabídky', detail: isNoPrice ? 'Nezávazný koncept bez cen (připraveno k odeslání).' : calculationReady ? 'Celková cena včetně DPH je připravena.' : 'Celková cena nabídky musí být vyšší než nula.', status: calculationReady ? 'ok' : 'error' },
+    { id: 'calculation', label: 'Kalkulace nabídky', detail: isNavigationLocationSelection ? 'Fáze 1: Lokační výběr bez cen (cenová nabídka následuje po schválení bodů).' : isNoPrice ? 'Nezávazný koncept bez cen (připraveno k odeslání).' : calculationReady ? 'Celková cena včetně DPH je připravena.' : 'Celková cena nabídky musí být vyšší než nula.', status: calculationReady ? 'ok' : 'error' },
   ];
 
   if (type === 'NAVIGATION') {

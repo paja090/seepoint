@@ -131,6 +131,13 @@ export type OfferView = {
     targetLatitude: number;
     targetLongitude: number;
     targetNote?: string | null;
+    targetPhotoUrl?: string | null;
+    proposalMode?: string | null;
+    graphicArtworkUrl?: string | null;
+    includeGraphicProof?: boolean;
+    clientArtworkUrl?: string | null;
+    clientArtworkFileName?: string | null;
+    selectionSubmitted?: boolean;
     targets?: Array<{
       id: string;
       stableKey?: string;
@@ -145,6 +152,7 @@ export type OfferView = {
     navigationOrderStatus?: string | null;
     points: Array<{
       id: string;
+      stableKey?: string | null;
       label: string;
       latitude: number;
       longitude: number;
@@ -178,6 +186,8 @@ export type OfferView = {
       isSelectedByClient?: boolean;
       targetId?: string | null;
       navigationTargetId?: string | null;
+      targetLatitude?: number | null;
+      targetLongitude?: number | null;
       color?: string | null;
     }>;
   } | null;

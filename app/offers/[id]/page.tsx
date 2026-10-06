@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { OfferProposal } from '@/components/offer/OfferProposal';
 import { OfferActions } from '@/components/offers/OfferActions';
 import { OfferWorkflowStepper } from '@/components/offers/OfferWorkflowStepper';
+import { NavigationOfferWorkflowStepper } from '@/components/offers/NavigationOfferWorkflowStepper';
 import { SpecializedOfferSummary } from '@/components/offers/SpecializedOfferSummary';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card } from '@/components/ui';
@@ -77,7 +78,11 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         <StatusBadge value={offer.status} />
       </header>
 
-      <OfferWorkflowStepper converted={offer.converted} events={offer.events} status={offer.status} />
+      {offer.offerType === 'NAVIGATION' ? (
+        <NavigationOfferWorkflowStepper offer={offer} />
+      ) : (
+        <OfferWorkflowStepper converted={offer.converted} events={offer.events} status={offer.status} />
+      )}
 
       {offer.offerType === 'STANDARD_MEDIA' || !offer.offerType
         ? <OfferProposal offer={toProposalOffer(offer)} token={offer.portalToken ?? offer.id} variant="internal" />
