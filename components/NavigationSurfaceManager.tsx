@@ -509,19 +509,21 @@ export function NavigationSurfaceManager({
               />
 
               <div className="pl-2 space-y-3">
-                <div className="flex items-start justify-between gap-2 border-b border-slate-200/80 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-200/80 pb-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-lg bg-slate-950 px-2 py-0.5 text-[11px] font-black text-white shadow-sm">
+                      <span className="rounded-lg bg-slate-950 px-2 py-0.5 text-[11px] font-black text-white shadow-sm shrink-0">
                         #{index + 1}
                       </span>
-                      <h4 className="font-extrabold text-base text-slate-900">{surface.name}</h4>
+                      <h4 className="font-extrabold text-base text-slate-900 break-words">{surface.name}</h4>
                     </div>
                     {surface.sourcePosition && (
                       <span className="text-[11px] font-medium text-slate-500">Kód pozice: {surface.sourcePosition}</span>
                     )}
                   </div>
-                  <StatusBadge value={isOutOfService ? 'OUT_OF_SERVICE' : isOccupied ? 'OCCUPIED' : 'AVAILABLE'} />
+                  <div className="shrink-0 self-start sm:self-auto">
+                    <StatusBadge value={isOutOfService ? 'OUT_OF_SERVICE' : isOccupied ? 'OCCUPIED' : 'AVAILABLE'} />
+                  </div>
                 </div>
 
                 {/* Client & Rental Status */}
@@ -698,7 +700,7 @@ export function NavigationSurfaceManager({
                         ✕
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 bg-white/80 p-2 rounded-xl border border-emerald-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white/80 p-2 rounded-xl border border-emerald-200">
                       <div>
                         <span className="text-[10px] text-slate-500 font-semibold block">Rozpoznaný směr</span>
                         <span className="font-bold text-slate-900">{aiResult.directionArrow} {aiResult.directionDescription || 'neuvedeno'}</span>

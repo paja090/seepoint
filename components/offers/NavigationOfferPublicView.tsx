@@ -704,16 +704,16 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       : 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-black ${
                         selectedPointId === point.id ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700'
                       }`}>
                         #{index + 1}
                       </span>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-bold text-slate-900 text-sm">{point.label}</h4>
+                          <h4 className="font-bold text-slate-900 text-sm break-words">{point.label}</h4>
                           {(() => {
                             const vis = getPointPinVisual({
                               color: typeof pObj.color === 'string' ? pObj.color : undefined,
@@ -721,7 +721,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                             });
                             return (
                               <span
-                                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border shadow-2xs"
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold border shadow-2xs"
                                 style={{
                                   backgroundColor: `${vis.color}15`,
                                   borderColor: `${vis.color}45`,
@@ -734,7 +734,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                             );
                           })()}
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-slate-500 mt-0.5 break-words">
                           {point.variant ? `Rozměr / varianta: ${point.variant}` : point.navigationType}
                         </p>
                       </div>
@@ -747,7 +747,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         e.stopPropagation();
                         togglePointSelection(point.id);
                       }}
-                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${
+                      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 w-full sm:w-auto ${
                         isSelected
                           ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
                           : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -773,7 +773,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     )}
 
                     {targets.length > 1 && (
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-900 border border-sky-200">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-900 border border-sky-200 truncate max-w-full">
                         🎯 Směr: {targets.find((t) => t.id === ((pObj.targetId as string) || targets[0].id))?.name || 'Prodejna'}
                       </span>
                     )}

@@ -69,7 +69,7 @@ export function NavigationOfferWorkflowStepper({ offer }: NavigationOfferWorkflo
         </span>
       </div>
 
-      <ol className="grid grid-cols-6 gap-2">
+      <ol className="grid grid-cols-6 gap-1 sm:gap-2">
         {stages.map((stage, index) => {
           const active = index === activeIndex;
           return (
@@ -98,19 +98,35 @@ export function NavigationOfferWorkflowStepper({ offer }: NavigationOfferWorkflo
                 )}
               </span>
               <span
-                className={`mt-2 truncate text-[11px] font-bold ${
+                className={`mt-2 hidden w-full max-w-full truncate text-[11px] font-bold sm:block ${
                   active || stage.complete ? 'text-slate-900' : 'text-slate-400'
                 }`}
               >
                 {stage.label}
               </span>
-              <span className="text-[10px] text-slate-400 truncate hidden sm:block">
+              <span className="mt-0.5 hidden w-full max-w-full truncate text-[10px] text-slate-400 md:block">
                 {stage.description}
               </span>
             </li>
           );
         })}
       </ol>
+
+      {/* Dedicated active step indicator for mobile screens to eliminate text overlap */}
+      <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2 text-center sm:hidden">
+        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-900">
+          <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[10px] font-black text-white">
+            {activeIndex + 1}
+          </span>
+          <span>Krok {activeIndex + 1} z {stages.length}:</span>
+          <span className="font-extrabold text-sky-700">{stages[activeIndex]?.label}</span>
+        </div>
+        {stages[activeIndex]?.description ? (
+          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+            {stages[activeIndex]?.description}
+          </p>
+        ) : null}
+      </div>
     </nav>
   );
 }

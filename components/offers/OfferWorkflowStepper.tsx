@@ -18,7 +18,7 @@ export function OfferWorkflowStepper({ status, events, converted }: OfferWorkflo
 
   return (
     <nav aria-label="Průběh nabídky" className="mb-6 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-      <ol className="grid grid-cols-5 gap-2">
+      <ol className="grid grid-cols-5 gap-1 sm:gap-2">
         {stages.map((stage, index) => {
           const active = index === activeIndex;
           return (
@@ -40,13 +40,24 @@ export function OfferWorkflowStepper({ status, events, converted }: OfferWorkflo
               >
                 {stage.complete ? <Check aria-hidden="true" size={15} /> : <Circle aria-hidden="true" size={10} fill="currentColor" />}
               </span>
-              <span className={`mt-2 truncate text-[11px] font-semibold sm:text-xs ${active || stage.complete ? 'text-slate-950' : 'text-slate-400'}`}>
+              <span className={`mt-2 hidden w-full max-w-full truncate text-[11px] font-semibold sm:block sm:text-xs ${active || stage.complete ? 'text-slate-950' : 'text-slate-400'}`}>
                 {stage.label}
               </span>
             </li>
           );
         })}
       </ol>
+
+      {/* Dedicated active step indicator for mobile screens to eliminate text overlap */}
+      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-center sm:hidden">
+        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-900">
+          <span className="inline-flex size-4.5 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[10px] font-black text-white">
+            {activeIndex + 1}
+          </span>
+          <span>Krok {activeIndex + 1} z {stages.length}:</span>
+          <span className="font-extrabold text-slate-950">{stages[activeIndex]?.label}</span>
+        </div>
+      </div>
     </nav>
   );
 }
