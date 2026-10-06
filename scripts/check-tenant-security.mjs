@@ -98,7 +98,7 @@ const API_ROUTE_EXCEPTIONS = new Set([
   'app/api/webhooks/resend/route.ts',
 ]);
 
-const DIRECT_GUARD_PATTERN = /\b(?:requireApiAccess|getCurrentUser|requireOrganization|requireOrganizationMember|requireOrganizationRole|requireSuperAdmin|enterTenantContext|requireTenantContext|plannerApi|plannerActor)\s*\(/;
+const DIRECT_GUARD_PATTERN = /\b(?:requireApiAccess|requireElectionRemovalAccess|getCurrentUser|requireOrganization|requireOrganizationMember|requireOrganizationRole|requireSuperAdmin|enterTenantContext|requireTenantContext|plannerApi|plannerActor)\s*\(/;
 const ROUTE_HANDLER_PATTERN = /export\s+(?:(?:async\s+)?function|const)\s+(?:GET|POST|PUT|PATCH|DELETE)\b/;
 
 function normalizePath(root, file) {

@@ -219,6 +219,14 @@ export const SYSTEM_MODULES: SystemModule[] = [
     badge: 'AI Engine',
     routes: ['/realization'],
   },
+  {
+    id: 'electionRemoval',
+    name: 'Volební demontáže',
+    description: 'KML import, plánování tras a mobilní realizace demontáží volebních médií',
+    category: 'operations',
+    badge: 'SeePoint Interní',
+    routes: ['/election-removal'],
+  },
 
 
   // Management
@@ -325,7 +333,7 @@ export function getOrganizationEnabledModules(
     result[mod.id] = defaultModules.has(mod.id);
   });
   // Foundation rollout is explicit per tenant, including enterprise/internal plans.
-  for (const id of ['planner', 'googleCalendar', 'aiPlanner']) result[id] = false;
+  for (const id of ['planner', 'googleCalendar', 'aiPlanner', 'electionRemoval']) result[id] = false;
 
   if (organization?.enabledModules && typeof organization.enabledModules === 'object') {
     const overrides = organization.enabledModules as Record<string, unknown>;

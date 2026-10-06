@@ -485,6 +485,26 @@ enum ReservationStatus {
   CANCELLED
 }
 
+enum ElectionRemovalPointStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  ISSUE
+  CANCELLED
+}
+
+enum ElectionRemovalMediaType {
+  ACKO
+  BENCH
+  CITY_POSTER
+  MINI_TOWER
+  BANNER
+  PLOT
+  TOWER
+  OTHER
+}
+
 model Organization {
   id                  String             @id @default(cuid())
   name                String
@@ -536,6 +556,8 @@ model Organization {
   calendarConnections CalendarConnection[]
   plannerPreferences PlannerPreferences[]
   plannerBlocks PlannerBlock[]
+  electionCampaigns ElectionCampaign[]
+  electionRemovalPoints ElectionRemovalPoint[]
 
   @@index([isActive])
   @@index([plan])
@@ -752,13 +774,17 @@ model FieldPlan {
   planningInputSnapshot Json
   planningSummary Json
   approvalSnapshot Json?
+  electionCampaignId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  electionCampaign ElectionCampaign? @relation(fields: [electionCampaignId], references: [id], onDelete: SetNull)
+  electionRemovalPoints ElectionRemovalPoint[]
 
   @@unique([organizationId, date, version])
   @@unique([organizationId, requestKey])
   @@index([organizationId, date, status])
+  @@index([organizationId, electionCampaignId])
 }
 
 model OrganizationOnboarding {
@@ -881,6 +907,7 @@ model User {
   verifiedFieldSurveyParcels     FieldSurveyParcel[]             @relation("FieldSurveyParcelVerifiedBy")
   verifiedFieldSurveyOwners      FieldSurveyOwner[]              @relation("FieldSurveyOwnerVerifiedBy")
   confirmedFieldSurveyAiAnalyses FieldSurveyAiAnalysis[]         @relation("FieldSurveyAiConfirmedBy")
+  completedElectionRemovalPoints ElectionRemovalPoint[]          @relation("ElectionPointCompletedBy")
 }
 
 model UserSession {
@@ -2252,6 +2279,7 @@ model Photo {
   crmRealizationId       String?
   surveyCandidatePointId String?
   surveyNavigationPointId String?
+  electionRemovalPointId String?
   url                    String
   driveFileId            String?
   fileName               String?
@@ -2291,6 +2319,7 @@ model Photo {
   siteNavigationPoints         NavigationPoint[]              @relation("PointSitePhoto")
   surveyCandidatePoint         NavigationCandidatePoint?     @relation("CandidatePhotos", fields: [surveyCandidatePointId], references: [id], onDelete: SetNull)
   surveyNavigationPoint        NavigationPoint?              @relation("NavigationPointSurveyPhotos", fields: [surveyNavigationPointId], references: [id], onDelete: SetNull)
+  electionRemovalPoint         ElectionRemovalPoint?         @relation(fields: [electionRemovalPointId], references: [id], onDelete: SetNull)
 
   @@unique([carrierId, driveFileId])
   @@index([carrierId])
@@ -2301,6 +2330,7 @@ model Photo {
   @@index([organizationId])
   @@index([organizationId, storageProvider])
   @@index([surveyNavigationPointId])
+  @@index([electionRemovalPointId])
 }
 
 model ImportProfile {
@@ -4615,4 +4645,72 @@ model FieldSurveyAiAnalysis {
   @@index([organizationId])
   @@index([surveyPointId])
   @@index([status])
+}
+
+model ElectionCampaign {
+  id              String            @id @default(cuid())
+  organizationId  String            @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  name            String
+  description     String?
+  status          String            @default("DRAFT") // DRAFT, PLANNED, IN_PROGRESS, COMPLETED, ARCHIVED
+  targetDate      DateTime?
+  totalPoints     Int               @default(0)
+  completedPoints Int               @default(0)
+  kmlFileName     String?
+  kmlRawContent   String?           @db.Text
+  mediaDefaults   Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  points          ElectionRemovalPoint[]
+  fieldPlans      FieldPlan[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+}
+
+model ElectionRemovalPoint {
+  id                  String                     @id @default(cuid())
+  organizationId      String                     @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  campaignId          String
+  mediaType           ElectionRemovalMediaType   @default(OTHER)
+  mediaTypeRaw        String?
+  layerName           String?
+  label               String
+  description         String?
+  latitude            Float
+  longitude           Float
+  quantity            Int                        @default(1)
+  baseServiceMinutes  Int                        @default(10)
+  serviceMinutes      Int                        @default(10)
+  status              ElectionRemovalPointStatus @default(PENDING)
+
+  assignedFieldPlanId String?
+  assignedCrewId      String?
+  plannedOrder        Int?
+  plannedArrivalAt    DateTime?
+
+  startedAt           DateTime?
+  completedAt         DateTime?
+  completedByUserId   String?
+
+  issueType           String?
+  issueNote           String?
+  issueReportedAt     DateTime?
+  issueReportedByUserId String?
+
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  campaign            ElectionCampaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  organization        Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedFieldPlan   FieldPlan?                 @relation(fields: [assignedFieldPlanId], references: [id], onDelete: SetNull)
+  completedBy         User?                      @relation("ElectionPointCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  photos              Photo[]
+
+  @@index([organizationId, campaignId, status])
+  @@index([organizationId, latitude, longitude])
+  @@index([organizationId, assignedFieldPlanId])
+  @@index([campaignId])
 }

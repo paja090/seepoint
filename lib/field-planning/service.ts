@@ -157,7 +157,22 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
           if (!realization || realization.workOrderId !== stop.workOrderId) throw new Error('Vazba realizace se změnila.');
           await tx.crmRealization.update({ where: { id: realization.id, organizationId }, data: { plannedDate: new Date(stop.startAt), assignedUserId: realization.assignedUserId ?? members.find(m => m.userId)?.userId ?? null } });
         }
-        if (!stop.workOrderId && stop.navigationPointId) continue;
+        if (stop.electionRemovalPointId) {
+          const pt = await tx.electionRemovalPoint.findFirst({ where: { id: stop.electionRemovalPointId, organizationId } });
+          if (pt && !['CANCELLED'].includes(pt.status)) {
+            await tx.electionRemovalPoint.update({
+              where: { id: pt.id, organizationId },
+              data: {
+                assignedFieldPlanId: row.id,
+                assignedCrewId: crew.id,
+                plannedArrivalAt: new Date(stop.arrivalAt),
+                plannedOrder: stop.routeOrder,
+                status: pt.status === 'COMPLETED' ? 'COMPLETED' : 'ASSIGNED',
+              },
+            });
+          }
+        }
+        if (!stop.workOrderId && (stop.navigationPointId || stop.electionRemovalPointId)) continue;
         if (assignedOrders.has(stop.workOrderId)) continue;
         assignedOrders.add(stop.workOrderId);
         const orderMemberIds = new Set(result.crews.filter(c => c.stops.some(s => s.workOrderId === stop.workOrderId)).flatMap(c => c.employeeIds));
@@ -187,6 +202,7 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
       }
     }
     await tx.fieldPlan.update({ where: { id, organizationId }, data: { approvalSnapshot: json({ reservationIds }) } });
+    if (row.electionCampaignId) await tx.electionCampaign.update({ where: { id: row.electionCampaignId, organizationId }, data: { status: 'PLANNED' } });
     if (parent) await tx.fieldPlan.update({ where: { id: parent.id, organizationId }, data: { status: 'CANCELLED' } });
     await auditPlan(tx, id, actor, 'FIELD_PLAN_APPROVED', { acceptEstimated, reservationIds, supersededPlanId: parent?.id, navigationPointIds: result.crews.flatMap(c => c.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : [])) });
     return planView(await getPlan(id, tx));

@@ -57,6 +57,7 @@ export const navigationHubs: NavigationHub[] = [
     { label: 'Realizace', items: [
       ["/work","Plán práce","briefcaseBusiness","work"],
       ["/work/route","Pracovní výjezd","route","work"],
+      ["/election-removal","Volební demontáže","route","electionRemoval"],
       ["/tasks","Všechny úkoly","clipboardList","tasks"],
       ["/production","Výroba, Tisk & Grafika","printer","printProduction"]
     ] },
