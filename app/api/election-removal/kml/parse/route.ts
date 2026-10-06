@@ -60,11 +60,10 @@ export async function POST(req: Request) {
       fileName,
       parseResult,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při parsování KML:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Chyba při zpracování KML souboru.' },
-      { status: 400 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Chyba při zpracování KML souboru.';
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

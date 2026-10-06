@@ -27,12 +27,13 @@ export async function GET(
   try {
     const resources = await loadElectionPlanningResources(id);
     return NextResponse.json({ success: true, resources });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při načítání plánovacích zdrojů:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Nepodařilo se načíst zdroje pro plánování.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Nepodařilo se načíst zdroje pro plánování.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -73,11 +74,10 @@ export async function POST(
       planningInput: input,
       planningResult: result,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při výpočtu plánu tras:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Nepodařilo se optimalizovat trasy.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Nepodařilo se optimalizovat trasy.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

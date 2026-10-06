@@ -95,11 +95,10 @@ export async function POST(
     });
 
     return NextResponse.json({ success: true, photo });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při nahrávání fotky demontáže:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Chyba při nahrávání fotografie.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Chyba při nahrávání fotografie.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

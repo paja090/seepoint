@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import type { ElectionRemovalMediaType } from '@prisma/client';
+import { Prisma, type ElectionRemovalMediaType } from '@prisma/client';
 import {
   requireElectionRemovalAccess,
   isElectionRemovalAccessDenied,
@@ -35,7 +35,7 @@ export async function GET() {
     });
 
     return NextResponse.json({ success: true, campaigns });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při načítání volebních kampaní:', error);
     return NextResponse.json(
       { error: 'Nepodařilo se načíst volební kampaně.' },
@@ -60,7 +60,7 @@ interface CreateCampaignPayload {
   description?: string;
   targetDate?: string | null;
   kmlFileName?: string | null;
-  mediaDefaults?: any;
+  mediaDefaults?: Prisma.InputJsonValue;
   points: CreatePointPayload[];
 }
 
@@ -118,7 +118,9 @@ export async function POST(req: Request) {
           description: body.description?.trim() || null,
           targetDate: body.targetDate ? new Date(body.targetDate) : null,
           kmlFileName: body.kmlFileName || null,
-          mediaDefaults: body.mediaDefaults || null,
+          mediaDefaults: body.mediaDefaults
+            ? (body.mediaDefaults as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
           totalPoints: validPoints.length,
           completedPoints: 0,
           status: 'DRAFT',
@@ -167,11 +169,10 @@ export async function POST(req: Request) {
       campaignId: campaign.id,
       campaign,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při zakládání volební kampaně:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Chyba při ukládání kampaně.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Chyba při ukládání kampaně.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

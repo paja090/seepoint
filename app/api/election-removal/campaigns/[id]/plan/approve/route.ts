@@ -45,11 +45,10 @@ export async function POST(
       success: true,
       fieldPlanId: fieldPlan.id,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při schvalování plánu:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Nepodařilo se uložit a schválit plán.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Nepodařilo se uložit a schválit plán.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

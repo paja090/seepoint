@@ -51,7 +51,7 @@ export async function GET(
     }
 
     return NextResponse.json({ success: true, campaign });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při načítání detailu volební kampaně:', error);
     return NextResponse.json(
       { error: 'Nepodařilo se načíst detail kampaně.' },
@@ -93,11 +93,10 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při mazání volební kampaně:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Nepodařilo se smazat kampaň.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Nepodařilo se smazat kampaň.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

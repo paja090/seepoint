@@ -697,6 +697,7 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
             crmRealizationId: null, workOrderItemId: null,
             surveyCandidatePointId: null,
             surveyNavigationPointId: null,
+            electionRemovalPointId: null,
             url: 'https://storage.seepoint.cz/nav-photo.jpg',
             driveFileId: null,
             fileName: 'nav-photo.jpg',
@@ -792,6 +793,7 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
             crmRealizationId: null, workOrderItemId: null, // NOT linked to this realization!
             surveyCandidatePointId: null,
             surveyNavigationPointId: null,
+            electionRemovalPointId: null,
             url: 'https://storage.seepoint.cz/old-carrier-photo-2024.jpg',
             driveFileId: null,
             fileName: 'old.jpg',

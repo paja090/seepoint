@@ -200,7 +200,10 @@ export default async function ElectionRemovalDetailPage({
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {campaign.fieldPlans.map((plan) => {
-                const summary = (plan.planningSummary && typeof plan.planningSummary === 'object') ? (plan.planningSummary as Record<string, any>) : null;
+                const summary =
+                  plan.planningSummary && typeof plan.planningSummary === 'object'
+                    ? (plan.planningSummary as Record<string, unknown>)
+                    : null;
                 return (
                   <div
                     key={plan.id}
@@ -220,7 +223,7 @@ export default async function ElectionRemovalDetailPage({
                     {summary?.totalDistanceKm !== undefined && (
                       <div className="pt-2 border-t border-slate-200/60 flex justify-between text-xs text-slate-500">
                         <span>{Number(summary.totalDistanceKm).toFixed(1)} km</span>
-                        <span>{summary.totalDurationMinutes || 0} min</span>
+                        <span>{Number(summary.totalDurationMinutes || 0)} min</span>
                       </div>
                     )}
                   </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import {
   requireElectionRemovalAccess,
   isElectionRemovalAccessDenied,
@@ -48,7 +49,7 @@ export async function PATCH(
       const wasCompleted = point.status === 'COMPLETED';
 
       let newStatus = point.status;
-      let updateData: any = {};
+      let updateData: Prisma.ElectionRemovalPointUncheckedUpdateInput = {};
 
       if (action === 'START') {
         newStatus = 'IN_PROGRESS';
@@ -128,11 +129,10 @@ export async function PATCH(
     });
 
     return NextResponse.json({ success: true, point: updatedPoint });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Chyba při aktualizaci stavu bodu:', error);
-    return NextResponse.json(
-      { error: error?.message || 'Chyba při změně stavu bodu.' },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : 'Chyba při změně stavu bodu.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
