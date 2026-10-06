@@ -148,6 +148,7 @@ export type OfferView = {
       note?: string | null;
       photoUrl?: string | null;
       sortOrder?: number;
+      color?: string | null;
     }>;
     navigationOrderStatus?: string | null;
     points: Array<{

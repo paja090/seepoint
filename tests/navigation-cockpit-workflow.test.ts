@@ -24,6 +24,7 @@ function createMockNavigationOffer(overrides: Partial<OfferView> = {}): OfferVie
     contactPerson: 'Petr Novák',
     contactEmail: 'novak@example.cz',
     status: 'DRAFT',
+    pricingTier: 'standard',
     validUntil: '2026-12-31',
     currency: 'CZK',
     taxRate: '21.00',
