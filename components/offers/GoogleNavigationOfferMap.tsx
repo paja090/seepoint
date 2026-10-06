@@ -130,6 +130,7 @@ export function GoogleNavigationOfferMap({
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [showRestrictedZones, setShowRestrictedZones] = useState(false);
+  const [mapType, setMapType] = useState<'roadmap' | 'hybrid' | 'terrain'>('roadmap');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
@@ -140,6 +141,12 @@ export function GoogleNavigationOfferMap({
   useEffect(() => {
     callbacksRef.current = { onMapClick, onTargetSelect, readOnly };
   }, [onMapClick, onTargetSelect, readOnly]);
+
+  useEffect(() => {
+    if (mapRef.current && typeof (mapRef.current as { setMapTypeId?: (t: string) => void }).setMapTypeId === 'function') {
+      (mapRef.current as { setMapTypeId: (t: string) => void }).setMapTypeId(mapType);
+    }
+  }, [mapType]);
 
   const activeCategories = useMemo(() => {
     const catMap = new Map<string, { id: string; label: string; icon: string; color: string; count: number }>();
@@ -403,7 +410,8 @@ export function GoogleNavigationOfferMap({
       const newMap = new googleMaps.Map(containerRef.current, {
         center,
         zoom: target ? 14 : 8,
-        mapTypeControl: false,
+        mapTypeId: mapType,
+        mapTypeControl: true,
         streetViewControl: false,
         fullscreenControl: true,
         mapId: 'DEMO_MAP_ID',
@@ -557,6 +565,7 @@ export function GoogleNavigationOfferMap({
           strokeWeight: isSelected ? 3.5 : 2,
           scale: isSelected ? 2.4 : 1.9,
           anchor: new googleMaps.Point(12, 22),
+          labelOrigin: new googleMaps.Point(12, 9),
         },
       });
 
@@ -733,11 +742,50 @@ export function GoogleNavigationOfferMap({
         </span>
       </div>}
 
-      {/* Interactive Google Map Container */}
-      {!readOnly && <label className="flex items-center gap-2 text-xs text-slate-600">
-        <input type="checkbox" checked={showRestrictedZones} onChange={(event) => setShowRestrictedZones(event.target.checked)} />
-        Ostrava – zóny omezení reklamy (volitelná mapová vrstva)
-      </label>}
+      {/* Interactive Google Map Container & Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        {!readOnly && (
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            <input type="checkbox" checked={showRestrictedZones} onChange={(event) => setShowRestrictedZones(event.target.checked)} />
+            <span>Ostrava – zóny omezení reklamy</span>
+          </label>
+        )}
+        <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-2xs ml-auto">
+          <button
+            type="button"
+            onClick={() => setMapType('roadmap')}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+              mapType === 'roadmap'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Běžná mapa
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapType('hybrid')}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+              mapType === 'hybrid'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Letecká / Satelitní
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapType('terrain')}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+              mapType === 'terrain'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Terénní
+          </button>
+        </div>
+      </div>
       <div
         ref={containerRef}
         aria-label="Google mapa plánování navigace"
