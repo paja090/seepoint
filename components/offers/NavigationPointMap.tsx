@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
+import { getPointPinColor, getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 
 export type NavigationMapPoint = {
   id: string;
@@ -10,6 +11,9 @@ export type NavigationMapPoint = {
   latitude: number;
   longitude: number;
   orientation?: string;
+  navigationType?: string;
+  carrierType?: string;
+  color?: string;
 };
 
 export function NavigationPointMap({
@@ -78,7 +82,9 @@ export function NavigationPointMap({
             });
           },
         });
-        L.control.layers({}, { 'Ostrava – zóny omezení reklamy': restrictedZones }).addTo(map);
+        if (!readOnlyRef.current) {
+          L.control.layers({}, { 'Ostrava – zóny omezení reklamy': restrictedZones }).addTo(map);
+        }
       } catch {
         // Ignore if geometry fails
       }
@@ -181,9 +187,11 @@ export function NavigationPointMap({
           ? '⬆'
           : '🧭';
 
-        const gradStart = isSelected ? '#ea580c' : '#0284c7';
-        const gradEnd = isSelected ? '#c2410c' : '#0369a1';
-        const strokeColor = isSelected ? '#fde047' : '#0284c7';
+        const pinColor = getPointPinColor(point);
+        const visual = getPointPinVisual(point);
+        const gradStart = isSelected ? '#ea580c' : pinColor;
+        const gradEnd = isSelected ? '#c2410c' : pinColor;
+        const strokeColor = isSelected ? '#fde047' : pinColor;
 
         const pointHtml = `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -198,21 +206,21 @@ export function NavigationPointMap({
               font-size: 11px;
               font-weight: 800;
               white-space: nowrap;
-              border: 2px solid ${isSelected ? '#fde047' : '#38bdf8'};
+              border: 2px solid ${isSelected ? '#fde047' : pinColor};
               box-shadow: 0 4px 12px ${isSelected ? 'rgba(234, 88, 12, 0.6)' : 'rgba(0,0,0,0.3)'};
               display: flex;
               align-items: center;
               gap: 4px;
             ">
-              <span>#${pointNumber}</span>
+              <span>${visual.icon} #${pointNumber}</span>
               <span style="color: ${isSelected ? '#fef08a' : '#38bdf8'};">${arrow}</span>
               <span>${point.label}</span>
             </div>
 
-            <svg width="${isSelected ? 42 : 36}" height="${isSelected ? 56 : 48}" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 6px 10px ${isSelected ? 'rgba(234, 88, 12, 0.7)' : 'rgba(2, 132, 199, 0.45)'});">
+            <svg width="${isSelected ? 42 : 36}" height="${isSelected ? 56 : 48}" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 6px 10px ${isSelected ? 'rgba(234, 88, 12, 0.7)' : 'rgba(0,0,0,0.35)'});">
               <path d="M18 0C8.059 0 0 8.059 0 18C0 29.25 15.3 45.225 17.235 47.19C17.658 47.613 18.342 47.613 18.765 47.19C20.7 45.225 36 29.25 36 18C36 8.059 27.941 0 18 0Z" fill="url(#pointGrad_${index})"/>
               <circle cx="18" cy="18" r="12" fill="#FFFFFF" stroke="${strokeColor}" stroke-width="2.5"/>
-              <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="13" fill="${isSelected ? '#ea580c' : '#000000'}">#${pointNumber}</text>
+              <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="13" fill="${isSelected ? '#ea580c' : '#0f172a'}">#${pointNumber}</text>
               <defs>
                 <linearGradient id="pointGrad_${index}" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
                   <stop stop-color="${gradStart}"/>

@@ -3,6 +3,7 @@
 import type { Map as LeafletMap } from 'leaflet';
 import { useEffect, useRef } from 'react';
 import type { OfferItemView } from '@/lib/offers/view-model';
+import { getPointPinColor } from '@/lib/offers/navigation-carrier-types';
 
 export interface NavigationMapPointInput {
   id: string;
@@ -23,6 +24,7 @@ export interface NavigationMapPointInput {
   installedPhotoUrl?: string | null;
   navigationType?: string | null;
   variant?: string | null;
+  color?: string | null;
 }
 
 export interface NavigationTargetInput {
@@ -231,12 +233,13 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
           const isInstalled = point.status === 'INSTALLED' || Boolean(point.installedPhotoUrl);
           const arrowStr = formatArrowText(point.arrowDirectionEnum);
           const distStr = formatDistance(point);
+          const pinColor = getPointPinColor(point);
 
           const navIcon = L.divIcon({
             className: 'custom-nav-pin',
             html: `
               <div style="
-                background: ${isInstalled ? '#059669' : '#009EE2'};
+                background: ${isInstalled ? '#059669' : pinColor};
                 color: white;
                 font-weight: 800;
                 font-size: 11px;
