@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
-import type { Map as LeafletMap, LayerGroup } from 'leaflet';
+import { useEffect, useRef, useMemo, useState } from 'react';
+import type { Map as LeafletMap, LayerGroup, TileLayer } from 'leaflet';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
-import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
-import { Maximize2 } from 'lucide-react';
+import {
+  parsePointMetadata,
+  cleanLayerName,
+  buildGoogleMapsRouteUrl,
+} from '@/lib/election-removal/point-metadata';
+import { Maximize2, ExternalLink } from 'lucide-react';
 
 export interface ElectionRemovalMapPoint {
   id: string;
@@ -17,6 +21,29 @@ export interface ElectionRemovalMapPoint {
   description?: string | null;
   plannedOrder?: number | null;
 }
+
+export type GoogleMapType = 'roadmap' | 'hybrid' | 'terrain';
+
+const GOOGLE_MAP_LAYERS: Record<
+  GoogleMapType,
+  { url: string; maxZoom: number; label: string }
+> = {
+  roadmap: {
+    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+    maxZoom: 20,
+    label: 'Google Běžná',
+  },
+  hybrid: {
+    url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    maxZoom: 20,
+    label: 'Satelitní',
+  },
+  terrain: {
+    url: 'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+    maxZoom: 20,
+    label: 'Terénní',
+  },
+};
 
 interface ElectionRemovalMapProps {
   points: ElectionRemovalMapPoint[];
@@ -47,7 +74,10 @@ export function ElectionRemovalMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const markerGroupRef = useRef<LayerGroup | null>(null);
+  const tileLayerRef = useRef<TileLayer | null>(null);
   const markersMapRef = useRef<Map<string, import('leaflet').Marker>>(new Map());
+
+  const [mapType, setMapType] = useState<GoogleMapType>('roadmap');
 
   // Filter valid coordinates
   const validPoints = useMemo(() => {
@@ -67,6 +97,22 @@ export function ElectionRemovalMap({
   const inProgressCount = validPoints.filter((p) => p.status === 'IN_PROGRESS').length;
   const issueCount = validPoints.filter((p) => p.status === 'ISSUE').length;
   const pendingCount = validPoints.length - completedCount - inProgressCount - issueCount;
+
+  // Change Google Maps layer
+  const handleMapTypeChange = async (type: GoogleMapType) => {
+    setMapType(type);
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    const L = await import('leaflet');
+    mapInstanceRef.current.removeLayer(tileLayerRef.current);
+
+    const newTileLayer = L.tileLayer(GOOGLE_MAP_LAYERS[type].url, {
+      maxZoom: GOOGLE_MAP_LAYERS[type].maxZoom,
+      subdomains: ['0', '1', '2', '3'],
+      attribution: '© Google Maps',
+    }).addTo(mapInstanceRef.current);
+    newTileLayer.bringToBack();
+    tileLayerRef.current = newTileLayer;
+  };
 
   // Initialize Map
   useEffect(() => {
@@ -101,13 +147,13 @@ export function ElectionRemovalMap({
         attributionControl: false,
       });
 
-      L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-        {
-          maxZoom: 19,
-          subdomains: 'abcd',
-        }
-      ).addTo(map);
+      // Default Google Maps Roadmap layer
+      const tileLayer = L.tileLayer(GOOGLE_MAP_LAYERS.roadmap.url, {
+        maxZoom: GOOGLE_MAP_LAYERS.roadmap.maxZoom,
+        subdomains: ['0', '1', '2', '3'],
+        attribution: '© Google Maps',
+      }).addTo(map);
+      tileLayerRef.current = tileLayer;
 
       const markerGroup = L.layerGroup().addTo(map);
       markerGroupRef.current = markerGroup;
@@ -285,7 +331,7 @@ export function ElectionRemovalMap({
               text-decoration:none;
               text-align:center;
               flex:1;
-            ">Maps ↗</a>
+            ">Google Maps ↗</a>
             <a href="https://waze.com/ul?ll=${point.latitude},${point.longitude}&navigate=yes" target="_blank" rel="noopener noreferrer" style="
               display:inline-block;
               background:#eef2ff;
@@ -348,26 +394,82 @@ export function ElectionRemovalMap({
     }
   };
 
+  const googleMapsRouteUrl = useMemo(() => {
+    return buildGoogleMapsRouteUrl(validPoints);
+  }, [validPoints]);
+
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 ${className}`}>
-      {/* Leaflet Container */}
+      {/* Map Container */}
       <div
         ref={mapContainerRef}
         style={{ height, width: '100%' }}
         className="z-0"
       />
 
-      {/* Floating Controls */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={handleResetView}
-          className="p-2 bg-white/95 hover:bg-white text-slate-700 hover:text-slate-900 rounded-xl shadow-md border border-slate-200 transition text-xs font-semibold flex items-center gap-1 active:scale-95 backdrop-blur-sm"
-          title="Zobrazit všechny body"
-        >
-          <Maximize2 className="w-3.5 h-3.5 text-slate-500" />
-          <span className="hidden sm:inline">Vycentrovat</span>
-        </button>
+      {/* Top Controls: Google Maps Layer Switcher & Actions */}
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        {/* Google Maps Layer Switcher */}
+        <div className="flex items-center rounded-xl border border-slate-200/90 bg-white/95 p-0.5 shadow-md backdrop-blur-sm pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => handleMapTypeChange('roadmap')}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+              mapType === 'roadmap'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Google Běžná
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMapTypeChange('hybrid')}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+              mapType === 'hybrid'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Satelitní
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMapTypeChange('terrain')}
+            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+              mapType === 'terrain'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Terénní
+          </button>
+        </div>
+
+        {/* Right Action Buttons */}
+        <div className="flex items-center gap-1.5 ml-auto pointer-events-auto">
+          {validPoints.length > 0 && (
+            <a
+              href={googleMapsRouteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="py-1 px-2.5 bg-white/95 hover:bg-white text-slate-700 hover:text-sky-700 rounded-xl shadow-md border border-slate-200 transition text-[11px] font-bold flex items-center gap-1 active:scale-95 backdrop-blur-sm"
+              title="Otevřít celou trasu v aplikaci Google Maps"
+            >
+              <ExternalLink className="w-3 h-3 text-sky-600" />
+              <span className="hidden sm:inline">Google Maps trasa</span>
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={handleResetView}
+            className="p-1.5 bg-white/95 hover:bg-white text-slate-700 hover:text-slate-900 rounded-xl shadow-md border border-slate-200 transition text-[11px] font-bold flex items-center gap-1 active:scale-95 backdrop-blur-sm"
+            title="Zobrazit všechny body"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden md:inline">Centrovat</span>
+          </button>
+        </div>
       </div>
 
       {/* Floating Legend */}

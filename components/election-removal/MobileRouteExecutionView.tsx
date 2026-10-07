@@ -21,7 +21,11 @@ import {
 import type { ElectionRemovalPoint, Photo } from '@prisma/client';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
-import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
+import {
+  parsePointMetadata,
+  cleanLayerName,
+  buildGoogleMapsRouteUrl,
+} from '@/lib/election-removal/point-metadata';
 
 interface PointWithPhotos extends ElectionRemovalPoint {
   photos?: Photo[];
@@ -93,6 +97,12 @@ export function MobileRouteExecutionView({
   const inProgressCount = points.filter((p) => p.status === 'IN_PROGRESS').length;
   const issueCount = points.filter((p) => p.status === 'ISSUE').length;
   const percentDone = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  const googleRouteUrl = useMemo(() => {
+    const uncompleted = displayedPoints.filter((p) => p.status !== 'COMPLETED');
+    const targetPoints = uncompleted.length > 0 ? uncompleted : displayedPoints;
+    return buildGoogleMapsRouteUrl(targetPoints);
+  }, [displayedPoints]);
 
   // Handle Point status update
   const handleUpdateStatus = async (
@@ -334,21 +344,36 @@ export function MobileRouteExecutionView({
         </div>
 
         {/* Map Toggle & Quick Info */}
-        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={() => setShowMap(!showMap)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-sm ${
-              showMap
-                ? 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
-                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <MapIcon className="w-3.5 h-3.5 text-sky-600" />
-            <span>{showMap ? 'Skrýt mapu' : '🗺️ Zobrazit mapu'}</span>
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMap(!showMap)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-sm ${
+                showMap
+                  ? 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <MapIcon className="w-3.5 h-3.5 text-sky-600" />
+              <span>{showMap ? 'Skrýt mapu' : '🗺️ Zobrazit mapu'}</span>
+            </button>
 
-          <span className="text-[11px] text-slate-500 font-medium">
+            {displayedPoints.length > 0 && (
+              <a
+                href={googleRouteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 shadow-sm"
+                title="Spustit zbývající trasu přímo v navigaci Google Maps"
+              >
+                <Navigation className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Google Maps trasa ↗</span>
+              </a>
+            )}
+          </div>
+
+          <span className="text-[11px] text-slate-500 font-medium ml-auto">
             {completedCount} z {totalCount} hotovo ({percentDone} %)
           </span>
         </div>

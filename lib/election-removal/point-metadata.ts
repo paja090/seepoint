@@ -176,6 +176,57 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
   };
 }
 
+/**
+ * Builds a direct Google Maps Directions URL for a sequence of points.
+ * Single point: https://www.google.com/maps/dir/?api=1&destination=lat,lng
+ * Multiple points: https://www.google.com/maps/dir/?api=1&origin=lat1,lng1&destination=latN,lngN&waypoints=lat2,lng2|...
+ */
+export function buildGoogleMapsRouteUrl(
+  points: Array<{ latitude: number; longitude: number }>
+): string {
+  if (!points || points.length === 0) return 'https://www.google.com/maps';
+
+  const valid = points.filter(
+    (p) =>
+      typeof p.latitude === 'number' &&
+      typeof p.longitude === 'number' &&
+      !Number.isNaN(p.latitude) &&
+      !Number.isNaN(p.longitude) &&
+      p.latitude !== 0 &&
+      p.longitude !== 0
+  );
+
+  if (valid.length === 0) return 'https://www.google.com/maps';
+
+  if (valid.length === 1) {
+    const params = new URLSearchParams({
+      api: '1',
+      destination: `${valid[0].latitude},${valid[0].longitude}`,
+    });
+    return `https://www.google.com/maps/dir/?${params.toString()}`;
+  }
+
+  const origin = `${valid[0].latitude},${valid[0].longitude}`;
+  const destination = `${valid[valid.length - 1].latitude},${valid[valid.length - 1].longitude}`;
+
+  const intermediate = valid.slice(1, -1).slice(0, 8);
+  const waypoints = intermediate.map((p) => `${p.latitude},${p.longitude}`).join('|');
+
+  const params = new URLSearchParams({
+    api: '1',
+    origin,
+    destination,
+    travelmode: 'driving',
+  });
+
+  if (waypoints) {
+    params.set('waypoints', waypoints);
+  }
+
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+

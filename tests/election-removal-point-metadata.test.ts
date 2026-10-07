@@ -3,7 +3,25 @@ import assert from 'node:assert/strict';
 import {
   parsePointMetadata,
   cleanLayerName,
+  buildGoogleMapsRouteUrl,
 } from '../lib/election-removal/point-metadata';
+
+test('buildGoogleMapsRouteUrl: constructs valid Google Maps directions URLs', () => {
+  assert.equal(buildGoogleMapsRouteUrl([]), 'https://www.google.com/maps');
+
+  const single = [{ latitude: 49.834, longitude: 18.282 }];
+  assert.ok(buildGoogleMapsRouteUrl(single).includes('destination=49.834%2C18.282'));
+
+  const multiple = [
+    { latitude: 49.834, longitude: 18.282 },
+    { latitude: 49.840, longitude: 18.290 },
+    { latitude: 49.850, longitude: 18.300 },
+  ];
+  const url = buildGoogleMapsRouteUrl(multiple);
+  assert.ok(url.includes('origin=49.834%2C18.282'));
+  assert.ok(url.includes('destination=49.85%2C18.3'));
+  assert.ok(url.includes('waypoints=49.84%2C18.29'));
+});
 
 test('parsePointMetadata: parses real-world Google My Maps point description', () => {
   const rawDescription =
