@@ -251,13 +251,23 @@ export function ElectionRoutePlanner({
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               Vyberte datum, čas odjezdu a posádky pro demontáž {pendingPoints.length} médií.
+              {campaign.points.length > pendingPoints.length && (
+                <span className="text-emerald-600 font-semibold ml-1">
+                  ({campaign.points.length - pendingPoints.length} ks již dříve dokončeno).
+                </span>
+              )}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-sky-50 text-sky-700 rounded-lg text-xs font-semibold">
-              K dispozici: {pendingPoints.length} médií
+              K naplánování: {pendingPoints.length} médií
             </span>
+            {campaign.points.length > pendingPoints.length && (
+              <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold">
+                ✓ {campaign.points.length - pendingPoints.length} hotovo
+              </span>
+            )}
           </div>
         </div>
 
