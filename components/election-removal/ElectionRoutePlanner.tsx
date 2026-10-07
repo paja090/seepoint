@@ -66,6 +66,8 @@ export function ElectionRoutePlanner({
 
   const [date, setDate] = useState<string>(initialDate);
   const [startTime, setStartTime] = useState<string>('07:30');
+  const [endTime, setEndTime] = useState<string>('18:00');
+  const [flexibleHours, setFlexibleHours] = useState<boolean>(true);
 
   // Crews configuration: default to 1 crew with first available employee & vehicle if present
   const [crews, setCrews] = useState<CrewConfig[]>([
@@ -175,6 +177,8 @@ export function ElectionRoutePlanner({
         body: JSON.stringify({
           date,
           startTime,
+          endTime,
+          flexibleHours,
           crews: crews.map((c) => ({
             id: c.id,
             employeeIds: c.employeeIds,
@@ -258,7 +262,7 @@ export function ElectionRoutePlanner({
         </div>
 
         {/* Date and Time Settings */}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-slate-400" />
@@ -284,6 +288,36 @@ export function ElectionRoutePlanner({
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-slate-400" />
+              Plánovaný konec směny
+            </label>
+            <input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Flexible Working Hours Toggle */}
+        <div className="p-3.5 bg-sky-50/70 border border-sky-100 rounded-xl flex items-start gap-3">
+          <input
+            id="flexibleHours"
+            type="checkbox"
+            checked={flexibleHours}
+            onChange={(e) => setFlexibleHours(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+          />
+          <label htmlFor="flexibleHours" className="text-xs text-slate-700 cursor-pointer select-none">
+            <span className="font-semibold text-slate-900 block">
+              Pružná pracovní doba (posádky mohou zůstat déle v terénu)
+            </span>
+            Povolí přesčasy a umožní posádkám obsloužit všechny zadané body bez jejich odmítnutí z důvodu konce pevné směny.
+          </label>
         </div>
 
         {/* Crews Setup */}

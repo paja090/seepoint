@@ -10,11 +10,15 @@ export const dynamic = 'force-dynamic';
 
 export default async function ElectionRemovalRoutePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ crew?: string }>;
 }) {
   const user = await checkElectionRemovalPageAccess();
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const initialCrewId = resolvedSearchParams?.crew;
 
   const campaign = await prisma.electionCampaign.findFirst({
     where: {
@@ -57,6 +61,7 @@ export default async function ElectionRemovalRoutePage({
         <MobileRouteExecutionView
           campaign={campaign}
           points={campaign.points}
+          initialCrewId={initialCrewId}
         />
       </div>
     </AppShell>

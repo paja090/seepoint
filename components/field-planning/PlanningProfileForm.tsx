@@ -32,6 +32,7 @@ export function PlanningProfileForm({
     const breakMins = Number(form.get('break')) || 30;
     const defaultDuration = Number(form.get('defaultDuration')) || 45;
     const strategy = (String(form.get('strategy')) || 'BALANCED') as PlanningProfile['strategy'];
+    const flexibleHours = form.has('flexibleHours');
 
     const profile: PlanningProfile = {
       timezone: initial?.timezone ?? 'Europe/Prague',
@@ -41,7 +42,8 @@ export function PlanningProfileForm({
       workdayStart: start,
       workdayEnd: end,
       breakMinutes: breakMins,
-      overtimeMinutes: initial?.overtimeMinutes ?? 60,
+      flexibleHours,
+      overtimeMinutes: flexibleHours ? Math.max(initial?.overtimeMinutes ?? 60, 480) : (initial?.overtimeMinutes ?? 60),
       maximumJobsPerRoute: initial?.maximumJobsPerRoute ?? 25,
       fallbackSpeedKph: initial?.fallbackSpeedKph ?? 50,
       fallbackDistanceFactor: initial?.fallbackDistanceFactor ?? 1.25,
@@ -169,6 +171,25 @@ export function PlanningProfileForm({
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">min</span>
                 </div>
               </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-200/60">
+              <label className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer">
+                <input
+                  name="flexibleHours"
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                  defaultChecked={initial?.flexibleHours ?? false}
+                />
+                <div>
+                  <span className="font-semibold text-slate-900 block">
+                    Pružná pracovní doba (individuální směny)
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Povolí posádkám delší pobyt v terénu bez odmítnutí bodů z důvodu pevného konce směny.
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
 

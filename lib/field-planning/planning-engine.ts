@@ -26,7 +26,8 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
   if (all.some(row => row.organizationId !== input.organizationId)) throw new Error('Cross-tenant reference rejected.');
   for (const rows of [input.jobs, input.employees, input.vehicles]) if (new Set(rows.map(r => r.id)).size !== rows.length) throw new Error('Duplicitní vstupní ID.');
   const start = Math.max(zonedTime(input.date, p.workdayStart, p.timezone), Date.parse(input.now));
-  const end = zonedTime(input.date, p.workdayEnd, p.timezone) + p.overtimeMinutes * 60000;
+  const maxOvertime = p.flexibleHours ? Math.max(p.overtimeMinutes, 480) : p.overtimeMinutes;
+  const end = zonedTime(input.date, p.workdayEnd, p.timezone) + maxOvertime * 60000;
   if (!Number.isFinite(start)) throw new Error('Neplatný čas plánování.');
   const result: PlanningResult = { crews: [], unassigned: [], conflicts: [], estimated: false, explanation: '', distanceMeters: 0, travelSeconds: 0, serviceMinutes: 0 };
   const usedEmployees = new Set<string>(); const usedVehicles = new Set<string>(); const crewIds = new Set<string>();
@@ -87,7 +88,21 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       // Reserve a contiguous break after service, before return; it is included in end-of-shift feasibility.
       const returnAt = finish + p.breakMinutes * 60000 + returning.durationSeconds * 1000;
       if (finish > deadline(job) || returnAt > end) continue;
-      const score = p.strategy === 'BALANCED' ? finish + incoming.durationSeconds * 250 : incoming.distanceMeters + returning.distanceMeters - crew.returnLeg.distanceMeters;
+
+      // Co-located items (same physical GPS / location within 25m in election removal):
+      // Must stay together on the same crew! Prioritize crew already on site.
+      const isCoLocated = Boolean(
+        job.workType === 'ELECTION_REMOVAL' &&
+        previous &&
+        coordinates(job.location) &&
+        distanceMeters(previous.location, job.location) <= 25
+      );
+      const score = isCoLocated
+        ? -1_000_000_000 + finish
+        : p.strategy === 'BALANCED'
+        ? finish + incoming.durationSeconds * 250
+        : incoming.distanceMeters + returning.distanceMeters - crew.returnLeg.distanceMeters;
+
       if (!best || score < best.score) best = { crew, incoming, returning, arrival, begin, finish, returnAt, score };
     }
     if (!best) {
