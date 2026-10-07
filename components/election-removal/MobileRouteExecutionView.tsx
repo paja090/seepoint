@@ -16,9 +16,12 @@ import {
   Image as ImageIcon,
   X,
   Upload,
+  Map as MapIcon,
 } from 'lucide-react';
 import type { ElectionRemovalPoint, Photo } from '@prisma/client';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
+import { ElectionRemovalMap } from './ElectionRemovalMap';
+import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
 
 interface PointWithPhotos extends ElectionRemovalPoint {
   photos?: Photo[];
@@ -43,6 +46,8 @@ export function MobileRouteExecutionView({
   const [points, setPoints] = useState<PointWithPhotos[]>(initialPoints);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'TODO' | 'DONE' | 'ISSUE'>('ALL');
   const [activeCrewFilter, setActiveCrewFilter] = useState<string>('ALL');
+  const [showMap, setShowMap] = useState<boolean>(true);
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
 
   // Issue reporting modal state
   const [reportingIssuePointId, setReportingIssuePointId] = useState<string | null>(null);
@@ -327,7 +332,55 @@ export function MobileRouteExecutionView({
             )}
           </div>
         </div>
+
+        {/* Map Toggle & Quick Info */}
+        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={() => setShowMap(!showMap)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-sm ${
+              showMap
+                ? 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <MapIcon className="w-3.5 h-3.5 text-sky-600" />
+            <span>{showMap ? 'Skrýt mapu' : '🗺️ Zobrazit mapu'}</span>
+          </button>
+
+          <span className="text-[11px] text-slate-500 font-medium">
+            {completedCount} z {totalCount} hotovo ({percentDone} %)
+          </span>
+        </div>
       </div>
+
+      {/* Interactive Route Map */}
+      {showMap && (
+        <div className="card p-3 space-y-2 bg-white shadow-sm border-slate-200">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+            <span className="flex items-center gap-1.5">
+              <MapIcon className="w-4 h-4 text-sky-600" />
+              <span>Interaktivní mapa trasy ({displayedPoints.length} bodů)</span>
+            </span>
+            <span className="text-[11px] font-normal text-slate-500 hidden sm:inline">
+              Kliknutím na bod na mapě vycentrujete kartu
+            </span>
+          </div>
+
+          <ElectionRemovalMap
+            points={displayedPoints}
+            selectedPointId={selectedPointId}
+            onSelectPoint={(id) => {
+              setSelectedPointId(id);
+              const el = document.getElementById(`point-card-${id}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+            height="300px"
+          />
+        </div>
+      )}
 
       {/* Point Cards List */}
       <div className="space-y-3">
@@ -346,11 +399,18 @@ export function MobileRouteExecutionView({
             const isCompleted = point.status === 'COMPLETED';
             const isInProgress = point.status === 'IN_PROGRESS';
             const isIssue = point.status === 'ISSUE';
+            const isSelected = selectedPointId === point.id;
+            const meta = parsePointMetadata(point.description);
+            const cleanLayer = cleanLayerName(point.layerName);
 
             return (
               <div
                 key={point.id}
+                id={`point-card-${point.id}`}
+                onClick={() => setSelectedPointId(point.id)}
                 className={`card p-4 space-y-3 transition border-2 ${
+                  isSelected ? 'ring-2 ring-sky-500 shadow-md ' : ''
+                }${
                   isCompleted
                     ? 'border-emerald-200 bg-emerald-50/20'
                     : isInProgress
@@ -363,16 +423,19 @@ export function MobileRouteExecutionView({
                 {/* Top header row */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 text-xs flex items-center justify-center font-mono font-bold">
-                      {point.plannedOrder || index + 1}
+                    <span className="w-7 h-7 rounded-full bg-slate-900 text-white text-xs flex items-center justify-center font-mono font-bold shadow-sm">
+                      #{point.plannedOrder || index + 1}
                     </span>
-                    <div>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800">
                         {ELECTION_REMOVAL_MEDIA_LABELS[point.mediaType] || point.mediaType}
                       </span>
-                      {point.layerName && (
-                        <span className="text-[11px] text-slate-500 ml-1.5 font-medium">
-                          ({point.layerName})
+                      {cleanLayer && (
+                        <span
+                          className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md"
+                          title={point.layerName || undefined}
+                        >
+                          {cleanLayer}
                         </span>
                       )}
                     </div>
@@ -381,39 +444,58 @@ export function MobileRouteExecutionView({
                   {/* Status Badge */}
                   <div>
                     {isCompleted && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
                         <CheckCircle2 className="w-3.5 h-3.5" /> Hotovo
                       </span>
                     )}
                     {isInProgress && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse border border-amber-300">
                         <Clock className="w-3.5 h-3.5" /> Na místě
                       </span>
                     )}
                     {isIssue && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
                         <AlertTriangle className="w-3.5 h-3.5" /> Problém
                       </span>
                     )}
                     {!isCompleted && !isInProgress && !isIssue && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-600">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
                         Čeká
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Medium Label & Description */}
+                {/* Medium Label */}
                 <div>
                   <h3 className="font-bold text-slate-900 text-base leading-snug">
                     {point.label}
                   </h3>
-                  {point.description && (
-                    <p className="text-xs text-slate-600 mt-1 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                      {point.description}
-                    </p>
-                  )}
                 </div>
+
+                {/* Structured Location & Address info */}
+                {(meta.locality || meta.fullAddress || meta.otherNotes) && (
+                  <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-2.5 space-y-1 text-xs text-slate-700">
+                    {meta.locality && (
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-slate-400 font-semibold min-w-[55px]">Lokalita:</span>
+                        <span className="text-slate-900 font-bold">{meta.locality}</span>
+                      </div>
+                    )}
+                    {meta.fullAddress && (
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-slate-400 font-semibold min-w-[55px]">Adresa:</span>
+                        <span className="text-slate-800 font-medium">{meta.fullAddress}</span>
+                      </div>
+                    )}
+                    {meta.otherNotes && (
+                      <div className="flex items-start gap-1.5 text-slate-600 pt-1 border-t border-slate-200/50">
+                        <span className="text-slate-400 font-semibold min-w-[55px]">Poznámka:</span>
+                        <span>{meta.otherNotes}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Issue Details Box if reported */}
                 {isIssue && (
@@ -427,12 +509,12 @@ export function MobileRouteExecutionView({
                 )}
 
                 {/* Navigation and Location Buttons */}
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
+                    className="flex-1 min-w-[90px] py-2 px-3 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
                   >
                     <Navigation className="w-3.5 h-3.5 text-sky-600" />
                     <span>Google Maps</span>
@@ -442,11 +524,23 @@ export function MobileRouteExecutionView({
                     href={`https://waze.com/ul?ll=${point.latitude},${point.longitude}&navigate=yes`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
+                    className="flex-1 min-w-[80px] py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
                   >
                     <MapPin className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Waze</span>
                   </a>
+
+                  {meta.photoUrl && (
+                    <a
+                      href={meta.photoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 min-w-[130px] py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Fotodokumentace ↗</span>
+                    </a>
+                  )}
                 </div>
 
                 {/* Photos List / Thumbnails if any */}

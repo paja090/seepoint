@@ -15,6 +15,7 @@ import {
   Vote,
   Sparkles,
 } from 'lucide-react';
+import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,7 +106,7 @@ export default async function ElectionRemovalDetailPage({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
                 href={`/election-removal/${campaign.id}/route`}
                 className="btn bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 text-sm font-semibold inline-flex items-center gap-2"
@@ -121,6 +122,11 @@ export default async function ElectionRemovalDetailPage({
                 <Sparkles className="w-4 h-4" />
                 <span>Plánovat trasy</span>
               </Link>
+
+              <DeleteCampaignButton
+                campaignId={campaign.id}
+                campaignName={campaign.name}
+              />
             </div>
           </div>
         </div>
