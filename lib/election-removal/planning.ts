@@ -18,6 +18,7 @@ import { planFieldWork } from '@/lib/field-planning/planning-engine';
 import { googleTravelProvider } from '@/lib/field-planning/travel';
 import { DEFAULT_MEDIA_SERVICE_MINUTES } from './constants';
 import { plannerTransaction } from '@/lib/field-planning/service';
+import { zonedTime } from '@/lib/field-planning/profile';
 
 /**
  * Transforms an ElectionRemovalPoint record into a PlanningJob for the routing engine.
@@ -222,9 +223,10 @@ export async function optimizeElectionRemovalRoutes(
       }
     }
 
-    // Ensure start of planned route begins at configured start time (never clamped to live clock time)
+    // Ensure start of planned route begins at configured start time in local timezone (never shifted by UTC offset)
     const planStartTime = payload.startTime || profile.workdayStart || '07:30';
-    const planNow = `${payload.date}T${planStartTime}:00.000Z`;
+    const startTimestamp = zonedTime(payload.date, planStartTime, profile.timezone);
+    const planNow = new Date(startTimestamp).toISOString();
 
     // Load all employees and vehicles in full format for the engine
     const [allEmployees, allVehicles] = await Promise.all([

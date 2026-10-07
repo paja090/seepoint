@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import type { ElectionRemovalPoint } from '@prisma/client';
 import {
   Search,
@@ -12,6 +13,7 @@ import {
   List,
   Map as MapIcon,
   Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
@@ -21,12 +23,58 @@ interface CampaignPointsViewProps {
   points: ElectionRemovalPoint[];
 }
 
-export function CampaignPointsView({ points }: CampaignPointsViewProps) {
+export function CampaignPointsView({ points: initialPoints }: CampaignPointsViewProps) {
+  const router = useRouter();
+  const [points, setPoints] = useState<ElectionRemovalPoint[]>(initialPoints);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const [layerFilter, setLayerFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [search, setSearch] = useState<string>('');
   const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+
+  // Set of point IDs that have an identical label or identical GPS in the campaign
+  const duplicatePointIds = useMemo(() => {
+    const dups = new Set<string>();
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const a = points[i];
+        const b = points[j];
+        if (
+          a.label === b.label &&
+          Math.abs(a.latitude - b.latitude) < 0.0005 &&
+          Math.abs(a.longitude - b.longitude) < 0.0005
+        ) {
+          dups.add(a.id);
+          dups.add(b.id);
+        }
+      }
+    }
+    return dups;
+  }, [points]);
+
+  const handleDeletePoint = async (pointId: string, pointLabel: string) => {
+    if (!confirm(`Opravdu chcete smazat bod "${pointLabel}" z kampaně?`)) {
+      return;
+    }
+    setDeletingId(pointId);
+    try {
+      const res = await fetch(`/api/election-removal/points/${pointId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Nepodařilo se smazat bod.');
+      }
+      setPoints((prev) => prev.filter((p) => p.id !== pointId));
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při mazání bodu.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Extract distinct layers
   const layers = useMemo(() => {
@@ -188,12 +236,13 @@ export function CampaignPointsView({ points }: CampaignPointsViewProps) {
                 <th className="py-2.5 px-3">GPS / Navigace</th>
                 <th className="py-2.5 px-3 text-center">Stav</th>
                 <th className="py-2.5 px-3 text-right">Čas demontáže</th>
+                <th className="py-2.5 px-3 text-right">Akce</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredPoints.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-slate-400">
+                  <td colSpan={8} className="text-center py-10 text-slate-400">
                     Žádné body neodpovídají zvolenému filtru.
                   </td>
                 </tr>
@@ -208,7 +257,17 @@ export function CampaignPointsView({ points }: CampaignPointsViewProps) {
                         {pt.plannedOrder || idx + 1}
                       </td>
                       <td className="py-2.5 px-3">
-                        <p className="font-bold text-slate-900">{pt.label}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-slate-900">{pt.label}</p>
+                          {duplicatePointIds.has(pt.id) && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200"
+                              title="V kampani je další bod se stejným názvem a shodnou GPS (ko-lokace)"
+                            >
+                              ⚠️ Shodná GPS
+                            </span>
+                          )}
+                        </div>
                         {meta.locality && (
                           <p className="text-[11px] font-semibold text-slate-700">
                             🏢 {meta.locality}
@@ -265,6 +324,17 @@ export function CampaignPointsView({ points }: CampaignPointsViewProps) {
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
                         {pt.serviceMinutes} min
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <button
+                          type="button"
+                          disabled={deletingId === pt.id}
+                          onClick={() => handleDeletePoint(pt.id, pt.label)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition disabled:opacity-50 inline-flex items-center"
+                          title="Smazat tento bod z kampaně"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   );
