@@ -33,6 +33,7 @@ export const TENANT_MODEL_NAMES = [
   'OrganizationOccupancyAIProfile', 'OccupancyInsight',
   'FieldSurvey', 'FieldSurveyPoint', 'FieldSurveyPhoto', 'FieldSurveyParcel',
   'FieldSurveyOwner', 'FieldSurveyContact', 'FieldSurveyAiAnalysis',
+  'ElectionCampaign', 'ElectionRemovalPoint',
 ] as const;
 
 // Platform identity bootstrap must resolve memberships before tenant context exists.

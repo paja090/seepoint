@@ -13,13 +13,15 @@ export type JobConstraints = {
 };
 /** Optional for compatibility with persisted V1 WorkOrder snapshots. */
 export type PlanningSource = {
-  sourceType?: 'WORK_ORDER' | 'WORK_ORDER_ITEM' | 'NAVIGATION_POINT'; sourceId?: string;
+  sourceType?: 'WORK_ORDER' | 'WORK_ORDER_ITEM' | 'NAVIGATION_POINT' | 'ELECTION_REMOVAL_POINT'; sourceId?: string;
   workOrderItemId?: string; carrierId?: string | null; surfaceId?: string | null; crmRealizationId?: string | null;
   parentWorkOrderId?: string; navigationOrderId?: string; navigationPointId?: string;
+  electionCampaignId?: string; electionRemovalPointId?: string; mediaType?: string; quantity?: number;
   clientName?: string | null; address?: string | null; orderNumber?: string | null;
 };
 export const stopId = (stop: { jobId?: string; workOrderId: string }) => stop.jobId ?? stop.workOrderId;
 export const navigationJobId = (id: string) => 'navigation-point:' + id;
+export const electionRemovalJobId = (id: string) => 'election-point:' + id;
 export type PlanningJob = PlanningSource & {
   id: string; organizationId: string; title: string; workType: string; priority: string;
   status: string; scheduledAt: string; deadlineAt?: string | null; campaignDateFrom?: string | null;

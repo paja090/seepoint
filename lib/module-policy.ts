@@ -5,13 +5,13 @@ export const SECTION_MODULES: Partial<Record<AppSection, string>> = {
   map: 'carriers', clients: 'crm', billing: 'crm', navigationProjects: 'navigation',
   navigationContracts: 'navigation', navigationContacts: 'navigation', navigationDocumentation: 'navigation',
   team: 'employees', mySettlements: 'settlements', workEntries: 'work', myWorkEntries: 'work',
-  realization: 'aiRealization', fieldSurvey: 'carriers',
+  realization: 'aiRealization', fieldSurvey: 'carriers', electionRemoval: 'electionRemoval',
 };
 const MODULE_SECTIONS: Record<string, AppSection> = {
   crm: 'clients', navigation: 'navigationProjects', mobileSurveys: 'carriers',
   workRoute: 'work', vacations: 'dashboard', salesRadar: 'offers', analytics: 'clients',
   network: 'offers', cityInventory: 'carriers', shopping: 'dashboard', aiRealization: 'realization',
-  fieldSurvey: 'fieldSurvey',
+  fieldSurvey: 'fieldSurvey', electionRemoval: 'electionRemoval',
 };
 export function moduleForSection(section: AppSection) { return SECTION_MODULES[section] ?? (section === 'settings' ? null : section); }
 

@@ -95,10 +95,12 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       result.unassigned.push({ code: deadline(job) < Infinity ? 'DEADLINE_AT_RISK' : 'WORK_ORDER_UNASSIGNED', workOrderId: job.id, message: `${job.title}: ${reason}` }); continue;
     }
     const { crew, incoming, returning, arrival, begin, finish, returnAt } = best;
-    crew.stops.push({ jobId: job.id, workOrderId: job.parentWorkOrderId ?? (job.sourceType === 'NAVIGATION_POINT' ? '' : job.id),
+    crew.stops.push({ jobId: job.id, workOrderId: job.parentWorkOrderId ?? (['NAVIGATION_POINT', 'ELECTION_REMOVAL_POINT'].includes(job.sourceType ?? '') ? '' : job.id),
       sourceType: job.sourceType, sourceId: job.sourceId, parentWorkOrderId: job.parentWorkOrderId,
       workOrderItemId: job.workOrderItemId, carrierId: job.carrierId, surfaceId: job.surfaceId, crmRealizationId: job.crmRealizationId,
       navigationPointId: job.navigationPointId, navigationOrderId: job.navigationOrderId,
+      electionCampaignId: job.electionCampaignId, electionRemovalPointId: job.electionRemovalPointId,
+      mediaType: job.mediaType, quantity: job.quantity,
       clientName: job.clientName, address: job.address, orderNumber: job.orderNumber, title: job.title, workType: job.workType, location: job.location!, routeOrder: crew.stops.length + 1,
       arrivalAt: iso(arrival), startAt: iso(begin), endAt: iso(finish), serviceMinutes: service, travel: incoming,
       reason: `Priorita ${job.priority}; ověřená dostupnost, kvalifikace a časové limity. ${incoming.estimated ? 'Přejezd je odhad.' : 'Přejezd podle Google Routes.'}` });

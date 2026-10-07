@@ -44,7 +44,8 @@ export type AppSection =
   | 'aiOccupancy'
   | 'realization'
   | 'commercial'
-  | 'fieldSurvey';
+  | 'fieldSurvey'
+  | 'electionRemoval';
 
 const permissions: Record<AppRole, AppSection[]> = {
   ADMIN: [
@@ -79,6 +80,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'realization',
     'commercial',
     'fieldSurvey',
+    'electionRemoval',
   ],
   MANAGER: [
     'dashboard',
@@ -110,6 +112,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'realization',
     'commercial',
     'fieldSurvey',
+    'electionRemoval',
   ],
   SALES: [
     'dashboard',
