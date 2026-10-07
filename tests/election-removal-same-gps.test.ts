@@ -187,3 +187,93 @@ test('Mandatory Same GPS Test: ACKO (5 min) and TOWER (15 min) at identical coor
   assert.equal(towerStatus, 'ISSUE');
   assert.equal(ackoStatus, 'COMPLETED', 'ACKO must remain COMPLETED when Tower reports an ISSUE');
 });
+
+test('Same GPS Election Removal with 2 Crews: co-located items stay on the SAME crew and are never split', async () => {
+  const organizationId = 'org_seepoint_test';
+  const gpsX = { latitude: 50.087, longitude: 14.421 };
+
+  const ackoJob: PlanningJob = {
+    id: electionRemovalJobId('point_a_1'),
+    organizationId,
+    title: 'Áčko u vchodu',
+    workType: 'ELECTION_REMOVAL',
+    priority: 'NORMAL',
+    status: 'PENDING',
+    scheduledAt: '2026-10-10T08:00:00.000Z',
+    location: gpsX,
+    serviceMinutes: 10,
+    sourceType: 'ELECTION_REMOVAL_POINT',
+    sourceId: 'point_a_1',
+    constraints: {},
+    updatedAt: new Date().toISOString(),
+  };
+
+  const benchJob: PlanningJob = {
+    id: electionRemovalJobId('point_b_2'),
+    organizationId,
+    title: 'Lavička u vchodu',
+    workType: 'ELECTION_REMOVAL',
+    priority: 'NORMAL',
+    status: 'PENDING',
+    scheduledAt: '2026-10-10T08:00:00.000Z',
+    location: gpsX,
+    serviceMinutes: 10,
+    sourceType: 'ELECTION_REMOVAL_POINT',
+    sourceId: 'point_b_2',
+    constraints: {},
+    updatedAt: new Date().toISOString(),
+  };
+
+  const twoCrewsInput: PlanningInput = {
+    organizationId,
+    date: '2026-10-10',
+    now: '2026-10-10T06:00:00.000Z',
+    profile: {
+      timezone: 'Europe/Prague',
+      country: 'CZ',
+      depot: { latitude: 50.08, longitude: 14.42 },
+      endLocation: { latitude: 50.08, longitude: 14.42 },
+      workdayStart: '08:00',
+      workdayEnd: '17:00',
+      breakMinutes: 30,
+      overtimeMinutes: 60,
+      strategy: 'BALANCED',
+      serviceMinutes: { ELECTION_REMOVAL: 10 },
+      fallbackSpeedKph: 50,
+      fallbackDistanceFactor: 1.3,
+      maximumJobsPerRoute: 50,
+      vehicleRequired: false,
+      requireHumanApproval: true,
+      enabled: true,
+    },
+    jobs: [ackoJob, benchJob],
+    employees: [
+      { id: 'emp_1', organizationId, name: 'Posádka 1 řidič', userId: 'u1', isActive: true, positions: [], roles: [], available: true },
+      { id: 'emp_2', organizationId, name: 'Posádka 2 řidič', userId: 'u2', isActive: true, positions: [], roles: [], available: true },
+    ],
+    vehicles: [],
+    crews: [
+      { id: 'crew_1', employeeIds: ['emp_1'], vehicleId: null },
+      { id: 'crew_2', employeeIds: ['emp_2'], vehicleId: null },
+    ],
+  };
+
+  const travelMock = async (from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) => {
+    const same = from.latitude === to.latitude && from.longitude === to.longitude;
+    return {
+      distanceMeters: same ? 0 : 4000,
+      durationSeconds: same ? 0 : 480,
+      estimated: false,
+      polyline: '',
+    };
+  };
+
+  const result = await planFieldWork(twoCrewsInput, travelMock);
+
+  // Crucial check: Exactly ONE crew must have BOTH stops at this identical GPS!
+  // It must NEVER split one stop to crew 1 and one stop to crew 2!
+  assert.equal(result.crews.length, 1, 'Co-located points must stay with one crew, leaving other crew free for other areas');
+  assert.equal(result.crews[0].stops.length, 2, 'The chosen crew must handle both stops at the same GPS');
+  assert.equal(result.crews[0].stops[1].travel.distanceMeters, 0, 'Travel between co-located items must be 0');
+});
+

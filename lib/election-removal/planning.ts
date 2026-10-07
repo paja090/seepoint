@@ -157,6 +157,8 @@ export async function loadElectionPlanningResources(
 export interface PlanRoutesPayload {
   date: string;
   startTime?: string;
+  endTime?: string;
+  flexibleHours?: boolean;
   crews: Array<{
     id: string;
     employeeIds: string[];
@@ -200,6 +202,30 @@ export async function optimizeElectionRemovalRoutes(
       throw new Error('Vyberte alespoň jednu pracovní posádku.');
     }
 
+    // Apply user-configured start time
+    if (payload.startTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(payload.startTime)) {
+      profile.workdayStart = payload.startTime;
+    }
+
+    // Apply user-configured end time
+    if (payload.endTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(payload.endTime)) {
+      profile.workdayEnd = payload.endTime;
+    }
+
+    // Flexible hours: allow overtime and expand max stops so points are never arbitrarily rejected
+    if (payload.flexibleHours) {
+      profile.flexibleHours = true;
+      profile.overtimeMinutes = Math.max(profile.overtimeMinutes, 480);
+      profile.maximumJobsPerRoute = Math.max(profile.maximumJobsPerRoute, 100);
+      if (!payload.endTime) {
+        profile.workdayEnd = '22:00';
+      }
+    }
+
+    // Ensure start of planned route begins at configured start time (never clamped to live clock time)
+    const planStartTime = payload.startTime || profile.workdayStart || '07:30';
+    const planNow = `${payload.date}T${planStartTime}:00.000Z`;
+
     // Load all employees and vehicles in full format for the engine
     const [allEmployees, allVehicles] = await Promise.all([
       prisma.employee.findMany({ where: { organizationId, isActive: true } }),
@@ -232,7 +258,7 @@ export async function optimizeElectionRemovalRoutes(
     const planningInput: PlanningInput = {
       organizationId,
       date: payload.date,
-      now: new Date().toISOString(),
+      now: planNow,
       profile,
       jobs: planningJobs,
       employees: planningEmployees,

@@ -38,18 +38,20 @@ interface MobileRouteExecutionViewProps {
     targetDate: Date | null;
   };
   points: PointWithPhotos[];
+  initialCrewId?: string;
 }
 
 export function MobileRouteExecutionView({
   campaign,
   points: initialPoints,
+  initialCrewId,
 }: MobileRouteExecutionViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [points, setPoints] = useState<PointWithPhotos[]>(initialPoints);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'TODO' | 'DONE' | 'ISSUE'>('ALL');
-  const [activeCrewFilter, setActiveCrewFilter] = useState<string>('ALL');
+  const [activeCrewFilter, setActiveCrewFilter] = useState<string>(initialCrewId || 'ALL');
   const [showMap, setShowMap] = useState<boolean>(true);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
 
@@ -73,11 +75,16 @@ export function MobileRouteExecutionView({
     return Array.from(set).sort();
   }, [points]);
 
+  // Points relevant to current crew filter
+  const relevantPoints = useMemo(() => {
+    return activeCrewFilter === 'ALL'
+      ? points
+      : points.filter((p) => p.assignedCrewId === activeCrewFilter);
+  }, [points, activeCrewFilter]);
+
   // Filter points
   const displayedPoints = useMemo(() => {
-    return points.filter((p) => {
-      const matchCrew = activeCrewFilter === 'ALL' || p.assignedCrewId === activeCrewFilter;
-
+    return relevantPoints.filter((p) => {
       let matchStatus = true;
       if (filterStatus === 'TODO') {
         matchStatus = ['PENDING', 'ASSIGNED', 'IN_PROGRESS'].includes(p.status);
@@ -87,15 +94,15 @@ export function MobileRouteExecutionView({
         matchStatus = p.status === 'ISSUE';
       }
 
-      return matchCrew && matchStatus;
+      return matchStatus;
     });
-  }, [points, filterStatus, activeCrewFilter]);
+  }, [relevantPoints, filterStatus]);
 
-  // Aggregate progress
-  const totalCount = points.length;
-  const completedCount = points.filter((p) => p.status === 'COMPLETED').length;
-  const inProgressCount = points.filter((p) => p.status === 'IN_PROGRESS').length;
-  const issueCount = points.filter((p) => p.status === 'ISSUE').length;
+  // Aggregate progress for current crew selection
+  const totalCount = relevantPoints.length;
+  const completedCount = relevantPoints.filter((p) => p.status === 'COMPLETED').length;
+  const inProgressCount = relevantPoints.filter((p) => p.status === 'IN_PROGRESS').length;
+  const issueCount = relevantPoints.filter((p) => p.status === 'ISSUE').length;
   const percentDone = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const googleRouteUrl = useMemo(() => {
@@ -251,7 +258,9 @@ export function MobileRouteExecutionView({
         <div className="flex items-center justify-between gap-2">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600">
-              Trasa posádky v terénu
+              {activeCrewFilter === 'ALL'
+                ? 'Trasa všech posádek v terénu'
+                : `Trasa pro: ${activeCrewFilter.replace('crew-', 'Posádka ')}`}
             </span>
             <h1 className="text-lg font-bold text-slate-900 leading-tight">
               {campaign.name}
@@ -282,14 +291,17 @@ export function MobileRouteExecutionView({
             <select
               value={activeCrewFilter}
               onChange={(e) => setActiveCrewFilter(e.target.value)}
-              className="px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white"
+              className="px-2.5 py-1 text-xs font-bold border border-slate-200 rounded-lg bg-white text-slate-800 shadow-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
             >
-              <option value="ALL">Všechny posádky</option>
-              {crews.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              <option value="ALL">Všechny posádky ({crews.length})</option>
+              {crews.map((c) => {
+                const crewCount = points.filter((p) => p.assignedCrewId === c).length;
+                return (
+                  <option key={c} value={c}>
+                    {c.replace('crew-', 'Posádka ')} ({crewCount} bodů)
+                  </option>
+                );
+              })}
             </select>
           )}
 
@@ -455,6 +467,11 @@ export function MobileRouteExecutionView({
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800">
                         {ELECTION_REMOVAL_MEDIA_LABELS[point.mediaType] || point.mediaType}
                       </span>
+                      {point.assignedCrewId && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                          🚗 {point.assignedCrewId.replace('crew-', 'Posádka ')}
+                        </span>
+                      )}
                       {cleanLayer && (
                         <span
                           className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md"

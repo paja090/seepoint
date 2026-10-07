@@ -3,6 +3,7 @@ export type PlanningProfile = {
   navigationPointMinutes?: Record<string, number>;
   timezone: string; country: string | null; depot: Coordinates; endLocation: Coordinates;
   workdayStart: string; workdayEnd: string; breakMinutes: number; overtimeMinutes: number;
+  flexibleHours?: boolean; maxShiftHours?: number;
   strategy: 'BALANCED' | 'DISTANCE'; serviceMinutes: Record<string, number>;
   fallbackSpeedKph: number; fallbackDistanceFactor: number; maximumJobsPerRoute: number;
   vehicleRequired: boolean; requireHumanApproval: true; enabled: boolean;

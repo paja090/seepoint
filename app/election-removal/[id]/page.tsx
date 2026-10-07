@@ -65,6 +65,10 @@ export default async function ElectionRemovalDetailPage({
 
   const percentDone = totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0;
 
+  const distinctCrews = Array.from(
+    new Set(campaign.points.map((p) => p.assignedCrewId).filter(Boolean) as string[])
+  ).sort();
+
   return (
     <AppShell>
       <div className="space-y-6 max-w-6xl mx-auto">
@@ -193,6 +197,68 @@ export default async function ElectionRemovalDetailPage({
             </p>
           </div>
         </div>
+
+        {/* Dispečink výjezdů pro posádky */}
+        {distinctCrews.length > 0 && (
+          <div className="card p-5 space-y-3 bg-gradient-to-r from-sky-50/70 to-indigo-50/50 border border-sky-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Route className="w-4 h-4 text-sky-600" />
+                  Výjezdy a trasy pro posádky v terénu
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Přímé odkazy na trasy pro mobilní telefony jednotlivých posádek
+                </p>
+              </div>
+
+              <Link
+                href={`/election-removal/${campaign.id}/route`}
+                className="text-xs font-semibold text-sky-700 hover:text-sky-900 underline"
+              >
+                Otevřít celkový přehled (všechny posádky) &rarr;
+              </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-1">
+              {distinctCrews.map((crewId) => {
+                const crewPoints = campaign.points.filter((p) => p.assignedCrewId === crewId);
+                const crewCompleted = crewPoints.filter((p) => p.status === 'COMPLETED').length;
+                const crewPercent =
+                  crewPoints.length > 0
+                    ? Math.round((crewCompleted / crewPoints.length) * 100)
+                    : 0;
+                const crewName = crewId.replace('crew-', 'Posádka ');
+
+                return (
+                  <Link
+                    key={crewId}
+                    href={`/election-removal/${campaign.id}/route?crew=${crewId}`}
+                    className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-sky-300 hover:shadow-sm transition flex items-center justify-between group"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-sm group-hover:text-sky-600 transition">
+                          🚗 {crewName}
+                        </span>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700">
+                          {crewPoints.length} bodů
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Hotovo: {crewCompleted} / {crewPoints.length} ({crewPercent} %)
+                      </p>
+                    </div>
+
+                    <span className="text-xs font-bold text-sky-600 group-hover:translate-x-0.5 transition">
+                      Otevřít &rarr;
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Field Plans / Routes section */}
         {campaign.fieldPlans.length > 0 && (
