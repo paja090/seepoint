@@ -88,7 +88,7 @@ test('Field Execution Lifecycle: START -> COMPLETE increments campaign counter',
     issueReportedByUserId: null,
   };
 
-  let campaign: MockCampaign = {
+  const campaign: MockCampaign = {
     id: 'camp-1',
     totalPoints: 10,
     completedPoints: 0,
@@ -114,7 +114,7 @@ test('Field Execution Lifecycle: START -> COMPLETE increments campaign counter',
 });
 
 test('Field Execution Lifecycle: REPORT_ISSUE captures issue details and decrements if was completed', () => {
-  let point: MockPoint = {
+  const point: MockPoint = {
     id: 'pt-2',
     campaignId: 'camp-1',
     status: 'IN_PROGRESS',
@@ -127,7 +127,7 @@ test('Field Execution Lifecycle: REPORT_ISSUE captures issue details and decreme
     issueReportedByUserId: null,
   };
 
-  let campaign: MockCampaign = {
+  const campaign: MockCampaign = {
     id: 'camp-1',
     totalPoints: 10,
     completedPoints: 2,
