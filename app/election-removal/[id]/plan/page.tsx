@@ -13,11 +13,15 @@ export default async function ElectionRemovalPlanPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await checkElectionRemovalPageAccess();
+  const user = await checkElectionRemovalPageAccess();
   const { id } = await params;
 
   try {
-    const { campaign, employees, vehicles } = await loadElectionPlanningResources(id);
+    const { campaign, employees, vehicles } = await loadElectionPlanningResources(
+      id,
+      undefined,
+      user.organization!.id
+    );
 
     return (
       <AppShell>
@@ -58,6 +62,12 @@ export default async function ElectionRemovalPlanPage({
     );
   } catch (error) {
     console.error('Chyba při načítání kampaně pro plánování:', error);
-    notFound();
+    if (
+      error instanceof Error &&
+      error.message.includes('Volební kampaň nebyla nalezena')
+    ) {
+      notFound();
+    }
+    throw error;
   }
 }

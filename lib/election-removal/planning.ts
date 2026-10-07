@@ -1,6 +1,10 @@
 import type { ElectionCampaign, ElectionRemovalPoint, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { requireTenantContext } from '@/lib/tenant-context';
+import {
+  getTenantContext,
+  requireTenantContext,
+  runWithTenantContext,
+} from '@/lib/tenant-context';
 import {
   electionRemovalJobId,
   type PlanningJob,
@@ -70,78 +74,84 @@ export function convertElectionPointToJob(
  */
 export async function loadElectionPlanningResources(
   campaignId: string,
-  targetDateStr?: string
+  targetDateStr?: string,
+  explicitOrganizationId?: string
 ) {
-  const { organizationId } = requireTenantContext();
+  const organizationId =
+    explicitOrganizationId ||
+    getTenantContext()?.organizationId ||
+    requireTenantContext().organizationId;
 
-  const [campaign, employees, vehicles, profile] = await Promise.all([
-    prisma.electionCampaign.findFirst({
-      where: { id: campaignId, organizationId },
-      include: {
-        points: {
-          where: {
-            status: { in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'] },
+  return runWithTenantContext({ organizationId, source: 'session' }, async () => {
+    const [campaign, employees, vehicles, profile] = await Promise.all([
+      prisma.electionCampaign.findFirst({
+        where: { id: campaignId, organizationId },
+        include: {
+          points: {
+            where: {
+              status: { in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'] },
+            },
+            orderBy: [{ layerName: 'asc' }, { label: 'asc' }],
           },
-          orderBy: [{ layerName: 'asc' }, { label: 'asc' }],
         },
+      }),
+      prisma.employee.findMany({
+        where: { organizationId, isActive: true },
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      }),
+      prisma.vehicle.findMany({
+        where: {
+          organizationId,
+          status: { notIn: ['SERVICE', 'OUT_OF_SERVICE'] },
+        },
+        orderBy: { name: 'asc' },
+      }),
+      loadProfile(),
+    ]);
+
+    if (!campaign) {
+      throw new Error('Volební kampaň nebyla nalezena.');
+    }
+
+    // Provide fallback profile if organization depot profile is not configured yet
+    const effectiveProfile: PlanningProfile = profile ?? {
+      timezone: 'Europe/Prague',
+      country: 'CZ',
+      depot: { latitude: 50.08804, longitude: 14.42076 }, // Praha centrum výchozí
+      endLocation: { latitude: 50.08804, longitude: 14.42076 },
+      workdayStart: '07:30',
+      workdayEnd: '16:00',
+      breakMinutes: 30,
+      overtimeMinutes: 60,
+      strategy: 'BALANCED',
+      serviceMinutes: {
+        ELECTION_REMOVAL: 10,
       },
-    }),
-    prisma.employee.findMany({
-      where: { organizationId, isActive: true },
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-    }),
-    prisma.vehicle.findMany({
-      where: {
-        organizationId,
-        status: { notIn: ['SERVICE', 'OUT_OF_SERVICE'] },
-      },
-      orderBy: { name: 'asc' },
-    }),
-    loadProfile(),
-  ]);
+      fallbackSpeedKph: 50,
+      fallbackDistanceFactor: 1.3,
+      maximumJobsPerRoute: 50,
+      vehicleRequired: false,
+      requireHumanApproval: true,
+      enabled: true,
+    };
 
-  if (!campaign) {
-    throw new Error('Volební kampaň nebyla nalezena.');
-  }
-
-  // Provide fallback profile if organization depot profile is not configured yet
-  const effectiveProfile: PlanningProfile = profile ?? {
-    timezone: 'Europe/Prague',
-    country: 'CZ',
-    depot: { latitude: 50.08804, longitude: 14.42076 }, // Praha centrum výchozí
-    endLocation: { latitude: 50.08804, longitude: 14.42076 },
-    workdayStart: '07:30',
-    workdayEnd: '16:00',
-    breakMinutes: 30,
-    overtimeMinutes: 60,
-    strategy: 'BALANCED',
-    serviceMinutes: {
-      ELECTION_REMOVAL: 10,
-    },
-    fallbackSpeedKph: 50,
-    fallbackDistanceFactor: 1.3,
-    maximumJobsPerRoute: 50,
-    vehicleRequired: false,
-    requireHumanApproval: true,
-    enabled: true,
-  };
-
-  return {
-    campaign,
-    points: campaign.points,
-    employees: employees.map((e) => ({
-      id: e.id,
-      name: `${e.firstName} ${e.lastName}`.trim(),
-      role: e.role,
-      position: e.position,
-    })),
-    vehicles: vehicles.map((v) => ({
-      id: v.id,
-      name: v.name,
-      registrationNumber: v.registrationNumber,
-    })),
-    profile: effectiveProfile,
-  };
+    return {
+      campaign,
+      points: campaign.points,
+      employees: employees.map((e) => ({
+        id: e.id,
+        name: `${e.firstName} ${e.lastName}`.trim(),
+        role: e.role,
+        position: e.position,
+      })),
+      vehicles: vehicles.map((v) => ({
+        id: v.id,
+        name: v.name,
+        registrationNumber: v.registrationNumber,
+      })),
+      profile: effectiveProfile,
+    };
+  });
 }
 
 export interface PlanRoutesPayload {
@@ -160,76 +170,84 @@ export interface PlanRoutesPayload {
  */
 export async function optimizeElectionRemovalRoutes(
   campaignId: string,
-  payload: PlanRoutesPayload
+  payload: PlanRoutesPayload,
+  explicitOrganizationId?: string
 ): Promise<{
   input: PlanningInput;
   result: PlanningResult;
 }> {
-  const { organizationId } = requireTenantContext();
-  const { campaign, points, profile } = await loadElectionPlanningResources(
-    campaignId,
-    payload.date
-  );
+  const organizationId =
+    explicitOrganizationId ||
+    getTenantContext()?.organizationId ||
+    requireTenantContext().organizationId;
 
-  const selectedPoints = payload.selectedPointIds?.length
-    ? points.filter((p) => payload.selectedPointIds!.includes(p.id))
-    : points;
+  return runWithTenantContext({ organizationId, source: 'session' }, async () => {
+    const { campaign, points, profile } = await loadElectionPlanningResources(
+      campaignId,
+      payload.date,
+      organizationId
+    );
 
-  if (selectedPoints.length === 0) {
-    throw new Error('Kampaň neobsahuje žádné body k naplánování.');
-  }
+    const selectedPoints = payload.selectedPointIds?.length
+      ? points.filter((p) => payload.selectedPointIds!.includes(p.id))
+      : points;
 
-  if (!payload.crews || payload.crews.length === 0) {
-    throw new Error('Vyberte alespoň jednu pracovní posádku.');
-  }
+    if (selectedPoints.length === 0) {
+      throw new Error('Kampaň neobsahuje žádné body k naplánování.');
+    }
 
-  // Load all employees and vehicles in full format for the engine
-  const [allEmployees, allVehicles] = await Promise.all([
-    prisma.employee.findMany({ where: { organizationId, isActive: true } }),
-    prisma.vehicle.findMany({ where: { organizationId } }),
-  ]);
+    if (!payload.crews || payload.crews.length === 0) {
+      throw new Error('Vyberte alespoň jednu pracovní posádku.');
+    }
 
-  const planningJobs: PlanningJob[] = selectedPoints.map((pt) =>
-    convertElectionPointToJob(pt, campaign)
-  );
+    // Load all employees and vehicles in full format for the engine
+    const [allEmployees, allVehicles] = await Promise.all([
+      prisma.employee.findMany({ where: { organizationId, isActive: true } }),
+      prisma.vehicle.findMany({ where: { organizationId } }),
+    ]);
 
-  const planningEmployees = allEmployees.map((e) => ({
-    id: e.id,
-    organizationId,
-    name: `${e.firstName} ${e.lastName}`.trim(),
-    userId: e.userId,
-    isActive: e.isActive,
-    positions: e.position ? [e.position] : [],
-    roles: [e.role],
-    available: true,
-  }));
+    const planningJobs: PlanningJob[] = selectedPoints.map((pt) =>
+      convertElectionPointToJob(pt, campaign)
+    );
 
-  const planningVehicles = allVehicles.map((v) => ({
-    id: v.id,
-    organizationId,
-    name: v.name,
-    status: v.status,
-    reserved: false,
-  }));
+    const planningEmployees = allEmployees.map((e) => ({
+      id: e.id,
+      organizationId,
+      name: `${e.firstName} ${e.lastName}`.trim(),
+      userId: e.userId,
+      isActive: e.isActive,
+      positions: e.position ? [e.position] : [],
+      roles: [e.role],
+      available: true,
+    }));
 
-  const planningInput: PlanningInput = {
-    organizationId,
-    date: payload.date,
-    now: new Date().toISOString(),
-    profile,
-    jobs: planningJobs,
-    employees: planningEmployees,
-    vehicles: planningVehicles,
-    crews: payload.crews,
-  };
+    const planningVehicles = allVehicles.map((v) => ({
+      id: v.id,
+      organizationId,
+      name: v.name,
+      status: v.status,
+      reserved: false,
+    }));
 
-  const travel = googleTravelProvider(profile);
-  const result = await planFieldWork(planningInput, travel);
+    const planningInput: PlanningInput = {
+      organizationId,
+      date: payload.date,
+      now: new Date().toISOString(),
+      profile,
+      jobs: planningJobs,
+      employees: planningEmployees,
+      vehicles: planningVehicles,
+      crews: payload.crews,
+    };
 
-  return {
-    input: planningInput,
-    result,
-  };
+    const travel = googleTravelProvider(profile);
+    const result = await planFieldWork(planningInput, travel);
+
+    return {
+      input: planningInput,
+      result,
+    };
+  });
 }
 
 /**
@@ -239,11 +257,18 @@ export async function approveAndSaveElectionPlan(
   campaignId: string,
   planningInput: PlanningInput,
   planningResult: PlanningResult,
-  actor: { id: string; email: string; role: string }
+  actor: { id: string; email: string; role: string },
+  explicitOrganizationId?: string
 ) {
-  const { organizationId } = requireTenantContext();
+  const organizationId =
+    explicitOrganizationId ||
+    getTenantContext()?.organizationId ||
+    requireTenantContext().organizationId;
 
-  return plannerTransaction(async (tx) => {
+  return runWithTenantContext(
+    { organizationId, userId: actor.id, source: 'session' },
+    () =>
+      plannerTransaction(async (tx) => {
     // Generate latest version
     const latest = await tx.fieldPlan.findFirst({
       where: { organizationId, date: planningInput.date },
@@ -295,5 +320,5 @@ export async function approveAndSaveElectionPlan(
     });
 
     return fieldPlan;
-  });
+  }));
 }
