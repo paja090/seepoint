@@ -15,6 +15,7 @@ const additions = [
   { href: '/settings/planner', section: 'planner' as AppSection, module: 'planner' },
   { href: '/realization', section: 'realization' as AppSection, module: 'aiRealization' },
   { href: '/field-survey', section: 'fieldSurvey' as AppSection, module: 'carriers' },
+  { href: '/election-removal', section: 'electionRemoval' as AppSection, module: 'electionRemoval' },
 ];
 const current = [...original, ...additions];
 
