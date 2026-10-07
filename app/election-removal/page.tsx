@@ -13,6 +13,7 @@ import {
   Route,
   Vote,
 } from 'lucide-react';
+import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -156,16 +157,18 @@ export default async function ElectionRemovalPage() {
                     : 0;
 
                 return (
-                  <Link
+                  <div
                     key={c.id}
-                    href={`/election-removal/${c.id}`}
-                    className="card p-5 hover:shadow-md transition hover:border-sky-300 block space-y-4 group"
+                    className="card p-5 hover:shadow-md transition hover:border-sky-300 space-y-4 group relative"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-bold text-slate-900 group-hover:text-sky-600 transition">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/election-removal/${c.id}`}
+                          className="font-bold text-slate-900 group-hover:text-sky-600 transition block truncate text-base hover:underline"
+                        >
                           {c.name}
-                        </h3>
+                        </Link>
                         {c.targetDate && (
                           <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -175,9 +178,16 @@ export default async function ElectionRemovalPage() {
                           </p>
                         )}
                       </div>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
-                        {c.status}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                          {c.status}
+                        </span>
+                        <DeleteCampaignButton
+                          campaignId={c.id}
+                          campaignName={c.name}
+                          variant="icon"
+                        />
+                      </div>
                     </div>
 
                     {c.description && (
@@ -207,12 +217,15 @@ export default async function ElectionRemovalPage() {
                         <Route className="w-3.5 h-3.5 text-slate-400" />
                         {c._count.fieldPlans} tras
                       </span>
-                      <span className="text-sky-600 font-semibold group-hover:translate-x-0.5 transition inline-flex items-center gap-1">
-                        <span>Detail</span>
+                      <Link
+                        href={`/election-removal/${c.id}`}
+                        className="text-sky-600 font-semibold group-hover:translate-x-0.5 transition inline-flex items-center gap-1"
+                      >
+                        <span>Detail kampaně</span>
                         <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
+                      </Link>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
