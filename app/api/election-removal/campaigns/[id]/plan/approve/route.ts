@@ -38,7 +38,8 @@ export async function POST(
       id,
       body.planningInput,
       body.planningResult,
-      auth.user
+      auth.user,
+      auth.organizationId
     );
 
     return NextResponse.json({

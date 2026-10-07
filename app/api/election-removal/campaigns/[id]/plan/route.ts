@@ -25,7 +25,11 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const resources = await loadElectionPlanningResources(id);
+    const resources = await loadElectionPlanningResources(
+      id,
+      undefined,
+      auth.organizationId
+    );
     return NextResponse.json({ success: true, resources });
   } catch (error: unknown) {
     console.error('Chyba při načítání plánovacích zdrojů:', error);
@@ -67,7 +71,11 @@ export async function POST(
       );
     }
 
-    const { input, result } = await optimizeElectionRemovalRoutes(id, payload);
+    const { input, result } = await optimizeElectionRemovalRoutes(
+      id,
+      payload,
+      auth.organizationId
+    );
 
     return NextResponse.json({
       success: true,
