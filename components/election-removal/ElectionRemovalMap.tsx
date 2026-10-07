@@ -85,7 +85,7 @@ export function ElectionRemovalMap({
       // Default center: Ostrava coordinates or center of points
       let centerLat = 49.834;
       let centerLng = 18.282;
-      let zoom = 12;
+      const zoom = 12;
 
       if (validPoints.length > 0) {
         centerLat =
