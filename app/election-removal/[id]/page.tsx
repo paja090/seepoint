@@ -56,8 +56,11 @@ export default async function ElectionRemovalDetailPage({
   // Calculate statistics
   const totalPoints = campaign.points.length;
   const completedPoints = campaign.points.filter((p) => p.status === 'COMPLETED').length;
-  const pendingPoints = campaign.points.filter((p) => p.status === 'PENDING').length;
-  const totalServiceMinutes = campaign.points.reduce((acc, p) => acc + p.serviceMinutes, 0);
+  const remainingPoints = totalPoints - completedPoints;
+  const unassignedPoints = campaign.points.filter((p) => p.status === 'PENDING').length;
+  const totalServiceMinutes = campaign.points
+    .filter((p) => p.status !== 'COMPLETED')
+    .reduce((acc, p) => acc + p.serviceMinutes, 0);
 
   const hours = Math.floor(totalServiceMinutes / 60);
   const mins = totalServiceMinutes % 60;
@@ -124,7 +127,11 @@ export default async function ElectionRemovalDetailPage({
                 className="btn btn-primary text-sm font-semibold inline-flex items-center gap-2 shadow-sm"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Plánovat trasy</span>
+                <span>
+                  {completedPoints > 0 && remainingPoints > 0
+                    ? `Plánovat další výjezd (${remainingPoints} ks)`
+                    : 'Plánovat trasy'}
+                </span>
               </Link>
 
               <DeleteCampaignButton
@@ -155,15 +162,17 @@ export default async function ElectionRemovalDetailPage({
           <div className="card p-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Čeká na plánování
+                Zbývá k demontáži
               </p>
               <Clock className="w-5 h-5 text-amber-600" />
             </div>
             <p className="text-2xl font-bold text-amber-600 mt-2">
-              {pendingPoints} ks
+              {remainingPoints} ks
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Zatím nepřiřazeno do tras
+              {unassignedPoints > 0
+                ? `${unassignedPoints} ks zatím bez trasy`
+                : `${completedPoints} hotovo z ${totalPoints}`}
             </p>
           </div>
 
