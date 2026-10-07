@@ -3,6 +3,7 @@ import test from 'node:test';
 import { calculateServiceMinutes } from '../lib/election-removal/constants';
 import { electionRemovalJobId, type PlanningJob, type PlanningInput } from '../lib/field-planning/contracts';
 import { planFieldWork } from '../lib/field-planning/planning-engine';
+import { zonedTime } from '../lib/field-planning/profile';
 
 test('Mandatory Same GPS Test: ACKO (5 min) and TOWER (15 min) at identical coordinates', async () => {
   const organizationId = 'org_seepoint_test';
@@ -276,4 +277,71 @@ test('Same GPS Election Removal with 2 Crews: co-located items stay on the SAME 
   assert.equal(result.crews[0].stops.length, 2, 'The chosen crew must handle both stops at the same GPS');
   assert.equal(result.crews[0].stops[1].travel.distanceMeters, 0, 'Travel between co-located items must be 0');
 });
+
+test('Start time alignment: route departs at configured local start time in Prague timezone and not shifted by UTC', async () => {
+  const organizationId = 'org_test_time';
+  const ackoJob: PlanningJob = {
+    id: electionRemovalJobId('pt_time_1'),
+    organizationId,
+    title: 'A2 - MH - Výstavní x Fráni Šrámka',
+    workType: 'ELECTION_REMOVAL',
+    sourceType: 'ELECTION_REMOVAL_POINT',
+    sourceId: 'pt_time_1',
+    priority: 'NORMAL',
+    status: 'READY',
+    scheduledAt: '2026-10-10',
+    deadlineAt: null,
+    campaignDateFrom: null,
+    serviceMinutes: 10,
+    location: { latitude: 49.82782, longitude: 18.26381 },
+    constraints: {},
+    updatedAt: new Date().toISOString(),
+  };
+
+  const startLocalTime = '07:30';
+  const localStartTs = zonedTime('2026-10-10', startLocalTime, 'Europe/Prague');
+  const planNow = new Date(localStartTs).toISOString();
+
+  const planningInput: PlanningInput = {
+    organizationId,
+    date: '2026-10-10',
+    now: planNow,
+    profile: {
+      timezone: 'Europe/Prague',
+      country: 'CZ',
+      depot: { latitude: 49.82782, longitude: 18.26381 },
+      endLocation: { latitude: 49.82782, longitude: 18.26381 },
+      workdayStart: startLocalTime,
+      workdayEnd: '17:00',
+      breakMinutes: 30,
+      overtimeMinutes: 0,
+      strategy: 'BALANCED',
+      serviceMinutes: { ELECTION_REMOVAL: 10 },
+      fallbackSpeedKph: 50,
+      fallbackDistanceFactor: 1.3,
+      maximumJobsPerRoute: 50,
+      vehicleRequired: false,
+      requireHumanApproval: true,
+      enabled: true,
+    },
+    jobs: [ackoJob],
+    employees: [
+      { id: 'emp_1', organizationId, name: 'Posádka 1 řidič', userId: 'u1', isActive: true, positions: [], roles: [], available: true },
+    ],
+    vehicles: [],
+    crews: [
+      { id: 'crew_1', employeeIds: ['emp_1'], vehicleId: null },
+    ],
+  };
+
+  const travelMock = async () => ({ distanceMeters: 0, durationSeconds: 0, estimated: false, polyline: '' });
+  const result = await planFieldWork(planningInput, travelMock);
+
+  assert.equal(result.crews.length, 1);
+  const stop = result.crews[0].stops[0];
+  const departureDate = new Date(stop.arrivalAt);
+  const localDepartureHourMin = departureDate.toLocaleTimeString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', minute: '2-digit' });
+  assert.equal(localDepartureHourMin, '07:30', 'Departure in Prague must be 07:30, NOT shifted to 09:30 by UTC offset');
+});
+
 
