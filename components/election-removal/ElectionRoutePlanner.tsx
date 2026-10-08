@@ -50,12 +50,14 @@ interface ElectionRoutePlannerProps {
   };
   employees: ResourceEmployee[];
   vehicles: ResourceVehicle[];
+  initialDepot?: { latitude: number; longitude: number };
 }
 
 export function ElectionRoutePlanner({
   campaign,
   employees,
   vehicles,
+  initialDepot,
 }: ElectionRoutePlannerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -71,6 +73,15 @@ export function ElectionRoutePlanner({
   const [flexibleHours, setFlexibleHours] = useState<boolean>(true);
   const [vehicleCapacitySlots, setVehicleCapacitySlots] = useState<number>(30);
   const [warehouseUnloadMinutes, setWarehouseUnloadMinutes] = useState<number>(15);
+
+  // Warehouse (depot) location: where items are unloaded and crews return
+  const [depotLat, setDepotLat] = useState<string>(
+    initialDepot?.latitude ? String(initialDepot.latitude) : '50.08804'
+  );
+  const [depotLng, setDepotLng] = useState<string>(
+    initialDepot?.longitude ? String(initialDepot.longitude) : '14.42076'
+  );
+  const [saveDepotAsDefault, setSaveDepotAsDefault] = useState<boolean>(false);
 
   // Crews configuration: default to 1 crew with first available employee & vehicle if present
   const [crews, setCrews] = useState<CrewConfig[]>([
@@ -209,6 +220,11 @@ export function ElectionRoutePlanner({
           vehicleCapacitySlots,
           warehouseUnloadMinutes,
           filterMediaType: selectedMediumFilter,
+          depot: {
+            latitude: parseFloat(depotLat) || 50.08804,
+            longitude: parseFloat(depotLng) || 14.42076,
+          },
+          saveDepotAsDefault,
           crews: crews.map((c) => ({
             id: c.id,
             employeeIds: c.employeeIds,
@@ -573,6 +589,77 @@ export function ElectionRoutePlanner({
             <p className="text-[11px] text-slate-500 mt-1">
               Odhadovaná doba složení nákladu do centrálního skladu před pokračováním ve svozu dalších bodů na trase.
             </p>
+          </div>
+
+          {/* Warehouse (Depot) Location Configuration */}
+          <div className="sm:col-span-2 pt-3 border-t border-slate-200/80 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🏢 Poloha centrálního skladu (Depo / Základna)</span>
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Cílová stanice pro vykládku svezených konstrukcí při naplnění kapacity vozidla a místo návratu posádky na konci dne.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if ('geolocation' in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        setDepotLat(pos.coords.latitude.toFixed(5));
+                        setDepotLng(pos.coords.longitude.toFixed(5));
+                      },
+                      () => alert('Nepodařilo se zjistit aktuální polohu prohlížeče.')
+                    );
+                  }
+                }}
+                className="text-[11px] font-semibold text-sky-600 hover:text-sky-800 underline flex items-center gap-1 cursor-pointer"
+              >
+                📍 Použít moji aktuální polohu
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                  Zeměpisná šířka (Latitude)
+                </span>
+                <input
+                  type="text"
+                  value={depotLat}
+                  onChange={(e) => setDepotLat(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="např. 50.08804 nebo 49.19506"
+                />
+              </div>
+              <div>
+                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                  Zeměpisná délka (Longitude)
+                </span>
+                <input
+                  type="text"
+                  value={depotLng}
+                  onChange={(e) => setDepotLng(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="např. 14.42076 nebo 16.60683"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="saveDepotDefaultCheck"
+                checked={saveDepotAsDefault}
+                onChange={(e) => setSaveDepotAsDefault(e.target.checked)}
+                className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+              />
+              <label htmlFor="saveDepotDefaultCheck" className="text-xs text-slate-600 cursor-pointer font-medium">
+                Uložit tyto souřadnice skladu jako trvalé výchozí depo pro celou firmu
+              </label>
+            </div>
           </div>
         </div>
 

@@ -15,9 +15,12 @@ import {
   Image as ImageIcon,
   Trash2,
   Loader2,
+  Plus,
+  X,
 } from 'lucide-react';
 import {
   ELECTION_REMOVAL_MEDIA_LABELS,
+  type ElectionRemovalMediaType,
   type ElectionRemovalOperationType,
 } from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
@@ -26,9 +29,13 @@ import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 
 interface CampaignPointsViewProps {
   points: ElectionRemovalPoint[];
+  campaignId?: string;
 }
 
-export function CampaignPointsView({ points: initialPoints }: CampaignPointsViewProps) {
+export function CampaignPointsView({
+  points: initialPoints,
+  campaignId: propCampaignId,
+}: CampaignPointsViewProps) {
   const router = useRouter();
   const [points, setPoints] = useState<ElectionRemovalPoint[]>(initialPoints);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -42,6 +49,80 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
   const [search, setSearch] = useState<string>('');
   const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+
+  const campaignId = propCampaignId || (points.length > 0 ? points[0].campaignId : '');
+
+  // Add Point Modal State
+  const [isAddingPointOpen, setIsAddingPointOpen] = useState(false);
+  const [isCreatingPoint, setIsCreatingPoint] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newMediaType, setNewMediaType] = useState<ElectionRemovalMediaType>('ACKO');
+  const [newOperationType, setNewOperationType] = useState<ElectionRemovalOperationType>('RELOCATION');
+  const [newRelocationDest, setNewRelocationDest] = useState('');
+  const [newLat, setNewLat] = useState('');
+  const [newLng, setNewLng] = useState('');
+  const [newLocality, setNewLocality] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newNote, setNewNote] = useState('');
+
+  const handleCreatePoint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!campaignId) {
+      alert('Chybí identifikátor kampaně.');
+      return;
+    }
+    if (!newLabel.trim()) {
+      alert('Zadejte název nebo označení bodu.');
+      return;
+    }
+    const lat = parseFloat(newLat);
+    const lng = parseFloat(newLng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      alert('Zadejte platné GPS souřadnice (zeměpisná šířka a délka).');
+      return;
+    }
+
+    setIsCreatingPoint(true);
+    try {
+      const res = await fetch('/api/election-removal/points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId,
+          label: newLabel.trim(),
+          mediaType: newMediaType,
+          operationType: newOperationType,
+          relocationDestination:
+            newOperationType === 'RELOCATION' ? newRelocationDest.trim() : null,
+          latitude: lat,
+          longitude: lng,
+          locality: newLocality.trim() || null,
+          fullAddress: newAddress.trim() || null,
+          note: newNote.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Nepodařilo se přidat bod.');
+      }
+
+      setPoints((prev) => [data.point as ElectionRemovalPoint, ...prev]);
+      setIsAddingPointOpen(false);
+      setNewLabel('');
+      setNewRelocationDest('');
+      setNewLat('');
+      setNewLng('');
+      setNewLocality('');
+      setNewAddress('');
+      setNewNote('');
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při vytváření bodu.');
+    } finally {
+      setIsCreatingPoint(false);
+    }
+  };
 
   // Set of point IDs that have an identical label or identical GPS in the campaign
   const duplicatePointIds = useMemo(() => {
@@ -346,11 +427,221 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
               placeholder="Hledat bod..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs w-40 focus:outline-none"
+              className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs w-36 focus:outline-none"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsAddingPointOpen(true)}
+            className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+            title="Přidat další stanoviště nebo cíl přesunu"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Přidat bod</span>
+          </button>
         </div>
       </div>
+
+      {/* Add Point Modal Dialog */}
+      {isAddingPointOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Přidat bod do kampaně</h3>
+                  <p className="text-xs text-slate-500">Zadejte nové stanoviště pro svoz nebo cíl přesunu</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddingPointOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePoint} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Název média / označení bodu *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newLabel}
+                  onChange={(e) => setNewLabel(e.target.value)}
+                  placeholder="např. Áčko – Náměstí Míru nebo MiniTower #8"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Typ média *
+                  </label>
+                  <select
+                    value={newMediaType}
+                    onChange={(e) => setNewMediaType(e.target.value as ElectionRemovalMediaType)}
+                    className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none"
+                  >
+                    <option value="ACKO">Áčko</option>
+                    <option value="MINI_TOWER">Mini Tower</option>
+                    <option value="TOWER">Velká věž (Tower)</option>
+                    <option value="BENCH">Lavička</option>
+                    <option value="BANNER">Banner</option>
+                    <option value="CITY_POSTER">City Poster</option>
+                    <option value="PLOT">Plotová reklama</option>
+                    <option value="OTHER">Jiné médium</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Typ operace / logistika *
+                  </label>
+                  <select
+                    value={newOperationType}
+                    onChange={(e) => setNewOperationType(e.target.value as ElectionRemovalOperationType)}
+                    className="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none"
+                  >
+                    <option value="RELOCATION">🚚 Přímý převoz na jiné místo</option>
+                    <option value="FULL_REMOVAL">📦 Odvoz do centrálního skladu</option>
+                    <option value="BANNER_CHANGE">🎨 Pouze výměna plachty</option>
+                  </select>
+                </div>
+              </div>
+
+              {newOperationType === 'RELOCATION' && (
+                <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-1">
+                  <label className="block font-bold text-purple-900">
+                    🚚 Cíl převozu (kam se konstrukce veze)
+                  </label>
+                  <input
+                    type="text"
+                    value={newRelocationDest}
+                    onChange={(e) => setNewRelocationDest(e.target.value)}
+                    placeholder="např. Náměstí Svobody 15 nebo Roh Masarykovy"
+                    className="w-full px-3 py-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:outline-none"
+                  />
+                  <p className="text-[10px] text-purple-700">
+                    Montér po naložení převeze konstrukci přímo na toto stanoviště a tam ji složí/nainstaluje.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-700">
+                    GPS souřadnice stanoviště *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if ('geolocation' in navigator) {
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setNewLat(pos.coords.latitude.toFixed(5));
+                            setNewLng(pos.coords.longitude.toFixed(5));
+                          },
+                          () => alert('Nepodařilo se zjistit aktuální GPS polohu.')
+                        );
+                      }
+                    }}
+                    className="text-[11px] font-semibold text-sky-600 hover:text-sky-800 underline flex items-center gap-1"
+                  >
+                    📍 Moje poloha
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={newLat}
+                    onChange={(e) => setNewLat(e.target.value)}
+                    placeholder="Zeměpisná šířka (např. 50.088)"
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    value={newLng}
+                    onChange={(e) => setNewLng(e.target.value)}
+                    placeholder="Zeměpisná délka (např. 14.420)"
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Lokalita / Město (volitelné)
+                  </label>
+                  <input
+                    type="text"
+                    value={newLocality}
+                    onChange={(e) => setNewLocality(e.target.value)}
+                    placeholder="např. Brno-střed"
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Ulice a č.p. (volitelné)
+                  </label>
+                  <input
+                    type="text"
+                    value={newAddress}
+                    onChange={(e) => setNewAddress(e.target.value)}
+                    placeholder="např. Masarykova 10"
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Poznámka pro montéry (volitelné)
+                </label>
+                <input
+                  type="text"
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="např. Vjezd ze dvora, klíč u vrátného"
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingPointOpen(false)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingPoint}
+                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isCreatingPoint && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Uložit bod do kampaně</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Batch Actions Toolbar when items are selected */}
       {selectedPointIds.size > 0 && (

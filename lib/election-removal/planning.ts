@@ -182,6 +182,8 @@ export interface PlanRoutesPayload {
     vehicleId: string | null;
   }>;
   selectedPointIds?: string[];
+  depot?: { latitude: number; longitude: number };
+  saveDepotAsDefault?: boolean;
 }
 
 /**
@@ -240,6 +242,37 @@ export async function optimizeElectionRemovalRoutes(
     // Apply vehicle capacity and warehouse unloading parameters
     profile.vehicleCapacitySlots = payload.vehicleCapacitySlots ?? DEFAULT_VEHICLE_CAPACITY_SLOTS;
     profile.warehouseUnloadMinutes = payload.warehouseUnloadMinutes ?? DEFAULT_WAREHOUSE_UNLOAD_MINUTES;
+
+    // Apply custom warehouse (depot) location if provided
+    if (
+      payload.depot &&
+      typeof payload.depot.latitude === 'number' &&
+      typeof payload.depot.longitude === 'number' &&
+      !Number.isNaN(payload.depot.latitude) &&
+      !Number.isNaN(payload.depot.longitude) &&
+      payload.depot.latitude !== 0 &&
+      payload.depot.longitude !== 0
+    ) {
+      profile.depot = { latitude: payload.depot.latitude, longitude: payload.depot.longitude };
+      profile.endLocation = { latitude: payload.depot.latitude, longitude: payload.depot.longitude };
+
+      if (payload.saveDepotAsDefault) {
+        try {
+          await prisma.organizationFieldPlanningProfile.upsert({
+            where: { organizationId },
+            create: {
+              organizationId,
+              configuration: profile as unknown as Prisma.InputJsonValue,
+            },
+            update: {
+              configuration: profile as unknown as Prisma.InputJsonValue,
+            },
+          });
+        } catch (saveDepotErr) {
+          console.warn('Nepodařilo se uložit výchozí depo organizace:', saveDepotErr);
+        }
+      }
+    }
 
     // Apply user-configured start time
     if (payload.startTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(payload.startTime)) {

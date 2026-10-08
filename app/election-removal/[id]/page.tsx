@@ -326,7 +326,7 @@ export default async function ElectionRemovalDetailPage({
         <CampaignTelemetryCard report={telemetryReport} />
 
         {/* Points Table Component */}
-        <CampaignPointsView points={campaign.points} />
+        <CampaignPointsView points={campaign.points} campaignId={campaign.id} />
       </div>
     </AppShell>
   );

@@ -1,4 +1,5 @@
 import type { ElectionRemovalMediaType } from '@prisma/client';
+export type { ElectionRemovalMediaType };
 
 export type ElectionRemovalOperationType =
   | 'FULL_REMOVAL'

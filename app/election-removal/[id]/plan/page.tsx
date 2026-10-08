@@ -21,7 +21,7 @@ export default async function ElectionRemovalPlanPage({
   }
 
   try {
-    const { campaign, employees, vehicles } = await loadElectionPlanningResources(
+    const { campaign, employees, vehicles, profile } = await loadElectionPlanningResources(
       id,
       undefined,
       user.organization!.id
@@ -60,6 +60,7 @@ export default async function ElectionRemovalPlanPage({
             campaign={campaign}
             employees={employees}
             vehicles={vehicles}
+            initialDepot={profile?.depot}
           />
         </div>
       </AppShell>
