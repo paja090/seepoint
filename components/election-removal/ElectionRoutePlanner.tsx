@@ -23,6 +23,7 @@ import type { ElectionCampaign, ElectionRemovalPoint } from '@prisma/client';
 import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import type { PlanningInput, PlanningResult, PlannedCrew } from '@/lib/field-planning/contracts';
+import { LocationPickerMap } from './LocationPickerMap';
 
 interface ResourceEmployee {
   id: string;
@@ -82,6 +83,7 @@ export function ElectionRoutePlanner({
     initialDepot?.longitude ? String(initialDepot.longitude) : '14.42076'
   );
   const [saveDepotAsDefault, setSaveDepotAsDefault] = useState<boolean>(false);
+  const [showDepotMap, setShowDepotMap] = useState<boolean>(true);
 
   // Crews configuration: default to 1 crew with first available employee & vehicle if present
   const [crews, setCrews] = useState<CrewConfig[]>([
@@ -592,7 +594,7 @@ export function ElectionRoutePlanner({
           </div>
 
           {/* Warehouse (Depot) Location Configuration */}
-          <div className="sm:col-span-2 pt-3 border-t border-slate-200/80 space-y-2">
+          <div className="sm:col-span-2 pt-3 border-t border-slate-200/80 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
@@ -602,24 +604,52 @@ export function ElectionRoutePlanner({
                   Cílová stanice pro vykládku svezených konstrukcí při naplnění kapacity vozidla a místo návratu posádky na konci dne.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if ('geolocation' in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        setDepotLat(pos.coords.latitude.toFixed(5));
-                        setDepotLng(pos.coords.longitude.toFixed(5));
-                      },
-                      () => alert('Nepodařilo se zjistit aktuální polohu prohlížeče.')
-                    );
-                  }
-                }}
-                className="text-[11px] font-semibold text-sky-600 hover:text-sky-800 underline flex items-center gap-1 cursor-pointer"
-              >
-                📍 Použít moji aktuální polohu
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDepotMap((prev) => !prev)}
+                  className="text-[11px] font-bold text-sky-600 hover:text-sky-800 underline flex items-center gap-1 cursor-pointer"
+                >
+                  🗺️ {showDepotMap ? 'Skrýt mapu skladu' : 'Zobrazit mapu pro kliknutí'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if ('geolocation' in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setDepotLat(pos.coords.latitude.toFixed(5));
+                          setDepotLng(pos.coords.longitude.toFixed(5));
+                        },
+                        () => alert('Nepodařilo se zjistit aktuální polohu prohlížeče.')
+                      );
+                    }
+                  }}
+                  className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline flex items-center gap-1 cursor-pointer"
+                >
+                  📍 Moje poloha
+                </button>
+              </div>
             </div>
+
+            {/* Interactive Map Picker for Depot */}
+            {showDepotMap && (
+              <div className="space-y-1">
+                <LocationPickerMap
+                  latitude={parseFloat(depotLat) || null}
+                  longitude={parseFloat(depotLng) || null}
+                  onChange={(coords) => {
+                    setDepotLat(coords.latitude.toFixed(5));
+                    setDepotLng(coords.longitude.toFixed(5));
+                  }}
+                  height="220px"
+                  pinLabel="Centrální sklad / Depo"
+                />
+                <p className="text-[10px] text-slate-500 italic">
+                  Tip: Klikněte kamkoliv do mapy nebo vyberte město nahoře pro okamžité přemístění skladu.
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>

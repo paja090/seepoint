@@ -24,6 +24,7 @@ import {
   type ElectionRemovalOperationType,
 } from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
+import { LocationPickerMap } from './LocationPickerMap';
 import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
 import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 
@@ -49,6 +50,7 @@ export function CampaignPointsView({
   const [search, setSearch] = useState<string>('');
   const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const [isMapClickAddMode, setIsMapClickAddMode] = useState<boolean>(false);
 
   const campaignId = propCampaignId || (points.length > 0 ? points[0].campaignId : '');
 
@@ -536,11 +538,16 @@ export function CampaignPointsView({
                 </div>
               )}
 
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="font-semibold text-slate-700">
-                    GPS souřadnice stanoviště *
-                  </label>
+                  <div>
+                    <label className="font-semibold text-slate-700 block">
+                      Umístění na mapě & GPS souřadnice *
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Klikněte přímo do mapy nebo přetáhněte špendlík na přesné místo
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -554,30 +561,52 @@ export function CampaignPointsView({
                         );
                       }
                     }}
-                    className="text-[11px] font-semibold text-sky-600 hover:text-sky-800 underline flex items-center gap-1"
+                    className="text-[11px] font-semibold text-sky-600 hover:text-sky-800 underline flex items-center gap-1 cursor-pointer shrink-0"
                   >
                     📍 Moje poloha
                   </button>
                 </div>
+
+                <LocationPickerMap
+                  latitude={parseFloat(newLat) || null}
+                  longitude={parseFloat(newLng) || null}
+                  onChange={(coords) => {
+                    setNewLat(coords.latitude.toFixed(5));
+                    setNewLng(coords.longitude.toFixed(5));
+                  }}
+                  height="220px"
+                  pinLabel={newLabel.trim() || 'Nový bod'}
+                />
+
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    value={newLat}
-                    onChange={(e) => setNewLat(e.target.value)}
-                    placeholder="Zeměpisná šířka (např. 50.088)"
-                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
-                  />
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    value={newLng}
-                    onChange={(e) => setNewLng(e.target.value)}
-                    placeholder="Zeměpisná délka (např. 14.420)"
-                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
-                  />
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-mono block mb-0.5">
+                      Šířka (Latitude)
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={newLat}
+                      onChange={(e) => setNewLat(e.target.value)}
+                      placeholder="např. 50.088"
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50/50"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-mono block mb-0.5">
+                      Délka (Longitude)
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={newLng}
+                      onChange={(e) => setNewLng(e.target.value)}
+                      placeholder="např. 14.420"
+                      className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-slate-50/50"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -696,12 +725,50 @@ export function CampaignPointsView({
 
       {/* Map View */}
       {viewMode === 'MAP' ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsMapClickAddMode(!isMapClickAddMode)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                  isMapClickAddMode
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white animate-pulse'
+                    : 'bg-sky-600 hover:bg-sky-700 text-white'
+                }`}
+              >
+                <span>{isMapClickAddMode ? '❌ Ukončit klikání do mapy' : '📍 Přidat bod kliknutím do mapy'}</span>
+              </button>
+              <span className="text-xs text-slate-600">
+                {isMapClickAddMode
+                  ? 'Klikněte do mapy na místo nového bodu – souřadnice se automaticky načtou'
+                  : 'Pro vytvoření nového bodu klikněte na tlačítko a potom kamkoliv do mapy'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsAddingPointOpen(true)}
+              className="text-xs text-sky-600 hover:text-sky-800 font-semibold underline cursor-pointer"
+            >
+              Nebo otevřít formulář přímo
+            </button>
+          </div>
+
           <ElectionRemovalMap
             points={filteredPoints}
             selectedPointId={selectedPointId}
             onSelectPoint={(id) => setSelectedPointId(id)}
-            height="500px"
+            onMapClick={(coords) => {
+              if (isMapClickAddMode) {
+                setNewLat(coords.latitude.toFixed(5));
+                setNewLng(coords.longitude.toFixed(5));
+                setIsMapClickAddMode(false);
+                setIsAddingPointOpen(true);
+              }
+            }}
+            isAddMode={isMapClickAddMode}
+            height="520px"
           />
         </div>
       ) : (
