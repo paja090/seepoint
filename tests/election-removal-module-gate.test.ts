@@ -64,6 +64,28 @@ test('hasModuleAccess respects RBAC and tenant module activation', () => {
     true
   );
 
+  // Enabled org + TECHNICIAN -> OK
+  assert.equal(
+    hasModuleAccess({
+      role: 'TECHNICIAN',
+      organizationId: enabledOrg.id,
+      organization: enabledOrg,
+      membership: { organizationId: enabledOrg.id, isActive: true },
+    }, 'electionRemoval'),
+    true
+  );
+
+  // Enabled org + WORKER -> OK
+  assert.equal(
+    hasModuleAccess({
+      role: 'WORKER',
+      organizationId: enabledOrg.id,
+      organization: enabledOrg,
+      membership: { organizationId: enabledOrg.id, isActive: true },
+    }, 'electionRemoval'),
+    true
+  );
+
   // Enabled org + VIEWER -> DENIED (RBAC)
   assert.equal(
     hasModuleAccess({

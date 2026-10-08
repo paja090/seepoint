@@ -68,6 +68,8 @@ export function ElectionRoutePlanner({
   const [startTime, setStartTime] = useState<string>('07:30');
   const [endTime, setEndTime] = useState<string>('18:00');
   const [flexibleHours, setFlexibleHours] = useState<boolean>(true);
+  const [vehicleCapacitySlots, setVehicleCapacitySlots] = useState<number>(30);
+  const [warehouseUnloadMinutes, setWarehouseUnloadMinutes] = useState<number>(15);
 
   // Crews configuration: default to 1 crew with first available employee & vehicle if present
   const [crews, setCrews] = useState<CrewConfig[]>([
@@ -179,6 +181,8 @@ export function ElectionRoutePlanner({
           startTime,
           endTime,
           flexibleHours,
+          vehicleCapacitySlots,
+          warehouseUnloadMinutes,
           crews: crews.map((c) => ({
             id: c.id,
             employeeIds: c.employeeIds,
@@ -328,6 +332,45 @@ export function ElectionRoutePlanner({
             </span>
             Povolí přesčasy a umožní posádkám obsloužit všechny zadané body bez jejich odmítnutí z důvodu konce pevné směny.
           </label>
+        </div>
+
+        {/* Logistics & Capacity Constraints */}
+        <div className="grid gap-4 sm:grid-cols-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Ložná kapacita vozíku / auta</span>
+              <span className="font-bold text-sky-600 font-mono text-sm">{vehicleCapacitySlots} slotů</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={150}
+              value={vehicleCapacitySlots}
+              onChange={(e) => setVehicleCapacitySlots(Math.max(1, parseInt(e.target.value) || 30))}
+              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              30 Áček (á 1) = 5 MiniTowerů (á 6) = 1 velká věž (30). Při naplnění plánovač automaticky vloží vykládku na centrálním skladě.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Čas vykládky na skladě</span>
+              <span className="font-bold text-sky-600 font-mono text-sm">{warehouseUnloadMinutes} min</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={warehouseUnloadMinutes}
+              onChange={(e) => setWarehouseUnloadMinutes(Math.max(0, parseInt(e.target.value) || 15))}
+              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Odhadovaná doba složení nákladu do centrálního skladu před pokračováním ve svozu dalších bodů na trase.
+            </p>
+          </div>
         </div>
 
         {/* Crews Setup */}
@@ -661,6 +704,40 @@ export function ElectionRoutePlanner({
                             });
                             const travelKm = (stop.travel.distanceMeters / 1000).toFixed(1);
                             const travelMin = Math.round(stop.travel.durationSeconds / 60);
+                            const isWarehouse = Boolean(stop.isWarehousePitstop || stop.workType === 'WAREHOUSE_UNLOAD');
+
+                            if (isWarehouse) {
+                              return (
+                                <tr key={stop.jobId || stop.routeOrder} className="bg-amber-50/90 border-y-2 border-amber-300">
+                                  <td className="py-2.5 px-2.5 font-mono font-bold text-amber-900">
+                                    {stop.routeOrder}.
+                                  </td>
+                                  <td className="py-2.5 px-2.5 font-bold text-amber-950 whitespace-nowrap">
+                                    {arrival} – {departure}
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-amber-800 font-medium">
+                                    +{travelKm} km ({travelMin} min na sklad)
+                                  </td>
+                                  <td className="py-2.5 px-2.5" colSpan={2}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-base">🏭</span>
+                                      <div>
+                                        <p className="font-bold text-amber-950">Centrální sklad: Vykládka materiálu</p>
+                                        <p className="text-[11px] text-amber-700">
+                                          Vozík naplněn ({stop.unloadedSlots ?? 30} ks). Složení materiálu do skladu a uvolnění kapacity na 0 ks.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 font-mono text-[11px]">
+                                    <span className="text-amber-800 font-semibold">Centrální sklad</span>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-right font-bold text-amber-950 whitespace-nowrap">
+                                    {stop.serviceMinutes} min vykládka
+                                  </td>
+                                </tr>
+                              );
+                            }
 
                             return (
                               <tr key={stop.jobId || stop.routeOrder} className="hover:bg-slate-50/60 transition">
@@ -688,12 +765,24 @@ export function ElectionRoutePlanner({
                                   )}
                                 </td>
                                 <td className="py-2 px-2.5">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
-                                    {ELECTION_REMOVAL_MEDIA_LABELS[
-                                      (stop.mediaType as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS) ||
-                                        'OTHER'
-                                    ] || stop.mediaType}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
+                                      {ELECTION_REMOVAL_MEDIA_LABELS[
+                                        (stop.mediaType as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS) ||
+                                          'OTHER'
+                                      ] || stop.mediaType}
+                                    </span>
+                                    {stop.operationType === 'BANNER_CHANGE' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        Výměna plachty (0 slotů)
+                                      </span>
+                                    )}
+                                    {stop.cumulativeLoadSlots !== undefined && (
+                                      <span className="text-[10px] text-slate-500 font-mono">
+                                        Náklad: {stop.cumulativeLoadSlots}/{vehicleCapacitySlots}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-2 px-2.5 font-mono text-[11px]">
                                   <a

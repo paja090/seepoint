@@ -157,6 +157,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'printProduction',
     'realization',
     'fieldSurvey',
+    'electionRemoval',
   ],
   WORKER: [
     'dashboard',
@@ -170,6 +171,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'team',
     'realization',
     'fieldSurvey',
+    'electionRemoval',
   ],
   ACCOUNTANT: [
     'dashboard',

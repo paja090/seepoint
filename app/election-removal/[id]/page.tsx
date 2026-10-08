@@ -16,6 +16,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
+import { CampaignTelemetryCard } from '@/components/election-removal/CampaignTelemetryCard';
+import { analyzeCampaignTelemetry } from '@/lib/election-removal/ai-telemetry';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +74,8 @@ export default async function ElectionRemovalDetailPage({
     new Set(campaign.points.map((p) => p.assignedCrewId).filter(Boolean) as string[])
   ).sort();
 
+  const telemetryReport = analyzeCampaignTelemetry(campaign.points);
+
   return (
     <AppShell>
       <div className="space-y-6 max-w-6xl mx-auto">
@@ -122,22 +126,26 @@ export default async function ElectionRemovalDetailPage({
                 <span>📱 Trasa v terénu</span>
               </Link>
 
-              <Link
-                href={`/election-removal/${campaign.id}/plan`}
-                className="btn btn-primary text-sm font-semibold inline-flex items-center gap-2 shadow-sm"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>
-                  {completedPoints > 0 && remainingPoints > 0
-                    ? `Plánovat další výjezd (${remainingPoints} ks)`
-                    : 'Plánovat trasy'}
-                </span>
-              </Link>
+              {(user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'TECHNICIAN') && (
+                <Link
+                  href={`/election-removal/${campaign.id}/plan`}
+                  className="btn btn-primary text-sm font-semibold inline-flex items-center gap-2 shadow-sm"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>
+                    {completedPoints > 0 && remainingPoints > 0
+                      ? `Plánovat další výjezd (${remainingPoints} ks)`
+                      : 'Plánovat trasy'}
+                  </span>
+                </Link>
+              )}
 
-              <DeleteCampaignButton
-                campaignId={campaign.id}
-                campaignName={campaign.name}
-              />
+              {(user.role === 'ADMIN' || user.role === 'MANAGER') && (
+                <DeleteCampaignButton
+                  campaignId={campaign.id}
+                  campaignName={campaign.name}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -313,6 +321,9 @@ export default async function ElectionRemovalDetailPage({
             </div>
           </div>
         )}
+
+        {/* AI Telemetry & Calibration Report */}
+        <CampaignTelemetryCard report={telemetryReport} />
 
         {/* Points Table Component */}
         <CampaignPointsView points={campaign.points} />

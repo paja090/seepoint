@@ -449,3 +449,32 @@ Potvrzené živé výsledky: Drive upload/download s kontrolou obsahu a odmítnu
 - Nasazení dpl_53SNWSd7vc9w2DBkjjQfJe7Zx2K3 READY, https://seepoint-hsn6emk3w-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app; produkční build prošel.
 - Živě QX testovací průzkum po reloadu: přepínač regionální vrstvy výchozí nezaškrtnutý; zaškrtnutí a odškrtnutí funguje, oba testovací markery i cíl zůstaly v DOM a mapa zachovala výřez. Vrstva ponechána vypnutá. Screenshot reports/qx-navigation-layer-fixed-2026-10-03.png.
 - Limity: vlastní ostravské polygony leží mimo tento testovací výřez, jejich geometrie nebyla vizuálně ověřena. Leaflet fallback a OfferMap prošly kódovou a typovou kontrolou, nebyly v této dávce samostatně živě otevřeny. Nebyl proveden zápis navigačních bodů.
+
+## 2026-10-08 – Produkční ověření úpravy starší výstavní nabídky
+
+- Přes produkční API pod samostatným QX ADMIN ověřena nabídka cmunyrood0006jm04zjhep718, TEST QX – výstavní koncept ADMIN – NEODESÍLAT (CITY_GALLERY, DRAFT).
+- Uložení dočasné interní poznámky vrátilo HTTP 200; následné čtení API potvrdilo uloženou hodnotu. Databázové porovnání potvrdilo nezměněné organizationId, status, publicTokenHash, publicTokenEncrypted, publicTokenRevokedAt a publishedAt.
+- Původní interní poznámka byla obnovena přes API (HTTP 200); konečný databázový snímek všech uvedených polí se shodoval s původním. Nebyl odeslán e-mail ani vytvořena objednávka.
+- Ověření potvrzuje opravu běžné editace této starší nabídky bez obnovy či rotace veřejného odkazu. Nepotvrzuje obnovitelnost starého tokenu, chování odvolaného odkazu, všechny typy nabídek ani úplnou izolaci firem.
+- V této dávce nebyl ovládán prohlížeč ani nasazován nový kód. Lokální reprodukční skript a výsledek jsou v ignorovaném scratch/verify-qx-offer-edit.cjs a scratch/qx-offer-edit-result-2026-10-08.json; neobsahují zveřejněné přihlašovací údaje ani tokeny.
+
+## 2026-10-08 – Přímý přístup k cizím záznamům a oprava fotografií
+
+- Před testem ověřena identita samostatného QX ADMIN: bez platformRole a bez aktivního členství v jiné organizaci. Identifikátory existujících cizích záznamů vybrány pouze pro čtecí testy; odpovědi se soubory nebyly ukládány ani zobrazovány.
+- Potvrzený nález: GET /api/photos/drive/[id] pod QX ADMIN vracel HTTP 200 u tří fotografií jiných organizací. Handler ověřoval pouze přihlášení, stahoval soubor dostupnými Drive credentials a používal public cache na 86400 sekund. Nešlo pouze o podezření ze čtení kódu.
+- Oprava: vyžadována aktivní organizace a explicitní tenant context. Před stažením musí existovat vlastní Photo se stejným driveFileId, nebo musí Drive metadata/složka potvrdit vlastnictví aktivní organizace. První větev zachovává vlastní starší fotografie bez nových metadat. Úspěšná odpověď nyní používá Cache-Control: private, no-store.
+- Regresní test ověřuje, že cizí soubor není vůbec stahován, vlastní starší i nepřipojený soubor fungují, chybějící organizace vrací 403 a nepřihlášený uživatel 401. Celkem 23 cílených testů prošlo; typecheck, security:tenant a diff --check také.
+- Produkční nasazení dpl_FmYKUdax4HhEq6baSgB4pdGwAE1S READY, https://seepoint-p0gbpurph-pavels-projects-073588fb.vercel.app, alias https://seepoint.vercel.app. Produkční build prošel. Nasazeno z pracovního stromu nad e0ce97510bd422e0d1ee2ee299aa1680132b840a, bez vytvoření commitu.
+- Po nasazení všech 16 živých API kontrol prošlo: vlastní nabídka 200; seznam organizací 404; tři cizí nabídky, tři cizí klienti, dvě cizí faktury a tři cizí fotografie 404; vlastní fotografie 200 s private, no-store; nabídka a fotografie bez přihlášení 401.
+- Doplňková CRM kontrola: vlastní klient i vrácené vnořené vazby patří QX; rodiče cizích faktur a dokumentů 404. Tři kontroly prošly, dvě přeskočeny: chybí existující cizí smlouva a faktura s Drive PDF. Samotné 404 u faktur bez PDF nejsou důkazem izolace stažení existujícího PDF.
+- Výsledky bez citlivých ID/obsahu: scratch/qx-direct-access-before-2026-10-08.json, scratch/qx-direct-access-2026-10-08.json a scratch/qx-crm-read-access-2026-10-08.json. Žádné obchodní záznamy nebyly změněny a žádný e-mail odeslán.
+- Limity: jde o vzorek API, nikoli úplný audit aplikace ani vizuální kontrolu. Přímé sdílení na drive.google.com a historicky uložené kopie v prohlížečích nebyly ověřeny ani odstraněny. Oprava neprokazuje, zda chybu někdo dříve využil.
+
+## 2026-10-08 – Navazující kontrola příloh a oprávnění uvnitř firmy
+
+- Dalších 12 čtecích kontrol na produkci pod QX ADMIN prošlo: po třech cizích záznamech pro /api/photos/[id]/file, /api/clients/[id]/logo/file, /api/navigation/documentation/[id]/pdf a /api/field-survey/photos/[id]/file. Všechny odpovědi 404. Výsledek scratch/qx-additional-files-2026-10-08.json; obsah cizích souborů nebyl ukládán.
+- Zjištěna mezera v oprávněních uvnitř firmy: přímá Drive cesta nepoužívala canReadPhoto, na rozdíl od běžné cesty přes ID fotografie. Doplněno stejné pravidlo pro soukromé fotografie, účtenky a další vazby. Soubor bez aplikačního Photo záznamu nově smí přes tuto přímou cestu načíst pouze ADMIN/MANAGER, stále po ověření příslušnosti úložiště k firmě.
+- Regresní test používá skutečnou canReadPhoto politiku: ADMIN může vlastní soukromou účtenku otevřít, WORKER bez vazby ne; při odmítnutí se soubor vůbec nestahuje. Ověřeno také odmítnutí pracovníka pro nepřipojený soubor. Nešlo o živý test účtu WORKER.
+- Tři cílené testy prošly; po zpřesnění testu znovu prošel test přímého stahování se skutečnou politikou. Typecheck, security:tenant a diff --check prošly.
+- Nasazení dpl_AzUXnYLSbLqZwnR96ae3qU2uMCw2 READY, https://seepoint-deerp5vnk-pavels-projects-073588fb.vercel.app, alias seepoint.vercel.app. Produkční build prošel. Po nasazení opět všech 16 kontrol přímého přístupu prošlo včetně vlastní QX fotografie 200/private,no-store a cizích fotografií 404.
+- Beze změny obchodních dat, členství a rolí; žádný e-mail odeslán. Celkový audit není dokončen. Veřejné odkazy a jejich cache po odvolání, skutečné cizí PDF faktury a celý obchodní proces zůstávají k dalšímu ověření.

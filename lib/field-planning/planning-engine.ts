@@ -60,6 +60,7 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     }));
     return cache.get(key)!;
   };
+  const crewLoadSlots = new Map<string, number>();
   while (pending.length) {
     const ready = pending.filter(j => (j.constraints.predecessorIds ?? []).every(id => done.has(id)));
     if (!ready.length) {
@@ -69,8 +70,12 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     ready.sort((a, b) => deadline(a) - deadline(b) || (rank[a.priority] ?? 2) - (rank[b.priority] ?? 2) || near(a) - near(b) || Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt) || a.id.localeCompare(b.id));
     const job = ready[0]; pending.splice(pending.indexOf(job), 1);
     const service = job.serviceMinutes ?? p.serviceMinutes[job.workType];
+    const jobLoad = job.loadSlots ?? (job.workType === 'ELECTION_REMOVAL' ? 1 : 0);
+    const maxCap = p.vehicleCapacitySlots;
+    const unloadMins = p.warehouseUnloadMinutes ?? 15;
     let reason = job.blockedReason || (!coordinates(job.location) ? 'Chybí jednoznačná GPS lokalizace.' : !Number.isFinite(service) || service <= 0 ? 'Chybí nakonfigurovaná délka práce.' : 'Práce se nevejde do dostupnosti, časového okna nebo požadavků posádky.');
-    let best: { crew: PlannedCrew; incoming: TravelLeg; returning: TravelLeg; arrival: number; begin: number; finish: number; returnAt: number; score: number } | null = null;
+    let best: { crew: PlannedCrew; incoming: TravelLeg; returning: TravelLeg; arrival: number; begin: number; finish: number; returnAt: number; score: number;
+      pitstop?: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number } } | null = null;
     if (!job.blockedReason && coordinates(job.location) && Number.isFinite(service) && service > 0) for (const crew of result.crews) {
       if (job.sourceType === 'NAVIGATION_POINT' && !input.employees.find(e => e.id === crew.employeeIds[0])?.userId) continue;
       if (crew.stops.length >= p.maximumJobsPerRoute) continue;
@@ -79,9 +84,26 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       const positions = crew.employeeIds.flatMap(id => input.employees.find(e => e.id === id)!.positions);
       if ((job.constraints.requiredPositions ?? []).some(position => !positions.includes(position))) continue;
       const previous = crew.stops.at(-1);
-      const incoming = await leg(previous?.location ?? crew.startLocation ?? p.depot, job.location);
+      const currentLoad = crewLoadSlots.get(crew.id) ?? 0;
+
+      let pitstop: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number } | undefined;
+      let incoming: TravelLeg;
+      let arrival: number;
+
+      if (maxCap && currentLoad > 0 && currentLoad + jobLoad > maxCap) {
+        // Vehicle capacity exceeded: pitstop at depot required to unload
+        const toDepot = await leg(previous?.location ?? crew.startLocation ?? p.depot, p.depot);
+        const pitstopArrival = (previous ? Date.parse(previous.endAt) : start) + toDepot.durationSeconds * 1000;
+        const pitstopFinish = pitstopArrival + unloadMins * 60000;
+        pitstop = { incoming: toDepot, arrival: pitstopArrival, finish: pitstopFinish, unloadedSlots: currentLoad };
+        incoming = await leg(p.depot, job.location);
+        arrival = pitstopFinish + incoming.durationSeconds * 1000;
+      } else {
+        incoming = await leg(previous?.location ?? crew.startLocation ?? p.depot, job.location);
+        arrival = (previous ? Date.parse(previous.endAt) : start) + incoming.durationSeconds * 1000;
+      }
+
       const returning = await leg(job.location, p.endLocation);
-      const arrival = (previous ? Date.parse(previous.endAt) : start) + incoming.durationSeconds * 1000;
       const begin = Math.max(arrival, job.constraints.windowStart ? Date.parse(job.constraints.windowStart) : start,
         ...((job.constraints.predecessorIds ?? []).map(id => done.get(id)!)));
       const finish = begin + service * 60000;
@@ -103,19 +125,43 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
         ? finish + incoming.durationSeconds * 250
         : incoming.distanceMeters + returning.distanceMeters - crew.returnLeg.distanceMeters;
 
-      if (!best || score < best.score) best = { crew, incoming, returning, arrival, begin, finish, returnAt, score };
+      if (!best || score < best.score) best = { crew, incoming, returning, arrival, begin, finish, returnAt, score, pitstop };
     }
     if (!best) {
       if (deadline(job) < start) reason = 'Pevný termín už vypršel.';
       result.unassigned.push({ code: deadline(job) < Infinity ? 'DEADLINE_AT_RISK' : 'WORK_ORDER_UNASSIGNED', workOrderId: job.id, message: `${job.title}: ${reason}` }); continue;
     }
-    const { crew, incoming, returning, arrival, begin, finish, returnAt } = best;
+    const { crew, incoming, returning, arrival, begin, finish, returnAt, pitstop } = best;
+    if (pitstop) {
+      crew.stops.push({
+        jobId: `depot-pitstop-${crew.id}-${crew.stops.length + 1}`,
+        workOrderId: '',
+        sourceType: 'ELECTION_REMOVAL_POINT',
+        title: `Centrální sklad: Vykládka materiálu (${pitstop.unloadedSlots} ks)`,
+        workType: 'WAREHOUSE_UNLOAD',
+        location: p.depot,
+        routeOrder: crew.stops.length + 1,
+        arrivalAt: iso(pitstop.arrival),
+        startAt: iso(pitstop.arrival),
+        endAt: iso(pitstop.finish),
+        serviceMinutes: unloadMins,
+        travel: pitstop.incoming,
+        reason: `Kapacita vozidla naplněna (${pitstop.unloadedSlots}/${maxCap} slotů). Vykládka na skladě.`,
+        isWarehousePitstop: true,
+        unloadedSlots: pitstop.unloadedSlots,
+        cumulativeLoadSlots: 0,
+      });
+      crewLoadSlots.set(crew.id, 0);
+    }
+    const newLoad = (crewLoadSlots.get(crew.id) ?? 0) + jobLoad;
+    crewLoadSlots.set(crew.id, newLoad);
     crew.stops.push({ jobId: job.id, workOrderId: job.parentWorkOrderId ?? (['NAVIGATION_POINT', 'ELECTION_REMOVAL_POINT'].includes(job.sourceType ?? '') ? '' : job.id),
       sourceType: job.sourceType, sourceId: job.sourceId, parentWorkOrderId: job.parentWorkOrderId,
       workOrderItemId: job.workOrderItemId, carrierId: job.carrierId, surfaceId: job.surfaceId, crmRealizationId: job.crmRealizationId,
       navigationPointId: job.navigationPointId, navigationOrderId: job.navigationOrderId,
       electionCampaignId: job.electionCampaignId, electionRemovalPointId: job.electionRemovalPointId,
-      mediaType: job.mediaType, quantity: job.quantity,
+      mediaType: job.mediaType, quantity: job.quantity, operationType: job.operationType, loadSlots: job.loadSlots,
+      cumulativeLoadSlots: newLoad,
       clientName: job.clientName, address: job.address, orderNumber: job.orderNumber, title: job.title, workType: job.workType, location: job.location!, routeOrder: crew.stops.length + 1,
       arrivalAt: iso(arrival), startAt: iso(begin), endAt: iso(finish), serviceMinutes: service, travel: incoming,
       reason: `Priorita ${job.priority}; ověřená dostupnost, kvalifikace a časové limity. ${incoming.estimated ? 'Přejezd je odhad.' : 'Přejezd podle Google Routes.'}` });

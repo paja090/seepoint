@@ -28,10 +28,12 @@ export function parseProfile(value: unknown): PlanningProfile {
   const navigationPointMinutes = p.navigationPointMinutes === undefined ? undefined : Object.fromEntries(Object.entries(object(p.navigationPointMinutes)).map(([id, value]) => [id, bounded(value, 1, 1440, id)]));
   const flexibleHours = typeof p.flexibleHours === 'boolean' ? p.flexibleHours : undefined;
   const maxShiftHours = typeof p.maxShiftHours === 'number' && Number.isFinite(p.maxShiftHours) ? bounded(p.maxShiftHours, 1, 24, 'max délka směny') : undefined;
+  const vehicleCapacitySlots = typeof p.vehicleCapacitySlots === 'number' && Number.isFinite(p.vehicleCapacitySlots) ? bounded(p.vehicleCapacitySlots, 1, 500, 'kapacita vozidla') : undefined;
+  const warehouseUnloadMinutes = typeof p.warehouseUnloadMinutes === 'number' && Number.isFinite(p.warehouseUnloadMinutes) ? bounded(p.warehouseUnloadMinutes, 0, 240, 'čas vykládky na skladě') : undefined;
   return { navigationPointMinutes, timezone: p.timezone, country: p.country as string | null, depot: p.depot, endLocation: p.endLocation,
     workdayStart: p.workdayStart as string, workdayEnd: p.workdayEnd as string,
     breakMinutes: bounded(p.breakMinutes, 0, 240, 'přestávka'), overtimeMinutes: bounded(p.overtimeMinutes, 0, 480, 'přesčas'),
-    flexibleHours, maxShiftHours,
+    flexibleHours, maxShiftHours, vehicleCapacitySlots, warehouseUnloadMinutes,
     strategy: p.strategy as PlanningProfile['strategy'], serviceMinutes,
     fallbackSpeedKph: bounded(p.fallbackSpeedKph, 1, 130, 'odhad rychlosti'), fallbackDistanceFactor: bounded(p.fallbackDistanceFactor, 1, 5, 'koeficient vzdálenosti'),
     maximumJobsPerRoute: bounded(p.maximumJobsPerRoute, 1, 100, 'počet zastávek'), vehicleRequired: p.vehicleRequired,

@@ -16,7 +16,13 @@ import {
 import { loadProfile } from '@/lib/field-planning/data';
 import { planFieldWork } from '@/lib/field-planning/planning-engine';
 import { googleTravelProvider } from '@/lib/field-planning/travel';
-import { DEFAULT_MEDIA_SERVICE_MINUTES } from './constants';
+import {
+  DEFAULT_MEDIA_SERVICE_MINUTES,
+  DEFAULT_BANNER_CHANGE_SERVICE_MINUTES,
+  calculateMediaLoadSlots,
+  DEFAULT_VEHICLE_CAPACITY_SLOTS,
+  DEFAULT_WAREHOUSE_UNLOAD_MINUTES,
+} from './constants';
 import { plannerTransaction } from '@/lib/field-planning/service';
 import { zonedTime } from '@/lib/field-planning/profile';
 
@@ -31,10 +37,27 @@ export function convertElectionPointToJob(
   point: ElectionRemovalPoint,
   campaign: { id: string; name: string; targetDate: Date | null; createdAt: Date }
 ): PlanningJob {
-  const serviceMinutes =
-    point.serviceMinutes ??
-    DEFAULT_MEDIA_SERVICE_MINUTES[point.mediaType] ??
-    10;
+  const rawText = `${point.layerName || ''} ${point.mediaTypeRaw || ''} ${point.description || ''}`.toLowerCase();
+  const isBannerChange =
+    rawText.includes('placht') ||
+    rawText.includes('banner') ||
+    rawText.includes('prevleceni') ||
+    rawText.includes('reskin') ||
+    rawText.includes('prelep');
+
+  const isRelocation =
+    rawText.includes('prevoz') ||
+    rawText.includes('premiste') ||
+    rawText.includes('relokac');
+
+  const operationType = isBannerChange ? 'BANNER_CHANGE' : isRelocation ? 'RELOCATION' : 'FULL_REMOVAL';
+
+  const defaultMinutes = isBannerChange
+    ? DEFAULT_BANNER_CHANGE_SERVICE_MINUTES[point.mediaType] ?? 8
+    : DEFAULT_MEDIA_SERVICE_MINUTES[point.mediaType] ?? 10;
+
+  const serviceMinutes = point.serviceMinutes ?? defaultMinutes;
+  const loadSlots = calculateMediaLoadSlots(point.mediaType, operationType, point.quantity);
 
   return {
     id: electionRemovalJobId(point.id),
@@ -67,6 +90,8 @@ export function convertElectionPointToJob(
     electionRemovalPointId: point.id,
     mediaType: point.mediaType,
     quantity: point.quantity,
+    operationType,
+    loadSlots,
   };
 }
 
@@ -160,6 +185,8 @@ export interface PlanRoutesPayload {
   startTime?: string;
   endTime?: string;
   flexibleHours?: boolean;
+  vehicleCapacitySlots?: number;
+  warehouseUnloadMinutes?: number;
   crews: Array<{
     id: string;
     employeeIds: string[];
@@ -202,6 +229,10 @@ export async function optimizeElectionRemovalRoutes(
     if (!payload.crews || payload.crews.length === 0) {
       throw new Error('Vyberte alespoň jednu pracovní posádku.');
     }
+
+    // Apply vehicle capacity and warehouse unloading parameters
+    profile.vehicleCapacitySlots = payload.vehicleCapacitySlots ?? DEFAULT_VEHICLE_CAPACITY_SLOTS;
+    profile.warehouseUnloadMinutes = payload.warehouseUnloadMinutes ?? DEFAULT_WAREHOUSE_UNLOAD_MINUTES;
 
     // Apply user-configured start time
     if (payload.startTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(payload.startTime)) {

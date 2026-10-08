@@ -2,6 +2,8 @@ import type { ElectionRemovalMediaType } from '@prisma/client';
 import {
   DEFAULT_MEDIA_SERVICE_MINUTES,
   calculateServiceMinutes,
+  calculateMediaLoadSlots,
+  type ElectionRemovalOperationType,
 } from './constants';
 
 export interface ParsedKmlLayer {
@@ -19,6 +21,8 @@ export interface ParsedKmlPoint {
   layerId: string;
   layerName: string;
   mediaType: ElectionRemovalMediaType;
+  operationType?: ElectionRemovalOperationType;
+  loadSlots?: number;
   latitude: number;
   longitude: number;
   quantity: number;
@@ -140,6 +144,35 @@ export function detectMediaTypeFromText(text?: string | null): ElectionRemovalMe
  */
 export function resolveLayerMediaType(layerName: string): ElectionRemovalMediaType {
   return detectMediaTypeFromText(layerName) ?? 'OTHER';
+}
+
+/**
+ * Detects whether an election removal placemark/layer is a full removal, banner change, or direct relocation.
+ */
+export function detectOperationTypeFromText(text?: string | null): ElectionRemovalOperationType {
+  if (!text) return 'FULL_REMOVAL';
+  const normalized = normalizeForMatching(text);
+  if (
+    normalized.includes('vymena placht') ||
+    normalized.includes('vymeny placht') ||
+    normalized.includes('jenom placht') ||
+    normalized.includes('jen placht') ||
+    normalized.includes('prevleceni') ||
+    normalized.includes('reskin') ||
+    normalized.includes('prelep') ||
+    normalized.includes('plachty')
+  ) {
+    return 'BANNER_CHANGE';
+  }
+  if (
+    normalized.includes('prevoz') ||
+    normalized.includes('premiste') ||
+    normalized.includes('stehovan') ||
+    normalized.includes('relokac')
+  ) {
+    return 'RELOCATION';
+  }
+  return 'FULL_REMOVAL';
 }
 
 /**
@@ -420,7 +453,9 @@ export function parseGoogleMyMapsKml(kmlContent: string): KmlParseResult {
     }
 
     // Valid point: default quantity strictly 1
-    const { totalMinutes } = calculateServiceMinutes(resolvedMediaType, 1);
+    const operationType = detectOperationTypeFromText(`${raw.layerName} ${raw.name} ${raw.description || ''}`);
+    const { totalMinutes } = calculateServiceMinutes(resolvedMediaType, 1, null, operationType);
+    const loadSlots = calculateMediaLoadSlots(resolvedMediaType, operationType, 1);
     validPointsCount++;
     totalEstimatedMinutes += totalMinutes;
 
@@ -435,6 +470,8 @@ export function parseGoogleMyMapsKml(kmlContent: string): KmlParseResult {
       layerId,
       layerName: raw.layerName,
       mediaType: resolvedMediaType,
+      operationType,
+      loadSlots,
       latitude: coordResult.latitude,
       longitude: coordResult.longitude,
       quantity: 1,

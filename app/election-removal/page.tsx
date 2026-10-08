@@ -42,6 +42,9 @@ export default async function ElectionRemovalPage() {
   const totalPoints = campaigns.reduce((acc, c) => acc + c.totalPoints, 0);
   const totalCompleted = campaigns.reduce((acc, c) => acc + c.completedPoints, 0);
 
+  const canManage = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const canImport = canManage || user.role === 'TECHNICIAN';
+
   return (
     <AppShell>
       <div className="space-y-6 max-w-6xl mx-auto">
@@ -62,15 +65,17 @@ export default async function ElectionRemovalPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/election-removal/new"
-              className="btn btn-primary text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nová akce (Import KML)</span>
-            </Link>
-          </div>
+          {canImport && (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/election-removal/new"
+                className="btn btn-primary text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nová akce (Import KML)</span>
+              </Link>
+            </div>
+          )}
         </header>
 
         {/* KPI Cards */}
@@ -182,11 +187,13 @@ export default async function ElectionRemovalPage() {
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
                           {c.status}
                         </span>
-                        <DeleteCampaignButton
-                          campaignId={c.id}
-                          campaignName={c.name}
-                          variant="icon"
-                        />
+                        {canManage && (
+                          <DeleteCampaignButton
+                            campaignId={c.id}
+                            campaignName={c.name}
+                            variant="icon"
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -217,13 +224,22 @@ export default async function ElectionRemovalPage() {
                         <Route className="w-3.5 h-3.5 text-slate-400" />
                         {c._count.fieldPlans} tras
                       </span>
-                      <Link
-                        href={`/election-removal/${c.id}`}
-                        className="text-sky-600 font-semibold group-hover:translate-x-0.5 transition inline-flex items-center gap-1"
-                      >
-                        <span>Detail kampaně</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/election-removal/${c.id}/route`}
+                          className="btn btn-sm bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 text-xs font-semibold inline-flex items-center gap-1 py-1 px-2"
+                        >
+                          <Route className="w-3.5 h-3.5" />
+                          <span>Do terénu</span>
+                        </Link>
+                        <Link
+                          href={`/election-removal/${c.id}`}
+                          className="text-sky-600 font-semibold group-hover:translate-x-0.5 transition inline-flex items-center gap-1 text-xs"
+                        >
+                          <span>Detail</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
