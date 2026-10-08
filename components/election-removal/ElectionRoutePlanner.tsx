@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Calendar,
@@ -85,6 +85,25 @@ export function ElectionRoutePlanner({
   const pendingPoints = campaign.points.filter((p) =>
     ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'].includes(p.status)
   );
+
+  // Dedicated media type filter: each medium is transported separately
+  const [selectedMediumFilter, setSelectedMediumFilter] = useState<string>('ALL');
+
+  const mediaTypeStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    let bannerChangeCount = 0;
+    pendingPoints.forEach((p) => {
+      const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`.toLowerCase();
+      const isBanner = rawText.includes('placht') || rawText.includes('banner');
+      if (isBanner) {
+        bannerChangeCount++;
+      } else {
+        const key = p.mediaType || 'OTHER';
+        stats[key] = (stats[key] || 0) + 1;
+      }
+    });
+    return { stats, bannerChangeCount };
+  }, [pendingPoints]);
 
   // Optimization state
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
@@ -183,6 +202,7 @@ export function ElectionRoutePlanner({
           flexibleHours,
           vehicleCapacitySlots,
           warehouseUnloadMinutes,
+          filterMediaType: selectedMediumFilter,
           crews: crews.map((c) => ({
             id: c.id,
             employeeIds: c.employeeIds,
@@ -332,6 +352,157 @@ export function ElectionRoutePlanner({
             </span>
             Povolí přesčasy a umožní posádkám obsloužit všechny zadané body bez jejich odmítnutí z důvodu konce pevné směny.
           </label>
+        </div>
+
+        {/* Dedicated Medium Filter (Single-Medium Transport Rule) */}
+        <div className="space-y-3 p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🎯 Médium pro tento výjezd</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 normal-case border border-indigo-100">
+                Každé médium se odváží samostatně
+              </span>
+            </label>
+            <span className="text-[11px] text-slate-500">
+              Různé typy konstrukcí se nemíchají na jeden vozík
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedMediumFilter('ALL')}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                selectedMediumFilter === 'ALL'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span>🌐 Všechna média</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                  selectedMediumFilter === 'ALL'
+                    ? 'bg-slate-800 text-slate-100'
+                    : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {pendingPoints.length} ks
+              </span>
+            </button>
+
+            {mediaTypeStats.stats.ACKO !== undefined && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('ACKO')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'ACKO'
+                    ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🅰️ Pouze Áčka</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'ACKO'
+                      ? 'bg-sky-700 text-white'
+                      : 'bg-sky-50 text-sky-800'
+                  }`}
+                >
+                  {mediaTypeStats.stats.ACKO} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.stats.MINI_TOWER !== undefined && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('MINI_TOWER')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'MINI_TOWER'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🗼 Pouze MiniTowery</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'MINI_TOWER'
+                      ? 'bg-indigo-700 text-white'
+                      : 'bg-indigo-50 text-indigo-800'
+                  }`}
+                >
+                  {mediaTypeStats.stats.MINI_TOWER} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.stats.TOWER !== undefined && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('TOWER')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'TOWER'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🏛️ Pouze Velké věže</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'TOWER'
+                      ? 'bg-purple-700 text-white'
+                      : 'bg-purple-50 text-purple-800'
+                  }`}
+                >
+                  {mediaTypeStats.stats.TOWER} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.bannerChangeCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('BANNER_CHANGE')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'BANNER_CHANGE'
+                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🎨 Pouze výměny / sundání plachet</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'BANNER_CHANGE'
+                      ? 'bg-teal-700 text-white'
+                      : 'bg-teal-50 text-teal-800'
+                  }`}
+                >
+                  {mediaTypeStats.bannerChangeCount} ks
+                </span>
+              </button>
+            )}
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/70 text-xs text-slate-600 flex items-center gap-2">
+            <span className="text-base shrink-0">💡</span>
+            <span>
+              {selectedMediumFilter === 'ACKO' && (
+                <>Výjezd je omezen <strong>pouze na A-stojany</strong>. Na vozík se naloží až 30 ks, při překročení následuje vykládka na skladě.</>
+              )}
+              {selectedMediumFilter === 'MINI_TOWER' && (
+                <>Výjezd je sestaven <strong>pouze pro MiniTowery</strong>. Na jedno naložení se vejde max. 5 ks, poté se odváží na sklad.</>
+              )}
+              {selectedMediumFilter === 'TOWER' && (
+                <>Výjezd je určen <strong>pouze pro Velké věže</strong>. Každá velká věž se odváží po 1 ks přímo na sklad.</>
+              )}
+              {selectedMediumFilter === 'BANNER_CHANGE' && (
+                <>Výjezd pro <strong>servis a výměnu plachet</strong>. Konstrukce zůstávají na místě, neblokují ložnou plochu vozíku.</>
+              )}
+              {selectedMediumFilter === 'ALL' && (
+                <>Plánování pro <strong>všechna média</strong>. Algoritmus striktně hlídá, aby se na jednom vozíku nemíchala různá média (před změnou typu konstrukce vždy nařídí vykládku na skladě).</>
+              )}
+            </span>
+          </div>
         </div>
 
         {/* Logistics & Capacity Constraints */}

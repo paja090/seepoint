@@ -187,6 +187,7 @@ export interface PlanRoutesPayload {
   flexibleHours?: boolean;
   vehicleCapacitySlots?: number;
   warehouseUnloadMinutes?: number;
+  filterMediaType?: string;
   crews: Array<{
     id: string;
     employeeIds: string[];
@@ -220,10 +221,22 @@ export async function optimizeElectionRemovalRoutes(
 
     const selectedPoints = payload.selectedPointIds?.length
       ? points.filter((p) => payload.selectedPointIds!.includes(p.id))
+      : payload.filterMediaType && payload.filterMediaType !== 'ALL'
+      ? points.filter((p) => {
+          const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`.toLowerCase();
+          const isBanner = rawText.includes('placht') || rawText.includes('banner');
+          if (payload.filterMediaType === 'BANNER_CHANGE') {
+            return isBanner;
+          }
+          if (isBanner) {
+            return false;
+          }
+          return p.mediaType === payload.filterMediaType;
+        })
       : points;
 
     if (selectedPoints.length === 0) {
-      throw new Error('Kampaň neobsahuje žádné body k naplánování.');
+      throw new Error('Kampaň neobsahuje žádné body vybraného média k naplánování.');
     }
 
     if (!payload.crews || payload.crews.length === 0) {

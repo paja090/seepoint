@@ -340,3 +340,90 @@ test('AI Telemetry: Measures real field durations and computes AI calibration re
 
   assert.ok(report.aiSummary.length > 20, 'AI shrnutí musí obsahovat konkrétní analýzu v češtině');
 });
+
+test('Single-Medium Rule: Áčka and MiniTower are never loaded together without warehouse unload pitstop', async () => {
+  const campaign = {
+    id: 'camp-single-medium',
+    name: 'Kampaň Oddělený svoz',
+    targetDate: new Date('2026-10-15T00:00:00Z'),
+    createdAt: new Date('2026-10-06T09:00:00Z'),
+  };
+
+  // 3 Áčka (3 slots) and 1 MiniTower (6 slots).
+  // Total slots = 9 slots (far below 30 limit).
+  // BUT because different media cannot be mixed on the same vehicle load,
+  // the crew must visit the warehouse to unload Áčka before picking up the MiniTower!
+  const ackoPoints: ElectionRemovalPoint[] = [1, 2, 3].map((i) => ({
+    id: `pt-acko-${i}`,
+    organizationId: 'org-1',
+    campaignId: campaign.id,
+    mediaType: 'ACKO',
+    label: `Áčko #${i}`,
+    latitude: 50.08 + (i * 0.001),
+    longitude: 14.42 + (i * 0.001),
+    quantity: 1,
+    serviceMinutes: 5,
+    status: 'PENDING',
+    updatedAt: new Date('2026-10-06T10:00:00Z'),
+  } as unknown as ElectionRemovalPoint));
+
+  const miniTowerPoint: ElectionRemovalPoint = {
+    id: 'pt-mini-single',
+    organizationId: 'org-1',
+    campaignId: campaign.id,
+    mediaType: 'MINI_TOWER',
+    label: 'MiniTower #1',
+    latitude: 50.085,
+    longitude: 14.425,
+    quantity: 1,
+    serviceMinutes: 10,
+    status: 'PENDING',
+    updatedAt: new Date('2026-10-06T10:00:00Z'),
+  } as unknown as ElectionRemovalPoint;
+
+  const jobs = [...ackoPoints, miniTowerPoint].map((p) => convertElectionPointToJob(p, campaign));
+
+  const input: PlanningInput = {
+    organizationId: 'org-1',
+    date: '2026-10-15',
+    now: '2026-10-15T07:30:00.000Z',
+    profile: mockProfileWithCapacity,
+    jobs,
+    employees: [
+      {
+        id: 'emp-1',
+        organizationId: 'org-1',
+        name: 'Jan Technik',
+        userId: 'u1',
+        isActive: true,
+        positions: [],
+        roles: ['WORKER'],
+        available: true,
+      },
+    ],
+    vehicles: [
+      {
+        id: 'veh-1',
+        organizationId: 'org-1',
+        name: 'Vozidlo',
+        status: 'AVAILABLE',
+        reserved: false,
+      },
+    ],
+    crews: [
+      {
+        id: 'crew-1',
+        employeeIds: ['emp-1'],
+        vehicleId: 'veh-1',
+      },
+    ],
+  };
+
+  const result = await planFieldWork(input, mockTravelProvider);
+  const crew = result.crews[0];
+  const pitstops = crew.stops.filter((s) => s.isWarehousePitstop || s.workType === 'WAREHOUSE_UNLOAD');
+
+  assert.equal(pitstops.length, 1, 'Musí být vložena vykládka na skladě při přechodu z Áček na MiniTower');
+  assert.ok(pitstops[0].reason.includes('Změna typu média') || pitstops[0].reason.includes('Změna média'));
+});
+

@@ -61,6 +61,7 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     return cache.get(key)!;
   };
   const crewLoadSlots = new Map<string, number>();
+  const crewLoadMediaType = new Map<string, string | null>();
   while (pending.length) {
     const ready = pending.filter(j => (j.constraints.predecessorIds ?? []).every(id => done.has(id)));
     if (!ready.length) {
@@ -75,7 +76,7 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     const unloadMins = p.warehouseUnloadMinutes ?? 15;
     let reason = job.blockedReason || (!coordinates(job.location) ? 'Chybí jednoznačná GPS lokalizace.' : !Number.isFinite(service) || service <= 0 ? 'Chybí nakonfigurovaná délka práce.' : 'Práce se nevejde do dostupnosti, časového okna nebo požadavků posádky.');
     let best: { crew: PlannedCrew; incoming: TravelLeg; returning: TravelLeg; arrival: number; begin: number; finish: number; returnAt: number; score: number;
-      pitstop?: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number } } | null = null;
+      pitstop?: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number; unloadedMedium: string | null; isMediaConflict: boolean } } | null = null;
     if (!job.blockedReason && coordinates(job.location) && Number.isFinite(service) && service > 0) for (const crew of result.crews) {
       if (job.sourceType === 'NAVIGATION_POINT' && !input.employees.find(e => e.id === crew.employeeIds[0])?.userId) continue;
       if (crew.stops.length >= p.maximumJobsPerRoute) continue;
@@ -85,17 +86,44 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       if ((job.constraints.requiredPositions ?? []).some(position => !positions.includes(position))) continue;
       const previous = crew.stops.at(-1);
       const currentLoad = crewLoadSlots.get(crew.id) ?? 0;
+      const currentMedium = crewLoadMediaType.get(crew.id) ?? null;
+      const jobMedium = job.mediaType ?? null;
 
-      let pitstop: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number } | undefined;
+      // Medium conflict: crew currently has cargo of a DIFFERENT physical medium on vehicle
+      // (Banners/0-slot operations do not conflict because they don't load structural frames)
+      const hasMediaConflict = Boolean(
+        maxCap &&
+        jobLoad > 0 &&
+        currentLoad > 0 &&
+        currentMedium &&
+        jobMedium &&
+        currentMedium !== jobMedium
+      );
+
+      const isCapacityExceeded = Boolean(
+        maxCap &&
+        currentLoad > 0 &&
+        jobLoad > 0 &&
+        currentLoad + jobLoad > maxCap
+      );
+
+      let pitstop: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number; unloadedMedium: string | null; isMediaConflict: boolean } | undefined;
       let incoming: TravelLeg;
       let arrival: number;
 
-      if (maxCap && currentLoad > 0 && currentLoad + jobLoad > maxCap) {
-        // Vehicle capacity exceeded: pitstop at depot required to unload
+      if ((hasMediaConflict || isCapacityExceeded) && currentLoad > 0) {
+        // Vehicle capacity exceeded OR changing media type: pitstop at depot required to unload
         const toDepot = await leg(previous?.location ?? crew.startLocation ?? p.depot, p.depot);
         const pitstopArrival = (previous ? Date.parse(previous.endAt) : start) + toDepot.durationSeconds * 1000;
         const pitstopFinish = pitstopArrival + unloadMins * 60000;
-        pitstop = { incoming: toDepot, arrival: pitstopArrival, finish: pitstopFinish, unloadedSlots: currentLoad };
+        pitstop = {
+          incoming: toDepot,
+          arrival: pitstopArrival,
+          finish: pitstopFinish,
+          unloadedSlots: currentLoad,
+          unloadedMedium: currentMedium,
+          isMediaConflict: hasMediaConflict,
+        };
         incoming = await leg(p.depot, job.location);
         arrival = pitstopFinish + incoming.durationSeconds * 1000;
       } else {
@@ -119,11 +147,15 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
         coordinates(job.location) &&
         distanceMeters(previous.location, job.location) <= 25
       );
+      // Prefer crews that are already carrying the SAME medium or empty, penalize medium switching
+      const sameMediumBonus = currentMedium && jobMedium && currentMedium === jobMedium ? -50_000 : 0;
+      const mediumConflictPenalty = hasMediaConflict ? 50_000 : 0;
+
       const score = isCoLocated
         ? -1_000_000_000 + finish
-        : p.strategy === 'BALANCED'
+        : (p.strategy === 'BALANCED'
         ? finish + incoming.durationSeconds * 250
-        : incoming.distanceMeters + returning.distanceMeters - crew.returnLeg.distanceMeters;
+        : incoming.distanceMeters + returning.distanceMeters - crew.returnLeg.distanceMeters) + sameMediumBonus + mediumConflictPenalty;
 
       if (!best || score < best.score) best = { crew, incoming, returning, arrival, begin, finish, returnAt, score, pitstop };
     }
@@ -133,11 +165,16 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     }
     const { crew, incoming, returning, arrival, begin, finish, returnAt, pitstop } = best;
     if (pitstop) {
+      const mediaLabel = pitstop.unloadedMedium ? pitstop.unloadedMedium : 'materiálu';
+      const reason = pitstop.isMediaConflict
+        ? `Změna média: Na vozidle je ${pitstop.unloadedSlots} ks (${mediaLabel}), odváží se samostatně. Vykládka na skladě.`
+        : `Kapacita vozidla naplněna (${pitstop.unloadedSlots}/${maxCap} slotů). Vykládka na skladě.`;
+
       crew.stops.push({
         jobId: `depot-pitstop-${crew.id}-${crew.stops.length + 1}`,
         workOrderId: '',
         sourceType: 'ELECTION_REMOVAL_POINT',
-        title: `Centrální sklad: Vykládka materiálu (${pitstop.unloadedSlots} ks)`,
+        title: `Centrální sklad: Vykládka materiálu (${pitstop.unloadedSlots} ks${pitstop.unloadedMedium ? ` – ${pitstop.unloadedMedium}` : ''})`,
         workType: 'WAREHOUSE_UNLOAD',
         location: p.depot,
         routeOrder: crew.stops.length + 1,
@@ -146,15 +183,19 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
         endAt: iso(pitstop.finish),
         serviceMinutes: unloadMins,
         travel: pitstop.incoming,
-        reason: `Kapacita vozidla naplněna (${pitstop.unloadedSlots}/${maxCap} slotů). Vykládka na skladě.`,
+        reason,
         isWarehousePitstop: true,
         unloadedSlots: pitstop.unloadedSlots,
         cumulativeLoadSlots: 0,
       });
       crewLoadSlots.set(crew.id, 0);
+      crewLoadMediaType.set(crew.id, null);
     }
     const newLoad = (crewLoadSlots.get(crew.id) ?? 0) + jobLoad;
     crewLoadSlots.set(crew.id, newLoad);
+    if (jobLoad > 0 && job.mediaType) {
+      crewLoadMediaType.set(crew.id, job.mediaType);
+    }
     crew.stops.push({ jobId: job.id, workOrderId: job.parentWorkOrderId ?? (['NAVIGATION_POINT', 'ELECTION_REMOVAL_POINT'].includes(job.sourceType ?? '') ? '' : job.id),
       sourceType: job.sourceType, sourceId: job.sourceId, parentWorkOrderId: job.parentWorkOrderId,
       workOrderItemId: job.workOrderItemId, carrierId: job.carrierId, surfaceId: job.surfaceId, crmRealizationId: job.crmRealizationId,
