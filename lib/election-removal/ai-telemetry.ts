@@ -2,9 +2,11 @@ import type { ElectionRemovalMediaType } from '@prisma/client';
 import {
   DEFAULT_MEDIA_SERVICE_MINUTES,
   DEFAULT_BANNER_CHANGE_SERVICE_MINUTES,
+  DEFAULT_RELOCATION_SERVICE_MINUTES,
   ELECTION_REMOVAL_MEDIA_LABELS,
   type ElectionRemovalOperationType,
 } from './constants';
+import { detectOperationTypeFromText } from './kml-parser';
 
 export interface PointTelemetry {
   pointId: string;
@@ -63,13 +65,8 @@ export function calculatePointTelemetry(point: {
   startedAt?: Date | null;
   completedAt?: Date | null;
 }): PointTelemetry {
-  const rawText = `${point.layerName || ''} ${point.description || ''}`.toLowerCase();
-  const operationType: ElectionRemovalOperationType =
-    rawText.includes('placht') || rawText.includes('banner')
-      ? 'BANNER_CHANGE'
-      : rawText.includes('prevoz') || rawText.includes('premiste')
-      ? 'RELOCATION'
-      : 'FULL_REMOVAL';
+  const rawText = `${point.layerName || ''} ${point.description || ''}`;
+  const operationType: ElectionRemovalOperationType = detectOperationTypeFromText(rawText);
 
   let actualMinutes: number | null = null;
   let diffMinutes: number | null = null;

@@ -514,12 +514,17 @@ export function MobileRouteExecutionView({
                       </span>
                       {operationType === 'BANNER_CHANGE' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200 shadow-2xs">
-                          🎨 Pouze výměna plachty
+                          🎨 Pouze výměna plachty (bez převozu)
                         </span>
                       )}
                       {operationType === 'RELOCATION' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs">
-                          🚚 Přímý převoz
+                          🚚 Přímý převoz na jiné místo
+                        </span>
+                      )}
+                      {operationType === 'FULL_REMOVAL' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                          📦 Demontáž a svoz na sklad
                         </span>
                       )}
                       {point.assignedCrewId && (
@@ -547,14 +552,10 @@ export function MobileRouteExecutionView({
                         </span>
                         {actualMinutes !== null && (
                           <span
-                            className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded-md border ${
-                              actualMinutes <= point.serviceMinutes
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                : 'bg-amber-50 text-amber-800 border-amber-200'
-                            }`}
-                            title={`Naměřeno ${actualMinutes} min oproti plánované normě ${point.serviceMinutes} min`}
+                            className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md border bg-slate-100 text-slate-700 border-slate-200"
+                            title={`Naměřeno ${actualMinutes} min`}
                           >
-                            ⏱️ {actualMinutes} min (plán {point.serviceMinutes} m)
+                            ⏱️ {actualMinutes} min
                           </span>
                         )}
                       </div>
@@ -580,9 +581,6 @@ export function MobileRouteExecutionView({
                       <div className="flex flex-col items-end gap-1">
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
                           Čeká
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          norma {point.serviceMinutes} min
                         </span>
                       </div>
                     )}
@@ -718,7 +716,7 @@ export function MobileRouteExecutionView({
                           ? 'Plachta hotova (Uložit)'
                           : operationType === 'RELOCATION'
                           ? 'Přemístěno (Hotovo)'
-                          : 'Demontováno (Hotovo)'}
+                          : 'Demontováno & naloženo (Hotovo)'}
                       </span>
                     </button>
                   )}

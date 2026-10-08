@@ -427,3 +427,91 @@ test('Single-Medium Rule: Áčka and MiniTower are never loaded together without
   assert.ok(pitstops[0].reason.includes('Změna typu média') || pitstops[0].reason.includes('Změna média'));
 });
 
+test('RELOCATION: calculates relocation service times and differentiates from warehouse removal', () => {
+  const fullTower = calculateServiceMinutes('TOWER', 1, null, 'FULL_REMOVAL');
+  const bannerChangeTower = calculateServiceMinutes('TOWER', 1, null, 'BANNER_CHANGE');
+  const relocationTower = calculateServiceMinutes('TOWER', 1, null, 'RELOCATION');
+
+  // Demontáž na sklad = 15m, výměna plachty = 7m, přemístění na jiné místo (demontáž + instalace) = 25m
+  assert.equal(bannerChangeTower.totalMinutes, 7);
+  assert.equal(fullTower.totalMinutes, 15);
+  assert.equal(relocationTower.totalMinutes, 25);
+  assert.ok(relocationTower.totalMinutes > fullTower.totalMinutes);
+
+  const fullAcko = calculateServiceMinutes('ACKO', 1, null, 'FULL_REMOVAL');
+  const bannerChangeAcko = calculateServiceMinutes('ACKO', 1, null, 'BANNER_CHANGE');
+  const relocationAcko = calculateServiceMinutes('ACKO', 1, null, 'RELOCATION');
+
+  assert.equal(bannerChangeAcko.totalMinutes, 4);
+  assert.equal(fullAcko.totalMinutes, 5);
+  assert.equal(relocationAcko.totalMinutes, 8);
+});
+
+test('RELOCATION: direct relocation does not trigger warehouse unload pitstop', async () => {
+  const campaign = {
+    id: 'camp-relocation',
+    name: 'Kampaň Převoz konstrukcí',
+    targetDate: new Date('2026-10-15T00:00:00Z'),
+    createdAt: new Date('2026-10-06T09:00:00Z'),
+  };
+
+  const points: ElectionRemovalPoint[] = [1, 2].map((i) => ({
+    id: `pt-reloc-${i}`,
+    organizationId: 'org-1',
+    campaignId: campaign.id,
+    mediaType: 'MINI_TOWER',
+    label: `Převoz MiniTower #${i}`,
+    description: 'Převoz na jiné místo (ul. Nádražní)',
+    latitude: 50.08 + (i * 0.002),
+    longitude: 14.42 + (i * 0.002),
+    quantity: 1,
+    status: 'PENDING',
+    updatedAt: new Date('2026-10-06T10:00:00Z'),
+  } as unknown as ElectionRemovalPoint));
+
+  const jobs = points.map((p) => convertElectionPointToJob(p, campaign));
+  assert.equal(jobs[0].operationType, 'RELOCATION');
+
+  const input: PlanningInput = {
+    organizationId: 'org-1',
+    date: '2026-10-15',
+    now: '2026-10-15T07:30:00.000Z',
+    profile: mockProfileWithCapacity,
+    jobs,
+    employees: [
+      {
+        id: 'emp-1',
+        organizationId: 'org-1',
+        name: 'Jan Technik',
+        userId: 'u1',
+        isActive: true,
+        positions: [],
+        roles: ['WORKER'],
+        available: true,
+      },
+    ],
+    vehicles: [
+      {
+        id: 'veh-1',
+        organizationId: 'org-1',
+        name: 'Vozidlo',
+        status: 'AVAILABLE',
+        reserved: false,
+      },
+    ],
+    crews: [
+      {
+        id: 'crew-1',
+        employeeIds: ['emp-1'],
+        vehicleId: 'veh-1',
+      },
+    ],
+  };
+
+  const result = await planFieldWork(input, mockTravelProvider);
+  const crew = result.crews[0];
+  const pitstops = crew.stops.filter((s) => s.isWarehousePitstop || s.workType === 'WAREHOUSE_UNLOAD');
+
+  assert.equal(pitstops.length, 0, 'Přímý převoz na jiné místo nesmí vyvolat mezizastávku pro vykládku na skladě');
+});
+

@@ -18,6 +18,7 @@ import {
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
+import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 
 interface CampaignPointsViewProps {
   points: ElectionRemovalPoint[];
@@ -30,6 +31,7 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
 
   const [layerFilter, setLayerFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [operationFilter, setOperationFilter] = useState<string>('ALL');
   const [search, setSearch] = useState<string>('');
   const [viewMode, setViewMode] = useState<'TABLE' | 'MAP'>('TABLE');
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
@@ -96,9 +98,16 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
         (p.description && p.description.toLowerCase().includes(search.toLowerCase())) ||
         (p.layerName && p.layerName.toLowerCase().includes(search.toLowerCase()));
 
-      return matchLayer && matchStatus && matchSearch;
+      let matchOp = true;
+      if (operationFilter !== 'ALL') {
+        const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
+        const op = detectOperationTypeFromText(rawText);
+        matchOp = op === operationFilter;
+      }
+
+      return matchLayer && matchStatus && matchSearch && matchOp;
     });
-  }, [points, layerFilter, statusFilter, search]);
+  }, [points, layerFilter, statusFilter, operationFilter, search]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -200,6 +209,17 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
             <option value="ISSUE">Hlášen problém</option>
           </select>
 
+          <select
+            value={operationFilter}
+            onChange={(e) => setOperationFilter(e.target.value)}
+            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium bg-white focus:outline-none"
+          >
+            <option value="ALL">Všechny operace</option>
+            <option value="FULL_REMOVAL">📦 Odvoz na sklad</option>
+            <option value="RELOCATION">🚚 Přímý převoz</option>
+            <option value="BANNER_CHANGE">🎨 Pouze výměna plachty</option>
+          </select>
+
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             <input
@@ -232,7 +252,7 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
                 <th className="py-2.5 px-3">#</th>
                 <th className="py-2.5 px-3">Název média a adresa</th>
                 <th className="py-2.5 px-3">Vrstva</th>
-                <th className="py-2.5 px-3">Typ média</th>
+                <th className="py-2.5 px-3">Médium & Operace</th>
                 <th className="py-2.5 px-3">GPS / Navigace</th>
                 <th className="py-2.5 px-3 text-center">Stav</th>
                 <th className="py-2.5 px-3 text-right">Čas demontáže</th>
@@ -288,9 +308,34 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
                         {cleanLayer || '–'}
                       </td>
                       <td className="py-2.5 px-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
-                          {ELECTION_REMOVAL_MEDIA_LABELS[pt.mediaType] || pt.mediaType}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
+                            {ELECTION_REMOVAL_MEDIA_LABELS[pt.mediaType] || pt.mediaType}
+                          </span>
+                          {(() => {
+                            const rawText = `${pt.layerName || ''} ${pt.label || ''} ${pt.description || ''}`;
+                            const op = detectOperationTypeFromText(rawText);
+                            if (op === 'BANNER_CHANGE') {
+                              return (
+                                <span className="inline-flex items-center text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">
+                                  🎨 Jen plachta
+                                </span>
+                              );
+                            }
+                            if (op === 'RELOCATION') {
+                              return (
+                                <span className="inline-flex items-center text-[10px] font-bold text-purple-800 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">
+                                  🚚 Přímý převoz
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                                📦 Na sklad
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[11px]">
                         <div className="flex flex-col gap-0.5">

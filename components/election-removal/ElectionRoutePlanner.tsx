@@ -20,6 +20,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import type { ElectionCampaign, ElectionRemovalPoint } from '@prisma/client';
+import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import type { PlanningInput, PlanningResult, PlannedCrew } from '@/lib/field-planning/contracts';
 
@@ -92,17 +93,22 @@ export function ElectionRoutePlanner({
   const mediaTypeStats = useMemo(() => {
     const stats: Record<string, number> = {};
     let bannerChangeCount = 0;
+    let relocationCount = 0;
+    let warehouseRemovalCount = 0;
     pendingPoints.forEach((p) => {
-      const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`.toLowerCase();
-      const isBanner = rawText.includes('placht') || rawText.includes('banner');
-      if (isBanner) {
+      const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
+      const op = detectOperationTypeFromText(rawText);
+      if (op === 'BANNER_CHANGE') {
         bannerChangeCount++;
+      } else if (op === 'RELOCATION') {
+        relocationCount++;
       } else {
-        const key = p.mediaType || 'OTHER';
-        stats[key] = (stats[key] || 0) + 1;
+        warehouseRemovalCount++;
       }
+      const key = p.mediaType || 'OTHER';
+      stats[key] = (stats[key] || 0) + 1;
     });
-    return { stats, bannerChangeCount };
+    return { stats, bannerChangeCount, relocationCount, warehouseRemovalCount };
   }, [pendingPoints]);
 
   // Optimization state
@@ -481,6 +487,29 @@ export function ElectionRoutePlanner({
                 </span>
               </button>
             )}
+
+            {mediaTypeStats.relocationCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('RELOCATION')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'RELOCATION'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🚚 Pouze přímé převozy</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'RELOCATION'
+                      ? 'bg-purple-700 text-white'
+                      : 'bg-purple-50 text-purple-800'
+                  }`}
+                >
+                  {mediaTypeStats.relocationCount} ks
+                </span>
+              </button>
+            )}
           </div>
 
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/70 text-xs text-slate-600 flex items-center gap-2">
@@ -496,10 +525,13 @@ export function ElectionRoutePlanner({
                 <>Výjezd je určen <strong>pouze pro Velké věže</strong>. Každá velká věž se odváží po 1 ks přímo na sklad.</>
               )}
               {selectedMediumFilter === 'BANNER_CHANGE' && (
-                <>Výjezd pro <strong>servis a výměnu plachet</strong>. Konstrukce zůstávají na místě, neblokují ložnou plochu vozíku.</>
+                <>Výjezd pro <strong>servis a výměnu plachet</strong>. Konstrukce zůstávají na místě, nikam se nepřevážejí a neblokují ložnou plochu vozíku.</>
+              )}
+              {selectedMediumFilter === 'RELOCATION' && (
+                <>Výjezd pro <strong>přímý převoz konstrukcí</strong> na nová stanoviště (neodváží se na sklad, ale přímo na jiné místo).</>
               )}
               {selectedMediumFilter === 'ALL' && (
-                <>Plánování pro <strong>všechna média</strong>. Algoritmus striktně hlídá, aby se na jednom vozíku nemíchala různá média (před změnou typu konstrukce vždy nařídí vykládku na skladě).</>
+                <>Plánování pro <strong>všechna média a operace</strong>. Algoritmus striktně hlídá, aby se na jednom vozíku nemíchala různá média (před změnou typu konstrukce vždy nařídí vykládku na skladě).</>
               )}
             </span>
           </div>

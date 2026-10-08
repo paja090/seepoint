@@ -56,6 +56,17 @@ export const DEFAULT_BANNER_CHANGE_SERVICE_MINUTES: Record<ElectionRemovalMediaT
   OTHER: 6,
 };
 
+export const DEFAULT_RELOCATION_SERVICE_MINUTES: Record<ElectionRemovalMediaType, number> = {
+  ACKO: 8,
+  BENCH: 8,
+  CITY_POSTER: 12,
+  MINI_TOWER: 15,
+  BANNER: 12,
+  PLOT: 12,
+  TOWER: 25,
+  OTHER: 15,
+};
+
 export const ELECTION_REMOVAL_MEDIA_LABELS: Record<ElectionRemovalMediaType, string> = {
   ACKO: 'Áčko',
   BENCH: 'Lavička',
@@ -98,6 +109,8 @@ export function calculateServiceMinutes(
   const table =
     operationType === 'BANNER_CHANGE'
       ? DEFAULT_BANNER_CHANGE_SERVICE_MINUTES
+      : operationType === 'RELOCATION'
+      ? DEFAULT_RELOCATION_SERVICE_MINUTES
       : DEFAULT_MEDIA_SERVICE_MINUTES;
 
   const baseMinutes = overrides?.[mediaType] ?? table[mediaType] ?? table.OTHER;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CrewInput, PlanningInput, PlanningProfile, PlanView } from '@/lib/field-planning/contracts';
 import { RouteMap } from './field-planning/RouteMap';
 import { PlanningProfileForm } from './field-planning/PlanningProfileForm';
+import { FieldTelemetryCard } from './field-planning/FieldTelemetryCard';
 import {
   Calendar,
   Clock,
@@ -71,6 +72,7 @@ export function WorkRoutePlanner({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [inputsChanged, setInputsChanged] = useState(false);
   const [acceptEstimated, setAcceptEstimated] = useState(false);
 
@@ -241,8 +243,30 @@ export function WorkRoutePlanner({
             <Settings2 size={16} className="text-slate-500" />
             <span>Nastavení depa</span>
           </button>
+          <button
+            onClick={() => setTelemetryOpen(!telemetryOpen)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition shadow-sm ${
+              telemetryOpen
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+            }`}
+          >
+            <Sparkles size={16} />
+            <span>AI Telemetrie norem</span>
+          </button>
         </div>
       </header>
+
+      {/* AI Telemetry & Calibration Section */}
+      {telemetryOpen && (
+        <div className="relative">
+          <FieldTelemetryCard
+            onProfileUpdated={() => {
+              void load();
+            }}
+          />
+        </div>
+      )}
 
       {/* Profile Settings Modal */}
       {loaded && !loaded.profile && (

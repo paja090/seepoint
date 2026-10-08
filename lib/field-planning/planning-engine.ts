@@ -191,10 +191,16 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       crewLoadSlots.set(crew.id, 0);
       crewLoadMediaType.set(crew.id, null);
     }
-    const newLoad = (crewLoadSlots.get(crew.id) ?? 0) + jobLoad;
+    const isRelocation = job.operationType === 'RELOCATION';
+    const isBannerChange = job.operationType === 'BANNER_CHANGE';
+    const newLoad = isRelocation || isBannerChange
+      ? (crewLoadSlots.get(crew.id) ?? 0)
+      : (crewLoadSlots.get(crew.id) ?? 0) + jobLoad;
     crewLoadSlots.set(crew.id, newLoad);
-    if (jobLoad > 0 && job.mediaType) {
+    if (newLoad > 0 && job.mediaType && !isRelocation && !isBannerChange) {
       crewLoadMediaType.set(crew.id, job.mediaType);
+    } else if (newLoad === 0) {
+      crewLoadMediaType.set(crew.id, null);
     }
     crew.stops.push({ jobId: job.id, workOrderId: job.parentWorkOrderId ?? (['NAVIGATION_POINT', 'ELECTION_REMOVAL_POINT'].includes(job.sourceType ?? '') ? '' : job.id),
       sourceType: job.sourceType, sourceId: job.sourceId, parentWorkOrderId: job.parentWorkOrderId,

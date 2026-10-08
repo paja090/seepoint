@@ -19,10 +19,13 @@ import { googleTravelProvider } from '@/lib/field-planning/travel';
 import {
   DEFAULT_MEDIA_SERVICE_MINUTES,
   DEFAULT_BANNER_CHANGE_SERVICE_MINUTES,
+  DEFAULT_RELOCATION_SERVICE_MINUTES,
+  calculateServiceMinutes,
   calculateMediaLoadSlots,
   DEFAULT_VEHICLE_CAPACITY_SLOTS,
   DEFAULT_WAREHOUSE_UNLOAD_MINUTES,
 } from './constants';
+import { detectOperationTypeFromText } from './kml-parser';
 import { plannerTransaction } from '@/lib/field-planning/service';
 import { zonedTime } from '@/lib/field-planning/profile';
 
@@ -37,26 +40,11 @@ export function convertElectionPointToJob(
   point: ElectionRemovalPoint,
   campaign: { id: string; name: string; targetDate: Date | null; createdAt: Date }
 ): PlanningJob {
-  const rawText = `${point.layerName || ''} ${point.mediaTypeRaw || ''} ${point.description || ''}`.toLowerCase();
-  const isBannerChange =
-    rawText.includes('placht') ||
-    rawText.includes('banner') ||
-    rawText.includes('prevleceni') ||
-    rawText.includes('reskin') ||
-    rawText.includes('prelep');
+  const rawText = `${point.layerName || ''} ${point.mediaTypeRaw || ''} ${point.description || ''}`;
+  const operationType = detectOperationTypeFromText(rawText);
 
-  const isRelocation =
-    rawText.includes('prevoz') ||
-    rawText.includes('premiste') ||
-    rawText.includes('relokac');
-
-  const operationType = isBannerChange ? 'BANNER_CHANGE' : isRelocation ? 'RELOCATION' : 'FULL_REMOVAL';
-
-  const defaultMinutes = isBannerChange
-    ? DEFAULT_BANNER_CHANGE_SERVICE_MINUTES[point.mediaType] ?? 8
-    : DEFAULT_MEDIA_SERVICE_MINUTES[point.mediaType] ?? 10;
-
-  const serviceMinutes = point.serviceMinutes ?? defaultMinutes;
+  const calculated = calculateServiceMinutes(point.mediaType, point.quantity, null, operationType);
+  const serviceMinutes = point.serviceMinutes ?? calculated.baseMinutes;
   const loadSlots = calculateMediaLoadSlots(point.mediaType, operationType, point.quantity);
 
   return {
@@ -223,12 +211,18 @@ export async function optimizeElectionRemovalRoutes(
       ? points.filter((p) => payload.selectedPointIds!.includes(p.id))
       : payload.filterMediaType && payload.filterMediaType !== 'ALL'
       ? points.filter((p) => {
-          const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`.toLowerCase();
-          const isBanner = rawText.includes('placht') || rawText.includes('banner');
+          const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
+          const op = detectOperationTypeFromText(rawText);
           if (payload.filterMediaType === 'BANNER_CHANGE') {
-            return isBanner;
+            return op === 'BANNER_CHANGE';
           }
-          if (isBanner) {
+          if (payload.filterMediaType === 'RELOCATION') {
+            return op === 'RELOCATION';
+          }
+          if (payload.filterMediaType === 'WAREHOUSE') {
+            return op === 'FULL_REMOVAL';
+          }
+          if (op === 'BANNER_CHANGE') {
             return false;
           }
           return p.mediaType === payload.filterMediaType;
