@@ -14,8 +14,12 @@ import {
   Map as MapIcon,
   Image as ImageIcon,
   Trash2,
+  Loader2,
 } from 'lucide-react';
-import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
+import {
+  ELECTION_REMOVAL_MEDIA_LABELS,
+  type ElectionRemovalOperationType,
+} from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
 import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
@@ -28,6 +32,9 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
   const router = useRouter();
   const [points, setPoints] = useState<ElectionRemovalPoint[]>(initialPoints);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [updatingPointId, setUpdatingPointId] = useState<string | null>(null);
+  const [selectedPointIds, setSelectedPointIds] = useState<Set<string>>(new Set());
+  const [isBatchUpdating, setIsBatchUpdating] = useState<boolean>(false);
 
   const [layerFilter, setLayerFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -70,12 +77,124 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
         throw new Error(data.error || 'Nepodařilo se smazat bod.');
       }
       setPoints((prev) => prev.filter((p) => p.id !== pointId));
+      setSelectedPointIds((prev) => {
+        const next = new Set(prev);
+        next.delete(pointId);
+        return next;
+      });
       router.refresh();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Chyba při mazání bodu.');
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const handleOperationChange = async (
+    pointId: string,
+    newOperation: ElectionRemovalOperationType,
+    dest?: string
+  ) => {
+    const pt = points.find((p) => p.id === pointId);
+    if (!pt) return;
+
+    let destination = dest;
+    if (newOperation === 'RELOCATION' && dest === undefined) {
+      const existingDest = parsePointMetadata(pt.description).relocationDestination || '';
+      const entered = prompt(
+        'Kam se má konstrukce převézt? (Cílová adresa nebo lokalita, volitelné):',
+        existingDest
+      );
+      if (entered === null) {
+        return; // Uživatel stiskl Storno
+      }
+      destination = entered;
+    }
+
+    setUpdatingPointId(pointId);
+    try {
+      const res = await fetch(`/api/election-removal/points/${pointId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operationType: newOperation,
+          relocationDestination: destination,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Nepodařilo se změnit typ operace.');
+      }
+      setPoints((prev) =>
+        prev.map((p) => (p.id === pointId ? (data.point as ElectionRemovalPoint) : p))
+      );
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při změně operace.');
+    } finally {
+      setUpdatingPointId(null);
+    }
+  };
+
+  const handleBatchOperation = async (newOperation: ElectionRemovalOperationType) => {
+    if (selectedPointIds.size === 0) return;
+
+    let destination: string | undefined = undefined;
+    if (newOperation === 'RELOCATION') {
+      const entered = prompt(
+        `Kam se mají konstrukce převézt? (Cílová adresa pro ${selectedPointIds.size} bodů, volitelné):`,
+        ''
+      );
+      if (entered === null) return;
+      destination = entered;
+    }
+
+    setIsBatchUpdating(true);
+    try {
+      const res = await fetch('/api/election-removal/points/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pointIds: Array.from(selectedPointIds),
+          operationType: newOperation,
+          relocationDestination: destination,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Nepodařilo se hromadně změnit operace.');
+      }
+      const updatedMap = new Map<string, ElectionRemovalPoint>(
+        (data.points as ElectionRemovalPoint[]).map((p) => [p.id, p])
+      );
+      setPoints((prev) => prev.map((p) => updatedMap.get(p.id) || p));
+      setSelectedPointIds(new Set());
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při hromadné změně operací.');
+    } finally {
+      setIsBatchUpdating(false);
+    }
+  };
+
+  const toggleSelectAll = (visiblePointIds: string[]) => {
+    if (selectedPointIds.size === visiblePointIds.length && visiblePointIds.length > 0) {
+      setSelectedPointIds(new Set());
+    } else {
+      setSelectedPointIds(new Set(visiblePointIds));
+    }
+  };
+
+  const toggleSelectPoint = (pointId: string) => {
+    setSelectedPointIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(pointId)) {
+        next.delete(pointId);
+      } else {
+        next.add(pointId);
+      }
+      return next;
+    });
   };
 
   // Extract distinct layers
@@ -233,6 +352,57 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
         </div>
       </div>
 
+      {/* Batch Actions Toolbar when items are selected */}
+      {selectedPointIds.size > 0 && (
+        <div className="bg-sky-50 border border-sky-200 p-3 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-sky-900">
+              Vybráno {selectedPointIds.size} z {filteredPoints.length} bodů
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedPointIds(new Set())}
+              className="text-slate-500 hover:text-slate-800 underline ml-2"
+            >
+              Zrušit výběr
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-slate-600 font-semibold">Změnit logistiku na:</span>
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchOperation('FULL_REMOVAL')}
+              className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg font-bold text-slate-700 shadow-sm transition disabled:opacity-50 flex items-center gap-1"
+            >
+              📦 Odvoz na sklad
+            </button>
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchOperation('RELOCATION')}
+              className="px-2.5 py-1 bg-purple-50 border border-purple-300 hover:bg-purple-100 rounded-lg font-bold text-purple-800 shadow-sm transition disabled:opacity-50 flex items-center gap-1"
+            >
+              🚚 Přímý převoz
+            </button>
+            <button
+              type="button"
+              disabled={isBatchUpdating}
+              onClick={() => handleBatchOperation('BANNER_CHANGE')}
+              className="px-2.5 py-1 bg-teal-50 border border-teal-300 hover:bg-teal-100 rounded-lg font-bold text-teal-800 shadow-sm transition disabled:opacity-50 flex items-center gap-1"
+            >
+              🎨 Pouze plachta
+            </button>
+            {isBatchUpdating && (
+              <span className="flex items-center gap-1 text-slate-500 font-medium ml-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                Ukládám...
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Map View */}
       {viewMode === 'MAP' ? (
         <div className="space-y-2">
@@ -249,6 +419,17 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
           <table className="w-full text-left text-xs">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider z-10">
               <tr>
+                <th className="py-2.5 px-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={
+                      filteredPoints.length > 0 && selectedPointIds.size === filteredPoints.length
+                    }
+                    onChange={() => toggleSelectAll(filteredPoints.map((p) => p.id))}
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                    title="Vybrat všechny filtrované body"
+                  />
+                </th>
                 <th className="py-2.5 px-3">#</th>
                 <th className="py-2.5 px-3">Název média a adresa</th>
                 <th className="py-2.5 px-3">Vrstva</th>
@@ -262,7 +443,7 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
             <tbody className="divide-y divide-slate-100">
               {filteredPoints.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-10 text-slate-400">
+                  <td colSpan={9} className="text-center py-10 text-slate-400">
                     Žádné body neodpovídají zvolenému filtru.
                   </td>
                 </tr>
@@ -272,7 +453,20 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
                   const cleanLayer = cleanLayerName(pt.layerName);
 
                   return (
-                    <tr key={pt.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr
+                      key={pt.id}
+                      className={`hover:bg-slate-50/60 transition-colors ${
+                        selectedPointIds.has(pt.id) ? 'bg-sky-50/40' : ''
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 w-8">
+                        <input
+                          type="checkbox"
+                          checked={selectedPointIds.has(pt.id)}
+                          onChange={() => toggleSelectPoint(pt.id)}
+                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">
                         {pt.plannedOrder || idx + 1}
                       </td>
@@ -308,31 +502,69 @@ export function CampaignPointsView({ points: initialPoints }: CampaignPointsView
                         {cleanLayer || '–'}
                       </td>
                       <td className="py-2.5 px-3">
-                        <div className="flex flex-col gap-1 items-start">
+                        <div className="flex flex-col gap-1.5 items-start">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
                             {ELECTION_REMOVAL_MEDIA_LABELS[pt.mediaType] || pt.mediaType}
                           </span>
                           {(() => {
                             const rawText = `${pt.layerName || ''} ${pt.label || ''} ${pt.description || ''}`;
                             const op = detectOperationTypeFromText(rawText);
-                            if (op === 'BANNER_CHANGE') {
-                              return (
-                                <span className="inline-flex items-center text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">
-                                  🎨 Jen plachta
-                                </span>
-                              );
-                            }
-                            if (op === 'RELOCATION') {
-                              return (
-                                <span className="inline-flex items-center text-[10px] font-bold text-purple-800 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">
-                                  🚚 Přímý převoz
-                                </span>
-                              );
-                            }
+                            const isUpdating = updatingPointId === pt.id;
+
                             return (
-                              <span className="inline-flex items-center text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
-                                📦 Na sklad
-                              </span>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1">
+                                  <select
+                                    value={op}
+                                    disabled={isUpdating}
+                                    onChange={(e) =>
+                                      handleOperationChange(
+                                        pt.id,
+                                        e.target.value as ElectionRemovalOperationType
+                                      )
+                                    }
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-md border cursor-pointer focus:outline-none transition shadow-sm ${
+                                      op === 'BANNER_CHANGE'
+                                        ? 'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100'
+                                        : op === 'RELOCATION'
+                                        ? 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100'
+                                        : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100'
+                                    } ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
+                                    title="Kliknutím přepnete logistiku bodu: Odvoz na sklad / Přímý převoz na jiné místo / Pouze výměna plachty"
+                                  >
+                                    <option value="FULL_REMOVAL">📦 Odvoz na sklad</option>
+                                    <option value="RELOCATION">🚚 Přímý převoz jinam</option>
+                                    <option value="BANNER_CHANGE">🎨 Pouze plachta</option>
+                                  </select>
+                                  {isUpdating && (
+                                    <Loader2 className="w-3 h-3 animate-spin text-sky-600" />
+                                  )}
+                                </div>
+
+                                {op === 'RELOCATION' && (
+                                  <div className="flex items-center gap-1 text-[10px] text-purple-800 font-medium max-w-[200px]">
+                                    <span className="truncate" title={meta.relocationDestination || 'Bez cílové adresy'}>
+                                      📍 {meta.relocationDestination ? meta.relocationDestination : 'Bez cílové adresy'}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const newDest = prompt(
+                                          'Zadejte novou cílovou adresu nebo stanoviště převozu:',
+                                          meta.relocationDestination || ''
+                                        );
+                                        if (newDest !== null) {
+                                          handleOperationChange(pt.id, 'RELOCATION', newDest);
+                                        }
+                                      }}
+                                      className="text-purple-600 hover:text-purple-900 font-bold underline shrink-0 cursor-pointer"
+                                      title="Upravit cílovou adresu"
+                                    >
+                                      Upravit
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             );
                           })()}
                         </div>

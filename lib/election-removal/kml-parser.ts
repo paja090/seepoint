@@ -148,19 +148,51 @@ export function resolveLayerMediaType(layerName: string): ElectionRemovalMediaTy
 
 /**
  * Detects whether an election removal placemark/layer is a full removal, banner change, or direct relocation.
+ * Explicit tags (e.g. [Operace: Odvoz na sklad] / [Operace: Převoz] / [Operace: Výměna plachty]) take absolute precedence.
  */
 export function detectOperationTypeFromText(text?: string | null): ElectionRemovalOperationType {
   if (!text) return 'FULL_REMOVAL';
   const normalized = normalizeForMatching(text);
+
+  // 1. Explicit tags take absolute precedence over underlying/imported text
+  if (
+    normalized.includes('operace: odvoz na sklad') ||
+    normalized.includes('operace: sklad') ||
+    normalized.includes('operace: demontaz') ||
+    normalized.includes('[full_removal]')
+  ) {
+    return 'FULL_REMOVAL';
+  }
+  if (
+    normalized.includes('operace: prevoz na jine misto') ||
+    normalized.includes('operace: prevoz') ||
+    normalized.includes('operace: premisteni') ||
+    normalized.includes('operace: relokace') ||
+    normalized.includes('[relocation]')
+  ) {
+    return 'RELOCATION';
+  }
+  if (
+    normalized.includes('operace: vymena plachty') ||
+    normalized.includes('operace: jen plachta') ||
+    normalized.includes('operace: plachta') ||
+    normalized.includes('[banner_change]')
+  ) {
+    return 'BANNER_CHANGE';
+  }
+
+  // 2. Heuristic detection from imported placemark/layer text
   if (
     normalized.includes('vymena placht') ||
     normalized.includes('vymeny placht') ||
+    normalized.includes('vymena plach') ||
     normalized.includes('jenom placht') ||
     normalized.includes('jen placht') ||
     normalized.includes('prevleceni') ||
     normalized.includes('reskin') ||
     normalized.includes('prelep') ||
-    normalized.includes('plachty')
+    normalized.includes('plachty') ||
+    normalized.includes('plachet')
   ) {
     return 'BANNER_CHANGE';
   }
@@ -173,6 +205,33 @@ export function detectOperationTypeFromText(text?: string | null): ElectionRemov
     return 'RELOCATION';
   }
   return 'FULL_REMOVAL';
+}
+
+/**
+ * Updates a point description by setting an explicit [Operace: ...] tag and optional relocation destination.
+ */
+export function setPointOperationTypeInDescription(
+  currentDescription: string | null | undefined,
+  operationType: ElectionRemovalOperationType,
+  relocationDestination?: string | null
+): string {
+  // Strip any existing [Operace: ...] and [Cíl převozu: ...] tags
+  let desc = (currentDescription || '')
+    .replace(/\[Operace:\s*[^\]]+\]\s*/gi, '')
+    .replace(/\[C[ií]l\s*p[rř]evozu:\s*[^\]]+\]\s*/gi, '')
+    .trim();
+
+  let tag = '[Operace: Odvoz na sklad]';
+  if (operationType === 'BANNER_CHANGE') {
+    tag = '[Operace: Výměna plachty]';
+  } else if (operationType === 'RELOCATION') {
+    const destPart = relocationDestination?.trim()
+      ? ` [Cíl převozu: ${relocationDestination.trim()}]`
+      : '';
+    tag = `[Operace: Převoz na jiné místo]${destPart}`;
+  }
+
+  return desc ? `${tag}\n${desc}` : tag;
 }
 
 /**
