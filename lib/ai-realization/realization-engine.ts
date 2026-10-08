@@ -439,6 +439,13 @@ export function determineRealizationNextBestActions(
   // Prioritize blockers:
   const missingGraphicsBlocker = blockers.find((b) => b.code === 'MISSING_GRAPHICS');
   if (missingGraphicsBlocker) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : context.offerId
+        ? `/offers/${context.offerId}`
+        : `/realization/${orderId}`;
+
     actions.push({
       id: `nba-${orderId}-graphics-request`,
       actionType: 'REQUEST_GRAPHICS',
@@ -446,7 +453,7 @@ export function determineRealizationNextBestActions(
       title: 'Vyžádat tiskové podklady',
       description: 'Zakázka čeká na dodání tiskových dat od klienta nebo grafika.',
       targetOrderId: orderId,
-      targetUrl: `/crm/orders/${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -454,6 +461,13 @@ export function determineRealizationNextBestActions(
 
   const unapprovedGraphicsBlocker = blockers.find((b) => b.code === 'GRAPHICS_NOT_APPROVED');
   if (unapprovedGraphicsBlocker) {
+    const targetUrl =
+      context.offerId
+        ? `/offers/${context.offerId}`
+        : context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/realization/${orderId}`;
+
     actions.push({
       id: `nba-${orderId}-graphics-approve`,
       actionType: 'APPROVE_GRAPHICS',
@@ -461,7 +475,7 @@ export function determineRealizationNextBestActions(
       title: 'Potvrdit schválení grafiky',
       description: 'Zajistěte potvrzení náhledu klientem pro uvolnění tiskových dat do výroby.',
       targetOrderId: orderId,
-      targetUrl: `/crm/orders/${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -492,7 +506,7 @@ export function determineRealizationNextBestActions(
       title: 'Posoudit změnu rozsahu nabídky',
       description: scopeChangeBlocker.message,
       targetOrderId: orderId,
-      targetUrl: `/crm/orders/${orderId}`,
+      targetUrl: `#changeset-review`,
       recommendedAt: new Date(),
     });
   }
@@ -529,6 +543,11 @@ export function determineRealizationNextBestActions(
 
   const missingPhotosBlocker = blockers.find((b) => b.code === 'MISSING_PHOTO_DOCUMENTATION');
   if (missingPhotosBlocker) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/realization/${orderId}`;
+
     actions.push({
       id: `nba-${orderId}-upload-photos`,
       actionType: 'UPLOAD_PHOTOS',
@@ -536,7 +555,7 @@ export function determineRealizationNextBestActions(
       title: 'Doplnit fotodokumentaci z terénu',
       description: 'Plochy jsou nainstalovány. Nahrajte kontrolní fotografie pro schválení a fakturaci.',
       targetOrderId: orderId,
-      targetUrl: `/realization/${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -544,6 +563,11 @@ export function determineRealizationNextBestActions(
 
   // If ready for billing:
   if (context.billingReadiness.isReady) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/clients/${context.clientId}`;
+
     actions.push({
       id: `nba-${orderId}-ready-billing`,
       actionType: 'READY_FOR_BILLING',
@@ -551,7 +575,7 @@ export function determineRealizationNextBestActions(
       title: 'Předat zakázku k fakturaci',
       description: 'Všechny podmínky realizace jsou splněny. Vystavte klientovi fakturu.',
       targetOrderId: orderId,
-      targetUrl: `/invoices/new?orderId=${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -721,6 +745,8 @@ export async function buildRealizationContext(
       offerTitle: crmOrder.offer?.title,
       offerAcceptedAt: crmOrder.offer?.acceptedAt || undefined,
       offerAcceptedBy: crmOrder.offer?.createdByUser?.name,
+      navigationOrderId: crmOrder.navigationOrder?.id,
+      pendingChangeSetId: crmOrder.navigationOrder?.changeSets?.[0]?.id,
       clientId: crmOrder.clientId,
       clientName: crmOrder.client.name,
       clientContactPerson: crmOrder.client.contactPerson || undefined,

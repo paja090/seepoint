@@ -910,4 +910,72 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
       )
     );
   });
+
+  /**
+   * SCENARIO P: RBAC access to AI realization module is restricted to ADMIN, MANAGER, and SALES, and denied to WORKER and TECHNICIAN.
+   */
+  it('Scenario P: realization module permission denies WORKER and TECHNICIAN and grants ADMIN and MANAGER', async () => {
+    const { canAccess } = await import('../lib/rbac.ts');
+    assert.equal(canAccess('ADMIN', 'realization'), true);
+    assert.equal(canAccess('MANAGER', 'realization'), true);
+    assert.equal(canAccess('SALES', 'realization'), true);
+    assert.equal(canAccess('WORKER', 'realization'), false, 'WORKER must NOT see AI realization');
+    assert.equal(canAccess('TECHNICIAN', 'realization'), false, 'TECHNICIAN must NOT see AI realization');
+    assert.equal(canAccess('VIEWER', 'realization'), false);
+    assert.equal(canAccess('ACCOUNTANT', 'realization'), false);
+  });
+
+  /**
+   * SCENARIO Q: determineRealizationNextBestActions never outputs dead /crm/orders/ or /invoices/ URLs
+   */
+  it('Scenario Q: Next best actions never produce dead /crm/orders/ or /invoices/ URLs', () => {
+    const contextWithScopeChange: RealizationContext = {
+      organizationId: TENANT_A,
+      orderId: 'crm-ord-nav-ff',
+      orderNumber: 'ZAK-2026-0001',
+      clientId: 'cli-ff',
+      clientName: 'Form Factory s.r.o.',
+      projectType: 'NAVIGATION',
+      navigationOrderId: 'nav-ord-ff',
+      offerId: 'off-ff',
+      status: 'FOTODOKUMENTACE',
+      campaign: {},
+      items: [],
+      tasks: [],
+      printJobs: [],
+      photos: [],
+      requirements: [],
+      blockers: [
+        {
+          code: 'SCOPE_CHANGE_PENDING',
+          severity: 'WARNING',
+          title: 'Změna nabídky čeká na posouzení',
+          message: 'K zakázce byl evidován změnový balíček.',
+          entityType: 'ORDER',
+          entityId: 'crm-ord-nav-ff',
+        },
+      ],
+      billingReadiness: {
+        isReady: false,
+        missingRequirements: [],
+        blockerCount: 1,
+        warningCount: 0,
+        currency: 'CZK',
+        explanation: 'Blocked',
+      },
+      overallPhase: 'PHOTO_DOCUMENTATION',
+      deadlineRisk: { riskLevel: 'LOW', estimatedRequiredDays: 0, isAtRisk: false, reason: '' },
+      hasPendingChangeSet: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const actions = determineRealizationNextBestActions(contextWithScopeChange);
+    assert.ok(actions.length > 0);
+    for (const action of actions) {
+      assert.ok(!action.targetUrl.startsWith('/crm/orders/'), `targetUrl must not be /crm/orders/ : ${action.targetUrl}`);
+      assert.ok(!action.targetUrl.startsWith('/invoices/'), `targetUrl must not be /invoices/ : ${action.targetUrl}`);
+    }
+    assert.equal(actions[0]?.targetUrl, '#changeset-review');
+  });
 });

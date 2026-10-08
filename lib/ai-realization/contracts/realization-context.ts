@@ -137,6 +137,8 @@ export type RealizationContext = {
   offerTitle?: string;
   offerAcceptedAt?: Date;
   offerAcceptedBy?: string;
+  navigationOrderId?: string;
+  pendingChangeSetId?: string;
   clientId: string;
   clientName: string;
   clientContactPerson?: string;

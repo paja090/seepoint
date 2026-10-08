@@ -155,7 +155,6 @@ const permissions: Record<AppRole, AppSection[]> = {
     'navigationDocumentation',
     'team',
     'printProduction',
-    'realization',
     'fieldSurvey',
     'electionRemoval',
   ],
@@ -169,7 +168,6 @@ const permissions: Record<AppRole, AppSection[]> = {
     'warehouse',
     'navigationProjects',
     'team',
-    'realization',
     'fieldSurvey',
     'electionRemoval',
   ],
@@ -181,7 +179,6 @@ const permissions: Record<AppRole, AppSection[]> = {
     'mySettlements',
     'workEntries',
     'team',
-    'realization',
   ],
   VIEWER: [
     'dashboard',

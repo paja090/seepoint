@@ -19,7 +19,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function RealizationDashboardPage() {
-  const user = await requirePageAccess('work');
+  const user = await requirePageAccess('realization');
   const organizationId = user.organizationId!;
   const profile = await getOrganizationRealizationProfile(organizationId);
 
