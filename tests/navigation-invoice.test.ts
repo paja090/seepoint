@@ -71,3 +71,47 @@ test('API ukládá neměnný doklad, přikládá jej a chrání samostatným bil
   assert.match(email, /'Idempotency-Key'/);
   assert.match(email, /multipart\/mixed/);
 });
+
+test('API podporuje doplnění položek, úpravu e-mailu a samostatný náhled dokladu před odesláním', () => {
+  const issueRoute = readFileSync(new URL('../app/api/navigation/orders/[id]/invoice/route.ts', import.meta.url), 'utf8');
+  const previewRoute = readFileSync(new URL('../app/api/navigation/orders/[id]/invoice/preview/route.ts', import.meta.url), 'utf8');
+
+  // Issue route supports custom items, email customization and draft without sending
+  assert.match(issueRoute, /customItems\?: Array/);
+  assert.match(issueRoute, /sendEmail === false/);
+  assert.match(issueRoute, /emailSubject = body\.subject\?\.trim\(\)/);
+  assert.match(issueRoute, /emailMessage = body\.message\?\.trim\(\)/);
+
+  // Preview route exists and has billing security and PDF generator
+  assert.match(previewRoute, /requireApiAccess\('billing', 'navigation'\)/);
+  assert.match(previewRoute, /createNavigationInvoicePdf/);
+  assert.match(previewRoute, /format'\) === 'pdf'/);
+  assert.match(previewRoute, /'Content-Type': 'application\/pdf'/);
+});
+
+test('API a UI poskytují akční chybová hlášení s přímým odkazem na řešení a rychlé doplnění', () => {
+  const issueRoute = readFileSync(new URL('../app/api/navigation/orders/[id]/invoice/route.ts', import.meta.url), 'utf8');
+  const detailView = readFileSync(new URL('../components/navigation/NavigationOrderDetailView.tsx', import.meta.url), 'utf8');
+  const modalComp = readFileSync(new URL('../components/settings/QuickCompanySettingsModal.tsx', import.meta.url), 'utf8');
+  const cardComp = readFileSync(new URL('../components/ui/ActionableResolutionCard.tsx', import.meta.url), 'utf8');
+
+  // Backend returns structured error with resolution
+  assert.match(issueRoute, /errorType: 'MISSING_INVOICE_DATA'/);
+  assert.match(issueRoute, /resolution: \{/);
+  assert.match(issueRoute, /url: hasSupplierIssue \? '\/settings\/company'/);
+
+  // Frontend integrates ActionableResolutionCard and QuickCompanySettingsModal
+  assert.match(detailView, /ActionableResolutionCard/);
+  assert.match(detailView, /QuickCompanySettingsModal/);
+  assert.match(detailView, /showCompanyModal/);
+  assert.match(detailView, /Rychle doplnit firemní údaje a vystavit fakturu/);
+
+  // QuickCompanySettingsModal saves to /api/settings/company
+  assert.match(modalComp, /\/api\/settings\/company/);
+  assert.match(modalComp, /PATCH/);
+
+  // Card component renders interactive primary/secondary action buttons
+  assert.match(cardComp, /primaryAction/);
+  assert.match(cardComp, /missingFields/);
+});
+

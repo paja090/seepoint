@@ -523,7 +523,7 @@ export function determineRealizationNextBestActions(
       title: 'Posoudit změnu rozsahu nabídky',
       description: scopeChangeBlocker.message,
       targetOrderId: orderId,
-      targetUrl: scopeChangeBlocker.resolutionUrl || `/realization/${orderId}#changeset-review`,
+      targetUrl: `#changeset-review`,
       recommendedAt: new Date(),
     });
   }

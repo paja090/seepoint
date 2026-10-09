@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
 import { createNavigationInvoicePdf, validateNavigationInvoiceParties, type NavigationInvoiceParty } from '@/lib/navigation/invoice-pdf';
@@ -99,10 +100,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     } else if (order.points.length > 0) {
       items = order.points.map((point) => ({
         description: point.label,
-        quantity: point.quantity,
+        quantity: Number(point.quantity),
         unit: 'ks',
         unitPrice: Number(point.unitPrice),
-        vatRate: defaultVatRate,
+        vatRate: Number(defaultVatRate),
       }));
     } else {
       items = [
@@ -110,8 +111,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           description: `Navigační kampaň – ${order.crmOrder.title}`,
           quantity: 1,
           unit: 'kpl',
-          unitPrice: Number(order.totalPrice || 0),
-          vatRate: defaultVatRate,
+          unitPrice: order.points.reduce((s, p) => s + Number(p.subtotal), 0),
+          vatRate: Number(defaultVatRate),
         },
       ];
     }
@@ -257,18 +258,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? body.customItems
       : order.points.map((p) => ({
           description: p.label,
-          quantity: p.quantity,
+          quantity: Number(p.quantity),
           unit: 'ks',
           unitPrice: Number(p.unitPrice),
-          vatRate: defaultVatRate,
+          vatRate: Number(defaultVatRate),
         }));
 
     const calculatedItems = rawItems.map((it) => {
       const quantity = Math.max(0.01, Number(it.quantity) || 1);
       const unitPrice = Math.max(0, Number(it.unitPrice) || 0);
-      const vatRate = typeof it.vatRate === 'number' ? it.vatRate : defaultVatRate;
+      const vatRate = typeof it.vatRate === 'number' ? it.vatRate : Number(defaultVatRate);
       const amount = Math.round(quantity * unitPrice * 100) / 100;
-      const { taxAmount: vatAmount, totalAmount } = invoiceVatAmounts(amount, vatRate);
+      const { taxAmount: vatAmount, totalAmount } = invoiceVatAmounts(new Prisma.Decimal(amount), vatRate);
       return {
         description: it.description || 'Položka faktury',
         quantity,
@@ -307,7 +308,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         totalAmount,
       });
 
-      return new Response(pdfBuffer, {
+      return new Response(new Uint8Array(pdfBuffer), {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `inline; filename="nahled-faktury-${invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '-')}.pdf"`,
