@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { issueUserToken } from '@/lib/auth';
-import { platformPrisma } from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { sendActivationEmail, sendPasswordResetEmail } from '@/lib/email';
 import { forgotPasswordResponse } from '@/lib/auth-responses';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
@@ -14,8 +14,7 @@ export async function POST(request: Request) {
   const limited = await enforceRateLimit(request, hashRateLimitIdentity(email ?? 'missing-email'), rateLimitPolicies.forgotPassword);
   if (limited) return limited;
 
-  // Use platformPrisma for authentication lookup across all tenants
-  const user = email ? await platformPrisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } }) : null;
+  const user = email ? await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } }) : null;
   if (user && (user.status === 'ACTIVE' || user.status === 'INVITED')) {
     try {
       const isInvited = user.status === 'INVITED';

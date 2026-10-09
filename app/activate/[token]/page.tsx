@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import { AuthForm } from '@/components/AuthForm';
 import { hashToken } from '@/lib/auth';
-import { platformPrisma } from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { isTokenUsable } from '@/lib/token-policy';
 
 export default async function Page({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const record = await platformPrisma.userToken.findUnique({
+  const record = await prisma.userToken.findUnique({
     where: { tokenHash: hashToken(token) },
   });
 
