@@ -22,6 +22,7 @@ import {
   ELECTION_REMOVAL_MEDIA_LABELS,
 } from '@/lib/election-removal/constants';
 import type { KmlParseResult, ParsedKmlLayer, ParsedKmlPoint } from '@/lib/election-removal/kml-parser';
+import { ElectionRemovalMap, type ElectionRemovalMapPoint } from './ElectionRemovalMap';
 
 interface LayerMappingState {
   layerName: string;
@@ -177,6 +178,22 @@ export function KmlImportWizard() {
       return matchesLayer && matchesSearch;
     });
   }, [adjustedPoints, selectedLayerFilter, searchTerm]);
+
+  // Points mapped for interactive Google Map preview
+  const mapPoints: ElectionRemovalMapPoint[] = useMemo(() => {
+    return adjustedPoints
+      .filter((pt) => pt.isValid)
+      .map((pt, idx) => ({
+        id: pt.id,
+        label: pt.name || `Bod ${idx + 1}`,
+        latitude: pt.latitude,
+        longitude: pt.longitude,
+        status: 'PENDING',
+        mediaType: pt.mediaType,
+        layerName: pt.layerName,
+        description: pt.description,
+      }));
+  }, [adjustedPoints]);
 
   // Aggregate stats
   const aggregateStats = useMemo(() => {
@@ -527,6 +544,25 @@ export function KmlImportWizard() {
                 />
               </div>
             </div>
+
+            {/* Interactive Google Map preview of KML points */}
+            {mapPoints.length > 0 && (
+              <div className="rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                <div className="p-2.5 bg-slate-900 text-white flex items-center justify-between text-xs font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-sky-400" />
+                    Interaktivní Google mapa importovaných bodů ({mapPoints.length} bodů)
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-300">
+                    Satelitní / Běžná mapa s barevnými špendlíky
+                  </span>
+                </div>
+                <ElectionRemovalMap
+                  points={mapPoints}
+                  height="420px"
+                />
+              </div>
+            )}
 
             <div className="overflow-x-auto max-h-96 overflow-y-auto border border-slate-100 rounded-xl">
               <table className="w-full text-left text-xs">

@@ -11,7 +11,7 @@ import {
   ArrowRight,
   Plus,
   Route,
-  Vote,
+  Truck,
 } from 'lucide-react';
 import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
 
@@ -57,11 +57,11 @@ export default async function ElectionRemovalPage() {
               </span>
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mt-1 flex items-center gap-2">
-              <Vote className="w-7 h-7 text-sky-600" />
-              Volební demontáže
+              <Truck className="w-7 h-7 text-sky-600" />
+              Přesuny a deinstalace
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              Plánování, rozdělení do tras a realizace demontáže volebních reklamních nosičů po kampaních.
+              Plánování přejezdů, přesunů nosičů, výměn plachet a deinstalací – přímo v interaktivní mapě nebo importem z KML.
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export default async function ElectionRemovalPage() {
                 className="btn btn-primary text-sm font-semibold inline-flex items-center gap-1.5 shadow-sm"
               >
                 <Plus className="w-4 h-4" />
-                <span>Nová akce (Import KML)</span>
+                <span>Nová akce (Mapa / KML)</span>
               </Link>
             </div>
           )}
@@ -83,15 +83,15 @@ export default async function ElectionRemovalPage() {
           <div className="card p-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Celkem kampaní
+                Celkem akcí
               </p>
-              <Vote className="w-5 h-5 text-sky-600" />
+              <Truck className="w-5 h-5 text-sky-600" />
             </div>
             <p className="text-2xl font-bold text-slate-900 mt-2">
               {totalCampaigns}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Registrované demontážní akce
+              Registrované přesuny a demontáže
             </p>
           </div>
 
@@ -130,14 +130,14 @@ export default async function ElectionRemovalPage() {
         {campaigns.length === 0 ? (
           <div className="card text-center py-16 px-4 space-y-4 border-dashed border-2 border-slate-200">
             <div className="w-16 h-16 rounded-full bg-sky-50 text-sky-600 mx-auto flex items-center justify-center">
-              <Vote className="w-8 h-8" />
+              <Truck className="w-8 h-8" />
             </div>
             <div className="space-y-1">
               <h2 className="text-lg font-bold text-slate-900">
-                Zatím nebyla vytvořena žádná volební demontáž
+                Zatím nebyl vytvořen žádný plán přesunů ani deinstalace
               </h2>
               <p className="text-sm text-slate-500 max-w-md mx-auto">
-                Nahrajte KML export z Google My Maps, zkontrolujte vrstvy médií a naplánujte demontážní trasy pro vaše týmy.
+                Naplánujte zastávky a přejezdy přímo klikáním do velké mapy, nebo nahrajte KML export z Google My Maps pro rozdělení do tras.
               </p>
             </div>
             <Link
@@ -145,13 +145,13 @@ export default async function ElectionRemovalPage() {
               className="btn btn-primary text-sm font-semibold inline-flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span>Založit první kampaň z KML</span>
+              <span>Naplánovat novou akci (Mapa / KML)</span>
             </Link>
           </div>
         ) : (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-slate-900">
-              Přehled kampaní
+              Přehled akcí a výjezdů
             </h2>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

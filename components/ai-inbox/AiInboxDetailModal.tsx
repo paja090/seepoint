@@ -35,7 +35,9 @@ import {
   ArrowUpRight,
   Phone,
   Mail,
+  Eye,
 } from 'lucide-react';
+import { BrandedEmailComposerModal } from '@/components/email/BrandedEmailComposerModal';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxActionStatus, AiInboxActionType, AiInboxAnalysisResult } from '@/lib/ai-inbox/types';
 import type { CommercialRequest, DatesClarity } from '@/lib/ai-commercial/contracts/commercial-request';
@@ -114,6 +116,9 @@ export function AiInboxDetailModal({
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [replyText, setReplyText] = useState(message.suggestedReply || '');
+  const [replySubject, setReplySubject] = useState(`Re: ${message.subject}`);
+  const [replyRecipient, setReplyRecipient] = useState(message.fromEmail);
+  const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [replyCopied, setReplyCopied] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [viewHtml, setViewHtml] = useState(false);
@@ -442,17 +447,19 @@ export function AiInboxDetailModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: message.fromEmail,
-          subject: `Re: ${message.subject}`,
-          message: replyText,
+          to: replyRecipient.trim() || message.fromEmail,
+          subject: replySubject.trim() || `Re: ${message.subject}`,
+          message: replyText.trim(),
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Odeslání odpovědi selhalo.');
       setFeedback({ type: 'success', message: 'Odpověď byla úspěšně odeslána a zapsána do komunikace klienta.' });
+      setShowReplyComposer(false);
       onActionComplete();
     } catch (err) {
       setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba odeslání' });
+      throw err;
     } finally {
       setIsSendingReply(false);
     }
@@ -1462,6 +1469,14 @@ export function AiInboxDetailModal({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setShowReplyComposer(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-800 hover:bg-sky-100 transition"
+                  >
+                    <Eye size={12} />
+                    <span>Náhled a editor e-mailu</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={copyReplyToClipboard}
                     className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 font-medium"
                   >
@@ -1481,23 +1496,53 @@ export function AiInboxDetailModal({
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 <span className="text-[11px] text-slate-500">
-                  Odpověď bude odeslána na: <strong>{message.fromEmail}</strong>
+                  Odpověď bude odeslána na: <strong>{replyRecipient}</strong>
                 </span>
 
-                <button
-                  type="button"
-                  onClick={sendReply}
-                  disabled={isSendingReply || !replyText.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition"
-                >
-                  <Send size={13} />
-                  <span>{isSendingReply ? 'Odesílám…' : 'Odeslat odpověď'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReplyComposer(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    <Eye size={13} />
+                    <span>Zkontrolovat vzhled</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={sendReply}
+                    disabled={isSendingReply || !replyText.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition"
+                  >
+                    <Send size={13} />
+                    <span>{isSendingReply ? 'Odesílám…' : 'Odeslat odpověď'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {showReplyComposer && (
+        <BrandedEmailComposerModal
+          open={showReplyComposer}
+          onClose={() => setShowReplyComposer(false)}
+          title="Odpověď na e-mail klienta"
+          subtitle={`Odpověď pro ${message.fromName || message.fromEmail} k původní zprávě`}
+          recipientEmail={replyRecipient}
+          onRecipientEmailChange={setReplyRecipient}
+          subject={replySubject}
+          onSubjectChange={setReplySubject}
+          message={replyText}
+          onMessageChange={setReplyText}
+          badgeLabel="AI Inbox"
+          submitLabel="Odeslat odpověď klientovi"
+          sendingLabel="Odesílám odpověď…"
+          busy={isSendingReply}
+          onSubmit={sendReply}
+        />
+      )}
     </div>
   );
 }

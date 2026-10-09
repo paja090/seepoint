@@ -17,7 +17,7 @@ export function OfferSendControl({ offerId, canSend, emailPreview, initialMessag
   const alreadySent = status === 'SENT';
   const canDeliver = status === 'DRAFT' || status === 'SENT';
 
-  async function send() {
+  async function send(): Promise<boolean> {
     setBusy(true);
     setMessage('');
     let sent = false;
@@ -39,6 +39,7 @@ export function OfferSendControl({ offerId, canSend, emailPreview, initialMessag
       if (sent) router.refresh();
       setBusy(false);
     }
+    return sent;
   }
 
   async function createPublicLink() {
@@ -81,7 +82,23 @@ export function OfferSendControl({ offerId, canSend, emailPreview, initialMessag
       {publicUrl && <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Veřejný klientský odkaz</p><a className="mt-1 block break-all text-sm text-sky-800 underline" href={publicUrl} rel="noreferrer" target="_blank">{publicUrl}</a><button className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sky-800" onClick={() => void navigator.clipboard.writeText(publicUrl)} type="button"><Copy aria-hidden="true" size={15} />Kopírovat odkaz</button></div>}
       <p className="mt-3 text-center text-xs text-slate-400">Odkaz obsahuje bezpečný token a lze jej kdykoli vygenerovat znovu.</p>
       {message && <p className="mt-3 text-sm text-amber-700" role="status">{message}</p>}
-      {previewOpen ? <OfferEmailPreviewDialog data={emailPreview} message={emailMessage} onClose={() => setPreviewOpen(false)} onMessageChange={setEmailMessage} onSubjectChange={setEmailSubject} subject={emailSubject} /> : null}
+      {previewOpen ? (
+        <OfferEmailPreviewDialog
+          canSend={canSend}
+          data={emailPreview}
+          message={emailMessage}
+          onClose={() => setPreviewOpen(false)}
+          onMessageChange={setEmailMessage}
+          onSend={() => {
+            void send().then((sent) => {
+              if (sent) setPreviewOpen(false);
+            });
+          }}
+          onSubjectChange={setEmailSubject}
+          sending={busy}
+          subject={emailSubject}
+        />
+      ) : null}
     </section>
   );
 }

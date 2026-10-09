@@ -29,6 +29,7 @@ import {
   Mail,
   Sparkles,
   Workflow,
+  Truck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -61,7 +62,8 @@ export type AppNavIcon =
   | 'printer'
   | 'mail'
   | 'sparkles'
-  | 'workflow';
+  | 'workflow'
+  | 'truck';
 
 export const navigationIcons = {
   badgeDollarSign: BadgeDollarSign,
@@ -71,6 +73,7 @@ export const navigationIcons = {
   calendarRange: CalendarRange,
   camera: Camera,
   car: Car,
+  truck: Truck,
   clipboardList: ClipboardList,
   clipboardCheck: ClipboardCheck,
   fileText: FileText,
