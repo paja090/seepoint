@@ -88,11 +88,13 @@ export function AccountAdmin({
       });
       const data = await res.json();
       setBusy(false);
+      const targetUrl = data.resetUrl || data.activationUrl;
       setMsg(
         data.error ??
           data.warning ??
-          (data.activationUrl
-            ? `✉️ Pozvánka odeslána! (Testovací odkaz: ${data.activationUrl})`
+          data.message ??
+          (targetUrl
+            ? `✉️ Odkaz odeslán e-mailem! (${targetUrl})`
             : 'Změna účtu byla uložena.')
       );
       if (res.ok) router.refresh();
@@ -191,16 +193,27 @@ export function AccountAdmin({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {status === 'INVITED' && (
+              {status === 'INVITED' ? (
                 <button
                   disabled={busy}
                   className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition active:scale-95"
                   onClick={() => act('invite')}
+                  title="Znovu odeslat pozvánku pro aktivaci účtu"
                 >
                   <Mail size={14} />
                   <span>Odeslat novou pozvánku</span>
                 </button>
-              )}
+              ) : status === 'ACTIVE' ? (
+                <button
+                  disabled={busy}
+                  className="flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900 hover:bg-sky-100 transition active:scale-95"
+                  onClick={() => act('sendPasswordReset')}
+                  title="Odeslat zaměstnanci e-mailem odkaz pro nastavení nového hesla"
+                >
+                  <Mail size={14} />
+                  <span>Odeslat odkaz pro nové heslo</span>
+                </button>
+              ) : null}
 
               {status === 'SUSPENDED' ? (
                 <button

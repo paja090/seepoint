@@ -39,8 +39,7 @@ export async function POST(request: Request) {
   if (!record || !isTokenUsable(record)) {
     return NextResponse.json({ error: 'Odkaz je neplatný nebo vypršel.' }, { status: 400 });
   }
-  const expectedType = body.purpose === 'activation' ? 'ACTIVATION' : 'PASSWORD_RESET';
-  if (record.type !== expectedType) {
+  if (record.type !== 'ACTIVATION' && record.type !== 'PASSWORD_RESET') {
     return NextResponse.json({ error: 'Odkaz je neplatný nebo vypršel.' }, { status: 400 });
   }
 
@@ -50,12 +49,12 @@ export async function POST(request: Request) {
         select: { organizationId: true, role: true, acceptedAt: true, revokedAt: true, expiresAt: true },
       })
     : null;
-  if (record.type === 'ACTIVATION' && (!activationInvitation || activationInvitation.acceptedAt || activationInvitation.revokedAt || activationInvitation.expiresAt <= new Date())) {
+  if (record.type === 'ACTIVATION' && activationInvitation && (activationInvitation.acceptedAt || activationInvitation.revokedAt || activationInvitation.expiresAt <= new Date())) {
     return NextResponse.json({ error: 'Odkaz je neplatný nebo vypršel.' }, { status: 400 });
   }
   const membership = activationInvitation
     ? record.user.organizationMemberships.find((item) => item.organizationId === activationInvitation.organizationId)
-    : record.user.organizationMemberships.find((item) => item.isActive);
+    : (record.user.organizationMemberships.find((item) => item.isActive) ?? record.user.organizationMemberships[0]);
   if (!membership) return NextResponse.json({ error: 'Pozvánka není přiřazena k aktivní organizaci.' }, { status: 400 });
   enterTenantContext({ organizationId: membership.organizationId, userId: record.userId, source: 'session' });
 
@@ -89,15 +88,22 @@ export async function POST(request: Request) {
       data: { isActive: true },
     });
 
-    if (record.type === 'ACTIVATION' && activationInvitation) {
-      await transaction.organizationMember.update({
-        where: { organizationId_userId: { organizationId: activationInvitation.organizationId, userId: record.userId } },
-        data: { isActive: true },
-      });
-      if (activationInvitation.role === 'OWNER') {
-        await transaction.organizationOnboarding.updateMany({
-          where: { organizationId: activationInvitation.organizationId },
-          data: { ownerCompletedAt: new Date(), currentStep: 'SETTINGS' },
+    if (record.type === 'ACTIVATION') {
+      if (activationInvitation) {
+        await transaction.organizationMember.update({
+          where: { organizationId_userId: { organizationId: activationInvitation.organizationId, userId: record.userId } },
+          data: { isActive: true },
+        });
+        if (activationInvitation.role === 'OWNER') {
+          await transaction.organizationOnboarding.updateMany({
+            where: { organizationId: activationInvitation.organizationId },
+            data: { ownerCompletedAt: new Date(), currentStep: 'SETTINGS' },
+          });
+        }
+      } else {
+        await transaction.organizationMember.updateMany({
+          where: { userId: record.userId },
+          data: { isActive: true },
         });
       }
     }

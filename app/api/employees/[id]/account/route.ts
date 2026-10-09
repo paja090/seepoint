@@ -5,13 +5,13 @@ import { canAssignOrganizationRole, canManageOrganizationMember, effectiveOrgani
 import { audit } from '@/lib/audit';
 import { getCurrentUser, hashPassword, issueUserToken } from '@/lib/auth';
 import { platformPrisma, prisma } from '@/lib/db';
-import { ensureEmailConfigured, sendActivationEmail } from '@/lib/email';
+import { ensureEmailConfigured, sendActivationEmail, sendPasswordResetEmail } from '@/lib/email';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { normalizeAuthEmail, temporaryPasswordError } from '@/lib/auth-onboarding';
 import { getAppUrl } from '@/lib/app-url';
 
-type AccountInput = { action?: 'enableAccess' | 'invite' | 'setTemporaryPassword' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[]; temporaryPassword?: string; temporaryPasswordConfirmation?: string };
+type AccountInput = { action?: 'enableAccess' | 'invite' | 'sendPasswordReset' | 'setTemporaryPassword' | 'suspend' | 'restore' | 'role'; role?: Role; roles?: Role[]; temporaryPassword?: string; temporaryPasswordConfirmation?: string };
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const actor = await requireApiAccess('employees');
@@ -90,19 +90,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Účet vlastníka organizace nelze pozastavit ani změnit z karty zaměstnance.' }, { status: 409 });
   }
 
-  if (body.action === 'invite') {
+  if (body.action === 'invite' || body.action === 'sendPasswordReset') {
     const limited = await enforceRateLimit(request, hashRateLimitIdentity(target.id), rateLimitPolicies.resendInvitation);
     if (limited) return limited;
-    if (target.status !== 'INVITED') return NextResponse.json({ error: 'Novou pozvánku lze poslat pouze účtu ve stavu INVITED.' }, { status: 400 });
     ensureEmailConfigured();
-    const token = await issueUserToken(target.id, 'ACTIVATION', 48); const url = getAppUrl(request, `/activate/${token}`);
-    const delivery = await sendActivationEmail(target.email, url);
+    const isInvited = target.status === 'INVITED';
+    const tokenType = isInvited && body.action !== 'sendPasswordReset' ? 'ACTIVATION' : 'PASSWORD_RESET';
+    const token = await issueUserToken(target.id, tokenType, 48);
+    const path = tokenType === 'ACTIVATION' ? `/activate/${token}` : `/reset-password/${token}`;
+    const url = getAppUrl(request, path);
+    const delivery = tokenType === 'ACTIVATION' ? await sendActivationEmail(target.email, url) : await sendPasswordResetEmail(target.email, url);
     if (delivery.status === 'sent') await audit('INVITATION_RESENT', target.id, actor.id);
     const exposeActivationUrl = process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV !== 'production';
     return NextResponse.json({
       ok: true,
-      ...(delivery.status === 'skipped' ? { warning: 'Preview: nová pozvánka byla připravena, ale e-mail nebyl odeslán. Použijte zobrazený aktivační odkaz.' } : {}),
-      ...(exposeActivationUrl ? { activationUrl: url } : {}),
+      message: tokenType === 'ACTIVATION' ? 'Nová pozvánka byla odeslána na e-mail zaměstnance.' : 'Odkaz pro nastavení hesla byl odeslán na e-mail zaměstnance.',
+      ...(delivery.status === 'skipped' ? { warning: 'Preview: odkaz byl připraven, ale e-mail nebyl odeslán. Použijte zobrazený odkaz.' } : {}),
+      ...(exposeActivationUrl ? { activationUrl: url, resetUrl: url } : {}),
     });
   }
 
