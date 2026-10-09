@@ -12,7 +12,7 @@ test('Field Planning AI Telemetry: Labels defined for all standard field work ty
   assert.ok(WORK_TYPE_LABELS.DEINSTALLATION.includes('Demontáž'));
   assert.ok(WORK_TYPE_LABELS.REINSTALLATION.includes('Přemontáž'));
   assert.ok(WORK_TYPE_LABELS.NAVIGATION_INSTALLATION.includes('navigačních'));
-  assert.ok(WORK_TYPE_LABELS.ELECTION_REMOVAL.includes('Volební'));
+  assert.ok(WORK_TYPE_LABELS.ELECTION_REMOVAL.includes('Přesuny') || WORK_TYPE_LABELS.ELECTION_REMOVAL.includes('Volební'));
 });
 
 test('Field Planning AI Telemetry: Rounds service minutes to sensible operational increments', () => {

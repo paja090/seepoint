@@ -13,7 +13,7 @@ export const WORK_TYPE_LABELS: Record<string, string> = {
   CHECK: 'Kontrola a pasportizace',
   TRANSPORT: 'Doprava materiálu na stavbu',
   NAVIGATION_INSTALLATION: 'Instalace navigačních cedulí',
-  ELECTION_REMOVAL: 'Volební demontáže a svozy',
+  ELECTION_REMOVAL: 'Přesuny, svozy a deinstalace',
   OTHER: 'Ostatní terénní práce',
 };
 

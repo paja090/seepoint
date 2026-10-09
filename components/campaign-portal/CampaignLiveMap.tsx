@@ -1,9 +1,11 @@
 'use client';
 
-import type { Map as LeafletMap } from 'leaflet';
-import { useEffect, useRef } from 'react';
+import type { Map as LeafletMap, TileLayer as LeafletTileLayer } from 'leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import type { OfferItemView } from '@/lib/offers/view-model';
 import { getPointPinColor } from '@/lib/offers/navigation-carrier-types';
+import { getGoogleMapsRouteUrl } from '@/lib/navigation-documentation-export';
 
 export interface NavigationMapPointInput {
   id: string;
@@ -95,6 +97,8 @@ function formatDistance(point: NavigationMapPointInput): string {
 export function CampaignLiveMap({ items = [], navigationPoints = [], target = null, onSelectCarrier, onSelectNavigationPoint }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const tileLayerRef = useRef<LeafletTileLayer | null>(null);
+  const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
 
   const isNavigation = navigationPoints.length > 0;
 
@@ -113,6 +117,30 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
   const hasAnyPoints = isNavigation
     ? validNavPoints.length > 0 || (target && typeof target.latitude === 'number' && typeof target.longitude === 'number')
     : pointsWithGps.length > 0;
+
+  const allRouteCoords = isNavigation
+    ? [
+        ...validNavPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+        ...(target && typeof target.latitude === 'number' && typeof target.longitude === 'number'
+          ? [{ latitude: target.latitude, longitude: target.longitude }]
+          : []),
+      ]
+    : pointsWithGps.map((i) => ({
+        latitude: i.surface?.carrier?.latitude,
+        longitude: i.surface?.carrier?.longitude,
+      }));
+
+  const googleMapsRouteUrl = getGoogleMapsRouteUrl(allRouteCoords);
+
+  // Switch Google Maps tile layer dynamically when user clicks layer switcher
+  useEffect(() => {
+    if (!tileLayerRef.current) return;
+    const url =
+      mapType === 'satellite'
+        ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+    tileLayerRef.current.setUrl(url);
+  }, [mapType]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -138,12 +166,13 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        tileLayerRef.current = null;
       }
 
       // Empty campaigns do not imply a location for the organization.
-      let centerLat = 20;
-      let centerLng = 0;
-      let zoom = 2;
+      let centerLat = 49.82;
+      let centerLng = 15.48;
+      let zoom = 8;
 
       if (isNavigation && validNavPoints.length > 0) {
         zoom = 12;
@@ -163,14 +192,21 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         center: [centerLat, centerLng],
         zoom,
         zoomControl: true,
-        attributionControl: false,
+        attributionControl: true,
       });
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd',
+      // Google Maps Tile Layer (no browser API key needed, never 403 blocked)
+      const tileUrl =
+        mapType === 'satellite'
+          ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+          : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+
+      const tileLayer = L.tileLayer(tileUrl, {
+        maxZoom: 20,
+        attribution: '&copy; Google Maps',
       }).addTo(map);
 
+      tileLayerRef.current = tileLayer;
       mapInstanceRef.current = map;
 
       const bounds = L.latLngBounds([]);
@@ -206,7 +242,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         });
 
         const targetPopup = `
-          <div style="font-family: sans-serif; min-width: 200px; max-width: 260px;">
+          <div style="font-family: sans-serif; min-width: 220px; max-width: 280px; padding: 2px;">
             <div style="font-size: 10px; font-weight: 800; color: #ef4444; text-transform: uppercase; letter-spacing: 0.05em;">
               🎯 CÍL NAVIGACE
             </div>
@@ -216,6 +252,11 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
             ${target.address ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">${target.address}</div>` : ''}
             <div style="margin-top: 6px; padding: 3px 8px; background: #fef2f2; border: 1px solid #fee2e2; border-radius: 6px; font-size: 10px; font-weight: 700; color: #991b1b; display: inline-block;">
               Cílová provozovna
+            </div>
+            <div style="margin-top: 8px; border-top: 1px solid #f1f5f9; padding-top: 6px;">
+              <a href="https://www.google.com/maps/dir/?api=1&destination=${target.latitude},${target.longitude}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px; background: #ef4444; color: #ffffff; border-radius: 8px; font-size: 11px; font-weight: 700; text-decoration: none;">
+                Navigovat do cíle v Google Maps ↗
+              </a>
             </div>
           </div>
         `;
@@ -266,8 +307,8 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
           const variantBadge = normalizedVariant ? ` · ${normalizedVariant}` : '';
 
           const popupContent = `
-            <div style="font-family: sans-serif; min-width: 220px; max-width: 280px;">
-              ${photo ? `<img src="${photo}" style="width: 100%; height: 115px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0;" />` : ''}
+            <div style="font-family: sans-serif; min-width: 230px; max-width: 290px; padding: 2px;">
+              ${photo ? `<img src="${photo}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0;" />` : ''}
               <div style="font-size: 10px; font-weight: 800; color: #009EE2; text-transform: uppercase;">
                 ${point.pillarNumber ? `SLOUP VO ${point.pillarNumber}` : `BOD ${index + 1}`} · ${point.navigationType || 'SMĚROVÁ TABULE'}${variantBadge}
               </div>
@@ -281,6 +322,11 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
               <div style="margin-top: 6px; padding: 3px 6px; background: ${isInstalled ? '#ecfdf5' : '#f0f9ff'}; border: 1px solid ${isInstalled ? '#a7f3d0' : '#bae6fd'}; border-radius: 6px; font-size: 10px; font-weight: 700; color: ${isInstalled ? '#065f46' : '#0369a1'}; display: inline-block;">
                 ${isInstalled ? '✓ Osazeno na sloupu VO' : '🧭 Schválené umístění VO'}
               </div>
+              <div style="margin-top: 8px; border-top: 1px solid #f1f5f9; padding-top: 6px;">
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px; background: #0284c7; color: #ffffff; border-radius: 8px; font-size: 11px; font-weight: 700; text-decoration: none;">
+                  Navigovat k bodu v Google Maps ↗
+                </a>
+              </div>
             </div>
           `;
 
@@ -293,6 +339,20 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
             });
           }
         });
+
+        // Connecting Route Line between points and target
+        const routeCoords: [number, number][] = validNavPoints.map((p) => [p.latitude, p.longitude]);
+        if (target && typeof target.latitude === 'number' && typeof target.longitude === 'number') {
+          routeCoords.push([target.latitude, target.longitude]);
+        }
+        if (routeCoords.length > 1) {
+          L.polyline(routeCoords, {
+            color: '#0284c7',
+            weight: 3.5,
+            dashArray: '6, 6',
+            opacity: 0.85,
+          }).addTo(map);
+        }
       } else {
         // Standard OOH Carriers
         pointsWithGps.forEach((item, index) => {
@@ -330,8 +390,8 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
           });
 
           const popupContent = `
-            <div style="font-family: sans-serif; min-width: 200px; max-width: 260px;">
-              ${photo ? `<img src="${photo}" style="width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
+            <div style="font-family: sans-serif; min-width: 220px; max-width: 280px; padding: 2px;">
+              ${photo ? `<img src="${photo}" style="width: 100%; height: 115px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />` : ''}
               <div style="font-size: 10px; font-weight: 800; color: #009EE2; text-transform: uppercase;">
                 ${carrier.code || 'NOSIČ'} · ${item.surface.mediaType || 'Plocha'}
               </div>
@@ -343,6 +403,11 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
               </div>
               <div style="margin-top: 6px; padding: 3px 6px; background: #ecfdf5; border-radius: 6px; font-size: 10px; font-weight: 700; color: #065f46; display: inline-block;">
                 ✓ Vylepeno & Ověřeno
+              </div>
+              <div style="margin-top: 8px; border-top: 1px solid #f1f5f9; padding-top: 6px;">
+                <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 10px; background: #0284c7; color: #ffffff; border-radius: 8px; font-size: 11px; font-weight: 700; text-decoration: none;">
+                  Zobrazit v Google Maps ↗
+                </a>
               </div>
             </div>
           `;
@@ -371,13 +436,54 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        tileLayerRef.current = null;
       }
     };
   }, [items, navigationPoints, target, isNavigation]);
 
   return (
-    <div className="relative w-full h-[400px] md:h-[480px] rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm">
-      <div ref={mapContainerRef} className="w-full h-full z-0" />
+    <div className="relative w-full rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm bg-slate-900">
+      {/* Top Map Toolbar: Layer Switcher & Route Export */}
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        {/* Layer toggle buttons */}
+        <div className="pointer-events-auto inline-flex items-center rounded-xl bg-white/95 backdrop-blur-md p-1 shadow-md border border-slate-200/80">
+          <button
+            type="button"
+            onClick={() => setMapType('roadmap')}
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+              mapType === 'roadmap' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Google Běžná
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapType('satellite')}
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+              mapType === 'satellite' ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Google Letecká
+          </button>
+        </div>
+
+        {/* Route button */}
+        {googleMapsRouteUrl && (
+          <a
+            href={googleMapsRouteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl bg-white/95 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-sky-800 shadow-md border border-sky-200 hover:bg-sky-50 transition"
+            title="Otevřít celou trasu v aplikaci Google Maps"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-sky-600" />
+            <span>Otevřít trasu v Google Maps ↗</span>
+          </a>
+        )}
+      </div>
+
+      <div ref={mapContainerRef} className="w-full h-[420px] md:h-[500px] z-0" />
+
       {!hasAnyPoints && (
         <div className="absolute inset-0 bg-slate-50/90 backdrop-blur-xs flex items-center justify-center p-6 text-center text-slate-500 text-xs">
           {isNavigation ? 'GPS souřadnice navigačních bodů v této nabídce nejsou k dispozici.' : 'GPS souřadnice nosičů v této kampani nejsou k dispozici.'}

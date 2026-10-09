@@ -8,7 +8,9 @@ import {
 import {
   DEFAULT_MEDIA_SERVICE_MINUTES,
   calculateServiceMinutes,
+  type ElectionRemovalOperationType,
 } from '@/lib/election-removal/constants';
+import { setPointOperationTypeInDescription } from '@/lib/election-removal/kml-parser';
 
 export const runtime = 'nodejs';
 
@@ -141,11 +143,17 @@ export async function POST(req: Request) {
           { [pt.mediaType]: baseMinutes }
         );
 
+        const opType = (pt as unknown as { operationType?: ElectionRemovalOperationType }).operationType;
+        const relocDest = (pt as unknown as { relocationDestination?: string }).relocationDestination;
+        const finalDescription = opType
+          ? setPointOperationTypeInDescription(pt.description, opType, relocDest)
+          : pt.description?.trim() || null;
+
         return {
           organizationId: auth.organizationId,
           campaignId: createdCampaign.id,
           label: pt.name?.trim() || 'Bod demontáže',
-          description: pt.description?.trim() || null,
+          description: finalDescription,
           layerName: pt.layerName?.trim() || null,
           mediaType: pt.mediaType,
           latitude: pt.latitude,

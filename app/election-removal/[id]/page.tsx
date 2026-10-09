@@ -12,7 +12,7 @@ import {
   Layers,
   MapPin,
   Route,
-  Vote,
+  Truck,
   Sparkles,
 } from 'lucide-react';
 import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
@@ -86,13 +86,13 @@ export default async function ElectionRemovalDetailPage({
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Zpět na přehled kampaní</span>
+            <span>Zpět na přehled přesunů a deinstalací</span>
           </Link>
 
           <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="p-2.5 bg-sky-50 text-sky-600 rounded-xl mt-1">
-                <Vote className="w-6 h-6" />
+                <Truck className="w-6 h-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2">

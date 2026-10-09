@@ -50,7 +50,7 @@ export function OfferMap({
 
       const bounds = L.latLngBounds(allCoords);
       const map = L.map(element.current, { scrollWheelZoom: false }).fitBounds(bounds.pad(0.3), { maxZoom: 16 });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
+      L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { attribution: '&copy; Google Maps', maxZoom: 20 }).addTo(map);
 
       // Public regional reference layer, available only on explicit selection.
       try {

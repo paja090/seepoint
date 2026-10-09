@@ -27,8 +27,8 @@ test('respondToPublicOffer respects selectedPointIds for Navigation Phase 1', ()
 
   assert.match(
     service,
-    /const\s+selectedPointIds\s*=\s*Array\.isArray\(body\?\.selectedPointIds\)/,
-    'respondToPublicOffer must parse body.selectedPointIds'
+    /resolveNavigationSelection\(body\.selectedPointIds,\s*allPoints\)/,
+    'respondToPublicOffer must pass body.selectedPointIds to resolveNavigationSelection'
   );
   assert.match(
     service,

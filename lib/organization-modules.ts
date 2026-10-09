@@ -222,8 +222,8 @@ export const SYSTEM_MODULES: SystemModule[] = [
   },
   {
     id: 'electionRemoval',
-    name: 'Volební demontáže',
-    description: 'KML import, plánování tras a mobilní realizace demontáží volebních médií',
+    name: 'Přesuny a deinstalace',
+    description: 'Plánování přejezdů, přesunů nosičů, KML import, interaktivní mapa a realizace deinstalací',
     category: 'operations',
     badge: 'SeePoint Interní',
     routes: ['/election-removal'],

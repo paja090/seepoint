@@ -37,7 +37,7 @@ export default async function ElectionRemovalPlanPage({
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Zpět na detail kampaně</span>
+              <span>Zpět na detail akce</span>
             </Link>
 
             <div className="mt-2 flex items-center gap-3">
@@ -46,7 +46,7 @@ export default async function ElectionRemovalPlanPage({
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">
-                  Plánování demontážních tras: {campaign.name}
+                  Plánování tras a přejezdů: {campaign.name}
                 </h1>
                 <p className="text-sm text-slate-500">
                   Přiřaďte pracovníky a vozidla do posádek a vygenerujte optimalizované trasy výjezdů.

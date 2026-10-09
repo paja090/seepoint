@@ -121,18 +121,18 @@ export function PublicNavigationClientView({
         tileLayerRef.current = null;
       }
 
-      let tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-      let tileAttribution = '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors';
-      let maxZoom = 19;
+      let tileUrl = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+      let tileAttribution = '&copy; Google Maps';
+      let maxZoom = 20;
 
       if (mapLayer === 'satellite') {
-        tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        tileAttribution = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community';
-        maxZoom = 18;
+        tileUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+        tileAttribution = '&copy; Google Maps';
+        maxZoom = 20;
       } else if (mapLayer === 'dark') {
-        tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-        tileAttribution = '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
-        maxZoom = 19;
+        tileUrl = 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';
+        tileAttribution = '&copy; Google Maps (Terén)';
+        maxZoom = 20;
       }
 
       const tileLayer = L.tileLayer(tileUrl, {
@@ -202,7 +202,7 @@ export function PublicNavigationClientView({
         const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
 
         marker.bindPopup(`
-          <div style="font-family: sans-serif; min-width: 200px; padding: 2px;">
+          <div style="font-family: sans-serif; min-width: 210px; padding: 2px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
               <span style="font-size: 10px; font-weight: 800; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 6px;">Bod #${index + 1} · ${item.pointCode}</span>
               <span style="font-size: 10px; color: #15803d; font-weight: 700;">${item.status || 'INSTALLED'}</span>
@@ -213,6 +213,11 @@ export function PublicNavigationClientView({
               Směr: ${item.direction || 'Obousměrný'}
             </div>
             ${item.photoUrl ? `<img src="${item.photoUrl}" style="width: 100%; height: 95px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #cbd5e1;"/>` : ''}
+            <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+              <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 8px; background: #0284c7; color: #ffffff; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none;">
+                Navigovat v Google Maps ↗
+              </a>
+            </div>
           </div>
         `);
 
@@ -663,7 +668,20 @@ export function PublicNavigationClientView({
 
                       <div className="flex items-center justify-between border-t pt-2.5 text-[11px] text-slate-400">
                         <span>Fotodokumentace: {item.photoDate ? new Date(item.photoDate).toLocaleDateString('cs-CZ') : 'Aktuální'}</span>
-                        {!hasGps && <span className="text-amber-600 font-medium">GPS neuvedeno</span>}
+                        {hasGps ? (
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${item.latitude},${item.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 font-bold transition"
+                            title="Navigovat k tomuto bodu v Google Maps"
+                          >
+                            <span>Google Maps ↗</span>
+                          </a>
+                        ) : (
+                          <span className="text-amber-600 font-medium">GPS neuvedeno</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -685,7 +703,7 @@ export function PublicNavigationClientView({
                     mapLayer === 'streets' ? 'bg-white text-sky-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Základní
+                  Google Běžná
                 </button>
                 <button
                   type="button"
@@ -694,7 +712,7 @@ export function PublicNavigationClientView({
                     mapLayer === 'satellite' ? 'bg-white text-sky-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Letecká
+                  Google Letecká
                 </button>
                 <button
                   type="button"
@@ -703,7 +721,7 @@ export function PublicNavigationClientView({
                     mapLayer === 'dark' ? 'bg-white text-sky-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Tmavá
+                  Google Terénní
                 </button>
               </div>
 
