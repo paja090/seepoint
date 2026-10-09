@@ -1,0 +1,2199 @@
+[
+  {
+    "id": "START-01",
+    "category": "Začínáme",
+    "title": "Aktivovat účet a obnovit heslo",
+    "priority": "P0",
+    "roles": [
+      "ALL"
+    ],
+    "entryRoute": "/profile",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "START-02",
+    "category": "Začínáme",
+    "title": "Přihlásit se a ověřit organizaci",
+    "priority": "P0",
+    "roles": [
+      "ALL"
+    ],
+    "entryRoute": "/profile",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "START-03",
+    "category": "Začínáme",
+    "title": "Přepnout aktivní roli a poznat dostupné moduly",
+    "priority": "P0",
+    "roles": [
+      "ALL"
+    ],
+    "entryRoute": "/profile",
+    "status": "MEDIA_PENDING",
+    "estimatedMinutes": 3,
+    "verification": "CODE_REVIEWED; BROWSER_UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "START-04",
+    "category": "Začínáme",
+    "title": "Najít svoji agendu na nástěnce",
+    "priority": "P0",
+    "roles": [
+      "ALL"
+    ],
+    "entryRoute": "/profile",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "START-05",
+    "category": "Začínáme",
+    "title": "Upravit profil",
+    "priority": "P0",
+    "roles": [
+      "ALL"
+    ],
+    "entryRoute": "/profile",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "START-06",
+    "category": "Začínáme",
+    "title": "Přečíst oznámení a otevřít související úkol",
+    "priority": "P0",
+    "roles": [
+      "ALL"
+    ],
+    "entryRoute": "/profile",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "MAP-01",
+    "category": "Mapa a reklamní nosiče",
+    "title": "Najít nosič podle mapy a filtrů",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "VIEWER"
+    ],
+    "entryRoute": "/map",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "MAP-02",
+    "category": "Mapa a reklamní nosiče",
+    "title": "Rozlišit nosič a reklamní plochu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "VIEWER"
+    ],
+    "entryRoute": "/map",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "MAP-03",
+    "category": "Mapa a reklamní nosiče",
+    "title": "Přečíst detail plochy a klienta",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "VIEWER"
+    ],
+    "entryRoute": "/map",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "MAP-04",
+    "category": "Mapa a reklamní nosiče",
+    "title": "Upravit údaje a GPS nosiče",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "VIEWER"
+    ],
+    "entryRoute": "/map",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "MAP-05",
+    "category": "Mapa a reklamní nosiče",
+    "title": "Přidat nosič a ověřit jeho typ",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "VIEWER"
+    ],
+    "entryRoute": "/map",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "MAP-06",
+    "category": "Mapa a reklamní nosiče",
+    "title": "Otevřít galerii a ověřit klientskou viditelnost",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "VIEWER"
+    ],
+    "entryRoute": "/map",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PHOTO-01",
+    "category": "Focení a fotodokumentace",
+    "title": "Vyfotit existující nosič s GPS",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/mobile-photos",
+    "status": "MEDIA_PENDING",
+    "estimatedMinutes": 3,
+    "verification": "CODE_REVIEWED; BROWSER_UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PHOTO-02",
+    "category": "Focení a fotodokumentace",
+    "title": "Vybrat správnou stranu a účel fotografie",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/mobile-photos",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PHOTO-03",
+    "category": "Focení a fotodokumentace",
+    "title": "Vyřešit návrh nesprávného přiřazení plochy",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/mobile-photos",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PHOTO-04",
+    "category": "Focení a fotodokumentace",
+    "title": "Nahlásit poškození nosiče fotografií",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/mobile-photos",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PHOTO-05",
+    "category": "Focení a fotodokumentace",
+    "title": "Rozlišit uloženou fotografii a chybu vedlejší akce",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/mobile-photos",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PHOTO-06",
+    "category": "Focení a fotodokumentace",
+    "title": "Postupovat při zamítnuté GPS nebo neúspěšném uploadu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/mobile-photos",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-01",
+    "category": "Navigační zakázky",
+    "title": "Připravit navigační nabídku pro více provozoven",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-02",
+    "category": "Navigační zakázky",
+    "title": "Doplnit body a terénní fotografie",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-03",
+    "category": "Navigační zakázky",
+    "title": "Nechat klienta vybrat lokality bez objednání realizace",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "MEDIA_PENDING",
+    "estimatedMinutes": 3,
+    "verification": "CODE_REVIEWED; BROWSER_UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-04",
+    "category": "Navigační zakázky",
+    "title": "Nacenit vybranou navigační trasu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-05",
+    "category": "Navigační zakázky",
+    "title": "Převést schválenou cenovou nabídku do realizace",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "MEDIA_PENDING",
+    "estimatedMinutes": 3,
+    "verification": "CODE_REVIEWED; BROWSER_UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-06",
+    "category": "Navigační zakázky",
+    "title": "Připravit smlouvu a grafické podklady",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-07",
+    "category": "Navigační zakázky",
+    "title": "Naplánovat instalaci a přiřadit pracovníky",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-08",
+    "category": "Navigační zakázky",
+    "title": "Dokončit montáž s fotografií a kontrolou kvality",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-09",
+    "category": "Navigační zakázky",
+    "title": "Sestavit a sdílet klientskou fotodokumentaci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-10",
+    "category": "Navigační zakázky",
+    "title": "Řízeně změnit přijatou navigační zakázku",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-11",
+    "category": "Navigační zakázky",
+    "title": "Připravit fakturační období a fakturu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NAV-12",
+    "category": "Navigační zakázky",
+    "title": "Provést průzkum lokalit k navigaci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/navigation",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-01",
+    "category": "Nabídky a obchod",
+    "title": "Vytvořit standardní nabídku klientovi",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-02",
+    "category": "Nabídky a obchod",
+    "title": "Vybrat typ nabídky a šablonu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-03",
+    "category": "Nabídky a obchod",
+    "title": "Sestavit výběr ploch a termín",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-04",
+    "category": "Nabídky a obchod",
+    "title": "Zkontrolovat cenu a připravenost nabídky",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-05",
+    "category": "Nabídky a obchod",
+    "title": "Odeslat nebo sdílet klientskou nabídku",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-06",
+    "category": "Nabídky a obchod",
+    "title": "Zpracovat dotaz a požadavek na úpravu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-07",
+    "category": "Nabídky a obchod",
+    "title": "Rozlišit přijetí odmítnutí a expiraci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OFFER-08",
+    "category": "Nabídky a obchod",
+    "title": "Připravit nabídku výstavní sítě",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/offers",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OCC-01",
+    "category": "Obsazenost a rezervace",
+    "title": "Ověřit dostupnost plochy v termínu",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/occupancy",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OCC-02",
+    "category": "Obsazenost a rezervace",
+    "title": "Založit rezervaci a odlišit ji od jednání",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/occupancy",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OCC-03",
+    "category": "Obsazenost a rezervace",
+    "title": "Vyřešit překryv termínů",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/occupancy",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OCC-04",
+    "category": "Obsazenost a rezervace",
+    "title": "Změnit nebo ukončit rezervaci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/occupancy",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "OCC-05",
+    "category": "Obsazenost a rezervace",
+    "title": "Zkontrolovat obsazenost po přijetí nabídky",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/occupancy",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CRM-01",
+    "category": "Klienti a komunikace",
+    "title": "Založit a dohledat klienta",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/clients",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CRM-02",
+    "category": "Klienti a komunikace",
+    "title": "Přidat kontakt a pobočku",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/clients",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CRM-03",
+    "category": "Klienti a komunikace",
+    "title": "Najít nabídky a zakázky v kartě klienta",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/clients",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CRM-04",
+    "category": "Klienti a komunikace",
+    "title": "Zapsat komunikaci a navazující CRM úkol",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/clients",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CRM-05",
+    "category": "Klienti a komunikace",
+    "title": "Najít smlouvu a klientský dokument",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/clients",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CRM-06",
+    "category": "Klienti a komunikace",
+    "title": "Zkontrolovat a sloučit duplicitu klienta",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/clients",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "REAL-01",
+    "category": "Realizace zakázek",
+    "title": "Zjistit další krok po potvrzení objednávky",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/realization",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "REAL-02",
+    "category": "Realizace zakázek",
+    "title": "Vyřešit chybějící podklady a blokaci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/realization",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "REAL-03",
+    "category": "Realizace zakázek",
+    "title": "Předat položku do výroby",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/realization",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "REAL-04",
+    "category": "Realizace zakázek",
+    "title": "Zkontrolovat instalaci a fotodokumentaci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/realization",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "REAL-05",
+    "category": "Realizace zakázek",
+    "title": "Předat hotovou realizaci k fakturaci",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/realization",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "REAL-06",
+    "category": "Realizace zakázek",
+    "title": "Zpracovat změnový požadavek",
+    "priority": "P0",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/realization",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-01",
+    "category": "Práce a zaměstnanci",
+    "title": "Převzít vlastní úkol",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-02",
+    "category": "Práce a zaměstnanci",
+    "title": "Najít pracovní příkaz a trasu výjezdu",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-03",
+    "category": "Práce a zaměstnanci",
+    "title": "Odevzdat dokončenou práci",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-04",
+    "category": "Práce a zaměstnanci",
+    "title": "Vykázat práci a výdaj",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-05",
+    "category": "Práce a zaměstnanci",
+    "title": "Odevzdat vlastní vyúčtování",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-06",
+    "category": "Práce a zaměstnanci",
+    "title": "Schválit výkaz pracovníka",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-07",
+    "category": "Práce a zaměstnanci",
+    "title": "Požádat o volno a ověřit kolizi",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-08",
+    "category": "Práce a zaměstnanci",
+    "title": "Najít kontakt a použít týmový chat",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "WORK-09",
+    "category": "Práce a zaměstnanci",
+    "title": "Přidat pracovníka a nastavit sazby",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/my-tasks",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "FIN-01",
+    "category": "Finance a fakturace",
+    "title": "Rozlišit klientskou fakturu a fakturu pracovníka",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/settlements",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "FIN-02",
+    "category": "Finance a fakturace",
+    "title": "Zkontrolovat a schválit vyúčtování",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/settlements",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "FIN-03",
+    "category": "Finance a fakturace",
+    "title": "Uzamknout vyúčtování a evidovat platbu",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/settlements",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "FIN-04",
+    "category": "Finance a fakturace",
+    "title": "Vytvořit klientskou fakturu v kontextu zakázky",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/settlements",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "FIN-05",
+    "category": "Finance a fakturace",
+    "title": "Najít fakturu a její stav v kartě klienta",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/settlements",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "FIN-06",
+    "category": "Finance a fakturace",
+    "title": "Zkontrolovat náklady a finanční přehled",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/settlements",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-01",
+    "category": "AI nástroje",
+    "title": "Zkontrolovat návrh v AI Inboxu",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-02",
+    "category": "AI nástroje",
+    "title": "Potvrdit nebo odmítnout navrženou akci",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-03",
+    "category": "AI nástroje",
+    "title": "Vyhodnotit signál obchodního radaru",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-04",
+    "category": "AI nástroje",
+    "title": "Použít AI obchodní centrum a dohledat zdroj",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-05",
+    "category": "AI nástroje",
+    "title": "Vyhodnotit AI upozornění na obsazenost",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-06",
+    "category": "AI nástroje",
+    "title": "Nadiktovat rychlý interní úkol",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-07",
+    "category": "AI nástroje",
+    "title": "Ověřit návrh AI rozpoznání fotografie",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "AI-08",
+    "category": "AI nástroje",
+    "title": "Rozpoznat neověřenou nebo nedostupnou AI odpověď",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/commercial",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "SURVEY-01",
+    "category": "Field Survey",
+    "title": "Založit samostatný terénní průzkum",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/field-survey",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "SURVEY-02",
+    "category": "Field Survey",
+    "title": "Zaznamenat bod s GPS a fotografií",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/field-survey",
+    "status": "MEDIA_PENDING",
+    "estimatedMinutes": 3,
+    "verification": "CODE_REVIEWED; BROWSER_UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "SURVEY-03",
+    "category": "Field Survey",
+    "title": "Doplnit parcelu vlastníka a kontakt",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/field-survey",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "SURVEY-04",
+    "category": "Field Survey",
+    "title": "Posoudit AI analýzu místa",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/field-survey",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "SURVEY-05",
+    "category": "Field Survey",
+    "title": "Exportovat průzkum do KML GeoJSON nebo XLSX",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/field-survey",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-01",
+    "category": "Administrace a nastavení",
+    "title": "Pozvat uživatele do organizace",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-02",
+    "category": "Administrace a nastavení",
+    "title": "Nastavit role a ověřit přístup",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-03",
+    "category": "Administrace a nastavení",
+    "title": "Nastavit firemní profil a fakturační údaje",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-04",
+    "category": "Administrace a nastavení",
+    "title": "Připojit integraci a ověřit její stav",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-05",
+    "category": "Administrace a nastavení",
+    "title": "Nastavit firemní odesílání e-mailů",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-06",
+    "category": "Administrace a nastavení",
+    "title": "Připravit import a zkontrolovat dry-run",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-07",
+    "category": "Administrace a nastavení",
+    "title": "Spravovat typy nosičů a produkty",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-08",
+    "category": "Administrace a nastavení",
+    "title": "Dokončit onboarding organizace",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ADMIN-09",
+    "category": "Administrace a nastavení",
+    "title": "Spravovat organizace jako platformní administrátor",
+    "priority": "P2",
+    "roles": [
+      "ADMIN"
+    ],
+    "entryRoute": "/settings",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PLAN-01",
+    "category": "Plánovač a kalendář",
+    "title": "Naplánovat osobní pracovní blok",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/planner",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PLAN-02",
+    "category": "Plánovač a kalendář",
+    "title": "Připojit kalendář a zvolit synchronizaci",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/planner",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PLAN-03",
+    "category": "Plánovač a kalendář",
+    "title": "Vyřešit souběh práce a absence",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/planner",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "PLAN-04",
+    "category": "Plánovač a kalendář",
+    "title": "Najít termíny vyžadující pozornost",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER",
+      "ACCOUNTANT"
+    ],
+    "entryRoute": "/planner",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "STOCK-01",
+    "category": "Sklad a nákupy",
+    "title": "Najít materiál přes QR",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/warehouse",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "STOCK-02",
+    "category": "Sklad a nákupy",
+    "title": "Zapsat příjem a výdej materiálu",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/warehouse",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "STOCK-03",
+    "category": "Sklad a nákupy",
+    "title": "Zkontrolovat nízkou zásobu",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/warehouse",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "STOCK-04",
+    "category": "Sklad a nákupy",
+    "title": "Připravit nákupní požadavek",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/warehouse",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "STOCK-05",
+    "category": "Sklad a nákupy",
+    "title": "Použít a ověřit AI návrh skladových položek",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/warehouse",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CAR-01",
+    "category": "Vozidla a provoz",
+    "title": "Rezervovat vozidlo",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/vehicles",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CAR-02",
+    "category": "Vozidla a provoz",
+    "title": "Zapsat tankování a ověřit účtenku",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/vehicles",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "CAR-03",
+    "category": "Vozidla a provoz",
+    "title": "Zaznamenat servis a stav vozidla",
+    "priority": "P1",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/vehicles",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NET-01",
+    "category": "Výstavní sítě a inventář",
+    "title": "Založit a sledovat projekt výstavní sítě",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/projects/city-gallery",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NET-02",
+    "category": "Výstavní sítě a inventář",
+    "title": "Dohledat městský inventář",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/projects/city-gallery",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "NET-03",
+    "category": "Výstavní sítě a inventář",
+    "title": "Orientovat se v omezeních B2B Network",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "SALES"
+    ],
+    "entryRoute": "/projects/city-gallery",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ELECT-01",
+    "category": "Volební demontáže",
+    "title": "Importovat kampaň a ověřit body",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/election-removal",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ELECT-02",
+    "category": "Volební demontáže",
+    "title": "Naplánovat trasu demontáží",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/election-removal",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ELECT-03",
+    "category": "Volební demontáže",
+    "title": "Dokončit bod v mobilu",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/election-removal",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  },
+  {
+    "id": "ELECT-04",
+    "category": "Volební demontáže",
+    "title": "Předat demontovaný materiál a uzavřít trasu",
+    "priority": "P2",
+    "roles": [
+      "ADMIN",
+      "MANAGER",
+      "TECHNICIAN",
+      "WORKER"
+    ],
+    "entryRoute": "/election-removal",
+    "status": "PLANNED",
+    "estimatedMinutes": 3,
+    "verification": "UNVERIFIED",
+    "verifiedAt": null,
+    "media": [],
+    "prerequisites": "Aktivní organizace, oprávnění příslušné akce a zapnutý modul; upřesnit při validaci.",
+    "note": "Kategorie určuje výchozí publikum, jednotlivá akce může vyžadovat užší oprávnění. EntryRoute je vstup do agendy, ne nutně vlastní obrazovka kroku."
+  }
+]

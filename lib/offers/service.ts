@@ -1,4 +1,5 @@
 import { isModuleEnabled } from '@/lib/organization-modules';
+import { resolveNavigationSelection } from './navigation-selection';
 import { auditProduction } from '@/lib/production/production-service';
 import { assertTenantResult } from '@/lib/tenant-result';
 import { enrichClientLogoFromSiblings, fetchClientLogoAsset, hasResolvableClientLogo } from '@/lib/client-logo';
@@ -1210,9 +1211,9 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     // Special handling for Navigation Phase 1 (LOCATION_SELECTION):
     // Client is confirming the selected points and route for pricing, NOT final priced order!
     if (target === 'ACCEPTED' && row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION') {
+      if (['REJECTED', 'EXPIRED'].includes(row.status)) throw new OfferValidationError('Nabídka již byla uzavřena a její výběr nelze měnit.');
       const allPoints = row.navigationOffer.points;
-      const selectedPointIds = Array.isArray(body?.selectedPointIds) ? (body.selectedPointIds as string[]) : null;
-      const selectedSet = selectedPointIds ? new Set(selectedPointIds) : null;
+      const selectedSet = resolveNavigationSelection(body.selectedPointIds, allPoints);
       await Promise.all(
         allPoints.map((point) =>
           tx.navigationPoint.update({

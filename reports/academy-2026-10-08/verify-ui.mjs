@@ -1,0 +1,38 @@
+import { chromium } from 'playwright';
+import { readFileSync, writeFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const dir='reports/academy-2026-10-08';
+const browser=await chromium.launch({headless:true,channel:'chrome'});
+try {
+ const page=await browser.newPage({viewport:{width:1100,height:1000}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.setContent(`<html lang="cs"><head><meta charset="utf-8"><style>body{margin:20px;color-scheme:light}</style></head><body>${readFileSync(`${dir}/academy-ui.html`,'utf8')}</body></html>`);
+ await page.screenshot({path:`${dir}/concept-desktop.png`,fullPage:true});
+ await page.locator('#sp-search').fill('GPS');
+ assert.equal(await page.locator('.sp-category').count(),1);
+ await page.locator('#sp-search').fill('');
+ await page.locator('#sp-role').selectOption('ADMIN');
+ await page.locator('#sp-admin-tab').click();
+ assert.equal(await page.locator('#sp-manage').isVisible(),true);
+ await page.locator('#sp-role').selectOption('WORKER');
+ assert.equal(await page.locator('#sp-home').isVisible(),true);
+ await page.locator('#sp-continue').click();
+ for(let i=0;i<4;i++)await page.locator('#sp-next').click();
+ await page.locator('[data-answer="right"]').click();
+ assert.match(await page.locator('#sp-quiz-result').innerText(),/Správně/);
+ await page.locator('#sp-report').click();
+ await page.locator('#sp-feedback-text').fill('Syntetický QA podnět');
+ await page.locator('#sp-feedback button').click();
+ assert.match(await page.locator('#sp-feedback-result').innerText(),/nic neodesílá/);
+ await page.locator('#sp-device').selectOption('mobile');
+ await page.setViewportSize({width:360,height:900});
+ await page.addStyleTag({content:'body{margin:8px}'});
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);
+ assert.equal(overflow,false,'Mobile has horizontal overflow');
+ await page.screenshot({path:`${dir}/concept-mobile-lesson.png`,fullPage:true});
+ await page.locator('[data-screen="home"]').click();
+ await page.screenshot({path:`${dir}/concept-mobile-home.png`,fullPage:true});
+ assert.deepEqual(errors,[]);
+ writeFileSync(`${dir}/ui-verification.txt`,'PASS: concept desktop render, role preview, search, manager screen, four steps, comprehension check, simulated feedback, 360px overflow check, no page errors.\nThese are design concept checks, NOT SeePoint application workflow verification.\n');
+ console.log('Concept UI checks passed; screenshots are labeled design evidence, not application captures.');
+} finally {await browser.close();}

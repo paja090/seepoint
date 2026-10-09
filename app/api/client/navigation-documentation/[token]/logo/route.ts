@@ -50,7 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       status: 200,
       headers: {
         'Content-Type': report.client.logoMimeType ?? file.headers.get('Content-Type') ?? 'image/png',
-        'Cache-Control': 'public, max-age=86400, immutable',
+        'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     });

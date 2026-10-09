@@ -20,18 +20,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { token, hash } = getDeterministicReportToken(id);
-  const effectiveStatus = isPublicNavigationReportStatus(report.status) ? report.status : 'PUBLISHED';
-  if (report.publicTokenHash !== hash || report.status !== effectiveStatus || !report.publishedAt) {
-    const now = new Date();
-    await prisma.navigationDocumentationReport.update({
-      where: { id },
-      data: {
-        publicTokenHash: hash,
-        status: effectiveStatus,
-        publishedAt: report.publishedAt || now,
-        tokenExpiresAt: report.tokenExpiresAt || new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000),
-      },
-    }).catch(() => {});
+  if (report.publicTokenHash !== hash || !isPublicNavigationReportStatus(report.status)
+      || !report.publishedAt || !report.tokenExpiresAt || report.tokenExpiresAt <= new Date()) {
+    return NextResponse.json({ error: 'Odkaz není aktivní. Obnovte jej výslovně.' }, { status: 409 });
   }
 
   return NextResponse.json({
@@ -83,12 +74,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: true, message: 'Odkaz byl zneplatněn.', report: updated });
     }
 
+    if (action === 'get') return GET(request, { params: Promise.resolve({ id }) });
     const { token, hash } = getDeterministicReportToken(id);
-    const tokenExpiresAt = body.tokenExpiresAt ? parseTokenExpiry(body.tokenExpiresAt) : (report.tokenExpiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
+    const tokenExpiresAt = body.tokenExpiresAt ? parseTokenExpiry(body.tokenExpiresAt) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
     const effectiveStatus = isPublicNavigationReportStatus(report.status) ? report.status : 'PUBLISHED';
 
     let updated = report;
-    if (report.publicTokenHash !== hash || report.status !== effectiveStatus || (body.tokenExpiresAt && report.tokenExpiresAt?.getTime() !== tokenExpiresAt.getTime())) {
+    if (action === 'regenerate') {
       updated = await prisma.navigationDocumentationReport.update({
         where: { id, organizationId: auth.organizationId },
         data: {

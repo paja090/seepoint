@@ -3,6 +3,7 @@ import { platformPrisma } from '@/lib/db';
 import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { isClientApprovedPhoto } from '@/lib/navigation-documentation-policy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -140,7 +141,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     for (let i = 0; i < report.items.length; i++) {
       const item = report.items[i];
       const photo = item.selectedPhoto || item.navigationPoint?.installedPhoto || item.navigationPoint?.sitePhoto;
-      if (!photo || photo.isPrivate) continue;
+      if (!photo || !isClientApprovedPhoto(photo) || photo.organizationId !== owner.organizationId) continue;
 
       let photoBuffer: Buffer | null = null;
 
@@ -169,7 +170,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       const pointCode = item.navigationPoint?.pillarNumber
         ? `VO-${item.navigationPoint.pillarNumber}`
         : item.carrier?.code || `BOD-${i + 1}`;
-      const city = item.carrier?.city || 'Ostrava';
+      const city = item.carrier?.city || 'misto';
       const cleanName = `${orderPrefix}_${sanitizeFileName(pointCode)}_${sanitizeFileName(city)}.jpg`;
 
       zipFiles.push({
@@ -191,7 +192,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'private, no-store',
         'Content-Length': String(zipBuffer.length),
       },
     });

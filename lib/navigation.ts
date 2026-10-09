@@ -1,6 +1,6 @@
 import type { AppNavIcon } from '@/components/AppNavLink';
 import { canAccess, type AppRole, type AppSection } from './rbac';
-import { getModuleIdForPath, isModuleEnabled } from './organization-modules';
+import { getModuleIdForPath, isModuleAvailable } from './organization-modules';
 
 // String icon IDs keep the server-to-client navigation payload serializable.
 export type NavItem = [href: string, label: string, icon: AppNavIcon, section: AppSection];
@@ -21,6 +21,7 @@ export const navigationHubs: NavigationHub[] = [
   { id: 'sales', label: 'Obchod & CRM', icon: 'briefcaseBusiness', groups: [
     { label: 'Obchod', items: [
       ["/dashboard","Nástěnka / Přehled","barChart3","dashboard"],
+      ["/academy","Návody & Akademie","fileText","academy"],
       ["/analytics","Analytics & Tržby","barChart3","clients"],
       ["/offers","Nabídky","badgeDollarSign","offers"],
       ["/network","B2B Media Network","globe","offers"]
@@ -66,7 +67,7 @@ export const navigationHubs: NavigationHub[] = [
       ["/work-entries","Odvedená práce (všichni)","fileText","workEntries"],
       ["/settlements","Vyúčtování firemní","fileText","settlements"],
       ["/vehicles","Vozidla a vozíky","car","vehicles"],
-      ["/warehouse","Sklad & Materiál","clipboardList","vehicles"]
+      ["/warehouse","Sklad & Materiál","clipboardList","warehouse"]
     ] }
   ] },
   { id: 'management', label: 'Správa', icon: 'settings', groups: [
@@ -109,7 +110,7 @@ export function getVisibleNavigation(user: {
   const hubs = navigationHubs.map(hub => ({ ...hub, groups: hub.groups.map(group => ({ ...group,
     items: group.items.filter(([href, , , section]) => {
       const moduleId = getModuleIdForPath(href);
-      return canAccess(user.role, section) && (moduleId !== 'planner' || Boolean(user.organization)) && (!user.organization || !moduleId || isModuleEnabled(user.organization, moduleId));
+      return canAccess(user.role, section) && (!['planner', 'academy'].includes(moduleId ?? '') || Boolean(user.organization)) && (!user.organization || !moduleId || isModuleAvailable(user.organization, moduleId));
     }),
   })).filter(group => group.items.length > 0) })).filter(hub => hub.groups.length > 0);
   const management = hubs.find(hub => hub.id === 'management');

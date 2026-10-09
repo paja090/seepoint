@@ -1,0 +1,342 @@
+[
+  {
+    "slug": "01-navigacni-koncept",
+    "title": "Jak připravit a uložit první navigační návrh",
+    "sourceHash": "d0420133fe689c48c8ae024ad898c182f1b469495389218dcd9bf3d3b58b9394",
+    "steps": [
+      {
+        "title": "Otevřete nabídky",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V levém sloupci otevřete Obchod & CRM, potom Nabídky. Na stránce Sales dashboard klikněte na Nový návrh kampaně. Otevře se výběr „Jaký typ nabídky vytváříte?“."
+          }
+        ]
+      },
+      {
+        "title": "Vyberte navigaci",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na kartu Navigace, na které je text Pokračovat manuálně. Dostanete se do formuláře se čtyřmi kroky: Klient a nabídka, Provozovny, Mapa a body, Kontrola a odeslání."
+          },
+          {
+            "kind": "image",
+            "text": "Výběr typu nabídky ve skutečné aplikaci",
+            "file": "01-vyber-typu.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Vyplňte klienta a název",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Ponechte aktivní Fáze 1 – Návrh rozmístění. V poli Klient / Odběratel vyberte klienta. Do Název kampaně / Nabídky napište jednoznačný název. Zkontrolujte Město / Lokalita kampaně – v tomto průchodu byla předvyplněná Ostrava. Pro školení použijte označení AKADEMIE a NEODESÍLAT. Klikněte na Pokračovat."
+          },
+          {
+            "kind": "text",
+            "text": "Kontrola: po přechodu zůstává nahoře Fáze 1 a zobrazí se „Cílové provozovny a prodejny klienta“."
+          },
+          {
+            "kind": "image",
+            "text": "Vyplněný klient, název a fáze nabídky",
+            "file": "02-klient-a-nabidka.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Určete cílovou provozovnu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Vyplňte Název provozovny. Při skutečné zakázce doplňte adresu a ověřte GPS souřadnice; výchozí špendlík není potvrzená poloha klienta. Volitelná poznámka pomůže vysvětlit příjezd. Pro školicí průchod byl použit název „AKADEMIE – ukázková provozovna Ostrava“ a výslovná poznámka, že jde o ukázku. Klikněte na Pokračovat na mapu."
+          },
+          {
+            "kind": "image",
+            "text": "Údaje ukázkové provozovny",
+            "file": "03-provozovna.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Přidejte bod a otevřete jeho detail",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na + Přidat navigační bod. Vyčkejte, až se vpravo objeví karta bodu a počítadlo se změní na 1. Na kartě klikněte na Detail."
+          },
+          {
+            "kind": "text",
+            "text": "Pozor: při ověření tlačítko vložilo bod do výchozí polohy poblíž cíle. Bod měl název „⚠️ Památková zóna (centrum)“. Samotné přidání bodu nepotvrzuje vhodnost umístění ani povolení instalace. Pro skutečnou zakázku ověřte polohu a místní podmínky."
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte parametry bodu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V detailu zkontrolujte umístění a Cílovou provozovnu, potom kategorii nosiče a směr šipky. Fotodokumentace a poznámky mají vlastní části. Školicí bod má interní poznámku „Neinstalovat, neobjednávat výrobu“."
+          },
+          {
+            "kind": "text",
+            "text": "Klikněte na Hotovo (Zavřít detail) a potom na Pokračovat. Zavření detailu ještě neznamená uložení nabídky: dole zůstává informace o neuložených změnách."
+          },
+          {
+            "kind": "image",
+            "text": "Skutečný detail navigačního bodu",
+            "file": "04-detail-bodu.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte souhrn",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Na obrazovce Kontrola lokačního návrhu před odesláním (Fáze 1) ověřte klienta, kampaň a město, počet provozoven i bodů. V ukázce je 1 provozovna, 1 bod a 0 fotografií. Klient bez e-mailu je výslovně označen Bez e-mailu."
+          },
+          {
+            "kind": "image",
+            "text": "Souhrn před uložením",
+            "file": "05-kontrola.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Uložte koncept",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Uložit nabídku navigace. Otevře se detail nabídky s jejím názvem a stavem Draft. Obnovte stránku a zkontrolujte, že název, provozovna a jeden bod zůstaly zachované. To je skutečné dokončení této lekce; otevření formuláře nestačí."
+          },
+          {
+            "kind": "image",
+            "text": "Uložený koncept po obnovení stránky",
+            "file": "06-ulozeny-koncept.jpg"
+          },
+          {
+            "kind": "text",
+            "text": "V tomto průchodu nebylo provedeno odeslání, potvrzení bodů k nacenění ani přijetí cenové nabídky. Detail obsahuje další akce i klientský formulář; nepatří do dokončení této lekce. Uložená nabídka může již obsahovat aktivní veřejný odkaz – zacházejte s ním jako s přístupovým odkazem, nevkládejte ho do screenshotů návodu."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "02-vice-provozoven",
+    "title": "Jak přidat druhou provozovnu do navigační nabídky",
+    "sourceHash": "161960c031850a4c1d061eff19e0388e42c62aacf54d1488e307d9593f3e54d8",
+    "steps": [
+      {
+        "title": "Otevřete úpravu návrhu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V detailu nabídky najděte Práce s nabídkou a klikněte na Upravit lokační návrh (přidat/odebrat body). Při ověření se editor otevřel rovnou na kroku 2. Provozovny. První provozovna měla jeden přiřazený bod."
+          }
+        ]
+      },
+      {
+        "title": "Přidejte pobočku",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na + Přidat pobočku. Objeví se Prodejna 2 s nulovým počtem bodů. Vyplňte Název provozovny; ukázka používá „AKADEMIE – druhá ukázková provozovna“. Pro skutečnou zakázku doplňte adresu a ověřte GPS."
+          },
+          {
+            "kind": "text",
+            "text": "Pozor: aplikace předvyplnila souřadnice poblíž první provozovny. Nejde o vyhledanou adresu druhé pobočky. Ve školení jsou ponechány jako výslovně označená ukázka."
+          },
+          {
+            "kind": "image",
+            "text": "Druhá ukázková provozovna",
+            "file": "07-druha-provozovna.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Přidejte navigační bod",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Pokračovat na mapu, potom + Přidat navigační bod. Vyčkejte na druhou kartu a počítadlo 2 body. Na druhé kartě klikněte na Detail."
+          },
+          {
+            "kind": "text",
+            "text": "V tomto průchodu se nový bod automaticky přiřadil k první provozovně, přestože jsme právě vyplňovali druhou. Správný cíl proto výslovně nastavte."
+          }
+        ]
+      },
+      {
+        "title": "Vyberte cílovou provozovnu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V detailu bodu, v části 1. Umístění a cíl trasy, otevřete výběr Cílová provozovna a zvolte #2 AKADEMIE – druhá ukázková provozovna. Při vlastní zakázce vyberte odpovídající skutečnou pobočku. Zkontrolujte polohu bodu a parametry značení. Školicí bod má interní poznámku, že se nemá instalovat."
+          },
+          {
+            "kind": "image",
+            "text": "Výběr cílové provozovny druhého bodu",
+            "file": "08-prirazeni-bodu.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte a uložte",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Hotovo (Zavřít detail) a potom Pokračovat. Souhrn má zobrazovat 2 prodejny a 2 body. Klikněte na Uložit nabídku navigace a vyčkejte na zprávu Navigační nabídka byla úspěšně uložena."
+          },
+          {
+            "kind": "text",
+            "text": "Při této úpravě aplikace zůstala na obrazovce kontroly. Na rozdíl od vytvoření nové nabídky nepřesměrovala na detail. Není potřeba znovu klikat na uložení jen kvůli chybějícímu přesměrování."
+          }
+        ]
+      },
+      {
+        "title": "Ověřte výsledek",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Obnovte stránku. Editor se v našem průchodu znovu otevřel na provozovnách. Obě provozovny zůstaly uložené a na každé kartě bylo 1 přiřazený bod. Horní lišta uváděla 2 cíle a 2 body. Tím je úkol dokončený."
+          },
+          {
+            "kind": "image",
+            "text": "Dvě provozovny a zachované vazby po obnovení stránky",
+            "file": "09-provozovny-po-ulozeni.jpg"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "03-kontrola-klientskeho-nahledu",
+    "title": "Jak zkontrolovat klientský náhled a body jednotlivých poboček",
+    "sourceHash": "8a9707237b61ca0142985dc2ae757199b6c74ba7de81a830611acfc79dc6de77",
+    "steps": [
+      {
+        "title": "Otevřete náhled",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V detailu nabídky v části Práce s nabídkou klikněte na Zkontrolovat klientský náhled. Otevře se stránka Náhled klientské nabídky s odkazem Detail nabídky a lištou obchodního workflow. Tento průchod používá interní náhled přihlášeného uživatele."
+          },
+          {
+            "kind": "image",
+            "text": "Interní klientský náhled",
+            "file": "10-klientsky-nahled.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte provozovny a fázi",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "U naší ukázky je uvedena Fáze 1: Nezávazný lokační návrh rozmístění v terénu (ZDARMA). Ověřte názvy obou provozoven a jejich poznámky. Počet bodů má být 2 navigačních cedulí. Názvy a poznámky z editoru jsou zde viditelné i v prezentaci."
+          }
+        ]
+      },
+      {
+        "title": "Zobrazte body jedné pobočky",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V části Zobrazit body pro pobočku klikněte na tlačítko #2 AKADEMIE – druhá ukázková provozovna 1. Výsledek: mapa hlásí jeden bod a seznam má nadpis Navigační body pro pobočku (1). Na kartě zkontrolujte Směr: AKADEMIE – druhá ukázková provozovna."
+          },
+          {
+            "kind": "text",
+            "text": "Pozor: ve filtrovaném seznamu se druhý bod zobrazil jako #1. Pro identifikaci proto používejte také cílovou provozovnu a polohu, nikoli samotné pořadové číslo."
+          },
+          {
+            "kind": "image",
+            "text": "Jeden bod filtrovaný pro druhou provozovnu",
+            "file": "11-filtr-druhe-provozovny.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Rozlište filtr a výběr",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Při zobrazení jedné pobočky zůstal údaj Vybráno: 2 / 2. Filtr mění zobrazení; v tomto průchodu nezměnil počet vybraných bodů. Nestiskli jsme tlačítka výběru ani Potvrdit body k nacenění."
+          }
+        ]
+      },
+      {
+        "title": "Obnovte všechny body",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Všechny provozovny (2). V seznamu se opět zobrazí dvě karty. Tím je kontrola filtru dokončená. Pro další kontrolu podkladů použijte Pokračovat na kontrolu a odeslání, případně se vraťte přes Detail nabídky."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "04-proc-nelze-odeslat-nabidku",
+    "title": "Jak zjistit, co nabídce chybí před odesláním",
+    "sourceHash": "d9a6f0c59fa1a292323bae68fa5866a3a911f7c16b2d5d303636d731565d5e32",
+    "steps": [
+      {
+        "title": "Přejděte z náhledu na kontrolu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Na stránce Náhled klientské nabídky klikněte na Pokračovat na kontrolu a odeslání. Stejný cíl nabízí krok 3 Kontrola a odeslání v horní liště."
+          }
+        ]
+      },
+      {
+        "title": "Přečtěte kontrolní seznam",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V části Kontrola před odesláním zjistěte, které položky mají stav Chybí. U školící nabídky je 4/7 splněno a chybějí:"
+          },
+          {
+            "kind": "text",
+            "text": "- Platnost nabídky – aplikace požaduje dnešní nebo budoucí datum.\n- Terénní fotografie sloupů – chybí reálná fotografie u obou bodů.\n- Fotografie a vizualizace bodů – chybí klientské vizuály u obou bodů."
+          },
+          {
+            "kind": "image",
+            "text": "Skutečný kontrolní seznam nabídky",
+            "file": "12-kontrola-pred-odeslanim.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte možnost odeslání",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V části Rozhodnutí aplikace uvádí Zbývá vyřešit 3 bodů a tlačítko Odeslat nabídku klientovi je zakázané. To v tomto průchodu odpovídá chybějícím podkladům. Samotné uložení konceptu neznamená připravenost k odeslání."
+          }
+        ]
+      },
+      {
+        "title": "Vraťte se k doplnění",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "K úpravě vede horní krok Zadání; k další prohlídce prezentace odkaz ← Zpět na klientský náhled. Po doplnění podkladů je potřeba kontrolu zopakovat. Doplnění fotografií a následné odblokování odesílání zatím v této lekci nebylo provedeno ani ověřeno."
+          }
+        ]
+      },
+      {
+        "title": "Známá nesrovnalost: kontakt",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Položka Klient a kontakt v tomto průchodu tvrdila „Klient a kontaktní e-mail jsou vyplněny“, přestože souhrn editoru uváděl „Bez e-mailu“. Kontrola kódu lib/offers/workflow.ts:33 až 37 ukázala, že lokační fáze 1 může projít kontrolou kontaktu bez e-mailu, ale text úspěchu tento důvod nerozlišuje. Z této zelené položky proto nelze vyvozovat, že je skutečný příjemce e-mailu vyplněný. Před skutečným odesláním příjemce ověřte."
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,4 +1,4 @@
-import { isModuleEnabled } from './organization-modules';
+import { isModuleAvailable } from './organization-modules';
 import { canAccess, type AppSection } from './rbac';
 
 export const SECTION_MODULES: Partial<Record<AppSection, string>> = {
@@ -20,9 +20,7 @@ export function hasModuleAccess(user: {
   organization?: { id: string; isActive: boolean; plan?: string | null; enabledModules?: unknown } | null;
   membership?: { organizationId: string; isActive: boolean } | null;
 } | null, moduleId: string, section?: AppSection): boolean {
-  const isEnabled = isModuleEnabled(user?.organization, moduleId)
-    || (moduleId === 'aiRealization' && isModuleEnabled(user?.organization, 'work'))
-    || (moduleId === 'fieldSurvey' && isModuleEnabled(user?.organization, 'carriers'));
+  const isEnabled = isModuleAvailable(user?.organization, moduleId);
 
   return Boolean(user?.organizationId && user.organization?.isActive && user.membership?.isActive
     && user.organization.id === user.organizationId && user.membership.organizationId === user.organizationId

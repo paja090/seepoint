@@ -109,6 +109,8 @@ export type RealizationBlocker = {
   message: string;
   entityId?: string;
   entityType?: 'SURFACE' | 'CARRIER' | 'PRINT_JOB' | 'ORDER' | 'WORK_ORDER' | 'POINT';
+  resolutionUrl?: string;
+  resolutionLabel?: string;
 };
 
 export type RealizationBillingReadiness = {

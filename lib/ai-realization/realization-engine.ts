@@ -239,6 +239,8 @@ export function evaluateRealization(
         severity: 'BLOCKING',
         title: 'Grafika čeká na schválení',
         message: 'Grafické podklady nebyly schváleny klientem. Tisk nelze zahájit.',
+        resolutionUrl: context.offerId ? `/offers/${context.offerId}` : context.navigationOrderId ? `/navigation/orders/${context.navigationOrderId}` : undefined,
+        resolutionLabel: 'Potvrdit schválení grafiky',
       });
     } else if (hasPrintJobs) {
       requirements.push({
@@ -268,6 +270,8 @@ export function evaluateRealization(
         severity: 'BLOCKING',
         title: 'Výroba není dokončena',
         message: 'Materiály ještě nebyly vytištěny a dodány do skladu. Instalaci nelze provést.',
+        resolutionUrl: '/production',
+        resolutionLabel: 'Zkontrolovat stav výroby',
       });
     } else {
       requirements.push({
@@ -290,6 +294,8 @@ export function evaluateRealization(
       message: `Na nosiči ${def.carrierCode || ''} (plocha ${def.surfaceName || def.id}) byl nahlášen problém: ${def.defectReason || 'poškození'}.`,
       entityId: def.surfaceId || def.id,
       entityType: 'SURFACE',
+      resolutionUrl: def.carrierId ? `/carriers/${def.carrierId}` : `/realization/${context.orderId}`,
+      resolutionLabel: 'Otevřít kartu nosiče a vyřešit závadu',
     });
   }
 
@@ -306,6 +312,8 @@ export function evaluateRealization(
       severity: 'WARNING',
       title: 'Instalace nemá přiřazeného pracovníka',
       message: `${unassignedItems.length} ploch nemá přiřazeného pracovníka nebo montážní tým.`,
+      resolutionUrl: '/work',
+      resolutionLabel: 'Přiřadit montážní tým v plánovači',
     });
   }
 
@@ -342,6 +350,11 @@ export function evaluateRealization(
       severity: profile.billingRequiresPhotos ? 'BLOCKING' : 'WARNING',
       title: 'Chybí fotodokumentace',
       message: `U ${unphotographedItems.length} instalovaných ploch nebyla nahrána platná fotodokumentace pro klienta.`,
+      resolutionUrl:
+        context.projectType === 'NAVIGATION' && context.navigationOrderId
+          ? `/navigation/orders/${context.navigationOrderId}`
+          : `/realization/${context.orderId}`,
+      resolutionLabel: 'Doplnit fotodokumentaci z terénu',
     });
   } else if (unphotographedItems.length === 0 && items.length > 0) {
     requirements.push({
@@ -361,6 +374,8 @@ export function evaluateRealization(
       severity: 'WARNING',
       title: 'Ohrožený termín kampaně',
       message: deadlineRisk.reason,
+      resolutionUrl: '/work/route',
+      resolutionLabel: 'Upravit harmonogram montáže',
     });
   }
 
@@ -372,6 +387,8 @@ export function evaluateRealization(
       message: 'K zakázce byl evidován změnový balíček z nabídky po zahájení realizace. Posuďte změnu před pokračováním.',
       entityType: 'ORDER',
       entityId: context.orderId,
+      resolutionUrl: `/realization/${context.orderId}#changeset-review`,
+      resolutionLabel: 'Posoudit změnu nabídky',
     });
   }
 
@@ -491,7 +508,7 @@ export function determineRealizationNextBestActions(
       description: defectBlocker.message,
       targetOrderId: orderId,
       targetSurfaceId: defectBlocker.entityId,
-      targetUrl: `/carriers/${defectBlocker.entityId || ''}`,
+      targetUrl: defectBlocker.resolutionUrl || `/realization/${orderId}`,
       recommendedAt: new Date(),
     });
     return actions;
@@ -506,7 +523,7 @@ export function determineRealizationNextBestActions(
       title: 'Posoudit změnu rozsahu nabídky',
       description: scopeChangeBlocker.message,
       targetOrderId: orderId,
-      targetUrl: `#changeset-review`,
+      targetUrl: scopeChangeBlocker.resolutionUrl || `/realization/${orderId}#changeset-review`,
       recommendedAt: new Date(),
     });
   }

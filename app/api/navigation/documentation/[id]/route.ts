@@ -79,31 +79,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   });
 
   const { token, hash } = getDeterministicReportToken(report.id);
-  const isArchived = report.status === 'ARCHIVED';
-  const effectiveStatus = !isArchived && !isPublicNavigationReportStatus(report.status) ? 'PUBLISHED' : report.status;
-  const publicUrl = !isArchived ? `/client/navigation-documentation/${token}` : null;
-
-  if (!isArchived && (report.publicTokenHash !== hash || report.status !== effectiveStatus || !report.publishedAt)) {
-    const now = new Date();
-    const expiresAt = report.tokenExpiresAt && report.tokenExpiresAt > now
-      ? report.tokenExpiresAt
-      : new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-    await prisma.navigationDocumentationReport.update({
-      where: { id: report.id },
-      data: {
-        publicTokenHash: hash,
-        status: effectiveStatus,
-        publishedAt: report.publishedAt || now,
-        tokenExpiresAt: expiresAt,
-      },
-    }).catch(() => {});
-  }
+  const linkActive = report.publicTokenHash === hash && isPublicNavigationReportStatus(report.status)
+    && Boolean(report.publishedAt) && Boolean(report.tokenExpiresAt && report.tokenExpiresAt > new Date());
+  const publicUrl = linkActive ? `/client/navigation-documentation/${token}` : null;
 
   return NextResponse.json({
     ...report,
-    status: effectiveStatus,
+    status: report.status,
     items,
-    token: !isArchived ? token : null,
+    token: linkActive ? token : null,
     publicUrl,
     warnings: runPrePublishChecks(report.client.email, items, report.periodFrom),
   });
@@ -118,7 +102,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json();
     const existing = await prisma.navigationDocumentationReport.findFirst({
       where: { id, organizationId: auth.organizationId },
-      select: { id: true, status: true, publishedAt: true },
+      select: { id: true, status: true, publishedAt: true, publicTokenHash: true, tokenExpiresAt: true },
     });
     if (!existing) return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     if (existing.status === 'ARCHIVED') return NextResponse.json({ error: 'Archivovaný report nelze upravovat.' }, { status: 409 });
@@ -131,8 +115,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const itemInputs = Array.isArray(body.items) ? body.items.slice(0, 250) : [];
 
     const { token, hash } = getDeterministicReportToken(id);
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
 
     await prisma.$transaction(async (tx) => {
       for (const input of itemInputs) {
@@ -192,10 +174,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         where: { id, organizationId: auth.organizationId },
         data: {
           ...updateData,
-          status: existing.status === 'SENT' ? 'SENT' : 'PUBLISHED',
-          publicTokenHash: hash,
-          publishedAt: existing.publishedAt || now,
-          tokenExpiresAt: expiresAt,
           ...(hasChanges
             ? {
                 auditLogs: {
@@ -203,7 +181,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
                     organizationId: auth.organizationId,
                     actorUserId: auth.id,
                     action: 'UPDATED',
-                    message: 'Report byl upraven a veřejný odkaz aktualizován.',
+                    message: 'Report byl upraven.',
                   },
                 },
               }
@@ -213,7 +191,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }, { isolationLevel: 'Serializable' });
 
     const updated = await prisma.navigationDocumentationReport.findFirst({ where: { id, organizationId: auth.organizationId }, include: reportInclude });
-    return NextResponse.json({ ...updated, token, publicUrl: `/client/navigation-documentation/${token}` });
+    const linkActive = updated?.publicTokenHash === hash && isPublicNavigationReportStatus(updated.status)
+      && Boolean(updated.publishedAt) && Boolean(updated.tokenExpiresAt && updated.tokenExpiresAt > new Date());
+    return NextResponse.json({ ...updated, token: linkActive ? token : null, publicUrl: linkActive ? `/client/navigation-documentation/${token}` : null });
   } catch (error) {
     if (error instanceof NavigationDocumentationValidationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error('[navigation/documentation/detail] Update failed', error instanceof Error ? error.message : String(error));

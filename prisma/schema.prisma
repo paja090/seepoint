@@ -1,3 +1,87 @@
+enum AcademyLessonStatus {
+  PLANNED
+  VERIFIED
+  MEDIA_PENDING
+  READY
+  PUBLISHED
+  OUTDATED
+}
+
+enum AcademyFeedbackCategory {
+  UNCLEAR
+  WRONG_UI
+  BROKEN
+  ACCESS
+  OUTDATED
+}
+
+model AcademyCategory {
+  id String @id @default(cuid())
+  organizationId String
+  slug String
+  title String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lessons AcademyLesson[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, slug])
+}
+
+model AcademyLesson {
+  id String @id @default(cuid())
+  organizationId String
+  categoryId String
+  slug String
+  archivedAt DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category AcademyCategory @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict)
+  revisions AcademyLessonRevision[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, slug])
+  @@index([organizationId, categoryId])
+}
+
+model AcademyLessonRevision {
+  id String @id @default(cuid())
+  organizationId String
+  lessonId String
+  version Int
+  title String
+  summary String
+  capability String
+  durationMinutes Int
+  status AcademyLessonStatus @default(PLANNED)
+  content Json
+  sourceCommit String
+  contentHash String
+  verifiedAt DateTime?
+  verifiedByUserId String?
+  publishedAt DateTime?
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lesson AcademyLesson @relation(fields: [organizationId, lessonId], references: [organizationId, id], onDelete: Restrict)
+  feedback AcademyFeedback[]
+  @@unique([organizationId, id])
+  @@unique([organizationId, lessonId, version])
+  @@index([organizationId, status])
+}
+
+model AcademyFeedback {
+  id String @id @default(cuid())
+  organizationId String
+  revisionId String
+  reporterUserId String
+  stepId String?
+  category AcademyFeedbackCategory
+  message String
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  revision AcademyLessonRevision @relation(fields: [organizationId, revisionId], references: [organizationId, id], onDelete: Restrict)
+  @@index([organizationId, createdAt])
+  @@index([organizationId, revisionId])
+}
+
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
@@ -506,6 +590,10 @@ enum ElectionRemovalMediaType {
 }
 
 model Organization {
+  academyCategories AcademyCategory[]
+  academyLessons AcademyLesson[]
+  academyRevisions AcademyLessonRevision[]
+  academyFeedback AcademyFeedback[]
   id                  String             @id @default(cuid())
   name                String
   slug                String             @unique

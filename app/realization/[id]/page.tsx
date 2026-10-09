@@ -232,7 +232,7 @@ export default async function RealizationDetailPage({
                       isBlocking ? 'text-rose-600' : 'text-amber-600'
                     }`}
                   />
-                  <div>
+                  <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{blocker.title}</span>
                       <span
@@ -244,6 +244,21 @@ export default async function RealizationDetailPage({
                       </span>
                     </div>
                     <div className="mt-1 text-xs opacity-90">{blocker.message}</div>
+                    {blocker.resolutionUrl && (
+                      <div className="mt-2.5">
+                        <Link
+                          href={blocker.resolutionUrl}
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold shadow-xs transition ${
+                            isBlocking
+                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                              : 'bg-amber-600 hover:bg-amber-700 text-white'
+                          }`}
+                        >
+                          <span>{blocker.resolutionLabel || 'Vyřešit překážku'}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

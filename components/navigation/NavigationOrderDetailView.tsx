@@ -26,8 +26,27 @@ import {
 } from '@/lib/navigation/types';
 import Link from 'next/link';
 import { NavigationSurveyTab } from './NavigationSurveyTab';
+import { QuickCompanySettingsModal, type CompanySettingsForm } from '@/components/settings/QuickCompanySettingsModal';
+import { ActionableResolutionCard } from '@/components/ui/ActionableResolutionCard';
+import { NavigationInvoiceModal } from './NavigationInvoiceModal';
 
 export type NavigationTabKey = 'overview' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
+
+export interface ActionableResolutionState {
+  title?: string;
+  message: string;
+  missingFields?: string[];
+  errorType?: string;
+  supplierData?: Partial<CompanySettingsForm>;
+  resolution?: {
+    type?: string;
+    url?: string;
+    label?: string;
+    target?: string;
+    clientId?: string;
+    tab?: string;
+  };
+}
 
 const navigationDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'UTC' });
 const navigationDateTimeFormatter = new Intl.DateTimeFormat('cs-CZ', {
@@ -56,6 +75,9 @@ export function NavigationOrderDetailView({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [actionableError, setActionableError] = useState<ActionableResolutionState | null>(null);
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Revert Status Modal
   const [showRevertModal, setShowRevertModal] = useState(false);
@@ -116,8 +138,17 @@ export function NavigationOrderDetailView({
   ];
 
   async function handleStatusChange(targetStatus: string) {
+    if (targetStatus === 'FAKTUROVANO') {
+      const hasInvoicedPeriod = currentOrder.billingPeriods.some((p) => p.invoiceId && p.status === 'SENT');
+      if (!hasInvoicedPeriod) {
+        setShowInvoiceModal(true);
+        return;
+      }
+    }
+
     setTransitioning(true);
     setErrorMsg('');
+    setActionableError(null);
     setSuccessMsg('');
 
     try {
@@ -127,7 +158,17 @@ export function NavigationOrderDetailView({
         body: JSON.stringify({ status: targetStatus }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Nepodařilo se změnit stav zakázky.');
+      if (!res.ok) {
+        if (data.resolution || data.errorType) {
+          setActionableError({
+            title: 'Změna stavu zakázky byla zablokována',
+            message: data.error || 'Nepodařilo se změnit stav zakázky.',
+            errorType: data.errorType,
+            resolution: data.resolution,
+          });
+        }
+        throw new Error(data.error || 'Nepodařilo se změnit stav zakázky.');
+      }
 
       setSuccessMsg(`Stav zakázky byl změněn na "${NAVIGATION_ORDER_STATUS_LABELS[targetStatus as keyof typeof NAVIGATION_ORDER_STATUS_LABELS]}"`);
       setCurrentOrder((prev) => ({
@@ -135,6 +176,7 @@ export function NavigationOrderDetailView({
         status: data.order.status,
         blockStatus: data.order.blockStatus,
       }));
+      setActionableError(null);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Chyba při přechodu stavu.');
     } finally {
@@ -145,11 +187,24 @@ export function NavigationOrderDetailView({
   async function handleCreateAndSendInvoice() {
     setCreatingInvoice(true);
     setErrorMsg('');
+    setActionableError(null);
     setSuccessMsg('');
     try {
       const response = await fetch(`/api/navigation/orders/${currentOrder.id}/invoice`, { method: 'POST' });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Fakturu se nepodařilo vytvořit nebo odeslat.');
+      if (!response.ok) {
+        if (data.errorType || data.resolution) {
+          setActionableError({
+            title: data.errorType === 'MISSING_INVOICE_DATA' ? 'Chybí fakturační údaje dodavatele' : 'Fakturu nelze vystavit',
+            message: data.error || 'Fakturu se nepodařilo vytvořit nebo odeslat.',
+            errorType: data.errorType,
+            missingFields: data.missingFields,
+            supplierData: data.supplierData,
+            resolution: data.resolution,
+          });
+        }
+        throw new Error(data.error || 'Fakturu se nepodařilo vytvořit nebo odeslat.');
+      }
       setCurrentOrder((previous) => ({
         ...previous,
         billingPeriods: [
@@ -157,7 +212,8 @@ export function NavigationOrderDetailView({
           data.billingPeriod,
         ],
       }));
-      setSuccessMsg(data.message);
+      setSuccessMsg(data.message || 'Faktura byla úspěšně vystavena.');
+      setActionableError(null);
     } catch (error: unknown) {
       setErrorMsg(error instanceof Error ? error.message : 'Fakturu se nepodařilo vytvořit nebo odeslat.');
     } finally {
@@ -318,12 +374,51 @@ export function NavigationOrderDetailView({
           </div>
         </div>
 
-        {/* Feedback Messages */}
-        {errorMsg && (
+        {/* Feedback Messages & Actionable Error Resolutions */}
+        {actionableError ? (
+          <div className="mt-3">
+            <ActionableResolutionCard
+              title={actionableError.title}
+              message={actionableError.message}
+              missingFields={actionableError.missingFields}
+              severity="error"
+              primaryAction={
+                actionableError.errorType === 'MISSING_INVOICE_DATA' && actionableError.resolution?.target === 'company'
+                  ? {
+                      label: '✏️ Rychle doplnit firemní údaje a vystavit fakturu',
+                      onClick: () => setShowCompanyModal(true),
+                    }
+                  : actionableError.errorType === 'MISSING_CLIENT_EMAIL' || actionableError.resolution?.target === 'client'
+                  ? {
+                      label: actionableError.resolution?.label || 'Doplnit v kartě klienta ↗',
+                      href: actionableError.resolution?.url || `/clients/${currentOrder.clientId}`,
+                    }
+                  : actionableError.resolution?.type === 'TAB_SWITCH' && actionableError.resolution?.tab
+                  ? {
+                      label: actionableError.resolution?.label || 'Přejít k vyřešení',
+                      onClick: () => setActiveTab(actionableError.resolution!.tab as NavigationTabKey),
+                    }
+                  : undefined
+              }
+              secondaryAction={
+                actionableError.errorType === 'MISSING_INVOICE_DATA'
+                  ? {
+                      label: 'Nastavení firmy ↗',
+                      href: '/settings/company',
+                    }
+                  : undefined
+              }
+              onDismiss={() => {
+                setActionableError(null);
+                setErrorMsg('');
+              }}
+            />
+          </div>
+        ) : errorMsg ? (
           <div className="mt-3 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-800">
             ⚠️ {errorMsg}
           </div>
-        )}
+        ) : null}
         {successMsg && (
           <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-semibold text-emerald-800">
             ✅ {successMsg}
@@ -620,11 +715,10 @@ export function NavigationOrderDetailView({
                   {canInvoice && currentOrder.status === 'PRIPRAVENO_K_FAKTURACI' && (
                     <button
                       type="button"
-                      onClick={handleCreateAndSendInvoice}
-                      disabled={creatingInvoice}
-                      className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                      onClick={() => setShowInvoiceModal(true)}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm transition"
                     >
-                      {creatingInvoice ? 'Vytvářím a odesílám…' : 'Vytvořit a odeslat fakturu klientovi'}
+                      Návrh, úprava položek a odeslání faktury
                     </button>
                   )}
                 </div>
@@ -654,13 +748,45 @@ export function NavigationOrderDetailView({
                   {canInvoice && currentOrder.status === 'PRIPRAVENO_K_FAKTURACI' && currentOrder.billingPeriods.some((period) => period.status !== 'SENT') && (
                     <button
                       type="button"
-                      onClick={handleCreateAndSendInvoice}
-                      disabled={creatingInvoice}
-                      className="mt-3 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                      onClick={() => setShowInvoiceModal(true)}
+                      className="mt-3 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 shadow-sm transition"
                     >
-                      {creatingInvoice ? 'Odesílám…' : 'Odeslat vystavenou fakturu klientovi'}
+                      Náhled dokladu, úprava e-mailu a odeslání faktury
                     </button>
                   )}
+                </div>
+              )}
+
+              {actionableError && (
+                <div className="pt-2">
+                  <ActionableResolutionCard
+                    title={actionableError.title}
+                    message={actionableError.message}
+                    missingFields={actionableError.missingFields}
+                    severity="error"
+                    primaryAction={
+                      actionableError.errorType === 'MISSING_INVOICE_DATA' && actionableError.resolution?.target === 'company'
+                        ? {
+                            label: '✏️ Rychle doplnit firemní údaje a vystavit fakturu',
+                            onClick: () => setShowCompanyModal(true),
+                          }
+                        : actionableError.errorType === 'MISSING_CLIENT_EMAIL' || actionableError.resolution?.target === 'client'
+                        ? {
+                            label: actionableError.resolution?.label || 'Doplnit v kartě klienta ↗',
+                            href: actionableError.resolution?.url || `/clients/${currentOrder.clientId}`,
+                          }
+                        : undefined
+                    }
+                    secondaryAction={
+                      actionableError.errorType === 'MISSING_INVOICE_DATA'
+                        ? {
+                            label: 'Nastavení firmy ↗',
+                            href: '/settings/company',
+                          }
+                        : undefined
+                    }
+                    onDismiss={() => setActionableError(null)}
+                  />
                 </div>
               )}
             </div>
@@ -855,6 +981,45 @@ export function NavigationOrderDetailView({
             </div>
           </form>
         </div>
+      )}
+
+      {/* Modal: Quick Company Settings */}
+      <QuickCompanySettingsModal
+        isOpen={showCompanyModal}
+        onClose={() => setShowCompanyModal(false)}
+        missingFields={actionableError?.missingFields || []}
+        initialData={actionableError?.supplierData}
+        actionLabel="Uložit údaje a vystavit fakturu"
+        onSuccess={async () => {
+          await handleCreateAndSendInvoice();
+        }}
+      />
+
+      {/* Modal: Navigation Invoice Drafting & Delivery */}
+      {showInvoiceModal && (
+        <NavigationInvoiceModal
+          orderId={currentOrder.id}
+          orderNumber={currentOrder.orderNumber}
+          orderTitle={currentOrder.targetName || currentOrder.title || ''}
+          clientName={currentOrder.clientName}
+          initialRecipientEmail={currentOrder.contactEmail}
+          onClose={() => setShowInvoiceModal(false)}
+          onSuccess={async (result) => {
+            setShowInvoiceModal(false);
+            setSuccessMsg(
+              `Faktura ${result.invoiceNumber} byla úspěšně zpracována${result.delivered ? ' a odeslána na e-mail klienta.' : '.'}`
+            );
+            try {
+              const res = await fetch(`/api/navigation/orders/${currentOrder.id}`);
+              const json = await res.json();
+              if (res.ok && json.success && json.order) {
+                setCurrentOrder(json.order);
+              }
+            } catch {
+              // Ignore refresh error
+            }
+          }}
+        />
       )}
 
     </div>

@@ -1,0 +1,551 @@
+TAP version 13
+# Subtest: AI inbox models have tenant isolation in prisma schema and tenant layer
+ok 1 - AI inbox models have tenant isolation in prisma schema and tenant layer
+  ---
+  duration_ms: 8.9739
+  type: 'test'
+  ...
+# Subtest: buildAnalysisPrompt provides prompt injection isolation with untrusted boundary tags
+ok 2 - buildAnalysisPrompt provides prompt injection isolation with untrusted boundary tags
+  ---
+  duration_ms: 115.7556
+  type: 'test'
+  ...
+# Subtest: RBAC permits ADMIN, MANAGER, SALES to access aiInbox and denies WORKER, TECHNICIAN, VIEWER
+ok 3 - RBAC permits ADMIN, MANAGER, SALES to access aiInbox and denies WORKER, TECHNICIAN, VIEWER
+  ---
+  duration_ms: 1.2733
+  type: 'test'
+  ...
+# Subtest: AI Inbox API routes enforce organizationId scoping and authentication
+ok 4 - AI Inbox API routes enforce organizationId scoping and authentication
+  ---
+  duration_ms: 12.1037
+  type: 'test'
+  ...
+# Subtest: field survey: GPS coordinates validation adheres to geographic bounds
+ok 5 - field survey: GPS coordinates validation adheres to geographic bounds
+  ---
+  duration_ms: 8.5137
+  type: 'test'
+  ...
+# Subtest: field survey: parcel lookup provider default never hallucinates and returns UNVERIFIED
+ok 6 - field survey: parcel lookup provider default never hallucinates and returns UNVERIFIED
+  ---
+  duration_ms: 1.9636
+  type: 'test'
+  ...
+# Subtest: field survey: factory returns CuzkRuianProvider by default and ManualParcelProvider when MANUAL_PARCEL_ONLY is set
+ok 7 - field survey: factory returns CuzkRuianProvider by default and ManualParcelProvider when MANUAL_PARCEL_ONLY is set
+  ---
+  duration_ms: 1.2963
+  type: 'test'
+  ...
+# Subtest: field survey: GeoJSON export adheres to RFC 7946 format and [lng, lat] coordinate order
+ok 8 - field survey: GeoJSON export adheres to RFC 7946 format and [lng, lat] coordinate order
+  ---
+  duration_ms: 4.4894
+  type: 'test'
+  ...
+# Subtest: field survey: KML export contains valid placemark structure and escapes XML entities
+ok 9 - field survey: KML export contains valid placemark structure and escapes XML entities
+  ---
+  duration_ms: 239.7124
+  type: 'test'
+  ...
+# Subtest: field survey: XLSX export writes all columns and returns a valid Buffer
+ok 10 - field survey: XLSX export writes all columns and returns a valid Buffer
+  ---
+  duration_ms: 190.8094
+  type: 'test'
+  ...
+# Subtest: field survey: RBAC access allows field roles and denies unauthorized roles
+ok 11 - field survey: RBAC access allows field roles and denies unauthorized roles
+  ---
+  duration_ms: 1.5458
+  type: 'test'
+  ...
+# Subtest: field survey: storage key for survey photos is isolated under tenant photos resource
+ok 12 - field survey: storage key for survey photos is isolated under tenant photos resource
+  ---
+  duration_ms: 0.9166
+  type: 'test'
+  ...
+# Subtest: field survey: conversion idempotency contract guarantees no duplicate carrier creation
+ok 13 - field survey: conversion idempotency contract guarantees no duplicate carrier creation
+  ---
+  duration_ms: 0.7384
+  type: 'test'
+  ...
+# Subtest: field survey: CuzkRuianProvider parses ArcGIS REST identify results and builds KN link
+ok 14 - field survey: CuzkRuianProvider parses ArcGIS REST identify results and builds KN link
+  ---
+  duration_ms: 90.4612
+  type: 'test'
+  ...
+# Subtest: field survey: AI vision response sanitization strips markdown fences and extracts JSON
+ok 15 - field survey: AI vision response sanitization strips markdown fences and extracts JSON
+  ---
+  duration_ms: 1.0352
+  type: 'test'
+  ...
+# Subtest: field survey: ARES entity search parses response and formats candidate addresses
+ok 16 - field survey: ARES entity search parses response and formats candidate addresses
+  ---
+  duration_ms: 0.8536
+  type: 'test'
+  ...
+# [mobile-photos/upload] Následná operace chat selhala Error: chat unavailable
+#     at Object.run (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:31:46)
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:69)
+#     at Array.map (<anonymous>)
+#     at runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:50)
+#     at TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:29:26)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+# [mobile-photos/upload] Pokus 1/2 selhal Error: temporary chat outage
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:41:31)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:39:24)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+#     at Test.postRun (node:internal/test_runner/test:1173:19)
+#     at Test.run (node:internal/test_runner/test:1101:12)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [mobile-photos/upload] Pokus 1/2 selhal Error: chat unavailable
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:55:15)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at Object.run (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:53:18)
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:69)
+#     at Array.map (<anonymous>)
+#     at runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:50)
+#     at TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:50:26)
+#     at Test.runInAsyncScope (node:async_hooks:214:14)
+#     at Test.run (node:internal/test_runner/test:1047:25)
+#     at Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+# [mobile-photos/upload] Pokus 2/2 selhal Error: chat unavailable
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:55:15)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at async Promise.allSettled (index 0)
+#     at async runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:19)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:50:20)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# [mobile-photos/upload] Následná operace chat selhala Error: chat unavailable
+#     at <anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:55:15)
+#     at runWithRetry (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:30:20)
+#     at async Promise.allSettled (index 0)
+#     at async runPostSaveTasks (C:\\Users\\42077\\Documents\\seepoint\\lib\\mobile-photo-upload.ts:14:19)
+#     at async TestContext.<anonymous> (C:\\Users\\42077\\Documents\\seepoint\\tests\\mobile-photo-upload.test.ts:50:20)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# Subtest: mobile upload: saved photos use a stable internal URL
+ok 17 - mobile upload: saved photos use a stable internal URL
+  ---
+  duration_ms: 5.4037
+  type: 'test'
+  ...
+# Subtest: mobile upload: missing or invalid GPS is rejected
+ok 18 - mobile upload: missing or invalid GPS is rejected
+  ---
+  duration_ms: 23.0877
+  type: 'test'
+  ...
+# Subtest: mobile upload: chat failure after persistence is only a warning
+ok 19 - mobile upload: chat failure after persistence is only a warning
+  ---
+  duration_ms: 26.5476
+  type: 'test'
+  ...
+# Subtest: mobile upload: transient chat failure is retried before becoming a warning
+ok 20 - mobile upload: transient chat failure is retried before becoming a warning
+  ---
+  duration_ms: 2.3953
+  type: 'test'
+  ...
+# Subtest: mobile upload: persistent chat failure is still isolated from saved photo
+ok 21 - mobile upload: persistent chat failure is still isolated from saved photo
+  ---
+  duration_ms: 3.72
+  type: 'test'
+  ...
+# Subtest: mobile upload: invalid photo ids cannot become URLs
+ok 22 - mobile upload: invalid photo ids cannot become URLs
+  ---
+  duration_ms: 5.5487
+  type: 'test'
+  ...
+# Subtest: mobile upload: damage options contain the requested field defects
+ok 23 - mobile upload: damage options contain the requested field defects
+  ---
+  duration_ms: 0.7193
+  type: 'test'
+  ...
+# Subtest: mobile nearby: client assigned in carrier detail is visible without an occupancy row
+ok 24 - mobile nearby: client assigned in carrier detail is visible without an occupancy row
+  ---
+  duration_ms: 0.7738
+  type: 'test'
+  ...
+# Subtest: Organization A client listing is always scoped away from Organization B
+ok 25 - Organization A client listing is always scoped away from Organization B
+  ---
+  duration_ms: 10.4392
+  type: 'test'
+  ...
+# Subtest: GET by a foreign client id receives an organization predicate and therefore resolves as 404
+ok 26 - GET by a foreign client id receives an organization predicate and therefore resolves as 404
+  ---
+  duration_ms: 120.4475
+  type: 'test'
+  ...
+# Subtest: updates and deletes cannot target a record outside the active organization
+ok 27 - updates and deletes cannot target a record outside the active organization
+  ---
+  duration_ms: 3.545
+  type: 'test'
+  ...
+# Subtest: same normalized client name is unique per organization, not globally
+ok 28 - same normalized client name is unique per organization, not globally
+  ---
+  duration_ms: 3.0469
+  type: 'test'
+  ...
+# Subtest: one global user email can have memberships in multiple organizations
+ok 29 - one global user email can have memberships in multiple organizations
+  ---
+  duration_ms: 2.7879
+  type: 'test'
+  ...
+# Subtest: AI inventory lookup is scoped to the active organization
+ok 30 - AI inventory lookup is scoped to the active organization
+  ---
+  duration_ms: 0.6473
+  type: 'test'
+  ...
+# Subtest: dashboard counts and aggregates are scoped to the active organization
+ok 31 - dashboard counts and aggregates are scoped to the active organization
+  ---
+  duration_ms: 1.0985
+  type: 'test'
+  ...
+# Subtest: public offers resolve tenant only by an opaque token and never by offer id fallback
+ok 32 - public offers resolve tenant only by an opaque token and never by offer id fallback
+  ---
+  duration_ms: 11.8703
+  type: 'test'
+  ...
+# Subtest: all declared tenant models receive create ownership and reject client overrides
+ok 33 - all declared tenant models receive create ownership and reject client overrides
+  ---
+  duration_ms: 2.7097
+  type: 'test'
+  ...
+# Subtest: OrganizationCarrierType is tenant-scoped
+ok 34 - OrganizationCarrierType is tenant-scoped
+  ---
+  duration_ms: 2.2113
+  type: 'test'
+  ...
+# Subtest: Product model is tenant-scoped and rejects cross-org overrides
+ok 35 - Product model is tenant-scoped and rejects cross-org overrides
+  ---
+  duration_ms: 1.4984
+  type: 'test'
+  ...
+# Subtest: OrganizationCarrierType and Product are in TENANT_MODEL_NAMES
+ok 36 - OrganizationCarrierType and Product are in TENANT_MODEL_NAMES
+  ---
+  duration_ms: 0.5804
+  type: 'test'
+  ...
+# Subtest: OrganizationCarrierType schema has unique constraint on [organizationId, code]
+ok 37 - OrganizationCarrierType schema has unique constraint on [organizationId, code]
+  ---
+  duration_ms: 1.844
+  type: 'test'
+  ...
+# Subtest: AdvertisingCarrier has carrierTypeId FK field
+ok 38 - AdvertisingCarrier has carrierTypeId FK field
+  ---
+  duration_ms: 3.0411
+  type: 'test'
+  ...
+# Subtest: PriceListItem, OfferPriceRule, and MediaPackageRule have carrierTypeId FK fields in schema
+ok 39 - PriceListItem, OfferPriceRule, and MediaPackageRule have carrierTypeId FK fields in schema
+  ---
+  duration_ms: 3.6329
+  type: 'test'
+  ...
+# Subtest: selectMediaPackageSurfaces matches by dynamic carrierTypeId first and falls back to mediaType
+ok 40 - selectMediaPackageSurfaces matches by dynamic carrierTypeId first and falls back to mediaType
+  ---
+  duration_ms: 2.0227
+  type: 'test'
+  ...
+# Subtest: filterOfferSurfaces supports dynamic carrierTypeId filter
+ok 41 - filterOfferSurfaces supports dynamic carrierTypeId filter
+  ---
+  duration_ms: 3.041
+  type: 'test'
+  ...
+# Subtest: parseRateInput handles carrierTypeLabel correctly
+ok 42 - parseRateInput handles carrierTypeLabel correctly
+  ---
+  duration_ms: 2.7052
+  type: 'test'
+  ...
+# Subtest: WorkEntry and SettlementItem models contain carrierTypeLabel snapshot column in schema
+ok 43 - WorkEntry and SettlementItem models contain carrierTypeLabel snapshot column in schema
+  ---
+  duration_ms: 3.6815
+  type: 'test'
+  ...
+# Subtest: new organization default carrier types seed generic OOH types without SeePoint proprietary names
+ok 44 - new organization default carrier types seed generic OOH types without SeePoint proprietary names
+  ---
+  duration_ms: 1.2876
+  type: 'test'
+  ...
+# Subtest: TEST 1 & TEST 2: Navigace 1. fáze bez cen – schválení výběru lokalit bez objednávky výroby
+ok 45 - TEST 1 & TEST 2: Navigace 1. fáze bez cen – schválení výběru lokalit bez objednávky výroby
+  ---
+  duration_ms: 4.2491
+  type: 'test'
+  ...
+# Subtest: TEST 3: Navigace 1. fáze bez cen – nezobrazuje falešné 0 Kč v public view modelu
+ok 46 - TEST 3: Navigace 1. fáze bez cen – nezobrazuje falešné 0 Kč v public view modelu
+  ---
+  duration_ms: 3.9799
+  type: 'test'
+  ...
+# Subtest: TEST 4: Finální nabídka (PRICED_QUOTE) vyžaduje validní cenu a odmítne 0 Kč
+ok 47 - TEST 4: Finální nabídka (PRICED_QUOTE) vyžaduje validní cenu a odmítne 0 Kč
+  ---
+  duration_ms: 1.701
+  type: 'test'
+  ...
+# Subtest: TEST 5 & TEST 6: Ochrana tokenů a tenant boundary při schvalování
+ok 48 - TEST 5 & TEST 6: Ochrana tokenů a tenant boundary při schvalování
+  ---
+  duration_ms: 5.9912
+  type: 'test'
+  ...
+# Subtest: TEST 7: Idempotence potvrzení výběru bodů klientem
+ok 49 - TEST 7: Idempotence potvrzení výběru bodů klientem
+  ---
+  duration_ms: 3.4146
+  type: 'test'
+  ...
+# Subtest: TEST 8: Selhání notifikačního e-mailu neohrozí uložení potvrzení klienta
+ok 50 - TEST 8: Selhání notifikačního e-mailu neohrozí uložení potvrzení klienta
+  ---
+  duration_ms: 4.3215
+  type: 'test'
+  ...
+# Subtest: report JSON, direct download and ZIP consistently exclude unapproved, private and foreign photos
+ok 51 - report JSON, direct download and ZIP consistently exclude unapproved, private and foreign photos
+  ---
+  duration_ms: 2328.7473
+  type: 'test'
+  ...
+# Subtest: public report lookup only reads a matching active published token and never restores links
+ok 52 - public report lookup only reads a matching active published token and never restores links
+  ---
+  duration_ms: 319.5385
+  type: 'test'
+  ...
+# Subtest: Modul NAVIGACE - Workflow a RBAC Testy
+    # Subtest: ověřuje povolené přechody stavového automatu zakázky
+    ok 1 - ověřuje povolené přechody stavového automatu zakázky
+      ---
+      duration_ms: 124.6551
+      type: 'test'
+      ...
+    # Subtest: ověřuje oprávnění pro samostatnou roli SALES
+    ok 2 - ověřuje oprávnění pro samostatnou roli SALES
+      ---
+      duration_ms: 1.1359
+      type: 'test'
+      ...
+    # Subtest: ověřuje vlastnictví nabídky pro roli SALES
+    ok 3 - ověřuje vlastnictví nabídky pro roli SALES
+      ---
+      duration_ms: 1.4529
+      type: 'test'
+      ...
+    # Subtest: fakturaci navigace chrání role, stav, Decimal výpočet a idempotence odeslání
+    ok 4 - fakturaci navigace chrání role, stav, Decimal výpočet a idempotence odeslání
+      ---
+      duration_ms: 3.1359
+      type: 'test'
+      ...
+    1..4
+ok 53 - Modul NAVIGACE - Workflow a RBAC Testy
+  ---
+  duration_ms: 134.8264
+  type: 'suite'
+  ...
+# Subtest: deriveSurfaceOccupancyState - returns AVAILABLE when no occupancies exist
+ok 54 - deriveSurfaceOccupancyState - returns AVAILABLE when no occupancies exist
+  ---
+  duration_ms: 5.725
+  type: 'test'
+  ...
+# Subtest: deriveSurfaceOccupancyState - ignores CANCELLED and FINISHED occupancies
+ok 55 - deriveSurfaceOccupancyState - ignores CANCELLED and FINISHED occupancies
+  ---
+  duration_ms: 114.8807
+  type: 'test'
+  ...
+# Subtest: deriveSurfaceOccupancyState - correctly identifies active OCCUPIED state
+ok 56 - deriveSurfaceOccupancyState - correctly identifies active OCCUPIED state
+  ---
+  duration_ms: 0.5289
+  type: 'test'
+  ...
+# Subtest: deriveSurfaceOccupancyState - prioritizes OCCUPIED over NEGOTIATION
+ok 57 - deriveSurfaceOccupancyState - prioritizes OCCUPIED over NEGOTIATION
+  ---
+  duration_ms: 0.5233
+  type: 'test'
+  ...
+# Subtest: occupancy client components receive a server reference date for hydration-safe rendering
+ok 58 - occupancy client components receive a server reference date for hydration-safe rendering
+  ---
+  duration_ms: 8.0532
+  type: 'test'
+  ...
+# Subtest: respondToPublicOffer and transitionOffer enforce availability conflict check before accepting standard media offers
+ok 59 - respondToPublicOffer and transitionOffer enforce availability conflict check before accepting standard media offers
+  ---
+  duration_ms: 5.4093
+  type: 'test'
+  ...
+# Subtest: respondToPublicOffer respects selectedPointIds for Navigation Phase 1
+ok 60 - respondToPublicOffer respects selectedPointIds for Navigation Phase 1
+  ---
+  duration_ms: 2.5907
+  type: 'test'
+  ...
+# Subtest: sendTransactionalEmail and all offer notification routes scope EmailLog with organizationId
+ok 61 - sendTransactionalEmail and all offer notification routes scope EmailLog with organizationId
+  ---
+  duration_ms: 24.0844
+  type: 'test'
+  ...
+# Subtest: photo validation verifies magic bytes instead of trusting MIME or extension
+ok 62 - photo validation verifies magic bytes instead of trusting MIME or extension
+  ---
+  duration_ms: 13.3487
+  type: 'test'
+  ...
+# Subtest: photo validation rejects empty and oversized uploads and sanitizes names
+ok 63 - photo validation rejects empty and oversized uploads and sanitizes names
+  ---
+  duration_ms: 3.7352
+  type: 'test'
+  ...
+# Subtest: legacy data URL photos are decoded with the same strict validation boundary
+ok 64 - legacy data URL photos are decoded with the same strict validation boundary
+  ---
+  duration_ms: 1.4896
+  type: 'test'
+  ...
+# Subtest: mobile upload separates survey uploads from carrier field captures
+ok 65 - mobile upload separates survey uploads from carrier field captures
+  ---
+  duration_ms: 3.4937
+  type: 'test'
+  ...
+# Subtest: mobile field UI never substitutes carrier coordinates for capture coordinates
+ok 66 - mobile field UI never substitutes carrier coordinates for capture coordinates
+  ---
+  duration_ms: 2.2453
+  type: 'test'
+  ...
+# Subtest: mobile carrier discovery is bounded, searchable and resistant to stale responses
+ok 67 - mobile carrier discovery is bounded, searchable and resistant to stale responses
+  ---
+  duration_ms: 4.1147
+  type: 'test'
+  ...
+# Subtest: photo confirmation is authenticated, one-way and idempotent
+ok 68 - photo confirmation is authenticated, one-way and idempotent
+  ---
+  duration_ms: 2.3939
+  type: 'test'
+  ...
+# Subtest: installation photos share tenant storage and clean up failed writes
+ok 69 - installation photos share tenant storage and clean up failed writes
+  ---
+  duration_ms: 2.0467
+  type: 'test'
+  ...
+# Subtest: all active photo upload routes use the shared storage boundary or verified Drive logo flow
+ok 70 - all active photo upload routes use the shared storage boundary or verified Drive logo flow
+  ---
+  duration_ms: 16.6006
+  type: 'test'
+  ...
+# Subtest: standard photo upload restores the verified tenant at the route boundary
+ok 71 - standard photo upload restores the verified tenant at the route boundary
+  ---
+  duration_ms: 1.2355
+  type: 'test'
+  ...
+# Subtest: profile and vehicle photos use correct types and replacement-safe storage
+ok 72 - profile and vehicle photos use correct types and replacement-safe storage
+  ---
+  duration_ms: 5.3593
+  type: 'test'
+  ...
+# Subtest: legacy content and thumbnail endpoints converge on the authorized file route
+ok 73 - legacy content and thumbnail endpoints converge on the authorized file route
+  ---
+  duration_ms: 6.1103
+  type: 'test'
+  ...
+# Subtest: deleting a photo removes the database row before best-effort object cleanup
+ok 74 - deleting a photo removes the database row before best-effort object cleanup
+  ---
+  duration_ms: 2.2789
+  type: 'test'
+  ...
+# Subtest: carrier photo count stays synchronized after gallery mutations
+ok 75 - carrier photo count stays synchronized after gallery mutations
+  ---
+  duration_ms: 9.2547
+  type: 'test'
+  ...
+# Subtest: carrier damage report validates, prepares and verifies photo uploads before closing
+ok 76 - carrier damage report validates, prepares and verifies photo uploads before closing
+  ---
+  duration_ms: 2.9606
+  type: 'test'
+  ...
+# Subtest: carrier gallery preserves and displays field capture metadata
+ok 77 - carrier gallery preserves and displays field capture metadata
+  ---
+  duration_ms: 6.374
+  type: 'test'
+  ...
+# Subtest: Google Drive image picker loads bounded pages instead of one thousand files
+ok 78 - Google Drive image picker loads bounded pages instead of one thousand files
+  ---
+  duration_ms: 6.6631
+  type: 'test'
+  ...
+1..78
+# tests 81
+# suites 1
+# pass 81
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6077.3561
