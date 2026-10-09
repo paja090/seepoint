@@ -19,7 +19,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       crmOrderId?: string;
     } | null;
 
-    if (!body || !body.to?.trim() || !body.subject?.trim() || !body.message?.trim()) {
+    const to = body?.to?.trim();
+    const subject = body?.subject?.trim();
+    const message = body?.message?.trim();
+
+    if (!to || !subject || !message) {
       return NextResponse.json({ error: 'Vyplňte prosím příjemce, předmět a text zprávy.' }, { status: 400 });
     }
 
@@ -32,9 +36,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const delivery = await sendTransactionalEmail({
-      to: body.to.trim(),
-      subject: body.subject.trim(),
-      message: body.message.trim(),
+      to,
+      subject,
+      message,
       template: 'client-crm-email',
       organizationId: user.organizationId,
       idempotencyKey: `crm-email-${clientId}-${Date.now()}`,
@@ -44,12 +48,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const created = await tx.clientCommunication.create({
         data: {
           clientId,
-          contactId: body.contactId || null,
+          contactId: body?.contactId || null,
           authorUserId: user.id,
-          crmOrderId: body.crmOrderId || null,
+          crmOrderId: body?.crmOrderId || null,
           type: 'EMAIL',
-          subject: body.subject.trim(),
-          content: body.message.trim(),
+          subject,
+          content: message,
           isInternal: false,
         },
       });
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           action: 'SEND_CLIENT_EMAIL',
           entityType: 'Client',
           entityId: clientId,
-          detailsJson: JSON.stringify({ communicationId: created.id, to: body.to.trim() }),
+          detailsJson: JSON.stringify({ communicationId: created.id, to }),
         },
       });
 
