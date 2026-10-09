@@ -216,7 +216,7 @@ export function setPointOperationTypeInDescription(
   relocationDestination?: string | null
 ): string {
   // Strip any existing [Operace: ...] and [Cíl převozu: ...] tags
-  let desc = (currentDescription || '')
+  const desc = (currentDescription || '')
     .replace(/\[Operace:\s*[^\]]+\]\s*/gi, '')
     .replace(/\[C[ií]l\s*p[rř]evozu:\s*[^\]]+\]\s*/gi, '')
     .trim();

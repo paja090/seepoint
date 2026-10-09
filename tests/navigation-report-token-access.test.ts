@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
+
 
 test('public report lookup only reads a matching active published token and never restores links', async t => {
   const hash = 'a'.repeat(64);

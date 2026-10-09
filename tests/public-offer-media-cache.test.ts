@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
+
 import { OfferValidationError } from '../lib/offers/domain';
 
 test('public offer media is not cached and rejected tokens cannot retrieve assets', async t => {

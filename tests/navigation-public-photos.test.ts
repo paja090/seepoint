@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
+
 
 test('report JSON, direct download and ZIP consistently exclude unapproved, private and foreign photos', async t => {
   let approved = true, privatePhoto = false, photoOrg = 'org-a';

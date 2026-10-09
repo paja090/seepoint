@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
+
 
 test('Drive photo route rejects foreign files before download and never publicly caches private photos', async t => {
   let user: { id: string; organizationId: string | null; role: string } | null = { id: 'admin-a', organizationId: 'org-a', role: 'ADMIN' };
