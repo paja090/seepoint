@@ -88,28 +88,31 @@ ${routePoints}
 /**
  * Builds Google Maps URL with the sequence of navigation points
  */
-export function getGoogleMapsRouteUrl(items: SnapshotItemData[]): string | null {
+export function getGoogleMapsPointUrl(latitude: number, longitude: number): string {
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+}
+
+export function getGoogleMapsRouteUrl(
+  items: Array<{ latitude?: number | null; longitude?: number | null }>,
+): string | null {
   const valid = items.filter(
-    (i) => i.latitude !== null && i.longitude !== null && (i.latitude !== 0 || i.longitude !== 0),
+    (i): i is { latitude: number; longitude: number } =>
+      typeof i.latitude === 'number' &&
+      typeof i.longitude === 'number' &&
+      !isNaN(i.latitude) &&
+      !isNaN(i.longitude) &&
+      (i.latitude !== 0 || i.longitude !== 0),
   );
 
   if (valid.length === 0) return null;
 
   if (valid.length === 1) {
-    return `https://www.google.com/maps/search/?api=1&query=${valid[0].latitude},${valid[0].longitude}`;
+    return getGoogleMapsPointUrl(valid[0].latitude, valid[0].longitude);
   }
 
-  const origin = `${valid[0].latitude},${valid[0].longitude}`;
-  const destination = `${valid[valid.length - 1].latitude},${valid[valid.length - 1].longitude}`;
-
-  // Google Maps supports up to ~9 intermediate waypoints in URL query
-  const intermediateWaypoints = valid.slice(1, -1).slice(0, 9);
-  const waypointsParam =
-    intermediateWaypoints.length > 0
-      ? `&waypoints=${intermediateWaypoints.map((w) => `${w.latitude},${w.longitude}`).join('%7C')}`
-      : '';
-
-  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=driving`;
+  // Multi-stop direct route format for Google Maps (up to 15 stops supported directly in URL)
+  const coordsPath = valid.slice(0, 15).map((p) => `${p.latitude},${p.longitude}`).join('/');
+  return `https://www.google.com/maps/dir/${coordsPath}`;
 }
 
 /**

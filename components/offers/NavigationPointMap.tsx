@@ -57,9 +57,9 @@ export function NavigationPointMap({
     void import('leaflet').then((L) => {
       if (cancelled || !element.current || mapRef.current) return;
       const map = L.map(element.current, { center: [49.82, 15.48], zoom: 8, scrollWheelZoom: true });
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
-        maxZoom: 19,
+      L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        attribution: '&copy; Google Maps',
+        maxZoom: 20,
       }).addTo(map);
 
       map.on('click', (event) => { if (!readOnlyRef.current) clickRef.current(event.latlng.lat, event.latlng.lng); });

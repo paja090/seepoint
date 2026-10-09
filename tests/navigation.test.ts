@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { canAccess, roles, type AppSection } from '../lib/rbac';
-import { PLAN_MODULE_PRESETS, SYSTEM_MODULES, isModuleEnabled } from '../lib/organization-modules';
+import { PLAN_MODULE_PRESETS, SYSTEM_MODULES, isModuleAvailable } from '../lib/organization-modules';
 import { findActiveNavigation, getVisibleNavigation, matchesNavigationPath, navigationHubs } from '../lib/navigation';
 
 // The audit is a frozen inventory of the pre-redesign links, sections and modules.
@@ -16,6 +16,7 @@ const additions = [
   { href: '/realization', section: 'realization' as AppSection, module: 'aiRealization' },
   { href: '/field-survey', section: 'fieldSurvey' as AppSection, module: 'carriers' },
   { href: '/election-removal', section: 'electionRemoval' as AppSection, module: 'electionRemoval' },
+  { href: '/academy', section: 'academy' as AppSection, module: 'academy' },
 ];
 const current = [...original, ...additions];
 
@@ -34,8 +35,8 @@ test('all roles retain the original visibility across plans, overrides and missi
   ];
   for (const role of roles) for (const organization of organizations) {
     const expected = current.filter(item => canAccess(role, item.section) &&
-      (item.module !== 'planner' || organization) &&
-      (!organization || item.module === '—' || isModuleEnabled(organization, item.module))).map(i => i.href).sort();
+      (!['planner', 'academy'].includes(item.module) || organization) &&
+      (!organization || item.module === '—' || isModuleAvailable(organization, item.module))).map(i => i.href).sort();
     const actual = getVisibleNavigation({ role, organization });
     assert.deepEqual(hrefs(actual), expected, `${role}: ${JSON.stringify(organization)}`);
     assert.ok(actual.every(h => h.groups.length && h.groups.every(g => g.items.length)));

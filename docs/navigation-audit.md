@@ -32,7 +32,7 @@ Audit původní navigace před změnou: 36 hlavních odkazů, všechny zachován
 | ⏱️ Odvedená práce (všichni) | /work-entries | workEntries | work | Provoz & Realizace / Interní provoz |
 | 💰 Vyúčtování firemní | /settlements | settlements | settlements | Provoz & Realizace / Interní provoz |
 | 🚘 Vozidla a vozíky | /vehicles | vehicles | vehicles | Provoz & Realizace / Interní provoz |
-| 📦 Sklad & Materiál | /warehouse | vehicles | warehouse | Provoz & Realizace / Interní provoz |
+| 📦 Sklad & Materiál | /warehouse | warehouse | warehouse | Provoz & Realizace / Interní provoz |
 | 👤 Zaměstnanci & Tým | /employees | employees | employees | Správa / Tým & Data |
 | 📥 Import dat | /import | import | import | Správa / Tým & Data |
 | ⚙️ Nastavení systému | /settings | settings | — | Správa / Nastavení |
@@ -42,7 +42,7 @@ Audit původní navigace před změnou: 36 hlavních odkazů, všechny zachován
 | 🔌 Integrace | /settings/integrations | settings | — | Správa / Nastavení |
 
 
-RBAC: každá původní položka používá canAccess(role, section) a při existující organizaci getModuleIdForPath + isModuleEnabled. Zachována i sekce vehicles pro sklad. Serverová autentizace, tenant kontext, requirePageAccess, module-policy a API autorizace se nemění.
+RBAC: každá původní položka používá canAccess(role, section) a při existující organizaci getModuleIdForPath + isModuleEnabled. Zachována sekce warehouse pro sklad. Serverová autentizace, tenant kontext, requirePageAccess, module-policy a API autorizace se nemění.
 
 Výjimky: /admin/organizations a /onboarding jsou dostupné ADMIN + SUPER_ADMIN bez modulového filtru. /onboarding pro ADMIN + OWNER nebo membership.roles ADMIN pouze při viditelné skupině Nastavení, stejně jako dříve.
 

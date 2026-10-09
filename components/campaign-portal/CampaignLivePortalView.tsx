@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import type { OfferView, OfferItemView } from '@/lib/offers/view-model';
 import { CampaignLiveMap } from './CampaignLiveMap';
 import { PrintApprovalModule } from './PrintApprovalModule';
+import { getGoogleMapsRouteUrl } from '@/lib/navigation-documentation-export';
 import {
   MapPin,
   Calendar,
@@ -138,6 +139,14 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   } : null;
 
   const items = offer.items || [];
+  const allRouteCoords = isNavigation
+    ? [
+        ...navPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+        ...(navTarget && navTarget.latitude && navTarget.longitude ? [{ latitude: navTarget.latitude, longitude: navTarget.longitude }] : []),
+      ]
+    : items.map((i) => ({ latitude: i.surface?.carrier?.latitude ?? null, longitude: i.surface?.carrier?.longitude ?? null }));
+  const googleMapsRouteUrl = getGoogleMapsRouteUrl(allRouteCoords);
+
   const clientName = offer.client?.name || 'Klient';
   const campaignTitle = offer.campaignName || offer.title || (isNavigation ? `Navigační systém pro ${offer.navigation?.targetName || 'klienta'}` : 'Venkovní reklamní kampaň');
   const branding = offer.branding;
@@ -773,14 +782,28 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
 
         {/* Interactive Map */}
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-sky-600" />
-              {isNavigation ? 'Interaktivní mapa navigačních bodů a trasy k cíli' : 'Interaktivní mapa kampaně v terénu'}
-            </h2>
-            <span className="text-xs text-slate-500 font-medium hidden sm:block">
-              Kliknutím na špendlík zobrazíte fotografii a detail bodu
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-sky-600" />
+                {isNavigation ? 'Interaktivní Google mapa navigačních bodů a trasy k cíli' : 'Interaktivní Google mapa kampaně v terénu'}
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                Kliknutím na špendlík zobrazíte fotografii, detail bodu a navigaci v Google Maps
+              </p>
+            </div>
+            {googleMapsRouteUrl && (
+              <a
+                href={googleMapsRouteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50 text-xs font-bold text-sky-700 hover:bg-sky-100 transition shadow-2xs self-start sm:self-auto"
+                title="Otevřít celou trasu v aplikaci Google Maps"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Otevřít trasu v Google Maps ↗
+              </a>
+            )}
           </div>
           <CampaignLiveMap
             items={items}
@@ -1013,7 +1036,18 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                           )}
                         </td>
                         <td className="p-3 font-mono text-[11px] text-slate-600">
-                          {point.latitude && point.longitude ? `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}` : '-'}
+                          {point.latitude && point.longitude ? (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${point.latitude},${point.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 hover:underline font-semibold"
+                              title="Otevřít bod v Google Maps"
+                            >
+                              <span>{point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          ) : '-'}
                         </td>
                         <td className="p-3 text-right">
                           {isPointInstalled ? (
@@ -1064,7 +1098,18 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                           <span className="block text-slate-500 text-[11px]">{carrier.street ? `${carrier.street}, ` : ''}{carrier.city}</span>
                         </td>
                         <td className="p-3 font-mono text-[11px] text-slate-600">
-                          {carrier.latitude && carrier.longitude ? `${carrier.latitude.toFixed(4)}, ${carrier.longitude.toFixed(4)}` : '-'}
+                          {carrier.latitude && carrier.longitude ? (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${carrier.latitude},${carrier.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-800 hover:underline font-semibold"
+                              title="Otevřít nosič v Google Maps"
+                            >
+                              <span>{carrier.latitude.toFixed(4)}, {carrier.longitude.toFixed(4)}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          ) : '-'}
                         </td>
                         <td className="p-3 font-medium text-slate-700">{itemStart} – {itemEnd}</td>
                         <td className="p-3 text-right">
