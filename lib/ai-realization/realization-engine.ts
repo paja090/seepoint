@@ -561,6 +561,34 @@ export function determineRealizationNextBestActions(
     return actions;
   }
 
+  // All items photographed and installed, but waiting for QC / billing approval:
+  const allPhotographed =
+    context.items.length > 0 &&
+    context.items.every((i) => i.isPhotographed) &&
+    context.items.every((i) => i.isInstalled);
+
+  if (
+    allPhotographed &&
+    (context.overallPhase === 'PHOTO_DOCUMENTATION' || String(context.status) === 'FOTODOKUMENTACE')
+  ) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/realization/${orderId}`;
+
+    actions.push({
+      id: `nba-${orderId}-approve-photos`,
+      actionType: 'APPROVE_PHOTOS',
+      priority: 'HIGH',
+      title: 'Schválit fotodokumentaci a předat k fakturaci',
+      description: `Všechny fotografie (${context.items.length}/${context.items.length}) jsou nahrány. Schvalte fotodokumentaci pro uvolnění zakázky k fakturaci.`,
+      targetOrderId: orderId,
+      targetUrl,
+      recommendedAt: new Date(),
+    });
+    return actions;
+  }
+
   // If ready for billing:
   if (context.billingReadiness.isReady) {
     const targetUrl =

@@ -973,9 +973,71 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
     const actions = determineRealizationNextBestActions(contextWithScopeChange);
     assert.ok(actions.length > 0);
     for (const action of actions) {
-      assert.ok(!action.targetUrl.startsWith('/crm/orders/'), `targetUrl must not be /crm/orders/ : ${action.targetUrl}`);
-      assert.ok(!action.targetUrl.startsWith('/invoices/'), `targetUrl must not be /invoices/ : ${action.targetUrl}`);
+      assert.ok(action.targetUrl && !action.targetUrl.startsWith('/crm/orders/'), `targetUrl must not be /crm/orders/ : ${action.targetUrl}`);
+      assert.ok(action.targetUrl && !action.targetUrl.startsWith('/invoices/'), `targetUrl must not be /invoices/ : ${action.targetUrl}`);
     }
     assert.equal(actions[0]?.targetUrl, '#changeset-review');
+  });
+
+  /**
+   * SCENARIO R: All items photographed in PHOTO_DOCUMENTATION recommends APPROVE_PHOTOS
+   */
+  it('Scenario R: When all items are installed and photographed in PHOTO_DOCUMENTATION, NBA recommends APPROVE_PHOTOS', () => {
+    const items: RealizationItemContext[] = [
+      {
+        id: 'nav-p1',
+        surfaceName: 'Bod 1',
+        status: 'INSTALLED',
+        isInstalled: true,
+        isPhotographed: true,
+        hasDefect: false,
+        photos: [{ id: 'ph1', url: 'https://ex.com/1.jpg', type: 'INSTALLATION', createdAt: new Date(), isRelevantForRealization: true }],
+      },
+      {
+        id: 'nav-p2',
+        surfaceName: 'Bod 2',
+        status: 'INSTALLED',
+        isInstalled: true,
+        isPhotographed: true,
+        hasDefect: false,
+        photos: [{ id: 'ph2', url: 'https://ex.com/2.jpg', type: 'INSTALLATION', createdAt: new Date(), isRelevantForRealization: true }],
+      },
+    ];
+
+    const contextAllPhotographed: RealizationContext = {
+      organizationId: TENANT_A,
+      orderId: 'crm-ord-ff-photos',
+      orderNumber: 'ZAK-2026-0001',
+      clientId: 'cli-ff',
+      clientName: 'Form Factory s.r.o.',
+      projectType: 'NAVIGATION',
+      navigationOrderId: 'nav-ord-ff',
+      status: 'FOTODOKUMENTACE',
+      campaign: {},
+      items,
+      tasks: [],
+      printJobs: [],
+      photos: items.flatMap((i) => i.photos),
+      requirements: [],
+      blockers: [],
+      billingReadiness: {
+        isReady: false,
+        missingRequirements: ["Navigační zakázka se nachází ve stavu 'FOTODOKUMENTACE'."],
+        blockerCount: 1,
+        warningCount: 0,
+        currency: 'CZK',
+        explanation: 'Waiting for billing status',
+      },
+      overallPhase: 'PHOTO_DOCUMENTATION',
+      deadlineRisk: { riskLevel: 'LOW', estimatedRequiredDays: 0, isAtRisk: false, reason: '' },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const actions = determineRealizationNextBestActions(contextAllPhotographed);
+    assert.ok(actions.length > 0);
+    assert.equal(actions[0]?.actionType, 'APPROVE_PHOTOS');
+    assert.ok(actions[0]?.title.includes('Schválit fotodokumentaci'));
+    assert.equal(actions[0]?.targetUrl, '/navigation/orders/nav-ord-ff');
   });
 });

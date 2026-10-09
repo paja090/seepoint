@@ -9,6 +9,7 @@ import {
   determineRealizationNextBestActions,
 } from '@/lib/ai-realization/realization-engine';
 import { RealizationChangeSetCard } from '@/components/ai-realization/RealizationChangeSetCard';
+import { RealizationStatusSyncCard } from '@/components/ai-realization/RealizationStatusSyncCard';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -132,6 +133,7 @@ export default async function RealizationDetailPage({
             {PIPELINE_PHASES.map((phase, idx) => {
               const isPast = currentPhaseIndex > idx;
               const isCurrent = currentPhaseIndex === idx;
+              const allPhotosDone = context.items.length > 0 && context.items.every((i) => i.isPhotographed);
 
               let style = 'border-slate-200 bg-slate-50 text-slate-400';
               if (isPast) {
@@ -140,18 +142,36 @@ export default async function RealizationDetailPage({
                 style = 'border-sky-500 bg-sky-50 text-sky-900 font-bold ring-2 ring-sky-200';
               }
 
+              const displayLabel =
+                phase.key === 'PHOTO_DOCUMENTATION' && allPhotosDone && !isPast
+                  ? '5. Foto ✔'
+                  : phase.label;
+
               return (
                 <div
                   key={phase.key}
                   className={`flex items-center justify-center rounded-lg border py-2 px-2 text-center text-xs ${style}`}
                 >
                   {isPast && <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
-                  {phase.label}
+                  {displayLabel}
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* Realization Status Sync & Quick Actions */}
+        <RealizationStatusSyncCard
+          orderId={id}
+          orderNumber={context.orderNumber}
+          overallPhase={context.overallPhase}
+          projectType={context.projectType}
+          navigationOrderId={context.navigationOrderId}
+          totalItems={context.items.length}
+          photographedItems={context.items.filter((i) => i.isPhotographed).length}
+          installedItems={context.items.filter((i) => i.isInstalled).length}
+          isReadyForBilling={context.billingReadiness.isReady}
+        />
 
         {/* Next Best Action Callout */}
         {primaryNba && (
