@@ -11,7 +11,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       headers: {
         'Content-Type': logo.mimeType,
         'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(logo.fileName)}`,
-        'Cache-Control': 'private, max-age=3600',
+        'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     });

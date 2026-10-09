@@ -1,0 +1,2 @@
+tests/ai-realization-intelligence.test.ts(976,18): error TS18048: 'action.targetUrl' is possibly 'undefined'.
+tests/ai-realization-intelligence.test.ts(977,18): error TS18048: 'action.targetUrl' is possibly 'undefined'.

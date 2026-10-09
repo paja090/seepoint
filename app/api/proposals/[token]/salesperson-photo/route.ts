@@ -25,7 +25,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     return new Response(file.body, {
       headers: {
         'Content-Type': photo.mimeType || file.headers.get('Content-Type') || 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     });

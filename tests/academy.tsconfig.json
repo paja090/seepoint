@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "include": ["../next-env.d.ts", "../app/academy/**/*.tsx", "../app/api/academy/**/*.ts", "../components/academy/**/*.ts", "../components/academy/**/*.tsx", "../lib/academy/**/*.ts", "../lib/offers/navigation-selection.ts", "../tests/academy.test.ts", "../tests/academy-migration.test.ts", "../tests/navigation-selection.test.ts"],
+  "exclude": ["../node_modules", "../.worktrees", "../.next", "../tmp", "../scratch", "../reports"]
+}

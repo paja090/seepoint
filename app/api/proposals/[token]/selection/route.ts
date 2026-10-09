@@ -3,6 +3,7 @@ import { offerErrorResponse } from '@/lib/offers/http';
 import { getPublicRow } from '@/lib/offers/service';
 import { prisma } from '@/lib/db';
 import { OfferValidationError } from '@/lib/offers/domain';
+import { resolveNavigationSelection } from '@/lib/offers/navigation-selection';
 import { enforceRateLimit, rateLimitPolicies } from '@/lib/rate-limit';
 import { hashRateLimitIdentity } from '@/lib/rate-limit-core';
 import { sendTransactionalEmail } from '@/lib/email';
@@ -31,18 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     }
 
     const allPoints = offer.navigationOffer.points;
-    const selectedKeys = new Set(selectedPointIds);
-    const pointIdByPublicKey = new Map<string, string>();
-    allPoints.forEach((point, index) => {
-      pointIdByPublicKey.set(`point-${index + 1}`, point.id);
-      pointIdByPublicKey.set(point.id, point.id);
-    });
-
-    if (selectedKeys.size === 0) throw new OfferValidationError('Vyberte alespoň jeden navigační bod.');
-    if (selectedKeys.size !== selectedPointIds.length || selectedPointIds.some((key) => !pointIdByPublicKey.has(key))) {
-      throw new OfferValidationError('Výběr obsahuje neplatný navigační bod.');
-    }
-    const selectedInternalIds = new Set(selectedPointIds.map((key) => pointIdByPublicKey.get(key)!));
+    const selectedInternalIds = resolveNavigationSelection(selectedPointIds, allPoints);
 
     // Idempotency check: if client submits the same selection that is already saved and confirmed, avoid duplicate events
     const currentlySelectedIds = new Set(

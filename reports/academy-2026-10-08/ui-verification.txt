@@ -1,0 +1,2 @@
+PASS: concept desktop render, role preview, search, manager screen, four steps, comprehension check, simulated feedback, 360px overflow check, no page errors.
+These are design concept checks, NOT SeePoint application workflow verification.

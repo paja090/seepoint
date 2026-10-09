@@ -1,0 +1,106 @@
+<div id="sp-academy-design">
+<style>
+#sp-academy-design { --sp-bg:light-dark(#f4f7f8,#111c2b);--sp-panel:light-dark(#fff,#192638);--sp-text:light-dark(#172637,#ecf2f8);--sp-muted:light-dark(#516376,#b4c4d6);--sp-line:light-dark(#d9e2e8,#394a5f);--sp-brand:light-dark(#087d63,#77e4c1);--sp-soft:light-dark(#e0f5ed,#173e36);color:var(--sp-text);font:14px/1.5 system-ui,sans-serif; }
+#sp-academy-design * {box-sizing:border-box}
+#sp-academy-design button,#sp-academy-design select,#sp-academy-design input,#sp-academy-design textarea {font:inherit;max-width:100%}
+#sp-academy-design button {min-height:44px;padding:9px 14px;border:1px solid var(--sp-line);border-radius:9px;background:var(--sp-panel);color:var(--sp-text);cursor:pointer}
+#sp-academy-design button:focus-visible,#sp-academy-design select:focus-visible,#sp-academy-design input:focus-visible {outline:3px solid var(--sp-brand);outline-offset:2px}
+#sp-academy-design .sp-primary {background:var(--sp-brand);color:light-dark(#fff,#092c23);border-color:var(--sp-brand)}
+#sp-academy-design .sp-toolbar {display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 0}
+#sp-academy-design .sp-toolbar strong {margin-right:auto}
+#sp-academy-design select,#sp-academy-design input,#sp-academy-design textarea {border:1px solid var(--sp-line);border-radius:9px;padding:10px;background:var(--sp-panel);color:var(--sp-text);min-height:44px}
+#sp-academy-design .sp-app {display:grid;grid-template-columns:184px minmax(0,1fr);background:var(--sp-bg);border:1px solid var(--sp-line);border-radius:16px;overflow:hidden;max-width:100%;margin:auto}
+#sp-academy-design .sp-sidebar {background:#081525;color:#eaf2fc;padding:24px 14px}
+#sp-academy-design .sp-logo {font-size:20px;font-weight:700;letter-spacing:-.7px;margin-bottom:30px}
+#sp-academy-design .sp-logo span {color:#62dab7}
+#sp-academy-design .sp-sidebar p {color:#b4c4d6;margin:20px 8px 8px;font-size:12px}
+#sp-academy-design .sp-sidebar .sp-navitem {padding:10px 8px;display:block;color:#cbd8e7}
+#sp-academy-design .sp-sidebar .sp-active {border-radius:8px;background:#153e35;color:#a2f4d9}
+#sp-academy-design .sp-main {min-width:0}
+#sp-academy-design .sp-header {padding:16px 24px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;border-bottom:1px solid var(--sp-line);background:var(--sp-panel)}
+#sp-academy-design .sp-badge {display:inline-block;color:var(--sp-brand);background:var(--sp-soft);padding:4px 9px;border-radius:7px;font-size:12px}
+#sp-academy-design .sp-content {padding:24px}
+#sp-academy-design .sp-tabs {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+#sp-academy-design .sp-tabs button[aria-pressed=true] {background:var(--sp-text);color:var(--sp-panel)}
+#sp-academy-design h1 {font-size:27px;line-height:1.2;margin:0 0 10px;font-weight:650;letter-spacing:-.8px}
+#sp-academy-design h2 {font-size:18px;margin:0 0 12px;font-weight:600}
+#sp-academy-design h3 {font-size:15px;margin:0 0 6px;font-weight:600}
+#sp-academy-design p {margin:0 0 12px}
+#sp-academy-design .sp-muted {color:var(--sp-muted)}
+#sp-academy-design .sp-search {display:block;width:100%;margin:18px 0 22px}
+#sp-academy-design .sp-learning {padding:20px;background:var(--sp-soft);border-radius:12px;margin:20px 0}
+#sp-academy-design .sp-learning-top {display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+#sp-academy-design .sp-progress {height:7px;background:light-dark(#c8e7dc,#2a554b);border-radius:6px;margin:15px 0 12px;overflow:hidden}
+#sp-academy-design .sp-progress span {display:block;height:100%;background:var(--sp-brand);width:25%}
+#sp-academy-design .sp-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#sp-academy-design .sp-category {background:var(--sp-panel);border:1px solid var(--sp-line);border-radius:12px;padding:17px;min-width:0}
+#sp-academy-design .sp-category button {margin-top:8px}
+#sp-academy-design .sp-row {display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+#sp-academy-design .sp-lesson {display:grid;grid-template-columns:minmax(0,1fr) 175px;gap:18px;margin-top:20px}
+#sp-academy-design .sp-media {display:grid;place-items:center;min-height:185px;padding:25px;border:1px dashed var(--sp-line);border-radius:12px;background:var(--sp-panel);text-align:center}
+#sp-academy-design .sp-step {padding:18px 0;border-bottom:1px solid var(--sp-line)}
+#sp-academy-design .sp-aside {background:var(--sp-panel);border:1px solid var(--sp-line);border-radius:10px;padding:16px;align-self:start}
+#sp-academy-design .sp-aside ol {padding-left:20px}
+#sp-academy-design .sp-aside li {margin-bottom:12px}
+#sp-academy-design .sp-warning {padding:12px;border-left:3px solid var(--sp-brand);background:var(--sp-soft);margin:14px 0}
+#sp-academy-design .sp-feedback {padding:16px;background:var(--sp-panel);border:1px solid var(--sp-line);border-radius:12px;margin-top:16px}
+#sp-academy-design textarea {display:block;width:100%;margin:10px 0;min-height:75px}
+#sp-academy-design .sp-table-wrap {overflow:auto}
+#sp-academy-design table {border-collapse:collapse;width:100%;font-size:13px}
+#sp-academy-design th,#sp-academy-design td {text-align:left;padding:12px 8px;border-bottom:1px solid var(--sp-line)}
+#sp-academy-design .sp-footer {display:none;border-top:1px solid var(--sp-line);padding:12px;background:var(--sp-panel)}
+#sp-academy-design .sp-phone {max-width:390px;grid-template-columns:1fr}
+#sp-academy-design .sp-phone .sp-sidebar {display:none}
+#sp-academy-design .sp-phone .sp-grid,#sp-academy-design .sp-phone .sp-lesson {grid-template-columns:1fr}
+#sp-academy-design .sp-phone .sp-content {padding:18px}
+#sp-academy-design .sp-phone .sp-header {padding:14px 18px}
+#sp-academy-design .sp-phone .sp-footer {display:flex;justify-content:space-around}
+#sp-academy-design .sp-phone .sp-aside {display:none}
+#sp-academy-design [hidden] {display:none!important}
+@media(max-width:650px){#sp-academy-design .sp-app{grid-template-columns:1fr}#sp-academy-design .sp-sidebar{display:none}#sp-academy-design .sp-grid,#sp-academy-design .sp-lesson{grid-template-columns:1fr}#sp-academy-design .sp-content{padding:18px}#sp-academy-design .sp-footer{display:flex;justify-content:space-around}#sp-academy-design .sp-aside{display:none}}
+</style>
+<div class="sp-toolbar"><strong>Návrh Akademie · ukázková data</strong><label>Zobrazení <select id="sp-device"><option value="desktop">Desktop</option><option value="mobile">Mobil</option></select></label><label>Náhled role <select id="sp-role"><option value="WORKER">Montážník</option><option value="SALES">Obchodník</option><option value="MANAGER">Manažer</option><option value="ADMIN">Administrátor</option></select></label></div>
+<div class="sp-app" id="sp-app">
+<aside class="sp-sidebar" aria-label="Kontext aplikace"><div class="sp-logo">SeePoint<span> OS</span></div><p>PRACOVNÍ PROSTŘEDÍ</p><span class="sp-navitem">Nástěnka</span><span class="sp-navitem">Moje úkoly</span><span class="sp-navitem">Provoz a realizace</span><p>POMOC PŘI PRÁCI</p><span class="sp-navitem sp-active">Návody & Akademie</span><p>Testovací organizace<br>Žádná zákaznická data</p></aside>
+<main class="sp-main"><header class="sp-header"><span>Akademie / <span id="sp-breadcrumb">Moje zaškolení</span></span><span class="sp-badge">Koncept · není screenshot aplikace</span></header>
+<div class="sp-content"><nav class="sp-tabs" aria-label="Obrazovky návrhu"><button type="button" data-screen="home" aria-pressed="true">Moje akademie</button><button type="button" data-screen="lesson" aria-pressed="false">Ukázka lekce</button><button type="button" data-screen="manage" aria-pressed="false" id="sp-admin-tab" hidden>Správa zaškolení</button></nav>
+<section id="sp-home"><h1>Vítejte v SeePoint Akademii</h1><p class="sp-muted">Krátké návody pro práci, kterou právě potřebujete udělat.</p>
+<label for="sp-search">Co se chcete naučit?</label><input class="sp-search" id="sp-search" type="search" placeholder="Například: Jak vyfotím nosič?">
+<div class="sp-learning"><div class="sp-learning-top"><div><span class="sp-badge">Moje zaškolení · ukázka</span><h2 id="sp-path-title" style="margin-top:10px">První den v terénu</h2><p id="sp-path-sub">1 ze 4 lekcí dokončena · další krok: Fotografie s GPS</p></div><button class="sp-primary" type="button" id="sp-continue">Pokračovat v lekci</button></div><div class="sp-progress" role="progressbar" aria-label="Ukázkový průběh" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"><span></span></div><span class="sp-muted">Otevření lekce se nepočítá jako dokončení.</span></div>
+<div class="sp-row"><h2>Návody podle pracovních činností</h2><span class="sp-muted" id="sp-result-count">4 témata v náhledu</span></div><div class="sp-grid" id="sp-categories"></div><p id="sp-empty" class="sp-warning" hidden>Pro tuto otázku není v náhledu odpovídající téma. Asistent by nabídl pouze ověřené zdroje.</p>
+</section>
+<section id="sp-lesson" hidden><span class="sp-badge">Čeká na vizuály · neověřeno v prohlížeči</span><h1 style="margin-top:14px">Vyfotit nosič s GPS</h1><p class="sp-muted">Fotodokumentace · návrh 3 min · pracovník / technik</p><p>Uložte fotografii ke správné ploše a ověřte výsledek.</p>
+<div class="sp-warning">Předpoklady: přístup k focení, testovací nosič, povolená kamera a poloha. Poslední ověření v aplikaci: zatím neprovedeno.</div>
+<div class="sp-lesson"><div><div class="sp-media"><div><i data-lucide="image" aria-hidden="true"></i><h3>Skutečný screenshot bude doplněn</h3><p class="sp-muted">Po průchodu bezpečným testovacím prostředím.<br>Tlačítko a pole budou zvýrazněny nad skutečným snímkem.</p></div></div>
+<div class="sp-step"><h2 id="sp-step-title">1. Zkontrolujte GPS</h2><p id="sp-step-text">V Mobilním foto povolte zjištění polohy. Před uložením musí být GPS dostupná.</p></div>
+<div class="sp-row" style="margin-top:16px"><button type="button" id="sp-prev" disabled>Zpět</button><span id="sp-step-count">Krok 1 ze 4</span><button type="button" class="sp-primary" id="sp-next">Další krok</button></div>
+<div id="sp-quiz" class="sp-feedback" hidden><h3>Ověřte porozumění</h3><p>Fotka je uložená, ale zpráva do chatu se neodeslala. Je nutné automaticky znovu nahrát fotku?</p><button type="button" data-answer="wrong">Ano, nahrát znovu</button> <button type="button" data-answer="right">Ne, ověřit uloženou fotku</button><p id="sp-quiz-result" aria-live="polite" style="margin-top:10px"></p></div>
+<div class="sp-warning">Častá chyba: uloženou fotografii nahrát podruhé kvůli selhání vedlejší zprávy do chatu.</div>
+<div class="sp-row"><button type="button" id="sp-guide">Ukázat postup v aplikaci</button><button type="button" id="sp-report">Nahlásit problém s návodem</button></div><p id="sp-guide-note" class="sp-muted" hidden style="margin-top:12px">Návrh průvodce: zvýrazní pole a počká na vás. V tomto konceptu není připojená aplikace; žádná akce se neprovádí.</p>
+<form id="sp-feedback" class="sp-feedback" hidden><label for="sp-feedback-text">Co je v tomto kroku nejasné?</label><textarea id="sp-feedback-text" required placeholder="Popište problém bez zákaznických údajů"></textarea><button type="submit" class="sp-primary">Vyzkoušet odeslání podnětu</button><p id="sp-feedback-result" aria-live="polite"></p></form>
+</div><aside class="sp-aside"><h3>V této lekci</h3><ol><li>GPS</li><li>Nosič a plocha</li><li>Fotografie</li><li>Uložení a kontrola</li></ol><p class="sp-muted">Video: plánované<br>Ověření: čeká<br>Revize návrhu: 1</p></aside></div>
+</section>
+<section id="sp-manage" hidden><span class="sp-badge">Správa · syntetická ukázka</span><h1 style="margin-top:14px">Zaškolení týmu</h1><p class="sp-muted">Přehled dokončení, povinných lekcí a podnětů v jedné organizaci.</p><div class="sp-table-wrap"><table><thead><tr><th>Zaměstnanec</th><th>Cesta</th><th>Dokončeno</th><th>Stav</th></tr></thead><tbody><tr><td>Pracovník A</td><td>První den v terénu</td><td>1 / 4</td><td>Rozpracováno</td></tr><tr><td>Pracovník B</td><td>První den v terénu</td><td>4 / 4</td><td>Dokončeno</td></tr><tr><td>Pracovník C</td><td>První nabídka</td><td>0 / 4</td><td>Chybí přístup</td></tr></tbody></table></div><div class="sp-learning"><h2>Obsah k revizi</h2><p>Fotografie s GPS — čeká na skutečné snímky a ověření.<br>Schválení navigace — čeká na kontrolu obou schvalovacích cest.</p><p class="sp-muted">Dokončení staré revize se zachová. Zásadní změna může vyžadovat nové zaškolení.</p></div><button type="button" id="sp-assign">Náhled přiřazení cesty</button><p id="sp-assignment" class="sp-warning" hidden>Přiřazení: osoba → dostupná cesta → povinné lekce → termín → potvrzení. Cesta nesmí udělit nové oprávnění. V tomto náhledu se nic neukládá.</p></section>
+<p id="sp-live" aria-live="polite" class="sp-muted" style="margin-top:16px"></p></div><footer class="sp-footer"><span>Moje akademie</span><span>Návody</span><span>Pomoc</span></footer></main></div>
+<script>
+(()=>{
+const root=document.getElementById('sp-academy-design');
+const q=s=>root.querySelector(s);
+const saved=window.openai?.widgetState?.modelContent||{};
+const state={screen:['home','lesson','manage'].includes(saved.screen)?saved.screen:'home',role:['WORKER','SALES','MANAGER','ADMIN'].includes(saved.role)?saved.role:'WORKER',device:saved.device==='mobile'?'mobile':'desktop',step:0};
+const topics={WORKER:[['Focení a fotodokumentace','Správná plocha, GPS a výsledek uploadu.'],['Moje práce','Převzetí úkolu, výjezd a odevzdání.'],['Field Survey','Nové místo, fotografie a průzkum.'],['Sklad a materiál','Příjem, výdej a QR.']],SALES:[['Nabídky a obchod','Od výběru ploch po klientský souhlas.'],['Navigační zakázky','Lokality, více cílů a cenová fáze.'],['Klienti a kontakty','Pobočky, komunikace a další krok.'],['Obsazenost','Termíny, rezervace a kolize.']],MANAGER:[['Realizace zakázek','Blokace, výroba a předání k fakturaci.'],['Navigační zakázky','Schválení a kontrola realizace.'],['Práce a výkazy','Přidělení a schvalování práce.'],['AI nástroje','Zdroj, doporučení a potvrzení.']],ADMIN:[['Administrace','Účty, role a dostupnost modulů.'],['Integrace a import','Konfigurace a kontrola dat.'],['Správa Akademie','Obsah, revize a publikace.'],['Zaškolení týmu','Přiřazení cesty a skutečné dokončení.']]};
+const steps=[['Zkontrolujte GPS','V Mobilním foto povolte zjištění polohy. Před uložením musí být GPS dostupná.'],['Vyberte správný nosič a plochu','Ověřte kód nosiče, jeho místo a stranu plochy. Nezaměňte existující nosič s novým bodem Field Survey.'],['Pořiďte a zkontrolujte fotografii','Vyfoťte čitelný celek, určete účel a stranu. Vyčkejte, až je GPS razítko připravené.'],['Uložte a ověřte výsledek','Použijte Uložit fotku s GPS. Počkejte na zprávu a zkontrolujte fotografii v galerii; případně potvrďte přiřazení.']];
+function persist(){window.openai?.setWidgetState?.({modelContent:{role:state.role,screen:state.screen,device:state.device},privateContent:null})?.catch(()=>{});}
+function renderTopics(){const term=q('#sp-search').value.toLocaleLowerCase('cs');const list=topics[state.role].filter(t=>t.join(' ').toLocaleLowerCase('cs').includes(term));const box=q('#sp-categories');box.replaceChildren();list.forEach(([title,desc])=>{const article=document.createElement('article');article.className='sp-category';const h=document.createElement('h3');h.textContent=title;const p=document.createElement('p');p.className='sp-muted';p.textContent=desc;const status=document.createElement('span');status.className='sp-badge';status.textContent='Navržené téma';article.append(h,p,status);box.append(article);});q('#sp-result-count').textContent=`${list.length} témata v náhledu`;q('#sp-empty').hidden=list.length>0;}
+function render(){q('#sp-device').value=state.device;q('#sp-role').value=state.role;q('#sp-app').classList.toggle('sp-phone',state.device==='mobile');const admin=state.role==='ADMIN'||state.role==='MANAGER';q('#sp-admin-tab').hidden=!admin;if(state.screen==='manage'&&!admin)state.screen='home';['home','lesson','manage'].forEach(s=>q('#sp-'+s).hidden=state.screen!==s);root.querySelectorAll('[data-screen]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.screen===state.screen)));q('#sp-breadcrumb').textContent={home:'Moje zaškolení',lesson:'Fotografie s GPS',manage:'Správa týmu'}[state.screen];q('#sp-path-title').textContent={WORKER:'První den v terénu',SALES:'První nabídka klientovi',MANAGER:'Přehled realizací',ADMIN:'Bezpečně spravovat organizaci'}[state.role];q('#sp-path-sub').textContent='1 ze 4 lekcí dokončena · ilustrační průběh';q('#sp-continue').textContent=state.role==='WORKER'?'Pokračovat v ukázkové lekci':'Prohlédnout ukázku lekce';renderTopics();}
+function show(s){state.screen=s;render();persist();}
+root.querySelectorAll('[data-screen]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.screen)));
+q('#sp-role').addEventListener('change',e=>{state.role=e.target.value;render();persist();});q('#sp-device').addEventListener('change',e=>{state.device=e.target.value;render();persist();});q('#sp-search').addEventListener('input',renderTopics);q('#sp-continue').addEventListener('click',()=>show('lesson'));
+function step(){q('#sp-step-title').textContent=`${state.step+1}. ${steps[state.step][0]}`;q('#sp-step-text').textContent=steps[state.step][1];q('#sp-step-count').textContent=`Krok ${state.step+1} ze 4`;q('#sp-prev').disabled=state.step===0;q('#sp-next').textContent=state.step===3?'Ověřit porozumění':'Další krok';q('#sp-quiz').hidden=true;}
+q('#sp-next').addEventListener('click',()=>{if(state.step===3){q('#sp-quiz').hidden=false;return;}state.step++;step();});q('#sp-prev').addEventListener('click',()=>{state.step=Math.max(0,state.step-1);step();});root.querySelectorAll('[data-answer]').forEach(b=>b.addEventListener('click',()=>q('#sp-quiz-result').textContent=b.dataset.answer==='right'?'Správně. Ukázkové ověření porozumění je hotové; skutečný pokrok se zde neukládá.':'Nejprve ověřte stav fotografie. Chyba vedlejší zprávy neznamená neúspěšný upload.'));
+q('#sp-report').addEventListener('click',()=>q('#sp-feedback').hidden=!q('#sp-feedback').hidden);q('#sp-feedback').addEventListener('submit',e=>{e.preventDefault();q('#sp-feedback-result').textContent='Ukázka potvrzení: podnět by byl předán správci této lekce. Z tohoto návrhu se nic neodesílá.';});q('#sp-guide').addEventListener('click',()=>q('#sp-guide-note').hidden=!q('#sp-guide-note').hidden);q('#sp-assign').addEventListener('click',()=>q('#sp-assignment').hidden=!q('#sp-assignment').hidden);
+render();window.addEventListener('openai:set_globals',e=>{const m=e.detail?.globals?.widgetState?.modelContent;if(m&&topics[m.role]){state.role=m.role;state.device=m.device==='mobile'?'mobile':'desktop';state.screen=['home','lesson','manage'].includes(m.screen)?m.screen:'home';render();}});
+if(globalThis.Tweak){const design={compact:false};const tweak=new Tweak({container:root,onChange:()=>{q('.sp-content').style.padding=design.compact?'16px':'24px';}});tweak.addToggle(design,'compact',{label:'Kompaktní obsah'});}
+})();
+</script>
+</div>

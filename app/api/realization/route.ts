@@ -7,7 +7,7 @@ import { buildRealizationContext } from '@/lib/ai-realization/realization-engine
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const auth = await requireApiAccess('work');
+  const auth = await requireApiAccess('realization');
   if (isApiDenied(auth)) return auth;
 
   try {

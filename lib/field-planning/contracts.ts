@@ -7,6 +7,7 @@ export type PlanningProfile = {
   strategy: 'BALANCED' | 'DISTANCE'; serviceMinutes: Record<string, number>;
   fallbackSpeedKph: number; fallbackDistanceFactor: number; maximumJobsPerRoute: number;
   vehicleRequired: boolean; requireHumanApproval: true; enabled: boolean;
+  vehicleCapacitySlots?: number; warehouseUnloadMinutes?: number;
 };
 export type JobConstraints = {
   windowStart?: string; windowEnd?: string; requiredEmployeeIds?: string[];
@@ -18,6 +19,7 @@ export type PlanningSource = {
   workOrderItemId?: string; carrierId?: string | null; surfaceId?: string | null; crmRealizationId?: string | null;
   parentWorkOrderId?: string; navigationOrderId?: string; navigationPointId?: string;
   electionCampaignId?: string; electionRemovalPointId?: string; mediaType?: string; quantity?: number;
+  operationType?: string; loadSlots?: number;
   clientName?: string | null; address?: string | null; orderNumber?: string | null;
 };
 export const stopId = (stop: { jobId?: string; workOrderId: string }) => stop.jobId ?? stop.workOrderId;
@@ -44,6 +46,7 @@ export type PlannedStop = PlanningSource & {
   jobId?: string;
   workOrderId: string; title: string; workType: string; location: Coordinates; routeOrder: number;
   arrivalAt: string; startAt: string; endAt: string; serviceMinutes: number; travel: TravelLeg; reason: string;
+  isWarehousePitstop?: boolean; cumulativeLoadSlots?: number; unloadedSlots?: number;
 };
 export type PlannedCrew = CrewInput & {
   names: string[]; vehicleName: string | null; departureAt: string; endAt: string;

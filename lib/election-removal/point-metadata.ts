@@ -10,6 +10,7 @@ export interface ParsedPointMetadata {
   fullAddress: string | null;
   photoUrl: string | null;
   otherNotes: string | null;
+  relocationDestination: string | null;
   raw: string;
 }
 
@@ -52,6 +53,7 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
       fullAddress: null,
       photoUrl: null,
       otherNotes: null,
+      relocationDestination: null,
       raw: '',
     };
   }
@@ -156,6 +158,21 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
     notesCleaned = notesCleaned.replace(new RegExp(`Pozn[aá]mka\\s*[:=]\\s*${escapeRegex(explicitNote)}`, 'gi'), '');
   }
 
+  // Extract explicit relocation destination if present
+  let relocationDestination: string | null = null;
+  const relocationMatch = raw.match(
+    /(?:\[C[ií]l\s*p[rř]evozu:\s*([^\]]+)\]|C[ií]l\s*p[rř]evozu\s*[:=]\s*([^\n\r;,]+))/i
+  );
+  if (relocationMatch) {
+    relocationDestination = (relocationMatch[1] || relocationMatch[2] || '').trim() || null;
+  }
+
+  // Strip operational tags and relocation destinations from general notes
+  notesCleaned = notesCleaned
+    .replace(/\[Operace:\s*[^\]]+\]/gi, '')
+    .replace(/\[C[ií]l\s*p[rř]evozu:\s*[^\]]+\]/gi, '')
+    .replace(/C[ií]l\s*p[rř]evozu\s*[:=]\s*[^\n\r;,]+/gi, '');
+
   // Clean remaining whitespace and punctuation
   notesCleaned = notesCleaned
     .replace(/^[,\s;:-]+|[,\s;:-]+$/g, '')
@@ -172,6 +189,7 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
     fullAddress,
     photoUrl,
     otherNotes,
+    relocationDestination,
     raw,
   };
 }

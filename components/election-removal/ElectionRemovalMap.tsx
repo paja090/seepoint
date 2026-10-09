@@ -49,6 +49,8 @@ interface ElectionRemovalMapProps {
   points: ElectionRemovalMapPoint[];
   selectedPointId?: string | null;
   onSelectPoint?: (pointId: string) => void;
+  onMapClick?: (coords: { latitude: number; longitude: number }) => void;
+  isAddMode?: boolean;
   className?: string;
   height?: string;
   showLegend?: boolean;
@@ -67,12 +69,16 @@ export function ElectionRemovalMap({
   points,
   selectedPointId,
   onSelectPoint,
+  onMapClick,
+  isAddMode = false,
   className = '',
   height = '380px',
   showLegend = true,
 }: ElectionRemovalMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
   const markerGroupRef = useRef<LayerGroup | null>(null);
   const tileLayerRef = useRef<TileLayer | null>(null);
   const markersMapRef = useRef<Map<string, import('leaflet').Marker>>(new Map());
@@ -158,6 +164,15 @@ export function ElectionRemovalMap({
       const markerGroup = L.layerGroup().addTo(map);
       markerGroupRef.current = markerGroup;
       mapInstanceRef.current = map;
+
+      map.on('click', (e: import('leaflet').LeafletMouseEvent) => {
+        if (onMapClickRef.current) {
+          onMapClickRef.current({
+            latitude: e.latlng.lat,
+            longitude: e.latlng.lng,
+          });
+        }
+      });
 
       // Initial render of markers
       renderMarkers(L, map, markerGroup);
@@ -404,8 +419,16 @@ export function ElectionRemovalMap({
       <div
         ref={mapContainerRef}
         style={{ height, width: '100%' }}
-        className="z-0"
+        className={`z-0 ${isAddMode ? 'cursor-crosshair' : ''}`}
       />
+
+      {/* Mode Banner */}
+      {isAddMode && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 bg-sky-600/95 backdrop-blur-sm text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-lg border border-sky-400 flex items-center gap-2 pointer-events-none animate-pulse">
+          <span className="text-sm">📍</span>
+          <span>Klikněte kamkoliv do mapy pro umístění nového bodu</span>
+        </div>
+      )}
 
       {/* Top Controls: Google Maps Layer Switcher & Actions */}
       <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">

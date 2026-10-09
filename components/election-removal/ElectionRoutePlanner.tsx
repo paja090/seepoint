@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Calendar,
@@ -20,8 +20,10 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import type { ElectionCampaign, ElectionRemovalPoint } from '@prisma/client';
+import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import type { PlanningInput, PlanningResult, PlannedCrew } from '@/lib/field-planning/contracts';
+import { LocationPickerMap } from './LocationPickerMap';
 
 interface ResourceEmployee {
   id: string;
@@ -49,12 +51,14 @@ interface ElectionRoutePlannerProps {
   };
   employees: ResourceEmployee[];
   vehicles: ResourceVehicle[];
+  initialDepot?: { latitude: number; longitude: number };
 }
 
 export function ElectionRoutePlanner({
   campaign,
   employees,
   vehicles,
+  initialDepot,
 }: ElectionRoutePlannerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -68,6 +72,18 @@ export function ElectionRoutePlanner({
   const [startTime, setStartTime] = useState<string>('07:30');
   const [endTime, setEndTime] = useState<string>('18:00');
   const [flexibleHours, setFlexibleHours] = useState<boolean>(true);
+  const [vehicleCapacitySlots, setVehicleCapacitySlots] = useState<number>(30);
+  const [warehouseUnloadMinutes, setWarehouseUnloadMinutes] = useState<number>(15);
+
+  // Warehouse (depot) location: where items are unloaded and crews return
+  const [depotLat, setDepotLat] = useState<string>(
+    initialDepot?.latitude ? String(initialDepot.latitude) : '50.08804'
+  );
+  const [depotLng, setDepotLng] = useState<string>(
+    initialDepot?.longitude ? String(initialDepot.longitude) : '14.42076'
+  );
+  const [saveDepotAsDefault, setSaveDepotAsDefault] = useState<boolean>(false);
+  const [showDepotMap, setShowDepotMap] = useState<boolean>(true);
 
   // Crews configuration: default to 1 crew with first available employee & vehicle if present
   const [crews, setCrews] = useState<CrewConfig[]>([
@@ -83,6 +99,30 @@ export function ElectionRoutePlanner({
   const pendingPoints = campaign.points.filter((p) =>
     ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'].includes(p.status)
   );
+
+  // Dedicated media type filter: each medium is transported separately
+  const [selectedMediumFilter, setSelectedMediumFilter] = useState<string>('ALL');
+
+  const mediaTypeStats = useMemo(() => {
+    const stats: Record<string, number> = {};
+    let bannerChangeCount = 0;
+    let relocationCount = 0;
+    let warehouseRemovalCount = 0;
+    pendingPoints.forEach((p) => {
+      const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
+      const op = detectOperationTypeFromText(rawText);
+      if (op === 'BANNER_CHANGE') {
+        bannerChangeCount++;
+      } else if (op === 'RELOCATION') {
+        relocationCount++;
+      } else {
+        warehouseRemovalCount++;
+      }
+      const key = p.mediaType || 'OTHER';
+      stats[key] = (stats[key] || 0) + 1;
+    });
+    return { stats, bannerChangeCount, relocationCount, warehouseRemovalCount };
+  }, [pendingPoints]);
 
   // Optimization state
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
@@ -179,6 +219,14 @@ export function ElectionRoutePlanner({
           startTime,
           endTime,
           flexibleHours,
+          vehicleCapacitySlots,
+          warehouseUnloadMinutes,
+          filterMediaType: selectedMediumFilter,
+          depot: {
+            latitude: parseFloat(depotLat) || 50.08804,
+            longitude: parseFloat(depotLng) || 14.42076,
+          },
+          saveDepotAsDefault,
           crews: crews.map((c) => ({
             id: c.id,
             employeeIds: c.employeeIds,
@@ -328,6 +376,321 @@ export function ElectionRoutePlanner({
             </span>
             Povolí přesčasy a umožní posádkám obsloužit všechny zadané body bez jejich odmítnutí z důvodu konce pevné směny.
           </label>
+        </div>
+
+        {/* Dedicated Medium Filter (Single-Medium Transport Rule) */}
+        <div className="space-y-3 p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🎯 Médium pro tento výjezd</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 normal-case border border-indigo-100">
+                Každé médium se odváží samostatně
+              </span>
+            </label>
+            <span className="text-[11px] text-slate-500">
+              Různé typy konstrukcí se nemíchají na jeden vozík
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedMediumFilter('ALL')}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                selectedMediumFilter === 'ALL'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span>🌐 Všechna média</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                  selectedMediumFilter === 'ALL'
+                    ? 'bg-slate-800 text-slate-100'
+                    : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {pendingPoints.length} ks
+              </span>
+            </button>
+
+            {mediaTypeStats.stats.ACKO !== undefined && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('ACKO')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'ACKO'
+                    ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🅰️ Pouze Áčka</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'ACKO'
+                      ? 'bg-sky-700 text-white'
+                      : 'bg-sky-50 text-sky-800'
+                  }`}
+                >
+                  {mediaTypeStats.stats.ACKO} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.stats.MINI_TOWER !== undefined && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('MINI_TOWER')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'MINI_TOWER'
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🗼 Pouze MiniTowery</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'MINI_TOWER'
+                      ? 'bg-indigo-700 text-white'
+                      : 'bg-indigo-50 text-indigo-800'
+                  }`}
+                >
+                  {mediaTypeStats.stats.MINI_TOWER} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.stats.TOWER !== undefined && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('TOWER')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'TOWER'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🏛️ Pouze Velké věže</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'TOWER'
+                      ? 'bg-purple-700 text-white'
+                      : 'bg-purple-50 text-purple-800'
+                  }`}
+                >
+                  {mediaTypeStats.stats.TOWER} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.bannerChangeCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('BANNER_CHANGE')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'BANNER_CHANGE'
+                    ? 'bg-teal-600 text-white border-teal-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🎨 Pouze výměny / sundání plachet</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'BANNER_CHANGE'
+                      ? 'bg-teal-700 text-white'
+                      : 'bg-teal-50 text-teal-800'
+                  }`}
+                >
+                  {mediaTypeStats.bannerChangeCount} ks
+                </span>
+              </button>
+            )}
+
+            {mediaTypeStats.relocationCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedMediumFilter('RELOCATION')}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border shadow-2xs ${
+                  selectedMediumFilter === 'RELOCATION'
+                    ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🚚 Pouze přímé převozy</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                    selectedMediumFilter === 'RELOCATION'
+                      ? 'bg-purple-700 text-white'
+                      : 'bg-purple-50 text-purple-800'
+                  }`}
+                >
+                  {mediaTypeStats.relocationCount} ks
+                </span>
+              </button>
+            )}
+          </div>
+
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/70 text-xs text-slate-600 flex items-center gap-2">
+            <span className="text-base shrink-0">💡</span>
+            <span>
+              {selectedMediumFilter === 'ACKO' && (
+                <>Výjezd je omezen <strong>pouze na A-stojany</strong>. Na vozík se naloží až 30 ks, při překročení následuje vykládka na skladě.</>
+              )}
+              {selectedMediumFilter === 'MINI_TOWER' && (
+                <>Výjezd je sestaven <strong>pouze pro MiniTowery</strong>. Na jedno naložení se vejde max. 5 ks, poté se odváží na sklad.</>
+              )}
+              {selectedMediumFilter === 'TOWER' && (
+                <>Výjezd je určen <strong>pouze pro Velké věže</strong>. Každá velká věž se odváží po 1 ks přímo na sklad.</>
+              )}
+              {selectedMediumFilter === 'BANNER_CHANGE' && (
+                <>Výjezd pro <strong>servis a výměnu plachet</strong>. Konstrukce zůstávají na místě, nikam se nepřevážejí a neblokují ložnou plochu vozíku.</>
+              )}
+              {selectedMediumFilter === 'RELOCATION' && (
+                <>Výjezd pro <strong>přímý převoz konstrukcí</strong> na nová stanoviště (neodváží se na sklad, ale přímo na jiné místo).</>
+              )}
+              {selectedMediumFilter === 'ALL' && (
+                <>Plánování pro <strong>všechna média a operace</strong>. Algoritmus striktně hlídá, aby se na jednom vozíku nemíchala různá média (před změnou typu konstrukce vždy nařídí vykládku na skladě).</>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Logistics & Capacity Constraints */}
+        <div className="grid gap-4 sm:grid-cols-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Ložná kapacita vozíku / auta</span>
+              <span className="font-bold text-sky-600 font-mono text-sm">{vehicleCapacitySlots} slotů</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={150}
+              value={vehicleCapacitySlots}
+              onChange={(e) => setVehicleCapacitySlots(Math.max(1, parseInt(e.target.value) || 30))}
+              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              30 Áček (á 1) = 5 MiniTowerů (á 6) = 1 velká věž (30). Při naplnění plánovač automaticky vloží vykládku na centrálním skladě.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Čas vykládky na skladě</span>
+              <span className="font-bold text-sky-600 font-mono text-sm">{warehouseUnloadMinutes} min</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={warehouseUnloadMinutes}
+              onChange={(e) => setWarehouseUnloadMinutes(Math.max(0, parseInt(e.target.value) || 15))}
+              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              Odhadovaná doba složení nákladu do centrálního skladu před pokračováním ve svozu dalších bodů na trase.
+            </p>
+          </div>
+
+          {/* Warehouse (Depot) Location Configuration */}
+          <div className="sm:col-span-2 pt-3 border-t border-slate-200/80 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🏢 Poloha centrálního skladu (Depo / Základna)</span>
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Cílová stanice pro vykládku svezených konstrukcí při naplnění kapacity vozidla a místo návratu posádky na konci dne.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDepotMap((prev) => !prev)}
+                  className="text-[11px] font-bold text-sky-600 hover:text-sky-800 underline flex items-center gap-1 cursor-pointer"
+                >
+                  🗺️ {showDepotMap ? 'Skrýt mapu skladu' : 'Zobrazit mapu pro kliknutí'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if ('geolocation' in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          setDepotLat(pos.coords.latitude.toFixed(5));
+                          setDepotLng(pos.coords.longitude.toFixed(5));
+                        },
+                        () => alert('Nepodařilo se zjistit aktuální polohu prohlížeče.')
+                      );
+                    }
+                  }}
+                  className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 underline flex items-center gap-1 cursor-pointer"
+                >
+                  📍 Moje poloha
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive Map Picker for Depot */}
+            {showDepotMap && (
+              <div className="space-y-1">
+                <LocationPickerMap
+                  latitude={parseFloat(depotLat) || null}
+                  longitude={parseFloat(depotLng) || null}
+                  onChange={(coords) => {
+                    setDepotLat(coords.latitude.toFixed(5));
+                    setDepotLng(coords.longitude.toFixed(5));
+                  }}
+                  height="220px"
+                  pinLabel="Centrální sklad / Depo"
+                />
+                <p className="text-[10px] text-slate-500 italic">
+                  Tip: Klikněte kamkoliv do mapy nebo vyberte město nahoře pro okamžité přemístění skladu.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                  Zeměpisná šířka (Latitude)
+                </span>
+                <input
+                  type="text"
+                  value={depotLat}
+                  onChange={(e) => setDepotLat(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="např. 50.08804 nebo 49.19506"
+                />
+              </div>
+              <div>
+                <span className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                  Zeměpisná délka (Longitude)
+                </span>
+                <input
+                  type="text"
+                  value={depotLng}
+                  onChange={(e) => setDepotLng(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="např. 14.42076 nebo 16.60683"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="saveDepotDefaultCheck"
+                checked={saveDepotAsDefault}
+                onChange={(e) => setSaveDepotAsDefault(e.target.checked)}
+                className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+              />
+              <label htmlFor="saveDepotDefaultCheck" className="text-xs text-slate-600 cursor-pointer font-medium">
+                Uložit tyto souřadnice skladu jako trvalé výchozí depo pro celou firmu
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* Crews Setup */}
@@ -661,6 +1024,40 @@ export function ElectionRoutePlanner({
                             });
                             const travelKm = (stop.travel.distanceMeters / 1000).toFixed(1);
                             const travelMin = Math.round(stop.travel.durationSeconds / 60);
+                            const isWarehouse = Boolean(stop.isWarehousePitstop || stop.workType === 'WAREHOUSE_UNLOAD');
+
+                            if (isWarehouse) {
+                              return (
+                                <tr key={stop.jobId || stop.routeOrder} className="bg-amber-50/90 border-y-2 border-amber-300">
+                                  <td className="py-2.5 px-2.5 font-mono font-bold text-amber-900">
+                                    {stop.routeOrder}.
+                                  </td>
+                                  <td className="py-2.5 px-2.5 font-bold text-amber-950 whitespace-nowrap">
+                                    {arrival} – {departure}
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-amber-800 font-medium">
+                                    +{travelKm} km ({travelMin} min na sklad)
+                                  </td>
+                                  <td className="py-2.5 px-2.5" colSpan={2}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-base">🏭</span>
+                                      <div>
+                                        <p className="font-bold text-amber-950">Centrální sklad: Vykládka materiálu</p>
+                                        <p className="text-[11px] text-amber-700">
+                                          Vozík naplněn ({stop.unloadedSlots ?? 30} ks). Složení materiálu do skladu a uvolnění kapacity na 0 ks.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 font-mono text-[11px]">
+                                    <span className="text-amber-800 font-semibold">Centrální sklad</span>
+                                  </td>
+                                  <td className="py-2.5 px-2.5 text-right font-bold text-amber-950 whitespace-nowrap">
+                                    {stop.serviceMinutes} min vykládka
+                                  </td>
+                                </tr>
+                              );
+                            }
 
                             return (
                               <tr key={stop.jobId || stop.routeOrder} className="hover:bg-slate-50/60 transition">
@@ -688,12 +1085,24 @@ export function ElectionRoutePlanner({
                                   )}
                                 </td>
                                 <td className="py-2 px-2.5">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
-                                    {ELECTION_REMOVAL_MEDIA_LABELS[
-                                      (stop.mediaType as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS) ||
-                                        'OTHER'
-                                    ] || stop.mediaType}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-100">
+                                      {ELECTION_REMOVAL_MEDIA_LABELS[
+                                        (stop.mediaType as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS) ||
+                                          'OTHER'
+                                      ] || stop.mediaType}
+                                    </span>
+                                    {stop.operationType === 'BANNER_CHANGE' && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        Výměna plachty (0 slotů)
+                                      </span>
+                                    )}
+                                    {stop.cumulativeLoadSlots !== undefined && (
+                                      <span className="text-[10px] text-slate-500 font-mono">
+                                        Náklad: {stop.cumulativeLoadSlots}/{vehicleCapacitySlots}
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="py-2 px-2.5 font-mono text-[11px]">
                                   <a

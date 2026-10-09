@@ -12,7 +12,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireApiAccess('work');
+  const auth = await requireApiAccess('realization');
   if (isApiDenied(auth)) return auth;
 
   try {
@@ -39,7 +39,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireApiAccess('work');
+  const auth = await requireApiAccess('realization');
   if (isApiDenied(auth)) return auth;
 
   try {

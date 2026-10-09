@@ -79,6 +79,13 @@ export async function DELETE(
 
   const { id } = await params;
 
+  if (auth.user.role !== 'ADMIN' && auth.user.role !== 'MANAGER') {
+    return NextResponse.json(
+      { error: 'Kampaň může smazat pouze administrátor nebo manažer.' },
+      { status: 403 }
+    );
+  }
+
   try {
     await runWithTenantContext(
       { organizationId: auth.organizationId, source: 'session' },

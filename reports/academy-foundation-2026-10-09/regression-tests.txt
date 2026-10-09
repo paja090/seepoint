@@ -1,0 +1,226 @@
+TAP version 13
+# Subtest: Academy migration prevents cross-tenant relationships and keeps business tables intact
+ok 1 - Academy migration prevents cross-tenant relationships and keeps business tables intact
+  ---
+  duration_ms: 15367.2862
+  type: 'test'
+  ...
+# Subtest: Academy requires explicit tenant flag and active matching membership for every role
+ok 2 - Academy requires explicit tenant flag and active matching membership for every role
+  ---
+  duration_ms: 18.6959
+  type: 'test'
+  ...
+# Subtest: drafts are admin-only and cannot bypass capability, module, tenant or archival checks
+ok 3 - drafts are admin-only and cannot bypass capability, module, tenant or archival checks
+  ---
+  duration_ms: 7.923
+  type: 'test'
+  ...
+# Subtest: inactive domain module removes lesson even with Academy enabled
+ok 4 - inactive domain module removes lesson even with Academy enabled
+  ---
+  duration_ms: 3.669
+  type: 'test'
+  ...
+# Subtest: all five pilots have valid unique steps and unambiguous content
+ok 5 - all five pilots have valid unique steps and unambiguous content
+  ---
+  duration_ms: 8.0413
+  type: 'test'
+  ...
+# Subtest: Czech search handles accents and all query words
+ok 6 - Czech search handles accents and all query words
+  ---
+  duration_ms: 4.4594
+  type: 'test'
+  ...
+# Subtest: feedback limits input and discards forged ownership fields
+ok 7 - feedback limits input and discards forged ownership fields
+  ---
+  duration_ms: 4.1014
+  type: 'test'
+  ...
+# Subtest: Academy models participate in tenant query scoping
+ok 8 - Academy models participate in tenant query scoping
+  ---
+  duration_ms: 10.8827
+  type: 'test'
+  ...
+# Subtest: public campaign portal reaches token validation but Academy stays protected
+ok 9 - public campaign portal reaches token validation but Academy stays protected
+  ---
+  duration_ms: 64.1169
+  type: 'test'
+  ...
+# Subtest: warehouse navigation matches section and realization honors existing work fallback
+ok 10 - warehouse navigation matches section and realization honors existing work fallback
+  ---
+  duration_ms: 47.943
+  type: 'test'
+  ...
+# Subtest: 1. Stage-aware readiness: Fáze 1 (LOCATION_SELECTION) s cenou 0 Kč projde auditem bez chyby
+ok 11 - 1. Stage-aware readiness: Fáze 1 (LOCATION_SELECTION) s cenou 0 Kč projde auditem bez chyby
+  ---
+  duration_ms: 18.2825
+  type: 'test'
+  ...
+# Subtest: 2. Stage-aware readiness: Fáze 2 (PRICED_QUOTE) s cenou 0 Kč vyžaduje doplnění cen
+ok 12 - 2. Stage-aware readiness: Fáze 2 (PRICED_QUOTE) s cenou 0 Kč vyžaduje doplnění cen
+  ---
+  duration_ms: 15.108
+  type: 'test'
+  ...
+# Subtest: 3. Stage-aware readiness: Fáze 2 (PRICED_QUOTE) s kladnou cenou projde auditem
+ok 13 - 3. Stage-aware readiness: Fáze 2 (PRICED_QUOTE) s kladnou cenou projde auditem
+  ---
+  duration_ms: 2.5382
+  type: 'test'
+  ...
+# Subtest: 4. Správa cílů: definice palety barev pro provozovny v Cockpitu
+ok 14 - 4. Správa cílů: definice palety barev pro provozovny v Cockpitu
+  ---
+  duration_ms: 1.8792
+  type: 'test'
+  ...
+# Subtest: 5. Provázání cílů a bodů: bod má přiřazený konkrétní targetId a cílové souřadnice
+ok 15 - 5. Provázání cílů a bodů: bod má přiřazený konkrétní targetId a cílové souřadnice
+  ---
+  duration_ms: 1.4261
+  type: 'test'
+  ...
+# Subtest: 6. Specifické nosiče a rozměry: Áčka, Towery a směrové tabule v konfiguraci nosičů
+ok 16 - 6. Specifické nosiče a rozměry: Áčka, Towery a směrové tabule v konfiguraci nosičů
+  ---
+  duration_ms: 2.2399
+  type: 'test'
+  ...
+# Subtest: 7. Barevné odlišení pinů podle typu nosiče: detekce kategorie nosiče
+ok 17 - 7. Barevné odlišení pinů podle typu nosiče: detekce kategorie nosiče
+  ---
+  duration_ms: 2.5112
+  type: 'test'
+  ...
+# Subtest: 8. Směrové šipky: validace 13 směrů včetně kruhových objezdů
+ok 18 - 8. Směrové šipky: validace 13 směrů včetně kruhových objezdů
+  ---
+  duration_ms: 1.2089
+  type: 'test'
+  ...
+# Subtest: 9. Položková kalkulace navigačního bodu: nájem, rám, výroba, montáž, demontáž
+ok 19 - 9. Položková kalkulace navigačního bodu: nájem, rám, výroba, montáž, demontáž
+  ---
+  duration_ms: 8.4928
+  type: 'test'
+  ...
+# Subtest: 10. Celkový rozpočet nabídky s DPH 21 %
+ok 20 - 10. Celkový rozpočet nabídky s DPH 21 %
+  ---
+  duration_ms: 7.8649
+  type: 'test'
+  ...
+# Subtest: 11. Ostrava restrikce: detekce dálnic a silnic 1. třídy dle zákona o pozemních komunikacích
+ok 21 - 11. Ostrava restrikce: detekce dálnic a silnic 1. třídy dle zákona o pozemních komunikacích
+  ---
+  duration_ms: 3.2875
+  type: 'test'
+  ...
+# Subtest: 12. Ostrava restrikce: detekce památkové zóny (Nařízení č. 2/2020)
+ok 22 - 12. Ostrava restrikce: detekce památkové zóny (Nařízení č. 2/2020)
+  ---
+  duration_ms: 6.4762
+  type: 'test'
+  ...
+# Subtest: 13. Zachování alternativ: nevybrané body klientem se nemažou a mají isSelectedByClient === false
+ok 23 - 13. Zachování alternativ: nevybrané body klientem se nemažou a mají isSelectedByClient === false
+  ---
+  duration_ms: 1.4729
+  type: 'test'
+  ...
+# Subtest: 14. Kontrola přítomnosti cílů v auditu připravenosti navigace
+ok 24 - 14. Kontrola přítomnosti cílů v auditu připravenosti navigace
+  ---
+  duration_ms: 1.5158
+  type: 'test'
+  ...
+# Subtest: 15. Kontrola přítomnosti navigačních bodů v auditu připravenosti
+ok 25 - 15. Kontrola přítomnosti navigačních bodů v auditu připravenosti
+  ---
+  duration_ms: 1.5147
+  type: 'test'
+  ...
+# Subtest: 16. Kontrola klientských vizuálů bodů v auditu připravenosti
+ok 26 - 16. Kontrola klientských vizuálů bodů v auditu připravenosti
+  ---
+  duration_ms: 2.1174
+  type: 'test'
+  ...
+# Subtest: 17. Kontrola terénních fotografií sloupů v auditu připravenosti
+ok 27 - 17. Kontrola terénních fotografií sloupů v auditu připravenosti
+  ---
+  duration_ms: 1.6868
+  type: 'test'
+  ...
+# Subtest: 18. Validace struktury navigační nabídky pro obě fáze workflow
+ok 28 - 18. Validace struktury navigační nabídky pro obě fáze workflow
+  ---
+  duration_ms: 1.8711
+  type: 'test'
+  ...
+# Subtest: TEST 1 & TEST 2: Navigace 1. fáze bez cen – schválení výběru lokalit bez objednávky výroby
+ok 29 - TEST 1 & TEST 2: Navigace 1. fáze bez cen – schválení výběru lokalit bez objednávky výroby
+  ---
+  duration_ms: 8.4256
+  type: 'test'
+  ...
+# Subtest: TEST 3: Navigace 1. fáze bez cen – nezobrazuje falešné 0 Kč v public view modelu
+ok 30 - TEST 3: Navigace 1. fáze bez cen – nezobrazuje falešné 0 Kč v public view modelu
+  ---
+  duration_ms: 18.0216
+  type: 'test'
+  ...
+# Subtest: TEST 4: Finální nabídka (PRICED_QUOTE) vyžaduje validní cenu a odmítne 0 Kč
+ok 31 - TEST 4: Finální nabídka (PRICED_QUOTE) vyžaduje validní cenu a odmítne 0 Kč
+  ---
+  duration_ms: 8.0262
+  type: 'test'
+  ...
+# Subtest: TEST 5 & TEST 6: Ochrana tokenů a tenant boundary při schvalování
+ok 32 - TEST 5 & TEST 6: Ochrana tokenů a tenant boundary při schvalování
+  ---
+  duration_ms: 15.6256
+  type: 'test'
+  ...
+# Subtest: TEST 7: Idempotence potvrzení výběru bodů klientem
+ok 33 - TEST 7: Idempotence potvrzení výběru bodů klientem
+  ---
+  duration_ms: 2.7352
+  type: 'test'
+  ...
+# Subtest: TEST 8: Selhání notifikačního e-mailu neohrozí uložení potvrzení klienta
+ok 34 - TEST 8: Selhání notifikačního e-mailu neohrozí uložení potvrzení klienta
+  ---
+  duration_ms: 4.3289
+  type: 'test'
+  ...
+# Subtest: navigation selection resolves both public keys and existing internal ids
+ok 35 - navigation selection resolves both public keys and existing internal ids
+  ---
+  duration_ms: 16.7402
+  type: 'test'
+  ...
+# Subtest: both selection callers must reject missing, empty, foreign and canonical duplicate ids
+ok 36 - both selection callers must reject missing, empty, foreign and canonical duplicate ids
+  ---
+  duration_ms: 10.1264
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 23908.1872

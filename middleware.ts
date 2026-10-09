@@ -21,6 +21,7 @@ const publicPathPrefixes = [
   '/proposal',
   '/offer',
   '/campaign',
+  '/p',
   '/client',
   '/images',
   '/data',

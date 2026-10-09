@@ -14,12 +14,13 @@ import {
   ChevronRight,
   ShieldAlert,
   ArrowUpRight,
+  RotateCcw,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RealizationDashboardPage() {
-  const user = await requirePageAccess('work');
+  const user = await requirePageAccess('realization');
   const organizationId = user.organizationId!;
   const profile = await getOrganizationRealizationProfile(organizationId);
 
@@ -80,7 +81,7 @@ export default async function RealizationDashboardPage() {
     <AppShell>
       <div className="mx-auto max-w-7xl space-y-6 pb-12">
         {/* Header */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               AI Realization Intelligence
@@ -88,6 +89,15 @@ export default async function RealizationDashboardPage() {
             <p className="text-sm text-slate-500">
               Inteligentní řízení a kontrola realizace zakázek po schválení nabídky
             </p>
+          </div>
+          <div>
+            <Link
+              href="/realization"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+              Obnovit přehled
+            </Link>
           </div>
         </div>
 
@@ -152,6 +162,18 @@ export default async function RealizationDashboardPage() {
                 const photographedItems = ctx!.items.filter((i) => i.isPhotographed).length;
                 const hasBlockers = ctx!.blockers.some((b) => b.severity === 'BLOCKING');
                 const isAtRisk = ctx!.deadlineRisk.isAtRisk;
+                const isPhotoPhase = ctx!.overallPhase === 'PHOTO_DOCUMENTATION';
+                const allPhotographed = totalItems > 0 && photographedItems === totalItems;
+
+                const dynamicPhaseLabel = isPhotoPhase
+                  ? allPhotographed
+                    ? 'Fotodokumentace nahrána'
+                    : `Čeká na fotografie (${totalItems - photographedItems} chybí)`
+                  : phaseLabels[ctx!.overallPhase] || ctx!.overallPhase;
+
+                const dynamicPhaseColor = isPhotoPhase && allPhotographed
+                  ? 'bg-teal-50 text-teal-800 border-teal-300 font-medium'
+                  : phaseColors[ctx!.overallPhase] || 'bg-slate-100 text-slate-700';
 
                 return (
                   <div
@@ -164,11 +186,9 @@ export default async function RealizationDashboardPage() {
                           {ctx!.orderNumber}
                         </span>
                         <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                            phaseColors[ctx!.overallPhase] || 'bg-slate-100 text-slate-700'
-                          }`}
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${dynamicPhaseColor}`}
                         >
-                          {phaseLabels[ctx!.overallPhase] || ctx!.overallPhase}
+                          {dynamicPhaseLabel}
                         </span>
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
                           {ctx!.projectType}

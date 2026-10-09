@@ -26,7 +26,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     }
 
     if (stored.redirectUrl) {
-      return NextResponse.redirect(stored.redirectUrl);
+      return new Response(null, { status: 307, headers: {
+        Location: stored.redirectUrl,
+        'Cache-Control': 'private, no-store',
+        'Referrer-Policy': 'no-referrer',
+      } });
     }
 
     return new Response(stored.body, {
@@ -34,7 +38,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       headers: {
         'Content-Type': stored.contentType ?? photo.mimeType ?? 'image/jpeg',
         'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? 'photo')}`,
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },
     });

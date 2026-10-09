@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useMemo, useRef } from 'react';
+import { useState, useEffect, useTransition, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { ElectionRemovalPoint, Photo } from '@prisma/client';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
+import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import {
   parsePointMetadata,
@@ -65,6 +66,19 @@ export function MobileRouteExecutionView({
   const [uploadingPhotoPointId, setUploadingPhotoPointId] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Live stopwatch timer for in-progress stops
+  const [nowTime, setNowTime] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const hasInProgress = points.some((p) => p.status === 'IN_PROGRESS');
+    if (!hasInProgress) return;
+
+    const interval = setInterval(() => {
+      setNowTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [points]);
 
   // Distinct crews
   const crews = useMemo(() => {
@@ -440,6 +454,37 @@ export function MobileRouteExecutionView({
             const meta = parsePointMetadata(point.description);
             const cleanLayer = cleanLayerName(point.layerName);
 
+            const operationType = detectOperationTypeFromText(
+              `${point.layerName || ''} ${point.label || ''} ${point.description || ''}`
+            );
+
+            // Measured duration if completed
+            const actualMinutes =
+              point.startedAt && point.completedAt
+                ? Math.max(
+                    1,
+                    Math.round(
+                      (new Date(point.completedAt).getTime() -
+                        new Date(point.startedAt).getTime()) /
+                        60000
+                    )
+                  )
+                : null;
+
+            // Live elapsed time if in progress
+            const elapsedSeconds =
+              isInProgress && point.startedAt
+                ? Math.max(
+                    0,
+                    Math.floor(
+                      (nowTime - new Date(point.startedAt).getTime()) / 1000
+                    )
+                  )
+                : 0;
+            const elapsedM = Math.floor(elapsedSeconds / 60);
+            const elapsedS = elapsedSeconds % 60;
+            const formattedElapsed = `${elapsedM}:${elapsedS.toString().padStart(2, '0')}`;
+
             return (
               <div
                 key={point.id}
@@ -467,6 +512,21 @@ export function MobileRouteExecutionView({
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800">
                         {ELECTION_REMOVAL_MEDIA_LABELS[point.mediaType] || point.mediaType}
                       </span>
+                      {operationType === 'BANNER_CHANGE' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200 shadow-2xs">
+                          🎨 Pouze výměna plachty (bez převozu)
+                        </span>
+                      )}
+                      {operationType === 'RELOCATION' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs">
+                          🚚 Přímý převoz na jiné místo
+                        </span>
+                      )}
+                      {operationType === 'FULL_REMOVAL' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+                          📦 Demontáž a svoz na sklad
+                        </span>
+                      )}
                       {point.assignedCrewId && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
                           🚗 {point.assignedCrewId.replace('crew-', 'Posádka ')}
@@ -486,14 +546,31 @@ export function MobileRouteExecutionView({
                   {/* Status Badge */}
                   <div>
                     {isCompleted && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Hotovo
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Hotovo
+                        </span>
+                        {actualMinutes !== null && (
+                          <span
+                            className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-md border bg-slate-100 text-slate-700 border-slate-200"
+                            title={`Naměřeno ${actualMinutes} min`}
+                          >
+                            ⏱️ {actualMinutes} min
+                          </span>
+                        )}
+                      </div>
                     )}
                     {isInProgress && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse border border-amber-300">
-                        <Clock className="w-3.5 h-3.5" /> Na místě
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 animate-pulse border border-amber-300">
+                          <Clock className="w-3.5 h-3.5" /> Na místě
+                        </span>
+                        {point.startedAt && (
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-900 border border-amber-300 shadow-2xs">
+                            ⏱️ {formattedElapsed}
+                          </span>
+                        )}
+                      </div>
                     )}
                     {isIssue && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
@@ -501,9 +578,11 @@ export function MobileRouteExecutionView({
                       </span>
                     )}
                     {!isCompleted && !isInProgress && !isIssue && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                        Čeká
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                          Čeká
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -632,7 +711,13 @@ export function MobileRouteExecutionView({
                       className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-95"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Demontováno (Hotovo)</span>
+                      <span>
+                        {operationType === 'BANNER_CHANGE'
+                          ? 'Plachta hotova (Uložit)'
+                          : operationType === 'RELOCATION'
+                          ? 'Přemístěno (Hotovo)'
+                          : 'Demontováno & naloženo (Hotovo)'}
+                      </span>
                     </button>
                   )}
 

@@ -26,6 +26,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
 
   try {
+    const body = (await request.json().catch(() => ({}))) as {
+      customItems?: Array<{
+        description: string;
+        quantity: number;
+        unit?: string;
+        unitPrice: number;
+        vatRate?: number;
+      }>;
+      recipientEmail?: string;
+      subject?: string;
+      message?: string;
+      dueDays?: number;
+      sendEmail?: boolean;
+      note?: string;
+    };
+
     const order = await prisma.navigationOrder.findUnique({
       where: { id },
       include: {
@@ -38,13 +54,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (order.status !== 'PRIPRAVENO_K_FAKTURACI') {
       return NextResponse.json({ error: 'Fakturu lze vystavit pouze u zakázky připravené k fakturaci.' }, { status: 409 });
     }
-    if (order.points.length === 0) {
+    const hasCustomItems = Array.isArray(body.customItems) && body.customItems.length > 0;
+    if (order.points.length === 0 && !hasCustomItems) {
       return NextResponse.json({ error: 'Zakázka nemá žádné fakturovatelné body.' }, { status: 409 });
     }
 
-    const requestedRecipientEmail = order.crmOrder.contact?.email || order.crmOrder.client.email;
+    const requestedRecipientEmail = body.recipientEmail?.trim() || order.crmOrder.contact?.email || order.crmOrder.client.email;
     if (!requestedRecipientEmail) {
-      return NextResponse.json({ error: 'Klient ani kontaktní osoba nemají vyplněný e-mail.' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: 'Klient ani kontaktní osoba nemají vyplněný e-mail pro odeslání faktury.',
+          errorType: 'MISSING_CLIENT_EMAIL',
+          resolution: {
+            type: 'CLIENT_DETAILS',
+            url: `/clients/${order.crmOrder.clientId}`,
+            label: 'Doplnit e-mail v kartě klienta',
+            clientId: order.crmOrder.clientId,
+          },
+        },
+        { status: 400 }
+      );
     }
 
     const organization = auth.organization;
@@ -75,7 +104,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
     const missingInvoiceData = validateNavigationInvoiceParties(supplier, customer);
     if (missingInvoiceData.length > 0) {
-      return NextResponse.json({ error: `Fakturu nelze vystavit. Doplňte: ${missingInvoiceData.join(', ')}.` }, { status: 409 });
+      const hasSupplierIssue = missingInvoiceData.some((m) => m.includes('dodavatele'));
+      const hasCustomerIssue = missingInvoiceData.some((m) => m.includes('odběratele'));
+
+      return NextResponse.json(
+        {
+          error: `Fakturu nelze vystavit. Doplňte: ${missingInvoiceData.join(', ')}.`,
+          errorType: 'MISSING_INVOICE_DATA',
+          missingFields: missingInvoiceData,
+          supplierData: {
+            name: supplier.name,
+            companyId: supplier.companyId || '',
+            vatId: supplier.vatId || '',
+            street: supplier.street || '',
+            city: supplier.city || '',
+            postalCode: supplier.postalCode || '',
+            country: supplier.country || 'CZ',
+            bankAccount: supplier.bankAccount || '',
+            iban: supplier.iban || '',
+            swift: supplier.swift || '',
+          },
+          resolution: {
+            type: hasSupplierIssue ? 'SUPPLIER_SETTINGS' : 'CLIENT_DETAILS',
+            url: hasSupplierIssue ? '/settings/company' : `/clients/${order.crmOrder.clientId}`,
+            label: hasSupplierIssue
+              ? 'Doplnit firemní údaje dodavatele'
+              : 'Doplnit fakturační údaje klienta',
+            target: hasSupplierIssue ? 'company' : 'client',
+            clientId: order.crmOrder.clientId,
+          },
+        },
+        { status: 409 }
+      );
     }
 
     let invoice: Prisma.ClientInvoiceGetPayload<object> | null = order.billingPeriods.find((period) => period.invoice)?.invoice ?? null;
@@ -86,14 +146,78 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     if (!invoice) {
       const issueDate = new Date();
-      const dueDate = invoiceDueDate(issueDate, organization?.invoiceDueDays ?? 14);
+      const dueDays = typeof body.dueDays === 'number' && body.dueDays >= 1 && body.dueDays <= 365
+        ? body.dueDays
+        : (organization?.invoiceDueDays ?? 14);
+      const dueDate = invoiceDueDate(issueDate, dueDays);
       const dateFrom = order.rentStart ?? new Date(Date.UTC(issueDate.getUTCFullYear(), issueDate.getUTCMonth(), 1));
       const dateTo = order.rentEnd ?? new Date(Date.UTC(issueDate.getUTCFullYear(), issueDate.getUTCMonth() + 1, 0, 23, 59, 59));
-      const subtotal = order.points.reduce((sum, point) => sum.plus(point.subtotal), new Prisma.Decimal(0));
+      const defaultVatRate = organization?.defaultVatRate ?? 21;
+
+      let subtotal: Prisma.Decimal;
+      let taxAmount: Prisma.Decimal;
+      let totalAmount: Prisma.Decimal;
+      let itemsToCreate: Array<{
+        description: string;
+        quantity: Prisma.Decimal;
+        unit: string;
+        unitPrice: Prisma.Decimal;
+        amount: Prisma.Decimal;
+        vatRate: Prisma.Decimal;
+        vatAmount: Prisma.Decimal;
+        totalAmount: Prisma.Decimal;
+      }>;
+
+      if (Array.isArray(body.customItems) && body.customItems.length > 0) {
+        itemsToCreate = body.customItems.map((item, idx) => {
+          const description = String(item.description || '').trim();
+          if (!description) throw new Error(`Položka č. ${idx + 1} musí mít vyplněný popis.`);
+          const quantityNum = Math.max(0.01, Number(item.quantity) || 1);
+          const unitPriceNum = Math.max(0, Number(item.unitPrice) || 0);
+          const vatRateNum = typeof item.vatRate === 'number' && item.vatRate >= 0 ? item.vatRate : defaultVatRate;
+          const quantity = new Prisma.Decimal(quantityNum);
+          const unitPrice = new Prisma.Decimal(unitPriceNum);
+          const amount = quantity.times(unitPrice).toDecimalPlaces(2);
+          const itemTax = invoiceVatAmounts(amount, vatRateNum);
+          return {
+            description,
+            quantity,
+            unit: String(item.unit || 'ks').trim() || 'ks',
+            unitPrice,
+            amount,
+            vatRate: new Prisma.Decimal(vatRateNum),
+            vatAmount: itemTax.taxAmount,
+            totalAmount: itemTax.totalAmount,
+          };
+        });
+
+        subtotal = itemsToCreate.reduce((sum, it) => sum.plus(it.amount), new Prisma.Decimal(0));
+        taxAmount = itemsToCreate.reduce((sum, it) => sum.plus(it.vatAmount), new Prisma.Decimal(0));
+        totalAmount = subtotal.plus(taxAmount);
+      } else {
+        subtotal = order.points.reduce((sum, point) => sum.plus(point.subtotal), new Prisma.Decimal(0));
+        const vatAmounts = invoiceVatAmounts(subtotal, defaultVatRate);
+        taxAmount = vatAmounts.taxAmount;
+        totalAmount = vatAmounts.totalAmount;
+        itemsToCreate = order.points.map((point) => {
+          const amount = new Prisma.Decimal(point.subtotal);
+          const pointTax = invoiceVatAmounts(amount, defaultVatRate);
+          return {
+            description: point.label,
+            quantity: new Prisma.Decimal(point.quantity),
+            unit: 'ks',
+            unitPrice: new Prisma.Decimal(point.unitPrice),
+            amount,
+            vatRate: new Prisma.Decimal(defaultVatRate),
+            vatAmount: pointTax.taxAmount,
+            totalAmount: pointTax.totalAmount,
+          };
+        });
+      }
+
       if (!subtotal.isPositive()) {
         return NextResponse.json({ error: 'Celková cena faktury musí být vyšší než nula.' }, { status: 409 });
       }
-      const { vatRate, taxAmount, totalAmount } = invoiceVatAmounts(subtotal, organization?.defaultVatRate ?? 21);
 
       let created: { invoice: Prisma.ClientInvoiceGetPayload<object>; billingPeriod: Prisma.NavigationBillingPeriodGetPayload<object> };
       try {
@@ -124,25 +248,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               taxAmount,
               totalAmount,
               currency: organization?.defaultCurrency || 'CZK',
-              note: `Navigační zakázka ${order.crmOrder.orderNumber}`,
+              note: body.note?.trim() || `Navigační zakázka ${order.crmOrder.orderNumber}`,
               recipientEmail: requestedRecipientEmail,
               supplierSnapshot: createInvoicePartySnapshot(supplier),
               customerSnapshot: createInvoicePartySnapshot(customer),
               items: {
-                create: order.points.map((point) => {
-                  const amount = new Prisma.Decimal(point.subtotal);
-                  const pointTax = invoiceVatAmounts(amount, vatRate);
-                  return {
-                    description: point.label,
-                    quantity: point.quantity,
-                    unit: 'ks',
-                    unitPrice: point.unitPrice,
-                    amount,
-                    vatRate,
-                    vatAmount: pointTax.taxAmount,
-                    totalAmount: pointTax.totalAmount,
-                  };
-                }),
+                create: itemsToCreate,
               },
             },
           });
@@ -236,7 +347,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
     }
 
-    const message = [
+    if (body.sendEmail === false) {
+      return NextResponse.json({
+        success: true,
+        delivered: false,
+        message: `Faktura ${invoice.invoiceNumber} byla úspěšně vystavena a uložena (e-mail nebyl odeslán).`,
+        billingPeriod: {
+          id: billingPeriod.id,
+          dateFrom: billingPeriod.dateFrom.toISOString(),
+          dateTo: billingPeriod.dateTo.toISOString(),
+          dateFromLabel: invoicePeriodDateFormatter.format(billingPeriod.dateFrom),
+          dateToLabel: invoicePeriodDateFormatter.format(billingPeriod.dateTo),
+          amount: Number(billingPeriod.amount),
+          status: billingPeriod.status,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+        },
+      });
+    }
+
+    const defaultInvoiceMessage = [
       `Dobrý den,`,
       '',
       `zasíláme vám fakturu ${invoice.invoiceNumber} za navigační zakázku ${order.crmOrder.orderNumber}.`,
@@ -250,10 +380,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       'Tým SeePOINT',
     ].join('\n');
 
+    const emailSubject = body.subject?.trim() || `Faktura ${invoice.invoiceNumber} – SeePOINT`;
+    const emailMessage = body.message?.trim() || defaultInvoiceMessage;
+
     const emailDelivery = await sendTransactionalEmail({
       to: recipientEmail,
-      subject: `Faktura ${invoice.invoiceNumber} – SeePOINT`,
-      message,
+      subject: emailSubject,
+      message: emailMessage,
       template: 'navigation-invoice',
       attachments: [{ filename: pdfFileName, content: invoicePdf, contentType: 'application/pdf' }],
       idempotencyKey: `navigation-invoice/${invoice.id}`,

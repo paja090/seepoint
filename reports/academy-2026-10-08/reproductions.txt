@@ -1,0 +1,3 @@
+AUD-01 CONFIRMED: anonymous /p/token redirects to /login before token validation.
+AUD-02 CONFIRMED: SALES sees /warehouse link but warehouse page guard denies section.
+AUD-03 CONFIRMED: work fallback allows realization page while navigation hides it.

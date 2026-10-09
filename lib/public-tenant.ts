@@ -2,7 +2,7 @@ import 'server-only';
 import { platformPrisma } from './db';
 import { enterTenantContext } from './tenant-context';
 import { getDeterministicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken, encryptPortalToken } from '@/lib/offers/token';
-import { getDeterministicReportToken } from '@/lib/navigation-documentation';
+
 
 export async function enterPublicOfferTenant(tokenOrHash: string) {
   if (!tokenOrHash || typeof tokenOrHash !== 'string') return null;
@@ -58,40 +58,21 @@ export async function enterPublicOfferTenant(tokenOrHash: string) {
 
 export async function enterPublicNavigationReportTenant(publicTokenHash: string) {
   const clean = publicTokenHash.trim();
-  let owner = await platformPrisma.navigationDocumentationReport.findFirst({
+  if (!/^[a-f0-9]{64}$/i.test(clean)) return null;
+  const owner = await platformPrisma.navigationDocumentationReport.findFirst({
     where: {
-      OR: [
-        { publicTokenHash: clean },
-        { id: clean },
-      ],
+      publicTokenHash: clean,
+      status: { in: ['PUBLISHED', 'SENT'] },
+      publishedAt: { not: null },
+      tokenExpiresAt: { gt: new Date() },
     },
     select: { id: true, organizationId: true },
   });
-
-  if (!owner) {
-    const candidates = await platformPrisma.navigationDocumentationReport.findMany({
-      where: { status: { not: 'ARCHIVED' } },
-      select: { id: true, organizationId: true, status: true, publishedAt: true },
-    });
-    const matched = candidates.find((c) => getDeterministicReportToken(c.id).hash === clean);
-    if (matched) {
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-      await platformPrisma.navigationDocumentationReport.update({
-        where: { id: matched.id },
-        data: {
-          publicTokenHash: clean,
-          status: matched.status === 'DRAFT' || matched.status === 'REVIEW' ? 'PUBLISHED' : matched.status,
-          publishedAt: matched.publishedAt || now,
-          tokenExpiresAt: expiresAt,
-        },
-      }).catch(() => {});
-      owner = { id: matched.id, organizationId: matched.organizationId };
-    }
-  }
-
   if (!owner) return null;
+  const organization = await platformPrisma.organization.findUnique({
+    where: { id: owner.organizationId }, select: { isActive: true },
+  });
+  if (!organization?.isActive) return null;
   enterTenantContext({ organizationId: owner.organizationId, source: 'public-token' });
   return owner;
 }
-

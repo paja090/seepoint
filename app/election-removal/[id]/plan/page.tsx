@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { checkElectionRemovalPageAccess } from '@/lib/election-removal/guard';
 import { loadElectionPlanningResources } from '@/lib/election-removal/planning';
@@ -16,8 +16,12 @@ export default async function ElectionRemovalPlanPage({
   const user = await checkElectionRemovalPageAccess();
   const { id } = await params;
 
+  if (user.role === 'WORKER') {
+    redirect(`/election-removal/${id}/route`);
+  }
+
   try {
-    const { campaign, employees, vehicles } = await loadElectionPlanningResources(
+    const { campaign, employees, vehicles, profile } = await loadElectionPlanningResources(
       id,
       undefined,
       user.organization!.id
@@ -56,6 +60,7 @@ export default async function ElectionRemovalPlanPage({
             campaign={campaign}
             employees={employees}
             vehicles={vehicles}
+            initialDepot={profile?.depot}
           />
         </div>
       </AppShell>

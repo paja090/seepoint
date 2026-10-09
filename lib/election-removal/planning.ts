@@ -16,7 +16,16 @@ import {
 import { loadProfile } from '@/lib/field-planning/data';
 import { planFieldWork } from '@/lib/field-planning/planning-engine';
 import { googleTravelProvider } from '@/lib/field-planning/travel';
-import { DEFAULT_MEDIA_SERVICE_MINUTES } from './constants';
+import {
+  DEFAULT_MEDIA_SERVICE_MINUTES,
+  DEFAULT_BANNER_CHANGE_SERVICE_MINUTES,
+  DEFAULT_RELOCATION_SERVICE_MINUTES,
+  calculateServiceMinutes,
+  calculateMediaLoadSlots,
+  DEFAULT_VEHICLE_CAPACITY_SLOTS,
+  DEFAULT_WAREHOUSE_UNLOAD_MINUTES,
+} from './constants';
+import { detectOperationTypeFromText } from './kml-parser';
 import { plannerTransaction } from '@/lib/field-planning/service';
 import { zonedTime } from '@/lib/field-planning/profile';
 
@@ -31,10 +40,12 @@ export function convertElectionPointToJob(
   point: ElectionRemovalPoint,
   campaign: { id: string; name: string; targetDate: Date | null; createdAt: Date }
 ): PlanningJob {
-  const serviceMinutes =
-    point.serviceMinutes ??
-    DEFAULT_MEDIA_SERVICE_MINUTES[point.mediaType] ??
-    10;
+  const rawText = `${point.layerName || ''} ${point.mediaTypeRaw || ''} ${point.description || ''}`;
+  const operationType = detectOperationTypeFromText(rawText);
+
+  const calculated = calculateServiceMinutes(point.mediaType, point.quantity, null, operationType);
+  const serviceMinutes = point.serviceMinutes ?? calculated.baseMinutes;
+  const loadSlots = calculateMediaLoadSlots(point.mediaType, operationType, point.quantity);
 
   return {
     id: electionRemovalJobId(point.id),
@@ -67,6 +78,8 @@ export function convertElectionPointToJob(
     electionRemovalPointId: point.id,
     mediaType: point.mediaType,
     quantity: point.quantity,
+    operationType,
+    loadSlots,
   };
 }
 
@@ -160,12 +173,17 @@ export interface PlanRoutesPayload {
   startTime?: string;
   endTime?: string;
   flexibleHours?: boolean;
+  vehicleCapacitySlots?: number;
+  warehouseUnloadMinutes?: number;
+  filterMediaType?: string;
   crews: Array<{
     id: string;
     employeeIds: string[];
     vehicleId: string | null;
   }>;
   selectedPointIds?: string[];
+  depot?: { latitude: number; longitude: number };
+  saveDepotAsDefault?: boolean;
 }
 
 /**
@@ -193,14 +211,67 @@ export async function optimizeElectionRemovalRoutes(
 
     const selectedPoints = payload.selectedPointIds?.length
       ? points.filter((p) => payload.selectedPointIds!.includes(p.id))
+      : payload.filterMediaType && payload.filterMediaType !== 'ALL'
+      ? points.filter((p) => {
+          const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
+          const op = detectOperationTypeFromText(rawText);
+          if (payload.filterMediaType === 'BANNER_CHANGE') {
+            return op === 'BANNER_CHANGE';
+          }
+          if (payload.filterMediaType === 'RELOCATION') {
+            return op === 'RELOCATION';
+          }
+          if (payload.filterMediaType === 'WAREHOUSE') {
+            return op === 'FULL_REMOVAL';
+          }
+          if (op === 'BANNER_CHANGE') {
+            return false;
+          }
+          return p.mediaType === payload.filterMediaType;
+        })
       : points;
 
     if (selectedPoints.length === 0) {
-      throw new Error('Kampaň neobsahuje žádné body k naplánování.');
+      throw new Error('Kampaň neobsahuje žádné body vybraného média k naplánování.');
     }
 
     if (!payload.crews || payload.crews.length === 0) {
       throw new Error('Vyberte alespoň jednu pracovní posádku.');
+    }
+
+    // Apply vehicle capacity and warehouse unloading parameters
+    profile.vehicleCapacitySlots = payload.vehicleCapacitySlots ?? DEFAULT_VEHICLE_CAPACITY_SLOTS;
+    profile.warehouseUnloadMinutes = payload.warehouseUnloadMinutes ?? DEFAULT_WAREHOUSE_UNLOAD_MINUTES;
+
+    // Apply custom warehouse (depot) location if provided
+    if (
+      payload.depot &&
+      typeof payload.depot.latitude === 'number' &&
+      typeof payload.depot.longitude === 'number' &&
+      !Number.isNaN(payload.depot.latitude) &&
+      !Number.isNaN(payload.depot.longitude) &&
+      payload.depot.latitude !== 0 &&
+      payload.depot.longitude !== 0
+    ) {
+      profile.depot = { latitude: payload.depot.latitude, longitude: payload.depot.longitude };
+      profile.endLocation = { latitude: payload.depot.latitude, longitude: payload.depot.longitude };
+
+      if (payload.saveDepotAsDefault) {
+        try {
+          await prisma.organizationFieldPlanningProfile.upsert({
+            where: { organizationId },
+            create: {
+              organizationId,
+              configuration: profile as unknown as Prisma.InputJsonValue,
+            },
+            update: {
+              configuration: profile as unknown as Prisma.InputJsonValue,
+            },
+          });
+        } catch (saveDepotErr) {
+          console.warn('Nepodařilo se uložit výchozí depo organizace:', saveDepotErr);
+        }
+      }
     }
 
     // Apply user-configured start time

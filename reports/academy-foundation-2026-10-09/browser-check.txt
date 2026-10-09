@@ -1,0 +1,1 @@
+PASS: real catalog and feedback components rendered in isolated browser; feedback request/response with mocked endpoint, no client tenant field, no page errors, no horizontal overflow at 360 px. Not an authenticated application E2E.

@@ -2,11 +2,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
+import { prisma } from '@/lib/db';
 import { getOrganizationRealizationProfile } from '@/lib/ai-realization/profile';
 import {
   buildRealizationContext,
   determineRealizationNextBestActions,
 } from '@/lib/ai-realization/realization-engine';
+import { RealizationChangeSetCard } from '@/components/ai-realization/RealizationChangeSetCard';
+import { RealizationStatusSyncCard } from '@/components/ai-realization/RealizationStatusSyncCard';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -42,13 +45,28 @@ export default async function RealizationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requirePageAccess('work');
+  const user = await requirePageAccess('realization');
   const { id } = await params;
   const organizationId = user.organizationId!;
   const profile = await getOrganizationRealizationProfile(organizationId);
 
   const context = await buildRealizationContext(id, user, profile);
   if (!context) notFound();
+
+  const pendingChangeSets = context.hasPendingChangeSet
+    ? await prisma.navigationChangeSet.findMany({
+        where: {
+          organizationId,
+          status: 'PENDING',
+          OR: [
+            { crmOrderId: id },
+            ...(context.navigationOrderId ? [{ navigationOrderId: context.navigationOrderId }] : []),
+            ...(context.offerId ? [{ offerId: context.offerId }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
 
   const nextBestActions = determineRealizationNextBestActions(context);
   const primaryNba = nextBestActions[0];
@@ -115,6 +133,7 @@ export default async function RealizationDetailPage({
             {PIPELINE_PHASES.map((phase, idx) => {
               const isPast = currentPhaseIndex > idx;
               const isCurrent = currentPhaseIndex === idx;
+              const allPhotosDone = context.items.length > 0 && context.items.every((i) => i.isPhotographed);
 
               let style = 'border-slate-200 bg-slate-50 text-slate-400';
               if (isPast) {
@@ -123,18 +142,36 @@ export default async function RealizationDetailPage({
                 style = 'border-sky-500 bg-sky-50 text-sky-900 font-bold ring-2 ring-sky-200';
               }
 
+              const displayLabel =
+                phase.key === 'PHOTO_DOCUMENTATION' && allPhotosDone && !isPast
+                  ? '5. Foto ✔'
+                  : phase.label;
+
               return (
                 <div
                   key={phase.key}
                   className={`flex items-center justify-center rounded-lg border py-2 px-2 text-center text-xs ${style}`}
                 >
                   {isPast && <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600" />}
-                  {phase.label}
+                  {displayLabel}
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* Realization Status Sync & Quick Actions */}
+        <RealizationStatusSyncCard
+          orderId={id}
+          orderNumber={context.orderNumber}
+          overallPhase={context.overallPhase}
+          projectType={context.projectType}
+          navigationOrderId={context.navigationOrderId}
+          totalItems={context.items.length}
+          photographedItems={context.items.filter((i) => i.isPhotographed).length}
+          installedItems={context.items.filter((i) => i.isInstalled).length}
+          isReadyForBilling={context.billingReadiness.isReady}
+        />
 
         {/* Next Best Action Callout */}
         {primaryNba && (
@@ -155,7 +192,7 @@ export default async function RealizationDetailPage({
                 <div>
                   <Link
                     href={primaryNba.targetUrl}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-700"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow transition hover:bg-indigo-700 cursor-pointer"
                   >
                     Provést akci
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -164,6 +201,16 @@ export default async function RealizationDetailPage({
               )}
             </div>
           </div>
+        )}
+
+        {/* ChangeSet Review Section */}
+        {pendingChangeSets.length > 0 && (
+          <RealizationChangeSetCard
+            orderId={id}
+            changeSets={pendingChangeSets as unknown as import('@/components/ai-realization/RealizationChangeSetCard').PendingChangeSetItem[]}
+            navigationOrderId={context.navigationOrderId}
+            offerId={context.offerId}
+          />
         )}
 
         {/* Blockers & Deadline Risks */}
@@ -185,7 +232,7 @@ export default async function RealizationDetailPage({
                       isBlocking ? 'text-rose-600' : 'text-amber-600'
                     }`}
                   />
-                  <div>
+                  <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{blocker.title}</span>
                       <span
@@ -197,6 +244,21 @@ export default async function RealizationDetailPage({
                       </span>
                     </div>
                     <div className="mt-1 text-xs opacity-90">{blocker.message}</div>
+                    {blocker.resolutionUrl && (
+                      <div className="mt-2.5">
+                        <Link
+                          href={blocker.resolutionUrl}
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold shadow-xs transition ${
+                            isBlocking
+                              ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                              : 'bg-amber-600 hover:bg-amber-700 text-white'
+                          }`}
+                        >
+                          <span>{blocker.resolutionLabel || 'Vyřešit překážku'}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

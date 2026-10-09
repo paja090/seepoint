@@ -239,6 +239,8 @@ export function evaluateRealization(
         severity: 'BLOCKING',
         title: 'Grafika čeká na schválení',
         message: 'Grafické podklady nebyly schváleny klientem. Tisk nelze zahájit.',
+        resolutionUrl: context.offerId ? `/offers/${context.offerId}` : context.navigationOrderId ? `/navigation/orders/${context.navigationOrderId}` : undefined,
+        resolutionLabel: 'Potvrdit schválení grafiky',
       });
     } else if (hasPrintJobs) {
       requirements.push({
@@ -268,6 +270,8 @@ export function evaluateRealization(
         severity: 'BLOCKING',
         title: 'Výroba není dokončena',
         message: 'Materiály ještě nebyly vytištěny a dodány do skladu. Instalaci nelze provést.',
+        resolutionUrl: '/production',
+        resolutionLabel: 'Zkontrolovat stav výroby',
       });
     } else {
       requirements.push({
@@ -290,6 +294,8 @@ export function evaluateRealization(
       message: `Na nosiči ${def.carrierCode || ''} (plocha ${def.surfaceName || def.id}) byl nahlášen problém: ${def.defectReason || 'poškození'}.`,
       entityId: def.surfaceId || def.id,
       entityType: 'SURFACE',
+      resolutionUrl: def.carrierId ? `/carriers/${def.carrierId}` : `/realization/${context.orderId}`,
+      resolutionLabel: 'Otevřít kartu nosiče a vyřešit závadu',
     });
   }
 
@@ -306,6 +312,8 @@ export function evaluateRealization(
       severity: 'WARNING',
       title: 'Instalace nemá přiřazeného pracovníka',
       message: `${unassignedItems.length} ploch nemá přiřazeného pracovníka nebo montážní tým.`,
+      resolutionUrl: '/work',
+      resolutionLabel: 'Přiřadit montážní tým v plánovači',
     });
   }
 
@@ -342,6 +350,11 @@ export function evaluateRealization(
       severity: profile.billingRequiresPhotos ? 'BLOCKING' : 'WARNING',
       title: 'Chybí fotodokumentace',
       message: `U ${unphotographedItems.length} instalovaných ploch nebyla nahrána platná fotodokumentace pro klienta.`,
+      resolutionUrl:
+        context.projectType === 'NAVIGATION' && context.navigationOrderId
+          ? `/navigation/orders/${context.navigationOrderId}`
+          : `/realization/${context.orderId}`,
+      resolutionLabel: 'Doplnit fotodokumentaci z terénu',
     });
   } else if (unphotographedItems.length === 0 && items.length > 0) {
     requirements.push({
@@ -361,6 +374,8 @@ export function evaluateRealization(
       severity: 'WARNING',
       title: 'Ohrožený termín kampaně',
       message: deadlineRisk.reason,
+      resolutionUrl: '/work/route',
+      resolutionLabel: 'Upravit harmonogram montáže',
     });
   }
 
@@ -372,6 +387,8 @@ export function evaluateRealization(
       message: 'K zakázce byl evidován změnový balíček z nabídky po zahájení realizace. Posuďte změnu před pokračováním.',
       entityType: 'ORDER',
       entityId: context.orderId,
+      resolutionUrl: `/realization/${context.orderId}#changeset-review`,
+      resolutionLabel: 'Posoudit změnu nabídky',
     });
   }
 
@@ -439,6 +456,13 @@ export function determineRealizationNextBestActions(
   // Prioritize blockers:
   const missingGraphicsBlocker = blockers.find((b) => b.code === 'MISSING_GRAPHICS');
   if (missingGraphicsBlocker) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : context.offerId
+        ? `/offers/${context.offerId}`
+        : `/realization/${orderId}`;
+
     actions.push({
       id: `nba-${orderId}-graphics-request`,
       actionType: 'REQUEST_GRAPHICS',
@@ -446,7 +470,7 @@ export function determineRealizationNextBestActions(
       title: 'Vyžádat tiskové podklady',
       description: 'Zakázka čeká na dodání tiskových dat od klienta nebo grafika.',
       targetOrderId: orderId,
-      targetUrl: `/crm/orders/${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -454,6 +478,13 @@ export function determineRealizationNextBestActions(
 
   const unapprovedGraphicsBlocker = blockers.find((b) => b.code === 'GRAPHICS_NOT_APPROVED');
   if (unapprovedGraphicsBlocker) {
+    const targetUrl =
+      context.offerId
+        ? `/offers/${context.offerId}`
+        : context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/realization/${orderId}`;
+
     actions.push({
       id: `nba-${orderId}-graphics-approve`,
       actionType: 'APPROVE_GRAPHICS',
@@ -461,7 +492,7 @@ export function determineRealizationNextBestActions(
       title: 'Potvrdit schválení grafiky',
       description: 'Zajistěte potvrzení náhledu klientem pro uvolnění tiskových dat do výroby.',
       targetOrderId: orderId,
-      targetUrl: `/crm/orders/${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -477,7 +508,7 @@ export function determineRealizationNextBestActions(
       description: defectBlocker.message,
       targetOrderId: orderId,
       targetSurfaceId: defectBlocker.entityId,
-      targetUrl: `/carriers/${defectBlocker.entityId || ''}`,
+      targetUrl: defectBlocker.resolutionUrl || `/realization/${orderId}`,
       recommendedAt: new Date(),
     });
     return actions;
@@ -492,7 +523,7 @@ export function determineRealizationNextBestActions(
       title: 'Posoudit změnu rozsahu nabídky',
       description: scopeChangeBlocker.message,
       targetOrderId: orderId,
-      targetUrl: `/crm/orders/${orderId}`,
+      targetUrl: `#changeset-review`,
       recommendedAt: new Date(),
     });
   }
@@ -529,6 +560,11 @@ export function determineRealizationNextBestActions(
 
   const missingPhotosBlocker = blockers.find((b) => b.code === 'MISSING_PHOTO_DOCUMENTATION');
   if (missingPhotosBlocker) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/realization/${orderId}`;
+
     actions.push({
       id: `nba-${orderId}-upload-photos`,
       actionType: 'UPLOAD_PHOTOS',
@@ -536,7 +572,35 @@ export function determineRealizationNextBestActions(
       title: 'Doplnit fotodokumentaci z terénu',
       description: 'Plochy jsou nainstalovány. Nahrajte kontrolní fotografie pro schválení a fakturaci.',
       targetOrderId: orderId,
-      targetUrl: `/realization/${orderId}`,
+      targetUrl,
+      recommendedAt: new Date(),
+    });
+    return actions;
+  }
+
+  // All items photographed and installed, but waiting for QC / billing approval:
+  const allPhotographed =
+    context.items.length > 0 &&
+    context.items.every((i) => i.isPhotographed) &&
+    context.items.every((i) => i.isInstalled);
+
+  if (
+    allPhotographed &&
+    (context.overallPhase === 'PHOTO_DOCUMENTATION' || String(context.status) === 'FOTODOKUMENTACE')
+  ) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/realization/${orderId}`;
+
+    actions.push({
+      id: `nba-${orderId}-approve-photos`,
+      actionType: 'APPROVE_PHOTOS',
+      priority: 'HIGH',
+      title: 'Schválit fotodokumentaci a předat k fakturaci',
+      description: `Všechny fotografie (${context.items.length}/${context.items.length}) jsou nahrány. Schvalte fotodokumentaci pro uvolnění zakázky k fakturaci.`,
+      targetOrderId: orderId,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -544,6 +608,11 @@ export function determineRealizationNextBestActions(
 
   // If ready for billing:
   if (context.billingReadiness.isReady) {
+    const targetUrl =
+      context.projectType === 'NAVIGATION' && context.navigationOrderId
+        ? `/navigation/orders/${context.navigationOrderId}`
+        : `/clients/${context.clientId}`;
+
     actions.push({
       id: `nba-${orderId}-ready-billing`,
       actionType: 'READY_FOR_BILLING',
@@ -551,7 +620,7 @@ export function determineRealizationNextBestActions(
       title: 'Předat zakázku k fakturaci',
       description: 'Všechny podmínky realizace jsou splněny. Vystavte klientovi fakturu.',
       targetOrderId: orderId,
-      targetUrl: `/invoices/new?orderId=${orderId}`,
+      targetUrl,
       recommendedAt: new Date(),
     });
     return actions;
@@ -721,6 +790,8 @@ export async function buildRealizationContext(
       offerTitle: crmOrder.offer?.title,
       offerAcceptedAt: crmOrder.offer?.acceptedAt || undefined,
       offerAcceptedBy: crmOrder.offer?.createdByUser?.name,
+      navigationOrderId: crmOrder.navigationOrder?.id,
+      pendingChangeSetId: crmOrder.navigationOrder?.changeSets?.[0]?.id,
       clientId: crmOrder.clientId,
       clientName: crmOrder.client.name,
       clientContactPerson: crmOrder.client.contactPerson || undefined,

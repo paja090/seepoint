@@ -3,6 +3,7 @@ import { platformPrisma } from '@/lib/db';
 import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { isClientApprovedPhoto } from '@/lib/navigation-documentation-policy';
 
 export const runtime = 'nodejs';
 
@@ -65,7 +66,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
       },
     });
 
-    if (!photo || photo.isPrivate) {
+    if (!photo || !isClientApprovedPhoto(photo)) {
       return NextResponse.json({ error: 'Fotografie není dostupná.' }, { status: 404 });
     }
 
@@ -82,7 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
         headers: {
           'Content-Type': photo.mimeType ?? 'image/jpeg',
           'Content-Disposition': disposition,
-          'Cache-Control': 'public, max-age=86400, immutable',
+          'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         },
       });
@@ -99,7 +100,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           headers: {
             'Content-Type': mime,
             'Content-Disposition': disposition,
-            'Cache-Control': 'public, max-age=86400, immutable',
+            'Cache-Control': 'private, no-store',
           },
         });
       }
@@ -114,7 +115,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
           headers: {
             'Content-Type': photo.mimeType ?? file.headers.get('Content-Type') ?? 'image/jpeg',
             'Content-Disposition': disposition,
-            'Cache-Control': 'public, max-age=86400, immutable',
+            'Cache-Control': 'private, no-store',
             'X-Content-Type-Options': 'nosniff',
           },
         });
@@ -123,7 +124,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
     // 4. External HTTP URL
     if (photo.url && photo.url.startsWith('http') && !photo.url.includes('/api/photos/')) {
-      return NextResponse.redirect(photo.url);
+      return new Response(null, { status: 307, headers: { Location: photo.url, 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } });
     }
 
     return NextResponse.json({ error: 'Fotografii se nepodařilo načíst.' }, { status: 404 });

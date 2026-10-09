@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { platformPrisma } from '@/lib/db';
 import { hashToken, buildSnapshotItem, documentationPhotoSelect, SnapshotItemData } from '@/lib/navigation-documentation';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
+import { isClientApprovedPhoto } from '@/lib/navigation-documentation-policy';
 
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -26,12 +27,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
         include: {
           navigationPoint: {
             include: {
-              installedPhoto: { select: documentationPhotoSelect },
-              sitePhoto: { select: documentationPhotoSelect },
+              installedPhoto: { select: { ...documentationPhotoSelect, organizationId: true } },
+              sitePhoto: { select: { ...documentationPhotoSelect, organizationId: true } },
             },
           },
           carrier: true,
-          selectedPhoto: { select: documentationPhotoSelect },
+          selectedPhoto: { select: { ...documentationPhotoSelect, organizationId: true } },
         },
         orderBy: { sortOrder: 'asc' },
       },
@@ -44,7 +45,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
   const items: SnapshotItemData[] = report.items.map((item) => {
     const candidatePhoto = item.selectedPhoto || item.navigationPoint?.installedPhoto || item.navigationPoint?.sitePhoto || null;
-    const photoId = candidatePhoto && !candidatePhoto.isPrivate ? candidatePhoto.id : null;
+    const photoId = candidatePhoto && isClientApprovedPhoto(candidatePhoto) && candidatePhoto.organizationId === owner.organizationId ? candidatePhoto.id : null;
 
     let baseItem: SnapshotItemData;
     if (item.snapshot && typeof item.snapshot === 'object') {
@@ -80,5 +81,5 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     campaignTitle,
     itemsCount: items.length,
     items,
-  });
+  }, { headers: { 'Cache-Control': 'private, no-store' } });
 }

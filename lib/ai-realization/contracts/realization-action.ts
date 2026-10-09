@@ -6,6 +6,7 @@ export type RealizationActionType =
   | 'COMPLETE_INSTALLATION'
   | 'UPLOAD_PHOTOS'
   | 'REVIEW_DOCUMENTATION'
+  | 'APPROVE_PHOTOS'
   | 'READY_FOR_BILLING'
   | 'RESOLVE_BLOCKER';
 

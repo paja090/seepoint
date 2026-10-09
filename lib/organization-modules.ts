@@ -10,6 +10,7 @@ export interface SystemModule {
 }
 
 export const SYSTEM_MODULES: SystemModule[] = [
+  { id: 'academy', name: 'Návody & Akademie', description: 'Ověřené návody a školicí centrum', category: 'overview', routes: ['/academy'] },
   { id: 'planner', name: 'Planner', description: 'Osobní den, pracovní bloky a dostupnost týmu', category: 'overview', routes: ['/planner', '/settings/planner'] },
   { id: 'googleCalendar', name: 'Google Calendar v Planneru', description: 'Osobní a sdílené kalendáře', category: 'management', routes: [] },
   { id: 'aiPlanner', name: 'AI Planner (připravujeme)', description: 'Návrhy plánu s potvrzením uživatele', category: 'management', routes: [] },
@@ -333,7 +334,7 @@ export function getOrganizationEnabledModules(
     result[mod.id] = defaultModules.has(mod.id);
   });
   // Foundation rollout is explicit per tenant, including enterprise/internal plans.
-  for (const id of ['planner', 'googleCalendar', 'aiPlanner', 'electionRemoval']) result[id] = false;
+  for (const id of ['planner', 'googleCalendar', 'aiPlanner', 'electionRemoval', 'academy']) result[id] = false;
 
   if (organization?.enabledModules && typeof organization.enabledModules === 'object') {
     const overrides = organization.enabledModules as Record<string, unknown>;
@@ -363,4 +364,11 @@ export function getModuleIdForPath(pathname: string): string | null {
   return SYSTEM_MODULES.flatMap(mod => mod.routes.map(route => ({ route, id: mod.id })))
     .sort((a, b) => b.route.length - a.route.length)
     .find(({ route }) => pathname === route || pathname.startsWith(route + '/'))?.id ?? null;
+}
+
+// Shared effective availability for page/API guards and navigation.
+export function isModuleAvailable(organization: Parameters<typeof isModuleEnabled>[0], moduleId: string): boolean {
+  return isModuleEnabled(organization, moduleId)
+    || (moduleId === 'aiRealization' && isModuleEnabled(organization, 'work'))
+    || (moduleId === 'fieldSurvey' && isModuleEnabled(organization, 'carriers'));
 }
