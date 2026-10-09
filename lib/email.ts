@@ -483,7 +483,21 @@ export async function sendActivationEmail(email: string, url: string): Promise<E
   return sendEmail({
     to: email,
     subject: 'Aktivace účtu SeePoint',
-    html: `<h1>Vítejte v SeePoint</h1><p>Pro nastavení hesla a aktivaci účtu použijte následující odkaz:</p><p><a href="${safeUrl}">Aktivovat účet</a></p><p>Pokud jste účet neočekávali, tento e-mail ignorujte.</p>`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:580px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;background:#ffffff">
+        <h2 style="margin-top:0;color:#0f172a;font-size:20px;font-weight:800">Vítejte v SeePoint</h2>
+        <p style="color:#334155;font-size:14px">Byl pro Vás vytvořen uživatelský přístup. Pro nastavení Vašeho hesla a aktivaci účtu klikněte na tlačítko níže:</p>
+        <p style="margin:24px 0">
+          <a href="${safeUrl}" style="display:inline-block;border-radius:12px;background:#0284c7;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px">Aktivovat účet & Nastavit heslo</a>
+        </p>
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b">
+          Pokud tlačítko nefunguje, zkopírujte tento odkaz do prohlížeče:<br>
+          <a href="${safeUrl}" style="color:#0284c7;word-break:break-all">${safeUrl}</a>
+        </p>
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0">
+        <p style="font-size:11px;color:#94a3b8;margin:0">Pokud jste tento přístup neočekávali, můžete tento e-mail bezpečně ignorovat.</p>
+      </div>
+    `,
     webhookBody: { template: 'activation', activationUrl: url },
   });
 }
@@ -493,7 +507,21 @@ export async function sendPasswordResetEmail(email: string, url: string): Promis
   return sendEmail({
     to: email,
     subject: 'Obnovení hesla SeePoint',
-    html: `<h1>Obnovení hesla</h1><p>Pro nastavení nového hesla použijte následující odkaz:</p><p><a href="${safeUrl}">Nastavit nové heslo</a></p><p>Pokud jste o změnu nežádali, tento e-mail ignorujte.</p>`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:580px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;background:#ffffff">
+        <h2 style="margin-top:0;color:#0f172a;font-size:20px;font-weight:800">Obnovení přístupového hesla</h2>
+        <p style="color:#334155;font-size:14px">Obdrželi jsme žádost o nastavení nového hesla k Vašemu účtu SeePoint. Pro pokračování klikněte na tlačítko níže:</p>
+        <p style="margin:24px 0">
+          <a href="${safeUrl}" style="display:inline-block;border-radius:12px;background:#0284c7;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px">Nastavit nové heslo</a>
+        </p>
+        <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b">
+          Pokud tlačítko nefunguje, zkopírujte tento odkaz do prohlížeče:<br>
+          <a href="${safeUrl}" style="color:#0284c7;word-break:break-all">${safeUrl}</a>
+        </p>
+        <hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0">
+        <p style="font-size:11px;color:#94a3b8;margin:0">Pokud jste o obnovu hesla nežádali, Vaše heslo zůstává beze změny a tento e-mail můžete ignorovat.</p>
+      </div>
+    `,
     webhookBody: { template: 'password-reset', resetUrl: url },
   });
 }
