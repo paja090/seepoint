@@ -35,8 +35,8 @@ export async function myRoute(userId: string, now = new Date()) {
       });
       const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
-      const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => (s as any).isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
-      const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => (s as any).isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
+      const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
+      const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
       routes.push({ planId: plan.id, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
         stops: crew.stops.flatMap(s => {
           if (s.electionRemovalPointId) {
@@ -44,7 +44,7 @@ export async function myRoute(userId: string, now = new Date()) {
             if (!ep) return [];
             return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: ep.id, address: null, pointPhotoUrl: null, workOrderId: '', title: ep.label, clientName: 'Svoz voleb', instructions: ep.description || `Demontáž (${ep.mediaType})`, status: ['COMPLETED', 'ISSUE'].includes(ep.status) ? 'DONE' : ep.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
           }
-          if ((s as any).isWarehousePitstop) {
+          if (s.isWarehousePitstop) {
             const isCompleted = pitstopCompletions.some(c => c.entityId === stopId(s));
             const isStarted = pitstopStarts.some(c => c.entityId === stopId(s));
             return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: null, address: null, pointPhotoUrl: null, workOrderId: '', title: s.title, clientName: 'Sklad', instructions: '', status: isCompleted ? 'DONE' : isStarted ? 'IN_PROGRESS' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
@@ -92,7 +92,7 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       if (input.action !== 'inspect') await refreshExecutionPlan(tx, plan.id, result);
       return response;
     }
-    if ((stop as any).isWarehousePitstop) {
+    if (stop.isWarehousePitstop) {
       if (input.action === 'inspect') return { ok: true };
       if (!['start', 'complete'].includes(input.action)) throw new Error('Neplatná akce.');
       const actionStr = input.action === 'start' ? 'FIELD_POINT_STARTED' : 'FIELD_POINT_COMPLETED';
