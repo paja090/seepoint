@@ -34,9 +34,12 @@ test('all roles retain the original visibility across plans, overrides and missi
     ...SYSTEM_MODULES.map(m => ({ plan: 'ENTERPRISE', enabledModules: { [m.id]: false } })),
   ];
   for (const role of roles) for (const organization of organizations) {
-    const expected = current.filter(item => canAccess(role, item.section) &&
-      (!['planner', 'academy'].includes(item.module) || organization) &&
-      (!organization || item.module === '—' || isModuleAvailable(organization, item.module))).map(i => i.href).sort();
+    const expected = current.filter(item => {
+      if (item.href === '/academy') return canAccess(role, 'academy') && Boolean(organization);
+      return canAccess(role, item.section) &&
+        (item.module !== 'planner' || organization) &&
+        (!organization || item.module === '—' || isModuleAvailable(organization, item.module));
+    }).map(i => i.href).sort();
     const actual = getVisibleNavigation({ role, organization });
     assert.deepEqual(hrefs(actual), expected, `${role}: ${JSON.stringify(organization)}`);
     assert.ok(actual.every(h => h.groups.length && h.groups.every(g => g.items.length)));

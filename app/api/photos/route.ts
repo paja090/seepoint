@@ -113,6 +113,7 @@ export async function POST(request: Request) {
           employeeId,
           sortOrder: count,
           isPrimary,
+          isClientVisible: !employeeId && rawType !== 'DAMAGE' && rawType !== 'CHECK' && rawType !== 'EXPENSE_RECEIPT',
           note: form.get('note') ? String(form.get('note')).trim().slice(0, 1000) : null,
         },
       });

@@ -10,10 +10,12 @@ export function CarrierShowcase({
   offer,
   selectedCarrierId,
   onOpenCarrier,
+  onOpenPhoto,
 }: {
   offer: ProposalOffer;
   selectedCarrierId?: string | null;
   onOpenCarrier: (carrier: ProposalCarrier) => void;
+  onOpenPhoto?: (photoUrl: string, title: string) => void;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +32,7 @@ export function CarrierShowcase({
           id="carriers-heading"
           eyebrow="Ukázka nosičů"
           title="Vybrané reklamní nosiče"
-          description={`Přehled všech ${offer.carriers.length} reklamních ploch zařazených do nabídky.`}
+          description={`Přehled všech ${offer.carriers.length} reklamních ploch zařazených do nabídky s přesným umístěním a odůvodněním výběru.`}
         />
         <div className="mb-6 hidden gap-2 sm:flex print:hidden">
           <button
@@ -62,6 +64,7 @@ export function CarrierShowcase({
               carrier={carrier}
               isSelected={selectedCarrierId === carrier.id}
               onOpen={onOpenCarrier}
+              onOpenPhoto={onOpenPhoto}
             />
           </div>
         ))}

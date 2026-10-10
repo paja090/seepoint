@@ -86,7 +86,7 @@ export const navigationHubs: NavigationHub[] = [
   ] }
 ];
 
-export const quickAccessHrefs = ['/dashboard', '/my-tasks', '/commercial'];
+export const quickAccessHrefs = ['/dashboard', '/my-tasks', '/commercial', '/academy'];
 export const mobileHrefs = ['/dashboard', '/warehouse', '/my-tasks'];
 
 export function matchesNavigationPath(pathname: string, href: string) {
@@ -110,7 +110,8 @@ export function getVisibleNavigation(user: {
   const hubs = navigationHubs.map(hub => ({ ...hub, groups: hub.groups.map(group => ({ ...group,
     items: group.items.filter(([href, , , section]) => {
       const moduleId = getModuleIdForPath(href);
-      return canAccess(user.role, section) && (!['planner', 'academy'].includes(moduleId ?? '') || Boolean(user.organization)) && (!user.organization || !moduleId || isModuleAvailable(user.organization, moduleId));
+      if (href === '/academy') return canAccess(user.role, 'academy') && Boolean(user.organization);
+      return canAccess(user.role, section) && (moduleId !== 'planner' || Boolean(user.organization)) && (!user.organization || !moduleId || isModuleAvailable(user.organization, moduleId));
     }),
   })).filter(group => group.items.length > 0) })).filter(hub => hub.groups.length > 0);
   const management = hubs.find(hub => hub.id === 'management');

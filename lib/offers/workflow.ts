@@ -23,7 +23,7 @@ export type OfferReadinessCheck = {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function clientVisiblePhotos(offer: OfferView) {
-  return offer.items.flatMap((item) => item.surface.photos.filter((photo) => photo.isClientVisible === true));
+  return offer.items.flatMap((item) => item.surface.photos.filter((photo) => photo.isClientVisible !== false));
 }
 
 export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictView[] = [], today = new Date().toISOString().slice(0, 10)): OfferReadinessCheck[] {
@@ -126,7 +126,7 @@ export function offerDateRange(offer: OfferView) {
 export function offerMissingAssets(offer: OfferView) {
   return offer.items.flatMap((item) => {
     const missing: Array<{ id: string; kind: 'photo' | 'gps'; code: string; city: string; surface: string }> = [];
-    if (!item.surface.photos.some((photo) => photo.isClientVisible === true)) missing.push({ id: `${item.surfaceId}-photo`, kind: 'photo', code: item.surface.carrier.code, city: item.surface.carrier.city, surface: item.surface.name });
+    if (!item.surface.photos.some((photo) => photo.isClientVisible !== false)) missing.push({ id: `${item.surfaceId}-photo`, kind: 'photo', code: item.surface.carrier.code, city: item.surface.carrier.city, surface: item.surface.name });
     if (item.surface.carrier.latitude == null || item.surface.carrier.longitude == null) missing.push({ id: `${item.surfaceId}-gps`, kind: 'gps', code: item.surface.carrier.code, city: item.surface.carrier.city, surface: item.surface.name });
     return missing;
   });
