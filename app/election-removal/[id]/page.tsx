@@ -56,10 +56,10 @@ export default async function ElectionRemovalDetailPage({
   }
 
   // Calculate statistics
-  const totalPoints = campaign.points.length;
-  const completedPoints = campaign.points.filter((p) => p.status === 'COMPLETED').length;
+  const totalPoints = campaign.points.reduce((sum, p) => sum + p.quantity, 0);
+  const completedPoints = campaign.points.filter((p) => p.status === 'COMPLETED').reduce((sum, p) => sum + p.quantity, 0);
   const remainingPoints = totalPoints - completedPoints;
-  const unassignedPoints = campaign.points.filter((p) => p.status === 'PENDING').length;
+  const unassignedPoints = campaign.points.filter((p) => p.status === 'PENDING').reduce((sum, p) => sum + p.quantity, 0);
   const totalServiceMinutes = campaign.points
     .filter((p) => p.status !== 'COMPLETED')
     .reduce((acc, p) => acc + p.serviceMinutes, 0);
@@ -240,10 +240,11 @@ export default async function ElectionRemovalDetailPage({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-1">
               {distinctCrews.map((crewId) => {
                 const crewPoints = campaign.points.filter((p) => p.assignedCrewId === crewId);
-                const crewCompleted = crewPoints.filter((p) => p.status === 'COMPLETED').length;
+                const crewCompleted = crewPoints.filter((p) => p.status === 'COMPLETED').reduce((sum, p) => sum + p.quantity, 0);
+                const crewTotal = crewPoints.reduce((sum, p) => sum + p.quantity, 0);
                 const crewPercent =
-                  crewPoints.length > 0
-                    ? Math.round((crewCompleted / crewPoints.length) * 100)
+                  crewTotal > 0
+                    ? Math.round((crewCompleted / crewTotal) * 100)
                     : 0;
                 const crewName = crewId.replace('crew-', 'Posádka ');
 
@@ -259,11 +260,11 @@ export default async function ElectionRemovalDetailPage({
                           🚗 {crewName}
                         </span>
                         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700">
-                          {crewPoints.length} bodů
+                          {crewTotal} ks
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        Hotovo: {crewCompleted} / {crewPoints.length} ({crewPercent} %)
+                        Hotovo: {crewCompleted} / {crewTotal} ({crewPercent} %)
                       </p>
                     </div>
 
