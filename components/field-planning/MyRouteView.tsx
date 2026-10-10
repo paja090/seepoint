@@ -129,6 +129,28 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               </span>
             </div>
 
+            {/* Google Maps Full Route */}
+            {(() => {
+              const points = route.stops.map(s => s.location).filter((loc): loc is { latitude: number; longitude: number } => Boolean(loc));
+              if (points.length < 2) return null;
+              const origin = `${points[0].latitude},${points[0].longitude}`;
+              const dest = `${points[points.length - 1].latitude},${points[points.length - 1].longitude}`;
+              const waypoints = points.slice(1, -1).map(p => `${p.latitude},${p.longitude}`).join('|');
+              const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypoints ? `&waypoints=${waypoints}` : ''}`;
+              
+              return (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 mt-2 border border-indigo-200/50"
+                >
+                  <MapPin size={16} />
+                  <span>Zobrazit celou trasu na mapě</span>
+                </a>
+              );
+            })()}
+
             {/* Stops list */}
             {route.stops.map((s, i) => {
               const isDone = s.status === 'DONE';

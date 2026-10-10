@@ -79,7 +79,30 @@ const offerPhotoSelect = {
 
 const offerInclude = {
   client: true,
-  createdByUser: { select: { id: true, name: true, email: true, role: true } },
+  createdByUser: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      employees: {
+        where: { isActive: true },
+        take: 1,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          photos: {
+            where: { type: 'EMPLOYEE_PROFILE' },
+            orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+            take: 1,
+            select: { id: true, url: true },
+          },
+        },
+      },
+    },
+  },
   updatedByUser: { select: { id: true, name: true } },
   crmOrder: {
     include: {
@@ -194,7 +217,20 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     archivedAt: publicView ? undefined : row.archivedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    createdBy: row.createdByUser ? { id: row.createdByUser.id, name: row.createdByUser.name, email: publicView ? undefined : row.createdByUser.email } : { name: row.createdBy ?? 'Obchodní kontakt' },
+    createdBy: (() => {
+      const spEmployee = row.createdByUser?.employees?.[0];
+      const avatarUrl = spEmployee?.photos?.[0]?.url ?? null;
+      const phone = row.contactPhone ?? spEmployee?.phone ?? null;
+      return row.createdByUser
+        ? {
+            id: row.createdByUser.id,
+            name: row.createdByUser.name,
+            email: publicView ? undefined : row.createdByUser.email,
+            phone,
+            avatarUrl,
+          }
+        : { name: row.createdBy ?? 'Obchodní kontakt', phone: row.contactPhone ?? null, avatarUrl: null };
+    })(),
     client: {
       name: row.client.name,
       logoUrl: hasResolvableClientLogo({

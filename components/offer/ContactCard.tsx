@@ -1,4 +1,8 @@
-import { Mail, Phone } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { Mail, Phone, User as UserIcon } from 'lucide-react';
 import type { ProposalSalesperson } from '@/lib/offers/presentation';
 
 export function ContactCard({
@@ -8,22 +12,52 @@ export function ContactCard({
   salesperson: ProposalSalesperson;
   onQuestion: () => void;
 }) {
+  const [avatarError, setAvatarError] = useState(false);
+
+  const initials = salesperson.name
+    ? salesperson.name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join('')
+    : 'SP';
+
+  const hasAvatar = Boolean(salesperson.avatar) && !avatarError;
+
   return (
     <section
       aria-labelledby="contact-heading"
       className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8"
     >
-      <h2 className="text-xl font-semibold tracking-tight text-slate-950" id="contact-heading">
-        Váš kontaktní obchodník
-      </h2>
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold tracking-tight text-slate-950" id="contact-heading">
+          Váš kontaktní obchodník
+        </h2>
+        <Link
+          href="/profile"
+          className="text-xs text-slate-400 hover:text-indigo-600 transition print:hidden"
+          title="Změnit profilovou fotografii v nastavení účtu"
+        >
+          Upravit foto v profilu
+        </Link>
+      </div>
+
       <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-slate-200">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            alt={`Fotografie – ${salesperson.name}`}
-            className="h-full w-full object-cover"
-            src={salesperson.avatar || '/placeholder.svg'}
-          />
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-slate-200 bg-slate-100 flex items-center justify-center">
+          {hasAvatar ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              alt={`Fotografie – ${salesperson.name}`}
+              className="h-full w-full object-cover"
+              src={salesperson.avatar}
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-500 via-indigo-600 to-sky-600 font-black text-white text-xl tracking-wider shadow-inner">
+              {initials || <UserIcon className="size-8 text-white/80" />}
+            </div>
+          )}
         </div>
         <div className="min-w-0">
           <p className="text-lg font-semibold text-slate-900">{salesperson.name}</p>

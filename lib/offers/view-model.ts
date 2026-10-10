@@ -120,7 +120,7 @@ export type OfferView = {
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  createdBy: { id?: string; name: string; email?: string };
+  createdBy: { id?: string; name: string; email?: string; phone?: string | null; avatarUrl?: string | null };
   client: { name: string; logoUrl?: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null };
   items: OfferItemView[];
   charges: OfferChargeView[];

@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FilePenLine,
   Link2,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -192,6 +193,18 @@ export function OfferActions({
           <Eye aria-hidden="true" size={17} />
           Zkontrolovat klientský náhled
         </a>
+
+        {offerType === 'STANDARD_MEDIA' && (
+          <button
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50/70 px-4 py-3 text-sm font-semibold text-purple-900 transition hover:bg-purple-100 disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => void action('ai-copy')}
+            type="button"
+          >
+            <Sparkles aria-hidden="true" size={17} className="text-purple-600" />
+            {busy === 'ai-copy' ? 'AI generuje strategii pro klienta...' : 'Navrhnout texty & strategii AI'}
+          </button>
+        )}
 
         {status === 'SENT' && !isNavigationLocationSelection && (
           <>
