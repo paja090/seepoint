@@ -17,7 +17,7 @@ function escapeHtml(str: string): string {
   }[tag] || tag));
 }
 
-export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO; height?: string }) {
+export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO['routes'][number]; height?: string }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<LeafletMap | null>(null);
   const layerInstance = useRef<TileLayer | null>(null);
