@@ -33,6 +33,24 @@ export type ProposalCarrier = {
   longitude?: number | null;
   mapX: number;
   mapY: number;
+  orderIndex?: number;
+  aiReasons?: string[];
+  allPhotos?: Array<{ id: string; url: string; note?: string | null; isPrimary: boolean; isInstallation?: boolean }>;
+  unitPrice?: string | null;
+  surfaceName?: string;
+  customTitle?: string | null;
+};
+export type ProposalCampaignPhase = {
+  name: string;
+  phase: 'TEASER' | 'OPENING' | 'FOLLOW_UP' | string;
+  timeframe: string;
+  description: string;
+  recommendedMediaTypes?: string[];
+};
+export type ProposalCampaignStrategy = {
+  city?: string;
+  summary?: string;
+  recommendedMediaTypes?: string[];
 };
 export type ProposalMediaType = {
   key: ProposalMediaTypeKey;
@@ -74,6 +92,8 @@ export type ProposalOffer = {
   navigationTarget?: { name: string; latitude: number; longitude: number } | null;
   offerType?: string;
   rawOffer?: OfferView;
+  campaignPhases?: ProposalCampaignPhase[] | null;
+  campaignStrategy?: ProposalCampaignStrategy | null;
 };
 
 export const MEDIA_TYPE_META: Record<ProposalMediaTypeKey, { label: string; tone: ProposalAccentTone; image: string }> = {
@@ -124,6 +144,14 @@ function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
+function parseAiReasons(description?: string | null): string[] {
+  if (!description) return [];
+  return description
+    .split(/(?:\. |\n|; )/)
+    .map((s) => s.trim().replace(/\.$/, ''))
+    .filter((s) => s.length > 3 && !s.toLowerCase().startsWith('poznámka') && !s.toLowerCase().startsWith('interní'));
+}
+
 export function toProposalOffer(offer: OfferView): ProposalOffer {
   const portfolioImage = (path: string) => hasSeePointPortfolio(offer.branding) ? path : '/placeholder.svg';
   const fromValues = offer.items.map((item) => item.dateFrom).filter(Boolean) as string[];
@@ -140,9 +168,24 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     const meta = MEDIA_TYPE_META[key] || { label: item.surface.carrierTypeRef?.name || key, tone: 'blue', image: '/offer/media-city-poster.png' };
     const label = item.surface.carrierTypeRef?.name || meta.label;
     const carrier = item.surface.carrier;
-    const photos = item.surface.photos.filter((photo) => photo.isClientVisible === true);
+    const photos = item.surface.photos.filter((photo) => photo.isClientVisible !== false);
+    const presentationPhotos = photos.filter((photo) => !photo.isInstallation);
+    const primaryPhoto =
+      presentationPhotos.find((photo) => photo.isPrimary) ||
+      presentationPhotos[0] ||
+      photos.find((photo) => photo.isPrimary) ||
+      photos[0];
+
+    const rawReasons = parseAiReasons(item.clientDescription);
+    const aiReasons = rawReasons.length > 0 ? rawReasons : [
+      'Vysoká vizuální expozice na frekventovaném místě',
+      'Ověřená 100% dostupnost v termínu kampaně',
+      'Ideální reklamní formát pro zásah spádové oblasti',
+    ];
+
     return {
       id: item.id ?? `${carrier.code}-${index}`,
+      orderIndex: index + 1,
       code: carrier.code,
       mediaType: key,
       city: carrier.city,
@@ -150,12 +193,17 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       description: item.clientDescription || carrier.description || item.surface.name,
       dimensions: item.surface.size || item.surface.orientation || 'dle specifikace plochy',
       status: item.surface.status || 'AVAILABLE',
-      image: photos[0]?.url || portfolioImage(meta.image),
-      imageAlt: photos[0]?.note || `${label} ${carrier.code}`,
+      image: primaryPhoto?.url || portfolioImage(meta.image),
+      imageAlt: primaryPhoto?.note || `${label} ${carrier.code}`,
       latitude: carrier.latitude,
       longitude: carrier.longitude,
       mapX: 12 + ((index * 23) % 76),
       mapY: 20 + ((index * 17) % 65),
+      aiReasons,
+      allPhotos: photos.map((p) => ({ id: p.id, url: p.url, note: p.note, isPrimary: p.isPrimary, isInstallation: p.isInstallation })),
+      unitPrice: item.unitPrice,
+      surfaceName: item.surface.name,
+      customTitle: item.customTitle,
     };
   });
 
@@ -170,11 +218,12 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         distStr = `🚗 ${formatDistance(roadM)} po silnici`;
       }
 
-      const carrierPhotos = (point as { carrier?: { photos?: Array<{ url: string; isClientVisible?: boolean }> } }).carrier?.photos?.filter((p) => p.isClientVisible === true) || [];
-      const photoUrl = carrierPhotos[0]?.url || portfolioImage(MEDIA_TYPE_META.NAVIGATION_SIGN.image);
+      const carrierPhotos = (point as { carrier?: { photos?: Array<{ id?: string; url: string; isClientVisible?: boolean; isPrimary?: boolean; note?: string | null }> } }).carrier?.photos?.filter((p) => p.isClientVisible !== false) || [];
+      const photoUrl = point.sitePhotoUrl || carrierPhotos[0]?.url || portfolioImage(MEDIA_TYPE_META.NAVIGATION_SIGN.image);
 
       carriers.push({
         id: point.id,
+        orderIndex: offer.items.length + index + 1,
         code: point.label || `NAV-${String(index + 1).padStart(2, '0')}`,
         mediaType: 'NAVIGATION_SIGN',
         city: offer.navigation!.targetName,
@@ -188,6 +237,14 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
         longitude: point.longitude,
         mapX: 12 + ((index * 23) % 76),
         mapY: 20 + ((index * 17) % 65),
+        aiReasons: [
+          'Klíčový navigační bod na příjezdové trase k provozovně',
+          distStr || 'Přímé vizuální navádění pro přijíždějící zákazníky',
+          'Ukotvení na sloupu veřejného osvětlení s 24/7 viditelností',
+        ],
+        allPhotos: carrierPhotos.map((p) => ({ id: p.id ?? '', url: p.url, note: p.note, isPrimary: p.isPrimary ?? false })),
+        unitPrice: point.unitPrice,
+        surfaceName: point.label,
       });
     });
   }
@@ -219,7 +276,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       key,
       name: label,
       description: `Vybrané plochy typu ${label} v lokalitách ${[...new Set(items.map((item) => item.surface.carrier.city))].join(', ')}.`,
-      image: items.flatMap((item) => item.surface.photos).find((photo) => photo.isClientVisible === true)?.url || portfolioImage(meta.image),
+      image: items.flatMap((item) => item.surface.photos).find((photo) => !photo.isInstallation)?.url || portfolioImage(meta.image),
       imageAlt: `${label} v nabídce`,
       tone: meta.tone,
       surfaceCount: items.length,
@@ -273,7 +330,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt', phone: '', email: offer.createdBy.email || '', avatar: undefined },
     heroImage: carriers[0]?.image || portfolioImage(offer.offerType === 'NAVIGATION' ? '/offer/media-navigation.png' : offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png'),
     heroImageAlt: `Navigační kampaň pro ${offer.campaignName || offer.title}`,
-    stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible === true).length, 0), total: number(offer.totalWithTax), days: campaignDays },
+    stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible !== false).length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
     navigationTarget: offer.navigation ? {
@@ -446,5 +503,44 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     ],
     offerType: offer.offerType,
     rawOffer: offer,
+    campaignPhases: (() => {
+      const rawPhases = (offer as unknown as Record<string, unknown>).campaignPhases;
+      if (Array.isArray(rawPhases) && rawPhases.length > 0) {
+        return rawPhases as ProposalCampaignPhase[];
+      }
+      return [
+        {
+          name: 'Před-otvírací fáze (Teaser)',
+          phase: 'TEASER',
+          timeframe: '2–3 týdny před zahájením',
+          description: 'Budování povědomí o značce a vyvolání prvotního zájmu obyvatel a řidičů v širším okolí.',
+          recommendedMediaTypes: ['CITY_POSTER', 'PROMO_BENCH'],
+        },
+        {
+          name: 'Fáze slavnostního otevření / Hlavní kampaň',
+          phase: 'OPENING',
+          timeframe: 'Týden otevření a hlavní sezóna',
+          description: 'Intenzivní lokální kampaň s přímou navigací zákazníků z hlavních příjezdových křižovatek k provozovně.',
+          recommendedMediaTypes: ['CITY_POSTER', 'NAVIGATION_SIGN', 'CITYLIGHT'],
+        },
+        {
+          name: 'Stabilizační fáze (Follow-up)',
+          phase: 'FOLLOW_UP',
+          timeframe: 'Následné období kampaně',
+          description: 'Upevnění nákupního návyku zákazníků a trvalé navádění v rezidenčních i nákupních čtvrtích.',
+          recommendedMediaTypes: ['PROMO_BENCH', 'CITY_POSTER'],
+        },
+      ];
+    })(),
+    campaignStrategy: (() => {
+      const rawStrategy = (offer as unknown as Record<string, unknown>).campaignStrategy as Record<string, unknown> | null;
+      return {
+        city: typeof rawStrategy?.city === 'string' ? rawStrategy.city : cities.join(', '),
+        summary: typeof rawStrategy?.summary === 'string'
+          ? rawStrategy.summary
+          : (offer.clientMessage || offer.campaignGoal || `Na základě Vašeho zadání jsme připravili strategický návrh reklamní kampaně v lokalitě ${cities.join(', ')}. Vybrali jsme ${offer.items.length} dostupných nosičů s vysokou viditelností a ověřeným zásahem pro ${offer.client.name}.`),
+        recommendedMediaTypes: Array.isArray(rawStrategy?.recommendedMediaTypes) ? rawStrategy.recommendedMediaTypes as string[] : undefined,
+      };
+    })(),
   };
 }

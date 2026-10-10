@@ -8,9 +8,13 @@ type MapPoint = {
   id?: string;
   code: string;
   city: string;
+  locality?: string;
   latitude?: number | null;
   longitude?: number | null;
   selected?: boolean;
+  orderIndex?: number;
+  imageUrl?: string;
+  mediaTypeLabel?: string;
 };
 
 export type OfferMapBounds = { north: number; south: number; east: number; west: number };
@@ -18,7 +22,7 @@ export type OfferMapBounds = { north: number; south: number; east: number; west:
 export function OfferMap({
   points,
   target,
-  className = 'h-80',
+  className = 'h-[460px] sm:h-[560px]',
   selectedPointId,
   onPointClick,
   onBoundsChange,
@@ -132,6 +136,7 @@ export function OfferMap({
 
       // 2. Render Point Markers & Polyline Route Lines
       located.forEach((point, idx) => {
+        const pinNumber = point.orderIndex ?? (idx + 1);
         const isPointSelected = selectedPointId === point.id;
         const isNav = point.code.startsWith('NAV-');
         const fillGradStart = isPointSelected ? '#ea580c' : isNav ? '#0284c7' : point.selected ? '#059669' : '#0f172a';
@@ -153,12 +158,12 @@ export function OfferMap({
               border: ${isPointSelected ? '2px solid #fde047' : '1px solid #38bdf8'};
               box-shadow: ${isPointSelected ? '0 4px 14px rgba(234, 88, 12, 0.7)' : '0 3px 8px rgba(0,0,0,0.3)'};
             ">
-              ${point.code}
+              #${pinNumber} · ${point.code}
             </div>
-            <svg width="${isPointSelected ? 40 : 34}" height="${isPointSelected ? 52 : 44}" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px ${isPointSelected ? 'rgba(234, 88, 12, 0.6)' : 'rgba(0,0,0,0.35)'});">
+            <svg width="${isPointSelected ? 42 : 36}" height="${isPointSelected ? 54 : 46}" viewBox="0 0 36 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0px 5px 8px ${isPointSelected ? 'rgba(234, 88, 12, 0.6)' : 'rgba(0,0,0,0.35)'});">
               <path d="M18 0C8.059 0 0 8.059 0 18C0 29.25 15.3 45.225 17.235 47.19C17.658 47.613 18.342 47.613 18.765 47.19C20.7 45.225 36 29.25 36 18C36 8.059 27.941 0 18 0Z" fill="url(#offerPinGrad_${idx})"/>
               <circle cx="18" cy="18" r="11" fill="#FFFFFF" stroke="${fillGradStart}" stroke-width="2"/>
-              <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="11" fill="${fillGradStart}">#${idx + 1}</text>
+              <text x="18" y="22" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="11" fill="${fillGradStart}">#${pinNumber}</text>
               <defs>
                 <linearGradient id="offerPinGrad_${idx}" x1="0" y1="0" x2="36" y2="48" gradientUnits="userSpaceOnUse">
                   <stop stop-color="${fillGradStart}"/>
@@ -173,19 +178,30 @@ export function OfferMap({
           html: markerHtml,
           className: 'custom-offer-svg-pin',
           iconSize: [120, 60],
-          iconAnchor: [60, isPointSelected ? 52 : 44],
+          iconAnchor: [60, isPointSelected ? 54 : 46],
         });
 
         const marker = L.marker([point.latitude, point.longitude], {
           icon,
-          title: `${point.code} · ${point.city}`,
+          title: `#${pinNumber} · ${point.code} · ${point.city}`,
           zIndexOffset: isPointSelected ? 1200 : 100,
         }).addTo(map);
 
-        marker.bindTooltip(`<strong>${point.code}</strong> · ${point.city}`, { permanent: false, direction: 'top' });
+        const popupContent = `
+          <div style="font-family: system-ui, sans-serif; min-width: 170px; max-width: 220px; padding: 2px;">
+            ${point.imageUrl ? `<img src="${point.imageUrl}" alt="" style="width: 100%; height: 90px; object-fit: cover; border-radius: 8px; margin-bottom: 6px;" />` : ''}
+            <div style="font-weight: 800; font-size: 13px; color: #0f172a;">#${pinNumber} · ${point.code}</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${point.city}${point.locality ? ` · ${point.locality}` : ''}</div>
+            ${point.mediaTypeLabel ? `<span style="display: inline-block; margin-top: 4px; padding: 2px 6px; background: #e0f2fe; color: #0369a1; border-radius: 6px; font-size: 10px; font-weight: 700;">${point.mediaTypeLabel}</span>` : ''}
+          </div>
+        `;
+        marker.bindPopup(popupContent, { offset: [0, -38] });
+        marker.bindTooltip(`<strong>#${pinNumber} · ${point.code}</strong> · ${point.city}`, { permanent: false, direction: 'top' });
 
         if (point.id && onPointClick) {
-          marker.on('click', () => onPointClick(point.id!));
+          marker.on('click', () => {
+            onPointClick(point.id!);
+          });
         }
 
         // Draw polyline connecting point to target

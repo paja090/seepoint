@@ -216,15 +216,22 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         .filter((r) => r.surfaceId === item.surfaceId)
         .flatMap((r) => (r.photos || []).map((p) => ({ ...p, isInstallation: true })));
 
-      const photos = [...installationPhotos, ...item.surface.photos, ...item.surface.carrier.photos]
-          .filter((photo) => !publicView || !photo.isPrivate)
+      const allCandidatePhotos = [
+        ...item.surface.photos.map((p) => ({ ...p, isInstallation: false, priority: p.isPrimary ? 1 : 3 })),
+        ...item.surface.carrier.photos.map((p) => ({ ...p, isInstallation: false, priority: p.isPrimary ? 2 : 4 })),
+        ...installationPhotos.map((p) => ({ ...p, isInstallation: true, priority: 5 })),
+      ];
+
+      const photos = allCandidatePhotos
+        .filter((photo) => !publicView || !photo.isPrivate)
         .filter((photo, index, all) => all.findIndex((candidate) => candidate.id === photo.id) === index)
+        .sort((a, b) => a.priority - b.priority || (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
         .map((photo) => ({
           id: photo.id,
           url: publicView && token ? `/api/proposals/${encodeURIComponent(token)}/photos/${photo.id}` : `/api/photos/${photo.id}/thumbnail`,
           note: photo.note,
           isPrimary: photo.isPrimary,
-          isClientVisible: photo.isClientVisible,
+          isClientVisible: photo.isClientVisible ?? true,
           isInstallation: ('isInstallation' in photo && photo.isInstallation === true) || ['INSTALLATION', 'AFTER_INSTALLATION'].includes(photo.type),
         }));
       return {
