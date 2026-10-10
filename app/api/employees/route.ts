@@ -2,7 +2,9 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { EmploymentType, OrganizationRole, Prisma, Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser, hashPassword, validatePassword } from '@/lib/auth';
+import { getCurrentUser, hashPassword, issueUserToken, validatePassword } from '@/lib/auth';
+import { sendActivationEmail } from '@/lib/email';
+import { getAppUrl } from '@/lib/app-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,9 +55,10 @@ export async function POST(request: Request) {
   const role = roleInput && Object.values(Role).includes(roleInput as Role) ? roleInput as Role : Role.WORKER;
   if (user.role === 'MANAGER' && role === Role.ADMIN) return NextResponse.json({ error: 'Manažer nemůže vytvářet administrátory.' }, { status: 403 });
   const allowAccess = text(input, 'allowAccess') === 'true';
+  const accessMode = (text(input, 'accessMode') as 'invite' | 'manual' | undefined) ?? (text(input, 'temporaryPassword') ? 'manual' : 'invite');
   if (allowAccess && !email) return NextResponse.json({ error: 'Pro přístup do aplikace je e-mail povinný.' }, { status: 400 });
   const temporaryPassword = text(input, 'temporaryPassword');
-  if (allowAccess && (!temporaryPassword || !validatePassword(temporaryPassword))) {
+  if (allowAccess && accessMode === 'manual' && (!temporaryPassword || !validatePassword(temporaryPassword))) {
     return NextResponse.json({ error: 'Dočasné heslo musí mít alespoň 12 znaků a obsahovat písmeno i číslo.' }, { status: 400 });
   }
   const employmentTypeInput = text(input, 'employmentType');
@@ -79,7 +82,7 @@ export async function POST(request: Request) {
   if (allowAccess && existingUser?.employees[0]) return NextResponse.json({ error: 'Tento e-mail je už propojený s jiným zaměstnancem.' }, { status: 409 });
 
   try {
-    const passwordHash = allowAccess ? await hashPassword(temporaryPassword!) : undefined;
+    const passwordHash = allowAccess && accessMode === 'manual' && temporaryPassword ? await hashPassword(temporaryPassword) : undefined;
     const employee = await prisma.$transaction(async (tx) => {
       const created = await tx.employee.create({ data: {
         firstName,
@@ -104,11 +107,11 @@ export async function POST(request: Request) {
                   name: `${firstName} ${lastName}`,
                   email,
                   role,
-                  status: 'ACTIVE',
+                  status: accessMode === 'manual' ? 'ACTIVE' : 'INVITED',
                   passwordHash,
-                  mustChangePassword: true,
+                  mustChangePassword: accessMode === 'manual',
                   organizationMemberships: {
-                    create: { organizationId: user.organizationId!, role: role as OrganizationRole, roles: [role as OrganizationRole] },
+                    create: { organizationId: user.organizationId!, role: role as OrganizationRole, roles: [role as OrganizationRole], isActive: true },
                   },
                 },
               },
@@ -126,6 +129,16 @@ export async function POST(request: Request) {
       }
       return created;
     });
+
+    if (allowAccess && email && accessMode === 'invite' && employee.userId && !existingUser) {
+      try {
+        const token = await issueUserToken(employee.userId, 'ACTIVATION', 48);
+        const url = getAppUrl(request, `/activate/${token}`);
+        await sendActivationEmail(email, url);
+      } catch (inviteError) {
+        console.error('[employees] Activation email delivery failed', inviteError instanceof Error ? inviteError.message : 'unknown');
+      }
+    }
 
     return NextResponse.json({ id: employee.id }, { status: 201 });
   } catch (error) {
