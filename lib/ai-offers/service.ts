@@ -119,31 +119,60 @@ async function confirmStandard(user: CurrentUser, request: AiOfferRequest, clien
         campaignStrategy: {
           summary: preview.explanation,
           city: request.city || client.name,
-          recommendedMediaTypes: [request.mediaType || 'CITY_POSTER'],
+          recommendedMediaTypes: Array.from(new Set(preview.items.map((i) => i.mediaType).filter(Boolean))),
         },
-        campaignPhases: [
-          {
-            phase: 'TEASER',
-            name: 'Před-otvírací fáze (Teaser)',
-            timeframe: '2–3 týdny před otevřením',
-            recommendedMediaTypes: ['CITY_POSTER', 'PROMO_BENCH'],
-            description: 'Budování povědomí o příchodu značky a vyvolání prvotního zájmu obyvatel v širším okolí.',
-          },
-          {
-            phase: 'OPENING',
-            name: 'Fáze slavnostního otevření',
-            timeframe: 'Týden otevření',
-            recommendedMediaTypes: ['CITY_POSTER', 'NAVIGATION_SIGN', 'PROMO_BENCH'],
-            description: 'Intenzivní lokální kampaň s přímou navigací zákazníků z hlavních příjezdových křižovatek k novému objektu.',
-          },
-          {
-            phase: 'FOLLOW_UP',
-            name: 'Stabilizační fáze (Follow-up)',
-            timeframe: '1–2 týdny po otevření',
-            recommendedMediaTypes: ['PROMO_BENCH', 'CITY_POSTER'],
-            description: 'Upevnění návyku zákazníků navštěvovat novou pobočku v rezidenčních a spádových čtvrtích.',
-          },
-        ],
+        campaignPhases: (() => {
+          const selectedMedia = Array.from(new Set(preview.items.map((i) => i.mediaType).filter(Boolean)));
+          const isOpening = /otevření|opening|otevíráme/i.test(`${request.prompt} ${cleanName}`);
+          if (isOpening) {
+            return [
+              {
+                phase: 'TEASER',
+                name: '1. Fáze: Před-otvírací kampaň (Teaser)',
+                timeframe: '2–3 týdny před otevřením',
+                recommendedMediaTypes: selectedMedia,
+                description: 'Budování povědomí o příchodu značky a vyvolání prvotního zájmu obyvatel v širším okolí.',
+              },
+              {
+                phase: 'OPENING',
+                name: '2. Fáze: Slavnostní otevření (Grand Opening)',
+                timeframe: 'Týden otevření a start',
+                recommendedMediaTypes: selectedMedia,
+                description: 'Maximální vizuální dominance na příjezdových tazích a klíčových křižovatkách města.',
+              },
+              {
+                phase: 'RETENTION',
+                name: '3. Fáze: Stabilizace a retence zákazníků',
+                timeframe: 'Následné období kampaně',
+                recommendedMediaTypes: selectedMedia,
+                description: 'Upevnění nákupního návyku zákazníků v rezidenčních i spádových zónách.',
+              },
+            ];
+          }
+          return [
+            {
+              phase: 'LAUNCH',
+              name: '1. Fáze: Zahájení a pokrytí hlavních tahů',
+              timeframe: 'Zahájení kampaně',
+              recommendedMediaTypes: selectedMedia,
+              description: 'Okamžitý zásah cílové skupiny na hlavních příjezdových komunikacích a klíčových uzlech města.',
+            },
+            {
+              phase: 'FREQUENCY',
+              name: '2. Fáze: Budování frekvence a povědomí',
+              timeframe: 'Průběh hlavní kampaně',
+              recommendedMediaTypes: selectedMedia,
+              description: 'Opakovaný vizuální kontakt v rezidenčních i nákupních zónách upevňuje povědomí o nabídce.',
+            },
+            {
+              phase: 'RETENTION',
+              name: '3. Fáze: Dlouhodobý dopad a stabilizace',
+              timeframe: 'Závěr kampaně a stabilizace',
+              recommendedMediaTypes: selectedMedia,
+              description: 'Stabilní přítomnost v myslích zákazníků pro dlouhodobou podporu návštěvnosti a prodejů.',
+            },
+          ];
+        })(),
       },
     }),
     ...preview.items.map((item) => prisma.offerItem.updateMany({ where: { offerId, surfaceId: item.surfaceId! }, data: {

@@ -327,9 +327,16 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     validUntil: asDate(offer.validUntil),
     cities,
     client: { id: offer.clientId ?? 'client', name: offer.client.name, logoLabel: offer.client.name.slice(0, 2).toUpperCase(), logoUrl: offer.client.logoUrl, contactPerson: offer.contactPerson || offer.client.contactPerson || '', email: offer.contactEmail || offer.client.email || '' },
-    salesperson: { id: offer.createdBy.id ?? 'sales', name: offer.createdBy.name, role: 'Obchodní kontakt', phone: '', email: offer.createdBy.email || '', avatar: undefined },
+    salesperson: {
+      id: offer.createdBy.id ?? 'sales',
+      name: offer.createdBy.name,
+      role: 'Váš obchodní zástupce',
+      phone: offer.contactPhone || offer.createdBy.phone || '',
+      email: offer.contactEmail || offer.createdBy.email || '',
+      avatar: offer.createdBy.avatarUrl || undefined,
+    },
     heroImage: carriers[0]?.image || portfolioImage(offer.offerType === 'NAVIGATION' ? '/offer/media-navigation.png' : offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png'),
-    heroImageAlt: `Navigační kampaň pro ${offer.campaignName || offer.title}`,
+    heroImageAlt: `${offer.offerType === 'NAVIGATION' ? 'Navigační kampaň' : 'Reklamní kampaň'} pro ${offer.campaignName || offer.title}`,
     stats: { carriers: carriers.length, mediaTypes: mediaMix.length, locations: cities.length, photos: offer.items.reduce((sum, item) => sum + item.surface.photos.filter((photo) => photo.isClientVisible !== false).length, 0), total: number(offer.totalWithTax), days: campaignDays },
     mediaMix,
     carriers,
@@ -479,19 +486,47 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
 
       return pricingRows;
     })(),
-    benefits: hasSeePointPortfolio(offer.branding) ? [
-      { id: 'reach', icon: 'reach', title: 'Vytipované trasy', description: 'Trasa a navigační body jsou přesně naplánovány pro nejlepší viditelnost k vaší prodejně.' },
-      { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Navigační cedule trvale navádějí řidiče i chodce po celou dobu kampaně.' },
-      { id: 'locations', icon: 'pin', title: 'Vzdálenost k prodejně', description: 'U každého bodu uvádíme přesnou vzdálenost a orientaci směru k cíli.' },
-      { id: 'traffic', icon: 'traffic', title: 'Hustá doprava', description: 'Umístění na frekventovaných křižovatkách a kruhových objezdech.' },
-      { id: 'brand', icon: 'brand', title: 'Posílení značky', description: 'Jasná identifikace provozovny zvyšuje návštěvnost prodejny.' },
-      { id: 'documentation', icon: 'camera', title: 'Kvartální fotodokumentace', description: 'Pravidelné dokládání stavu a fotografie všech zřízených nosičů.' },
-    ] : [],
-    references: hasSeePointPortfolio(offer.branding) ? [
-      { id: 'ref-1', company: 'Globus ČR', logoLabel: 'GLOBUS', testimonial: 'Dlouhodobá spolupráce na navigační reklamě a promo plochách u našich hypermarketů funguje perfektně.', cooperation: 'Dlouhodobá navigační kampaň', campaigns: 14 },
-      { id: 'ref-2', company: 'Kaufland Česká republika', logoLabel: 'KAUFLAND', testimonial: 'Rychlá realizace navigačních tabulí a perfektní fotodokumentace každého kvartálu.', cooperation: 'Navigační cedule a CLV', campaigns: 22 },
-      { id: 'ref-3', company: 'Decathlon CZ', logoLabel: 'DECATHLON', testimonial: 'Přehledná nabídka s přesnou mapou trasy k prodejně nám pomohla navést zákazníky přímo z křižovatek.', cooperation: 'Navádění k prodejnám', campaigns: 8 },
-    ] : [],
+    benefits: (() => {
+      const rawStrategy = (offer as unknown as Record<string, unknown>).campaignStrategy as Record<string, unknown> | null;
+      if (Array.isArray(rawStrategy?.benefits) && rawStrategy.benefits.length > 0) {
+        return rawStrategy.benefits as ProposalBenefit[];
+      }
+
+      if (!hasSeePointPortfolio(offer.branding)) return [];
+
+      const isNavigation = offer.offerType === 'NAVIGATION';
+      if (isNavigation) {
+        return [
+          { id: 'reach', icon: 'reach', title: 'Vytipované trasy', description: 'Trasa a navigační body jsou přesně naplánovány pro nejlepší viditelnost k vaší provozovně.' },
+          { id: 'visibility', icon: 'clock', title: 'Viditelnost 24/7', description: 'Navigační cedule trvale navádějí řidiče i chodce po celou dobu trvání kampaně.' },
+          { id: 'locations', icon: 'pin', title: 'Vzdálenost k cíli', description: 'U každého navigačního bodu uvádíme přesnou vzdálenost a orientaci směru k cíli.' },
+          { id: 'traffic', icon: 'traffic', title: 'Hustá doprava', description: 'Umístění na frekventovaných křižovatkách, uzlech a kruhových objezdech.' },
+          { id: 'brand', icon: 'brand', title: 'Posílení návštěvnosti', description: 'Jasná identifikace provozovny spolehlivě navádí nové i stálé zákazníky.' },
+          { id: 'documentation', icon: 'camera', title: 'Kvartální fotodokumentace', description: 'Pravidelné dokládání stavu a fotografie všech zřízených nosičů.' },
+        ];
+      }
+
+      const targetCity = cities[0] || 'regionu';
+      return [
+        { id: 'reach', icon: 'reach', title: 'Vysoký zásah a frekvence', description: `Plochy na klíčových dopravních tepnách v ${targetCity} denně oslovují desetitisíce řidičů, cestujících i pěších.` },
+        { id: 'visibility', icon: 'clock', title: 'Nepřetržitá viditelnost 24/7', description: 'Vaše reklamní sdělení působí ve veřejném prostoru nonstop bez možnosti reklamu přeskočit nebo vypnout.' },
+        { id: 'locations', icon: 'pin', title: 'Strategické spádové zóny', description: `Umístění v přirozených nákupních, komerčních a rezidenčních zónách s vysokou afinitou pro značku ${offer.client.name}.` },
+        { id: 'traffic', icon: 'traffic', title: 'Dopravní uzly & křižovatky', description: 'Pozice s dlouhou dobou vizuálního kontaktu u světelných křižovatek, kruhových objezdů a zón se zpomalenou dopravou.' },
+        { id: 'brand', icon: 'brand', title: 'Budování silné značky', description: `Velkoformátová prezentace posiluje důvěryhodnost a povědomí o společnosti ${offer.client.name}.` },
+        { id: 'documentation', icon: 'camera', title: 'Kompletní servis & fotoreport', description: 'Realizace na klíč od velkoformátového tisku po precizní montáž a protokolární fotodokumentaci výlepu.' },
+      ];
+    })(),
+    references: hasSeePointPortfolio(offer.branding) ? (
+      offer.offerType === 'NAVIGATION' ? [
+        { id: 'ref-1', company: 'Globus ČR', logoLabel: 'GLOBUS', testimonial: 'Dlouhodobá spolupráce na navigační reklamě a promo plochách u našich hypermarketů funguje perfektně.', cooperation: 'Dlouhodobá navigační kampaň', campaigns: 14 },
+        { id: 'ref-2', company: 'Kaufland Česká republika', logoLabel: 'KAUFLAND', testimonial: 'Rychlá realizace navigačních tabulí a perfektní fotodokumentace každého kvartálu.', cooperation: 'Navigační cedule a CLV', campaigns: 22 },
+        { id: 'ref-3', company: 'Decathlon CZ', logoLabel: 'DECATHLON', testimonial: 'Přehledná nabídka s přesnou mapou trasy k prodejně nám pomohla navést zákazníky přímo z křižovatek.', cooperation: 'Navádění k prodejnám', campaigns: 8 },
+      ] : [
+        { id: 'ref-1', company: 'Globus ČR', logoLabel: 'GLOBUS', testimonial: 'Dlouhodobá spolupráce na OOH kampaních a velkoformátových plochách funguje skvěle.', cooperation: 'Venkovní reklamní kampaň', campaigns: 14 },
+        { id: 'ref-2', company: 'Kaufland Česká republika', logoLabel: 'KAUFLAND', testimonial: 'Rychlá realizace reklamních ploch, kvalitní tisk a precizní fotodokumentace každého výlepu.', cooperation: 'Billboardy & CLV sítě', campaigns: 22 },
+        { id: 'ref-3', company: 'Decathlon CZ', logoLabel: 'DECATHLON', testimonial: 'Přehledná nabídka s přesným zacílením a vynikajícím zásahem v klíčových lokalitách města.', cooperation: 'Regionální OOH kampaň', campaigns: 8 },
+      ]
+    ) : [],
     caseStudies: [],
     conditions: [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },
@@ -499,36 +534,131 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       { id: 'dates', text: `Navržený termín kampaně: ${asDate(from)} – ${asDate(to)}.` },
       { id: 'pricing', text: 'Uvedené ceny za pronájem, tisk, výrobu a montáž odpovídají kalkulaci zobrazené v nabídce.' },
       { id: 'production', text: 'Tisk a montáž jsou kalkulovány na základě zvolených nosičů a rozměrů.' },
-      { id: 'reservation', text: 'Potvrzením nabídky klientem vzniká závazná objednávka navigační kampaně.' },
+      { id: 'reservation', text: offer.offerType === 'NAVIGATION' ? 'Potvrzením nabídky klientem vzniká závazná objednávka navigační kampaně.' : 'Potvrzením nabídky klientem vzniká závazná objednávka reklamní kampaně.' },
     ],
     offerType: offer.offerType,
     rawOffer: offer,
     campaignPhases: (() => {
       const rawPhases = (offer as unknown as Record<string, unknown>).campaignPhases;
+      const isNavigation = offer.offerType === 'NAVIGATION';
+
       if (Array.isArray(rawPhases) && rawPhases.length > 0) {
+        if (!isNavigation) {
+          const validMediaKeys = new Set(mediaMix.map((m) => m.key));
+          const cleaned = (rawPhases as ProposalCampaignPhase[]).map((p) => {
+            const types = (p.recommendedMediaTypes || []).filter((t) => t !== 'NAVIGATION_SIGN');
+            return {
+              ...p,
+              description: p.description.replace(/s přímou navigací zákazníků|a navigace|a přímé navádění/gi, 'se zacílením na klíčové tahy'),
+              recommendedMediaTypes: types.length > 0 ? types : Array.from(validMediaKeys),
+            };
+          });
+
+          const isOpeningOffer = /otevření|opening|otevíráme/i.test(`${offer.campaignGoal || ''} ${offer.campaignName || ''} ${offer.title || ''}`);
+          if (!isOpeningOffer && cleaned.some((p) => /otevření|teaser/i.test(p.name))) {
+            return [
+              {
+                name: '1. Fáze: Zahájení a pokrytí hlavních tahů',
+                phase: 'LAUNCH',
+                timeframe: `${asDate(from)} – zahájení`,
+                description: 'Okamžitý zásah cílové skupiny na hlavních příjezdových komunikacích a klíčových uzlech města.',
+                recommendedMediaTypes: mediaMix.map((m) => m.key),
+              },
+              {
+                name: '2. Fáze: Budování frekvence a povědomí',
+                phase: 'FREQUENCY',
+                timeframe: 'Průběh hlavní kampaně',
+                description: 'Opakovaný vizuální kontakt v rezidenčních i nákupních zónách upevňuje povědomí o značce.',
+                recommendedMediaTypes: mediaMix.map((m) => m.key),
+              },
+              {
+                name: '3. Fáze: Dlouhodobý dopad a stabilizace',
+                phase: 'RETENTION',
+                timeframe: `${asDate(to)} – závěr kampaně`,
+                description: 'Stabilní přítomnost v myslích zákazníků pro dlouhodobou podporu návštěvnosti a prodejů.',
+                recommendedMediaTypes: mediaMix.map((m) => m.key),
+              },
+            ];
+          }
+          return cleaned;
+        }
         return rawPhases as ProposalCampaignPhase[];
       }
+
+      if (isNavigation) {
+        return [
+          {
+            name: '1. Fáze: Návrh a schválení navigačních bodů',
+            phase: 'PLANNING',
+            timeframe: 'Přípravné období',
+            description: 'Vytipování optimálních sloupů VO a schválení směrového značení.',
+            recommendedMediaTypes: ['NAVIGATION_SIGN'],
+          },
+          {
+            name: '2. Fáze: Realizace a instalace na trase',
+            phase: 'INSTALLATION',
+            timeframe: 'Termín instalace',
+            description: 'Výroba a montáž navigačních cedulí na schválené sloupy s fotodokumentací.',
+            recommendedMediaTypes: ['NAVIGATION_SIGN'],
+          },
+          {
+            name: '3. Fáze: Celoroční provoz a údržba',
+            phase: 'RETENTION',
+            timeframe: 'Po celou dobu kampaně',
+            description: 'Nepřetržité navádění zákazníků s pravidelnou kvartální kontrolou stavu.',
+            recommendedMediaTypes: ['NAVIGATION_SIGN'],
+          },
+        ];
+      }
+
+      const isOpening = /otevření|opening|otevíráme/i.test(`${offer.campaignGoal || ''} ${offer.campaignName || ''} ${offer.title || ''}`);
+      if (isOpening) {
+        return [
+          {
+            name: '1. Fáze: Před-otvírací kampaň (Teaser)',
+            phase: 'TEASER',
+            timeframe: '2–3 týdny před otevřením',
+            description: 'Budování povědomí o příchodu značky a vyvolání prvotního zájmu obyvatel v širším okolí.',
+            recommendedMediaTypes: mediaMix.map((m) => m.key),
+          },
+          {
+            name: '2. Fáze: Slavnostní otevření (Grand Opening)',
+            phase: 'OPENING',
+            timeframe: 'Týden otevření a start',
+            description: 'Maximální vizuální dominance na příjezdových tazích a klíčových křižovatkách města.',
+            recommendedMediaTypes: mediaMix.map((m) => m.key),
+          },
+          {
+            name: '3. Fáze: Stabilizace a retence zákazníků',
+            phase: 'RETENTION',
+            timeframe: 'Následné období kampaně',
+            description: 'Upevnění nákupního návyku zákazníků v rezidenčních i spádových zónách.',
+            recommendedMediaTypes: mediaMix.map((m) => m.key),
+          },
+        ];
+      }
+
       return [
         {
-          name: 'Před-otvírací fáze (Teaser)',
-          phase: 'TEASER',
-          timeframe: '2–3 týdny před zahájením',
-          description: 'Budování povědomí o značce a vyvolání prvotního zájmu obyvatel a řidičů v širším okolí.',
-          recommendedMediaTypes: ['CITY_POSTER', 'PROMO_BENCH'],
+          name: '1. Fáze: Zahájení a pokrytí hlavních tahů',
+          phase: 'LAUNCH',
+          timeframe: `${asDate(from)} – zahájení`,
+          description: 'Okamžitý zásah cílové skupiny na hlavních příjezdových komunikacích a klíčových uzlech města.',
+          recommendedMediaTypes: mediaMix.map((m) => m.key),
         },
         {
-          name: 'Fáze slavnostního otevření / Hlavní kampaň',
-          phase: 'OPENING',
-          timeframe: 'Týden otevření a hlavní sezóna',
-          description: 'Intenzivní lokální kampaň s přímou navigací zákazníků z hlavních příjezdových křižovatek k provozovně.',
-          recommendedMediaTypes: ['CITY_POSTER', 'NAVIGATION_SIGN', 'CITYLIGHT'],
+          name: '2. Fáze: Budování frekvence a povědomí',
+          phase: 'FREQUENCY',
+          timeframe: 'Průběh hlavní kampaně',
+          description: 'Opakovaný vizuální kontakt v rezidenčních i nákupních zónách upevňuje povědomí o nabídce.',
+          recommendedMediaTypes: mediaMix.map((m) => m.key),
         },
         {
-          name: 'Stabilizační fáze (Follow-up)',
-          phase: 'FOLLOW_UP',
-          timeframe: 'Následné období kampaně',
-          description: 'Upevnění nákupního návyku zákazníků a trvalé navádění v rezidenčních i nákupních čtvrtích.',
-          recommendedMediaTypes: ['PROMO_BENCH', 'CITY_POSTER'],
+          name: '3. Fáze: Dlouhodobý dopad a podpora návštěvnosti',
+          phase: 'RETENTION',
+          timeframe: `${asDate(to)} – závěr kampaně`,
+          description: 'Stabilní přítomnost v myslích zákazníků pro dlouhodobou podporu prodejů a návštěvnosti.',
+          recommendedMediaTypes: mediaMix.map((m) => m.key),
         },
       ];
     })(),

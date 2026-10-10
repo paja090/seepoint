@@ -1,18 +1,45 @@
 'use client';
 
+import { useState } from 'react';
 import { Sparkles, Calendar, Clock, Target, Layers, MapPin, CheckCircle2, TrendingUp, Compass, ShieldCheck } from 'lucide-react';
 import type { ProposalOffer, ProposalCampaignPhase } from '@/lib/offers/presentation';
 import { MEDIA_TYPE_META, TONE_CLASSES } from '@/lib/offers/presentation';
 
 const phaseMeta: Record<string, { icon: React.ComponentType<{ className?: string }>; tone: 'purple' | 'blue' | 'green'; defaultTime: string }> = {
+  LAUNCH: { icon: Target, tone: 'blue', defaultTime: 'Zahájení kampaně' },
+  FREQUENCY: { icon: Compass, tone: 'purple', defaultTime: 'Průběh hlavní kampaně' },
+  RETENTION: { icon: TrendingUp, tone: 'green', defaultTime: 'Dlouhodobý dopad & stabilizace' },
+  EVENT: { icon: Calendar, tone: 'purple', defaultTime: 'Ohlášení & předprodej' },
   TEASER: { icon: Clock, tone: 'purple', defaultTime: '2–3 týdny před zahájením' },
   OPENING: { icon: Target, tone: 'blue', defaultTime: 'Hlavní kampaňové období' },
   FOLLOW_UP: { icon: TrendingUp, tone: 'green', defaultTime: 'Následné stabilizační období' },
+  PLANNING: { icon: Layers, tone: 'blue', defaultTime: 'Příprava' },
+  INSTALLATION: { icon: CheckCircle2, tone: 'green', defaultTime: 'Realizace' },
 };
 
 export function CampaignStrategyPhases({ offer }: { offer: ProposalOffer }) {
   const strategy = offer.campaignStrategy;
   const phases = offer.campaignPhases || [];
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  async function handleGenerateAiCopy() {
+    if (!offer.id || offer.id === 'public-offer') return;
+    try {
+      setIsGenerating(true);
+      setGenerateError(null);
+      const res = await fetch(`/api/offers/${offer.id}/ai-copy`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Generování selhalo');
+      }
+      window.location.reload();
+    } catch (err: unknown) {
+      setGenerateError(err instanceof Error ? err.message : 'Chyba při volání AI');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <section aria-labelledby="campaign-strategy-heading" className="space-y-6">
@@ -20,9 +47,23 @@ export function CampaignStrategyPhases({ offer }: { offer: ProposalOffer }) {
       <div className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 sm:p-8 text-white shadow-xl">
         <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3 max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-400/40 bg-purple-950/80 px-3.5 py-1 text-xs font-black tracking-wide text-purple-300 shadow-sm">
-              <Sparkles className="size-3.5 text-purple-400 animate-pulse" />
-              <span>Doporučení AI & Strategický koncept kampaně</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-400/40 bg-purple-950/80 px-3.5 py-1 text-xs font-black tracking-wide text-purple-300 shadow-sm">
+                <Sparkles className="size-3.5 text-purple-400 animate-pulse" />
+                <span>Strategický koncept kampaně na míru klienta</span>
+              </div>
+              {offer.id && offer.id !== 'public-offer' && (
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={handleGenerateAiCopy}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-indigo-400/50 bg-indigo-900/70 hover:bg-indigo-800 text-indigo-200 hover:text-white px-3 py-1 text-xs font-bold transition shadow-xs print:hidden disabled:opacity-50"
+                  title="Vygenerovat nové přizpůsobené texty a strategii pomocí AI"
+                >
+                  <Sparkles className={`size-3 ${isGenerating ? 'animate-spin' : ''}`} />
+                  <span>{isGenerating ? 'AI generuje...' : 'Navrhnout texty AI'}</span>
+                </button>
+              )}
             </div>
 
             <h2 id="campaign-strategy-heading" className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
@@ -32,6 +73,10 @@ export function CampaignStrategyPhases({ offer }: { offer: ProposalOffer }) {
             <p className="text-sm sm:text-base leading-relaxed text-slate-300 font-medium">
               {strategy?.summary || offer.intro || offer.rawOffer?.clientMessage || offer.rawOffer?.campaignGoal || 'Komplexní návrh venkovní kampaně sestavený s důrazem na maximální viditelnost, frekventované trasy a spádové zóny pro vaše zákazníky.'}
             </p>
+
+            {generateError && (
+              <p className="text-xs font-semibold text-rose-400">{generateError}</p>
+            )}
 
             <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-semibold text-slate-300">
               {strategy?.city && (
@@ -70,14 +115,14 @@ export function CampaignStrategyPhases({ offer }: { offer: ProposalOffer }) {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-bold tracking-tight text-slate-950">
-                Fáze a harmonogram kampaně
+                Strategické pilíře & Harmonogram kampaně
               </h3>
               <p className="text-xs text-slate-500">
                 Doporučený postup nasazení pro dosažení nejvyšší návratnosti a stabilizace zákazníků.
               </p>
             </div>
             <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-              3 strategické fáze
+              {phases.length} {phases.length < 5 ? 'strategické fáze' : 'strategických fází'}
             </span>
           </div>
 

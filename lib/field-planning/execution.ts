@@ -35,12 +35,19 @@ export async function myRoute(userId: string, now = new Date()) {
       });
       const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
+      const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => (s as any).isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
+      const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => (s as any).isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
       routes.push({ planId: plan.id, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
         stops: crew.stops.flatMap(s => {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
             if (!ep) return [];
-            return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: ep.id, address: null, pointPhotoUrl: null, workOrderId: '', title: ep.label, clientName: 'Svoz voleb', instructions: ep.description || `Demontáž (${ep.mediaType})`, status: ['COMPLETED', 'ISSUE'].includes(ep.status) ? 'DONE' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
+            return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: ep.id, address: null, pointPhotoUrl: null, workOrderId: '', title: ep.label, clientName: 'Svoz voleb', instructions: ep.description || `Demontáž (${ep.mediaType})`, status: ['COMPLETED', 'ISSUE'].includes(ep.status) ? 'DONE' : ep.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
+          }
+          if ((s as any).isWarehousePitstop) {
+            const isCompleted = pitstopCompletions.some(c => c.entityId === stopId(s));
+            const isStarted = pitstopStarts.some(c => c.entityId === stopId(s));
+            return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: null, address: null, pointPhotoUrl: null, workOrderId: '', title: s.title, clientName: 'Sklad', instructions: '', status: isCompleted ? 'DONE' : isStarted ? 'IN_PROGRESS' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
           }
           const order = orders.find(o => o.id === s.workOrderId); if (s.workOrderId && !order) return [];
           if (s.navigationPointId && !navigation) return [];
@@ -84,6 +91,16 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       const response = await executeItem(tx, stop, plan.id, input, actor, installationPhotos, members.flatMap(m => m.userId ? [m.userId] : []));
       if (input.action !== 'inspect') await refreshExecutionPlan(tx, plan.id, result);
       return response;
+    }
+    if ((stop as any).isWarehousePitstop) {
+      if (input.action === 'inspect') return { ok: true };
+      if (!['start', 'complete'].includes(input.action)) throw new Error('Neplatná akce.');
+      const actionStr = input.action === 'start' ? 'FIELD_POINT_STARTED' : 'FIELD_POINT_COMPLETED';
+      const eventId = `fp-pitstop-${plan.id}-${stop.jobId!}-${actionStr}`;
+      const existing = await tx.crmAuditLog.findUnique({ where: { id: eventId, organizationId } });
+      if (existing) return { ok: true };
+      await tx.crmAuditLog.create({ data: { id: eventId, organizationId, entityType: 'WarehousePitstop', entityId: stop.jobId!, userId: actor.id, userEmail: actor.email, action: actionStr, detailsJson: '{}' } });
+      return { ok: true };
     }
     if (stop.electionRemovalPointId) {
       const point = await tx.electionRemovalPoint.findFirst({ where: { organizationId, id: stop.electionRemovalPointId } });
@@ -180,9 +197,10 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
 async function refreshExecutionPlan(tx: Prisma.TransactionClient, planId: string, result: PlanningResult) {
   const { organizationId } = requireTenantContext();
   const stops = result.crews.flatMap(c => c.stops);
-  const remainingOrders = await tx.workOrder.count({ where: { organizationId, id: { in: stops.filter(s => !s.navigationPointId && !s.workOrderItemId).map(s => s.workOrderId) }, status: { notIn: ['DONE', 'CANCELLED'] } } });
+  const remainingOrders = await tx.workOrder.count({ where: { organizationId, id: { in: stops.filter(s => !s.navigationPointId && !s.workOrderItemId && !s.electionRemovalPointId).map(s => s.workOrderId) }, status: { notIn: ['DONE', 'CANCELLED'] } } });
   const remainingPoints = await tx.navigationPoint.count({ where: { organizationId, id: { in: stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) }, OR: [{ status: { notIn: ['INSTALLED', 'CANCELLED'] } }, { issueReported: true }] } });
   const items = await tx.workOrderItem.findMany({ where: { organizationId, id: { in: stops.flatMap(s => s.workOrderItemId ? [s.workOrderItemId] : []) } }, include: { crmRealization: true } });
   const remainingItems = items.filter(i => i.issueNote || !['DONE', 'CANCELLED'].includes(itemStatus(i))).length;
-  await tx.fieldPlan.update({ where: { id: planId, organizationId }, data: { status: remainingOrders + remainingPoints + remainingItems ? 'ACTIVE' : 'COMPLETED' } });
+  const remainingElections = await tx.electionRemovalPoint.count({ where: { organizationId, id: { in: stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) }, status: { notIn: ['COMPLETED', 'CANCELLED'] } } });
+  await tx.fieldPlan.update({ where: { id: planId, organizationId }, data: { status: remainingOrders + remainingPoints + remainingItems + remainingElections ? 'ACTIVE' : 'COMPLETED' } });
 }

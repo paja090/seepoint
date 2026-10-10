@@ -19,7 +19,13 @@ export function BenefitsGrid({ offer }: { offer: ProposalOffer }) {
         id="benefits-heading"
         eyebrow="Přínosy nabídky"
         title="Co vám kampaň přinese"
-        description="Silné stránky venkovní reklamy, na kterých je návrh postaven."
+        description={
+          offer.offerType === 'NAVIGATION'
+            ? 'Výhody navigačního systému a směrového značení k vaší provozovně.'
+            : offer.client?.name
+            ? `Klíčové přínosy venkovní reklamy zacílené přímo pro ${offer.client.name}.`
+            : 'Silné stránky venkovní reklamy, na kterých je návrh postaven.'
+        }
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {offer.benefits.map((benefit) => {
