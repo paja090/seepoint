@@ -1,11 +1,384 @@
 [
   {
-    "slug": "01-navigacni-koncept",
-    "title": "Jak připravit a uložit první navigační návrh",
-    "sourceHash": "d0420133fe689c48c8ae024ad898c182f1b469495389218dcd9bf3d3b58b9394",
+    "slug": "start-01-prvni-kroky",
+    "title": "Začínáme: od založené agentury k připravenému týmu",
+    "capability": "organizationAdmin",
+    "status": "PUBLISHED",
+    "verification": "Živě ověřeno otevření onboardingu a jeho kroky. Dokončení jednotlivých nastavení není tímto potvrzeno.",
+    "duration": "2 min",
+    "route": "/onboarding",
     "steps": [
       {
-        "title": "Otevřete nabídky",
+        "title": "Zjistěte, kdo zakládá agenturu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Novou organizaci v SeePoint OS zakládá správce platformy SUPER_ADMIN. Běžný administrátor agentury nastavuje již založenou firmu. Pokud svou agenturu ještě nemáte, připravte její název a e-mail vlastníka pro správce SeePoint. Nezakládejte kvůli přidání kolegy další organizaci."
+          }
+        ]
+      },
+      {
+        "title": "Přihlaste se a zkontrolujte organizaci",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Pokud jde o nový účet, vlastník nejprve dokončí aktivaci z pozvánky. Již aktivní účet může získat členství bez nové aktivace. Po přihlášení zkontrolujte název aktivní organizace v horní liště. Máte-li více členství, vyberte správnou firmu před úpravami."
+          }
+        ]
+      },
+      {
+        "title": "Otevřete úvodní přehled",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Ve Správě otevřete Onboarding agentury. Uvidíte pět oblastí: Firemní údaje, OWNER účet, Nastavení firmy, Import ploch a Pozvání kolegů. Procento vyjadřuje stav tohoto seznamu, nikoli absolvování Akademie. Ukázková agentura už má část kroků dokončenou."
+          },
+          {
+            "kind": "image",
+            "file": "22-onboarding-agentury.jpg",
+            "text": "Skutečný onboarding školicí agentury s pěti kroky"
+          }
+        ]
+      },
+      {
+        "title": "Postupujte od firmy k týmu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Nejprve doplňte Nastavení firmy, potom logo a barvy. Následně přidejte zaměstnanecké profily a podle potřeby přihlašovací přístupy. Import ploch můžete řešit později. Navazující lekce v části Začínáme vás provedou jednotlivými úkoly."
+          }
+        ]
+      },
+      {
+        "title": "Kontrolujte skutečné dokončení",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Tlačítko Označit jako dokončené používejte až po kontrole nastavení. Přeskočit prozatím u importu nebo týmu neprovede import a nepozve žádného kolegu. Do onboardingu se můžete vrátit; u dokončených kroků nemusí být původní odkaz zobrazen, příslušné stránky zůstávají ve Správě."
+          }
+        ]
+      }
+    ],
+    "category": "Začínáme · Firma a tým",
+    "verifiedAt": "2026-10-10",
+    "sourceHash": "b40f83b0d6873c2c75af619c8a766572107a8370fd350bca49173213f8590bc4"
+  },
+  {
+    "slug": "start-02-zalozeni-agentury",
+    "title": "Jak správce platformy založí novou agenturu",
+    "capability": "platformAdmin",
+    "status": "MEDIA_PENDING",
+    "verification": "Postup potvrzen v CreateOrganizationForm a API /api/admin/organizations. Na živém SUPER_ADMIN účtu ani odesláním nebyl ověřen. Screenshot čeká na pořízení.",
+    "duration": "3 min",
+    "route": "/onboarding",
+    "steps": [
+      {
+        "title": "Otevřete založení organizace",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Tato lekce je pouze pro SUPER_ADMIN platformy. Na stránce Onboarding agentury je sekce Založit novou organizaci. Vlastník běžné agentury tento formulář nevidí."
+          }
+        ]
+      },
+      {
+        "title": "Vyplňte identitu a vlastníka",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Vyplňte Název, Slug a E-mail OWNERA. Slug je jedinečný identifikátor z malých písmen bez diakritiky, číslic a pomlček, například ukazkova-agentura. E-mail OWNERA patří člověku, který má agenturu spravovat. Firemní e-mail je samostatný kontaktní údaj. Doplňte IČO a DIČ, pokud je máte."
+          }
+        ]
+      },
+      {
+        "title": "Připravte firemní identitu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V části Firemní identita (White-label) můžete zadat URL loga společnosti a Hlavní firemní barvu (HEX). Logo se zadává odkazem na obrázek; formulář zde nenabízí nahrání souboru. Údaje lze později upravit v Nastavení firmy."
+          }
+        ]
+      },
+      {
+        "title": "Založte agenturu a přečtěte výsledek",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Po kontrole příjemce klikněte na Založit organizaci a OWNER účet. Tím skutečně vzniká organizace a členství. Nový nebo dosud neaktivovaný účet potřebuje aktivaci. Existující aktivní vlastník získá členství přímo a aktivační e-mail se mu neposílá. Pokud hlášení říká, že organizace vznikla, ale e-mail neodešel, neopakujte slepě založení."
+          }
+        ]
+      },
+      {
+        "title": "Předejte pokračování vlastníkovi",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Odkaz Otevřít detail organizace se zobrazí po úspěchu. Vlastník pokračuje aktivací, přihlášením a lekcí firemních údajů. Slug již existuje znamená kolizi identifikátoru, nikoli důvod zakládat duplicitní účet. Tento postup zatím čeká na úplný živý test a screenshoty."
+          }
+        ]
+      }
+    ],
+    "category": "Začínáme · Firma a tým",
+    "verifiedAt": "2026-10-10",
+    "sourceHash": "8a4222bb4be947d32aaf3cba165c1410dc3a373b72493a272d9ef1f0686708e3"
+  },
+  {
+    "slug": "start-03-firemni-udaje",
+    "title": "Jak nastavit firemní a fakturační údaje",
+    "capability": "organizationAdmin",
+    "status": "PUBLISHED",
+    "verification": "Obrazovka a obsluha v kódu zkontrolovány 10. 10. 2026. Uložení změn, odeslání pozvánky ani aktivace účtu nebyly v tomto průchodu provedeny.",
+    "duration": "3 min",
+    "route": "/settings/company",
+    "steps": [
+      {
+        "title": "Otevřete nastavení správné firmy",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Jako vlastník nebo administrátor organizace zkontrolujte aktivní firmu a otevřete Správa → Nastavení firmy. Stránka má nadpis Nastavení firmy & Měření Služeb. Pod přehledem spotřeby najdete Firemní a fakturační údaje."
+          }
+        ]
+      },
+      {
+        "title": "Doplňte název, adresu a kontakt",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Vyplňte Název firmy, IČO, DIČ, Ulice, Město, PSČ a Země. Následují Telefon, Firemní e-mail a Web. Použijte skutečné údaje své firmy. Web musí být úplná HTTPS adresa. Školicí snímek má většinu údajů prázdnou."
+          },
+          {
+            "kind": "image",
+            "file": "21-firemni-udaje.jpg",
+            "text": "Výřez skutečného firemního formuláře bez soukromých údajů"
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte banku a nové faktury",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Podle potřeby doplňte Bankovní účet, IBAN, SWIFT a Výchozí měna, například CZK. V části Výchozí nastavení vystavených faktur nastavte Splatnost (dní), Výchozí DPH (%) a Prefix číselné řady. Splatnost musí být 1–365 dní. Tato nastavení platí pro nové faktury, již vystavené doklady se nemění."
+          }
+        ]
+      },
+      {
+        "title": "Přidejte podpis a uložte",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Do E-mailový podpis zadejte podpis firmy. Klikněte na Uložit firemní údaje a očekávejte hlášení Firemní údaje byly uloženy. Při chybě opravte uvedené pole. Po novém načtení stránky zkontrolujte hodnoty. Uložení a následné načtení nebylo při tvorbě této lekce živě testováno."
+          }
+        ]
+      }
+    ],
+    "category": "Začínáme · Firma a tým",
+    "verifiedAt": "2026-10-10",
+    "sourceHash": "749703b927fadab9018c18ae5bcf3737fda5bf56b8821ac19093e9c588f4b373"
+  },
+  {
+    "slug": "start-04-logo-a-barvy",
+    "title": "Jak nastavit logo a firemní barvy",
+    "capability": "organizationAdmin",
+    "status": "PUBLISHED",
+    "verification": "Obrazovka a obsluha v kódu zkontrolovány 10. 10. 2026. Uložení změn, odeslání pozvánky ani aktivace účtu nebyly v tomto průchodu provedeny.",
+    "duration": "2 min",
+    "route": "/settings/company",
+    "steps": [
+      {
+        "title": "Připravte odkaz na logo",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Připravte HTTPS odkaz přímo na obrázek firemního loga. Nejde o cestu k souboru ve vašem počítači ani odkaz na stránku vyžadující přihlášení. V tomto formuláři je pole URL loga, nikoli tlačítko pro upload. Dostupnost obrázku si ověřte otevřením odkazu."
+          }
+        ]
+      },
+      {
+        "title": "Vyplňte logo v Nastavení firmy",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Otevřete Správa → Nastavení firmy. V části Firemní a fakturační údaje vložte odkaz do URL loga. Pokud nechcete měnit ostatní údaje, ponechte jejich stávající hodnoty."
+          },
+          {
+            "kind": "image",
+            "file": "21-firemni-udaje.jpg",
+            "text": "URL loga a pole firemních barev ve skutečném formuláři"
+          }
+        ]
+      },
+      {
+        "title": "Nastavte barvy",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Do Primární barva a případně Sekundární barva zadejte barvu ve formátu #RRGGBB, například #0ea5e9. Slovní název barvy ani zkrácený kód #fff validační pravidla nepřijmou."
+          }
+        ]
+      },
+      {
+        "title": "Uložte a ověřte výsledek",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Uložit firemní údaje. Po úspěšném hlášení znovu načtěte stránku a zkontrolujte URL i kódy barev. Potom prohlédněte místa, kde se logo používá. Rozsah promítnutí do všech PDF, portálů a tlačítek nebyl v této lekci živě ověřen; samotné uložení nezaručuje změnu každé části aplikace."
+          }
+        ]
+      }
+    ],
+    "category": "Začínáme · Firma a tým",
+    "verifiedAt": "2026-10-10",
+    "sourceHash": "d69d04dec1a90ad0d9f3437c2963bb05b7f597451d3d1049351c3390e6112ae0"
+  },
+  {
+    "slug": "start-05-zamestnanec",
+    "title": "Jak založit zaměstnance a rozlišit jeho přístup",
+    "capability": "employees",
+    "status": "PUBLISHED",
+    "verification": "Živě ověřeno 10. 10. 2026: vytvoření školicího zaměstnance bez přístupu, otevření jeho karty a samostatná sekce přihlašovacího účtu.",
+    "duration": "3 min",
+    "route": "/employees",
+    "steps": [
+      {
+        "title": "Otevřete Nový zaměstnanec",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Jako administrátor nebo manažer s dostupným modulem zaměstnanců otevřete Správa → Zaměstnanci & Tým. Rozbalte Nový zaměstnanec, pokud je zavřený. Nejdřív ověřte, že kolega již není v evidenci."
+          }
+        ]
+      },
+      {
+        "title": "Vyplňte základní profil",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Zadejte Jméno a Příjmení. Doplňte E-mail a případně Telefon. Do Pozice lze napsat více pozic oddělených čárkou. Role určuje pracovní oprávnění; manažer nemůže založit administrátora. Doplňte Typ spolupráce a podle potřeby Datum nástupu. Na snímku je pouze školicí profil."
+          },
+          {
+            "kind": "image",
+            "file": "24-novy-zamestnanec.jpg",
+            "text": "Vyplněný školicí zaměstnanec před uložením"
+          }
+        ]
+      },
+      {
+        "title": "Rozhodněte o přihlašovacím účtu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Pro samotnou evidenci ponechte Povolit přístup do aplikace nezaškrtnuté. Takto proběhl ověřený průchod. Samotný e-mail účet nezaloží. Zaškrtnutí nabízí jinou cestu s dočasným heslem; tato lekce její aktivaci netestuje. Pro pozdější přístup použijte sekci na detailu zaměstnance."
+          }
+        ]
+      },
+      {
+        "title": "Uložte a zkontrolujte kartu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Založit zaměstnance. Po úspěšném uložení se otevře detail. Zkontrolujte jméno, e-mail, roli a pozici. U ukázky se otevřela karta AKADEMIE Ukázkový pracovník. Stav Aktivní u zaměstnaneckého profilu sám o sobě neznamená aktivní přihlašovací účet."
+          },
+          {
+            "kind": "image",
+            "file": "25-karta-zamestnance.jpg",
+            "text": "Uložená karta školicího zaměstnance"
+          }
+        ]
+      },
+      {
+        "title": "Najděte samostatné přístupové nastavení",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Níže je Přístup do Aplikace & Přiřazené Funkce. Text Profil zaměstnance není přímo propojený s přihlašovacím účtem potvrzuje oddělení evidence a přístupu. Tlačítko Povolit přístup & Odeslat pozvánku e-mailem již mění přístup a může odeslat e-mail. Před použitím zkontrolujte adresu i roli; při našem průchodu stisknuto nebylo."
+          },
+          {
+            "kind": "image",
+            "file": "26-pristup-zamestnance.jpg",
+            "text": "Samostatná správa přístupu školicího zaměstnance"
+          }
+        ]
+      }
+    ],
+    "category": "Začínáme · Firma a tým",
+    "verifiedAt": "2026-10-10",
+    "sourceHash": "10922ebfe6437335c7ec928cfd50b0e1a177325636c25df12960291ecfaa3520"
+  },
+  {
+    "slug": "start-06-pozvani-kolegy",
+    "title": "Jak pozvat kolegu do agentury a ověřit aktivaci",
+    "capability": "organizationAdmin",
+    "status": "MEDIA_PENDING",
+    "verification": "Obrazovka a obsluha v kódu zkontrolovány 10. 10. 2026. Uložení změn, odeslání pozvánky ani aktivace účtu nebyly v tomto průchodu provedeny.",
+    "duration": "3 min",
+    "route": "/settings/members",
+    "steps": [
+      {
+        "title": "Vyberte správný způsob přidání",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Potřebujete-li pouze členství v organizaci, otevřete Správa → Uživatelé organizace. Pokud chcete propojit konkrétní zaměstnaneckou kartu, začněte její sekcí Přístup do Aplikace & Přiřazené Funkce. Pozvání člena přes Uživatelé organizace samo nevytváří zaměstnanecký profil."
+          }
+        ]
+      },
+      {
+        "title": "Zadejte e-mail a vyberte roli",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V horním formuláři vyplňte E-mail a Role. Výchozí hodnota je Náhled. Nabídka obsahuje Administrátor, Manažer, Obchodník, Technik, Pracovník, Účetní a Náhled. Vyberte roli podle práce kolegy; automaticky každému nepřidělujte administrátora."
+          }
+        ]
+      },
+      {
+        "title": "Odešlete pozvánku a čtěte hlášení",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Po kontrole adresy a role klikněte na Pozvat. Tato akce vytváří členství a pro účet vyžadující aktivaci odesílá pozvánku. Hlášení o vytvoření není důkaz doručení e-mailu. Pokud aplikace oznámí problém s odesláním, nepovažujte přístup za vyřešený. Odeslání jsme při tvorbě návodu neprováděli."
+          }
+        ]
+      },
+      {
+        "title": "Nechte kolegu dokončit aktivaci",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Nový kolega otevře aktivační odkaz a sám nastaví své heslo. Aktivační pozvánka má podle aktuální implementace platnost 48 hodin. Existující aktivní účet může dostat členství přímo bez nového nastavování hesla. Jeden účet může být členem více agentur."
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte členství a přihlášení",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Na stejné stránce jsou Aktivní pozvánky a Členové organizace. Obnovte stránku a zkontrolujte správný e-mail, roli a stav. Nový kolega má po přihlášení zkontrolovat aktivní organizaci a své dostupné moduly. Chybějící modul může souviset s rolí nebo nastavením organizace, ne nutně s neúspěšnou pozvánkou."
+          }
+        ]
+      }
+    ],
+    "category": "Začínáme · Firma a tým",
+    "verifiedAt": "2026-10-10",
+    "sourceHash": "6c3672fd31479d387af7ef6cb8bb4bbe8331ad31f27cce10dedc2277af08e2cb"
+  },
+  {
+    "slug": "01-navigacni-koncept",
+    "title": "Jak připravit a uložit první navigační návrh\r",
+    "capability": "offers",
+    "category": "Další pracovní postupy",
+    "verification": "Ověřeno 9. 10. 2026 na školicích datech QX promotion v roli ADMIN na počítači. Omezení konkrétních kroků jsou uvedena v lekci.",
+    "duration": "1–3 min",
+    "route": "/offers",
+    "status": "PUBLISHED",
+    "verifiedAt": "2026-10-09",
+    "sourceHash": "a31d1dacb47a71addf3176370719c2b24c9bf43a7555b8a4f6720296e92a4ad2",
+    "steps": [
+      {
+        "title": "Otevřete nabídky\r",
         "blocks": [
           {
             "kind": "text",
@@ -14,11 +387,11 @@
         ]
       },
       {
-        "title": "Vyberte navigaci",
+        "title": "Vyberte navigaci\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Klikněte na kartu Navigace, na které je text Pokračovat manuálně. Dostanete se do formuláře se čtyřmi kroky: Klient a nabídka, Provozovny, Mapa a body, Kontrola a odeslání."
+            "text": "Klikněte na kartu Navigace, na které je text Pokračovat manuálně. Dostanete se do formuláře se čtyřmi kroky: Klient a nabídka, Provozovny, Mapa a body, Kontrola a odeslání.\r"
           },
           {
             "kind": "image",
@@ -28,15 +401,15 @@
         ]
       },
       {
-        "title": "Vyplňte klienta a název",
+        "title": "Vyplňte klienta a název\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Ponechte aktivní Fáze 1 – Návrh rozmístění. V poli Klient / Odběratel vyberte klienta. Do Název kampaně / Nabídky napište jednoznačný název. Zkontrolujte Město / Lokalita kampaně – v tomto průchodu byla předvyplněná Ostrava. Pro školení použijte označení AKADEMIE a NEODESÍLAT. Klikněte na Pokračovat."
+            "text": "Ponechte aktivní Fáze 1 – Návrh rozmístění. V poli Klient / Odběratel vyberte klienta. Do Název kampaně / Nabídky napište jednoznačný název. Zkontrolujte Město / Lokalita kampaně – v tomto průchodu byla předvyplněná Ostrava. Pro školení použijte označení AKADEMIE a NEODESÍLAT. Klikněte na Pokračovat.\r"
           },
           {
             "kind": "text",
-            "text": "Kontrola: po přechodu zůstává nahoře Fáze 1 a zobrazí se „Cílové provozovny a prodejny klienta“."
+            "text": "Kontrola: po přechodu zůstává nahoře Fáze 1 a zobrazí se „Cílové provozovny a prodejny klienta“.\r"
           },
           {
             "kind": "image",
@@ -46,11 +419,11 @@
         ]
       },
       {
-        "title": "Určete cílovou provozovnu",
+        "title": "Určete cílovou provozovnu\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Vyplňte Název provozovny. Při skutečné zakázce doplňte adresu a ověřte GPS souřadnice; výchozí špendlík není potvrzená poloha klienta. Volitelná poznámka pomůže vysvětlit příjezd. Pro školicí průchod byl použit název „AKADEMIE – ukázková provozovna Ostrava“ a výslovná poznámka, že jde o ukázku. Klikněte na Pokračovat na mapu."
+            "text": "Vyplňte Název provozovny. Při skutečné zakázce doplňte adresu a ověřte GPS souřadnice; výchozí špendlík není potvrzená poloha klienta. Volitelná poznámka pomůže vysvětlit příjezd. Pro školicí průchod byl použit název „AKADEMIE – ukázková provozovna Ostrava“ a výslovná poznámka, že jde o ukázku. Klikněte na Pokračovat na mapu.\r"
           },
           {
             "kind": "image",
@@ -60,11 +433,11 @@
         ]
       },
       {
-        "title": "Přidejte bod a otevřete jeho detail",
+        "title": "Přidejte bod a otevřete jeho detail\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Klikněte na + Přidat navigační bod. Vyčkejte, až se vpravo objeví karta bodu a počítadlo se změní na 1. Na kartě klikněte na Detail."
+            "text": "Klikněte na + Přidat navigační bod. Vyčkejte, až se vpravo objeví karta bodu a počítadlo se změní na 1. Na kartě klikněte na Detail.\r"
           },
           {
             "kind": "text",
@@ -73,15 +446,15 @@
         ]
       },
       {
-        "title": "Zkontrolujte parametry bodu",
+        "title": "Zkontrolujte parametry bodu\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "V detailu zkontrolujte umístění a Cílovou provozovnu, potom kategorii nosiče a směr šipky. Fotodokumentace a poznámky mají vlastní části. Školicí bod má interní poznámku „Neinstalovat, neobjednávat výrobu“."
+            "text": "V detailu zkontrolujte umístění a Cílovou provozovnu, potom kategorii nosiče a směr šipky. Fotodokumentace a poznámky mají vlastní části. Školicí bod má interní poznámku „Neinstalovat, neobjednávat výrobu“.\r"
           },
           {
             "kind": "text",
-            "text": "Klikněte na Hotovo (Zavřít detail) a potom na Pokračovat. Zavření detailu ještě neznamená uložení nabídky: dole zůstává informace o neuložených změnách."
+            "text": "Klikněte na Hotovo (Zavřít detail) a potom na Pokračovat. Zavření detailu ještě neznamená uložení nabídky: dole zůstává informace o neuložených změnách.\r"
           },
           {
             "kind": "image",
@@ -91,11 +464,11 @@
         ]
       },
       {
-        "title": "Zkontrolujte souhrn",
+        "title": "Zkontrolujte souhrn\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Na obrazovce Kontrola lokačního návrhu před odesláním (Fáze 1) ověřte klienta, kampaň a město, počet provozoven i bodů. V ukázce je 1 provozovna, 1 bod a 0 fotografií. Klient bez e-mailu je výslovně označen Bez e-mailu."
+            "text": "Na obrazovce Kontrola lokačního návrhu před odesláním (Fáze 1) ověřte klienta, kampaň a město, počet provozoven i bodů. V ukázce je 1 provozovna, 1 bod a 0 fotografií. Klient bez e-mailu je výslovně označen Bez e-mailu.\r"
           },
           {
             "kind": "image",
@@ -105,16 +478,15 @@
         ]
       },
       {
-        "title": "Uložte koncept",
+        "title": "Uložte koncept\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Klikněte na Uložit nabídku navigace. Otevře se detail nabídky s jejím názvem a stavem Draft. Obnovte stránku a zkontrolujte, že název, provozovna a jeden bod zůstaly zachované. To je skutečné dokončení této lekce; otevření formuláře nestačí."
+            "text": "Klikněte na Uložit nabídku navigace. Otevře se detail nabídky s jejím názvem a stavem Draft. Obnovte stránku a zkontrolujte, že název, provozovna a jeden bod zůstaly zachované. To je skutečné dokončení této lekce; otevření formuláře nestačí.\r"
           },
           {
-            "kind": "image",
-            "text": "Uložený koncept po obnovení stránky",
-            "file": "06-ulozeny-koncept.jpg"
+            "kind": "text",
+            "text": "!Uložený koncept po obnovení stránky\r"
           },
           {
             "kind": "text",
@@ -126,11 +498,18 @@
   },
   {
     "slug": "02-vice-provozoven",
-    "title": "Jak přidat druhou provozovnu do navigační nabídky",
-    "sourceHash": "161960c031850a4c1d061eff19e0388e42c62aacf54d1488e307d9593f3e54d8",
+    "title": "Jak přidat druhou provozovnu do navigační nabídky\r",
+    "capability": "offers",
+    "category": "Další pracovní postupy",
+    "verification": "Ověřeno 9. 10. 2026 na školicích datech QX promotion v roli ADMIN na počítači. Omezení konkrétních kroků jsou uvedena v lekci.",
+    "duration": "1–3 min",
+    "route": "/offers",
+    "status": "PUBLISHED",
+    "verifiedAt": "2026-10-09",
+    "sourceHash": "1352d2c85d1eac199645c33cde81b578385181dcf63a52cbac26a0766f48045a",
     "steps": [
       {
-        "title": "Otevřete úpravu návrhu",
+        "title": "Otevřete úpravu návrhu\r",
         "blocks": [
           {
             "kind": "text",
@@ -139,15 +518,15 @@
         ]
       },
       {
-        "title": "Přidejte pobočku",
+        "title": "Přidejte pobočku\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Klikněte na + Přidat pobočku. Objeví se Prodejna 2 s nulovým počtem bodů. Vyplňte Název provozovny; ukázka používá „AKADEMIE – druhá ukázková provozovna“. Pro skutečnou zakázku doplňte adresu a ověřte GPS."
+            "text": "Klikněte na + Přidat pobočku. Objeví se Prodejna 2 s nulovým počtem bodů. Vyplňte Název provozovny; ukázka používá „AKADEMIE – druhá ukázková provozovna“. Pro skutečnou zakázku doplňte adresu a ověřte GPS.\r"
           },
           {
             "kind": "text",
-            "text": "Pozor: aplikace předvyplnila souřadnice poblíž první provozovny. Nejde o vyhledanou adresu druhé pobočky. Ve školení jsou ponechány jako výslovně označená ukázka."
+            "text": "Pozor: aplikace předvyplnila souřadnice poblíž první provozovny. Nejde o vyhledanou adresu druhé pobočky. Ve školení jsou ponechány jako výslovně označená ukázka.\r"
           },
           {
             "kind": "image",
@@ -157,11 +536,11 @@
         ]
       },
       {
-        "title": "Přidejte navigační bod",
+        "title": "Přidejte navigační bod\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Klikněte na Pokračovat na mapu, potom + Přidat navigační bod. Vyčkejte na druhou kartu a počítadlo 2 body. Na druhé kartě klikněte na Detail."
+            "text": "Klikněte na Pokračovat na mapu, potom + Přidat navigační bod. Vyčkejte na druhou kartu a počítadlo 2 body. Na druhé kartě klikněte na Detail.\r"
           },
           {
             "kind": "text",
@@ -170,11 +549,11 @@
         ]
       },
       {
-        "title": "Vyberte cílovou provozovnu",
+        "title": "Vyberte cílovou provozovnu\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "V detailu bodu, v části 1. Umístění a cíl trasy, otevřete výběr Cílová provozovna a zvolte #2 AKADEMIE – druhá ukázková provozovna. Při vlastní zakázce vyberte odpovídající skutečnou pobočku. Zkontrolujte polohu bodu a parametry značení. Školicí bod má interní poznámku, že se nemá instalovat."
+            "text": "V detailu bodu, v části 1. Umístění a cíl trasy, otevřete výběr Cílová provozovna a zvolte #2 AKADEMIE – druhá ukázková provozovna. Při vlastní zakázce vyberte odpovídající skutečnou pobočku. Zkontrolujte polohu bodu a parametry značení. Školicí bod má interní poznámku, že se nemá instalovat.\r"
           },
           {
             "kind": "image",
@@ -184,11 +563,11 @@
         ]
       },
       {
-        "title": "Zkontrolujte a uložte",
+        "title": "Zkontrolujte a uložte\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Klikněte na Hotovo (Zavřít detail) a potom Pokračovat. Souhrn má zobrazovat 2 prodejny a 2 body. Klikněte na Uložit nabídku navigace a vyčkejte na zprávu Navigační nabídka byla úspěšně uložena."
+            "text": "Klikněte na Hotovo (Zavřít detail) a potom Pokračovat. Souhrn má zobrazovat 2 prodejny a 2 body. Klikněte na Uložit nabídku navigace a vyčkejte na zprávu Navigační nabídka byla úspěšně uložena.\r"
           },
           {
             "kind": "text",
@@ -197,11 +576,11 @@
         ]
       },
       {
-        "title": "Ověřte výsledek",
+        "title": "Ověřte výsledek\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "Obnovte stránku. Editor se v našem průchodu znovu otevřel na provozovnách. Obě provozovny zůstaly uložené a na každé kartě bylo 1 přiřazený bod. Horní lišta uváděla 2 cíle a 2 body. Tím je úkol dokončený."
+            "text": "Obnovte stránku. Editor se v našem průchodu znovu otevřel na provozovnách. Obě provozovny zůstaly uložené a na každé kartě bylo 1 přiřazený bod. Horní lišta uváděla 2 cíle a 2 body. Tím je úkol dokončený.\r"
           },
           {
             "kind": "image",
@@ -214,15 +593,22 @@
   },
   {
     "slug": "03-kontrola-klientskeho-nahledu",
-    "title": "Jak zkontrolovat klientský náhled a body jednotlivých poboček",
-    "sourceHash": "8a9707237b61ca0142985dc2ae757199b6c74ba7de81a830611acfc79dc6de77",
+    "title": "Jak zkontrolovat klientský náhled a body jednotlivých poboček\r",
+    "capability": "offers",
+    "category": "Další pracovní postupy",
+    "verification": "Ověřeno 9. 10. 2026 na školicích datech QX promotion v roli ADMIN na počítači. Omezení konkrétních kroků jsou uvedena v lekci.",
+    "duration": "1–3 min",
+    "route": "/offers",
+    "status": "PUBLISHED",
+    "verifiedAt": "2026-10-09",
+    "sourceHash": "e47bcfe72e70041e2b1923b56a2417ebc594ed2afc5015d525592ab3899ca573",
     "steps": [
       {
-        "title": "Otevřete náhled",
+        "title": "Otevřete náhled\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "V detailu nabídky v části Práce s nabídkou klikněte na Zkontrolovat klientský náhled. Otevře se stránka Náhled klientské nabídky s odkazem Detail nabídky a lištou obchodního workflow. Tento průchod používá interní náhled přihlášeného uživatele."
+            "text": "V detailu nabídky v části Práce s nabídkou klikněte na Zkontrolovat klientský náhled. Otevře se stránka Náhled klientské nabídky s odkazem Detail nabídky a lištou obchodního workflow. Tento průchod používá interní náhled přihlášeného uživatele.\r"
           },
           {
             "kind": "image",
@@ -232,7 +618,7 @@
         ]
       },
       {
-        "title": "Zkontrolujte provozovny a fázi",
+        "title": "Zkontrolujte provozovny a fázi\r",
         "blocks": [
           {
             "kind": "text",
@@ -241,15 +627,15 @@
         ]
       },
       {
-        "title": "Zobrazte body jedné pobočky",
+        "title": "Zobrazte body jedné pobočky\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "V části Zobrazit body pro pobočku klikněte na tlačítko #2 AKADEMIE – druhá ukázková provozovna 1. Výsledek: mapa hlásí jeden bod a seznam má nadpis Navigační body pro pobočku (1). Na kartě zkontrolujte Směr: AKADEMIE – druhá ukázková provozovna."
+            "text": "V části Zobrazit body pro pobočku klikněte na tlačítko #2 AKADEMIE – druhá ukázková provozovna 1. Výsledek: mapa hlásí jeden bod a seznam má nadpis Navigační body pro pobočku (1). Na kartě zkontrolujte Směr: AKADEMIE – druhá ukázková provozovna.\r"
           },
           {
             "kind": "text",
-            "text": "Pozor: ve filtrovaném seznamu se druhý bod zobrazil jako #1. Pro identifikaci proto používejte také cílovou provozovnu a polohu, nikoli samotné pořadové číslo."
+            "text": "Pozor: ve filtrovaném seznamu se druhý bod zobrazil jako #1. Pro identifikaci proto používejte také cílovou provozovnu a polohu, nikoli samotné pořadové číslo.\r"
           },
           {
             "kind": "image",
@@ -259,7 +645,7 @@
         ]
       },
       {
-        "title": "Rozlište filtr a výběr",
+        "title": "Rozlište filtr a výběr\r",
         "blocks": [
           {
             "kind": "text",
@@ -268,7 +654,7 @@
         ]
       },
       {
-        "title": "Obnovte všechny body",
+        "title": "Obnovte všechny body\r",
         "blocks": [
           {
             "kind": "text",
@@ -280,11 +666,18 @@
   },
   {
     "slug": "04-proc-nelze-odeslat-nabidku",
-    "title": "Jak zjistit, co nabídce chybí před odesláním",
-    "sourceHash": "d9a6f0c59fa1a292323bae68fa5866a3a911f7c16b2d5d303636d731565d5e32",
+    "title": "Jak zjistit, co nabídce chybí před odesláním\r",
+    "capability": "offers",
+    "category": "Další pracovní postupy",
+    "verification": "Ověřeno 9. 10. 2026 na školicích datech QX promotion v roli ADMIN na počítači. Omezení konkrétních kroků jsou uvedena v lekci.",
+    "duration": "1–3 min",
+    "route": "/offers",
+    "status": "PUBLISHED",
+    "verifiedAt": "2026-10-09",
+    "sourceHash": "97c399ad29a2afc8a29c621577a4441be24405e57d78ca896fad4ac69ba3ea40",
     "steps": [
       {
-        "title": "Přejděte z náhledu na kontrolu",
+        "title": "Přejděte z náhledu na kontrolu\r",
         "blocks": [
           {
             "kind": "text",
@@ -293,15 +686,15 @@
         ]
       },
       {
-        "title": "Přečtěte kontrolní seznam",
+        "title": "Přečtěte kontrolní seznam\r",
         "blocks": [
           {
             "kind": "text",
-            "text": "V části Kontrola před odesláním zjistěte, které položky mají stav Chybí. U školící nabídky je 4/7 splněno a chybějí:"
+            "text": "V části Kontrola před odesláním zjistěte, které položky mají stav Chybí. U školící nabídky je 4/7 splněno a chybějí:\r"
           },
           {
             "kind": "text",
-            "text": "- Platnost nabídky – aplikace požaduje dnešní nebo budoucí datum.\n- Terénní fotografie sloupů – chybí reálná fotografie u obou bodů.\n- Fotografie a vizualizace bodů – chybí klientské vizuály u obou bodů."
+            "text": "- Platnost nabídky – aplikace požaduje dnešní nebo budoucí datum.\r\n- Terénní fotografie sloupů – chybí reálná fotografie u obou bodů.\r\n- Fotografie a vizualizace bodů – chybí klientské vizuály u obou bodů.\r"
           },
           {
             "kind": "image",
@@ -311,7 +704,7 @@
         ]
       },
       {
-        "title": "Zkontrolujte možnost odeslání",
+        "title": "Zkontrolujte možnost odeslání\r",
         "blocks": [
           {
             "kind": "text",
@@ -320,7 +713,7 @@
         ]
       },
       {
-        "title": "Vraťte se k doplnění",
+        "title": "Vraťte se k doplnění\r",
         "blocks": [
           {
             "kind": "text",
@@ -329,11 +722,126 @@
         ]
       },
       {
-        "title": "Známá nesrovnalost: kontakt",
+        "title": "Známá nesrovnalost: kontakt\r",
         "blocks": [
           {
             "kind": "text",
             "text": "Položka Klient a kontakt v tomto průchodu tvrdila „Klient a kontaktní e-mail jsou vyplněny“, přestože souhrn editoru uváděl „Bez e-mailu“. Kontrola kódu lib/offers/workflow.ts:33 až 37 ukázala, že lokační fáze 1 může projít kontrolou kontaktu bez e-mailu, ale text úspěchu tento důvod nerozlišuje. Z této zelené položky proto nelze vyvozovat, že je skutečný příjemce e-mailu vyplněný. Před skutečným odesláním příjemce ověřte."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "05-mapove-podklady",
+    "title": "Jak přepnout mapu při kontrole navigačních bodů",
+    "capability": "offers",
+    "category": "Další pracovní postupy",
+    "verification": "Ověřeno 9. 10. 2026 na školicích datech QX promotion v roli ADMIN na počítači. Omezení konkrétních kroků jsou uvedena v lekci.",
+    "duration": "1–3 min",
+    "route": "/offers",
+    "status": "PUBLISHED",
+    "verifiedAt": "2026-10-09",
+    "sourceHash": "9c4ee5b71534cb19a3b5235860e65445304118c4b15887d519a51d534f562e3f",
+    "steps": [
+      {
+        "title": "Otevřete klientský náhled",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Otevřete Nabídky, vyberte svou navigační nabídku a v části Práce s nabídkou použijte Zkontrolovat klientský náhled. Posuňte se k mapě. Tento návod používá interní náhled přihlášeného uživatele."
+          }
+        ]
+      },
+      {
+        "title": "Zvolte satelitní podklad",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Nad mapou klikněte na Letecká / Satelitní. Podklad se přepne na snímky okolí. Zkontrolujte umístění bodů vzhledem k budovám a komunikacím. Snímek je orientační podklad; nenahrazuje aktuální kontrolu místa v terénu."
+          },
+          {
+            "kind": "image",
+            "text": "Tlačítko Letecká / Satelitní nad mapou a satelitní podklad",
+            "file": "15-satelitni-mapa.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Vraťte se na běžnou mapu",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Běžná mapa. Znovu se zobrazí uliční mapa. Přepnutí podkladu nevyžaduje uložení nabídky."
+          },
+          {
+            "kind": "image",
+            "text": "Běžná mapa se zachovanými navigačními body",
+            "file": "16-bezna-mapa.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Zkontrolujte zachování bodů",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Pod mapou zkontrolujte karty navigačních bodů. Ve školicí nabídce zůstaly při obou podkladech dvě karty. Přepínáte pouze zobrazení mapy; pro úpravu polohy se vraťte do editoru nabídky. Tlačítko Potvrdit body k nacenění není součástí této kontroly."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "06-vyhledani-klienta",
+    "title": "Jak vyhledat klienta v adresáři",
+    "capability": "crm",
+    "category": "Další pracovní postupy",
+    "verification": "Ověřeno 9. 10. 2026 na školicích datech QX promotion v roli ADMIN na počítači. Omezení konkrétních kroků jsou uvedena v lekci.",
+    "duration": "1–3 min",
+    "route": "/clients",
+    "status": "PUBLISHED",
+    "verifiedAt": "2026-10-09",
+    "sourceHash": "03eab73314019f64f2d04fd32137df86fc144b7b56511f596631f033d5338835",
+    "steps": [
+      {
+        "title": "Otevřete adresář",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "V levé navigaci otevřete Obchod & CRM, potom Klienti & Adresář. Stránka má nadpis CRM Klienti. Pracujete v aktuálně zvolené organizaci; její název je vidět v horní části aplikace."
+          }
+        ]
+      },
+      {
+        "title": "Zadejte hledaný název",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Do pole Vyhledat klienta napište část názvu klienta, kterého hledáte. V ukázce používáme TEST QX. Použijte název vlastního klienta; školicí klient z obrázku ve vaší organizaci být nemusí."
+          }
+        ]
+      },
+      {
+        "title": "Spusťte hledání",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Klikněte na Hledat. Nad tabulkou zkontrolujte údaj Nalezeno. V ověřené ukázce se seznam zúžil na jeden výsledek TEST QX – kontrola izolace."
+          },
+          {
+            "kind": "image",
+            "text": "Vyhledávání TEST QX a jeden nalezený školicí klient",
+            "file": "17-hledani-klienta.jpg"
+          }
+        ]
+      },
+      {
+        "title": "Ověřte správný výsledek",
+        "blocks": [
+          {
+            "kind": "text",
+            "text": "Porovnejte název a dostupné kontaktní údaje v řádku. Prázdný údaj neznamená chybu hledání: školicí klient například nemá vyplněnou kontaktní osobu. Pokud klienta nenajdete, zkontrolujte pravopis a aktivní organizaci, než založíte nový záznam. Tato lekce končí nalezením klienta v seznamu."
           }
         ]
       }
