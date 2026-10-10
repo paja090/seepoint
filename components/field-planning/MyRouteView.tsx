@@ -15,7 +15,11 @@ import {
   Car,
   FileText,
   ExternalLink,
+  Map as MapIcon,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const MyRouteMap = dynamic(() => import('@/components/field-planning/MyRouteMap').then(m => m.MyRouteMap), { ssr: false });
 
 export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [data, setData] = useState(initial);
@@ -128,6 +132,9 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 {doneCount} / {totalCount} hotovo
               </span>
             </div>
+
+            {/* LIVE MAP */}
+            <MyRouteMap route={route} height="h-[280px]" />
 
             {/* Google Maps Full Route */}
             {(() => {
