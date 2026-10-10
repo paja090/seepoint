@@ -36,7 +36,7 @@ export type DiscoveryRunResult = {
 export async function runDiscoveryForOrganization(
   params: DiscoveryRunParams
 ): Promise<DiscoveryRunResult> {
-  const { organizationId, userId, triggerType, batchLimit = 15, timeBudgetMs = 25_000 } = params;
+  const { organizationId, userId, triggerType, batchLimit = 15, timeBudgetMs = 75_000 } = params;
 
   return runWithTenantContext(
     {
@@ -83,7 +83,8 @@ export async function runDiscoveryForOrganization(
       try {
         // 1. Live Web Search Grounding via Gemini 3.6 Flash (real-time regional opportunities)
         try {
-          const liveResults = await searchLiveOpportunitiesWithGemini(profile, startTime + Math.floor(timeBudgetMs * 0.6));
+          const liveDeadline = Math.max(startTime + Math.floor(timeBudgetMs * 0.75), deadline - 15_000);
+          const liveResults = await searchLiveOpportunitiesWithGemini(profile, liveDeadline);
           const boundedLiveResults = liveResults.slice(0, batchLimit);
           liveFoundCount = boundedLiveResults.length;
 

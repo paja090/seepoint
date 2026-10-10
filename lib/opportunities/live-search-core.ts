@@ -64,7 +64,7 @@ PŘÍSNÁ PRAVIDLA:
 - Vždy uveď skutečnou URL adresu článku nebo média v poli "sourceUrl".
 - Pokud město v článku není jednoznačné, zadej "city": null.
 
-Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými příležitostmi:
+Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 4 až 6 nalezenými příležitostmi:
 [
   {
     "companyName": "Přesný název firmy, značky, pořadatele nebo akce",
@@ -89,7 +89,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 12 nalezenými př�
   const configuredOppModel = process.env.GEMINI_OPPORTUNITY_MODEL?.trim();
   const models = configuredOppModel
     ? [configuredOppModel]
-    : ['gemini-3.8-flash', 'gemini-flash-latest'];
+    : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
 
   let jsonText = '';
   let failure = 'Gemini nevrátil použitelnou odpověď.';
