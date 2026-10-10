@@ -29,10 +29,19 @@ export async function myRoute(userId: string, now = new Date()) {
           items: { where: { organizationId }, include: { crmRealization: true, photos: { where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } }, carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } }, surface: { include: { carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } } } } } } } });
       const points = navigation ? await prisma.navigationPoint.findMany({ where: { organizationId, id: { in: crew.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) } },
         select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
+      const electionPoints = await prisma.electionRemovalPoint.findMany({
+        where: { organizationId, id: { in: crew.stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) } },
+        select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true }
+      });
       const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
       routes.push({ planId: plan.id, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
         stops: crew.stops.flatMap(s => {
+          if (s.electionRemovalPointId) {
+            const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
+            if (!ep) return [];
+            return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: ep.id, address: null, pointPhotoUrl: null, workOrderId: '', title: ep.label, clientName: 'Svoz voleb', instructions: ep.description || `Demontáž (${ep.mediaType})`, status: ['COMPLETED', 'ISSUE'].includes(ep.status) ? 'DONE' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
+          }
           const order = orders.find(o => o.id === s.workOrderId); if (s.workOrderId && !order) return [];
           if (s.navigationPointId && !navigation) return [];
           const item = s.workOrderItemId ? order?.items.find(i => i.id === s.workOrderItemId) : null;
@@ -62,7 +71,7 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
     const { organizationId } = requireTenantContext(); const plan = await getPlan(input.planId, tx);
     const employee = await tx.employee.findFirst({ where: { organizationId, userId: actor.id, isActive: true } });
     const result = plan.planningSummary as unknown as PlanningResult;
-    const crew = result.crews.find(c => employee && c.employeeIds.includes(employee.id) && c.stops.some(s => s.workOrderId === input.workOrderId && stopId(s) === (input.jobId ?? input.workOrderId)));
+    const crew = result.crews.find(c => employee && c.employeeIds.includes(employee.id) && c.stops.some(s => stopId(s) === (input.jobId ?? input.workOrderId)));
     if (!crew || !employee || !['APPROVED', 'ACTIVE', 'COMPLETED'].includes(plan.status)) throw new Error('FORBIDDEN: pouze vlastní schválená trasa.');
     const profile = (plan.planningInputSnapshot as unknown as PlanningInput).profile;
     if (dayInZone(new Date(), profile.timezone) !== plan.date) throw new Error('Realizovat lze pouze dnešní trasu.');
@@ -75,6 +84,25 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       const response = await executeItem(tx, stop, plan.id, input, actor, installationPhotos, members.flatMap(m => m.userId ? [m.userId] : []));
       if (input.action !== 'inspect') await refreshExecutionPlan(tx, plan.id, result);
       return response;
+    }
+    if (stop.electionRemovalPointId) {
+      const point = await tx.electionRemovalPoint.findFirst({ where: { organizationId, id: stop.electionRemovalPointId } });
+      if (!point || ['CANCELLED', 'COMPLETED'].includes(point.status)) throw new Error('Bod již není dostupný.');
+      if (input.action === 'inspect') return { ok: true };
+      if (!['start', 'complete', 'problem'].includes(input.action)) throw new Error('Neplatná akce.');
+      if (input.action === 'problem') {
+        if (!fieldProblemTypes.includes(input.problemType as typeof fieldProblemTypes[number]) || !input.note?.trim() || !input.requestKey) throw new Error('Vyberte typ problému a popis.');
+        await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: { status: 'ISSUE', issueType: input.problemType, issueNote: input.note.trim() } });
+      } else if (input.action === 'start') {
+        if (point.status === 'PENDING' || point.status === 'ASSIGNED' || point.status === 'ISSUE') {
+          await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: { status: 'IN_PROGRESS', startedAt: new Date() } });
+        }
+      } else if (input.action === 'complete') {
+        if (point.status !== 'IN_PROGRESS' && point.status !== 'ISSUE') throw new Error('Nejprve zahajte práci.');
+        await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: { status: 'COMPLETED', completedAt: new Date(), completedByUserId: actor.id } });
+      }
+      await refreshExecutionPlan(tx, plan.id, result);
+      return { ok: true };
     }
     if (stop.navigationPointId) {
       if (!await navigationAvailable(tx)) throw new Error('FORBIDDEN: Navigation není aktivní.');
