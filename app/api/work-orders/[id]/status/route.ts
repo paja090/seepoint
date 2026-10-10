@@ -87,15 +87,45 @@ export async function PATCH(
           where: { id: existing.navigationOrderId },
           include: { points: true },
         });
-        if (navOrder && ['PRIPRAVENO_K_INSTALACI', 'INSTALACE'].includes(navOrder.status)) {
+        if (navOrder && ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE'].includes(navOrder.status)) {
           const allPointsInstalled = navOrder.points.length > 0 && navOrder.points.every((p) => p.status === 'INSTALLED');
-          if (allPointsInstalled) {
+          const allPointsPhotographed = navOrder.points.length > 0 && navOrder.points.every((p) => Boolean(p.installedPhotoId));
+
+          if (allPointsInstalled && allPointsPhotographed) {
+            // Auto-advance to PRIPRAVENO_K_FAKTURACI when everything is physically complete & photographed
+            await prisma.navigationPoint.updateMany({
+              where: {
+                navigationOrderId: navOrder.id,
+                qcStatus: 'PENDING',
+              },
+              data: {
+                qcStatus: 'APPROVED',
+                qcNote: 'Automaticky schváleno po dokončení zakázky technikem',
+              },
+            });
+
+            await prisma.navigationOrder.update({
+              where: { id: navOrder.id },
+              data: {
+                status: 'PRIPRAVENO_K_FAKTURACI',
+                blockStatus: 'CEKA_NA_FAKTURACI',
+                installedAt: navOrder.installedAt ?? new Date(),
+              },
+            });
+
+            if (navOrder.crmOrderId) {
+              await prisma.crmOrder.update({
+                where: { id: navOrder.crmOrderId },
+                data: { status: 'IN_REALIZATION' },
+              });
+            }
+          } else if (allPointsInstalled) {
             await prisma.navigationOrder.update({
               where: { id: navOrder.id },
               data: {
                 status: 'FOTODOKUMENTACE',
                 blockStatus: 'CEKA_NA_FAKTURACI',
-                installedAt: new Date(),
+                installedAt: navOrder.installedAt ?? new Date(),
               },
             });
           }
