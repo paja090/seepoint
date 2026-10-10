@@ -110,7 +110,7 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO;
   }, [mapType]);
 
   return (
-    <div className={\`relative w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm \${height}\`}>
+    <div className={`relative w-full overflow-hidden rounded-3xl border border-slate-200 shadow-sm ${height}`}>
       <div ref={mapRef} className="h-full w-full" />
       
       {/* Map controls over the map */}
@@ -120,11 +120,11 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO;
             <button
               key={key}
               onClick={() => setMapType(key)}
-              className={\`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition \${
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
                 mapType === key
                   ? 'bg-slate-800 text-white'
                   : 'bg-white text-slate-600 hover:bg-slate-50'
-              }\`}
+              }`}
             >
               {config.label}
             </button>
