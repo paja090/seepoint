@@ -214,6 +214,49 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       reason: `Priorita ${job.priority}; ověřená dostupnost, kvalifikace a časové limity. ${incoming.estimated ? 'Přejezd je odhad.' : 'Přejezd podle Google Routes.'}` });
     crew.returnLeg = returning; crew.endAt = iso(returnAt); done.set(job.id, finish);
   }
+
+  // Závěrečný flush: Pokud posádka po posledním úkolu veze nějaký materiál (např. naložila věž), musíme ji na konci dne poslat na sklad k vyložení.
+  for (const crew of result.crews) {
+    const finalLoad = crewLoadSlots.get(crew.id) ?? 0;
+    if (finalLoad > 0 && crew.stops.length > 0) {
+      const lastStop = crew.stops[crew.stops.length - 1];
+      const lastLocation = lastStop.location;
+      const arrivalTime = Date.parse(lastStop.endAt);
+      const finalMedium = crewLoadMediaType.get(crew.id);
+      const maxCap = p.vehicleCapacitySlots;
+      
+      const toDepot = await leg(lastLocation, p.depot);
+      const pitstopArrival = arrivalTime + toDepot.durationSeconds * 1000;
+      const pitstopFinish = pitstopArrival + (p.warehouseUnloadMinutes ?? 15) * 60000;
+      
+      const mediaLabel = finalMedium ? finalMedium : 'materiálu';
+      crew.stops.push({
+        jobId: `depot-pitstop-${crew.id}-final`,
+        workOrderId: '',
+        sourceType: 'ELECTION_REMOVAL_POINT',
+        title: `Centrální sklad: Závěrečná vykládka (${finalLoad} ks${finalMedium ? ` – ${finalMedium}` : ''})`,
+        workType: 'WAREHOUSE_UNLOAD',
+        location: p.depot,
+        routeOrder: crew.stops.length + 1,
+        arrivalAt: iso(pitstopArrival),
+        startAt: iso(pitstopArrival),
+        endAt: iso(pitstopFinish),
+        serviceMinutes: p.warehouseUnloadMinutes ?? 15,
+        travel: toDepot,
+        reason: `Závěrečný návrat na sklad k vyložení vozidla (${finalLoad}/${maxCap} slotů).`,
+        isWarehousePitstop: true,
+        unloadedSlots: finalLoad,
+        cumulativeLoadSlots: 0,
+      });
+      
+      // Přenastavit návratovou cestu ze skladu do endLocation
+      crew.returnLeg = await leg(p.depot, p.endLocation);
+      crew.endAt = iso(pitstopFinish + crew.returnLeg.durationSeconds * 1000);
+      crewLoadSlots.set(crew.id, 0);
+      crewLoadMediaType.set(crew.id, null);
+    }
+  }
+
   result.crews = result.crews.filter(c => c.stops.length);
   for (const c of result.crews) {
     c.distanceMeters = c.stops.reduce((n, s) => n + s.travel.distanceMeters, c.returnLeg.distanceMeters);

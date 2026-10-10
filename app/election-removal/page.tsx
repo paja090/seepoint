@@ -28,19 +28,27 @@ export default async function ElectionRemovalPage() {
       createdAt: 'desc',
     },
     include: {
+      points: { select: { quantity: true, status: true } },
       _count: {
         select: {
-          points: true,
           fieldPlans: true,
         },
       },
     },
   });
 
+  const processedCampaigns = campaigns.map((c) => {
+    const totalPoints = c.points.reduce((sum, p) => sum + p.quantity, 0);
+    const completedPoints = c.points
+      .filter((p) => p.status === 'COMPLETED')
+      .reduce((sum, p) => sum + p.quantity, 0);
+    return { ...c, totalPoints, completedPoints };
+  });
+
   // Calculate totals
-  const totalCampaigns = campaigns.length;
-  const totalPoints = campaigns.reduce((acc, c) => acc + c.totalPoints, 0);
-  const totalCompleted = campaigns.reduce((acc, c) => acc + c.completedPoints, 0);
+  const totalCampaigns = processedCampaigns.length;
+  const totalPoints = processedCampaigns.reduce((acc, c) => acc + c.totalPoints, 0);
+  const totalCompleted = processedCampaigns.reduce((acc, c) => acc + c.completedPoints, 0);
 
   const canManage = user.role === 'ADMIN' || user.role === 'MANAGER';
   const canImport = canManage || user.role === 'TECHNICIAN';
@@ -127,7 +135,7 @@ export default async function ElectionRemovalPage() {
         </div>
 
         {/* Campaign List */}
-        {campaigns.length === 0 ? (
+        {processedCampaigns.length === 0 ? (
           <div className="card text-center py-16 px-4 space-y-4 border-dashed border-2 border-slate-200">
             <div className="w-16 h-16 rounded-full bg-sky-50 text-sky-600 mx-auto flex items-center justify-center">
               <Truck className="w-8 h-8" />
@@ -155,7 +163,7 @@ export default async function ElectionRemovalPage() {
             </h2>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {campaigns.map((c) => {
+              {processedCampaigns.map((c) => {
                 const percentDone =
                   c.totalPoints > 0
                     ? Math.round((c.completedPoints / c.totalPoints) * 100)

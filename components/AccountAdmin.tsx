@@ -235,42 +235,64 @@ export function AccountAdmin({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
-            <div className="flex items-start gap-3">
-              <Lock className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-              <div>
-                <h3 className="text-sm font-black text-amber-950">Nastavit dočasné heslo</h3>
-                <p className="mt-1 text-xs text-amber-800">{canResetPassword ? 'Zaměstnanec se tímto heslem přihlásí pouze pro první vstup. Aplikace ho ihned přesměruje na povinnou změnu hesla. Staré session a pozvánky se zneplatní.' : 'Tento účet je členem více organizací. Globální heslo si musí změnit uživatel nebo platformní administrátor.'}</p>
+          {status === 'INVITED' && (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 text-sky-950">
+              <div className="flex items-start gap-3">
+                <Mail className="mt-0.5 h-5 w-5 text-sky-600 shrink-0" />
+                <div className="text-xs space-y-1">
+                  <p className="font-bold text-sm text-sky-950">Aktivační pozvánka byla odeslána na e-mail</p>
+                  <p className="text-sky-800">
+                    Zaměstnanec má v e-mailu odkaz s platností 48 hodin. Po kliknutí na odkaz si heslo sám bezpečně nastaví. <b>Není potřeba zadávat žádné dočasné heslo.</b>
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-bold text-slate-800">Dočasné heslo
-                <input className="input mt-1" type="password" value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} minLength={12} autoComplete="new-password" placeholder="Alespoň 12 znaků, písmeno a číslo" disabled={!canResetPassword} />
-              </label>
-              <label className="text-xs font-bold text-slate-800">Potvrzení hesla
-                <input className="input mt-1" type="password" value={temporaryPasswordConfirmation} onChange={(event) => setTemporaryPasswordConfirmation(event.target.value)} minLength={12} autoComplete="new-password" disabled={!canResetPassword} />
-              </label>
+          )}
+
+          <details className="group rounded-2xl border border-amber-200 bg-amber-50/60 p-5 space-y-4">
+            <summary className="cursor-pointer text-sm font-black text-amber-950 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Lock className="h-4 w-4 text-amber-700" />
+                <span>Nouzová volba: Nastavit dočasné heslo ručně (pro osobní předání)</span>
+              </div>
+              <span className="text-xs font-semibold text-amber-800 group-open:hidden">Zobrazit možnosti →</span>
+            </summary>
+            <div className="pt-2 space-y-4 border-t border-amber-200/70">
+              <div className="rounded-xl bg-amber-100/80 p-3 text-xs text-amber-900 font-medium">
+                ⚠️ <b>Důležité:</b> Tuto možnost použijte pouze v případě, že zaměstnanec nemůže použít e-mail. Nastavením dočasného hesla se <b>okamžitě zneplatní odeslaný e-mailový odkaz</b> a dočasné heslo budete muset zaměstnanci předat osobně (např. ústně nebo přes SMS). E-mailem se toto heslo neposílá.
+              </div>
+              <p className="text-xs text-amber-800">
+                {canResetPassword ? 'Zaměstnanec se tímto heslem přihlásí pouze pro první vstup. Aplikace ho ihned přesměruje na povinnou změnu hesla. Staré session a pozvánky se zneplatní.' : 'Tento účet je členem více organizací. Globální heslo si musí změnit uživatel nebo platformní administrátor.'}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-bold text-slate-800">Dočasné heslo
+                  <input className="input mt-1" type="password" value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} minLength={12} autoComplete="new-password" placeholder="Alespoň 12 znaků, písmeno a číslo" disabled={!canResetPassword} />
+                </label>
+                <label className="text-xs font-bold text-slate-800">Potvrzení hesla
+                  <input className="input mt-1" type="password" value={temporaryPasswordConfirmation} onChange={(event) => setTemporaryPasswordConfirmation(event.target.value)} minLength={12} autoComplete="new-password" disabled={!canResetPassword} />
+                </label>
+              </div>
+              <p className="text-xs font-semibold text-amber-900">Heslo musí mít alespoň 12 znaků, jedno písmeno a jedno číslo.</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={generateTemporaryPassword}
+                  disabled={busy || !canResetPassword}
+                  className="rounded-xl border border-amber-700 px-4 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Vygenerovat bezpečné heslo
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !canResetPassword || !temporaryPassword || !temporaryPasswordConfirmation}
+                  onClick={setTemporaryAccessPassword}
+                  className="rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  Nastavit dočasné heslo a aktivovat účet
+                </button>
+              </div>
             </div>
-            <p className="text-xs font-semibold text-amber-900">Heslo musí mít alespoň 12 znaků, jedno písmeno a jedno číslo.</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={generateTemporaryPassword}
-                disabled={busy || !canResetPassword}
-                className="rounded-xl border border-amber-700 px-4 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-              >
-                Vygenerovat bezpečné heslo
-              </button>
-              <button
-                type="button"
-                disabled={busy || !canResetPassword || !temporaryPassword || !temporaryPasswordConfirmation}
-                onClick={setTemporaryAccessPassword}
-                className="rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50"
-              >
-                Nastavit dočasné heslo a aktivovat účet
-              </button>
-            </div>
-          </div>
+          </details>
 
           {/* Multiple Roles Selection Box */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
