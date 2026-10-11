@@ -150,6 +150,7 @@ export type MyRouteDTO = {
     actualTripMinutes?: number | null;
     liveEstimatedEndAt?: string;
     totalDelayMinutes?: number;
+    liveLocation?: LiveCrewLocation | null;
     stops: MyRouteStop[];
   }>;
 };

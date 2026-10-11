@@ -17,7 +17,15 @@ function escapeHtml(str: string): string {
   }[tag] || tag));
 }
 
-export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO['routes'][number]; height?: string }) {
+export function MyRouteMap({
+  route,
+  routes,
+  height = 'h-[400px]',
+}: {
+  route?: MyRouteDTO['routes'][number];
+  routes?: MyRouteDTO['routes'];
+  height?: string;
+}) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<LeafletMap | null>(null);
   const layerInstance = useRef<TileLayer | null>(null);
@@ -25,6 +33,8 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
 
   useEffect(() => {
     let disposed = false;
+    const allRoutes = routes && routes.length > 0 ? routes : route ? [route] : [];
+    if (allRoutes.length === 0) return;
 
     void import('leaflet').then((L) => {
       if (disposed || !mapRef.current) return;
@@ -42,55 +52,133 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
       }).addTo(m);
 
       const bounds = L.latLngBounds([]);
+      const ROUTE_COLORS = ['#0284c7', '#059669', '#7c3aed', '#d97706', '#db2777', '#475569'];
 
-      route.stops.forEach((stop: MyRouteStop, i: number) => {
-        if (!stop.location) return;
-        const pt: [number, number] = [stop.location.latitude, stop.location.longitude];
-        
-        let color = '#0ea5e9'; // sky-500 (planned)
-        if (stop.status === 'DONE') color = '#10b981'; // emerald-500
-        else if (stop.status === 'IN_PROGRESS') color = '#3b82f6'; // blue-500
-        else if (stop.status === 'ISSUE') color = '#ef4444'; // red-500
-        else if (stop.status === 'CANCELLED') color = '#ef4444'; // red-500
+      allRoutes.forEach((r, routeIndex) => {
+        const routeColor = ROUTE_COLORS[routeIndex % ROUTE_COLORS.length];
+        const stopPoints: [number, number][] = [];
 
-        const isDone = stop.status === 'DONE';
-        const isIssue = stop.status === 'ISSUE';
-        
-        const iconHtml = `
-          <div style="
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            background-color: ${color};
-            color: white;
-            border-radius: 12px;
-            font-weight: 900;
-            font-size: ${isIssue ? '16px' : '14px'};
-            border: 2px solid white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, ${isIssue ? '0.3' : '0.1'});
-            opacity: ${isDone ? 0.7 : 1};
-          ">
-            ${isDone ? '✓' : isIssue ? '!' : i + 1}
-          </div>
-        `;
+        r.stops.forEach((stop: MyRouteStop, i: number) => {
+          if (!stop.location) return;
+          const pt: [number, number] = [stop.location.latitude, stop.location.longitude];
+          stopPoints.push(pt);
+          
+          let color = allRoutes.length > 1 ? routeColor : '#0ea5e9';
+          if (stop.status === 'DONE') color = '#10b981';
+          else if (stop.status === 'IN_PROGRESS') color = '#3b82f6';
+          else if (stop.status === 'ISSUE') color = '#ef4444';
+          else if (stop.status === 'CANCELLED') color = '#ef4444';
 
-        const marker = L.marker(pt, {
-          icon: L.divIcon({ className: '', html: iconHtml, iconSize: [32, 32], iconAnchor: [16, 16] })
+          const isDone = stop.status === 'DONE';
+          const isIssue = stop.status === 'ISSUE';
+          
+          const iconHtml = `
+            <div style="
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 32px;
+              height: 32px;
+              background-color: ${color};
+              color: white;
+              border-radius: 12px;
+              font-weight: 900;
+              font-size: ${isIssue ? '16px' : '14px'};
+              border: 2px solid white;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, ${isIssue ? '0.3' : '0.1'});
+              opacity: ${isDone ? 0.7 : 1};
+            ">
+              ${isDone ? '✓' : isIssue ? '!' : i + 1}
+            </div>
+          `;
+
+          const marker = L.marker(pt, {
+            icon: L.divIcon({ className: '', html: iconHtml, iconSize: [32, 32], iconAnchor: [16, 16] })
+          });
+          
+          const crewLabel = r.crewName ? `<span style="color: ${routeColor}; font-weight: bold;">Posádka: ${escapeHtml(r.crewName)}</span><br/>` : '';
+          const tooltipHtml = `
+            <div style="font-weight: bold; font-family: sans-serif; font-size: 12px; color: ${isIssue ? '#dc2626' : '#0f172a'};">
+              ${isIssue ? '⚠️ ' : ''}${escapeHtml(stop.title)}
+            </div>
+            ${crewLabel}
+            <div style="font-size: 11px; color: ${isIssue ? '#b91c1c' : '#64748b'}; font-family: sans-serif; margin-top: 2px;">
+              ${escapeHtml(stop.issueType || stop.clientName || stop.workType)}
+            </div>
+          `;
+          
+          marker.bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -16] }).addTo(m);
+          bounds.extend(pt);
         });
-        
-        const tooltipHtml = `
-          <div style="font-weight: bold; font-family: sans-serif; font-size: 12px; color: ${isIssue ? '#dc2626' : '#0f172a'};">
-            ${isIssue ? '⚠️ ' : ''}${escapeHtml(stop.title)}
-          </div>
-          <div style="font-size: 11px; color: ${isIssue ? '#b91c1c' : '#64748b'}; font-family: sans-serif; margin-top: 2px;">
-            ${escapeHtml(stop.issueType || stop.clientName || stop.workType)}
-          </div>
-        `;
-        
-        marker.bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -16] }).addTo(m);
-        bounds.extend(pt);
+
+        if (stopPoints.length > 1) {
+          L.polyline(stopPoints, {
+            color: routeColor,
+            weight: 3,
+            opacity: 0.6,
+            dashArray: '5 7',
+          }).addTo(m);
+        }
+
+        // Live vehicle location marker
+        if (r.liveLocation) {
+          const livePt: [number, number] = [r.liveLocation.latitude, r.liveLocation.longitude];
+          const isRecent = r.liveLocation.isRecent;
+          const speedKmH = r.liveLocation.speed != null ? Math.round(r.liveLocation.speed * 3.6) : null;
+          const speedText = speedKmH != null && speedKmH > 2 ? `${speedKmH} km/h` : 'Stojí na místě';
+          const ageMs = Date.now() - new Date(r.liveLocation.updatedAt).getTime();
+          const ageSeconds = Math.max(0, Math.round(ageMs / 1000));
+          const ageText = ageSeconds < 60 ? `před ${ageSeconds} s` : `před ${Math.round(ageSeconds / 60)} min`;
+          const crewLabel = r.crewName || `Posádka ${routeIndex + 1}`;
+
+          const vehicleIconHtml = `
+            <div style="
+              display: inline-flex;
+              align-items: center;
+              gap: 5px;
+              background-color: ${routeColor};
+              color: white;
+              padding: 4px 10px;
+              border-radius: 9999px;
+              border: 2px solid white;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+              font-family: system-ui, -apple-system, sans-serif;
+              font-size: 11px;
+              font-weight: 800;
+              white-space: nowrap;
+              cursor: pointer;
+            ">
+              <span style="font-size: 13px;">🚐</span>
+              <span>${escapeHtml(crewLabel)}</span>
+              <span style="
+                display: inline-block;
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: ${isRecent ? '#4ade80' : '#f59e0b'};
+                box-shadow: 0 0 6px ${isRecent ? '#4ade80' : '#f59e0b'};
+              "></span>
+            </div>
+          `;
+
+          const vehicleMarker = L.marker(livePt, {
+            zIndexOffset: 1000,
+            icon: L.divIcon({ className: '', html: vehicleIconHtml, iconAnchor: [50, 15] }),
+          });
+
+          const vehicleTooltipHtml = `
+            <div style="font-family: system-ui, -apple-system, sans-serif; font-size: 11px; line-height: 1.4;">
+              <strong style="font-size: 12px; color: #0f172a;">${escapeHtml(crewLabel)}</strong><br/>
+              ${r.vehicleName ? `<span style="color: #475569;">Vozidlo: ${escapeHtml(r.vehicleName)}</span><br/>` : ''}
+              <span style="color: #0369a1; font-weight: 700;">Rychlost: ${speedText}</span> · 
+              <span style="color: ${isRecent ? '#15803d' : '#b45309'}; font-weight: 600;">Signál: ${ageText}</span>
+              ${r.liveLocation.workerName ? `<br/><span style="color: #64748b; font-size: 10px;">Vysílá: ${escapeHtml(r.liveLocation.workerName)}</span>` : ''}
+            </div>
+          `;
+
+          vehicleMarker.bindTooltip(vehicleTooltipHtml, { direction: 'top', offset: [0, -10] }).addTo(m);
+          bounds.extend(livePt);
+        }
       });
 
       if (bounds.isValid()) {
@@ -104,7 +192,7 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
       mapInstance.current = null;
       layerInstance.current = null;
     };
-  }, [route]);
+  }, [route, routes]);
 
   useEffect(() => {
     if (!mapInstance.current || !layerInstance.current) return;

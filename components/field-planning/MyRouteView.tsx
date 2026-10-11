@@ -127,6 +127,25 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
     };
   }, [data.routes]);
 
+  // Auto-refresh routes & crew live locations periodically when a trip is active
+  useEffect(() => {
+    const hasActiveTrip = data.routes.some((r) => r.tripStartedAt && !r.tripCompletedAt);
+    if (!hasActiveTrip) return;
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/work/route/mine?date=${currentDate}`);
+        if (res.ok) {
+          setData(await res.json());
+        }
+      } catch {
+        // Silently ignore background poll errors
+      }
+    }, 25000);
+
+    return () => clearInterval(timer);
+  }, [data.routes, currentDate]);
+
   async function loadDateRoute(date: string) {
     setBusy(true);
     setError('');
@@ -297,6 +316,28 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
             </span>
           </div>
         </div>
+      )}
+
+      {/* Combined Shared Fleet Map */}
+      {routesWithLiveETA.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-2">
+              <MapPin size={18} className="text-sky-600" />
+              <h2 className="text-sm font-extrabold text-slate-900">
+                Společná mapa posádek a tras ({routesWithLiveETA.length}{' '}
+                {routesWithLiveETA.length === 1 ? 'trasa' : routesWithLiveETA.length < 5 ? 'trasy' : 'tras'})
+              </h2>
+            </div>
+            <span className="text-xs font-semibold text-slate-500">
+              Živá poloha všech vozidel a přehled všech zastávek na jedné mapě
+            </span>
+          </div>
+          <MyRouteMap
+            routes={routesWithLiveETA}
+            height="h-[360px] sm:h-[460px] lg:h-[500px]"
+          />
+        </section>
       )}
 
       {/* Route Cards */}

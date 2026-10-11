@@ -12,6 +12,7 @@ import { attachPointInstallationPhotos, type StoredInstallationPhoto } from '../
 import { reportNavigationPointIssue } from '../navigation/point-issue';
 import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './contracts';
 import { computeRouteLiveETA } from './live-eta';
+import { loadPlanCrewLocations } from './live-location';
 
 export async function myRoute(userId: string, dateOrNow?: string | Date): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
@@ -44,6 +45,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
   const routes: MyRouteDTO['routes'] = [];
   for (const plan of effectivePlans) {
     const result = plan.planningSummary as unknown as PlanningResult;
+    const planLocations = await loadPlanCrewLocations(plan.id, organizationId);
     for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
       const orders = await prisma.workOrder.findMany({ where: { organizationId, id: { in: crew.stops.map(s => s.workOrderId) }, workTasks: { some: { organizationId, assignedToEmployeeId: employee.id } } },
         select: { id: true, title: true, description: true, clientName: true, status: true, workType: true, navigationOrderId: true,
@@ -289,6 +291,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
         actualTripMinutes,
         liveEstimatedEndAt: liveEtaResult.liveEstimatedEndAt,
         totalDelayMinutes: liveEtaResult.totalDelayMinutes,
+        liveLocation: planLocations[crew.id] ?? null,
         stops: liveEtaResult.stops,
       });
     }
