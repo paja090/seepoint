@@ -120,7 +120,7 @@ export function MyRouteMap({
           }).addTo(m);
         }
 
-        // Live vehicle location marker
+        // Live vehicle location marker (simple pulsing blue location dot)
         if (r.liveLocation) {
           const livePt: [number, number] = [r.liveLocation.latitude, r.liveLocation.longitude];
           const isRecent = r.liveLocation.isRecent;
@@ -133,42 +133,42 @@ export function MyRouteMap({
 
           const vehicleIconHtml = `
             <div style="
-              display: inline-flex;
+              position: relative;
+              width: 24px;
+              height: 24px;
+              display: flex;
               align-items: center;
-              gap: 5px;
-              background-color: ${routeColor};
-              color: white;
-              padding: 4px 10px;
-              border-radius: 9999px;
-              border: 2px solid white;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-              font-family: system-ui, -apple-system, sans-serif;
-              font-size: 11px;
-              font-weight: 800;
-              white-space: nowrap;
+              justify-content: center;
               cursor: pointer;
             ">
-              <span style="font-size: 13px;">🚐</span>
-              <span>${escapeHtml(crewLabel)}</span>
               <span style="
-                display: inline-block;
-                width: 7px;
-                height: 7px;
+                position: absolute;
+                inset: -5px;
                 border-radius: 50%;
-                background: ${isRecent ? '#4ade80' : '#f59e0b'};
-                box-shadow: 0 0 6px ${isRecent ? '#4ade80' : '#f59e0b'};
+                background: ${isRecent ? 'rgba(2, 132, 199, 0.35)' : 'rgba(245, 158, 11, 0.3)'};
+                animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+              "></span>
+              <span style="
+                position: relative;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #0284c7;
+                border: 2.5px solid white;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
               "></span>
             </div>
           `;
 
           const vehicleMarker = L.marker(livePt, {
             zIndexOffset: 1000,
-            icon: L.divIcon({ className: '', html: vehicleIconHtml, iconAnchor: [50, 15] }),
+            icon: L.divIcon({ className: '', html: vehicleIconHtml, iconSize: [24, 24], iconAnchor: [12, 12] }),
           });
 
           const vehicleTooltipHtml = `
             <div style="font-family: system-ui, -apple-system, sans-serif; font-size: 11px; line-height: 1.4;">
-              <strong style="font-size: 12px; color: #0f172a;">${escapeHtml(crewLabel)}</strong><br/>
+              <strong style="font-size: 12px; color: #0284c7;">📍 Moje aktuální poloha</strong><br/>
+              ${r.crewName ? `<span style="color: #0f172a; font-weight: 700;">${escapeHtml(r.crewName)}</span><br/>` : ''}
               ${r.vehicleName ? `<span style="color: #475569;">Vozidlo: ${escapeHtml(r.vehicleName)}</span><br/>` : ''}
               <span style="color: #0369a1; font-weight: 700;">Rychlost: ${speedText}</span> · 
               <span style="color: ${isRecent ? '#15803d' : '#b45309'}; font-weight: 600;">Signál: ${ageText}</span>
@@ -176,7 +176,7 @@ export function MyRouteMap({
             </div>
           `;
 
-          vehicleMarker.bindTooltip(vehicleTooltipHtml, { direction: 'top', offset: [0, -10] }).addTo(m);
+          vehicleMarker.bindTooltip(vehicleTooltipHtml, { direction: 'top', offset: [0, -12] }).addTo(m);
           bounds.extend(livePt);
         }
       });

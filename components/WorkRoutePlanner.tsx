@@ -844,7 +844,24 @@ export function WorkRoutePlanner({
           )}
 
           {/* Interactive Map */}
-          <div className="rounded-3xl border border-slate-200 bg-white p-2 shadow-sm overflow-hidden">
+          <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm overflow-hidden space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-sky-600" />
+                <h3 className="text-xs font-extrabold text-slate-800">
+                  Dispečerská mapa tras a živých poloh posádek
+                </h3>
+              </div>
+              {plan?.result?.crews?.some((c) => c.liveLocation) && (
+                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span>Živé GPS posádek aktivní</span>
+                </span>
+              )}
+            </div>
             <RouteMap
               result={plan?.result}
               depot={loaded?.profile?.depot}

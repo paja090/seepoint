@@ -232,6 +232,14 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               Plán montáží a výjezdů vaší posádky seřazený podle optimálních zastávek.
             </p>
           </div>
+          <Link
+            href="/work/route"
+            className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-sky-700"
+            title="Přepnout na plánování tras a dispečerskou mapu"
+          >
+            <MapPin size={14} className="text-sky-600" />
+            <span>Dispečink výjezdů</span>
+          </Link>
         </div>
 
         {/* Date Selector Tabs */}
@@ -316,28 +324,6 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
             </span>
           </div>
         </div>
-      )}
-
-      {/* Combined Shared Fleet Map */}
-      {routesWithLiveETA.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-2">
-              <MapPin size={18} className="text-sky-600" />
-              <h2 className="text-sm font-extrabold text-slate-900">
-                Společná mapa posádek a tras ({routesWithLiveETA.length}{' '}
-                {routesWithLiveETA.length === 1 ? 'trasa' : routesWithLiveETA.length < 5 ? 'trasy' : 'tras'})
-              </h2>
-            </div>
-            <span className="text-xs font-semibold text-slate-500">
-              Živá poloha všech vozidel a přehled všech zastávek na jedné mapě
-            </span>
-          </div>
-          <MyRouteMap
-            routes={routesWithLiveETA}
-            height="h-[360px] sm:h-[460px] lg:h-[500px]"
-          />
-        </section>
       )}
 
       {/* Route Cards */}

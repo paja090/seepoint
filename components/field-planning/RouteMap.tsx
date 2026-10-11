@@ -49,13 +49,35 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
             icon: L.divIcon({
               className: '',
               html: `
-                <div style="display:inline-flex;align-items:center;gap:5px;background:${color};color:white;padding:4px 9px;border-radius:9999px;border:2px solid white;box-shadow:0 4px 10px rgba(0,0,0,0.35);font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer;">
-                  <span style="font-size:13px;">🚐</span>
-                  <span>Posádka ${index + 1}</span>
-                  <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isRecent ? '#4ade80' : '#f59e0b'};box-shadow:0 0 6px ${isRecent ? '#4ade80' : '#f59e0b'};"></span>
+                <div style="
+                  position: relative;
+                  width: 30px;
+                  height: 30px;
+                  border-radius: 50%;
+                  background: ${color};
+                  border: 2px solid white;
+                  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 14px;
+                  cursor: pointer;
+                ">
+                  🚐
+                  <span style="
+                    position: absolute;
+                    top: -2px;
+                    right: -2px;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: ${isRecent ? '#22c55e' : '#f59e0b'};
+                    border: 1.5px solid white;
+                    box-shadow: 0 0 4px ${isRecent ? '#22c55e' : '#f59e0b'};
+                  "></span>
                 </div>
               `,
-              iconAnchor: [50, 15],
+              iconAnchor: [15, 15],
             }),
           });
 
