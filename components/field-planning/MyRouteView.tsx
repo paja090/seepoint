@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import type { MyRouteDTO } from '@/lib/field-planning/execution';
+import { fieldProblemTypes, type MyRouteDTO } from '@/lib/field-planning/execution';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
   Navigation,
@@ -118,6 +118,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       {/* Route Cards */}
       {data.routes.map((route) => {
         const doneCount = route.stops.filter((s) => s.status === 'DONE').length;
+        const issueCount = route.stops.filter((s) => s.status === 'ISSUE').length;
         const totalCount = route.stops.length;
 
         return (
@@ -128,9 +129,17 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 <Car size={15} className="text-sky-600" />
                 <span>{route.vehicleName ?? 'Výjezd bez vozidla'}</span>
               </div>
-              <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] shadow-sm font-extrabold text-slate-800">
-                {doneCount} / {totalCount} hotovo
-              </span>
+              <div className="flex items-center gap-2">
+                {issueCount > 0 && (
+                  <span className="rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[11px] font-extrabold text-rose-700 shadow-sm flex items-center gap-1">
+                    <AlertTriangle size={12} className="text-rose-600" />
+                    <span>{issueCount} {issueCount === 1 ? 'problém' : issueCount < 5 ? 'problémy' : 'problémů'}</span>
+                  </span>
+                )}
+                <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] shadow-sm font-extrabold text-slate-800">
+                  {doneCount} / {totalCount} hotovo
+                </span>
+              </div>
             </div>
 
             {/* LIVE MAP */}
@@ -162,6 +171,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
             {route.stops.map((s, i) => {
               const isDone = s.status === 'DONE';
               const isInProgress = s.status === 'IN_PROGRESS';
+              const isIssue = s.status === 'ISSUE';
               const timeString = new Date(s.startAt).toLocaleTimeString('cs-CZ', {
                 timeZone: data.timezone,
                 hour: '2-digit',
@@ -175,6 +185,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   className={`rounded-3xl border p-5 shadow-sm space-y-3 transition ${
                     isDone
                       ? 'border-emerald-200 bg-emerald-50/20'
+                      : isIssue
+                      ? 'border-rose-300 bg-rose-50/30 ring-2 ring-rose-500/20'
                       : isInProgress
                       ? 'border-sky-300 bg-sky-50/30 ring-2 ring-sky-500/20'
                       : 'border-slate-200 bg-white'
@@ -187,16 +199,18 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-xs font-black ${
                           isDone
                             ? 'bg-emerald-600 text-white'
+                            : isIssue
+                            ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400/50'
                             : isInProgress
                             ? 'bg-sky-600 text-white animate-pulse'
                             : 'bg-slate-900 text-white'
                         }`}
                       >
-                        {isDone ? '✓' : i + 1}
+                        {isDone ? '✓' : isIssue ? '!' : i + 1}
                       </div>
 
                       <div>
-                        <h2 className="font-extrabold text-sm sm:text-base text-slate-950 leading-tight">
+                        <h2 className={`font-extrabold text-sm sm:text-base leading-tight ${isIssue ? 'text-rose-950' : 'text-slate-950'}`}>
                           {s.title}
                         </h2>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
@@ -205,9 +219,17 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                       </div>
                     </div>
 
-                    <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-1 rounded-xl shrink-0">
-                      {timeString}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isIssue && (
+                        <span className="text-[11px] font-black text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-xl flex items-center gap-1 shadow-xs">
+                          <AlertTriangle size={12} />
+                          <span>Hlášen problém</span>
+                        </span>
+                      )}
+                      <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-1 rounded-xl">
+                        {timeString}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Address */}
@@ -223,6 +245,19 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         Instrukce k montáži:
                       </span>
                       <p className="whitespace-pre-wrap">{s.instructions}</p>
+                    </div>
+                  )}
+
+                  {/* Issue details box */}
+                  {(isIssue || s.issueType || s.issueNote) && (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-3.5 text-xs text-rose-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-rose-800 uppercase tracking-wider text-[10px]">
+                        <AlertTriangle size={13} className="text-rose-600" />
+                        <span>{s.issueType || 'Hlášený problém na místě'}</span>
+                      </div>
+                      {s.issueNote && (
+                        <p className="whitespace-pre-wrap text-rose-800 font-medium pl-4">{s.issueNote}</p>
+                      )}
                     </div>
                   )}
 
@@ -249,11 +284,13 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-bold transition shadow-sm ${
                           isInProgress
                             ? 'bg-emerald-700 text-white hover:bg-emerald-600'
+                            : isIssue
+                            ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
                             : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
                         }`}
                       >
                         <Clock size={14} />
-                        <span>{isInProgress ? 'Označit za hotové ✓' : 'Zahájit práci'}</span>
+                        <span>{isInProgress ? 'Označit za hotové ✓' : isIssue ? 'Zkusit znovu / Zahájit' : 'Zahájit práci'}</span>
                       </button>
                     )}
 
@@ -278,10 +315,12 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         onClick={() =>
                           setActiveProblemModalStopId(activeProblemModalStopId === s.jobId ? null : s.jobId)
                         }
-                        className="flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-xs font-bold text-amber-700 hover:bg-amber-50 transition ml-auto"
+                        className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-xs font-bold transition ml-auto ${
+                          isIssue ? 'text-rose-700 bg-rose-100 hover:bg-rose-200 border border-rose-200' : 'text-amber-700 hover:bg-amber-50'
+                        }`}
                       >
                         <AlertTriangle size={14} />
-                        <span>Problém?</span>
+                        <span>{isIssue ? 'Upravit problém' : 'Problém?'}</span>
                       </button>
                     )}
                   </div>
@@ -346,7 +385,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
                           <AlertTriangle size={14} />
-                          <span>Nahlásit zádrhel na místě</span>
+                          <span>{isIssue ? 'Upravit zádrhel na místě' : 'Nahlásit zádrhel na místě'}</span>
                         </h4>
                         <button
                           type="button"
@@ -361,13 +400,10 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
 
                       <div>
                         <label className="text-xs font-bold text-slate-700 block">Důvod zádrhelu</label>
-                        <select name="type" className="input mt-1 w-full text-xs font-semibold">
-                          <option>Technický problém</option>
-                          <option>Nosič zarostlý / nepřístupný</option>
-                          <option>Nemožnost instalace (počasí / překážka)</option>
-                          <option>Poškození konstrukce</option>
-                          <option>Chybějící materiál nebo klíč</option>
-                          <option>Jiné</option>
+                        <select name="type" defaultValue={s.issueType ?? fieldProblemTypes[0]} className="input mt-1 w-full text-xs font-semibold">
+                          {fieldProblemTypes.map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
                         </select>
                       </div>
 
@@ -377,6 +413,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                           name="note"
                           rows={2}
                           required
+                          defaultValue={s.issueNote ?? ''}
                           placeholder="Popište situaci pro dispečera…"
                           className="input mt-1 w-full text-xs font-medium"
                         />
@@ -384,9 +421,11 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
 
                       <button
                         disabled={busy}
-                        className="w-full rounded-xl bg-amber-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition"
+                        className={`w-full rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition ${
+                          isIssue ? 'bg-rose-700 hover:bg-rose-600' : 'bg-amber-700 hover:bg-amber-600'
+                        }`}
                       >
-                        {busy ? 'Odesílám…' : 'Odeslat upozornění dispečerovi ⚠️'}
+                        {busy ? 'Odesílám…' : isIssue ? 'Aktualizovat upozornění dispečerovi ⚠️' : 'Odeslat upozornění dispečerovi ⚠️'}
                       </button>
                     </form>
                   )}

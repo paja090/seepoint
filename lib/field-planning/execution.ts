@@ -25,16 +25,22 @@ export async function myRoute(userId: string, now = new Date()) {
     for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
       const orders = await prisma.workOrder.findMany({ where: { organizationId, id: { in: crew.stops.map(s => s.workOrderId) }, workTasks: { some: { organizationId, assignedToEmployeeId: employee.id } } },
         select: { id: true, title: true, description: true, clientName: true, status: true, workType: true, navigationOrderId: true,
+          crmRealizations: { where: { organizationId }, select: { id: true, claimNote: true, status: true } },
           workTasks: { where: { organizationId, assignedToEmployeeId: employee.id }, select: { id: true } },
           items: { where: { organizationId }, include: { crmRealization: true, photos: { where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } }, carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } }, surface: { include: { carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } } } } } } } });
       const points = navigation ? await prisma.navigationPoint.findMany({ where: { organizationId, id: { in: crew.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) } },
-        select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
+        select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, issueType: true, issueNote: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
       const electionPoints = await prisma.electionRemovalPoint.findMany({
         where: { organizationId, id: { in: crew.stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) } },
-        select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true }
+        select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true, issueType: true, issueNote: true }
       });
       const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
+      const orderLogs = await prisma.crmAuditLog.findMany({
+        where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } },
+        orderBy: { createdAt: 'desc' },
+        select: { entityId: true, action: true, detailsJson: true }
+      });
       const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
       const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
       routes.push({ planId: plan.id, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
@@ -42,12 +48,54 @@ export async function myRoute(userId: string, now = new Date()) {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
             if (!ep) return [];
-            return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: ep.id, address: null, pointPhotoUrl: null, workOrderId: '', title: ep.label, clientName: 'Svoz voleb', instructions: ep.description || `Demontáž (${ep.mediaType})`, status: ['COMPLETED', 'ISSUE'].includes(ep.status) ? 'DONE' : ep.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
+            return [{
+              jobId: stopId(s),
+              workOrderItemId: null,
+              navigationPointId: null,
+              electionRemovalPointId: ep.id,
+              address: null,
+              pointPhotoUrl: null,
+              workOrderId: '',
+              title: ep.label,
+              clientName: 'Svoz voleb',
+              instructions: ep.description || `Demontáž (${ep.mediaType})`,
+              status: ep.status === 'COMPLETED' ? 'DONE' : ep.status === 'ISSUE' ? 'ISSUE' : ep.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED',
+              issueType: ep.status === 'ISSUE' ? ep.issueType : null,
+              issueNote: ep.status === 'ISSUE' ? ep.issueNote : null,
+              workType: s.workType,
+              startAt: s.startAt,
+              endAt: s.endAt,
+              location: s.location,
+              taskId: null,
+              navigationOrderId: null,
+              carrier: null
+            }];
           }
           if (s.isWarehousePitstop) {
             const isCompleted = pitstopCompletions.some(c => c.entityId === stopId(s));
             const isStarted = pitstopStarts.some(c => c.entityId === stopId(s));
-            return [{ jobId: stopId(s), workOrderItemId: null, navigationPointId: null, electionRemovalPointId: null, address: null, pointPhotoUrl: null, workOrderId: '', title: s.title, clientName: 'Sklad', instructions: '', status: isCompleted ? 'DONE' : isStarted ? 'IN_PROGRESS' : 'PLANNED', workType: s.workType, startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: null, navigationOrderId: null, carrier: null }];
+            return [{
+              jobId: stopId(s),
+              workOrderItemId: null,
+              navigationPointId: null,
+              electionRemovalPointId: null,
+              address: null,
+              pointPhotoUrl: null,
+              workOrderId: '',
+              title: s.title,
+              clientName: 'Sklad',
+              instructions: '',
+              status: isCompleted ? 'DONE' : isStarted ? 'IN_PROGRESS' : 'PLANNED',
+              issueType: null,
+              issueNote: null,
+              workType: s.workType,
+              startAt: s.startAt,
+              endAt: s.endAt,
+              location: s.location,
+              taskId: null,
+              navigationOrderId: null,
+              carrier: null
+            }];
           }
           const order = orders.find(o => o.id === s.workOrderId); if (s.workOrderId && !order) return [];
           if (s.navigationPointId && !navigation) return [];
@@ -59,17 +107,97 @@ export async function myRoute(userId: string, now = new Date()) {
           if (!point && !order) return [];
           const carrier = item ? item.carrier ?? item.surface?.carrier : order?.items.find(i => i.carrier?.organizationId === organizationId)?.carrier;
           if (carrier && carrier.organizationId !== organizationId) return [];
-          return [{ jobId: stopId(s), workOrderItemId: item?.id ?? null, navigationPointId: point?.id ?? null, address: point?.address ?? null, pointPhotoUrl: item?.photos[0] ? `/api/photos/${item.photos[0].id}/file` : point?.installedPhotoId || point?.sitePhotoId ? `/api/photos/${point.installedPhotoId ?? point.sitePhotoId}/file` : null, workOrderId: order?.id ?? '', title: point?.label ?? (item ? s.title : order!.title), clientName: order?.clientName ?? s.clientName ?? null, instructions: point ? point.clientNote : item?.description ?? order!.description, status: point ? !point.isSelectedByClient || ['CANCELLED', 'REMOVED'].includes(point.status) ? 'CANCELLED' : point.status === 'INSTALLED' ? 'DONE' : starts.some(a => a.entityId === point.id) ? 'IN_PROGRESS' : 'PLANNED' : item ? itemStatus(item) : order!.status, workType: s.workType,
-            startAt: s.startAt, endAt: s.endAt, location: s.location, taskId: order?.workTasks[0]?.id ?? null,
+
+          const isItemIssue = Boolean(item?.issueNote || item?.crmRealization?.claimNote || item?.crmRealization?.status === 'CLAIM');
+          const isPointIssue = Boolean(point?.issueReported);
+          const latestOrderIssue = order ? orderLogs.find(l => l.entityId === order.id) : null;
+          const orderClaim = order?.crmRealizations.find(r => r.claimNote || r.status === 'CLAIM');
+          const isOrderIssue = Boolean(order && !item && !point && (orderClaim || latestOrderIssue?.action === 'FIELD_EXECUTION_BLOCKED'));
+
+          const stopStatus = point
+            ? !point.isSelectedByClient || ['CANCELLED', 'REMOVED'].includes(point.status)
+              ? 'CANCELLED'
+              : isPointIssue
+              ? 'ISSUE'
+              : point.status === 'INSTALLED'
+              ? 'DONE'
+              : starts.some(a => a.entityId === point.id)
+              ? 'IN_PROGRESS'
+              : 'PLANNED'
+            : item
+            ? isItemIssue
+              ? 'ISSUE'
+              : itemStatus(item)
+            : isOrderIssue
+            ? 'ISSUE'
+            : order!.status;
+
+          let stopIssueType: string | null = null;
+          let stopIssueNote: string | null = null;
+
+          if (isPointIssue) {
+            stopIssueType = point?.issueType ?? 'Provozní zádrhel';
+            stopIssueNote = point?.issueNote ?? null;
+          } else if (isItemIssue) {
+            stopIssueType = 'Reklamace / Problém';
+            stopIssueNote = item?.crmRealization?.claimNote ?? item?.issueNote ?? null;
+          } else if (isOrderIssue) {
+            if (latestOrderIssue?.detailsJson) {
+              try {
+                const parsed = JSON.parse(latestOrderIssue.detailsJson);
+                stopIssueType = parsed.problemType ?? 'Problém na zakázce';
+                stopIssueNote = parsed.note ?? null;
+              } catch {
+                stopIssueType = 'Problém na zakázce';
+              }
+            } else if (orderClaim?.claimNote) {
+              stopIssueType = 'Reklamace / Problém';
+              stopIssueNote = orderClaim.claimNote;
+            } else {
+              stopIssueType = 'Problém na zakázce';
+            }
+          }
+
+          return [{
+            jobId: stopId(s),
+            workOrderItemId: item?.id ?? null,
+            navigationPointId: point?.id ?? null,
+            electionRemovalPointId: null,
+            address: point?.address ?? null,
+            pointPhotoUrl: item?.photos[0] ? `/api/photos/${item.photos[0].id}/file` : point?.installedPhotoId || point?.sitePhotoId ? `/api/photos/${point.installedPhotoId ?? point.sitePhotoId}/file` : null,
+            workOrderId: order?.id ?? '',
+            title: point?.label ?? (item ? s.title : order!.title),
+            clientName: order?.clientName ?? s.clientName ?? null,
+            instructions: point ? point.clientNote : item?.description ?? order!.description,
+            status: stopStatus,
+            issueType: stopIssueType,
+            issueNote: stopIssueNote,
+            workType: s.workType,
+            startAt: s.startAt,
+            endAt: s.endAt,
+            location: s.location,
+            taskId: order?.workTasks[0]?.id ?? null,
             navigationOrderId: point?.navigationOrderId ?? order?.navigationOrderId ?? null,
-            carrier: carrier ? { id: carrier.id, name: carrier.name, code: carrier.code, city: carrier.city, address: carrier.address, photoUrl: carrier.photos[0] ? `/api/photos/${carrier.photos[0].id}/file` : null } : null }];
+            carrier: carrier ? { id: carrier.id, name: carrier.name, code: carrier.code, city: carrier.city, address: carrier.address, photoUrl: carrier.photos[0] ? `/api/photos/${carrier.photos[0].id}/file` : null } : null
+          }];
         }) });
     }
   }
   return { timezone: profile.timezone, routes: routes.filter(r => r.stops.length) };
 }
 export type MyRouteDTO = Awaited<ReturnType<typeof myRoute>>;
-export const fieldProblemTypes = ['Technický problém', 'Nedostupný nosič', 'Nemožnost instalace', 'Poškození', 'Chybějící materiál', 'Jiné'] as const;
+export const fieldProblemTypes = [
+  'Technický problém',
+  'Nedostupný nosič',
+  'Nosič zarostlý / nepřístupný',
+  'Nemožnost instalace',
+  'Nemožnost instalace (počasí / překážka)',
+  'Poškození',
+  'Poškození konstrukce',
+  'Chybějící materiál',
+  'Chybějící materiál nebo klíč',
+  'Jiné'
+] as const;
 
 /** Authenticated worker operations over canonical work; no billing/FTD/payroll state is inferred. */
 export async function executeStop(input: { planId: string; workOrderId: string; jobId?: string; action: string; problemType?: string; note?: string; requestKey?: string }, actor: PlannerActor, db = prisma, installationPhotos?: StoredInstallationPhoto[]) {
