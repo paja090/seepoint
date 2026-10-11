@@ -106,3 +106,34 @@ test('Field Planning AI Telemetry: Aggregates real observations and calculates c
   assert.ok(report.aiSummary.length > 50);
   assert.ok(report.aiSummary.includes('efektivita') || report.aiSummary.includes('minut'));
 });
+
+test('Field Planning AI Telemetry: Supports SeePoint custom activities and reports ignored fast tasks', () => {
+  const customActivities = [
+    { key: 'CUSTOM_TEST_ACTIVITY', label: 'Vlastní polep dodávky', defaultMinutes: 40, category: 'Vlastní činnosti' }
+  ];
+  const observations: RawFieldObservation[] = [
+    { workType: 'CUSTOM_TEST_ACTIVITY', plannedMinutes: 40, actualMinutes: 35 },
+    { workType: 'BENCH_INSTALLATION', plannedMinutes: 15, actualMinutes: 12 },
+  ];
+
+  const report = aggregateFieldObservations(
+    observations,
+    { CUSTOM_TEST_ACTIVITY: 40, BENCH_INSTALLATION: 15 },
+    'test-org',
+    customActivities,
+    3 // 3 tasks ignored because duration was < 1 minute
+  );
+
+  assert.equal(report.ignoredTooFastCount, 3);
+  const customAgg = report.aggregates.find((a) => a.workType === 'CUSTOM_TEST_ACTIVITY');
+  assert.ok(customAgg);
+  assert.equal(customAgg.workTypeLabel, 'Vlastní polep dodávky');
+  assert.equal(customAgg.isCustom, true);
+  assert.equal(customAgg.completedCount, 1);
+
+  const benchAgg = report.aggregates.find((a) => a.workType === 'BENCH_INSTALLATION');
+  assert.ok(benchAgg);
+  assert.equal(benchAgg.workTypeLabel, 'Instalace lavičky');
+  assert.equal(benchAgg.category, 'Lavičky');
+});
+

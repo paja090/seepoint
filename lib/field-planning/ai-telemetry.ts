@@ -3,23 +3,47 @@ import { getTenantContext, requireTenantContext, runWithTenantContext } from '@/
 import { loadProfile } from './data';
 import { parseProfile } from './profile';
 import { auditPlan, type PlannerActor, requirePlannerManager } from './service';
-import type { PlanningProfile } from './contracts';
+import type { CustomPlanningActivity, PlanningProfile } from './contracts';
 
-export const WORK_TYPE_LABELS: Record<string, string> = {
-  INSTALLATION: 'Montáž nosičů a instalace ploch',
-  REINSTALLATION: 'Přemontáž a výměna plochy',
-  DEINSTALLATION: 'Demontáž konstrukcí a nosičů',
-  REPAIR: 'Oprava a servis nosičů',
-  CHECK: 'Kontrola a pasportizace',
-  TRANSPORT: 'Doprava materiálu na stavbu',
-  NAVIGATION_INSTALLATION: 'Instalace navigačních cedulí',
-  ELECTION_REMOVAL: 'Přesuny, svozy a deinstalace',
-  OTHER: 'Ostatní terénní práce',
+export const DEFAULT_SEEPOINT_ACTIVITIES: Record<
+  string,
+  { label: string; defaultMinutes: number; category: string }
+> = {
+  BENCH_INSTALLATION: { label: 'Instalace lavičky', defaultMinutes: 15, category: 'Lavičky' },
+  BENCH_DEINSTALLATION: { label: 'Deinstalace lavičky', defaultMinutes: 10, category: 'Lavičky' },
+  HORIZON_INSTALLATION: { label: 'Instalace horizontu', defaultMinutes: 20, category: 'Horizonty' },
+  HORIZON_DEINSTALLATION: { label: 'Deinstalace horizontu', defaultMinutes: 15, category: 'Horizonty' },
+  TOWER_INSTALLATION: { label: 'Instalace velké věže (Tower)', defaultMinutes: 45, category: 'Věže' },
+  TOWER_DEINSTALLATION: { label: 'Deinstalace velké věže', defaultMinutes: 30, category: 'Věže' },
+  NAVIGATION_INSTALLATION: { label: 'Instalace navigačních cedulí', defaultMinutes: 15, category: 'Navigace' },
+  NAVIGATION_DEINSTALLATION: { label: 'Deinstalace navigačních cedulí', defaultMinutes: 10, category: 'Navigace' },
+  BILLBOARD_POSTING: { label: 'Lepení billboardu', defaultMinutes: 30, category: 'Billboardy' },
+  BILLBOARD_DEINSTALLATION: { label: 'Deinstalace billboardu', defaultMinutes: 15, category: 'Billboardy' },
+  ABOARD_INSTALLATION: { label: 'Instalace reklamního áčka / stojanu', defaultMinutes: 10, category: 'Áčka & Stojany' },
+  ABOARD_DEINSTALLATION: { label: 'Deinstalace reklamního áčka / stojanu', defaultMinutes: 5, category: 'Áčka & Stojany' },
+  CITYGALLERY_INSTALLATION: { label: 'Instalace CityGallery / CLV', defaultMinutes: 25, category: 'CityGallery' },
+  CITYGALLERY_DEINSTALLATION: { label: 'Deinstalace CityGallery', defaultMinutes: 15, category: 'CityGallery' },
+  ELECTION_BOARD_REMOVAL: { label: 'Svoz volebních desek a sololitů', defaultMinutes: 6, category: 'Svozy voleb' },
+  ELECTION_BANNER_REMOVAL: { label: 'Svoz volebních bannerů (plachet)', defaultMinutes: 12, category: 'Svozy voleb' },
+  ELECTION_REMOVAL: { label: 'Přesuny, svozy a deinstalace (obecné)', defaultMinutes: 7, category: 'Svozy voleb' },
+  INSTALLATION: { label: 'Montáž nosičů a instalace ploch', defaultMinutes: 30, category: 'Obecné' },
+  DEINSTALLATION: { label: 'Demontáž konstrukcí a nosičů', defaultMinutes: 20, category: 'Obecné' },
+  REINSTALLATION: { label: 'Přemontáž a výměna plochy', defaultMinutes: 25, category: 'Obecné' },
+  TRANSPORT: { label: 'Doprava materiálu na stavbu', defaultMinutes: 60, category: 'Logistika' },
+  CHECK: { label: 'Kontrola a pasportizace', defaultMinutes: 20, category: 'Servis & Pasport' },
+  REPAIR: { label: 'Oprava a servis nosičů', defaultMinutes: 30, category: 'Servis & Pasport' },
+  OTHER: { label: 'Ostatní terénní práce', defaultMinutes: 15, category: 'Ostatní' },
 };
+
+export const WORK_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(DEFAULT_SEEPOINT_ACTIVITIES).map(([k, v]) => [k, v.label])
+);
 
 export interface WorkTypeTelemetryAggregate {
   workType: string;
   workTypeLabel: string;
+  category?: string;
+  isCustom?: boolean;
   completedCount: number;
   plannedMinutesAvg: number;
   actualMinutesAvg: number;
@@ -37,6 +61,7 @@ export interface OrganizationFieldTelemetryReport {
   totalActualMinutes: number;
   totalDiffMinutes: number;
   overallEfficiencyPercent: number;
+  ignoredTooFastCount: number;
   aggregates: WorkTypeTelemetryAggregate[];
   aiSummary: string;
   recommendedCalibration: Record<string, number>;
@@ -73,12 +98,14 @@ export function roundToSensibleMinutes(minutes: number): number {
 export function aggregateFieldObservations(
   observations: RawFieldObservation[],
   currentServiceMinutes: Record<string, number>,
-  organizationId = 'default-org'
+  organizationId = 'default-org',
+  customActivities: CustomPlanningActivity[] = [],
+  ignoredTooFastCount = 0
 ): OrganizationFieldTelemetryReport {
   const observationsByWorkType = new Map<string, Array<{ planned: number; actual: number }>>();
 
   for (const obs of observations) {
-    if (obs.actualMinutes < 2 || obs.actualMinutes > 480) continue;
+    if (obs.actualMinutes < 1 || obs.actualMinutes > 480) continue;
     if (!observationsByWorkType.has(obs.workType)) {
       observationsByWorkType.set(obs.workType, []);
     }
@@ -88,9 +115,17 @@ export function aggregateFieldObservations(
     });
   }
 
+  // Combine standard activities with custom activities
+  const allLabels: Record<string, { label: string; category?: string; isCustom?: boolean }> = {};
+  for (const [k, v] of Object.entries(DEFAULT_SEEPOINT_ACTIVITIES)) {
+    allLabels[k] = { label: v.label, category: v.category, isCustom: false };
+  }
+  for (const ca of customActivities) {
+    allLabels[ca.key] = { label: ca.label, category: ca.category || 'Vlastní činnosti', isCustom: true };
+  }
+
   // Ensure standard work types appear even if no telemetry is yet measured
-  const allKnownWorkTypes = Object.keys(WORK_TYPE_LABELS);
-  for (const wt of allKnownWorkTypes) {
+  for (const wt of Object.keys(allLabels)) {
     if (!observationsByWorkType.has(wt)) {
       observationsByWorkType.set(wt, []);
     }
@@ -104,13 +139,17 @@ export function aggregateFieldObservations(
   let totalMeasuredCount = 0;
 
   for (const [workType, items] of observationsByWorkType.entries()) {
-    const currentNorm = currentServiceMinutes[workType] ?? 30;
+    const meta = allLabels[workType] || { label: workType, category: 'Ostatní', isCustom: false };
+    const defaultFromDef = DEFAULT_SEEPOINT_ACTIVITIES[workType]?.defaultMinutes ?? 20;
+    const currentNorm = currentServiceMinutes[workType] ?? defaultFromDef;
 
     if (items.length === 0) {
       recommendedCalibration[workType] = currentNorm;
       aggregates.push({
         workType,
-        workTypeLabel: WORK_TYPE_LABELS[workType] || workType,
+        workTypeLabel: meta.label,
+        category: meta.category,
+        isCustom: meta.isCustom,
         completedCount: 0,
         plannedMinutesAvg: currentNorm,
         actualMinutesAvg: currentNorm,
@@ -157,7 +196,9 @@ export function aggregateFieldObservations(
 
     aggregates.push({
       workType,
-      workTypeLabel: WORK_TYPE_LABELS[workType] || workType,
+      workTypeLabel: meta.label,
+      category: meta.category,
+      isCustom: meta.isCustom,
       completedCount: items.length,
       plannedMinutesAvg: avgPlanned,
       actualMinutesAvg: avgActual,
@@ -226,6 +267,7 @@ export function aggregateFieldObservations(
     totalActualMinutes,
     totalDiffMinutes: totalDiff,
     overallEfficiencyPercent,
+    ignoredTooFastCount,
     aggregates,
     aiSummary,
     recommendedCalibration,
@@ -251,19 +293,15 @@ export async function analyzeOrganizationFieldTelemetry(
       } catch {
         profile = null;
       }
-      const currentServiceMinutes = profile?.serviceMinutes ?? {
-        INSTALLATION: 45,
-        REINSTALLATION: 45,
-        DEINSTALLATION: 30,
-        REPAIR: 45,
-        CHECK: 20,
-        TRANSPORT: 60,
-        NAVIGATION_INSTALLATION: 30,
-        ELECTION_REMOVAL: 10,
-        OTHER: 30,
+      const currentServiceMinutes: Record<string, number> = {
+        ...Object.fromEntries(
+          Object.entries(DEFAULT_SEEPOINT_ACTIVITIES).map(([k, v]) => [k, v.defaultMinutes])
+        ),
+        ...(profile?.serviceMinutes ?? {}),
       };
 
       const rawObservations: RawFieldObservation[] = [];
+      let ignoredTooFastCount = 0;
 
       try {
         // 1. Gather completed ElectionRemovalPoint records with timestamps
@@ -276,6 +314,7 @@ export async function analyzeOrganizationFieldTelemetry(
           },
           select: {
             id: true,
+            mediaType: true,
             serviceMinutes: true,
             startedAt: true,
             completedAt: true,
@@ -285,9 +324,27 @@ export async function analyzeOrganizationFieldTelemetry(
         for (const ep of electionPoints) {
           if (ep.startedAt && ep.completedAt) {
             const diffMs = new Date(ep.completedAt).getTime() - new Date(ep.startedAt).getTime();
+            if (diffMs < 60000) {
+              ignoredTooFastCount++;
+              continue; // Ignored if under 1 minute (forgot to click Zahájit)
+            }
             const actual = Math.max(1, Math.round(diffMs / 60000));
-            const planned = ep.serviceMinutes || currentServiceMinutes.ELECTION_REMOVAL || 10;
-            rawObservations.push({ workType: 'ELECTION_REMOVAL', plannedMinutes: planned, actualMinutes: actual });
+            let specificWorkType = 'ELECTION_REMOVAL';
+            if (ep.mediaType === 'BANNER') {
+              specificWorkType = 'ELECTION_BANNER_REMOVAL';
+            } else if (ep.mediaType === 'ACKO') {
+              specificWorkType = 'ABOARD_DEINSTALLATION';
+            } else if (ep.mediaType === 'BENCH') {
+              specificWorkType = 'BENCH_DEINSTALLATION';
+            } else if (ep.mediaType === 'TOWER' || ep.mediaType === 'MINI_TOWER') {
+              specificWorkType = 'TOWER_DEINSTALLATION';
+            } else if (ep.mediaType === 'CITY_POSTER') {
+              specificWorkType = 'CITYGALLERY_DEINSTALLATION';
+            } else if (ep.mediaType === 'PLOT') {
+              specificWorkType = 'ELECTION_BOARD_REMOVAL';
+            }
+            const planned = ep.serviceMinutes || currentServiceMinutes[specificWorkType] || 6;
+            rawObservations.push({ workType: specificWorkType, plannedMinutes: planned, actualMinutes: actual });
           }
         }
 
@@ -317,6 +374,10 @@ export async function analyzeOrganizationFieldTelemetry(
           let actualMins: number | null = null;
           if (we.timeFrom && we.timeTo) {
             const diffMs = new Date(we.timeTo).getTime() - new Date(we.timeFrom).getTime();
+            if (diffMs < 60000) {
+              ignoredTooFastCount++;
+              continue;
+            }
             actualMins = Math.max(1, Math.round(diffMs / 60000));
           } else if (we.unit === 'hod' || we.unit === 'h') {
             const hours = Number(we.quantity);
@@ -327,7 +388,7 @@ export async function analyzeOrganizationFieldTelemetry(
 
           if (actualMins !== null) {
             const workTypeStr = String(we.workType);
-            const planned = currentServiceMinutes[workTypeStr] ?? 45;
+            const planned = currentServiceMinutes[workTypeStr] ?? 30;
             rawObservations.push({ workType: workTypeStr, plannedMinutes: planned, actualMinutes: actualMins });
           }
         }
@@ -365,20 +426,143 @@ export async function analyzeOrganizationFieldTelemetry(
           ) {
             const start = entityStarts.get(log.entityId)!;
             const diffMs = log.createdAt.getTime() - start.getTime();
+            entityStarts.delete(log.entityId);
+            if (diffMs < 60000) {
+              ignoredTooFastCount++;
+              continue; // Ignored if under 1 minute (forgot to click Zahájit)
+            }
             const mins = Math.max(1, Math.round(diffMs / 60000));
-            if (mins >= 2 && mins <= 480) {
+            if (mins >= 1 && mins <= 480) {
               const actionType = log.action.includes('POINT') ? 'NAVIGATION_INSTALLATION' : 'INSTALLATION';
-              const planned = currentServiceMinutes[actionType] ?? 30;
+              const planned = currentServiceMinutes[actionType] ?? 15;
               rawObservations.push({ workType: actionType, plannedMinutes: planned, actualMinutes: mins });
             }
-            entityStarts.delete(log.entityId);
           }
         }
       } catch {
         // Fallback gracefully if database is unreachable (e.g. in tests)
       }
 
-      return aggregateFieldObservations(rawObservations, currentServiceMinutes, organizationId);
+      return aggregateFieldObservations(
+        rawObservations,
+        currentServiceMinutes,
+        organizationId,
+        profile?.customActivities ?? [],
+        ignoredTooFastCount
+      );
+    }
+  );
+}
+
+/**
+ * Adds a custom activity to the organization's planning profile.
+ */
+export async function addCustomActivityToProfile(
+  activity: { label: string; defaultMinutes: number; category?: string },
+  actor: PlannerActor,
+  explicitOrgId?: string
+): Promise<PlanningProfile> {
+  requirePlannerManager(actor);
+  const currentCtx = getTenantContext();
+  const organizationId = explicitOrgId || currentCtx?.organizationId || requireTenantContext().organizationId;
+
+  return runWithTenantContext(
+    { organizationId, source: 'session', userId: actor.id },
+    async () => {
+      const row = await prisma.organizationFieldPlanningProfile.findUnique({ where: { organizationId } });
+      if (!row) throw new Error('Profil plánování organizace nebyl nalezen.');
+      const profile = parseProfile(row.configuration);
+      const cleanKey =
+        'CUSTOM_' +
+        activity.label
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^A-Z0-9]/g, '_')
+          .slice(0, 24) +
+        '_' +
+        Date.now().toString(36);
+
+      const newCustomActivities: CustomPlanningActivity[] = [
+        ...(profile.customActivities ?? []),
+        {
+          key: cleanKey,
+          label: activity.label,
+          defaultMinutes: activity.defaultMinutes,
+          category: activity.category || 'Vlastní činnosti',
+        },
+      ];
+      const updatedServiceMinutes = {
+        ...profile.serviceMinutes,
+        [cleanKey]: activity.defaultMinutes,
+      };
+      const updatedProfile: PlanningProfile = {
+        ...profile,
+        serviceMinutes: updatedServiceMinutes,
+        customActivities: newCustomActivities,
+      };
+      await prisma.organizationFieldPlanningProfile.update({
+        where: { organizationId },
+        data: { configuration: JSON.parse(JSON.stringify(updatedProfile)) },
+      });
+      await prisma.crmAuditLog.create({
+        data: {
+          organizationId,
+          entityType: 'FieldPlanProfile',
+          entityId: row.id,
+          userId: actor.id,
+          userEmail: actor.email,
+          action: 'FIELD_CUSTOM_ACTIVITY_ADDED',
+          detailsJson: JSON.stringify({ key: cleanKey, label: activity.label, defaultMinutes: activity.defaultMinutes }),
+        },
+      });
+      return updatedProfile;
+    }
+  );
+}
+
+/**
+ * Removes a custom activity from the organization's planning profile.
+ */
+export async function deleteCustomActivityFromProfile(
+  key: string,
+  actor: PlannerActor,
+  explicitOrgId?: string
+): Promise<PlanningProfile> {
+  requirePlannerManager(actor);
+  const currentCtx = getTenantContext();
+  const organizationId = explicitOrgId || currentCtx?.organizationId || requireTenantContext().organizationId;
+
+  return runWithTenantContext(
+    { organizationId, source: 'session', userId: actor.id },
+    async () => {
+      const row = await prisma.organizationFieldPlanningProfile.findUnique({ where: { organizationId } });
+      if (!row) throw new Error('Profil plánování organizace nebyl nalezen.');
+      const profile = parseProfile(row.configuration);
+      const newCustomActivities = (profile.customActivities ?? []).filter((a) => a.key !== key);
+      const updatedServiceMinutes = { ...profile.serviceMinutes };
+      delete updatedServiceMinutes[key];
+      const updatedProfile: PlanningProfile = {
+        ...profile,
+        serviceMinutes: updatedServiceMinutes,
+        customActivities: newCustomActivities,
+      };
+      await prisma.organizationFieldPlanningProfile.update({
+        where: { organizationId },
+        data: { configuration: JSON.parse(JSON.stringify(updatedProfile)) },
+      });
+      await prisma.crmAuditLog.create({
+        data: {
+          organizationId,
+          entityType: 'FieldPlanProfile',
+          entityId: row.id,
+          userId: actor.id,
+          userEmail: actor.email,
+          action: 'FIELD_CUSTOM_ACTIVITY_DELETED',
+          detailsJson: JSON.stringify({ key }),
+        },
+      });
+      return updatedProfile;
     }
   );
 }

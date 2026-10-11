@@ -120,7 +120,17 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
               startedAt: ep.startedAt?.toISOString() ?? null,
               completedAt: ep.completedAt?.toISOString() ?? null,
-              actualDurationMinutes: ep.startedAt && ep.completedAt ? Math.max(1, Math.round((ep.completedAt.getTime() - ep.startedAt.getTime()) / 60000)) : null,
+              actualDurationMinutes: (() => {
+                if (!ep.startedAt || !ep.completedAt) return null;
+                const diffMs = ep.completedAt.getTime() - ep.startedAt.getTime();
+                if (diffMs < 60000) return null; // Ignored if under 1 minute (forgot to click Zahájit)
+                return Math.max(1, Math.round(diffMs / 60000));
+              })(),
+              isInstantCompletion: Boolean(
+                ep.startedAt &&
+                ep.completedAt &&
+                ep.completedAt.getTime() - ep.startedAt.getTime() < 60000
+              ),
             }];
           }
           if (s.isWarehousePitstop) {
