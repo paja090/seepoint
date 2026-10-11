@@ -75,7 +75,7 @@ test('hasModuleAccess respects RBAC and tenant module activation', () => {
     true
   );
 
-  // Enabled org + WORKER -> OK
+  // Enabled org + WORKER -> DENIED (Planning card hidden from workers; workers execute stops via /my-tasks and /my-route)
   assert.equal(
     hasModuleAccess({
       role: 'WORKER',
@@ -83,7 +83,7 @@ test('hasModuleAccess respects RBAC and tenant module activation', () => {
       organization: enabledOrg,
       membership: { organizationId: enabledOrg.id, isActive: true },
     }, 'electionRemoval'),
-    true
+    false
   );
 
   // Enabled org + VIEWER -> DENIED (RBAC)
@@ -135,3 +135,19 @@ test('getVisibleNavigation hides election-removal for unauthorized organizations
     'Standard tenant user must NOT see /election-removal in navigation'
   );
 });
+
+test('getVisibleNavigation hides election-removal planning card for WORKER even with module enabled', () => {
+  const workerUser = {
+    role: 'WORKER' as const,
+    organization: { plan: 'INTERNAL', enabledModules: { electionRemoval: true } },
+    membership: { role: 'WORKER', roles: [] },
+  };
+
+  const nav = getVisibleNavigation(workerUser);
+  const hrefs = nav.flatMap(h => h.groups.flatMap(g => g.items.map(i => i[0])));
+
+  assert.ok(!hrefs.includes('/election-removal'), 'Worker must NOT see /election-removal in navigation');
+  assert.ok(hrefs.includes('/my-tasks'), 'Worker must retain access to /my-tasks');
+  assert.ok(hrefs.includes('/work'), 'Worker must retain access to /work');
+});
+
