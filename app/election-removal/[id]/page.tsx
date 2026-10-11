@@ -4,6 +4,7 @@ import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { checkElectionRemovalPageAccess } from '@/lib/election-removal/guard';
 import { CampaignPointsView } from '@/components/election-removal/CampaignPointsView';
+import { CampaignCrewsManager } from '@/components/election-removal/CampaignCrewsManager';
 import {
   ArrowLeft,
   Calendar,
@@ -73,6 +74,74 @@ export default async function ElectionRemovalDetailPage({
   const distinctCrews = Array.from(
     new Set(campaign.points.map((p) => p.assignedCrewId).filter(Boolean) as string[])
   ).sort();
+
+  const [employees, vehicles] = await Promise.all([
+    prisma.employee.findMany({
+      where: { organizationId: user.organization!.id, isActive: true },
+      select: { id: true, firstName: true, lastName: true, role: true, position: true },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    }),
+    prisma.vehicle.findMany({
+      where: {
+        organizationId: user.organization!.id,
+        status: { notIn: ['SERVICE', 'OUT_OF_SERVICE'] },
+      },
+      select: { id: true, name: true, registrationNumber: true },
+      orderBy: { name: 'asc' },
+    }),
+  ]);
+
+  const employeeMap = new Map(
+    employees.map((e) => [e.id, `${e.firstName} ${e.lastName}`.trim()])
+  );
+  const vehicleMap = new Map(
+    vehicles.map((v) => [
+      v.id,
+      v.registrationNumber ? `${v.name} (${v.registrationNumber})` : v.name,
+    ])
+  );
+
+  const latestPlan = campaign.fieldPlans[campaign.fieldPlans.length - 1];
+  const latestSummary = latestPlan?.planningSummary as {
+    crews?: Array<{
+      id: string;
+      employeeIds?: string[];
+      names?: string[];
+      vehicleId?: string | null;
+      vehicleName?: string | null;
+    }>;
+  } | null;
+
+  const crewsData = distinctCrews.map((crewId) => {
+    const crewPoints = campaign.points.filter((p) => p.assignedCrewId === crewId);
+    const crewCompleted = crewPoints
+      .filter((p) => p.status === 'COMPLETED')
+      .reduce((sum, p) => sum + p.quantity, 0);
+    const crewTotal = crewPoints.reduce((sum, p) => sum + p.quantity, 0);
+
+    const plannedCrew = latestSummary?.crews?.find((c) => c.id === crewId);
+    const employeeIds = plannedCrew?.employeeIds || [];
+    const names =
+      plannedCrew?.names && plannedCrew.names.length > 0
+        ? plannedCrew.names
+        : employeeIds.map((id) => employeeMap.get(id) || id);
+
+    const vehicleId = plannedCrew?.vehicleId || null;
+    const vehicleName =
+      plannedCrew?.vehicleName ||
+      (vehicleId ? vehicleMap.get(vehicleId) || null : null);
+
+    return {
+      id: crewId,
+      name: crewId.replace('crew-', 'Posádka '),
+      employeeIds,
+      names,
+      vehicleId,
+      vehicleName,
+      totalPoints: crewTotal,
+      completedPoints: crewCompleted,
+    };
+  });
 
   const telemetryReport = analyzeCampaignTelemetry(campaign.points);
 
@@ -217,65 +286,18 @@ export default async function ElectionRemovalDetailPage({
 
         {/* Dispečink výjezdů pro posádky */}
         {distinctCrews.length > 0 && (
-          <div className="card p-5 space-y-3 bg-gradient-to-r from-sky-50/70 to-indigo-50/50 border border-sky-100">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Route className="w-4 h-4 text-sky-600" />
-                  Výjezdy a trasy pro posádky v terénu
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Přímé odkazy na trasy pro mobilní telefony jednotlivých posádek
-                </p>
-              </div>
-
-              <Link
-                href={`/election-removal/${campaign.id}/route`}
-                className="text-xs font-semibold text-sky-700 hover:text-sky-900 underline"
-              >
-                Otevřít celkový přehled (všechny posádky) &rarr;
-              </Link>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-1">
-              {distinctCrews.map((crewId) => {
-                const crewPoints = campaign.points.filter((p) => p.assignedCrewId === crewId);
-                const crewCompleted = crewPoints.filter((p) => p.status === 'COMPLETED').reduce((sum, p) => sum + p.quantity, 0);
-                const crewTotal = crewPoints.reduce((sum, p) => sum + p.quantity, 0);
-                const crewPercent =
-                  crewTotal > 0
-                    ? Math.round((crewCompleted / crewTotal) * 100)
-                    : 0;
-                const crewName = crewId.replace('crew-', 'Posádka ');
-
-                return (
-                  <Link
-                    key={crewId}
-                    href={`/election-removal/${campaign.id}/route?crew=${crewId}`}
-                    className="p-3.5 bg-white border border-slate-200 rounded-xl hover:border-sky-300 hover:shadow-sm transition flex items-center justify-between group"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm group-hover:text-sky-600 transition">
-                          🚗 {crewName}
-                        </span>
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700">
-                          {crewTotal} ks
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500">
-                        Hotovo: {crewCompleted} / {crewTotal} ({crewPercent} %)
-                      </p>
-                    </div>
-
-                    <span className="text-xs font-bold text-sky-600 group-hover:translate-x-0.5 transition">
-                      Otevřít &rarr;
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
+          <CampaignCrewsManager
+            campaignId={campaign.id}
+            initialCrews={crewsData}
+            employees={employees.map((e) => ({
+              id: e.id,
+              name: `${e.firstName} ${e.lastName}`.trim(),
+              role: e.role,
+              position: e.position,
+            }))}
+            vehicles={vehicles}
+            canManage={user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'TECHNICIAN'}
+          />
         )}
 
         {/* Field Plans / Routes section */}
@@ -314,6 +336,41 @@ export default async function ElectionRemovalDetailPage({
                       <div className="pt-2 border-t border-slate-200/60 flex justify-between text-xs text-slate-500">
                         <span>{Number(summary.totalDistanceKm).toFixed(1)} km</span>
                         <span>{Number(summary.totalDurationMinutes || 0)} min</span>
+                      </div>
+                    )}
+                    {Array.isArray(summary?.crews) && (
+                      <div className="pt-2 border-t border-slate-200/60 space-y-1">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          Posádky:
+                        </p>
+                        <div className="space-y-1">
+                          {(
+                            summary.crews as Array<{
+                              id: string;
+                              names?: string[];
+                              vehicleName?: string | null;
+                            }>
+                          ).map((c, i) => (
+                            <div
+                              key={c.id || i}
+                              className="text-xs text-slate-700 flex items-start justify-between gap-1"
+                            >
+                              <span className="font-semibold text-slate-800">
+                                {c.id.replace('crew-', 'Posádka ')}:{' '}
+                                <span className="font-normal text-slate-600">
+                                  {c.names && c.names.length > 0
+                                    ? c.names.join(', ')
+                                    : 'Bez pracovníků'}
+                                </span>
+                              </span>
+                              {c.vehicleName && (
+                                <span className="text-[10px] text-slate-400 shrink-0">
+                                  {c.vehicleName}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

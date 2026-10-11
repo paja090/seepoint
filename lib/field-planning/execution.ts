@@ -18,9 +18,19 @@ export async function myRoute(userId: string, now = new Date()): Promise<MyRoute
   const employee = await prisma.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
   if (!employee) return { timezone: profile.timezone, routes: [] };
   const plans = await prisma.fieldPlan.findMany({ where: { organizationId, date: dayInZone(now, profile.timezone), status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
+  // For election campaigns, if multiple plans exist for today, only take the latest version so superseded routes are excluded
+  const seenCampaigns = new Set<string>();
+  const effectivePlans: typeof plans = [];
+  for (const plan of plans) {
+    if (plan.electionCampaignId) {
+      if (seenCampaigns.has(plan.electionCampaignId)) continue;
+      seenCampaigns.add(plan.electionCampaignId);
+    }
+    effectivePlans.push(plan);
+  }
   const navigation = await navigationAvailable();
   const routes: MyRouteDTO['routes'] = [];
-  for (const plan of plans) {
+  for (const plan of effectivePlans) {
     const result = plan.planningSummary as unknown as PlanningResult;
     for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
       const orders = await prisma.workOrder.findMany({ where: { organizationId, id: { in: crew.stops.map(s => s.workOrderId) }, workTasks: { some: { organizationId, assignedToEmployeeId: employee.id } } },
@@ -43,7 +53,7 @@ export async function myRoute(userId: string, now = new Date()): Promise<MyRoute
       });
       const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
       const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
-      routes.push({ planId: plan.id, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
+      routes.push({ planId: plan.id, crewName: crew.names?.length ? crew.names.join(', ') : null, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
         stops: crew.stops.flatMap((s): MyRouteStop[] => {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
