@@ -640,7 +640,12 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
         const profile = getOrganizationOrchestratorProfile(org);
         if (profile.autoCreateOfferDraft) {
           const assignedUser = await prisma.user.findFirst({
-            where: { organizationId, role: { in: ['ADMIN', 'MANAGER', 'SALES'] } },
+            where: {
+              organizationMemberships: {
+                some: { organizationId, isActive: true },
+              },
+              role: { in: ['ADMIN', 'MANAGER', 'SALES'] },
+            },
             select: { id: true, name: true, email: true, role: true },
           });
           if (assignedUser) {
