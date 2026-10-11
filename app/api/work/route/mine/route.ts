@@ -2,10 +2,12 @@ import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { executeStop, myRoute } from '@/lib/field-planning/execution';
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireApiAccess('myTasks', 'workRoute'); if (isApiDenied(user)) return user;
   enterTenantContext({ organizationId: user.organizationId!, userId: user.id, source: 'session' });
-  return NextResponse.json(await myRoute(user.id));
+  const url = new URL(request.url);
+  const date = url.searchParams.get('date') || undefined;
+  return NextResponse.json(await myRoute(user.id, date));
 }
 export async function POST(request: Request) {
   const user = await requireApiAccess('myTasks', 'workRoute'); if (isApiDenied(user)) return user;

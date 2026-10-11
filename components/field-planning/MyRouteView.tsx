@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
@@ -26,6 +26,30 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
   const [hideDoneStops, setHideDoneStops] = useState(true);
 
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const tomorrowStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }, []);
+  const [currentDate, setCurrentDate] = useState<string>(initial.date || todayStr);
+
+  async function loadDateRoute(date: string) {
+    setBusy(true);
+    setError('');
+    setCurrentDate(date);
+    try {
+      const refreshed = await fetch(`/api/work/route/mine?date=${date}`);
+      if (refreshed.ok) {
+        setData(await refreshed.json());
+      }
+    } catch {
+      setError('Nepodařilo se načíst trasu.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function run(planId: string, workOrderId: string, action: string, form?: FormData, jobId?: string) {
     setBusy(true);
     setError('');
@@ -46,7 +70,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       const value = await response.json();
       if (!response.ok) throw new Error(value.error);
       setActiveProblemModalStopId(null);
-      const refreshed = await fetch('/api/work/route/mine');
+      const refreshed = await fetch(`/api/work/route/mine?date=${currentDate}`);
       if (refreshed.ok) setData(await refreshed.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Operace selhala.');
@@ -66,7 +90,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       const value = await response.json();
       if (!response.ok) throw new Error(value.error);
       setActivePhotoModalStopId(null);
-      const refreshed = await fetch('/api/work/route/mine');
+      const refreshed = await fetch(`/api/work/route/mine?date=${currentDate}`);
       if (refreshed.ok) setData(await refreshed.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Nahrání fotografie selhalo.');
@@ -78,7 +102,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-12">
       {/* Top Header */}
-      <header className="space-y-2">
+      <header className="space-y-3">
         <Link
           href="/my-tasks"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:underline"
@@ -86,13 +110,58 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
           <ArrowLeft size={14} />
           <span>Zpět na Moje úkoly</span>
         </Link>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 flex items-center gap-2.5">
-          <Navigation className="text-sky-600" size={28} />
-          <span>Moje dnešní trasa</span>
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-600">
-          Váš dnešní plán montáží a výjezdů v terénu seřazený podle zastávek.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 flex items-center gap-2.5">
+              <Navigation className="text-sky-600" size={28} />
+              <span>Moje trasa v terénu</span>
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+              Plán montáží a výjezdů vaší posádky seřazený podle optimálních zastávek.
+            </p>
+          </div>
+        </div>
+
+        {/* Date Selector Tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => loadDateRoute(todayStr)}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                currentDate === todayStr
+                  ? 'bg-white shadow-xs text-sky-700 font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Dnes
+            </button>
+            <button
+              type="button"
+              onClick={() => loadDateRoute(tomorrowStr)}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                currentDate === tomorrowStr
+                  ? 'bg-white shadow-xs text-sky-700 font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Zítra
+            </button>
+            <input
+              type="date"
+              value={currentDate}
+              onChange={(e) => e.target.value && loadDateRoute(e.target.value)}
+              className="bg-transparent text-[11px] text-slate-600 border-none outline-none cursor-pointer pl-1 font-medium"
+            />
+          </div>
+          <span className="text-xs font-semibold text-slate-500">
+            {new Date(currentDate).toLocaleDateString('cs-CZ', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })}
+          </span>
+        </div>
       </header>
 
       {error && (
@@ -103,12 +172,25 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
 
       {/* No routes banner */}
       {!data.routes.length && (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center space-y-2">
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 text-center space-y-3">
           <CheckCircle2 size={36} className="mx-auto text-slate-300" />
-          <h2 className="font-bold text-sm text-slate-700">Na dnešek nemáte naplánovanou žádnou trasu</h2>
-          <p className="text-xs text-slate-500">
-            Jakmile dispečer schválí trasu pro vaši posádku, uvidíte zde zastávky s navigací.
+          <h2 className="font-bold text-sm text-slate-700">
+            Na den {new Date(currentDate).toLocaleDateString('cs-CZ')} nemáte naplánovanou žádnou trasu
+          </h2>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Jakmile dispečer schválí trasu pro vaši posádku, uvidíte zde zastávky s přímou navigací.
           </p>
+          {currentDate === todayStr && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => loadDateRoute(tomorrowStr)}
+                className="text-xs font-bold text-sky-600 hover:text-sky-800 underline cursor-pointer"
+              >
+                Zkontrolovat trasu na zítřek →
+              </button>
+            </div>
+          )}
         </div>
       )}
 

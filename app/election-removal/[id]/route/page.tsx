@@ -13,7 +13,7 @@ export default async function ElectionRemovalRoutePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ crew?: string }>;
+  searchParams?: Promise<{ crew?: string; planId?: string }>;
 }) {
   const user = await checkElectionRemovalPageAccess();
   const { id } = await params;
@@ -43,6 +43,8 @@ export default async function ElectionRemovalRoutePage({
           where: { organizationId: user.organization!.id },
           select: {
             id: true,
+            date: true,
+            version: true,
             status: true,
             planningSummary: true,
           },
@@ -79,16 +81,39 @@ export default async function ElectionRemovalRoutePage({
     ])
   );
 
-  const latestPlan = campaign.fieldPlans[0];
-  const latestSummary = latestPlan?.planningSummary as {
+  const selectedPlanId = resolvedSearchParams?.planId;
+  const currentPlan = selectedPlanId
+    ? campaign.fieldPlans.find((p) => p.id === selectedPlanId) || campaign.fieldPlans[0]
+    : campaign.fieldPlans[0];
+
+  const planPointIds = new Set<string>();
+  const currentSummary = currentPlan?.planningSummary as {
     crews?: Array<{
       id: string;
       employeeIds?: string[];
       names?: string[];
       vehicleId?: string | null;
       vehicleName?: string | null;
+      stops?: Array<{ electionRemovalPointId?: string }>;
     }>;
   } | null;
+
+  if (currentSummary?.crews) {
+    for (const c of currentSummary.crews) {
+      if (c.stops) {
+        for (const s of c.stops) {
+          if (s.electionRemovalPointId) {
+            planPointIds.add(s.electionRemovalPointId);
+          }
+        }
+      }
+    }
+  }
+
+  // Filter points: only include points that belong to this approved plan
+  const planPoints = currentPlan && planPointIds.size > 0
+    ? campaign.points.filter((p) => planPointIds.has(p.id) || p.assignedFieldPlanId === currentPlan.id)
+    : campaign.points;
 
   const crewMembersMap: Record<
     string,
@@ -100,8 +125,8 @@ export default async function ElectionRemovalRoutePage({
     }
   > = {};
 
-  if (latestSummary?.crews) {
-    for (const c of latestSummary.crews) {
+  if (currentSummary?.crews) {
+    for (const c of currentSummary.crews) {
       const empIds = c.employeeIds || [];
       const names =
         c.names && c.names.length > 0
@@ -131,9 +156,51 @@ export default async function ElectionRemovalRoutePage({
           </Link>
         </div>
 
+        {currentPlan && (
+          <div className="p-4 bg-sky-50/70 border border-sky-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-slate-900 text-sm">
+                  Schválená trasa pro výjezd ({currentPlan.date})
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-200 text-sky-900">
+                  {currentPlan.status}
+                </span>
+                <span className="text-[10px] font-medium text-slate-500">
+                  v{currentPlan.version}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Obsahuje <strong>{planPoints.length}</strong> vybraných stanovišť k realizaci.
+              </p>
+            </div>
+
+            {campaign.fieldPlans.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-slate-500 text-[11px]">Další trasy:</span>
+                <div className="flex flex-wrap gap-1">
+                  {campaign.fieldPlans.map((fp) => (
+                    <Link
+                      key={fp.id}
+                      href={`/election-removal/${campaign.id}/route?planId=${fp.id}`}
+                      className={`px-2 py-1 rounded text-[11px] font-bold transition ${
+                        fp.id === currentPlan.id
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {fp.date}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <MobileRouteExecutionView
           campaign={campaign}
-          points={campaign.points}
+          points={planPoints}
           initialCrewId={initialCrewId}
           crewMembersMap={crewMembersMap}
           employees={employees.map((e) => ({
