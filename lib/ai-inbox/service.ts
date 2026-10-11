@@ -11,6 +11,9 @@ import { analyzeInboundMessageWithGemini } from './extraction';
 import { matchClientForInboundMessage } from './client-matcher';
 import { matchRelatedEntities } from './entity-matcher';
 import { buildProposedActions } from './action-builder';
+import { orchestrateMailboxToOffer } from '@/lib/ai-orchestrator/orchestrator-engine';
+import { getOrganizationOrchestratorProfile } from '@/lib/ai-orchestrator/automation-policy';
+import type { CurrentUser } from '@/lib/rbac';
 
 export function isBotOrSystemEmail(email: string): boolean {
   if (!email) return false;
@@ -626,6 +629,49 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
         actions: true,
       },
     });
+
+    // Pokud je aktivní automatická příprava konceptu nabídky (SEMI_AUTOMATIC) a máme klienta i poptávku
+    if (!isSpam && analysis.classification === 'NEW_INQUIRY' && (bestClient || msg.clientId)) {
+      try {
+        const org = await prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { enabledModules: true },
+        });
+        const profile = getOrganizationOrchestratorProfile(org);
+        if (profile.autoCreateOfferDraft) {
+          const assignedUser = await prisma.user.findFirst({
+            where: { organizationId, role: { in: ['ADMIN', 'MANAGER', 'SALES'] } },
+            select: { id: true, name: true, email: true, role: true },
+          });
+          if (assignedUser) {
+            const actor: CurrentUser = {
+              id: assignedUser.id,
+              name: assignedUser.name,
+              email: assignedUser.email,
+              role: assignedUser.role,
+              organizationId,
+            };
+            const orchRun = await orchestrateMailboxToOffer(msg.id, actor);
+            if (orchRun.offerDraftResult?.offerId) {
+              await prisma.aiInboxAction.updateMany({
+                where: {
+                  messageId: msg.id,
+                  type: 'CREATE_OFFER',
+                  status: 'PROPOSED',
+                },
+                data: {
+                  status: 'EXECUTED',
+                  executedAt: new Date(),
+                  executedById: assignedUser.id,
+                },
+              });
+            }
+          }
+        }
+      } catch (autoDraftErr) {
+        console.warn(`[AI Inbox] Auto-draft offer skipped for message ${msg.id}:`, autoDraftErr);
+      }
+    }
 
     return updated;
   } catch (error) {
