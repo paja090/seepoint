@@ -180,6 +180,40 @@ test('Live ETA: Preserves planned times for future date before departure', () =>
   assert.equal(result.hasStarted, false);
 });
 
+test('Live ETA: Correctly reflects stop from tomorrow completed today in advance', () => {
+  const stops: MyRouteStop[] = [
+    makeMockStop({
+      jobId: 'stop-1',
+      startAt: '2026-10-12T08:15:00.000Z',
+      endAt: '2026-10-12T08:45:00.000Z',
+      status: 'DONE',
+      startedAt: '2026-10-11T14:00:00.000Z', // Completed day before!
+      completedAt: '2026-10-11T14:25:00.000Z',
+      actualDurationMinutes: 25,
+    }),
+    makeMockStop({
+      jobId: 'stop-2',
+      startAt: '2026-10-12T09:00:00.000Z',
+      endAt: '2026-10-12T09:30:00.000Z',
+      status: 'PLANNED',
+    }),
+  ];
+
+  const route = {
+    departureAt: '2026-10-12T08:00:00.000Z',
+    endAt: '2026-10-12T09:45:00.000Z',
+    stops,
+  };
+
+  const result = computeRouteLiveETA(route, {
+    now: new Date('2026-10-11T15:00:00.000Z'),
+    targetDate: '2026-10-12',
+  });
+
+  assert.equal(result.stops[0].status, 'DONE');
+  assert.equal(result.stops[0].liveEstimatedStartAt, '2026-10-11T14:00:00.000Z');
+});
+
 test('formatLiveClock: Formats ISO timestamp in local Prague timezone', () => {
   assert.equal(formatLiveClock('2026-10-11T08:15:00.000Z', 'UTC'), '08:15');
   assert.equal(formatLiveClock(null), '—');

@@ -307,7 +307,13 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
     const crew = result.crews.find(c => employee && c.employeeIds.includes(employee.id) && (['start_trip', 'complete_trip'].includes(input.action) || c.stops.some(s => stopId(s) === (input.jobId ?? input.workOrderId))));
     if (!crew || !employee || !['APPROVED', 'ACTIVE', 'COMPLETED'].includes(plan.status)) throw new Error('FORBIDDEN: pouze vlastní schválená trasa.');
     const profile = (plan.planningInputSnapshot as unknown as PlanningInput).profile;
-    if (dayInZone(new Date(), profile.timezone) !== plan.date) throw new Error('Realizovat lze pouze dnešní trasu.');
+    const today = dayInZone(new Date(), profile.timezone);
+    if (plan.date < today && !['ADMIN', 'MANAGER'].includes(actor.role)) {
+      throw new Error('Nelze realizovat trasu z minulosti; kontaktujte dispečera.');
+    }
+    if (plan.date > today && (input.action === 'start_trip' || input.action === 'complete_trip')) {
+      throw new Error('Celodenní výjezd ze skladu lze zahájit pouze pro dnešní den.');
+    }
     if (input.action === 'start_trip' || input.action === 'complete_trip') {
       const actionStr = input.action === 'start_trip' ? 'FIELD_TRIP_STARTED' : 'FIELD_TRIP_COMPLETED';
       const eventId = `fp-trip-${plan.id}-${crew.id}-${actionStr}`;
