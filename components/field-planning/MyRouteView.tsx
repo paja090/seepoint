@@ -229,6 +229,18 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         </div>
       )}
 
+      {/* Advance work notice for future dates */}
+      {currentDate > todayStr && routesWithLiveETA.length > 0 && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-3.5 text-xs text-indigo-950 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚡</span>
+            <span>
+              <strong>Plán na {currentDate === tomorrowStr ? 'zítřek' : 'další dny'}:</strong> Pokud máte dnešní trasu hotovou a stíháte, můžete kterýkoliv úkol zahájit a splnit v předstihu již dnes.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Route Cards */}
       {routesWithLiveETA.map((route) => {
         const doneCount = route.stops.filter((s) => s.status === 'DONE').length;
@@ -356,10 +368,16 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         <CheckCircle2 size={12} className="text-emerald-700" />
                         <span>Hotovo {s.completedAt ? formatLiveClock(s.completedAt, data.timezone) : ''}</span>
                       </span>
-                      {hasSignificantDelay && (
-                        <span className="text-[10px] font-medium text-slate-400 mt-0.5">
-                          plán {plannedTimeString}
+                      {currentDate > todayStr ? (
+                        <span className="text-[10px] font-bold text-emerald-700 mt-0.5">
+                          ✓ Splněno v předstihu
                         </span>
+                      ) : (
+                        hasSignificantDelay && (
+                          <span className="text-[10px] font-medium text-slate-400 mt-0.5">
+                            plán {plannedTimeString}
+                          </span>
+                        )
                       )}
                     </div>
                   ) : isInProgress ? (
@@ -505,6 +523,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         ? 'Označit za hotové ✓'
                         : isIssue
                         ? 'Zkusit znovu / Zahájit'
+                        : currentDate > todayStr
+                        ? 'Zahájit v předstihu ⚡'
                         : 'Zahájit práci'}
                     </span>
                   </button>
