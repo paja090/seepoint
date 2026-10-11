@@ -311,9 +311,6 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
     if (plan.date < today && !['ADMIN', 'MANAGER'].includes(actor.role)) {
       throw new Error('Nelze realizovat trasu z minulosti; kontaktujte dispečera.');
     }
-    if (plan.date > today && (input.action === 'start_trip' || input.action === 'complete_trip')) {
-      throw new Error('Celodenní výjezd ze skladu lze zahájit pouze pro dnešní den.');
-    }
     if (input.action === 'start_trip' || input.action === 'complete_trip') {
       const actionStr = input.action === 'start_trip' ? 'FIELD_TRIP_STARTED' : 'FIELD_TRIP_COMPLETED';
       const eventId = `fp-trip-${plan.id}-${crew.id}-${actionStr}`;

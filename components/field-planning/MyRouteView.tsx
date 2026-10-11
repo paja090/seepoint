@@ -787,6 +787,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                           )}`
                         : route.tripStartedAt
                         ? 'Stopky směny běží včetně cest a případných kolon'
+                        : currentDate > todayStr
+                        ? 'Zahajte výjezd i v předstihu pro změření celé trasy'
                         : 'Zahajte při ranním odjezdu z firmy pro změření celé směny'}
                     </span>
                   </div>
@@ -800,7 +802,11 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                       onClick={() => run(route.planId, '', 'start_trip')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
                     >
-                      <span>🚀 Zahájit výjezd (odjezd ze skladu)</span>
+                      <span>
+                        {currentDate > todayStr
+                          ? '🚀 Zahájit výjezd v předstihu ⚡'
+                          : '🚀 Zahájit výjezd (odjezd ze skladu)'}
+                      </span>
                     </button>
                   )}
                   {route.tripStartedAt && !route.tripCompletedAt && (
@@ -810,7 +816,11 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                       onClick={() => run(route.planId, '', 'complete_trip')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
                     >
-                      <span>🏁 Ukončit výjezd (návrat na sklad)</span>
+                      <span>
+                        {currentDate > todayStr
+                          ? '🏁 Ukončit výjezd v předstihu ⚡'
+                          : '🏁 Ukončit výjezd (návrat na sklad)'}
+                      </span>
                     </button>
                   )}
                   {route.tripCompletedAt && (
