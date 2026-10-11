@@ -330,9 +330,19 @@ export async function analyzeOrganizationFieldTelemetry(
             }
             const actual = Math.max(1, Math.round(diffMs / 60000));
             let specificWorkType = 'ELECTION_REMOVAL';
-            if (ep.mediaType === 'BOARD') specificWorkType = 'ELECTION_BOARD_REMOVAL';
-            else if (ep.mediaType === 'BANNER') specificWorkType = 'ELECTION_BANNER_REMOVAL';
-            else if (ep.mediaType === 'STAND') specificWorkType = 'ABOARD_DEINSTALLATION';
+            if (ep.mediaType === 'BANNER') {
+              specificWorkType = 'ELECTION_BANNER_REMOVAL';
+            } else if (ep.mediaType === 'ACKO') {
+              specificWorkType = 'ABOARD_DEINSTALLATION';
+            } else if (ep.mediaType === 'BENCH') {
+              specificWorkType = 'BENCH_DEINSTALLATION';
+            } else if (ep.mediaType === 'TOWER' || ep.mediaType === 'MINI_TOWER') {
+              specificWorkType = 'TOWER_DEINSTALLATION';
+            } else if (ep.mediaType === 'CITY_POSTER') {
+              specificWorkType = 'CITYGALLERY_DEINSTALLATION';
+            } else if (ep.mediaType === 'PLOT') {
+              specificWorkType = 'ELECTION_BOARD_REMOVAL';
+            }
             const planned = ep.serviceMinutes || currentServiceMinutes[specificWorkType] || 6;
             rawObservations.push({ workType: specificWorkType, plannedMinutes: planned, actualMinutes: actual });
           }
