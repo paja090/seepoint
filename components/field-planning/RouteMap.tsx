@@ -7,6 +7,12 @@ function decode(encoded: string): [number, number][] {
   function next() { let value = 0, shift = 0, b: number; do { b = encoded.charCodeAt(i++) - 63; value |= (b & 31) << shift; shift += 5; } while (b >= 32 && i < encoded.length); return value & 1 ? ~(value >> 1) : value >> 1; }
   while (i < encoded.length) { lat += next(); lng += next(); points.push([lat / 1e5, lng / 1e5]); } return points;
 }
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+  }[tag] || tag));
+}
+
 export function RouteMap({ result, depot, active }: { result?: PlanningResult; depot?: Coordinates; active: string }) {
   const element = useRef<HTMLDivElement>(null); const map = useRef<LeafletMap | null>(null);
   useEffect(() => {
@@ -28,6 +34,43 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
           previous = stop.location;
         });
         if (crew.returnLeg.polyline) L.polyline(decode(crew.returnLeg.polyline), { color, weight: 2, opacity: 0.5 }).addTo(m);
+
+        if (crew.liveLocation) {
+          const livePoint: [number, number] = [crew.liveLocation.latitude, crew.liveLocation.longitude];
+          const isRecent = crew.liveLocation.isRecent;
+          const speedKmH = crew.liveLocation.speed != null ? Math.round(crew.liveLocation.speed * 3.6) : null;
+          const speedText = speedKmH != null && speedKmH > 2 ? `${speedKmH} km/h` : 'Stojí na místě';
+          const ageMs = Date.now() - new Date(crew.liveLocation.updatedAt).getTime();
+          const ageSeconds = Math.max(0, Math.round(ageMs / 1000));
+          const ageText = ageSeconds < 60 ? `před ${ageSeconds} s` : `před ${Math.round(ageSeconds / 60)} min`;
+
+          const vehicleMarker = L.marker(livePoint, {
+            zIndexOffset: 1000,
+            icon: L.divIcon({
+              className: '',
+              html: `
+                <div style="display:inline-flex;align-items:center;gap:5px;background:${color};color:white;padding:4px 9px;border-radius:9999px;border:2px solid white;box-shadow:0 4px 10px rgba(0,0,0,0.35);font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer;">
+                  <span style="font-size:13px;">🚐</span>
+                  <span>Posádka ${index + 1}</span>
+                  <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isRecent ? '#4ade80' : '#f59e0b'};box-shadow:0 0 6px ${isRecent ? '#4ade80' : '#f59e0b'};"></span>
+                </div>
+              `,
+              iconAnchor: [50, 15],
+            }),
+          });
+
+          const tooltipHtml = `
+            <div style="font-family:system-ui,-apple-system,sans-serif;font-size:11px;line-height:1.4;">
+              <strong style="font-size:12px;color:#0f172a;">Posádka ${index + 1}: ${escapeHtml(crew.names.join(' + '))}</strong><br/>
+              ${crew.vehicleName ? `<span style="color:#475569;">Vozidlo: ${escapeHtml(crew.vehicleName)}</span><br/>` : ''}
+              <span style="color:#0369a1;font-weight:700;">Rychlost: ${speedText}</span> · 
+              <span style="color:${isRecent ? '#15803d' : '#b45309'};font-weight:600;">Signál: ${ageText}</span>
+              ${crew.liveLocation.workerName ? `<br/><span style="color:#64748b;font-size:10px;">Vysílá: ${escapeHtml(crew.liveLocation.workerName)}</span>` : ''}
+            </div>
+          `;
+          vehicleMarker.bindTooltip(tooltipHtml, { direction: 'top', offset: [0, -10] }).addTo(m);
+          bounds.extend(livePoint);
+        }
       });
       if (bounds.isValid()) m.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 });
     });
