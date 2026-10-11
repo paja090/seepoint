@@ -224,3 +224,108 @@ test('Smart Routing: divides election removal points between crews and clusters 
     }
   }
 });
+
+test('Custom Point Selection: only selectedPointIds are planned into crew stops', async () => {
+  const campaign = {
+    id: 'camp-1',
+    name: 'Volby 2026',
+    targetDate: new Date('2026-10-15T00:00:00Z'),
+    createdAt: new Date('2026-10-06T09:00:00Z'),
+  };
+
+  const points = [
+    {
+      id: 'pt-1',
+      organizationId: 'org-test',
+      campaignId: 'camp-1',
+      mediaType: 'ACKO',
+      label: 'Áčko Radnice',
+      latitude: 50.088,
+      longitude: 14.42,
+      quantity: 1,
+      serviceMinutes: 5,
+      status: 'PENDING',
+      updatedAt: new Date('2026-10-06T10:00:00Z'),
+    },
+    {
+      id: 'pt-2',
+      organizationId: 'org-test',
+      campaignId: 'camp-1',
+      mediaType: 'TOWER',
+      label: 'Tower Radnice',
+      latitude: 50.088,
+      longitude: 14.42,
+      quantity: 1,
+      serviceMinutes: 15,
+      status: 'PENDING',
+      updatedAt: new Date('2026-10-06T10:00:00Z'),
+    },
+    {
+      id: 'pt-3',
+      organizationId: 'org-test',
+      campaignId: 'camp-1',
+      mediaType: 'BANNER',
+      label: 'Banner Most',
+      latitude: 50.095,
+      longitude: 14.43,
+      quantity: 1,
+      serviceMinutes: 10,
+      status: 'PENDING',
+      updatedAt: new Date('2026-10-06T10:00:00Z'),
+    },
+    {
+      id: 'pt-4',
+      organizationId: 'org-test',
+      campaignId: 'camp-1',
+      mediaType: 'BENCH',
+      label: 'Lavička Nádraží',
+      latitude: 50.07,
+      longitude: 14.41,
+      quantity: 1,
+      serviceMinutes: 5,
+      status: 'PENDING',
+      updatedAt: new Date('2026-10-06T10:00:00Z'),
+    },
+  ] as unknown as ElectionRemovalPoint[];
+
+  const selectedPointIds = ['pt-1', 'pt-3'];
+  const filteredPoints = points.filter((p) => selectedPointIds.includes(p.id));
+  const jobs = filteredPoints.map((p) => convertElectionPointToJob(p, campaign));
+
+  const employees = [
+    { id: 'emp-1', organizationId: 'org-test', name: 'Jan Novák', userId: 'user-1', isActive: true, roles: ['WORKER'], positions: ['MONTÉR'], available: true },
+  ];
+
+  const vehicles = [
+    { id: 'veh-1', organizationId: 'org-test', name: 'Dodávka A', status: 'ACTIVE', reserved: false },
+  ];
+
+  const crews = [
+    { id: 'crew-1', employeeIds: ['emp-1'], vehicleId: 'veh-1' },
+  ];
+
+  const input: PlanningInput = {
+    organizationId: 'org-test',
+    date: '2026-10-15',
+    now: '2026-10-15T07:30:00.000Z',
+    profile: mockProfile,
+    jobs,
+    employees,
+    vehicles,
+    crews,
+  };
+
+  const travelProvider = async (): Promise<TravelLeg> => {
+    return { distanceMeters: 1000, durationSeconds: 120, estimated: true, polyline: '' };
+  };
+
+  const result = await planFieldWork(input, travelProvider);
+
+  const plannedStops = result.crews.flatMap((c) => c.stops);
+  assert.equal(plannedStops.length, 2);
+  const plannedIds = plannedStops.map((s) => s.electionRemovalPointId);
+  assert.deepEqual(plannedIds.sort(), ['pt-1', 'pt-3']);
+  assert.equal(plannedStops.some((s) => s.electionRemovalPointId === 'pt-2'), false);
+  assert.equal(plannedStops.some((s) => s.electionRemovalPointId === 'pt-4'), false);
+});
+
