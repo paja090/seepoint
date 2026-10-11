@@ -213,9 +213,9 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         const issueCount = route.stops.filter((s) => s.status === 'ISSUE').length;
         const totalCount = route.stops.length;
 
-        // Measured duration from completed stops
+        // Measured duration from completed stops (excluding instant completions < 1 min)
         const measuredStops = route.stops.filter(
-          (s) => s.status === 'DONE' && s.actualDurationMinutes != null
+          (s) => s.status === 'DONE' && s.actualDurationMinutes != null && !s.isInstantCompletion
         );
         const totalMeasuredMinutes = measuredStops.reduce(
           (acc, s) => acc + (s.actualDurationMinutes || 0),
@@ -365,6 +365,14 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                           } min)`
                         : ''}
                     </span>
+                  </span>
+                )}
+                {s.isInstantCompletion && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold text-slate-500 bg-slate-100 border border-slate-200"
+                    title="Práce trvala méně než 1 minutu (zapomenuté zahájení). Nezapočítává se do průměru norem."
+                  >
+                    <span>⚡ Hotovo (&lt; 1 min, mimo průměr)</span>
                   </span>
                 )}
               </div>

@@ -5,6 +5,8 @@ import { requirePlannerManager } from '@/lib/field-planning/service';
 import {
   analyzeOrganizationFieldTelemetry,
   applyFieldTelemetryCalibration,
+  addCustomActivityToProfile,
+  deleteCustomActivityFromProfile,
 } from '@/lib/field-planning/ai-telemetry';
 
 export const runtime = 'nodejs';
@@ -35,7 +37,7 @@ export async function GET() {
 
 /**
  * POST /api/field-planning/telemetry
- * Aplikuje AI kalibrované normy časů do profilu organizace.
+ * Aplikuje AI kalibrované normy časů do profilu organizace nebo spravuje vlastní činnosti.
  */
 export async function POST(req: Request) {
   const user = await requireApiAccess('work', 'workRoute');
@@ -50,6 +52,33 @@ export async function POST(req: Request) {
   try {
     requirePlannerManager(user);
     const body = await req.json();
+
+    if (body.action === 'addCustomActivity') {
+      const { label, defaultMinutes, category } = body;
+      if (!label || typeof label !== 'string' || !label.trim()) {
+        return NextResponse.json({ error: 'Zadejte název činnosti.' }, { status: 400 });
+      }
+      const mins = Number(defaultMinutes);
+      if (!Number.isFinite(mins) || mins < 1 || mins > 480) {
+        return NextResponse.json({ error: 'Zadejte platný čas v minutách (1-480).' }, { status: 400 });
+      }
+      const updatedProfile = await addCustomActivityToProfile(
+        { label: label.trim(), defaultMinutes: Math.round(mins), category: typeof category === 'string' ? category.trim() : undefined },
+        user,
+        user.organizationId
+      );
+      return NextResponse.json({ success: true, updatedProfile });
+    }
+
+    if (body.action === 'deleteCustomActivity') {
+      const { key } = body;
+      if (!key || typeof key !== 'string') {
+        return NextResponse.json({ error: 'Chybí klíč činnosti.' }, { status: 400 });
+      }
+      const updatedProfile = await deleteCustomActivityFromProfile(key, user, user.organizationId);
+      return NextResponse.json({ success: true, updatedProfile });
+    }
+
     const calibration = body.calibration as Record<string, number>;
 
     if (!calibration || typeof calibration !== 'object') {

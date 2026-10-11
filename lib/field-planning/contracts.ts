@@ -1,10 +1,12 @@
 export type Coordinates = { latitude: number; longitude: number };
+export type CustomPlanningActivity = { key: string; label: string; defaultMinutes: number; category?: string };
 export type PlanningProfile = {
   navigationPointMinutes?: Record<string, number>;
   timezone: string; country: string | null; depot: Coordinates; endLocation: Coordinates;
   workdayStart: string; workdayEnd: string; breakMinutes: number; overtimeMinutes: number;
   flexibleHours?: boolean; maxShiftHours?: number;
   strategy: 'BALANCED' | 'DISTANCE'; serviceMinutes: Record<string, number>;
+  customActivities?: CustomPlanningActivity[];
   fallbackSpeedKph: number; fallbackDistanceFactor: number; maximumJobsPerRoute: number;
   vehicleRequired: boolean; requireHumanApproval: true; enabled: boolean;
   vehicleCapacitySlots?: number; warehouseUnloadMinutes?: number;
@@ -114,6 +116,7 @@ export type MyRouteStop = {
   startedAt?: string | null;
   completedAt?: string | null;
   actualDurationMinutes?: number | null;
+  isInstantCompletion?: boolean;
 };
 
 export type MyRouteDTO = {

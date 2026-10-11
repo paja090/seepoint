@@ -30,11 +30,17 @@ export function parseProfile(value: unknown): PlanningProfile {
   const maxShiftHours = typeof p.maxShiftHours === 'number' && Number.isFinite(p.maxShiftHours) ? bounded(p.maxShiftHours, 1, 24, 'max délka směny') : undefined;
   const vehicleCapacitySlots = typeof p.vehicleCapacitySlots === 'number' && Number.isFinite(p.vehicleCapacitySlots) ? bounded(p.vehicleCapacitySlots, 1, 500, 'kapacita vozidla') : undefined;
   const warehouseUnloadMinutes = typeof p.warehouseUnloadMinutes === 'number' && Number.isFinite(p.warehouseUnloadMinutes) ? bounded(p.warehouseUnloadMinutes, 0, 240, 'čas vykládky na skladě') : undefined;
+  const customActivities = Array.isArray(p.customActivities)
+    ? (p.customActivities as Array<{ key: string; label: string; defaultMinutes: number; category?: string }>).filter(
+        (a) => a && typeof a.key === 'string' && typeof a.label === 'string' && typeof a.defaultMinutes === 'number'
+      )
+    : undefined;
   return { navigationPointMinutes, timezone: p.timezone, country: p.country as string | null, depot: p.depot, endLocation: p.endLocation,
     workdayStart: p.workdayStart as string, workdayEnd: p.workdayEnd as string,
     breakMinutes: bounded(p.breakMinutes, 0, 240, 'přestávka'), overtimeMinutes: bounded(p.overtimeMinutes, 0, 480, 'přesčas'),
     flexibleHours, maxShiftHours, vehicleCapacitySlots, warehouseUnloadMinutes,
     strategy: p.strategy as PlanningProfile['strategy'], serviceMinutes,
+    customActivities,
     fallbackSpeedKph: bounded(p.fallbackSpeedKph, 1, 130, 'odhad rychlosti'), fallbackDistanceFactor: bounded(p.fallbackDistanceFactor, 1, 5, 'koeficient vzdálenosti'),
     maximumJobsPerRoute: bounded(p.maximumJobsPerRoute, 1, 100, 'počet zastávek'), vehicleRequired: p.vehicleRequired,
     requireHumanApproval: true, enabled: p.enabled };
