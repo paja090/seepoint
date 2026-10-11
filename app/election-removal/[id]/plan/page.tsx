@@ -10,11 +10,21 @@ export const dynamic = 'force-dynamic';
 
 export default async function ElectionRemovalPlanPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ points?: string }>;
 }) {
   const user = await checkElectionRemovalPageAccess();
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const pointsQuery = resolvedSearchParams?.points;
+  const initialSelectedPointIds = pointsQuery
+    ? pointsQuery
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : undefined;
 
   if (user.role === 'WORKER') {
     redirect(`/election-removal/${id}/route`);
@@ -61,6 +71,7 @@ export default async function ElectionRemovalPlanPage({
             employees={employees}
             vehicles={vehicles}
             initialDepot={profile?.depot}
+            initialSelectedPointIds={initialSelectedPointIds}
           />
         </div>
       </AppShell>

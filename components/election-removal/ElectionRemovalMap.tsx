@@ -49,6 +49,9 @@ interface ElectionRemovalMapProps {
   points: ElectionRemovalMapPoint[];
   selectedPointId?: string | null;
   onSelectPoint?: (pointId: string) => void;
+  selectedPointIds?: Set<string> | string[];
+  onTogglePointSelection?: (pointId: string) => void;
+  selectionMode?: boolean;
   onMapClick?: (coords: { latitude: number; longitude: number }) => void;
   isAddMode?: boolean;
   className?: string;
@@ -69,6 +72,9 @@ export function ElectionRemovalMap({
   points,
   selectedPointId,
   onSelectPoint,
+  selectedPointIds,
+  onTogglePointSelection,
+  selectionMode = false,
   onMapClick,
   isAddMode = false,
   className = '',
@@ -79,6 +85,18 @@ export function ElectionRemovalMap({
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const onMapClickRef = useRef(onMapClick);
   onMapClickRef.current = onMapClick;
+  const onSelectPointRef = useRef(onSelectPoint);
+  onSelectPointRef.current = onSelectPoint;
+  const onTogglePointSelectionRef = useRef(onTogglePointSelection);
+  onTogglePointSelectionRef.current = onTogglePointSelection;
+
+  const selectedSet = useMemo(() => {
+    if (!selectedPointIds) return null;
+    return selectedPointIds instanceof Set
+      ? selectedPointIds
+      : new Set(selectedPointIds);
+  }, [selectedPointIds]);
+
   const markerGroupRef = useRef<LayerGroup | null>(null);
   const tileLayerRef = useRef<TileLayer | null>(null);
   const markersMapRef = useRef<Map<string, import('leaflet').Marker>>(new Map());
@@ -204,7 +222,7 @@ export function ElectionRemovalMap({
       renderMarkers(L, mapInstanceRef.current, markerGroupRef.current);
     }
     updateMarkers();
-  }, [validPoints, selectedPointId]);
+  }, [validPoints, selectedPointId, selectedSet, selectionMode]);
 
   function renderMarkers(
     L: typeof import('leaflet'),
@@ -225,9 +243,10 @@ export function ElectionRemovalMap({
       const isInProgress = point.status === 'IN_PROGRESS';
       const isIssue = point.status === 'ISSUE';
       const isSelected = point.id === selectedPointId;
+      const isMultiSelected = selectedSet ? selectedSet.has(point.id) : false;
 
-      // Color coding: Completed is GREEN (#10b981), In Progress is Amber, Issue is Red, Pending is Blue
-      const bgColor = isCompleted
+      // Color coding & Selection Mode styling
+      let bgColor = isCompleted
         ? '#10b981'
         : isInProgress
         ? '#f59e0b'
@@ -235,18 +254,38 @@ export function ElectionRemovalMap({
         ? '#ef4444'
         : '#0284c7';
 
-      const borderColor = isSelected ? '#1e293b' : '#ffffff';
-      const borderWidth = isSelected ? '3px' : '2px';
-      const size = isSelected ? 34 : 28;
+      let borderColor = isSelected ? '#1e293b' : '#ffffff';
+      let borderWidth = isSelected ? '3px' : '2px';
+      let size = isSelected ? 34 : 28;
+      let opacity = '1';
+      let boxShadow = '0 3px 10px rgba(0,0,0,0.3)';
       const orderText = point.plannedOrder != null ? String(point.plannedOrder) : String(index + 1);
-      const iconLabel = isCompleted ? '✓' : isIssue ? '!' : orderText;
+      let iconLabel = isCompleted ? '✓' : isIssue ? '!' : orderText;
+
+      if (selectionMode) {
+        if (isMultiSelected) {
+          bgColor = '#2563eb';
+          borderColor = '#ffffff';
+          borderWidth = '3px';
+          size = 36;
+          boxShadow = '0 0 0 4px rgba(37, 99, 235, 0.45), 0 4px 12px rgba(0,0,0,0.35)';
+          iconLabel = '✓';
+        } else {
+          bgColor = isCompleted ? '#10b981' : isInProgress ? '#f59e0b' : isIssue ? '#ef4444' : '#64748b';
+          opacity = '0.55';
+          borderColor = '#cbd5e1';
+          borderWidth = '2px';
+          size = 24;
+          boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+        }
+      }
 
       const markerHtml = `
         <div style="
           background: ${bgColor};
           color: white;
           font-weight: 800;
-          font-size: ${isCompleted ? '14px' : '11px'};
+          font-size: ${isCompleted || isMultiSelected ? '14px' : '11px'};
           font-family: ui-sans-serif, system-ui, sans-serif;
           width: ${size}px;
           height: ${size}px;
@@ -255,10 +294,12 @@ export function ElectionRemovalMap({
           align-items: center;
           justify-content: center;
           border: ${borderWidth} solid ${borderColor};
-          box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+          box-shadow: ${boxShadow};
+          opacity: ${opacity};
           cursor: pointer;
           transform: translate(-50%, -50%);
-          transition: transform 0.15s ease, background-color 0.3s ease;
+          transition: transform 0.15s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+          ${isMultiSelected ? 'z-index: 1000;' : ''}
         " title="${escapeHtml(point.label)}">
           ${iconLabel}
         </div>
@@ -362,14 +403,51 @@ export function ElectionRemovalMap({
             ">Waze ↗</a>
             ${photoBtnHtml}
           </div>
+          ${
+            onTogglePointSelectionRef.current
+              ? `
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0;">
+            <button type="button" class="btn-toggle-pt-${point.id}" style="
+              width:100%;
+              padding:6px 10px;
+              border-radius:8px;
+              font-size:11px;
+              font-weight:700;
+              cursor:pointer;
+              background:${isMultiSelected ? '#fee2e2' : '#eff6ff'};
+              color:${isMultiSelected ? '#991b1b' : '#1d4ed8'};
+              border:1px solid ${isMultiSelected ? '#fca5a5' : '#bfdbfe'};
+              transition:background-color 0.15s;
+            ">
+              ${isMultiSelected ? '✕ Odebrat z výběru pro posádku' : '✓ Vybrat bod pro posádku'}
+            </button>
+          </div>
+          `
+              : ''
+          }
         </div>
       `;
 
       marker.bindPopup(popupHtml, { maxWidth: 280 });
 
       marker.on('click', () => {
-        if (onSelectPoint) {
-          onSelectPoint(point.id);
+        if (onTogglePointSelectionRef.current) {
+          onTogglePointSelectionRef.current(point.id);
+        }
+        if (onSelectPointRef.current) {
+          onSelectPointRef.current(point.id);
+        }
+      });
+
+      marker.on('popupopen', () => {
+        const btn = document.querySelector(`.btn-toggle-pt-${point.id}`);
+        if (btn) {
+          btn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (onTogglePointSelectionRef.current) {
+              onTogglePointSelectionRef.current(point.id);
+            }
+          });
         }
       });
 

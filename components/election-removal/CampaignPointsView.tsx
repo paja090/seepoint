@@ -17,6 +17,7 @@ import {
   Loader2,
   Plus,
   X,
+  Sparkles,
 } from 'lucide-react';
 import {
   ELECTION_REMOVAL_MEDIA_LABELS,
@@ -688,6 +689,18 @@ export function CampaignPointsView({
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const ids = Array.from(selectedPointIds).join(',');
+                router.push(`/election-removal/${campaignId}/plan?points=${ids}`);
+              }}
+              className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>🚀 Naplánovat trasu pro vybrané ({selectedPointIds.size})</span>
+            </button>
+            <span className="text-slate-300 mx-1">|</span>
             <span className="text-slate-600 font-semibold">Změnit logistiku na:</span>
             <button
               type="button"
@@ -742,7 +755,7 @@ export function CampaignPointsView({
               <span className="text-xs text-slate-600">
                 {isMapClickAddMode
                   ? 'Klikněte do mapy na místo nového bodu – souřadnice se automaticky načtou'
-                  : 'Pro vytvoření nového bodu klikněte na tlačítko a potom kamkoliv do mapy'}
+                  : 'Kliknutím na špendlíky v mapě body označíte pro plánování nebo hromadné úpravy'}
               </span>
             </div>
 
@@ -759,6 +772,9 @@ export function CampaignPointsView({
             points={filteredPoints}
             selectedPointId={selectedPointId}
             onSelectPoint={(id) => setSelectedPointId(id)}
+            selectedPointIds={selectedPointIds}
+            onTogglePointSelection={toggleSelectPoint}
+            selectionMode={selectedPointIds.size > 0}
             onMapClick={(coords) => {
               if (isMapClickAddMode) {
                 setNewLat(coords.latitude.toFixed(5));

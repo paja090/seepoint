@@ -24,6 +24,7 @@ import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import type { PlanningInput, PlanningResult, PlannedCrew } from '@/lib/field-planning/contracts';
 import { LocationPickerMap } from './LocationPickerMap';
+import { ElectionRemovalMap } from './ElectionRemovalMap';
 
 interface ResourceEmployee {
   id: string;
@@ -52,6 +53,7 @@ interface ElectionRoutePlannerProps {
   employees: ResourceEmployee[];
   vehicles: ResourceVehicle[];
   initialDepot?: { latitude: number; longitude: number };
+  initialSelectedPointIds?: string[];
 }
 
 export function ElectionRoutePlanner({
@@ -59,6 +61,7 @@ export function ElectionRoutePlanner({
   employees,
   vehicles,
   initialDepot,
+  initialSelectedPointIds,
 }: ElectionRoutePlannerProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -99,6 +102,46 @@ export function ElectionRoutePlanner({
   const pendingPoints = campaign.points.filter((p) =>
     ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'].includes(p.status)
   );
+
+  // Point Selection Mode: 'ALL' (all pending points) vs 'CUSTOM' (hand-picked on map)
+  const [pointSelectionMode, setPointSelectionMode] = useState<'ALL' | 'CUSTOM'>(
+    initialSelectedPointIds && initialSelectedPointIds.length > 0 ? 'CUSTOM' : 'ALL'
+  );
+  const [selectedPointIds, setSelectedPointIds] = useState<Set<string>>(
+    new Set(initialSelectedPointIds || [])
+  );
+  const [showPointSelectionMap, setShowPointSelectionMap] = useState<boolean>(true);
+
+  const handleTogglePointSelection = (pointId: string) => {
+    setSelectedPointIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(pointId)) {
+        next.delete(pointId);
+      } else {
+        next.add(pointId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllPending = () => {
+    setSelectedPointIds(new Set(pendingPoints.map((p) => p.id)));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedPointIds(new Set());
+  };
+
+  const selectedPointsList = useMemo(() => {
+    return pendingPoints.filter((p) => selectedPointIds.has(p.id));
+  }, [pendingPoints, selectedPointIds]);
+
+  const selectedPointsServiceMinutes = useMemo(() => {
+    return selectedPointsList.reduce(
+      (sum, p) => sum + (p.serviceMinutes || 10),
+      0
+    );
+  }, [selectedPointsList]);
 
   // Dedicated media type filter: each medium is transported separately
   const [selectedMediumFilter, setSelectedMediumFilter] = useState<string>('ALL');
@@ -205,6 +248,10 @@ export function ElectionRoutePlanner({
       setCalculationError('Každá posádka musí mít přiřazeného alespoň jednoho pracovníka.');
       return;
     }
+    if (pointSelectionMode === 'CUSTOM' && selectedPointIds.size === 0) {
+      setCalculationError('Vyberte prosím na mapě alespoň jeden bod pro posádku.');
+      return;
+    }
 
     setIsCalculating(true);
     setCalculationError(null);
@@ -222,6 +269,10 @@ export function ElectionRoutePlanner({
           vehicleCapacitySlots,
           warehouseUnloadMinutes,
           filterMediaType: selectedMediumFilter,
+          selectedPointIds:
+            pointSelectionMode === 'CUSTOM'
+              ? Array.from(selectedPointIds)
+              : undefined,
           depot: {
             latitude: parseFloat(depotLat) || 50.08804,
             longitude: parseFloat(depotLng) || 14.42076,
@@ -309,7 +360,9 @@ export function ElectionRoutePlanner({
 
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-sky-50 text-sky-700 rounded-lg text-xs font-semibold">
-              K naplánování: {pendingPoints.length} médií
+              {pointSelectionMode === 'CUSTOM'
+                ? `K naplánování: ${selectedPointIds.size} z ${pendingPoints.length} vybráno`
+                : `K naplánování: ${pendingPoints.length} médií`}
             </span>
             {campaign.points.length > pendingPoints.length && (
               <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold">
@@ -376,6 +429,152 @@ export function ElectionRoutePlanner({
             </span>
             Povolí přesčasy a umožní posádkám obsloužit všechny zadané body bez jejich odmítnutí z důvodu konce pevné směny.
           </label>
+        </div>
+
+        {/* Point Selection: ALL vs CUSTOM MAP SELECTION */}
+        <div className="space-y-4 p-5 bg-white border border-slate-200 rounded-2xl shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-sky-600" />
+                <span>Výběr bodů pro trasu výjezdu</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Zvolte, zda má AI optimalizovat trasu pro celou kampaň, nebo chcete posádce naklikat jen určitá stanoviště.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPointSelectionMode('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
+                  pointSelectionMode === 'ALL'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <span>🌐 Všechny zbývající body ({pendingPoints.length} ks)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPointSelectionMode('CUSTOM');
+                  setShowPointSelectionMap(true);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
+                  pointSelectionMode === 'CUSTOM'
+                    ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>🎯 Pouze vybrané body na mapě ({selectedPointIds.size} ks)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Map & point selector when in CUSTOM mode */}
+          {pointSelectionMode === 'CUSTOM' && (
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-sky-50/70 border border-sky-100 rounded-xl">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold text-xs shadow-2xs">
+                    {selectedPointIds.size} / {pendingPoints.length} vybráno
+                  </span>
+                  {selectedPointsList.length > 0 && (
+                    <span className="text-xs font-semibold text-slate-700">
+                      ⏱️ Odhadovaný čas práce: ~{Math.floor(selectedPointsServiceMinutes / 60)} h {selectedPointsServiceMinutes % 60} min
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllPending}
+                    className="px-2.5 py-1 bg-white border border-sky-200 text-sky-800 hover:bg-sky-50 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  >
+                    Vybrat vše ({pendingPoints.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="px-2.5 py-1 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  >
+                    Zrušit výběr
+                  </button>
+                </div>
+              </div>
+
+              {/* Informative helper banner */}
+              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-sm">👆</span>
+                  <span>
+                    <strong>Klikněte na špendlíky v mapě:</strong> Vybrané body se zbarví modře s fajfkou (✓) a AI z nich navrhne optimální trasu pro posádku.
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPointSelectionMap((prev) => !prev)}
+                  className="text-sky-600 hover:text-sky-800 font-bold underline text-[11px] shrink-0 cursor-pointer"
+                >
+                  {showPointSelectionMap ? 'Skrýt mapu' : 'Zobrazit mapu'}
+                </button>
+              </div>
+
+              {showPointSelectionMap && (
+                <div className="rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                  <ElectionRemovalMap
+                    points={pendingPoints}
+                    selectedPointIds={selectedPointIds}
+                    onTogglePointSelection={handleTogglePointSelection}
+                    selectionMode={true}
+                    height="400px"
+                  />
+                </div>
+              )}
+
+              {/* Selected Points Chips Preview */}
+              {selectedPointsList.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs text-slate-600 font-semibold">
+                    <span>Vybraná stanoviště pro tuto trasu ({selectedPointsList.length}):</span>
+                    <span className="text-[11px] text-slate-400">
+                      Kliknutím na křížek (×) bod odeberete z trasy
+                    </span>
+                  </div>
+
+                  <div className="max-h-32 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap gap-1.5">
+                    {selectedPointsList.map((pt) => (
+                      <span
+                        key={pt.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-sky-200 text-slate-800 shadow-2xs"
+                      >
+                        <span className="font-bold text-sky-600">✓</span>
+                        <span className="truncate max-w-[200px]" title={pt.label}>
+                          {pt.label}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          ({pt.mediaType})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePointSelection(pt.id)}
+                          className="text-slate-400 hover:text-rose-600 ml-1 cursor-pointer font-bold"
+                          title="Odebrat z trasy"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Dedicated Medium Filter (Single-Medium Transport Rule) */}
@@ -824,8 +1023,13 @@ export function ElectionRoutePlanner({
           <button
             type="button"
             onClick={handleCalculateRoutes}
-            disabled={isCalculating || pendingPoints.length === 0}
-            className="btn btn-primary px-6 py-2.5 text-sm font-bold inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl shadow-md disabled:opacity-50"
+            disabled={
+              isCalculating ||
+              (pointSelectionMode === 'CUSTOM'
+                ? selectedPointIds.size === 0
+                : pendingPoints.length === 0)
+            }
+            className="btn btn-primary px-6 py-2.5 text-sm font-bold inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl shadow-md disabled:opacity-50 cursor-pointer"
           >
             {isCalculating ? (
               <>
