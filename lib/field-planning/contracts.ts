@@ -117,6 +117,9 @@ export type MyRouteStop = {
   completedAt?: string | null;
   actualDurationMinutes?: number | null;
   isInstantCompletion?: boolean;
+  liveEstimatedStartAt?: string;
+  liveEstimatedEndAt?: string;
+  delayMinutes?: number;
 };
 
 export type MyRouteDTO = {
@@ -134,6 +137,8 @@ export type MyRouteDTO = {
     tripStartedAt?: string | null;
     tripCompletedAt?: string | null;
     actualTripMinutes?: number | null;
+    liveEstimatedEndAt?: string;
+    totalDelayMinutes?: number;
     stops: MyRouteStop[];
   }>;
 };

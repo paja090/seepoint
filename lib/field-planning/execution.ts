@@ -11,6 +11,7 @@ import { stopId, fieldProblemTypes } from './contracts';
 import { attachPointInstallationPhotos, type StoredInstallationPhoto } from '../navigation/navigation-service';
 import { reportNavigationPointIssue } from '../navigation/point-issue';
 import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './contracts';
+import { computeRouteLiveETA } from './live-eta';
 
 export async function myRoute(userId: string, dateOrNow?: string | Date): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
@@ -56,14 +57,17 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
         select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true, issueType: true, issueNote: true, startedAt: true, completedAt: true, campaign: { select: { id: true, name: true } } }
       });
       const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
-      const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
+      const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
+      const pointCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true, createdAt: true } });
+      const orderStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: 'FIELD_WORK_STARTED' }, select: { entityId: true, createdAt: true } });
+      const orderCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: 'FIELD_WORK_COMPLETED' }, select: { entityId: true, createdAt: true } });
       const orderLogs = await prisma.crmAuditLog.findMany({
         where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } },
         orderBy: { createdAt: 'desc' },
         select: { entityId: true, action: true, detailsJson: true }
       });
-      const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
-      const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
+      const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
+      const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true, createdAt: true } });
       const tripLogs = await prisma.crmAuditLog.findMany({
         where: { organizationId, entityType: 'FieldPlanCrew', entityId: `${plan.id}-${crew.id}`, action: { in: ['FIELD_TRIP_STARTED', 'FIELD_TRIP_COMPLETED'] } },
         orderBy: { createdAt: 'asc' },
@@ -77,19 +81,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
         ? Math.max(1, Math.round((tripEnd.createdAt.getTime() - tripStart.createdAt.getTime()) / 60000))
         : null;
 
-      routes.push({
-        planId: plan.id,
-        crewName: crew.names?.length ? crew.names.join(', ') : null,
-        vehicleName: crew.vehicleName,
-        departureAt: crew.departureAt,
-        endAt: crew.endAt,
-        travelMinutes: Math.round((crew.travelSeconds ?? 0) / 60),
-        serviceMinutes: crew.serviceMinutes ?? 0,
-        distanceKm: Number(((crew.distanceMeters ?? 0) / 1000).toFixed(1)),
-        tripStartedAt,
-        tripCompletedAt,
-        actualTripMinutes,
-        stops: crew.stops.flatMap((s): MyRouteStop[] => {
+      const rawStops = crew.stops.flatMap((s): MyRouteStop[] => {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
             if (!ep) return [];
@@ -134,8 +126,12 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
             }];
           }
           if (s.isWarehousePitstop) {
-            const isCompleted = pitstopCompletions.some(c => c.entityId === stopId(s));
-            const isStarted = pitstopStarts.some(c => c.entityId === stopId(s));
+            const pStart = pitstopStarts.find(c => c.entityId === stopId(s));
+            const pComp = pitstopCompletions.find(c => c.entityId === stopId(s));
+            const pDiffMs = pStart && pComp ? pComp.createdAt.getTime() - pStart.createdAt.getTime() : null;
+            const pIsInstant = pDiffMs != null && pDiffMs < 60000;
+            const pActualMins = pDiffMs != null && !pIsInstant ? Math.max(1, Math.round(pDiffMs / 60000)) : null;
+
             return [{
               jobId: stopId(s),
               workOrderItemId: null,
@@ -148,7 +144,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               title: s.title,
               clientName: 'Sklad',
               instructions: '',
-              status: isCompleted ? 'DONE' : isStarted ? 'IN_PROGRESS' : 'PLANNED',
+              status: pComp ? 'DONE' : pStart ? 'IN_PROGRESS' : 'PLANNED',
               issueType: null,
               issueNote: null,
               workType: s.workType,
@@ -160,6 +156,10 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               carrier: null,
               serviceMinutes: s.serviceMinutes,
               travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
+              startedAt: pStart?.createdAt.toISOString() ?? null,
+              completedAt: pComp?.createdAt.toISOString() ?? null,
+              actualDurationMinutes: pActualMins,
+              isInstantCompletion: pIsInstant,
             }];
           }
           const order = orders.find(o => o.id === s.workOrderId); if (s.workOrderId && !order) return [];
@@ -223,6 +223,16 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
             }
           }
 
+          const rawStart = item?.startedAt?.toISOString()
+            ?? (point ? starts.find(a => a.entityId === point.id)?.createdAt.toISOString() : orderStarts.find(a => a.entityId === order?.id)?.createdAt.toISOString())
+            ?? null;
+          const rawComp = item?.completedAt?.toISOString()
+            ?? (point ? pointCompletions.find(a => a.entityId === point.id)?.createdAt.toISOString() : orderCompletions.find(a => a.entityId === order?.id)?.createdAt.toISOString())
+            ?? null;
+          const rawDiffMs = rawStart && rawComp ? new Date(rawComp).getTime() - new Date(rawStart).getTime() : null;
+          const rawIsInstant = rawDiffMs != null && rawDiffMs < 60000;
+          const rawActualMins = rawDiffMs != null && !rawIsInstant ? Math.max(1, Math.round(rawDiffMs / 60000)) : null;
+
           return [{
             jobId: stopId(s),
             workOrderItemId: item?.id ?? null,
@@ -247,8 +257,40 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
             carrier: carrier ? { id: carrier.id, name: carrier.name, code: carrier.code, city: carrier.city, address: carrier.address, photoUrl: carrier.photos[0] ? `/api/photos/${carrier.photos[0].id}/file` : null } : null,
             serviceMinutes: s.serviceMinutes,
             travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
+            startedAt: rawStart,
+            completedAt: rawComp,
+            actualDurationMinutes: rawActualMins,
+            isInstantCompletion: rawIsInstant,
           }];
-        }) });
+        });
+
+      const liveEtaResult = computeRouteLiveETA(
+        {
+          departureAt: crew.departureAt,
+          endAt: crew.endAt,
+          tripStartedAt,
+          tripCompletedAt,
+          stops: rawStops,
+        },
+        { targetDate }
+      );
+
+      routes.push({
+        planId: plan.id,
+        crewName: crew.names?.length ? crew.names.join(', ') : null,
+        vehicleName: crew.vehicleName,
+        departureAt: crew.departureAt,
+        endAt: crew.endAt,
+        travelMinutes: Math.round((crew.travelSeconds ?? 0) / 60),
+        serviceMinutes: crew.serviceMinutes ?? 0,
+        distanceKm: Number(((crew.distanceMeters ?? 0) / 1000).toFixed(1)),
+        tripStartedAt,
+        tripCompletedAt,
+        actualTripMinutes,
+        liveEstimatedEndAt: liveEtaResult.liveEstimatedEndAt,
+        totalDelayMinutes: liveEtaResult.totalDelayMinutes,
+        stops: liveEtaResult.stops,
+      });
     }
   }
   return { timezone: profile.timezone, date: targetDate, routes: routes.filter(r => r.stops.length) };

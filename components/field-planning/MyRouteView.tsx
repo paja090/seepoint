@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
+import { computeRouteLiveETA, formatLiveClock } from '@/lib/field-planning/live-eta';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
   Navigation,
@@ -46,6 +47,27 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
     return d.toISOString().slice(0, 10);
   }, []);
   const [currentDate, setCurrentDate] = useState<string>(initial.date || todayStr);
+
+  const routesWithLiveETA = useMemo(() => {
+    return data.routes.map((route) => {
+      const live = computeRouteLiveETA(
+        {
+          departureAt: route.departureAt,
+          endAt: route.endAt,
+          tripStartedAt: route.tripStartedAt,
+          tripCompletedAt: route.tripCompletedAt,
+          stops: route.stops,
+        },
+        { targetDate: currentDate }
+      );
+      return {
+        ...route,
+        liveEstimatedEndAt: live.liveEstimatedEndAt,
+        totalDelayMinutes: live.totalDelayMinutes,
+        stops: live.stops,
+      };
+    });
+  }, [data, currentDate]);
 
   async function loadDateRoute(date: string) {
     setBusy(true);
@@ -208,7 +230,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       )}
 
       {/* Route Cards */}
-      {data.routes.map((route) => {
+      {routesWithLiveETA.map((route) => {
         const doneCount = route.stops.filter((s) => s.status === 'DONE').length;
         const issueCount = route.stops.filter((s) => s.status === 'ISSUE').length;
         const totalCount = route.stops.length;
@@ -258,11 +280,13 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
           const isDone = s.status === 'DONE';
           const isInProgress = s.status === 'IN_PROGRESS';
           const isIssue = s.status === 'ISSUE';
-          const timeString = new Date(s.startAt).toLocaleTimeString('cs-CZ', {
+          const plannedTimeString = new Date(s.startAt).toLocaleTimeString('cs-CZ', {
             timeZone: data.timezone,
             hour: '2-digit',
             minute: '2-digit',
           });
+          const liveTimeString = formatLiveClock(s.liveEstimatedStartAt ?? s.startAt, data.timezone);
+          const hasSignificantDelay = s.delayMinutes !== undefined && Math.abs(s.delayMinutes) >= 5;
 
           return (
             <article
@@ -319,16 +343,47 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-col items-end gap-1 shrink-0">
                   {isIssue && (
                     <span className="text-[11px] font-black text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-xl flex items-center gap-1 shadow-xs">
                       <AlertTriangle size={12} />
                       <span>Hlášen problém</span>
                     </span>
                   )}
-                  <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-1 rounded-xl">
-                    {timeString}
-                  </span>
+                  {isDone ? (
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-2xs">
+                        <CheckCircle2 size={12} className="text-emerald-700" />
+                        <span>Hotovo {s.completedAt ? formatLiveClock(s.completedAt, data.timezone) : ''}</span>
+                      </span>
+                      {hasSignificantDelay && (
+                        <span className="text-[10px] font-medium text-slate-400 mt-0.5">
+                          plán {plannedTimeString}
+                        </span>
+                      )}
+                    </div>
+                  ) : isInProgress ? (
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs font-extrabold text-sky-950 bg-sky-100 border border-sky-300 px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-xs animate-pulse">
+                        <Clock size={12} className="text-sky-700" />
+                        <span>Běží (~do {formatLiveClock(s.liveEstimatedEndAt, data.timezone)})</span>
+                      </span>
+                      <span className="text-[10px] font-medium text-slate-500 mt-0.5">
+                        začátek {s.startedAt ? formatLiveClock(s.startedAt, data.timezone) : plannedTimeString}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs font-extrabold text-sky-900 bg-sky-100/90 border border-sky-300 px-2.5 py-1 rounded-xl shadow-2xs">
+                        ~{liveTimeString}
+                      </span>
+                      {hasSignificantDelay && (
+                        <span className="text-[10px] font-medium text-slate-500 mt-0.5">
+                          plán {plannedTimeString} ({s.delayMinutes! > 0 ? `+${s.delayMinutes}m` : `${s.delayMinutes}m`})
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -744,6 +799,49 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* Live Shift ETA Banner */}
+              <div className="rounded-xl border border-sky-200 bg-linear-to-r from-sky-50/90 via-indigo-50/30 to-white p-3 space-y-1.5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-sky-700 text-white shadow-xs">
+                      <Clock size={16} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-900 block leading-tight">
+                        Předpokládaný konec směny (Live ETA)
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg sm:text-xl font-black text-slate-950">
+                          ~{formatLiveClock(route.liveEstimatedEndAt, data.timezone)}
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-500">
+                          (původní plán dispečera {formatLiveClock(route.endAt, data.timezone)})
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    {route.totalDelayMinutes !== undefined && route.totalDelayMinutes > 5 ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 font-extrabold text-[11px] border border-amber-300 shadow-2xs">
+                        <span>⚠️ Posun +{formatHoursMinutes(route.totalDelayMinutes)}</span>
+                      </span>
+                    ) : route.totalDelayMinutes !== undefined && route.totalDelayMinutes < -5 ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-100 text-emerald-900 font-extrabold text-[11px] border border-emerald-300 shadow-2xs">
+                        <span>⚡ Náskok {formatHoursMinutes(Math.abs(route.totalDelayMinutes))}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-sky-100 text-sky-900 font-extrabold text-[11px] border border-sky-200 shadow-2xs">
+                        <span>✓ Podle plánu</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  Časy se dynamicky přepočítávají podle vašeho skutečného zahájení a tempa práce na jednotlivých zastávkách.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
