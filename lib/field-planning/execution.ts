@@ -186,18 +186,7 @@ export async function myRoute(userId: string, now = new Date()) {
   return { timezone: profile.timezone, routes: routes.filter(r => r.stops.length) };
 }
 export type MyRouteDTO = Awaited<ReturnType<typeof myRoute>>;
-export const fieldProblemTypes = [
-  'Technický problém',
-  'Nedostupný nosič',
-  'Nosič zarostlý / nepřístupný',
-  'Nemožnost instalace',
-  'Nemožnost instalace (počasí / překážka)',
-  'Poškození',
-  'Poškození konstrukce',
-  'Chybějící materiál',
-  'Chybějící materiál nebo klíč',
-  'Jiné'
-] as const;
+export { fieldProblemTypes } from './contracts';
 
 /** Authenticated worker operations over canonical work; no billing/FTD/payroll state is inferred. */
 export async function executeStop(input: { planId: string; workOrderId: string; jobId?: string; action: string; problemType?: string; note?: string; requestKey?: string }, actor: PlannerActor, db = prisma, installationPhotos?: StoredInstallationPhoto[]) {

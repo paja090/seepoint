@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { fieldProblemTypes, type MyRouteDTO } from '@/lib/field-planning/execution';
+import { fieldProblemTypes } from '@/lib/field-planning/contracts';
+import type { MyRouteDTO } from '@/lib/field-planning/execution';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
   Navigation,

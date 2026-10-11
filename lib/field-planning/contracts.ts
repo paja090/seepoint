@@ -58,6 +58,20 @@ export type PlanningResult = {
   crews: PlannedCrew[]; unassigned: PlanningAlert[]; conflicts: PlanningAlert[]; estimated: boolean;
   explanation: string; distanceMeters: number; travelSeconds: number; serviceMinutes: number;
 };
+
+export const fieldProblemTypes = [
+  'Technický problém',
+  'Nedostupný nosič',
+  'Nosič zarostlý / nepřístupný',
+  'Nemožnost instalace',
+  'Nemožnost instalace (počasí / překážka)',
+  'Poškození',
+  'Poškození konstrukce',
+  'Chybějící materiál',
+  'Chybějící materiál nebo klíč',
+  'Jiné'
+] as const;
+
 export type PlanView = {
   id: string; date: string; version: number; status: string; parentPlanId: string | null;
   approvedAt: string | null; result: PlanningResult; profile: PlanningProfile;
