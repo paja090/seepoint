@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Map as LeafletMap, TileLayer } from 'leaflet';
-import type { MyRouteDTO } from '@/lib/field-planning/execution';
+import type { MyRouteDTO, MyRouteStop } from '@/lib/field-planning/contracts';
 
 export type GoogleMapType = 'roadmap' | 'hybrid';
 
@@ -43,8 +43,8 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
 
       const bounds = L.latLngBounds([]);
 
-      (route.stops as any[]).forEach((stop: any, i: number) => {
-        if (!stop?.location) return;
+      route.stops.forEach((stop: MyRouteStop, i: number) => {
+        if (!stop.location) return;
         const pt: [number, number] = [stop.location.latitude, stop.location.longitude];
         
         let color = '#0ea5e9'; // sky-500 (planned)
