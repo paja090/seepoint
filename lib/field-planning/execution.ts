@@ -12,12 +12,23 @@ import { attachPointInstallationPhotos, type StoredInstallationPhoto } from '../
 import { reportNavigationPointIssue } from '../navigation/point-issue';
 import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './contracts';
 
-export async function myRoute(userId: string, now = new Date()): Promise<MyRouteDTO> {
+export async function myRoute(userId: string, dateOrNow?: string | Date): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(); if (!profile?.enabled) return { timezone: 'Europe/Prague', routes: [] };
   const employee = await prisma.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
   if (!employee) return { timezone: profile.timezone, routes: [] };
-  const plans = await prisma.fieldPlan.findMany({ where: { organizationId, date: dayInZone(now, profile.timezone), status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
+
+  let targetDate: string;
+  if (typeof dateOrNow === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOrNow)) {
+    targetDate = dateOrNow;
+  } else if (dateOrNow instanceof Date) {
+    targetDate = dayInZone(dateOrNow, profile.timezone);
+  } else {
+    targetDate = dayInZone(new Date(), profile.timezone);
+  }
+
+  const plans = await prisma.fieldPlan.findMany({ where: { organizationId, date: targetDate, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
+
   // For election campaigns, if multiple plans exist for today, only take the latest version so superseded routes are excluded
   const seenCampaigns = new Set<string>();
   const effectivePlans: typeof plans = [];
@@ -193,7 +204,7 @@ export async function myRoute(userId: string, now = new Date()): Promise<MyRoute
         }) });
     }
   }
-  return { timezone: profile.timezone, routes: routes.filter(r => r.stops.length) };
+  return { timezone: profile.timezone, date: targetDate, routes: routes.filter(r => r.stops.length) };
 }
 export { fieldProblemTypes, type MyRouteDTO, type MyRouteStop, type MyRouteCarrier } from './contracts';
 

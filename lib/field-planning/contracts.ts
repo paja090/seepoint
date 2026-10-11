@@ -111,6 +111,7 @@ export type MyRouteStop = {
 
 export type MyRouteDTO = {
   timezone: string;
+  date?: string;
   routes: Array<{
     planId: string;
     crewName?: string | null;
@@ -120,3 +121,4 @@ export type MyRouteDTO = {
     stops: MyRouteStop[];
   }>;
 };
+

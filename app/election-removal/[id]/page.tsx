@@ -316,41 +316,86 @@ export default async function ElectionRemovalDetailPage({
                   plan.planningSummary && typeof plan.planningSummary === 'object'
                     ? (plan.planningSummary as Record<string, unknown>)
                     : null;
+                const crews = Array.isArray(summary?.crews)
+                  ? (summary.crews as Array<{
+                      id: string;
+                      names?: string[];
+                      vehicleName?: string | null;
+                      stops?: Array<unknown>;
+                    }>)
+                  : [];
+                const totalStops = crews.reduce(
+                  (acc, c) => acc + (c.stops?.length || 0),
+                  0
+                );
+                const distanceKm =
+                  summary?.distanceMeters !== undefined
+                    ? (Number(summary.distanceMeters) / 1000).toFixed(1)
+                    : summary?.totalDistanceKm !== undefined
+                    ? Number(summary.totalDistanceKm).toFixed(1)
+                    : null;
+                const durationMinutes =
+                  summary?.travelSeconds !== undefined
+                    ? Math.round(
+                        Number(summary.travelSeconds) / 60 +
+                          (Number(summary.serviceMinutes) || 0)
+                      )
+                    : summary?.totalDurationMinutes !== undefined
+                    ? Number(summary.totalDurationMinutes)
+                    : null;
+
                 return (
                   <div
                     key={plan.id}
-                    className="p-4 border border-slate-200 rounded-xl space-y-2 bg-slate-50/50"
+                    className="p-4 border border-slate-200 rounded-xl space-y-3 bg-white shadow-xs hover:border-sky-300 transition"
                   >
                     <div className="flex items-center justify-between">
                       <p className="font-bold text-slate-900 text-sm">
                         Trasa {plan.date} (v{plan.version})
                       </p>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
-                        {plan.status}
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          plan.status === 'APPROVED'
+                            ? 'bg-sky-100 text-sky-800'
+                            : plan.status === 'ACTIVE'
+                            ? 'bg-amber-100 text-amber-800'
+                            : plan.status === 'COMPLETED'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {plan.status === 'APPROVED'
+                          ? 'Schváleno'
+                          : plan.status === 'COMPLETED'
+                          ? 'Dokončeno'
+                          : plan.status}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500">
-                      Plánováno na datum: {plan.date}
-                    </p>
-                    {summary?.totalDistanceKm !== undefined && (
-                      <div className="pt-2 border-t border-slate-200/60 flex justify-between text-xs text-slate-500">
-                        <span>{Number(summary.totalDistanceKm).toFixed(1)} km</span>
-                        <span>{Number(summary.totalDurationMinutes || 0)} min</span>
-                      </div>
-                    )}
-                    {Array.isArray(summary?.crews) && (
-                      <div className="pt-2 border-t border-slate-200/60 space-y-1">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+
+                    <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <span className="font-semibold text-slate-900">
+                        {totalStops}{' '}
+                        {totalStops === 1
+                          ? 'stanoviště'
+                          : totalStops < 5
+                          ? 'stanoviště'
+                          : 'stanovišť'}
+                      </span>
+                      {distanceKm && (
+                        <span>
+                          {distanceKm} km
+                          {durationMinutes ? ` • ~${durationMinutes} min` : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    {crews.length > 0 && (
+                      <div className="pt-2 border-t border-slate-100 space-y-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                           Posádky:
                         </p>
                         <div className="space-y-1">
-                          {(
-                            summary.crews as Array<{
-                              id: string;
-                              names?: string[];
-                              vehicleName?: string | null;
-                            }>
-                          ).map((c, i) => (
+                          {crews.map((c, i) => (
                             <div
                               key={c.id || i}
                               className="text-xs text-slate-700 flex items-start justify-between gap-1"
@@ -373,6 +418,16 @@ export default async function ElectionRemovalDetailPage({
                         </div>
                       </div>
                     )}
+
+                    <div className="pt-2 border-t border-slate-100">
+                      <Link
+                        href={`/election-removal/${campaign.id}/route?planId=${plan.id}`}
+                        className="w-full btn bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 text-xs font-bold inline-flex items-center justify-center gap-1.5 py-2 rounded-lg transition"
+                      >
+                        <Route className="w-3.5 h-3.5" />
+                        <span>Zobrazit detail trasy a zastávek ({totalStops}) →</span>
+                      </Link>
+                    </div>
                   </div>
                 );
               })}
