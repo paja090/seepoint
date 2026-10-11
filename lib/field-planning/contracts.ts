@@ -128,6 +128,9 @@ export type MyRouteDTO = {
     travelMinutes?: number;
     serviceMinutes?: number;
     distanceKm?: number;
+    tripStartedAt?: string | null;
+    tripCompletedAt?: string | null;
+    actualTripMinutes?: number | null;
     stops: MyRouteStop[];
   }>;
 };

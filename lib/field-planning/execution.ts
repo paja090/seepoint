@@ -64,6 +64,19 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
       });
       const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
       const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
+      const tripLogs = await prisma.crmAuditLog.findMany({
+        where: { organizationId, entityType: 'FieldPlanCrew', entityId: `${plan.id}-${crew.id}`, action: { in: ['FIELD_TRIP_STARTED', 'FIELD_TRIP_COMPLETED'] } },
+        orderBy: { createdAt: 'asc' },
+        select: { action: true, createdAt: true }
+      });
+      const tripStart = tripLogs.find(l => l.action === 'FIELD_TRIP_STARTED');
+      const tripEnd = tripLogs.find(l => l.action === 'FIELD_TRIP_COMPLETED');
+      const tripStartedAt = tripStart ? tripStart.createdAt.toISOString() : null;
+      const tripCompletedAt = tripEnd ? tripEnd.createdAt.toISOString() : null;
+      const actualTripMinutes = tripStart && tripEnd
+        ? Math.max(1, Math.round((tripEnd.createdAt.getTime() - tripStart.createdAt.getTime()) / 60000))
+        : null;
+
       routes.push({
         planId: plan.id,
         crewName: crew.names?.length ? crew.names.join(', ') : null,
@@ -73,6 +86,9 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
         travelMinutes: Math.round((crew.travelSeconds ?? 0) / 60),
         serviceMinutes: crew.serviceMinutes ?? 0,
         distanceKm: Number(((crew.distanceMeters ?? 0) / 1000).toFixed(1)),
+        tripStartedAt,
+        tripCompletedAt,
+        actualTripMinutes,
         stops: crew.stops.flatMap((s): MyRouteStop[] => {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
@@ -236,10 +252,29 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
     const { organizationId } = requireTenantContext(); const plan = await getPlan(input.planId, tx);
     const employee = await tx.employee.findFirst({ where: { organizationId, userId: actor.id, isActive: true } });
     const result = plan.planningSummary as unknown as PlanningResult;
-    const crew = result.crews.find(c => employee && c.employeeIds.includes(employee.id) && c.stops.some(s => stopId(s) === (input.jobId ?? input.workOrderId)));
+    const crew = result.crews.find(c => employee && c.employeeIds.includes(employee.id) && (['start_trip', 'complete_trip'].includes(input.action) || c.stops.some(s => stopId(s) === (input.jobId ?? input.workOrderId))));
     if (!crew || !employee || !['APPROVED', 'ACTIVE', 'COMPLETED'].includes(plan.status)) throw new Error('FORBIDDEN: pouze vlastní schválená trasa.');
     const profile = (plan.planningInputSnapshot as unknown as PlanningInput).profile;
     if (dayInZone(new Date(), profile.timezone) !== plan.date) throw new Error('Realizovat lze pouze dnešní trasu.');
+    if (input.action === 'start_trip' || input.action === 'complete_trip') {
+      const actionStr = input.action === 'start_trip' ? 'FIELD_TRIP_STARTED' : 'FIELD_TRIP_COMPLETED';
+      const eventId = `fp-trip-${plan.id}-${crew.id}-${actionStr}`;
+      const existing = await tx.crmAuditLog.findUnique({ where: { id: eventId, organizationId } });
+      if (existing) return { ok: true };
+      await tx.crmAuditLog.create({
+        data: {
+          id: eventId,
+          organizationId,
+          entityType: 'FieldPlanCrew',
+          entityId: `${plan.id}-${crew.id}`,
+          userId: actor.id,
+          userEmail: actor.email,
+          action: actionStr,
+          detailsJson: JSON.stringify({ planId: plan.id, crewId: crew.id, crewName: crew.names?.join(', ') })
+        }
+      });
+      return { ok: true };
+    }
     const order = input.workOrderId ? await tx.workOrder.findUnique({ where: { id: input.workOrderId, organizationId }, include: { items: true, workTasks: true, crmRealizations: true, navigationOrder: { include: { points: true } } } }) : null;
     if (input.workOrderId && (!order || !order.workTasks.some(t => t.organizationId === organizationId && t.assignedToEmployeeId === employee.id))) throw new Error('FORBIDDEN: pracovní přiřazení se změnilo.');
     if (order && [...order.crmRealizations, ...order.workTasks, ...(order.navigationOrder ? [order.navigationOrder, ...order.navigationOrder.points] : [])].some(r => r.organizationId !== organizationId)) throw new Error('Cross-tenant reference rejected.');

@@ -657,13 +657,94 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 </span>
               </div>
 
+              {/* Trip Controls (Start Departure from Warehouse / Complete Return to Warehouse) */}
+              <div
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border transition ${
+                  route.tripCompletedAt
+                    ? 'bg-emerald-50/70 border-emerald-200'
+                    : route.tripStartedAt
+                    ? 'bg-sky-50 border-sky-200'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`p-1.5 rounded-lg ${
+                      route.tripCompletedAt
+                        ? 'bg-emerald-600 text-white'
+                        : route.tripStartedAt
+                        ? 'bg-sky-600 text-white animate-pulse'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <Navigation size={14} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-900 block leading-tight">
+                      {route.tripCompletedAt
+                        ? `Výjezd dokončen: návrat na sklad v ${new Date(
+                            route.tripCompletedAt
+                          ).toLocaleTimeString('cs-CZ', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}`
+                        : route.tripStartedAt
+                        ? `Výjezd na trase: odjezd ze skladu v ${new Date(
+                            route.tripStartedAt
+                          ).toLocaleTimeString('cs-CZ', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}`
+                        : 'Celodenní výjezd (ze skladu a zpět)'}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {route.tripCompletedAt
+                        ? `Skutečná délka směny: ${formatHoursMinutes(
+                            route.actualTripMinutes ?? 0
+                          )}`
+                        : route.tripStartedAt
+                        ? 'Stopky směny běží včetně cest a případných kolon'
+                        : 'Zahajte při ranním odjezdu z firmy pro změření celé směny'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!route.tripStartedAt && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => run(route.planId, '', 'start_trip')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
+                    >
+                      <span>🚀 Zahájit výjezd (odjezd ze skladu)</span>
+                    </button>
+                  )}
+                  {route.tripStartedAt && !route.tripCompletedAt && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => run(route.planId, '', 'complete_trip')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
+                    >
+                      <span>🏁 Ukončit výjezd (návrat na sklad)</span>
+                    </button>
+                  )}
+                  {route.tripCompletedAt && (
+                    <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-100/80 px-2.5 py-1 rounded-lg">
+                      ✓ Návrat zapsán
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div className="p-2 bg-slate-50 rounded-xl">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                     Čas na cestě
                   </span>
                   <span className="font-extrabold text-slate-900 text-sm">
-                    ~{route.travelMinutes ?? 0} min
+                    ~{formatHoursMinutes(route.travelMinutes ?? 0)}
                   </span>
                   <span className="text-[10px] text-slate-500 block">
                     {route.distanceKm ? `${route.distanceKm} km přejezdů` : 'Přejezdy'}
@@ -701,13 +782,34 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     Reálně naměřeno
                   </span>
                   <span className="font-extrabold text-sky-950 text-sm">
-                    {measuredStops.length > 0
+                    {route.actualTripMinutes != null
+                      ? formatHoursMinutes(route.actualTripMinutes)
+                      : measuredStops.length > 0
                       ? formatHoursMinutes(totalMeasuredMinutes)
                       : '—'}
                   </span>
-                  <span className="text-[10px] text-sky-700 block truncate" title={measuredStops.length > 0 ? `Průměr ${avgMeasuredMinutes} min / bod` : ''}>
-                    {measuredStops.length > 0
-                      ? `Ø ${avgMeasuredMinutes} min / bod (${measuredStops.length}x)`
+                  <span
+                    className="text-[10px] text-sky-700 block truncate"
+                    title={
+                      route.actualTripMinutes != null
+                        ? `Celý výjezd: ${formatHoursMinutes(
+                            route.actualTripMinutes
+                          )}, z toho práce: ${formatHoursMinutes(totalMeasuredMinutes)}`
+                        : measuredStops.length > 0
+                        ? `Průměr ${avgMeasuredMinutes} min / bod`
+                        : ''
+                    }
+                  >
+                    {route.actualTripMinutes != null
+                      ? `Práce: ${formatHoursMinutes(
+                          totalMeasuredMinutes
+                        )} | Cesta: ${formatHoursMinutes(
+                          Math.max(0, route.actualTripMinutes - totalMeasuredMinutes)
+                        )}`
+                      : measuredStops.length > 0
+                      ? `Práce: ${formatHoursMinutes(
+                          totalMeasuredMinutes
+                        )} (${measuredStops.length}x)`
                       : 'Měří se po dokončení'}
                   </span>
                 </div>
