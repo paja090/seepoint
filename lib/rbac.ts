@@ -170,7 +170,6 @@ const permissions: Record<AppRole, AppSection[]> = {
     'navigationProjects',
     'team',
     'fieldSurvey',
-    'electionRemoval',
   ],
   ACCOUNTANT: [
     'dashboard',
