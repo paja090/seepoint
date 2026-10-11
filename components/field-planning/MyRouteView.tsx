@@ -26,7 +26,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [data, setData] = useState(initial);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [photoCarrier, setPhotoCarrier] = useState<MyRouteDTO['routes'][number]['stops'][number]['carrier']>(null);
+  const [photoCarrier, setPhotoCarrier] = useState<{ id: string; name: string; code?: string; city?: string; address?: string | null; photoUrl?: string | null } | null>(null);
   const [activePhotoModalStopId, setActivePhotoModalStopId] = useState<string | null>(null);
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
 
