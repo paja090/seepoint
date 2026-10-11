@@ -24,6 +24,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [photoCarrier, setPhotoCarrier] = useState<MyRouteCarrier>(null);
   const [activePhotoModalStopId, setActivePhotoModalStopId] = useState<string | null>(null);
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
+  const [hideDoneStops, setHideDoneStops] = useState(true);
 
   async function run(planId: string, workOrderId: string, action: string, form?: FormData, jobId?: string) {
     setBusy(true);
@@ -120,10 +121,15 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         return (
           <section key={route.planId} className="space-y-4">
             {/* Route summary bar */}
-            <div className="flex items-center justify-between rounded-2xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between rounded-2xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700 gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Car size={15} className="text-sky-600" />
                 <span>{route.vehicleName ?? 'Výjezd bez vozidla'}</span>
+                {route.crewName && (
+                  <span className="text-slate-600 font-semibold bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                    Posádka: {route.crewName}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {issueCount > 0 && (
@@ -141,15 +147,19 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
             {/* LIVE MAP */}
             <MyRouteMap route={route} height="h-[280px]" />
 
-            {/* Google Maps Full Route */}
+            {/* Google Maps Full Route (active uncompleted stops only) */}
             {(() => {
-              const points = route.stops.map(s => s.location).filter((loc): loc is { latitude: number; longitude: number } => Boolean(loc));
+              const activeStops = route.stops.filter((s) => s.status !== 'DONE');
+              const targetStops = activeStops.length > 0 ? activeStops : route.stops;
+              const points = targetStops
+                .map((s) => s.location)
+                .filter((loc): loc is { latitude: number; longitude: number } => Boolean(loc));
               if (points.length < 2) return null;
               const origin = `${points[0].latitude},${points[0].longitude}`;
               const dest = `${points[points.length - 1].latitude},${points[points.length - 1].longitude}`;
-              const waypoints = points.slice(1, -1).map(p => `${p.latitude},${p.longitude}`).join('|');
+              const waypoints = points.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|');
               const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypoints ? `&waypoints=${waypoints}` : ''}`;
-              
+
               return (
                 <a
                   href={url}
@@ -158,13 +168,36 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 mt-2 border border-indigo-200/50"
                 >
                   <MapPin size={16} />
-                  <span>Zobrazit celou trasu na mapě</span>
+                  <span>Zobrazit trasu na mapě (zbývající zastávky)</span>
                 </a>
               );
             })()}
 
+            {/* Done stops toggle banner */}
+            {doneCount > 0 && (
+              <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-900">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 size={14} className="text-emerald-600" />
+                  <span>
+                    {hideDoneStops
+                      ? `${doneCount} hotových zastávek je v trase skryto`
+                      : `${doneCount} dokončených zastávek`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHideDoneStops(!hideDoneStops)}
+                  className="text-emerald-700 hover:text-emerald-900 font-bold underline cursor-pointer"
+                >
+                  {hideDoneStops ? 'Zobrazit hotové' : 'Skrýt hotové'}
+                </button>
+              </div>
+            )}
+
             {/* Stops list */}
-            {route.stops.map((s, i) => {
+            {route.stops
+              .filter((s) => !hideDoneStops || s.status !== 'DONE')
+              .map((s, i) => {
               const isDone = s.status === 'DONE';
               const isInProgress = s.status === 'IN_PROGRESS';
               const isIssue = s.status === 'ISSUE';

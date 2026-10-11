@@ -376,6 +376,18 @@ export async function approveAndSaveElectionPlan(
     const version = (latest?.version ?? 0) + 1;
     const requestKey = `election-${campaignId}-${planningInput.date}-v${version}`;
 
+    // Mark previous active/approved plans for this campaign as COMPLETED so old superseded plans aren't running concurrently
+    await tx.fieldPlan.updateMany({
+      where: {
+        organizationId,
+        electionCampaignId: campaignId,
+        status: { in: ['APPROVED', 'ACTIVE'] },
+      },
+      data: {
+        status: 'COMPLETED',
+      },
+    });
+
     // Create the FieldPlan
     const fieldPlan = await tx.fieldPlan.create({
       data: {
@@ -394,12 +406,16 @@ export async function approveAndSaveElectionPlan(
       },
     });
 
-    // Update assigned points
+    // Update assigned points (never overwrite points that are already completed)
     for (const crew of planningResult.crews) {
       for (const stop of crew.stops) {
         if (stop.electionRemovalPointId) {
-          await tx.electionRemovalPoint.update({
-            where: { id: stop.electionRemovalPointId, organizationId },
+          await tx.electionRemovalPoint.updateMany({
+            where: {
+              id: stop.electionRemovalPointId,
+              organizationId,
+              status: { not: 'COMPLETED' },
+            },
             data: {
               assignedFieldPlanId: fieldPlan.id,
               assignedCrewId: crew.id,

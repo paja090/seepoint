@@ -113,6 +113,7 @@ export type MyRouteDTO = {
   timezone: string;
   routes: Array<{
     planId: string;
+    crewName?: string | null;
     vehicleName: string | null;
     departureAt: string;
     endAt: string;

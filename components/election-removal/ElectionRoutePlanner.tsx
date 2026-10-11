@@ -759,10 +759,30 @@ export function ElectionRoutePlanner({
 
                 {/* Employees Selection */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-slate-400" />
-                    Členové posádky ({crew.employeeIds.length})
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      Členové posádky ({crew.employeeIds.length})
+                    </label>
+                  </div>
+
+                  {/* Summary of assigned employee names */}
+                  {crew.employeeIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {crew.employeeIds.map((id) => {
+                        const emp = employees.find((e) => e.id === id);
+                        return emp ? (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-200"
+                          >
+                            👤 {emp.name}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+
                   <div className="max-h-36 overflow-y-auto space-y-1 bg-white border border-slate-200 rounded-lg p-2 text-xs">
                     {employees.map((emp) => {
                       const isSelected = crew.employeeIds.includes(emp.id);
@@ -963,8 +983,11 @@ export function ElectionRoutePlanner({
                         {cIdx + 1}
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-900 text-sm">
-                          Trasa posádky: {crew.names.join(', ') || crew.id}
+                        <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5 flex-wrap">
+                          <span>{crew.id.replace('crew-', 'Posádka ')}:</span>
+                          <span className="text-sky-700 font-semibold">
+                            {crew.names.join(', ') || 'Bez pracovníků'}
+                          </span>
                         </h4>
                         <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
                           {crew.vehicleName && (
