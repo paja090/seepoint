@@ -439,7 +439,12 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
           isOpen
           onClose={() => setPhotoCarrier(null)}
           preselectedCarrierId={photoCarrier.id}
-          carriers={[photoCarrier]}
+          carriers={[{
+            id: photoCarrier.id,
+            name: photoCarrier.name,
+            code: photoCarrier.code ?? '',
+            city: photoCarrier.city ?? '',
+          }]}
           onSuccess={() => setPhotoCarrier(null)}
         />
       )}
