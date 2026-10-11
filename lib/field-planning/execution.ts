@@ -7,10 +7,10 @@ import { auditPlan, getPlan, hash, plannerTransaction, type PlannerActor } from 
 import { executeItem } from './item-execution';
 import { itemStatus, usesItemExecution } from './item-jobs';
 import { navigationAvailable } from './capabilities';
-import { stopId } from './contracts';
+import { stopId, fieldProblemTypes } from './contracts';
 import { attachPointInstallationPhotos, type StoredInstallationPhoto } from '../navigation/navigation-service';
 import { reportNavigationPointIssue } from '../navigation/point-issue';
-import type { PlanningInput, PlanningResult, MyRouteDTO } from './contracts';
+import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './contracts';
 
 export async function myRoute(userId: string, now = new Date()): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
@@ -44,7 +44,7 @@ export async function myRoute(userId: string, now = new Date()): Promise<MyRoute
       const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
       const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
       routes.push({ planId: plan.id, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
-        stops: crew.stops.flatMap(s => {
+        stops: crew.stops.flatMap((s): MyRouteStop[] => {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
             if (!ep) return [];
