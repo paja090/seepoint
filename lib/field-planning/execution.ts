@@ -10,16 +10,16 @@ import { navigationAvailable } from './capabilities';
 import { stopId } from './contracts';
 import { attachPointInstallationPhotos, type StoredInstallationPhoto } from '../navigation/navigation-service';
 import { reportNavigationPointIssue } from '../navigation/point-issue';
-import type { PlanningInput, PlanningResult } from './contracts';
+import type { PlanningInput, PlanningResult, MyRouteDTO } from './contracts';
 
-export async function myRoute(userId: string, now = new Date()) {
+export async function myRoute(userId: string, now = new Date()): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(); if (!profile?.enabled) return { timezone: 'Europe/Prague', routes: [] };
   const employee = await prisma.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
   if (!employee) return { timezone: profile.timezone, routes: [] };
   const plans = await prisma.fieldPlan.findMany({ where: { organizationId, date: dayInZone(now, profile.timezone), status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
   const navigation = await navigationAvailable();
-  const routes = [];
+  const routes: MyRouteDTO['routes'] = [];
   for (const plan of plans) {
     const result = plan.planningSummary as unknown as PlanningResult;
     for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
@@ -185,8 +185,7 @@ export async function myRoute(userId: string, now = new Date()) {
   }
   return { timezone: profile.timezone, routes: routes.filter(r => r.stops.length) };
 }
-export type MyRouteDTO = Awaited<ReturnType<typeof myRoute>>;
-export { fieldProblemTypes } from './contracts';
+export { fieldProblemTypes, type MyRouteDTO, type MyRouteStop, type MyRouteCarrier } from './contracts';
 
 /** Authenticated worker operations over canonical work; no billing/FTD/payroll state is inferred. */
 export async function executeStop(input: { planId: string; workOrderId: string; jobId?: string; action: string; problemType?: string; note?: string; requestKey?: string }, actor: PlannerActor, db = prisma, installationPhotos?: StoredInstallationPhoto[]) {

@@ -76,3 +76,46 @@ export type PlanView = {
   id: string; date: string; version: number; status: string; parentPlanId: string | null;
   approvedAt: string | null; result: PlanningResult; profile: PlanningProfile;
 };
+
+export type MyRouteCarrier = {
+  id: string;
+  name: string;
+  code: string;
+  city: string;
+  address: string | null;
+  photoUrl: string | null;
+} | null;
+
+export type MyRouteStop = {
+  jobId: string;
+  workOrderItemId: string | null;
+  navigationPointId: string | null;
+  electionRemovalPointId: string | null;
+  address: string | null;
+  pointPhotoUrl: string | null;
+  workOrderId: string;
+  title: string;
+  clientName: string | null;
+  instructions: string | null;
+  status: string;
+  issueType: string | null;
+  issueNote: string | null;
+  workType: string;
+  startAt: string;
+  endAt: string;
+  location: Coordinates | null;
+  taskId: string | null;
+  navigationOrderId: string | null;
+  carrier: MyRouteCarrier;
+};
+
+export type MyRouteDTO = {
+  timezone: string;
+  routes: Array<{
+    planId: string;
+    vehicleName: string | null;
+    departureAt: string;
+    endAt: string;
+    stops: MyRouteStop[];
+  }>;
+};

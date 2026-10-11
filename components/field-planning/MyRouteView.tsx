@@ -1,8 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { fieldProblemTypes } from '@/lib/field-planning/contracts';
-import type { MyRouteDTO } from '@/lib/field-planning/execution';
+import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
   Navigation,
@@ -26,7 +25,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [data, setData] = useState(initial);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [photoCarrier, setPhotoCarrier] = useState<{ id: string; name: string; code?: string; city?: string; address?: string | null; photoUrl?: string | null } | null>(null);
+  const [photoCarrier, setPhotoCarrier] = useState<MyRouteCarrier>(null);
   const [activePhotoModalStopId, setActivePhotoModalStopId] = useState<string | null>(null);
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
 
