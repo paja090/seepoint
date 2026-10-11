@@ -205,7 +205,7 @@ export async function executeAiInboxAction(
           throw new Error('Před vytvořením konceptu nabídky je nutné nejprve potvrdit nebo vybrat klienta.');
         }
 
-        let offerId = msg.offerId;
+        let offerId: string | null | undefined = msg.offerId;
 
         // 1. Zkusíme plně asistovaný AI orchestrátor (párování ploch v kalendáři obsazenosti a nacenění)
         if (!offerId) {
@@ -232,13 +232,15 @@ export async function executeAiInboxAction(
             items: [],
           });
           offerId = offerResult.offer.id;
-          await prisma.aiInboxMessage.update({
-            where: { id: msg.id },
-            data: { offerId },
-          });
+          if (offerId) {
+            await prisma.aiInboxMessage.update({
+              where: { id: msg.id },
+              data: { offerId },
+            });
+          }
         }
 
-        createdEntityId = offerId;
+        createdEntityId = offerId || undefined;
         break;
       }
 
