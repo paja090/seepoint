@@ -12,10 +12,22 @@ import {
   Clock,
   ArrowLeft,
   Car,
+  Timer,
+  Layers,
+  Briefcase,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const MyRouteMap = dynamic(() => import('@/components/field-planning/MyRouteMap').then(m => m.MyRouteMap), { ssr: false });
+
+function formatHoursMinutes(totalMinutes: number): string {
+  if (!totalMinutes || totalMinutes <= 0) return '0 min';
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
 
 export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [data, setData] = useState(initial);
@@ -25,6 +37,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [activePhotoModalStopId, setActivePhotoModalStopId] = useState<string | null>(null);
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
   const [hideDoneStops, setHideDoneStops] = useState(true);
+  const [groupByOrder, setGroupByOrder] = useState(false);
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const tomorrowStr = useMemo(() => {
@@ -200,6 +213,405 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         const issueCount = route.stops.filter((s) => s.status === 'ISSUE').length;
         const totalCount = route.stops.length;
 
+        // Measured duration from completed stops
+        const measuredStops = route.stops.filter(
+          (s) => s.status === 'DONE' && s.actualDurationMinutes != null
+        );
+        const totalMeasuredMinutes = measuredStops.reduce(
+          (acc, s) => acc + (s.actualDurationMinutes || 0),
+          0
+        );
+        const avgMeasuredMinutes =
+          measuredStops.length > 0
+            ? (totalMeasuredMinutes / measuredStops.length).toFixed(1)
+            : null;
+
+        // Order & Campaign grouping
+        const orderGroupsMap = new Map<
+          string,
+          {
+            key: string;
+            title: string;
+            clientName: string | null;
+            stops: typeof route.stops;
+          }
+        >();
+        route.stops.forEach((s) => {
+          const key = s.workOrderId || s.campaignName || s.clientName || 'default';
+          const title =
+            s.orderTitle ||
+            s.campaignName ||
+            (s.clientName ? `Zakázka: ${s.clientName}` : 'Běžný výjezd');
+          if (!orderGroupsMap.has(key)) {
+            orderGroupsMap.set(key, {
+              key,
+              title,
+              clientName: s.clientName,
+              stops: [],
+            });
+          }
+          orderGroupsMap.get(key)!.stops.push(s);
+        });
+        const orderGroups = Array.from(orderGroupsMap.values());
+
+        const renderSingleStop = (s: (typeof route.stops)[number], displayOrder: number) => {
+          const isDone = s.status === 'DONE';
+          const isInProgress = s.status === 'IN_PROGRESS';
+          const isIssue = s.status === 'ISSUE';
+          const timeString = new Date(s.startAt).toLocaleTimeString('cs-CZ', {
+            timeZone: data.timezone,
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          return (
+            <article
+              id={`stop-${s.jobId}`}
+              key={s.jobId}
+              className={`rounded-3xl border p-5 shadow-sm space-y-3 transition ${
+                isDone
+                  ? 'border-emerald-200 bg-emerald-50/20'
+                  : isIssue
+                  ? 'border-rose-300 bg-rose-50/30 ring-2 ring-rose-500/20'
+                  : isInProgress
+                  ? 'border-sky-300 bg-sky-50/30 ring-2 ring-sky-500/20'
+                  : 'border-slate-200 bg-white'
+              }`}
+            >
+              {/* Order / Campaign Pill */}
+              {(s.orderTitle || s.campaignName) && (
+                <div className="flex items-center gap-1.5 pb-0.5">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                    <Briefcase size={10} className="text-sky-600" />
+                    <span>{s.orderTitle || s.campaignName}</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Stop header */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-xs font-black ${
+                      isDone
+                        ? 'bg-emerald-600 text-white'
+                        : isIssue
+                        ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400/50'
+                        : isInProgress
+                        ? 'bg-sky-600 text-white animate-pulse'
+                        : 'bg-slate-900 text-white'
+                    }`}
+                  >
+                    {isDone ? '✓' : isIssue ? '!' : displayOrder}
+                  </div>
+
+                  <div>
+                    <h2
+                      className={`font-extrabold text-sm sm:text-base leading-tight ${
+                        isIssue ? 'text-rose-950' : 'text-slate-950'
+                      }`}
+                    >
+                      {s.title}
+                    </h2>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      {s.clientName} · {s.carrier?.code ? `Nosič ${s.carrier.code}` : s.workType}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {isIssue && (
+                    <span className="text-[11px] font-black text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-xl flex items-center gap-1 shadow-xs">
+                      <AlertTriangle size={12} />
+                      <span>Hlášen problém</span>
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-1 rounded-xl">
+                    {timeString}
+                  </span>
+                </div>
+              </div>
+
+              {/* Timing row (Planned work & travel time, Measured duration) */}
+              <div className="flex flex-wrap items-center gap-2 text-[11px] pt-0.5">
+                {s.serviceMinutes !== undefined && (
+                  <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md font-medium">
+                    <Clock size={11} className="text-slate-400" />
+                    <span>Plán práce: {s.serviceMinutes} min</span>
+                  </span>
+                )}
+                {s.travelMinutes !== undefined && s.travelMinutes > 0 && (
+                  <span className="inline-flex items-center gap-1 text-slate-500 bg-slate-50 border border-slate-200/60 px-2 py-0.5 rounded-md font-medium">
+                    <Car size={11} className="text-slate-400" />
+                    <span>Přejezd: ~{s.travelMinutes} min</span>
+                  </span>
+                )}
+                {s.actualDurationMinutes !== undefined && s.actualDurationMinutes !== null && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold ${
+                      s.serviceMinutes && s.actualDurationMinutes <= s.serviceMinutes
+                        ? 'text-emerald-800 bg-emerald-100/80 border border-emerald-300'
+                        : 'text-amber-800 bg-amber-100/80 border border-amber-300'
+                    }`}
+                  >
+                    <CheckCircle2 size={11} />
+                    <span>
+                      Naměřeno: {s.actualDurationMinutes} min
+                      {s.serviceMinutes
+                        ? ` (${
+                            s.actualDurationMinutes <= s.serviceMinutes
+                              ? `-${s.serviceMinutes - s.actualDurationMinutes}`
+                              : `+${s.actualDurationMinutes - s.serviceMinutes}`
+                          } min)`
+                        : ''}
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {/* Address */}
+              <p className="text-xs text-slate-700 font-semibold flex items-center gap-1.5 pl-1">
+                <MapPin size={14} className="text-sky-600 shrink-0" />
+                <span>{s.address ?? s.carrier?.address ?? s.carrier?.city}</span>
+              </p>
+
+              {/* Instructions */}
+              {s.instructions && (
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                  <span className="font-bold text-slate-900 block uppercase tracking-wider text-[10px]">
+                    Instrukce k montáži:
+                  </span>
+                  <p className="whitespace-pre-wrap">{s.instructions}</p>
+                </div>
+              )}
+
+              {/* Issue details box */}
+              {(isIssue || s.issueType || s.issueNote) && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-3.5 text-xs text-rose-900 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-800 uppercase tracking-wider text-[10px]">
+                    <AlertTriangle size={13} className="text-rose-600" />
+                    <span>{s.issueType || 'Hlášený problém na místě'}</span>
+                  </div>
+                  {s.issueNote && (
+                    <p className="whitespace-pre-wrap text-rose-800 font-medium pl-4">
+                      {s.issueNote}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Primary Action Row */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {/* Navigate Button */}
+                {s.location && (
+                  <a
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-sky-700 px-4 py-3 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition"
+                    target="_blank"
+                    rel="noreferrer"
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${s.location.latitude},${s.location.longitude}`}
+                  >
+                    <Navigation size={14} />
+                    <span>Navigovat 🗺️</span>
+                  </a>
+                )}
+
+                {/* Start / Finish Button */}
+                {!isDone && s.status !== 'CANCELLED' && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        route.planId,
+                        s.workOrderId,
+                        isInProgress ? 'complete' : 'start',
+                        undefined,
+                        s.jobId
+                      )
+                    }
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-bold transition shadow-sm ${
+                      isInProgress
+                        ? 'bg-emerald-700 text-white hover:bg-emerald-600'
+                        : isIssue
+                        ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
+                        : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Clock size={14} />
+                    <span>
+                      {isInProgress
+                        ? 'Označit za hotové ✓'
+                        : isIssue
+                        ? 'Zkusit znovu / Zahájit'
+                        : 'Zahájit práci'}
+                    </span>
+                  </button>
+                )}
+
+                {/* Upload Photo Button */}
+                {(s.navigationPointId || s.workOrderItemId) && !isDone && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActivePhotoModalStopId(
+                        activePhotoModalStopId === s.jobId ? null : s.jobId
+                      )
+                    }
+                    className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                  >
+                    <Camera size={14} className="text-sky-600" />
+                    <span>Doklad / Fotka 📸</span>
+                  </button>
+                )}
+
+                {/* Report Problem Button */}
+                {!isDone && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveProblemModalStopId(
+                        activeProblemModalStopId === s.jobId ? null : s.jobId
+                      )
+                    }
+                    className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-xs font-bold transition ml-auto ${
+                      isIssue
+                        ? 'text-rose-700 bg-rose-100 hover:bg-rose-200 border border-rose-200'
+                        : 'text-amber-700 hover:bg-amber-50'
+                    }`}
+                  >
+                    <AlertTriangle size={14} />
+                    <span>{isIssue ? 'Upravit problém' : 'Problém?'}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Inline Photo Upload Drawer */}
+              {activePhotoModalStopId === s.jobId && (
+                <form
+                  action={(form) => upload(route.planId, s.workOrderId, s.jobId, form)}
+                  className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 space-y-3 mt-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
+                      <Camera size={14} />
+                      <span>Vyfotit doklad a dokončit montáž</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setActivePhotoModalStopId(null)}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Zavřít
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block">
+                      Fotografie hotové práce (povinné)
+                    </label>
+                    <input
+                      type="file"
+                      name="afterPhoto"
+                      accept="image/*"
+                      capture="environment"
+                      required
+                      className="mt-1 block w-full text-xs text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-sky-700 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-sky-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Poznámka (volitelné)
+                    </label>
+                    <input
+                      type="text"
+                      name="note"
+                      placeholder="Např. vylepeno v pořádku, osvětlení funkční"
+                      className="input mt-1 w-full text-xs font-medium"
+                    />
+                  </div>
+
+                  <button
+                    disabled={busy}
+                    className="w-full rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 transition"
+                  >
+                    {busy ? 'Ukládám…' : 'Odeslat fotku a dokončit zastávku ✓'}
+                  </button>
+                </form>
+              )}
+
+              {/* Inline Problem Report Drawer */}
+              {activeProblemModalStopId === s.jobId && (
+                <form
+                  action={(form) =>
+                    run(route.planId, s.workOrderId, 'problem', form, s.jobId)
+                  }
+                  className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3 mt-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                      <AlertTriangle size={14} />
+                      <span>{isIssue ? 'Upravit zádrhel na místě' : 'Nahlásit zádrhel na místě'}</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setActiveProblemModalStopId(null)}
+                      className="text-xs text-slate-400 hover:text-slate-600"
+                    >
+                      Zavřít
+                    </button>
+                  </div>
+
+                  <input
+                    type="hidden"
+                    name="key"
+                    value={`${route.planId}-${s.jobId}-${s.status}`}
+                  />
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block">Důvod zádrhelu</label>
+                    <select
+                      name="type"
+                      defaultValue={s.issueType ?? fieldProblemTypes[0]}
+                      className="input mt-1 w-full text-xs font-semibold"
+                    >
+                      {fieldProblemTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block">Co přesně se stalo?</label>
+                    <textarea
+                      name="note"
+                      rows={2}
+                      required
+                      defaultValue={s.issueNote ?? ''}
+                      placeholder="Popište situaci pro dispečera…"
+                      className="input mt-1 w-full text-xs font-medium"
+                    />
+                  </div>
+
+                  <button
+                    disabled={busy}
+                    className={`w-full rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition ${
+                      isIssue ? 'bg-rose-700 hover:bg-rose-600' : 'bg-amber-700 hover:bg-amber-600'
+                    }`}
+                  >
+                    {busy
+                      ? 'Odesílám…'
+                      : isIssue
+                      ? 'Aktualizovat upozornění dispečerovi ⚠️'
+                      : 'Odeslat upozornění dispečerovi ⚠️'}
+                  </button>
+                </form>
+              )}
+            </article>
+          );
+        };
+
         return (
           <section key={route.planId} className="space-y-4">
             {/* Route summary bar */}
@@ -217,12 +629,88 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 {issueCount > 0 && (
                   <span className="rounded-full bg-rose-100 border border-rose-300 px-2.5 py-0.5 text-[11px] font-extrabold text-rose-700 shadow-sm flex items-center gap-1">
                     <AlertTriangle size={12} className="text-rose-600" />
-                    <span>{issueCount} {issueCount === 1 ? 'problém' : issueCount < 5 ? 'problémy' : 'problémů'}</span>
+                    <span>
+                      {issueCount}{' '}
+                      {issueCount === 1
+                        ? 'problém'
+                        : issueCount < 5
+                        ? 'problémy'
+                        : 'problémů'}
+                    </span>
                   </span>
                 )}
                 <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] shadow-sm font-extrabold text-slate-800">
                   {doneCount} / {totalCount} hotovo
                 </span>
+              </div>
+            </div>
+
+            {/* Timing Breakdown Card (Travel, Planned Service, Shift Total, Measured Actual) */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Timer size={14} className="text-sky-600" />
+                  <span>Časová náročnost výjezdu</span>
+                </span>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Kalkulace a měření časů
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-2 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Čas na cestě
+                  </span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    ~{route.travelMinutes ?? 0} min
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">
+                    {route.distanceKm ? `${route.distanceKm} km přejezdů` : 'Přejezdy'}
+                  </span>
+                </div>
+
+                <div className="p-2 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Čas realizace (plán)
+                  </span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    ~{formatHoursMinutes(route.serviceMinutes ?? 0)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">
+                    Práce na stanovištích
+                  </span>
+                </div>
+
+                <div className="p-2 bg-slate-50 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Celkem výjezd
+                  </span>
+                  <span className="font-extrabold text-slate-900 text-sm">
+                    ~{formatHoursMinutes(
+                      (route.travelMinutes ?? 0) + (route.serviceMinutes ?? 0)
+                    )}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">
+                    Cesta + realizace
+                  </span>
+                </div>
+
+                <div className="p-2 bg-sky-50/70 border border-sky-100 rounded-xl">
+                  <span className="text-[10px] font-bold text-sky-800 uppercase tracking-wider block">
+                    Reálně naměřeno
+                  </span>
+                  <span className="font-extrabold text-sky-950 text-sm">
+                    {measuredStops.length > 0
+                      ? formatHoursMinutes(totalMeasuredMinutes)
+                      : '—'}
+                  </span>
+                  <span className="text-[10px] text-sky-700 block truncate" title={measuredStops.length > 0 ? `Průměr ${avgMeasuredMinutes} min / bod` : ''}>
+                    {measuredStops.length > 0
+                      ? `Ø ${avgMeasuredMinutes} min / bod (${measuredStops.length}x)`
+                      : 'Měří se po dokončení'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -235,12 +723,19 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               const targetStops = activeStops.length > 0 ? activeStops : route.stops;
               const points = targetStops
                 .map((s) => s.location)
-                .filter((loc): loc is { latitude: number; longitude: number } => Boolean(loc));
+                .filter((loc): loc is { latitude: number; longitude: number } =>
+                  Boolean(loc)
+                );
               if (points.length < 2) return null;
               const origin = `${points[0].latitude},${points[0].longitude}`;
               const dest = `${points[points.length - 1].latitude},${points[points.length - 1].longitude}`;
-              const waypoints = points.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|');
-              const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${waypoints ? `&waypoints=${waypoints}` : ''}`;
+              const waypoints = points
+                .slice(1, -1)
+                .map((p) => `${p.latitude},${p.longitude}`)
+                .join('|');
+              const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${
+                waypoints ? `&waypoints=${waypoints}` : ''
+              }`;
 
               return (
                 <a
@@ -276,275 +771,139 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               </div>
             )}
 
-            {/* Stops list */}
-            {route.stops
-              .filter((s) => !hideDoneStops || s.status !== 'DONE')
-              .map((s, i) => {
-              const isDone = s.status === 'DONE';
-              const isInProgress = s.status === 'IN_PROGRESS';
-              const isIssue = s.status === 'ISSUE';
-              const timeString = new Date(s.startAt).toLocaleTimeString('cs-CZ', {
-                timeZone: data.timezone,
-                hour: '2-digit',
-                minute: '2-digit',
-              });
+            {/* Order separation view switcher (if multiple orders exist) */}
+            {orderGroups.length > 1 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-2">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Layers size={14} className="text-sky-600" />
+                  <span>Rozdělení zakázek ({orderGroups.length}):</span>
+                </span>
+                <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setGroupByOrder(false)}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer text-xs ${
+                      !groupByOrder
+                        ? 'bg-white shadow-xs text-sky-700 font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Pořadí trasy (1, 2, 3...)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGroupByOrder(true)}
+                    className={`px-3 py-1 rounded-lg transition cursor-pointer text-xs ${
+                      groupByOrder
+                        ? 'bg-white shadow-xs text-sky-700 font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Dle zakázek ({orderGroups.length})
+                  </button>
+                </div>
+              </div>
+            )}
 
-              return (
-                <article
-                  id={`stop-${s.jobId}`}
-                  key={s.jobId}
-                  className={`rounded-3xl border p-5 shadow-sm space-y-3 transition ${
-                    isDone
-                      ? 'border-emerald-200 bg-emerald-50/20'
-                      : isIssue
-                      ? 'border-rose-300 bg-rose-50/30 ring-2 ring-rose-500/20'
-                      : isInProgress
-                      ? 'border-sky-300 bg-sky-50/30 ring-2 ring-sky-500/20'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  {/* Stop header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-xs font-black ${
-                          isDone
-                            ? 'bg-emerald-600 text-white'
-                            : isIssue
-                            ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400/50'
-                            : isInProgress
-                            ? 'bg-sky-600 text-white animate-pulse'
-                            : 'bg-slate-900 text-white'
-                        }`}
-                      >
-                        {isDone ? '✓' : isIssue ? '!' : i + 1}
-                      </div>
+            {/* Stops list rendering (Grouped by Order OR Sequential Route) */}
+            {groupByOrder && orderGroups.length > 1 ? (
+              <div className="space-y-4 pt-1">
+                {orderGroups.map((group) => {
+                  const visibleGroupStops = group.stops.filter(
+                    (s) => !hideDoneStops || s.status !== 'DONE'
+                  );
+                  const groupDone = group.stops.filter(
+                    (s) => s.status === 'DONE'
+                  ).length;
+                  const groupServiceMin = group.stops.reduce(
+                    (acc, s) => acc + (s.serviceMinutes || 0),
+                    0
+                  );
 
-                      <div>
-                        <h2 className={`font-extrabold text-sm sm:text-base leading-tight ${isIssue ? 'text-rose-950' : 'text-slate-950'}`}>
-                          {s.title}
-                        </h2>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
-                          {s.clientName} · {s.carrier?.code ? `Nosič ${s.carrier.code}` : s.workType}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {isIssue && (
-                        <span className="text-[11px] font-black text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-xl flex items-center gap-1 shadow-xs">
-                          <AlertTriangle size={12} />
-                          <span>Hlášen problém</span>
-                        </span>
-                      )}
-                      <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-1 rounded-xl">
-                        {timeString}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Address */}
-                  <p className="text-xs text-slate-700 font-semibold flex items-center gap-1.5 pl-1">
-                    <MapPin size={14} className="text-sky-600 shrink-0" />
-                    <span>{s.address ?? s.carrier?.address ?? s.carrier?.city}</span>
-                  </p>
-
-                  {/* Instructions */}
-                  {s.instructions && (
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
-                      <span className="font-bold text-slate-900 block uppercase tracking-wider text-[10px]">
-                        Instrukce k montáži:
-                      </span>
-                      <p className="whitespace-pre-wrap">{s.instructions}</p>
-                    </div>
-                  )}
-
-                  {/* Issue details box */}
-                  {(isIssue || s.issueType || s.issueNote) && (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-3.5 text-xs text-rose-900 space-y-1">
-                      <div className="flex items-center gap-1.5 font-bold text-rose-800 uppercase tracking-wider text-[10px]">
-                        <AlertTriangle size={13} className="text-rose-600" />
-                        <span>{s.issueType || 'Hlášený problém na místě'}</span>
-                      </div>
-                      {s.issueNote && (
-                        <p className="whitespace-pre-wrap text-rose-800 font-medium pl-4">{s.issueNote}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Primary Action Row */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    {/* Navigate Button */}
-                    {s.location && (
-                      <a
-                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-sky-700 px-4 py-3 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition"
-                        target="_blank"
-                        rel="noreferrer"
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${s.location.latitude},${s.location.longitude}`}
-                      >
-                        <Navigation size={14} />
-                        <span>Navigovat 🗺️</span>
-                      </a>
-                    )}
-
-                    {/* Start / Finish Button */}
-                    {!isDone && s.status !== 'CANCELLED' && (
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          void run(route.planId, s.workOrderId, isInProgress ? 'complete' : 'start', undefined, s.jobId)
-                        }
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-bold transition shadow-sm ${
-                          isInProgress
-                            ? 'bg-emerald-700 text-white hover:bg-emerald-600'
-                            : isIssue
-                            ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
-                            : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
-                        }`}
-                      >
-                        <Clock size={14} />
-                        <span>{isInProgress ? 'Označit za hotové ✓' : isIssue ? 'Zkusit znovu / Zahájit' : 'Zahájit práci'}</span>
-                      </button>
-                    )}
-
-                    {/* Upload Photo Button */}
-                    {(s.navigationPointId || s.workOrderItemId) && !isDone && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActivePhotoModalStopId(activePhotoModalStopId === s.jobId ? null : s.jobId)
-                        }
-                        className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm"
-                      >
-                        <Camera size={14} className="text-sky-600" />
-                        <span>Doklad / Fotka 📸</span>
-                      </button>
-                    )}
-
-                    {/* Report Problem Button */}
-                    {!isDone && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveProblemModalStopId(activeProblemModalStopId === s.jobId ? null : s.jobId)
-                        }
-                        className={`flex items-center justify-center gap-1 rounded-2xl px-3 py-3 text-xs font-bold transition ml-auto ${
-                          isIssue ? 'text-rose-700 bg-rose-100 hover:bg-rose-200 border border-rose-200' : 'text-amber-700 hover:bg-amber-50'
-                        }`}
-                      >
-                        <AlertTriangle size={14} />
-                        <span>{isIssue ? 'Upravit problém' : 'Problém?'}</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Inline Photo Upload Drawer */}
-                  {activePhotoModalStopId === s.jobId && (
-                    <form
-                      action={(form) => upload(route.planId, s.workOrderId, s.jobId, form)}
-                      className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 space-y-3 mt-3"
+                  return (
+                    <div
+                      key={group.key}
+                      className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50/50 p-4"
                     >
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
-                          <Camera size={14} />
-                          <span>Vyfotit doklad a dokončit montáž</span>
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={() => setActivePhotoModalStopId(null)}
-                          className="text-xs text-slate-400 hover:text-slate-600"
-                        >
-                          Zavřít
-                        </button>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-100 px-2 py-0.5 rounded-md inline-block">
+                            Zakázka / Kampaň
+                          </span>
+                          <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-1.5">
+                            <Briefcase size={14} className="text-sky-600 shrink-0" />
+                            <span>{group.title}</span>
+                          </h3>
+                          {group.clientName && group.clientName !== group.title && (
+                            <p className="text-xs text-slate-500 font-medium">
+                              Klient: {group.clientName}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-slate-500">
+                            ~{formatHoursMinutes(groupServiceMin)}
+                          </span>
+                          <span className="font-bold bg-white px-2.5 py-1 rounded-xl shadow-2xs text-slate-800 border border-slate-200">
+                            {groupDone} / {group.stops.length} hotovo
+                          </span>
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block">Fotografie hotové práce (povinné)</label>
-                        <input
-                          type="file"
-                          name="afterPhoto"
-                          accept="image/*"
-                          capture="environment"
-                          required
-                          className="mt-1 block w-full text-xs text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-sky-700 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-sky-600"
-                        />
+                      <div className="space-y-3 pt-1">
+                        {visibleGroupStops.length > 0 ? (
+                          visibleGroupStops.map((s, idx) =>
+                            renderSingleStop(s, idx + 1)
+                          )
+                        ) : (
+                          <p className="text-xs text-slate-400 italic p-2 text-center">
+                            Všechny zastávky této zakázky jsou hotové.
+                          </p>
+                        )}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {route.stops
+                  .filter((s) => !hideDoneStops || s.status !== 'DONE')
+                  .map((s, i, filteredStops) => {
+                    const prevStop = i > 0 ? filteredStops[i - 1] : null;
+                    const isNewOrder =
+                      orderGroups.length > 1 &&
+                      (!prevStop ||
+                        (prevStop.orderTitle ||
+                          prevStop.campaignName ||
+                          prevStop.workOrderId) !==
+                          (s.orderTitle ||
+                            s.campaignName ||
+                            s.workOrderId));
 
-                      <div>
-                        <label className="text-xs font-semibold text-slate-700 block">Poznámka (volitelné)</label>
-                        <input
-                          type="text"
-                          name="note"
-                          placeholder="Např. vylepeno v pořádku, osvětlení funkční"
-                          className="input mt-1 w-full text-xs font-medium"
-                        />
+                    return (
+                      <div key={s.jobId} className="space-y-2">
+                        {isNewOrder && (
+                          <div className="flex items-center gap-2 pt-2 pb-0.5">
+                            <div className="h-px bg-slate-200 flex-1" />
+                            <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/80 flex items-center gap-1.5">
+                              <Briefcase size={11} className="text-sky-600" />
+                              <span>
+                                {s.orderTitle ||
+                                  s.campaignName ||
+                                  s.clientName ||
+                                  'Další zakázka'}
+                              </span>
+                            </span>
+                            <div className="h-px bg-slate-200 flex-1" />
+                          </div>
+                        )}
+                        {renderSingleStop(s, i + 1)}
                       </div>
-
-                      <button
-                        disabled={busy}
-                        className="w-full rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 transition"
-                      >
-                        {busy ? 'Ukládám…' : 'Odeslat fotku a dokončit zastávku ✓'}
-                      </button>
-                    </form>
-                  )}
-
-                  {/* Inline Problem Report Drawer */}
-                  {activeProblemModalStopId === s.jobId && (
-                    <form
-                      action={(form) => run(route.planId, s.workOrderId, 'problem', form, s.jobId)}
-                      className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3 mt-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                          <AlertTriangle size={14} />
-                          <span>{isIssue ? 'Upravit zádrhel na místě' : 'Nahlásit zádrhel na místě'}</span>
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={() => setActiveProblemModalStopId(null)}
-                          className="text-xs text-slate-400 hover:text-slate-600"
-                        >
-                          Zavřít
-                        </button>
-                      </div>
-
-                      <input type="hidden" name="key" value={`${route.planId}-${s.jobId}-${s.status}`} />
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block">Důvod zádrhelu</label>
-                        <select name="type" defaultValue={s.issueType ?? fieldProblemTypes[0]} className="input mt-1 w-full text-xs font-semibold">
-                          {fieldProblemTypes.map((type) => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block">Co přesně se stalo?</label>
-                        <textarea
-                          name="note"
-                          rows={2}
-                          required
-                          defaultValue={s.issueNote ?? ''}
-                          placeholder="Popište situaci pro dispečera…"
-                          className="input mt-1 w-full text-xs font-medium"
-                        />
-                      </div>
-
-                      <button
-                        disabled={busy}
-                        className={`w-full rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition ${
-                          isIssue ? 'bg-rose-700 hover:bg-rose-600' : 'bg-amber-700 hover:bg-amber-600'
-                        }`}
-                      >
-                        {busy ? 'Odesílám…' : isIssue ? 'Aktualizovat upozornění dispečerovi ⚠️' : 'Odeslat upozornění dispečerovi ⚠️'}
-                      </button>
-                    </form>
-                  )}
-                </article>
-              );
-            })}
+                    );
+                  })}
+              </div>
+            )}
           </section>
         );
       })}

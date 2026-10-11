@@ -94,6 +94,8 @@ export type MyRouteStop = {
   address: string | null;
   pointPhotoUrl: string | null;
   workOrderId: string;
+  orderTitle?: string | null;
+  campaignName?: string | null;
   title: string;
   clientName: string | null;
   instructions: string | null;
@@ -107,6 +109,11 @@ export type MyRouteStop = {
   taskId: string | null;
   navigationOrderId: string | null;
   carrier: MyRouteCarrier;
+  serviceMinutes?: number;
+  travelMinutes?: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  actualDurationMinutes?: number | null;
 };
 
 export type MyRouteDTO = {
@@ -118,7 +125,11 @@ export type MyRouteDTO = {
     vehicleName: string | null;
     departureAt: string;
     endAt: string;
+    travelMinutes?: number;
+    serviceMinutes?: number;
+    distanceKm?: number;
     stops: MyRouteStop[];
   }>;
 };
+
 

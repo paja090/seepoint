@@ -53,7 +53,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
         select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, issueType: true, issueNote: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
       const electionPoints = await prisma.electionRemovalPoint.findMany({
         where: { organizationId, id: { in: crew.stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) } },
-        select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true, issueType: true, issueNote: true }
+        select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true, issueType: true, issueNote: true, startedAt: true, completedAt: true, campaign: { select: { id: true, name: true } } }
       });
       const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
@@ -64,7 +64,15 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
       });
       const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true } });
       const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true } });
-      routes.push({ planId: plan.id, crewName: crew.names?.length ? crew.names.join(', ') : null, vehicleName: crew.vehicleName, departureAt: crew.departureAt, endAt: crew.endAt,
+      routes.push({
+        planId: plan.id,
+        crewName: crew.names?.length ? crew.names.join(', ') : null,
+        vehicleName: crew.vehicleName,
+        departureAt: crew.departureAt,
+        endAt: crew.endAt,
+        travelMinutes: Math.round((crew.travelSeconds ?? 0) / 60),
+        serviceMinutes: crew.serviceMinutes ?? 0,
+        distanceKm: Number(((crew.distanceMeters ?? 0) / 1000).toFixed(1)),
         stops: crew.stops.flatMap((s): MyRouteStop[] => {
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
@@ -76,9 +84,11 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               electionRemovalPointId: ep.id,
               address: null,
               pointPhotoUrl: null,
-              workOrderId: '',
+              workOrderId: ep.campaignId,
+              orderTitle: ep.campaign?.name ? `Kampaň: ${ep.campaign.name}` : 'Svoz voleb',
+              campaignName: ep.campaign?.name ?? 'Svoz voleb',
               title: ep.label,
-              clientName: 'Svoz voleb',
+              clientName: ep.campaign?.name || 'Svoz voleb',
               instructions: ep.description || `Demontáž (${ep.mediaType})`,
               status: ep.status === 'COMPLETED' ? 'DONE' : ep.status === 'ISSUE' ? 'ISSUE' : ep.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED',
               issueType: ep.status === 'ISSUE' ? ep.issueType : null,
@@ -89,7 +99,12 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               location: s.location,
               taskId: null,
               navigationOrderId: null,
-              carrier: null
+              carrier: null,
+              serviceMinutes: s.serviceMinutes,
+              travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
+              startedAt: ep.startedAt?.toISOString() ?? null,
+              completedAt: ep.completedAt?.toISOString() ?? null,
+              actualDurationMinutes: ep.startedAt && ep.completedAt ? Math.max(1, Math.round((ep.completedAt.getTime() - ep.startedAt.getTime()) / 60000)) : null,
             }];
           }
           if (s.isWarehousePitstop) {
@@ -102,7 +117,8 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               electionRemovalPointId: null,
               address: null,
               pointPhotoUrl: null,
-              workOrderId: '',
+              workOrderId: 'warehouse',
+              orderTitle: 'Skladový mezistav',
               title: s.title,
               clientName: 'Sklad',
               instructions: '',
@@ -115,7 +131,9 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               location: s.location,
               taskId: null,
               navigationOrderId: null,
-              carrier: null
+              carrier: null,
+              serviceMinutes: s.serviceMinutes,
+              travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
             }];
           }
           const order = orders.find(o => o.id === s.workOrderId); if (s.workOrderId && !order) return [];
@@ -187,6 +205,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
             address: point?.address ?? null,
             pointPhotoUrl: item?.photos[0] ? `/api/photos/${item.photos[0].id}/file` : point?.installedPhotoId || point?.sitePhotoId ? `/api/photos/${point.installedPhotoId ?? point.sitePhotoId}/file` : null,
             workOrderId: order?.id ?? '',
+            orderTitle: order?.title ? `Zakázka: ${order.title}` : s.clientName ? `Klient: ${s.clientName}` : null,
             title: point?.label ?? (item ? s.title : order!.title),
             clientName: order?.clientName ?? s.clientName ?? null,
             instructions: point ? point.clientNote : item?.description ?? order!.description,
@@ -199,7 +218,9 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
             location: s.location,
             taskId: order?.workTasks[0]?.id ?? null,
             navigationOrderId: point?.navigationOrderId ?? order?.navigationOrderId ?? null,
-            carrier: carrier ? { id: carrier.id, name: carrier.name, code: carrier.code, city: carrier.city, address: carrier.address, photoUrl: carrier.photos[0] ? `/api/photos/${carrier.photos[0].id}/file` : null } : null
+            carrier: carrier ? { id: carrier.id, name: carrier.name, code: carrier.code, city: carrier.city, address: carrier.address, photoUrl: carrier.photos[0] ? `/api/photos/${carrier.photos[0].id}/file` : null } : null,
+            serviceMinutes: s.serviceMinutes,
+            travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
           }];
         }) });
     }
