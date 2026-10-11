@@ -11,11 +11,7 @@ import {
   CheckCircle2,
   Clock,
   ArrowLeft,
-  ChevronDown,
   Car,
-  FileText,
-  ExternalLink,
-  Map as MapIcon,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 

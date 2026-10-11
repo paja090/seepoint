@@ -80,10 +80,10 @@ export type PlanView = {
 export type MyRouteCarrier = {
   id: string;
   name: string;
-  code: string;
-  city: string;
-  address: string | null;
-  photoUrl: string | null;
+  code?: string | null;
+  city?: string | null;
+  address?: string | null;
+  photoUrl?: string | null;
 } | null;
 
 export type MyRouteStop = {
