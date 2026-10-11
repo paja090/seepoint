@@ -265,15 +265,17 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   {/* Primary Action Row */}
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     {/* Navigate Button */}
-                    <a
-                      className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-sky-700 px-4 py-3 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition"
-                      target="_blank"
-                      rel="noreferrer"
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${s.location.latitude},${s.location.longitude}`}
-                    >
-                      <Navigation size={14} />
-                      <span>Navigovat 🗺️</span>
-                    </a>
+                    {s.location && (
+                      <a
+                        className="flex-1 sm:flex-initial flex items-center justify-center gap-2 rounded-2xl bg-sky-700 px-4 py-3 text-xs font-bold text-white shadow-sm hover:bg-sky-600 transition"
+                        target="_blank"
+                        rel="noreferrer"
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${s.location.latitude},${s.location.longitude}`}
+                      >
+                        <Navigation size={14} />
+                        <span>Navigovat 🗺️</span>
+                      </a>
+                    )}
 
                     {/* Start / Finish Button */}
                     {!isDone && s.status !== 'CANCELLED' && (
