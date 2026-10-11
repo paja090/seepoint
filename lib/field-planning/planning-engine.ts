@@ -215,10 +215,11 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     crew.returnLeg = returning; crew.endAt = iso(returnAt); done.set(job.id, finish);
   }
 
-  // Závěrečný flush: Pokud posádka po posledním úkolu veze nějaký materiál (např. naložila věž), musíme ji na konci dne poslat na sklad k vyložení.
+  // Závěrečný flush: Pokud posádka po posledním úkolu veze nějaký materiál a směna nekončí na centrálním skladě, musíme ji na konci dne poslat na sklad k vyložení.
   for (const crew of result.crews) {
     const finalLoad = crewLoadSlots.get(crew.id) ?? 0;
-    if (finalLoad > 0 && crew.stops.length > 0) {
+    const endsAtDepot = distanceMeters(p.depot, p.endLocation) <= 50;
+    if (finalLoad > 0 && crew.stops.length > 0 && !endsAtDepot) {
       const lastStop = crew.stops[crew.stops.length - 1];
       const lastLocation = lastStop.location;
       const arrivalTime = Date.parse(lastStop.endAt);

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Map as LeafletMap, TileLayer } from 'leaflet';
-import type { MyRouteDTO } from '@/lib/field-planning/execution';
+import type { MyRouteDTO, MyRouteStop } from '@/lib/field-planning/contracts';
 
 export type GoogleMapType = 'roadmap' | 'hybrid';
 
@@ -43,16 +43,18 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
 
       const bounds = L.latLngBounds([]);
 
-      route.stops.forEach((stop, i) => {
+      route.stops.forEach((stop: MyRouteStop, i: number) => {
         if (!stop.location) return;
         const pt: [number, number] = [stop.location.latitude, stop.location.longitude];
         
         let color = '#0ea5e9'; // sky-500 (planned)
         if (stop.status === 'DONE') color = '#10b981'; // emerald-500
         else if (stop.status === 'IN_PROGRESS') color = '#3b82f6'; // blue-500
+        else if (stop.status === 'ISSUE') color = '#ef4444'; // red-500
         else if (stop.status === 'CANCELLED') color = '#ef4444'; // red-500
 
         const isDone = stop.status === 'DONE';
+        const isIssue = stop.status === 'ISSUE';
         
         const iconHtml = `
           <div style="
@@ -65,12 +67,12 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
             color: white;
             border-radius: 12px;
             font-weight: 900;
-            font-size: 14px;
+            font-size: ${isIssue ? '16px' : '14px'};
             border: 2px solid white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, ${isIssue ? '0.3' : '0.1'});
             opacity: ${isDone ? 0.7 : 1};
           ">
-            ${isDone ? '✓' : i + 1}
+            ${isDone ? '✓' : isIssue ? '!' : i + 1}
           </div>
         `;
 
@@ -79,11 +81,11 @@ export function MyRouteMap({ route, height = 'h-[400px]' }: { route: MyRouteDTO[
         });
         
         const tooltipHtml = `
-          <div style="font-weight: bold; font-family: sans-serif; font-size: 12px;">
-            ${escapeHtml(stop.title)}
+          <div style="font-weight: bold; font-family: sans-serif; font-size: 12px; color: ${isIssue ? '#dc2626' : '#0f172a'};">
+            ${isIssue ? '⚠️ ' : ''}${escapeHtml(stop.title)}
           </div>
-          <div style="font-size: 11px; color: #64748b; font-family: sans-serif; margin-top: 2px;">
-            ${escapeHtml(stop.clientName || stop.workType)}
+          <div style="font-size: 11px; color: ${isIssue ? '#b91c1c' : '#64748b'}; font-family: sans-serif; margin-top: 2px;">
+            ${escapeHtml(stop.issueType || stop.clientName || stop.workType)}
           </div>
         `;
         
