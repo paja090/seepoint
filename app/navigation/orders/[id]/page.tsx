@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
+import { prisma } from '@/lib/db';
 import { getNavigationOrderDetail } from '@/lib/navigation/navigation-service';
 import { NavigationOrderDetailView } from '@/components/navigation/NavigationOrderDetailView';
 import { canInvoiceNavigationOrderRole } from '@/lib/navigation/permissions';
@@ -16,13 +17,24 @@ export default async function NavigationOrderDetailPage({
   const id = (await params).id;
 
   try {
-    const order = await getNavigationOrderDetail(id, user);
+    const [order, salesUsers] = await Promise.all([
+      getNavigationOrderDetail(id, user),
+      prisma.user.findMany({
+        where: user.organizationId
+          ? { organizationMemberships: { some: { organizationId: user.organizationId, isActive: true } } }
+          : {},
+        select: { id: true, name: true, email: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
     return (
       <AppShell>
         <NavigationOrderDetailView
           order={order}
           canInvoice={canInvoiceNavigationOrderRole(user.role)}
           currentDate={new Date().toISOString().slice(0, 10)}
+          salesUsers={salesUsers}
         />
       </AppShell>
     );

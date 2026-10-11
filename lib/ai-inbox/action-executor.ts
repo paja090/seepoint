@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db';
 import { createClient, type CreateClientInput } from '@/lib/crm/client-service';
 import { nextCrmOrderNumber } from '@/lib/crm/domain';
-import { transitionOffer } from '@/lib/offers/service';
+import { transitionOffer, createOffer } from '@/lib/offers/service';
+import { orchestrateMailboxToOffer } from '@/lib/ai-orchestrator/orchestrator-engine';
 import { validateStatusTransition } from '@/lib/navigation/workflow-service';
 import type { CurrentUser } from '@/lib/rbac';
 import type { NavigationOrderStatus } from '@prisma/client';
@@ -181,6 +182,65 @@ export async function executeAiInboxAction(
           where: { id: msg.id },
           data: { navigationOrderId: navOrder.id },
         });
+        break;
+      }
+
+      case 'CREATE_OFFER': {
+        let clientId = msg.clientId || String(payload.clientId || '');
+        if (!clientId) {
+          const client = await prisma.client.findFirst({
+            where: { organizationId, email: msg.fromEmail },
+            select: { id: true },
+          });
+          if (client) {
+            clientId = client.id;
+            await prisma.aiInboxMessage.update({
+              where: { id: msg.id },
+              data: { clientId },
+            });
+          }
+        }
+
+        if (!clientId) {
+          throw new Error('Před vytvořením konceptu nabídky je nutné nejprve potvrdit nebo vybrat klienta.');
+        }
+
+        let offerId: string | null = msg.offerId ?? null;
+
+        // 1. Zkusíme plně asistovaný AI orchestrátor (párování ploch v kalendáři obsazenosti a nacenění)
+        if (!offerId) {
+          try {
+            const run = await orchestrateMailboxToOffer(msg.id, actor);
+            if (run.offerDraftResult?.offerId) {
+              offerId = run.offerDraftResult.offerId;
+            }
+          } catch (orchErr) {
+            console.warn('[ActionExecutor] Orchestrator auto-draft fallback:', orchErr);
+          }
+        }
+
+        // 2. Pokud orchestrátor nenašel konkrétní plochy (např. vágní zadání termínu), vytvoříme koncept DRAFT nabídky pro klienta
+        if (!offerId) {
+          const client = await prisma.client.findFirst({
+            where: { id: clientId, organizationId },
+            select: { name: true },
+          });
+          const title = String(payload.title || `Nabídka reklamních ploch – ${client?.name || msg.fromName || 'Klient'}`);
+          const offerResult = await createOffer(actor, {
+            title,
+            clientId,
+            items: [],
+          });
+          offerId = offerResult.offer?.id ?? null;
+          if (offerId) {
+            await prisma.aiInboxMessage.update({
+              where: { id: msg.id },
+              data: { offerId },
+            });
+          }
+        }
+
+        createdEntityId = offerId || undefined;
         break;
       }
 
