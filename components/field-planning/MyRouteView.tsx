@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
 import { computeRouteLiveETA, formatLiveClock } from '@/lib/field-planning/live-eta';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
@@ -68,6 +68,64 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       };
     });
   }, [data, currentDate]);
+
+  // Live GPS tracking when trip is active (from start_trip until complete_trip)
+  useEffect(() => {
+    const activeRoute = data.routes.find((r) => r.tripStartedAt && !r.tripCompletedAt);
+    if (!activeRoute) return;
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) return;
+
+    let isMounted = true;
+    let lastSent = 0;
+
+    const sendPosition = async (pos: GeolocationPosition) => {
+      const now = Date.now();
+      if (now - lastSent < 25000) return; // Throttle to max 1 ping per 25s
+      lastSent = now;
+      try {
+        await fetch('/api/work/route/mine/location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            planId: activeRoute.planId,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            speed: pos.coords.speed,
+            heading: pos.coords.heading,
+          }),
+        });
+      } catch {
+        // Silently ignore transient network errors
+      }
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { if (isMounted) void sendPosition(pos); },
+      undefined,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => { if (isMounted) void sendPosition(pos); },
+      undefined,
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+
+    const timer = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { if (isMounted) void sendPosition(pos); },
+        undefined,
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    }, 45000);
+
+    return () => {
+      isMounted = false;
+      navigator.geolocation.clearWatch(watchId);
+      clearInterval(timer);
+    };
+  }, [data.routes]);
 
   async function loadDateRoute(date: string) {
     setBusy(true);
@@ -791,6 +849,15 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         ? 'Zahajte výjezd i v předstihu pro změření celé trasy'
                         : 'Zahajte při ranním odjezdu z firmy pro změření celé směny'}
                     </span>
+                    {route.tripStartedAt && !route.tripCompletedAt && (
+                      <span className="flex items-center gap-1.5 mt-1 text-[10px] text-emerald-700 font-bold">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>Živé GPS spojení s dispečinkem aktivní</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 

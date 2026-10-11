@@ -50,10 +50,21 @@ export type PlannedStop = PlanningSource & {
   arrivalAt: string; startAt: string; endAt: string; serviceMinutes: number; travel: TravelLeg; reason: string;
   isWarehousePitstop?: boolean; cumulativeLoadSlots?: number; unloadedSlots?: number;
 };
+export type LiveCrewLocation = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  speed?: number | null;
+  heading?: number | null;
+  updatedAt: string;
+  isRecent: boolean;
+  workerName?: string | null;
+};
 export type PlannedCrew = CrewInput & {
   names: string[]; vehicleName: string | null; departureAt: string; endAt: string;
   stops: PlannedStop[]; returnLeg: TravelLeg; distanceMeters: number; travelSeconds: number;
   serviceMinutes: number; breakMinutes: number;
+  liveLocation?: LiveCrewLocation | null;
 };
 export type PlanningAlert = { code: string; message: string; workOrderId?: string; crewId?: string };
 export type PlanningResult = {

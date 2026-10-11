@@ -7,6 +7,7 @@ import { navigationAvailable } from '@/lib/field-planning/capabilities';
 import { prisma } from '@/lib/db';
 import { loadPlanningData, loadProfile } from '@/lib/field-planning/data';
 import { approvePlan, cancelDraft, generatePlan, getPlan, planView, requirePlannerManager, saveProfile } from '@/lib/field-planning/service';
+import { enrichCrewsWithLiveLocations } from '@/lib/field-planning/live-location';
 
 async function publicPlan(plan: PlanView) { return { ...plan, profile: profileForNavigation(plan.profile, await navigationAvailable()) }; }
 function failure(error: unknown) {
@@ -24,7 +25,12 @@ export async function GET(request: Request) {
     const data = profile?.enabled ? await loadPlanningData(date) : null;
     const plans = await prisma.fieldPlan.findMany({ where: { organizationId: user.organizationId, date }, orderBy: { version: 'desc' }, take: 20 });
     const navigation = await navigationAvailable();
-    return NextResponse.json({ profile, data, plans: plans.filter(p => navigation || !(p.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)).map(planView).map(p => ({ ...p, profile: profileForNavigation(p.profile, navigation) })) });
+    const rawPlans = plans.filter(p => navigation || !(p.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)).map(planView);
+    const enrichedPlans = await Promise.all(rawPlans.map(async p => {
+      const crewsWithLocations = await enrichCrewsWithLiveLocations(p.result.crews, p.id, user.organizationId!);
+      return { ...p, result: { ...p.result, crews: crewsWithLocations }, profile: profileForNavigation(p.profile, navigation) };
+    }));
+    return NextResponse.json({ profile, data, plans: enrichedPlans });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

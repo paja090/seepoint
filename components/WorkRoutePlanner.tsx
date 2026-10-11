@@ -130,6 +130,38 @@ export function WorkRoutePlanner({
     void load();
   }, [load]);
 
+  // Periodic poll for live crew GPS locations when an approved/active plan is displayed
+  useEffect(() => {
+    if (!plan?.id || !['APPROVED', 'ACTIVE'].includes(plan.status)) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/work/route/locations?planId=${plan.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.locations) {
+          setPlan((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              result: {
+                ...prev.result,
+                crews: prev.result.crews.map((c) => ({
+                  ...c,
+                  liveLocation: data.locations[c.id] ?? c.liveLocation ?? null,
+                })),
+              },
+            };
+          });
+        }
+      } catch {
+        // Silently ignore background polling errors
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [plan?.id, plan?.status]);
+
   async function handleAction(kind: 'generate' | 'replan' | 'approve' | 'cancel') {
     setBusy(true);
     setError('');
@@ -790,7 +822,15 @@ export function WorkRoutePlanner({
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  <span>Posádka {i + 1}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span>Posádka {i + 1}</span>
+                    {c.liveLocation && (
+                      <span
+                        className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse"
+                        title="Živá GPS poloha na mapě"
+                      />
+                    )}
+                  </div>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] ${
                       activeCrew?.id === c.id ? 'bg-sky-800 text-white' : 'bg-slate-100 text-slate-600'
@@ -823,6 +863,30 @@ export function WorkRoutePlanner({
                   <p className="text-xs text-slate-500 mt-0.5">
                     {activeCrew.vehicleName ?? 'Bez vozidla'} · Odjezd {formatTime(activeCrew.departureAt)} · Návrat {formatTime(activeCrew.endAt)}
                   </p>
+                  {activeCrew.liveLocation && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-900 shadow-2xs">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span>
+                        Živá GPS poloha:{' '}
+                        {activeCrew.liveLocation.speed != null && activeCrew.liveLocation.speed > 2
+                          ? `${Math.round(activeCrew.liveLocation.speed * 3.6)} km/h`
+                          : 'Stojí na místě'}
+                        {' · '}
+                        signál{' '}
+                        {Math.round(
+                          (Date.now() - new Date(activeCrew.liveLocation.updatedAt).getTime()) / 1000
+                        ) < 60
+                          ? 'před chvílí'
+                          : `před ${Math.round(
+                              (Date.now() - new Date(activeCrew.liveLocation.updatedAt).getTime()) /
+                                60000
+                            )} min`}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {mapsLinks(plan!, activeCrew.id).map((href, i, links) => (
