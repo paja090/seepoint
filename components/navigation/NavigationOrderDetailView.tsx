@@ -29,6 +29,7 @@ import { NavigationSurveyTab } from './NavigationSurveyTab';
 import { QuickCompanySettingsModal, type CompanySettingsForm } from '@/components/settings/QuickCompanySettingsModal';
 import { ActionableResolutionCard } from '@/components/ui/ActionableResolutionCard';
 import { NavigationInvoiceModal } from './NavigationInvoiceModal';
+import { NavigationContactModal } from './NavigationContactModal';
 
 export type NavigationTabKey = 'overview' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
 
@@ -64,10 +65,12 @@ export function NavigationOrderDetailView({
   order,
   canInvoice,
   currentDate,
+  salesUsers = [],
 }: {
   order: NavigationOrderDetail;
   canInvoice: boolean;
   currentDate: string;
+  salesUsers?: Array<{ id: string; name: string; email: string }>;
 }) {
   const [currentOrder, setCurrentOrder] = useState<NavigationOrderDetail>(order);
   const [activeTab, setActiveTab] = useState<NavigationTabKey>('overview');
@@ -78,6 +81,7 @@ export function NavigationOrderDetailView({
   const [actionableError, setActionableError] = useState<ActionableResolutionState | null>(null);
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
 
   // Revert Status Modal
   const [showRevertModal, setShowRevertModal] = useState(false);
@@ -505,14 +509,48 @@ export function NavigationOrderDetailView({
               </div>
 
               <div className="card space-y-4">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <User size={18} className="text-sky-600" /> Kontaktní údaje
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <User size={18} className="text-sky-600" /> Kontaktní údaje
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactModal(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-900 transition"
+                    title="Upravit kontaktní údaje v zakázce i v CRM"
+                  >
+                    <Edit3 size={13} /> Upravit
+                  </button>
+                </div>
                 <div className="space-y-2 text-xs text-slate-700">
-                  <p><strong>Klient:</strong> {currentOrder.clientName}</p>
-                  {currentOrder.contactPerson && <p className="flex items-center gap-2"><User size={12} /> {currentOrder.contactPerson}</p>}
-                  {currentOrder.contactEmail && <p className="flex items-center gap-2"><Mail size={12} /> {currentOrder.contactEmail}</p>}
-                  {currentOrder.contactPhone && <p className="flex items-center gap-2"><Phone size={12} /> {currentOrder.contactPhone}</p>}
+                  <p>
+                    <strong>Klient:</strong>{' '}
+                    <Link
+                      href={`/clients/${currentOrder.clientId}`}
+                      target="_blank"
+                      className="font-semibold text-sky-700 hover:underline inline-flex items-center gap-1"
+                      title="Otevřít kartu klienta v CRM v novém okně"
+                    >
+                      {currentOrder.clientName} ↗
+                    </Link>
+                  </p>
+                  {currentOrder.contactPerson && <p className="flex items-center gap-2"><User size={12} className="text-slate-400" /> {currentOrder.contactPerson}</p>}
+                  {currentOrder.contactEmail && (
+                    <p className="flex items-center gap-2">
+                      <Mail size={12} className="text-slate-400" />{' '}
+                      <a href={`mailto:${currentOrder.contactEmail}`} className="text-slate-700 hover:text-sky-700 hover:underline">
+                        {currentOrder.contactEmail}
+                      </a>
+                    </p>
+                  )}
+                  {currentOrder.contactPhone && (
+                    <p className="flex items-center gap-2">
+                      <Phone size={12} className="text-slate-400" />{' '}
+                      <a href={`tel:${currentOrder.contactPhone}`} className="text-slate-700 hover:text-sky-700 hover:underline">
+                        {currentOrder.contactPhone}
+                      </a>
+                    </p>
+                  )}
                   <p><strong>Odpovědný obchodník:</strong> {currentOrder.assignedUserName || 'Nepřiřazen'}</p>
                 </div>
               </div>
@@ -1021,6 +1059,24 @@ export function NavigationOrderDetailView({
           }}
         />
       )}
+
+      {/* Modal: Edit Contact Details & Sync with CRM */}
+      <NavigationContactModal
+        isOpen={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        orderId={currentOrder.id}
+        clientId={currentOrder.clientId}
+        clientName={currentOrder.clientName}
+        initialContactPerson={currentOrder.contactPerson}
+        initialContactEmail={currentOrder.contactEmail}
+        initialContactPhone={currentOrder.contactPhone}
+        initialAssignedUserId={currentOrder.assignedUserId}
+        salesUsers={salesUsers}
+        onSuccess={(updatedOrder) => {
+          setCurrentOrder(updatedOrder);
+          setSuccessMsg('✅ Kontaktní údaje byly úspěšně uloženy do CRM i zakázky.');
+        }}
+      />
 
     </div>
   );
