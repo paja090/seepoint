@@ -137,26 +137,32 @@ export function MyRouteMap({
           });
 
           marker.on('click', () => {
-            let el = document.getElementById(`stop-${stop.jobId}`);
-            if (!el && isDone) {
+            const stopId = `stop-${stop.jobId}`;
+            const existing = document.getElementById(stopId);
+            if (!existing && isDone) {
               const toggleBtn = document.getElementById('toggle-done-stops-btn');
               if (toggleBtn) {
                 toggleBtn.click();
                 setTimeout(() => {
-                  el = document.getElementById(`stop-${stop.jobId}`);
-                  if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    el.classList.add('ring-4', 'ring-emerald-400');
-                    setTimeout(() => el.classList.remove('ring-4', 'ring-emerald-400'), 2000);
+                  const delayedEl = document.getElementById(stopId);
+                  if (delayedEl) {
+                    delayedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    delayedEl.classList.add('ring-4', 'ring-emerald-400');
+                    setTimeout(() => {
+                      delayedEl.classList.remove('ring-4', 'ring-emerald-400');
+                    }, 2000);
                   }
                 }, 100);
                 return;
               }
             }
-            if (el) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              el.classList.add('ring-4', isDone ? 'ring-emerald-400' : 'ring-sky-400');
-              setTimeout(() => el.classList.remove('ring-4', isDone ? 'ring-emerald-400' : 'ring-sky-400'), 2000);
+            if (existing) {
+              const target = existing;
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              target.classList.add('ring-4', isDone ? 'ring-emerald-400' : 'ring-sky-400');
+              setTimeout(() => {
+                target.classList.remove('ring-4', isDone ? 'ring-emerald-400' : 'ring-sky-400');
+              }, 2000);
             }
           });
           
