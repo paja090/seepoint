@@ -137,11 +137,26 @@ export function MyRouteMap({
           });
 
           marker.on('click', () => {
-            const el = document.getElementById(`stop-${stop.jobId}`);
+            let el = document.getElementById(`stop-${stop.jobId}`);
+            if (!el && isDone) {
+              const toggleBtn = document.getElementById('toggle-done-stops-btn');
+              if (toggleBtn) {
+                toggleBtn.click();
+                setTimeout(() => {
+                  el = document.getElementById(`stop-${stop.jobId}`);
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('ring-4', 'ring-emerald-400');
+                    setTimeout(() => el.classList.remove('ring-4', 'ring-emerald-400'), 2000);
+                  }
+                }, 100);
+                return;
+              }
+            }
             if (el) {
               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              el.classList.add('ring-4', 'ring-sky-400');
-              setTimeout(() => el.classList.remove('ring-4', 'ring-sky-400'), 2000);
+              el.classList.add('ring-4', isDone ? 'ring-emerald-400' : 'ring-sky-400');
+              setTimeout(() => el.classList.remove('ring-4', isDone ? 'ring-emerald-400' : 'ring-sky-400'), 2000);
             }
           });
           

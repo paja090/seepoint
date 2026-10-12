@@ -1119,6 +1119,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </span>
                 </span>
                 <button
+                  id="toggle-done-stops-btn"
                   type="button"
                   onClick={() => setHideDoneStops(!hideDoneStops)}
                   className="text-emerald-700 hover:text-emerald-900 font-bold underline cursor-pointer"
