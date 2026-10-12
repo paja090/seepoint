@@ -23,26 +23,33 @@ function cleanEnvValue(val?: string): string | undefined {
   return cleaned || undefined;
 }
 
+export function getGoogleMapsKeyDetails(): { key: string | undefined; sourceName: string | undefined } {
+  const candidates = [
+    'GOOGLE_MAPS_SERVER_API_KEY',
+    'GOOGLE_MAPS_SERVER_KEY',
+    'GOOGLE_MAPS_API_KEY',
+    'GOOGLE_ROUTES_API_KEY',
+    'GOOGLE_API_KEY',
+    'MAPS_API_KEY',
+    'GOOGLE_MAPS',
+    'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY',
+    'NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY',
+    'NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY',
+    'NEXT_PUBLIC_GOOGLE_MAPS_KEY',
+  ];
+  for (const name of candidates) {
+    const val = cleanEnvValue(process.env[name]);
+    if (val) return { key: val, sourceName: name };
+  }
+  return { key: undefined, sourceName: undefined };
+}
+
 /**
  * Resolves the Google Maps API key on the server side:
- * 1. GOOGLE_MAPS_SERVER_API_KEY (preferred primary server key)
- * 2. GOOGLE_MAPS_SERVER_KEY (legacy server key in Vercel)
- * 3. GOOGLE_MAPS_API_KEY (legacy server key in Vercel)
- * 4. NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (browser key fallback if server key not set)
- * 5. NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY
- * 6. NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY
- * 7. NEXT_PUBLIC_GOOGLE_MAPS_KEY
+ * Checks server keys, alternative names, and browser key fallbacks.
  */
 export function getGoogleMapsServerApiKey(): string | undefined {
-  return (
-    cleanEnvValue(process.env.GOOGLE_MAPS_SERVER_API_KEY) ||
-    cleanEnvValue(process.env.GOOGLE_MAPS_SERVER_KEY) ||
-    cleanEnvValue(process.env.GOOGLE_MAPS_API_KEY) ||
-    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ||
-    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY) ||
-    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY) ||
-    cleanEnvValue(process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY)
-  );
+  return getGoogleMapsKeyDetails().key;
 }
 
 export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
@@ -173,14 +180,19 @@ export async function computeGoogleRoute(
     };
 
     const referer = requestReferer || process.env.APP_URL || 'https://seepoint.vercel.app/';
+    let originHeader: string | undefined;
+    try { originHeader = new URL(referer).origin; } catch {}
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+      'Referer': referer,
+    };
+    if (originHeader) headers['Origin'] = originHeader;
+
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
-        'Referer': referer,
-      },
+      headers,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
     });
