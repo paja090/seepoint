@@ -47,10 +47,18 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
     const result = plan.planningSummary as unknown as PlanningResult;
     const planLocations = await loadPlanCrewLocations(plan.id, organizationId);
     for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
-      const orders = await prisma.workOrder.findMany({ where: { organizationId, id: { in: crew.stops.map(s => s.workOrderId) }, workTasks: { some: { organizationId, assignedToEmployeeId: employee.id } } },
+      const orders = await prisma.workOrder.findMany({
+        where: {
+          organizationId,
+          id: { in: crew.stops.map(s => s.workOrderId) },
+          OR: [
+            { workTasks: { some: { organizationId, assignedToEmployeeId: { in: crew.employeeIds } } } },
+            { workTasks: { none: {} } },
+          ],
+        },
         select: { id: true, title: true, description: true, clientName: true, status: true, workType: true, navigationOrderId: true,
           crmRealizations: { where: { organizationId }, select: { id: true, claimNote: true, status: true } },
-          workTasks: { where: { organizationId, assignedToEmployeeId: employee.id }, select: { id: true } },
+          workTasks: { where: { organizationId, assignedToEmployeeId: { in: crew.employeeIds } }, select: { id: true } },
           items: { where: { organizationId }, include: { crmRealization: true, photos: { where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } }, carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } }, surface: { include: { carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } } } } } } } });
       const points = navigation ? await prisma.navigationPoint.findMany({ where: { organizationId, id: { in: crew.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) } },
         select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, issueType: true, issueNote: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
@@ -333,16 +341,16 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       });
       return { ok: true };
     }
-    const order = input.workOrderId ? await tx.workOrder.findUnique({ where: { id: input.workOrderId, organizationId }, include: { items: true, workTasks: true, crmRealizations: true, navigationOrder: { include: { points: true } } } }) : null;
-    if (input.workOrderId && (!order || !order.workTasks.some(t => t.organizationId === organizationId && t.assignedToEmployeeId === employee.id))) throw new Error('FORBIDDEN: pracovní přiřazení se změnilo.');
-    if (order && [...order.crmRealizations, ...order.workTasks, ...(order.navigationOrder ? [order.navigationOrder, ...order.navigationOrder.points] : [])].some(r => r.organizationId !== organizationId)) throw new Error('Cross-tenant reference rejected.');
-    const stop = crew.stops.find(s => stopId(s) === (input.jobId ?? input.workOrderId))!;
+    const stop = crew.stops.find(s => stopId(s) === (input.jobId ?? input.workOrderId));
+    if (!stop) throw new Error('Zastávka nebyla v trase nalezena.');
+
     if (stop.workOrderItemId) {
       const members = await tx.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const response = await executeItem(tx, stop, plan.id, input, actor, installationPhotos, members.flatMap(m => m.userId ? [m.userId] : []));
       if (input.action !== 'inspect') await refreshExecutionPlan(tx, plan.id, result);
       return response;
     }
+
     if (stop.isWarehousePitstop) {
       if (input.action === 'inspect') return { ok: true };
       if (!['start', 'complete'].includes(input.action)) throw new Error('Neplatná akce.');
@@ -353,6 +361,7 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       await tx.crmAuditLog.create({ data: { id: eventId, organizationId, entityType: 'WarehousePitstop', entityId: stop.jobId!, userId: actor.id, userEmail: actor.email, action: actionStr, detailsJson: '{}' } });
       return { ok: true };
     }
+
     if (stop.electionRemovalPointId) {
       const point = await tx.electionRemovalPoint.findFirst({ where: { organizationId, id: stop.electionRemovalPointId } });
       if (!point || ['CANCELLED', 'COMPLETED'].includes(point.status)) throw new Error('Bod již není dostupný.');
@@ -372,6 +381,11 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       await refreshExecutionPlan(tx, plan.id, result);
       return { ok: true };
     }
+
+    const orderId = stop.workOrderId || input.workOrderId;
+    const order = orderId ? await tx.workOrder.findUnique({ where: { id: orderId, organizationId }, include: { items: true, workTasks: true, crmRealizations: true, navigationOrder: { include: { points: true } } } }) : null;
+    if (orderId && (!order || (order.workTasks.length > 0 && !order.workTasks.some(t => t.organizationId === organizationId && (t.assignedToEmployeeId === employee.id || crew.employeeIds.includes(t.assignedToEmployeeId ?? '')))))) throw new Error('FORBIDDEN: pracovní přiřazení se změnilo.');
+    if (order && [...order.crmRealizations, ...order.workTasks, ...(order.navigationOrder ? [order.navigationOrder, ...order.navigationOrder.points] : [])].some(r => r.organizationId !== organizationId)) throw new Error('Cross-tenant reference rejected.');
     if (stop.navigationPointId) {
       if (!await navigationAvailable(tx)) throw new Error('FORBIDDEN: Navigation není aktivní.');
       const point = await tx.navigationPoint.findFirst({ where: { organizationId, id: stop.navigationPointId, navigationOrderId: stop.navigationOrderId, navigationOrder: { organizationId } } });

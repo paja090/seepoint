@@ -186,6 +186,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       if (refreshed.ok) setData(await refreshed.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Operace selhala.');
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setBusy(false);
     }
@@ -285,8 +286,16 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
       </header>
 
       {error && (
-        <div role="alert" className="rounded-2xl bg-red-50 p-4 text-xs font-semibold text-red-800 border border-red-200">
-          {error}
+        <div role="alert" className="rounded-2xl bg-red-50 p-4 text-xs font-semibold text-red-800 border border-red-200 flex items-start justify-between gap-2 shadow-xs">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="text-red-500 hover:text-red-700 font-bold ml-2 cursor-pointer"
+            aria-label="Zavřít"
+          >
+            ✕
+          </button>
         </div>
       )}
 
