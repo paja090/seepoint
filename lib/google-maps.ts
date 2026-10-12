@@ -139,6 +139,23 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
   return null;
 }
 
+function toGoogleRoutesTravelMode(mode?: string): 'DRIVE' | 'BICYCLE' | 'WALK' | 'TWO_WHEELER' {
+  switch (mode?.toUpperCase()) {
+    case 'BICYCLING':
+    case 'BICYCLE':
+      return 'BICYCLE';
+    case 'WALKING':
+    case 'WALK':
+      return 'WALK';
+    case 'TWO_WHEELER':
+      return 'TWO_WHEELER';
+    case 'DRIVING':
+    case 'DRIVE':
+    default:
+      return 'DRIVE';
+  }
+}
+
 /**
  * Computes route driving distance and polyline using Google Routes API (New).
  * Only called on point creation, drag end, or explicit recalculation request.
@@ -146,7 +163,7 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
 export async function computeGoogleRoute(
   origin: { latitude: number; longitude: number },
   destination: { latitude: number; longitude: number },
-  travelMode: 'DRIVING' | 'BICYCLING' | 'WALKING' = 'DRIVING',
+  travelMode: 'DRIVING' | 'BICYCLING' | 'WALKING' | string = 'DRIVING',
   requestReferer?: string
 ): Promise<RouteComputeResult> {
   const apiKey = getGoogleMapsServerApiKey();
@@ -163,7 +180,8 @@ export async function computeGoogleRoute(
 
   try {
     const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-    const body = {
+    const googleTravelMode = toGoogleRoutesTravelMode(travelMode);
+    const body: Record<string, unknown> = {
       origin: {
         location: {
           latLng: { latitude: origin.latitude, longitude: origin.longitude },
@@ -174,10 +192,12 @@ export async function computeGoogleRoute(
           latLng: { latitude: destination.latitude, longitude: destination.longitude },
         },
       },
-      travelMode: travelMode,
-      routingPreference: 'TRAFFIC_UNAWARE',
+      travelMode: googleTravelMode,
       polylineQuality: 'OVERVIEW',
     };
+    if (googleTravelMode === 'DRIVE' || googleTravelMode === 'TWO_WHEELER') {
+      body.routingPreference = 'TRAFFIC_UNAWARE';
+    }
 
     const referer = requestReferer || process.env.APP_URL || 'https://seepoint.vercel.app/';
     let originHeader: string | undefined;
@@ -199,6 +219,48 @@ export async function computeGoogleRoute(
 
     if (!res.ok) {
       const errText = await res.text();
+
+      // Fallback: Try Google Directions API v1 if available with the same key
+      try {
+        const directionsMode = googleTravelMode === 'BICYCLE' ? 'bicycling' : googleTravelMode === 'WALK' ? 'walking' : 'driving';
+        const directionsUrl = new URL('https://maps.googleapis.com/maps/api/directions/json');
+        directionsUrl.searchParams.set('origin', `${origin.latitude},${origin.longitude}`);
+        directionsUrl.searchParams.set('destination', `${destination.latitude},${destination.longitude}`);
+        directionsUrl.searchParams.set('mode', directionsMode);
+        directionsUrl.searchParams.set('key', apiKey);
+
+        const dirRes = await fetch(directionsUrl, {
+          headers: originHeader ? { Referer: referer, Origin: originHeader } : { Referer: referer },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (dirRes.ok) {
+          const dirData = (await dirRes.json()) as {
+            status?: string;
+            routes?: Array<{
+              overview_polyline?: { points?: string };
+              legs?: Array<{ distance?: { value?: number }; duration?: { value?: number } }>;
+            }>;
+            error_message?: string;
+          };
+          if (dirData.status === 'OK' && dirData.routes?.[0]) {
+            const firstRoute = dirData.routes[0];
+            const firstLeg = firstRoute.legs?.[0];
+            const rawDistance = firstLeg?.distance?.value || 0;
+            const distanceMeters = rawDistance > 0 ? Math.max(50, Math.round(rawDistance / 50) * 50) : 0;
+            const durationSeconds = firstLeg?.duration?.value || 0;
+            const polyline = firstRoute.overview_polyline?.points || '';
+            return {
+              distanceMeters,
+              durationSeconds,
+              polyline,
+              status: 'OK',
+            };
+          }
+        }
+      } catch {
+        /* Fall through to report primary Routes API error */
+      }
+
       return {
         distanceMeters: 0,
         durationSeconds: 0,
