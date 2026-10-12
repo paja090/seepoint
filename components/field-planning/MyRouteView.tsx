@@ -382,6 +382,12 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         });
         const orderGroups = Array.from(orderGroupsMap.values());
 
+        // Map jobId to absolute 1-based route sequence number (matching map markers 1:1)
+        const stopIndexMap = new Map<string, number>();
+        route.stops.forEach((s, idx) => {
+          stopIndexMap.set(s.jobId, idx + 1);
+        });
+
         const renderSingleStop = (s: (typeof route.stops)[number], displayOrder: number) => {
           const isDone = s.status === 'DONE';
           const isInProgress = s.status === 'IN_PROGRESS';
@@ -422,7 +428,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-xs font-black ${
+                    className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-xs font-black ${
                       isDone
                         ? 'bg-emerald-600 text-white'
                         : isIssue
@@ -432,7 +438,17 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                         : 'bg-slate-900 text-white'
                     }`}
                   >
-                    {isDone ? '✓' : isIssue ? '!' : displayOrder}
+                    {displayOrder}
+                    {isDone && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-black text-white border border-white shadow-xs">
+                        ✓
+                      </span>
+                    )}
+                    {isIssue && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-700 text-[10px] font-black text-white border border-white shadow-xs">
+                        !
+                      </span>
+                    )}
                   </div>
 
                   <div>
@@ -1193,8 +1209,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
 
                       <div className="space-y-3 pt-1">
                         {visibleGroupStops.length > 0 ? (
-                          visibleGroupStops.map((s, idx) =>
-                            renderSingleStop(s, idx + 1)
+                          visibleGroupStops.map((s) =>
+                            renderSingleStop(s, stopIndexMap.get(s.jobId) ?? 1)
                           )
                         ) : (
                           <p className="text-xs text-slate-400 italic p-2 text-center">
@@ -1239,7 +1255,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                             <div className="h-px bg-slate-200 flex-1" />
                           </div>
                         )}
-                        {renderSingleStop(s, i + 1)}
+                        {renderSingleStop(s, stopIndexMap.get(s.jobId) ?? (i + 1))}
                       </div>
                     );
                   })}

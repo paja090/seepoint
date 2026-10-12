@@ -71,9 +71,11 @@ export function MyRouteMap({
 
           const isDone = stop.status === 'DONE';
           const isIssue = stop.status === 'ISSUE';
+          const stopNumber = i + 1;
           
           const iconHtml = `
             <div style="
+              position: relative;
               display: flex;
               align-items: center;
               justify-content: center;
@@ -83,23 +85,70 @@ export function MyRouteMap({
               color: white;
               border-radius: 12px;
               font-weight: 900;
-              font-size: ${isIssue ? '16px' : '14px'};
+              font-size: 14px;
               border: 2px solid white;
-              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, ${isIssue ? '0.3' : '0.1'});
-              opacity: ${isDone ? 0.7 : 1};
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, ${isIssue ? '0.35' : '0.15'});
+              opacity: ${isDone ? 0.75 : 1};
+              cursor: pointer;
             ">
-              ${isDone ? '✓' : isIssue ? '!' : i + 1}
+              ${stopNumber}
+              ${isDone ? `
+                <span style="
+                  position: absolute;
+                  top: -5px;
+                  right: -5px;
+                  width: 15px;
+                  height: 15px;
+                  border-radius: 9999px;
+                  background-color: #059669;
+                  color: white;
+                  font-size: 10px;
+                  font-weight: 900;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  border: 1.5px solid white;
+                  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                ">✓</span>
+              ` : isIssue ? `
+                <span style="
+                  position: absolute;
+                  top: -5px;
+                  right: -5px;
+                  width: 15px;
+                  height: 15px;
+                  border-radius: 9999px;
+                  background-color: #dc2626;
+                  color: white;
+                  font-size: 10px;
+                  font-weight: 900;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  border: 1.5px solid white;
+                  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                ">!</span>
+              ` : ''}
             </div>
           `;
 
           const marker = L.marker(pt, {
             icon: L.divIcon({ className: '', html: iconHtml, iconSize: [32, 32], iconAnchor: [16, 16] })
           });
+
+          marker.on('click', () => {
+            const el = document.getElementById(`stop-${stop.jobId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.classList.add('ring-4', 'ring-sky-400');
+              setTimeout(() => el.classList.remove('ring-4', 'ring-sky-400'), 2000);
+            }
+          });
           
           const crewLabel = r.crewName ? `<span style="color: ${routeColor}; font-weight: bold;">Posádka: ${escapeHtml(r.crewName)}</span><br/>` : '';
           const tooltipHtml = `
             <div style="font-weight: bold; font-family: sans-serif; font-size: 12px; color: ${isIssue ? '#dc2626' : '#0f172a'};">
-              ${isIssue ? '⚠️ ' : ''}${escapeHtml(stop.title)}
+              ${isIssue ? '⚠️ ' : ''}#${stopNumber}. ${escapeHtml(stop.title)}
             </div>
             ${crewLabel}
             <div style="font-size: 11px; color: ${isIssue ? '#b91c1c' : '#64748b'}; font-family: sans-serif; margin-top: 2px;">
@@ -168,7 +217,7 @@ export function MyRouteMap({
           const vehicleTooltipHtml = `
             <div style="font-family: system-ui, -apple-system, sans-serif; font-size: 11px; line-height: 1.4;">
               <strong style="font-size: 12px; color: #0284c7;">📍 Moje aktuální poloha</strong><br/>
-              ${r.crewName ? `<span style="color: #0f172a; font-weight: 700;">${escapeHtml(r.crewName)}</span><br/>` : ''}
+              <span style="color: #0f172a; font-weight: 700;">${escapeHtml(crewLabel)}</span><br/>
               ${r.vehicleName ? `<span style="color: #475569;">Vozidlo: ${escapeHtml(r.vehicleName)}</span><br/>` : ''}
               <span style="color: #0369a1; font-weight: 700;">Rychlost: ${speedText}</span> · 
               <span style="color: ${isRecent ? '#15803d' : '#b45309'}; font-weight: 600;">Signál: ${ageText}</span>
