@@ -6,6 +6,7 @@ import { runWithTenantContext } from '../lib/tenant-context';
 import type { PlannerActor } from '../lib/field-planning/service';
 
 test('Field execution: Election removal points and pitstops execute seamlessly without requiring dummy WorkOrders', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-12T08:00:00Z') });
   const orgId = 'org-test-123';
   const planId = 'plan-test-1';
   const campaignId = 'campaign-test-1';

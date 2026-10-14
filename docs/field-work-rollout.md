@@ -109,3 +109,11 @@ Po přidání sloupců není nutné schéma vracet. Při problému pozastavit no
 - Retry formuláře drží stav v otevřené stránce; nejde o plnou offline aplikaci s perzistentní frontou po restartu prohlížeče.
 - Nové práce mají fotografickou fázi podle operace (AFTER_INSTALLATION / AFTER_DEINSTALLATION / CONTROL); není přidán samostatný administrační editor fotografických politik.
 - KML/KMZ import je zachován jako založení akce s body k ověření; dodatečné připojení dalšího KML do již existující akce není nově implementováno.
+
+## Předprodukční ověření 15. 10. 2026
+
+Uživatel autorizoval sloučení a produkční nasazení. Produkční Neon projekt je `royal-hat-94187799`, větev `br-super-boat-at3cgqf3` (potvrzeno i historií předchozích nasazení). Nová izolovaná kopie `br-bold-hall-atbtwayw` má expiraci 22. 10. 2026 22:00 UTC. Standardní `prisma migrate deploy` na této kopii úspěšně aplikovalo čekající `20261009010000_academy_foundation` z main a `20261012150000_field_work_steps`. Žádný reset ani přepis historických migračních záznamů neproběhl.
+
+Před i po: 9 kampaní, 250 bodů, 961 fotografií, 29 plánů; stejný kontrolní součet původních popisů/stavů bodů i fotografických vazeb. Historie měla 68 záznamů, poté 70, žádná nedokončená migrace. Starší historie obsahuje odlišné checksumy a duplicitní historický záznam; zůstala nedotčená. Není to doklad čistého bootstrapu starých migrací.
+
+Před produkční změnou vytvořen recovery snapshot `snap-plain-sea-atzql440`, expirace 29. 10. 2026 22:00 UTC. Opraveny dvě testovací fixture nalezené CI: explicitní typování částečného transportního objektu a pevný čas u realizačního testu (UTC datum kolem pražské půlnoci). Produkční logika se těmito opravami nemění. Lokální plná typová kontrola i cílené testy prošly. Stav samotného nasazení viz PR #417 a jeho deploy.
