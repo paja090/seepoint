@@ -74,7 +74,7 @@ test('transport adapter snapshot survives database JSON serialization', async ()
   const spec = parseTaskSpec({ ...task, operationType: 'RELOCATION', materialDisposition: 'TRANSFER', destinationLatitude: 49, destinationLongitude: 15, destinationGpsConfirmed: true, destinationName: 'B', loadSlots: 2 });
   const now = new Date('2026-10-20T05:00:00Z');
   const point = { ...spec, id: 'point', organizationId: 'org', status: 'PENDING', reviewRequired: false, updatedAt: now,
-    steps: taskSteps(spec).map((s, i) => ({ ...s, id: 'step-' + i, status: 'PENDING', updatedAt: now, createdAt: now })) } as Parameters<typeof convertElectionPointToJob>[0];
+    steps: taskSteps(spec).map((s, i) => ({ ...s, id: 'step-' + i, status: 'PENDING', updatedAt: now, createdAt: now })) } as unknown as Parameters<typeof convertElectionPointToJob>[0];
   const adapted = convertElectionPointToJob(point, { id: 'campaign', name: 'Transfer', targetDate: now, createdAt: now });
   assert.deepEqual(adapted.delivery?.location, { latitude: 49, longitude: 15 });
   assert.equal(hash(adapted), hash(JSON.parse(JSON.stringify(adapted))));
