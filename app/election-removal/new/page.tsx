@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { checkElectionRemovalPageAccess } from '@/lib/election-removal/guard';
 import { NewCampaignTabsView } from '@/components/election-removal/NewCampaignTabsView';
+import { NewFieldAction } from '@/components/election-removal/NewFieldAction';
 import { ArrowLeft, Truck, MapPin } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export default async function NewElectionRemovalCampaignPage() {
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Zpět na přehled přesunů a deinstalací</span>
+            <span>Zpět na přehled terénních prací</span>
           </Link>
 
           <div className="mt-2 flex items-center gap-3">
@@ -28,7 +29,7 @@ export default async function NewElectionRemovalCampaignPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">
-                Nová akce: Plánování přesunů a deinstalací
+                Nová akce: Plánování terénních prací
               </h1>
               <p className="text-sm text-slate-500">
                 Naplánujte zastávky a přejezdy přímo klikáním do velké Google mapy, nebo importujte existující KML soubor.
@@ -38,6 +39,9 @@ export default async function NewElectionRemovalCampaignPage() {
         </div>
 
         {/* Campaign Creator Tabs Component */}
+        <NewFieldAction />
+        <h2 className="text-xl font-semibold">Import KML/KMZ nebo existující mapové zadání</h2>
+        <p>Importované operace jsou návrhy klasifikace. Před plánováním potvrďte zadání, materiál a cílovou GPS.</p>
         <NewCampaignTabsView />
       </div>
     </AppShell>

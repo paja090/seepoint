@@ -1,9 +1,10 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import {
   requireElectionRemovalAccess,
   isElectionRemovalAccessDenied,
 } from '@/lib/election-removal/guard';
-import { approveAndSaveElectionPlan } from '@/lib/election-removal/planning';
+import { approveFieldDraft } from '@/lib/election-removal/approval';
 import type { PlanningInput, PlanningResult } from '@/lib/field-planning/contracts';
 
 export const runtime = 'nodejs';
@@ -16,13 +17,15 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   const { id } = await params;
 
   try {
     const body = (await req.json()) as {
+      draftPlanId?: string;
       planningInput: PlanningInput;
       planningResult: PlanningResult;
     };
@@ -34,12 +37,11 @@ export async function POST(
       );
     }
 
-    const fieldPlan = await approveAndSaveElectionPlan(
+    const fieldPlan = await approveFieldDraft(
       id,
       body.planningInput,
-      body.planningResult,
       auth.user,
-      auth.organizationId
+      body.draftPlanId
     );
 
     return NextResponse.json({
@@ -50,6 +52,6 @@ export async function POST(
     console.error('Chyba při schvalování plánu:', error);
     const message =
       error instanceof Error ? error.message : 'Nepodařilo se uložit a schválit plán.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 409 });
   }
 }

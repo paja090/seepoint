@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
-import { requireTenantContext, enterTenantContext } from '@/lib/tenant-context';
+import { enterTenantContext } from '@/lib/tenant-context';
 import { getCurrentUser } from '@/lib/auth';
 import { isModuleEnabled } from '@/lib/organization-modules';
 import { canAccess } from '@/lib/rbac';
 import { redirect } from 'next/navigation';
 
-export async function requireElectionRemovalAccess() {
+export async function requireElectionRemovalAccess(manage = false) {
   const user = await requireApiAccess('electionRemoval');
   if (isApiDenied(user)) return user;
+  if (manage && !['ADMIN', 'MANAGER'].includes(user.role)) return NextResponse.json({ error: 'Plánování a změna zadání vyžadují správce nebo manažera.' }, { status: 403 });
 
   const organizationId = user.organizationId!;
   enterTenantContext({ organizationId, userId: user.id, source: 'session' });

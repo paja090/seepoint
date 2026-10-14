@@ -1,10 +1,11 @@
+import { plannerTransaction } from '@/lib/field-planning/service';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import {
   requireElectionRemovalAccess,
   isElectionRemovalAccessDenied,
 } from '@/lib/election-removal/guard';
-import { runWithTenantContext } from '@/lib/tenant-context';
+import { runWithTenantContext, enterTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 
@@ -16,8 +17,9 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   const { id } = await params;
 
@@ -70,74 +72,16 @@ export async function GET(
  * DELETE /api/election-removal/campaigns/[id]
  * Odstranění volební kampaně a všech jejích bodů.
  */
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const auth = await requireElectionRemovalAccess();
-  if (isElectionRemovalAccessDenied(auth)) return auth;
-
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireElectionRemovalAccess(true); if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
   const { id } = await params;
-
-  if (auth.user.role !== 'ADMIN' && auth.user.role !== 'MANAGER') {
-    return NextResponse.json(
-      { error: 'Kampaň může smazat pouze administrátor nebo manažer.' },
-      { status: 403 }
-    );
-  }
-
   try {
-    await runWithTenantContext(
-      { organizationId: auth.organizationId, source: 'session' },
-      async () => {
-        const campaign = await prisma.electionCampaign.findFirst({
-          where: {
-            id,
-            organizationId: auth.organizationId,
-          },
-        });
-
-        if (!campaign) {
-          throw new Error('NOT_FOUND');
-        }
-
-        // 1. Clean up photos associated with this campaign's points
-        await prisma.photo.deleteMany({
-          where: {
-            organizationId: auth.organizationId,
-            electionRemovalPoint: {
-              campaignId: id,
-            },
-          },
-        });
-
-        // 2. Clean up field plans associated with this campaign
-        await prisma.fieldPlan.deleteMany({
-          where: {
-            organizationId: auth.organizationId,
-            electionCampaignId: id,
-          },
-        });
-
-        // 3. Delete campaign (cascades to ElectionRemovalPoint)
-        await prisma.electionCampaign.delete({
-          where: { id },
-        });
-      }
-    );
-
+    await plannerTransaction(async tx => {
+      if (await tx.fieldPlan.count({ where: { organizationId: auth.organizationId, electionCampaignId: id, status: { in: ['APPROVED','ACTIVE'] } } })) throw new Error('Akce obsahuje aktivní výjezdy.');
+      const changed = await tx.electionCampaign.updateMany({ where: { id, organizationId: auth.organizationId, status: { not: 'ARCHIVED' } }, data: { status: 'ARCHIVED' } });
+      if (changed.count) await tx.crmAuditLog.create({ data: { organizationId: auth.organizationId, entityType: 'ElectionCampaign', entityId: id, userId: auth.user.id, userEmail: auth.user.email, action: 'FIELD_ACTION_ARCHIVED', detailsJson: '{}' } });
+    });
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message === 'NOT_FOUND') {
-      return NextResponse.json(
-        { error: 'Kampaň nebyla nalezena.' },
-        { status: 404 }
-      );
-    }
-
-    console.error('Chyba při mazání volební kampaně:', error);
-    const message =
-      error instanceof Error ? error.message : 'Nepodařilo se smazat kampaň.';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'Archivace selhala.' }, { status: 409 }); }
 }

@@ -1,3 +1,5 @@
+import { executeFieldStep, type FieldExecutionInput } from '../election-removal/step-execution';
+import { taskInstructions } from '../election-removal/task-spec';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
@@ -14,10 +16,10 @@ import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './c
 import { computeRouteLiveETA } from './live-eta';
 import { loadPlanCrewLocations } from './live-location';
 
-export async function myRoute(userId: string, dateOrNow?: string | Date): Promise<MyRouteDTO> {
+export async function myRoute(userId: string, dateOrNow?: string | Date, db = prisma): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
-  const profile = await loadProfile(); if (!profile?.enabled) return { timezone: 'Europe/Prague', routes: [] };
-  const employee = await prisma.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
+  const profile = await loadProfile(db); if (!profile?.enabled) return { timezone: 'Europe/Prague', routes: [] };
+  const employee = await db.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
   if (!employee) return { timezone: profile.timezone, routes: [] };
 
   let targetDate: string;
@@ -29,25 +31,16 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
     targetDate = dayInZone(new Date(), profile.timezone);
   }
 
-  const plans = await prisma.fieldPlan.findMany({ where: { organizationId, date: targetDate, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
+  const plans = await db.fieldPlan.findMany({ where: { organizationId, date: targetDate, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
 
-  // For election campaigns, if multiple plans exist for today, only take the latest version so superseded routes are excluded
-  const seenCampaigns = new Set<string>();
-  const effectivePlans: typeof plans = [];
-  for (const plan of plans) {
-    if (plan.electionCampaignId) {
-      if (seenCampaigns.has(plan.electionCampaignId)) continue;
-      seenCampaigns.add(plan.electionCampaignId);
-    }
-    effectivePlans.push(plan);
-  }
-  const navigation = await navigationAvailable();
+  const effectivePlans = plans;
+  const navigation = await navigationAvailable(db);
   const routes: MyRouteDTO['routes'] = [];
   for (const plan of effectivePlans) {
     const result = plan.planningSummary as unknown as PlanningResult;
-    const planLocations = await loadPlanCrewLocations(plan.id, organizationId);
+    const planLocations = await loadPlanCrewLocations(plan.id, organizationId, db);
     for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
-      const orders = await prisma.workOrder.findMany({
+      const orders = await db.workOrder.findMany({
         where: {
           organizationId,
           id: { in: crew.stops.map(s => s.workOrderId) },
@@ -60,25 +53,25 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
           crmRealizations: { where: { organizationId }, select: { id: true, claimNote: true, status: true } },
           workTasks: { where: { organizationId, assignedToEmployeeId: { in: crew.employeeIds } }, select: { id: true } },
           items: { where: { organizationId }, include: { crmRealization: true, photos: { where: { organizationId }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } }, carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } }, surface: { include: { carrier: { include: { photos: { where: { organizationId, workOrderItemId: null }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } } } } } } } } } });
-      const points = navigation ? await prisma.navigationPoint.findMany({ where: { organizationId, id: { in: crew.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) } },
+      const points = navigation ? await db.navigationPoint.findMany({ where: { organizationId, id: { in: crew.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) } },
         select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, issueType: true, issueNote: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
-      const electionPoints = await prisma.electionRemovalPoint.findMany({
+      const electionPoints = await db.electionRemovalPoint.findMany({
         where: { organizationId, id: { in: crew.stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) } },
-        select: { id: true, campaignId: true, label: true, description: true, status: true, mediaType: true, issueType: true, issueNote: true, startedAt: true, completedAt: true, campaign: { select: { id: true, name: true } } }
+        include: { steps: true, campaign: { select: { id: true, name: true, description: true, clientName: true } } }
       });
-      const crewUsers = await prisma.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
-      const starts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
-      const pointCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true, createdAt: true } });
-      const orderStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: 'FIELD_WORK_STARTED' }, select: { entityId: true, createdAt: true } });
-      const orderCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: 'FIELD_WORK_COMPLETED' }, select: { entityId: true, createdAt: true } });
-      const orderLogs = await prisma.crmAuditLog.findMany({
+      const crewUsers = await db.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
+      const starts = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
+      const pointCompletions = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true, createdAt: true } });
+      const orderStarts = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: 'FIELD_WORK_STARTED' }, select: { entityId: true, createdAt: true } });
+      const orderCompletions = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: 'FIELD_WORK_COMPLETED' }, select: { entityId: true, createdAt: true } });
+      const orderLogs = await db.crmAuditLog.findMany({
         where: { organizationId, entityType: 'WorkOrder', entityId: { in: orders.map(o => o.id) }, action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } },
         orderBy: { createdAt: 'desc' },
         select: { entityId: true, action: true, detailsJson: true }
       });
-      const pitstopStarts = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
-      const pitstopCompletions = await prisma.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', entityId: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => stopId(s)) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true, createdAt: true } });
-      const tripLogs = await prisma.crmAuditLog.findMany({
+      const pitstopStarts = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', id: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => `fp-pitstop-${plan.id}-${stopId(s)}-FIELD_POINT_STARTED`) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
+      const pitstopCompletions = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WarehousePitstop', id: { in: crew.stops.filter(s => s.isWarehousePitstop).map(s => `fp-pitstop-${plan.id}-${stopId(s)}-FIELD_POINT_COMPLETED`) }, action: 'FIELD_POINT_COMPLETED' }, select: { entityId: true, createdAt: true } });
+      const tripLogs = await db.crmAuditLog.findMany({
         where: { organizationId, entityType: 'FieldPlanCrew', entityId: `${plan.id}-${crew.id}`, action: { in: ['FIELD_TRIP_STARTED', 'FIELD_TRIP_COMPLETED'] } },
         orderBy: { createdAt: 'asc' },
         select: { action: true, createdAt: true }
@@ -95,7 +88,13 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
           if (s.electionRemovalPointId) {
             const ep = electionPoints.find(e => e.id === s.electionRemovalPointId);
             if (!ep) return [];
+            const step = ep.steps.find(step => step.id === s.fieldWorkStepId);
+            if (step ? step.assignedFieldPlanId !== plan.id || step.assignedCrewId !== crew.id : ep.assignedFieldPlanId !== plan.id || ep.assignedCrewId !== crew.id) return [];
+            const startedAt = step ? step.startedAt : ep.startedAt;
+            const completedAt = step ? step.completedAt : ep.completedAt;
             return [{
+              fieldWorkStepId: step?.id, quantity: step?.quantity ?? ep.quantity, completedQuantity: step?.completedQuantity ?? 0,
+              referenceUrl: ep.referenceUrl, photoType: step?.photoType,
               jobId: stopId(s),
               workOrderItemId: null,
               navigationPointId: null,
@@ -103,14 +102,14 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               address: null,
               pointPhotoUrl: null,
               workOrderId: ep.campaignId,
-              orderTitle: ep.campaign?.name ? `Kampaň: ${ep.campaign.name}` : 'Svoz voleb',
-              campaignName: ep.campaign?.name ?? 'Svoz voleb',
-              title: ep.label,
-              clientName: ep.campaign?.name || 'Svoz voleb',
-              instructions: ep.description || `Demontáž (${ep.mediaType})`,
-              status: ep.status === 'COMPLETED' ? 'DONE' : ep.status === 'ISSUE' ? 'ISSUE' : ep.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED',
+              orderTitle: ep.campaign?.name ? `Akce: ${ep.campaign.name}` : 'Terénní práce',
+              campaignName: ep.campaign?.name ?? 'Terénní práce',
+              title: step?.label ?? ep.label,
+              clientName: ep.campaign.clientName || ep.campaign.name,
+              instructions: taskInstructions(ep) + (ep.campaign.description ? '. Společné instrukce: ' + ep.campaign.description : '') + ep.steps.filter(x => x.custodyNote).map(x => '. Materiál: ' + x.custodyNote).join(''),
+              status: (step?.status ?? ep.status) === 'COMPLETED' ? 'DONE' : (step?.status ?? ep.status) === 'ISSUE' ? 'ISSUE' : (step?.status ?? ep.status) === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED',
               issueType: ep.status === 'ISSUE' ? ep.issueType : null,
-              issueNote: ep.status === 'ISSUE' ? ep.issueNote : null,
+              issueNote: step?.issueNote ?? (ep.status === 'ISSUE' ? ep.issueNote : null),
               workType: s.workType,
               startAt: s.startAt,
               endAt: s.endAt,
@@ -120,18 +119,18 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
               carrier: null,
               serviceMinutes: s.serviceMinutes,
               travelMinutes: s.travel ? Math.round(s.travel.durationSeconds / 60) : undefined,
-              startedAt: ep.startedAt?.toISOString() ?? null,
-              completedAt: ep.completedAt?.toISOString() ?? null,
+              startedAt: startedAt?.toISOString() ?? null,
+              completedAt: completedAt?.toISOString() ?? null,
               actualDurationMinutes: (() => {
-                if (!ep.startedAt || !ep.completedAt) return null;
-                const diffMs = ep.completedAt.getTime() - ep.startedAt.getTime();
+                if (!startedAt || !completedAt) return null;
+                const diffMs = completedAt.getTime() - startedAt.getTime();
                 if (diffMs < 60000) return null; // Ignored if under 1 minute (forgot to click Zahájit)
                 return Math.max(1, Math.round(diffMs / 60000));
               })(),
               isInstantCompletion: Boolean(
-                ep.startedAt &&
-                ep.completedAt &&
-                ep.completedAt.getTime() - ep.startedAt.getTime() < 60000
+                startedAt &&
+                completedAt &&
+                completedAt.getTime() - startedAt.getTime() < 60000
               ),
             }];
           }
@@ -309,7 +308,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date): Promis
 export { fieldProblemTypes, type MyRouteDTO, type MyRouteStop, type MyRouteCarrier } from './contracts';
 
 /** Authenticated worker operations over canonical work; no billing/FTD/payroll state is inferred. */
-export async function executeStop(input: { planId: string; workOrderId: string; jobId?: string; action: string; problemType?: string; note?: string; requestKey?: string }, actor: PlannerActor, db = prisma, installationPhotos?: StoredInstallationPhoto[]) {
+export async function executeStop(input: FieldExecutionInput & { planId: string; workOrderId: string; jobId?: string }, actor: PlannerActor, db = prisma, installationPhotos?: StoredInstallationPhoto[]) {
   if (!['WORKER', 'TECHNICIAN', 'ADMIN', 'MANAGER'].includes(actor.role)) throw new Error('FORBIDDEN');
   return plannerTransaction(async tx => {
     const { organizationId } = requireTenantContext(); const plan = await getPlan(input.planId, tx);
@@ -323,6 +322,7 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       throw new Error('Nelze realizovat trasu z minulosti; kontaktujte dispečera.');
     }
     if (input.action === 'start_trip' || input.action === 'complete_trip') {
+      if (input.action === 'complete_trip' && crew.stops.some(s => s.fieldWorkStepId) && await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: plan.id, assignedCrewId: crew.id, status: { notIn: ['COMPLETED','CANCELLED'] } } })) throw new Error('Nejprve dokončete všechny kroky včetně doručení materiálu.');
       const actionStr = input.action === 'start_trip' ? 'FIELD_TRIP_STARTED' : 'FIELD_TRIP_COMPLETED';
       const eventId = `fp-trip-${plan.id}-${crew.id}-${actionStr}`;
       const existing = await tx.crmAuditLog.findUnique({ where: { id: eventId, organizationId } });
@@ -359,27 +359,14 @@ export async function executeStop(input: { planId: string; workOrderId: string; 
       const existing = await tx.crmAuditLog.findUnique({ where: { id: eventId, organizationId } });
       if (existing) return { ok: true };
       await tx.crmAuditLog.create({ data: { id: eventId, organizationId, entityType: 'WarehousePitstop', entityId: stop.jobId!, userId: actor.id, userEmail: actor.email, action: actionStr, detailsJson: '{}' } });
+      await refreshExecutionPlan(tx, plan.id, result);
       return { ok: true };
     }
 
     if (stop.electionRemovalPointId) {
-      const point = await tx.electionRemovalPoint.findFirst({ where: { organizationId, id: stop.electionRemovalPointId } });
-      if (!point || ['CANCELLED', 'COMPLETED'].includes(point.status)) throw new Error('Bod již není dostupný.');
-      if (input.action === 'inspect') return { ok: true };
-      if (!['start', 'complete', 'problem'].includes(input.action)) throw new Error('Neplatná akce.');
-      if (input.action === 'problem') {
-        if (!fieldProblemTypes.includes(input.problemType as typeof fieldProblemTypes[number]) || !input.note?.trim() || !input.requestKey) throw new Error('Vyberte typ problému a popis.');
-        await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: { status: 'ISSUE', issueType: input.problemType, issueNote: input.note.trim() } });
-      } else if (input.action === 'start') {
-        if (point.status === 'PENDING' || point.status === 'ASSIGNED' || point.status === 'ISSUE') {
-          await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: { status: 'IN_PROGRESS', startedAt: new Date() } });
-        }
-      } else if (input.action === 'complete') {
-        if (point.status !== 'IN_PROGRESS' && point.status !== 'ISSUE') throw new Error('Nejprve zahajte práci.');
-        await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: { status: 'COMPLETED', completedAt: new Date(), completedByUserId: actor.id } });
-      }
-      await refreshExecutionPlan(tx, plan.id, result);
-      return { ok: true };
+      const response = await executeFieldStep(tx, stop, plan.id, crew.id, input, actor);
+      if (input.action !== 'inspect') await refreshExecutionPlan(tx, plan.id, result);
+      return response;
     }
 
     const orderId = stop.workOrderId || input.workOrderId;
@@ -466,6 +453,9 @@ async function refreshExecutionPlan(tx: Prisma.TransactionClient, planId: string
   const remainingPoints = await tx.navigationPoint.count({ where: { organizationId, id: { in: stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : []) }, OR: [{ status: { notIn: ['INSTALLED', 'CANCELLED'] } }, { issueReported: true }] } });
   const items = await tx.workOrderItem.findMany({ where: { organizationId, id: { in: stops.flatMap(s => s.workOrderItemId ? [s.workOrderItemId] : []) } }, include: { crmRealization: true } });
   const remainingItems = items.filter(i => i.issueNote || !['DONE', 'CANCELLED'].includes(itemStatus(i))).length;
-  const remainingElections = await tx.electionRemovalPoint.count({ where: { organizationId, id: { in: stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) }, status: { notIn: ['COMPLETED', 'CANCELLED'] } } });
-  await tx.fieldPlan.update({ where: { id: planId, organizationId }, data: { status: remainingOrders + remainingPoints + remainingItems + remainingElections ? 'ACTIVE' : 'COMPLETED' } });
+  const remainingElections = await tx.electionRemovalPoint.count({ where: { organizationId, id: { in: stops.flatMap(s => s.electionRemovalPointId && !s.fieldWorkStepId ? [s.electionRemovalPointId] : []) }, assignedFieldPlanId: planId, status: { notIn: ['COMPLETED', 'CANCELLED'] } } });
+  const remainingSteps = await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: planId, status: { notIn: ['COMPLETED','CANCELLED'] } } });
+  const warehouseIds = stops.filter(s => s.isWarehousePitstop).map(s => `fp-pitstop-${planId}-${stopId(s)}-FIELD_POINT_COMPLETED`);
+  const warehouseDone = warehouseIds.length ? await tx.crmAuditLog.count({ where: { organizationId, id: { in: warehouseIds } } }) : 0;
+  await tx.fieldPlan.update({ where: { id: planId, organizationId }, data: { status: remainingOrders + remainingPoints + remainingItems + remainingElections + remainingSteps + warehouseIds.length - warehouseDone ? 'ACTIVE' : 'COMPLETED' } });
 }

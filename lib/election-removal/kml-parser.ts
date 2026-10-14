@@ -75,6 +75,7 @@ export function detectMediaTypeFromText(text?: string | null): ElectionRemovalMe
   if (!text) return null;
   const normalized = normalizeForMatching(text);
 
+
   // Check composite / specific phrases first before general words
   if (
     normalized.includes('mini tower') ||
@@ -153,6 +154,7 @@ export function resolveLayerMediaType(layerName: string): ElectionRemovalMediaTy
 export function detectOperationTypeFromText(text?: string | null): ElectionRemovalOperationType {
   if (!text) return 'FULL_REMOVAL';
   const normalized = normalizeForMatching(text);
+  if (normalized.includes('[operace: jina prace]') || normalized.includes('[other]')) return 'OTHER';
 
   // 1. Explicit tags take absolute precedence over underlying/imported text
   if (
@@ -222,7 +224,9 @@ export function setPointOperationTypeInDescription(
     .trim();
 
   let tag = '[Operace: Odvoz na sklad]';
-  if (operationType === 'BANNER_CHANGE') {
+  if (operationType === 'OTHER') {
+    tag = '[Operace: Jiná práce]';
+  } else if (operationType === 'BANNER_CHANGE') {
     tag = '[Operace: Výměna plachty]';
   } else if (operationType === 'RELOCATION') {
     const destPart = relocationDestination?.trim()

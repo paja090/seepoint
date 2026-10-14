@@ -6,6 +6,7 @@ import { runWithTenantContext } from '../lib/tenant-context';
 import type { PlannerActor } from '../lib/field-planning/service';
 
 test('Field execution: Election removal points and pitstops execute seamlessly without requiring dummy WorkOrders', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-12T08:00:00Z') });
   const orgId = 'org-test-123';
   const planId = 'plan-test-1';
   const campaignId = 'campaign-test-1';
@@ -20,8 +21,12 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
     role: 'WORKER',
   };
 
+  let requestSequence = 0;
+  const stepState: any = { id: 'step-1', pointId, organizationId: orgId, sequence: 1, kind: 'WORK', quantity: 1, completedQuantity: 0,
+    version: 0, status: 'ASSIGNED', assignedFieldPlanId: planId, assignedCrewId: 'crew-1', photoType: 'CONTROL', startedAt: null };
   // State store for mocked DB
   let pointState = {
+    steps: [stepState],
     id: pointId,
     organizationId: orgId,
     campaignId,
@@ -70,6 +75,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
                   jobId: `election-point:${pointId}`,
                   workOrderId: '',
                   electionRemovalPointId: pointId,
+                  fieldWorkStepId: 'step-1',
                   routeOrder: 1,
                   startAt: '2026-10-12T08:00:00Z',
                   endAt: '2026-10-12T08:15:00Z',
@@ -97,7 +103,13 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
         return pointState;
       },
     },
+    fieldWorkStep: {
+      findMany: async () => [stepState], count: async () => stepState.status === 'COMPLETED' ? 0 : 1,
+      updateMany: async ({where,data}: any) => { if(where.version !== stepState.version) return {count:0}; const version=stepState.version+1;Object.assign(stepState,data,{version});return {count:1}; },
+    },
+    photo: { count: async () => 1 }, electionCampaign: { update: async () => ({}) },
     crmAuditLog: {
+      count: async ({where}: any) => auditLogs.filter(l=>where.id.in.includes(l.id)).length,
       findUnique: async ({ where }: any) =>
         auditLogs.find((l) => l.id === where.id) || null,
       findFirst: async () => null,
@@ -130,6 +142,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
           workOrderId: campaignId, // MyRouteView passes campaignId as workOrderId
           jobId: `election-point:${pointId}`,
           action: 'start',
+          requestKey: 'request-' + (++requestSequence),
         },
         workerActor,
         mockDb as any
@@ -172,6 +185,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
           workOrderId: campaignId,
           jobId: `election-point:${pointId}`,
           action: 'start',
+          requestKey: 'request-' + (++requestSequence),
         },
         workerActor,
         mockDb as any
@@ -190,6 +204,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
           workOrderId: campaignId,
           jobId: `election-point:${pointId}`,
           action: 'complete',
+          requestKey: 'request-' + (++requestSequence),
         },
         workerActor,
         mockDb as any
@@ -210,6 +225,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
           workOrderId: 'warehouse',
           jobId: pitstopJobId,
           action: 'start',
+          requestKey: 'request-' + (++requestSequence),
         },
         workerActor,
         mockDb as any
@@ -222,6 +238,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
           workOrderId: 'warehouse',
           jobId: pitstopJobId,
           action: 'complete',
+          requestKey: 'request-' + (++requestSequence),
         },
         workerActor,
         mockDb as any

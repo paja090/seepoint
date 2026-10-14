@@ -222,7 +222,7 @@ export const SYSTEM_MODULES: SystemModule[] = [
   },
   {
     id: 'electionRemoval',
-    name: 'Přesuny a deinstalace',
+    name: 'Terénní práce',
     description: 'Plánování přejezdů, přesunů nosičů, KML import, interaktivní mapa a realizace deinstalací',
     category: 'operations',
     badge: 'SeePoint Interní',

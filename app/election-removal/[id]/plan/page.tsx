@@ -13,7 +13,7 @@ export default async function ElectionRemovalPlanPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ points?: string }>;
+  searchParams?: Promise<{ points?: string; parentPlanId?: string }>;
 }) {
   const user = await checkElectionRemovalPageAccess();
   const { id } = await params;
@@ -71,7 +71,8 @@ export default async function ElectionRemovalPlanPage({
             employees={employees}
             vehicles={vehicles}
             initialDepot={profile?.depot}
-            initialSelectedPointIds={initialSelectedPointIds}
+            parentPlanId={resolvedSearchParams?.parentPlanId}
+            initialSelectedPointIds={initialSelectedPointIds ?? (resolvedSearchParams?.parentPlanId ? campaign.points.filter(p => p.assignedFieldPlanId === resolvedSearchParams.parentPlanId).map(p => p.id) : undefined)}
           />
         </div>
       </AppShell>

@@ -12,7 +12,6 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
-  ArrowRight,
   Route,
   MapPin,
   ExternalLink,
@@ -20,9 +19,9 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import type { ElectionCampaign, ElectionRemovalPoint } from '@prisma/client';
-import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
+
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
-import type { PlanningInput, PlanningResult, PlannedCrew } from '@/lib/field-planning/contracts';
+import type { PlanningInput, PlanningResult } from '@/lib/field-planning/contracts';
 import { LocationPickerMap } from './LocationPickerMap';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 
@@ -34,6 +33,8 @@ interface ResourceEmployee {
 }
 
 interface ResourceVehicle {
+  capacitySlots?: number | null;
+  equipment?: string[];
   id: string;
   name: string;
   registrationNumber: string | null;
@@ -54,6 +55,7 @@ interface ElectionRoutePlannerProps {
   vehicles: ResourceVehicle[];
   initialDepot?: { latitude: number; longitude: number };
   initialSelectedPointIds?: string[];
+  parentPlanId?: string;
 }
 
 export function ElectionRoutePlanner({
@@ -62,8 +64,11 @@ export function ElectionRoutePlanner({
   vehicles,
   initialDepot,
   initialSelectedPointIds,
+  parentPlanId,
 }: ElectionRoutePlannerProps) {
   const router = useRouter();
+  const [draftPlanId, setDraftPlanId] = useState<string>();
+  const [routeMode, setRouteMode] = useState('SEPARATE_MEDIA');
   const [isPending, startTransition] = useTransition();
 
   // Planning date & time configuration
@@ -152,9 +157,8 @@ export function ElectionRoutePlanner({
     let relocationCount = 0;
     let warehouseRemovalCount = 0;
     pendingPoints.forEach((p) => {
-      const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
-      const op = detectOperationTypeFromText(rawText);
-      if (op === 'BANNER_CHANGE') {
+      const op = p.operationType;
+      if (op === 'REPLACE_AD') {
         bannerChangeCount++;
       } else if (op === 'RELOCATION') {
         relocationCount++;
@@ -263,6 +267,7 @@ export function ElectionRoutePlanner({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date,
+          parentPlanId, routeMode,
           startTime,
           endTime,
           flexibleHours,
@@ -291,6 +296,7 @@ export function ElectionRoutePlanner({
         throw new Error(data.error || 'Nepodařilo se optimalizovat trasy.');
       }
 
+      setDraftPlanId(data.draftPlanId);
       setPlanningInput(data.planningInput);
       setPlanningResult(data.planningResult);
     } catch (err: unknown) {
@@ -317,6 +323,7 @@ export function ElectionRoutePlanner({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             planningInput,
+            draftPlanId,
             planningResult,
           }),
         }
@@ -340,6 +347,16 @@ export function ElectionRoutePlanner({
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
+      <label className="block rounded border p-3">Režim tras<select className="ml-3 rounded border p-2" value={routeMode} onChange={e => setRouteMode(e.target.value)}><option value="SEPARATE_MEDIA">Odděleně podle média</option><option value="MIXED">Společně podle oblasti</option></select></label>
+      <details className="rounded border p-3"><summary>Ověřená kapacita a vybavení konkrétních vozidel</summary>
+        {vehicles.map(v => <form key={v.id} className="my-3 flex flex-wrap items-end gap-2" onSubmit={async e => {
+          e.preventDefault(); const f = new FormData(e.currentTarget);
+          try { const r = await fetch('/api/election-removal/vehicles', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vehicleId: v.id, capacitySlots: Number(f.get('capacity')), equipment: String(f.get('equipment') || '').split(',').map(x => x.trim()).filter(Boolean) }) });
+            const d = await r.json(); if (!r.ok) throw new Error(d.error); setPlanningResult(null); setPlanningInput(null); router.refresh();
+          } catch (e) { setCalculationError(e instanceof Error ? e.message : 'Uložení vozidla selhalo.'); }
+        }}><strong>{v.name}</strong><label>Sloty<input className="block w-24 rounded border p-2" name="capacity" type="number" min="1" required defaultValue={v.capacitySlots ?? ''} /></label>
+          <label>Vybavení (čárkou)<input className="block rounded border p-2" name="equipment" defaultValue={v.equipment?.join(', ') ?? ''} /></label><button className="rounded border p-2">Uložit ověřené údaje</button></form>)}
+      </details>
       {/* Configuration Card */}
       <div className="card p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
@@ -349,7 +366,7 @@ export function ElectionRoutePlanner({
               Nastavení výjezdu a posádek
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Vyberte datum, čas odjezdu a posádky pro demontáž {pendingPoints.length} médií.
+              Vyberte datum, čas odjezdu a posádky pro {pendingPoints.length} prací.
               {campaign.points.length > pendingPoints.length && (
                 <span className="text-emerald-600 font-semibold ml-1">
                   ({campaign.points.length - pendingPoints.length} ks již dříve dokončeno).
@@ -377,7 +394,7 @@ export function ElectionRoutePlanner({
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-slate-400" />
-              Datum realizace demontáže *
+              Datum realizace prací *
             </label>
             <input
               type="date"
@@ -583,11 +600,11 @@ export function ElectionRoutePlanner({
             <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
               <span>🎯 Médium pro tento výjezd</span>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 normal-case border border-indigo-100">
-                Každé médium se odváží samostatně
+                {routeMode === 'SEPARATE_MEDIA' ? 'Oddělené trasy podle média' : 'Společné trasy podle oblasti'}
               </span>
             </label>
             <span className="text-[11px] text-slate-500">
-              Různé typy konstrukcí se nemíchají na jeden vozík
+              Kapacita a manipulace se řídí zadáním práce
             </span>
           </div>
 
@@ -739,16 +756,16 @@ export function ElectionRoutePlanner({
                 <>Výjezd je sestaven <strong>pouze pro MiniTowery</strong>. Na jedno naložení se vejde max. 5 ks, poté se odváží na sklad.</>
               )}
               {selectedMediumFilter === 'TOWER' && (
-                <>Výjezd je určen <strong>pouze pro Velké věže</strong>. Každá velká věž se odváží po 1 ks přímo na sklad.</>
+                <>Výjezd je určen <strong>pouze pro Velké věže</strong>. Nakládání a cílové zastávky odpovídají zadání jednotlivých prací.</>
               )}
               {selectedMediumFilter === 'BANNER_CHANGE' && (
-                <>Výjezd pro <strong>servis a výměnu plachet</strong>. Konstrukce zůstávají na místě, nikam se nepřevážejí a neblokují ložnou plochu vozíku.</>
+                <>Výjezd pro <strong>servis a výměnu plachet</strong>. Přepravovaný materiál a kapacita se řídí zadáním jednotlivých prací.</>
               )}
               {selectedMediumFilter === 'RELOCATION' && (
                 <>Výjezd pro <strong>přímý převoz konstrukcí</strong> na nová stanoviště (neodváží se na sklad, ale přímo na jiné místo).</>
               )}
               {selectedMediumFilter === 'ALL' && (
-                <>Plánování pro <strong>všechna média a operace</strong>. Algoritmus striktně hlídá, aby se na jednom vozíku nemíchala různá média (před změnou typu konstrukce vždy nařídí vykládku na skladě).</>
+                <>Plánování pro <strong>všechna média a operace</strong>. Zvolený režim určuje společné nebo oddělené trasy; vyzvednutí a doručení odpovídají jednotlivým zadáním.</>
               )}
             </span>
           </div>
@@ -1101,7 +1118,7 @@ export function ElectionRoutePlanner({
 
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-slate-400">
-                  Naplánovaných nosičů
+                  Naplánovaných kroků
                 </p>
                 <p className="text-2xl font-bold text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-5 h-5" />
@@ -1319,9 +1336,9 @@ export function ElectionRoutePlanner({
                                           'OTHER'
                                       ] || stop.mediaType}
                                     </span>
-                                    {stop.operationType === 'BANNER_CHANGE' && (
+                                    {stop.operationType === 'REPLACE_AD' && (
                                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        Výměna plachty (0 slotů)
+                                        Výměna reklamního materiálu
                                       </span>
                                     )}
                                     {stop.cumulativeLoadSlots !== undefined && (

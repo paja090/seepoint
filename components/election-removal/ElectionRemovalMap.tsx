@@ -488,7 +488,7 @@ export function ElectionRemovalMap({
   };
 
   const googleMapsRouteUrl = useMemo(() => {
-    return buildGoogleMapsRouteUrl(validPoints);
+    return buildGoogleMapsRouteUrl(validPoints.slice(0, 1));
   }, [validPoints]);
 
   return (
@@ -555,7 +555,7 @@ export function ElectionRemovalMap({
               target="_blank"
               rel="noopener noreferrer"
               className="py-1 px-2.5 bg-white/95 hover:bg-white text-slate-700 hover:text-sky-700 rounded-xl shadow-md border border-slate-200 transition text-[11px] font-bold flex items-center gap-1 active:scale-95 backdrop-blur-sm"
-              title="Otevřít celou trasu v aplikaci Google Maps"
+              title="Navigovat na další zastávku v aplikaci Google Maps"
             >
               <ExternalLink className="w-3 h-3 text-sky-600" />
               <span className="hidden sm:inline">Google Maps trasa</span>

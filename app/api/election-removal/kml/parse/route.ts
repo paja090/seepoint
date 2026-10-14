@@ -1,3 +1,4 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import {
   requireElectionRemovalAccess,
@@ -8,8 +9,9 @@ import { parseGoogleMyMapsKml } from '@/lib/election-removal/kml-parser';
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   try {
     const contentType = req.headers.get('content-type') || '';
