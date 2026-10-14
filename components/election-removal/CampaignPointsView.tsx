@@ -27,7 +27,7 @@ import {
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import { LocationPickerMap } from './LocationPickerMap';
 import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
-import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
+
 
 interface CampaignPointsViewProps {
   points: ElectionRemovalPoint[];
@@ -304,7 +304,7 @@ export function CampaignPointsView({
       let matchOp = true;
       if (operationFilter !== 'ALL') {
         const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
-        const op = detectOperationTypeFromText(rawText);
+        const op = p.operationType ?? 'OTHER';
         matchOp = op === operationFilter;
       }
 
@@ -882,7 +882,7 @@ export function CampaignPointsView({
                           </span>
                           {(() => {
                             const rawText = `${pt.layerName || ''} ${pt.label || ''} ${pt.description || ''}`;
-                            const op = detectOperationTypeFromText(rawText);
+                            const op = pt.operationType ?? 'OTHER';
                             const isUpdating = updatingPointId === pt.id;
 
                             return (

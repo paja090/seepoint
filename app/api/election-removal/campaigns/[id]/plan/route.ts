@@ -1,3 +1,4 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import {
   requireElectionRemovalAccess,
@@ -19,8 +20,9 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   const { id } = await params;
 
@@ -49,8 +51,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   const { id } = await params;
 
@@ -71,7 +74,7 @@ export async function POST(
       );
     }
 
-    const { input, result } = await optimizeElectionRemovalRoutes(
+    const { input, result, draftPlanId } = await optimizeElectionRemovalRoutes(
       id,
       payload,
       auth.organizationId
@@ -79,6 +82,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
+      draftPlanId,
       planningInput: input,
       planningResult: result,
     });

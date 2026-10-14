@@ -10,10 +10,12 @@ export type PlanningProfile = {
   fallbackSpeedKph: number; fallbackDistanceFactor: number; maximumJobsPerRoute: number;
   vehicleRequired: boolean; requireHumanApproval: true; enabled: boolean;
   vehicleCapacitySlots?: number; warehouseUnloadMinutes?: number;
+  routeMode?: 'SEPARATE_MEDIA' | 'MIXED';
 };
 export type JobConstraints = {
   windowStart?: string; windowEnd?: string; requiredEmployeeIds?: string[];
   requiredPositions?: string[]; predecessorIds?: string[]; vehicleRequired?: boolean;
+  requiredWorkers?: number; requiredEquipment?: string[];
 };
 /** Optional for compatibility with persisted V1 WorkOrder snapshots. */
 export type PlanningSource = {
@@ -22,6 +24,7 @@ export type PlanningSource = {
   parentWorkOrderId?: string; navigationOrderId?: string; navigationPointId?: string;
   electionCampaignId?: string; electionRemovalPointId?: string; mediaType?: string; quantity?: number;
   operationType?: string; loadSlots?: number;
+  fieldWorkStepId?: string;
   clientName?: string | null; address?: string | null; orderNumber?: string | null;
 };
 export const stopId = (stop: { jobId?: string; workOrderId: string }) => stop.jobId ?? stop.workOrderId;
@@ -32,12 +35,13 @@ export type PlanningJob = PlanningSource & {
   status: string; scheduledAt: string; deadlineAt?: string | null; campaignDateFrom?: string | null;
   location: Coordinates | null; serviceMinutes: number | null; constraints: JobConstraints;
   blockedReason?: string; updatedAt: string;
+  delivery?: { id: string; title: string; location: Coordinates; serviceMinutes: number };
 };
 export type PlanningEmployee = {
   id: string; organizationId: string; name: string; userId: string | null; isActive: boolean;
   positions: string[]; roles: string[]; available: boolean;
 };
-export type PlanningVehicle = { id: string; organizationId: string; name: string; status: string; reserved: boolean };
+export type PlanningVehicle = { id: string; organizationId: string; name: string; status: string; reserved: boolean; capacitySlots?: number | null; equipment?: string[] };
 export type CrewInput = { id: string; employeeIds: string[]; vehicleId: string | null; startLocation?: Coordinates };
 export type PlanningInput = {
   organizationId: string; date: string; now: string; profile: PlanningProfile;
@@ -100,6 +104,11 @@ export type MyRouteCarrier = {
 } | null;
 
 export type MyRouteStop = {
+  fieldWorkStepId?: string;
+  quantity?: number;
+  completedQuantity?: number;
+  referenceUrl?: string | null;
+  photoType?: string | null;
   jobId: string;
   workOrderItemId: string | null;
   navigationPointId: string | null;

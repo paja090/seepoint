@@ -1,138 +1,19 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@prisma/client';
-import {
-  requireElectionRemovalAccess,
-  isElectionRemovalAccessDenied,
-} from '@/lib/election-removal/guard';
-
-export const runtime = 'nodejs';
-
-/**
- * PATCH /api/election-removal/points/[id]/status
- * Aktualizace stavu realizace demontáže konkrétního bodu / média.
- */
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const auth = await requireElectionRemovalAccess();
-  if (isElectionRemovalAccessDenied(auth)) return auth;
-
-  const { id } = await params;
-
+import { requireElectionRemovalAccess, isElectionRemovalAccessDenied } from '@/lib/election-removal/guard';
+import { executeStop } from '@/lib/field-planning/execution';
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireElectionRemovalAccess(); if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
   try {
-    const body = await req.json();
-    const action = body.action as 'START' | 'COMPLETE' | 'REPORT_ISSUE' | 'RESET';
-
-    if (!['START', 'COMPLETE', 'REPORT_ISSUE', 'RESET'].includes(action)) {
-      return NextResponse.json(
-        {
-          error:
-            'Neplatná akce. Povolené akce: START, COMPLETE, REPORT_ISSUE, RESET.',
-        },
-        { status: 400 }
-      );
-    }
-
-    const updatedPoint = await prisma.$transaction(async (tx) => {
-      const point = await tx.electionRemovalPoint.findFirst({
-        where: { id, organizationId: auth.organizationId },
-        include: { campaign: true },
-      });
-
-      if (!point) {
-        throw new Error('Bod demontáže nebyl nalezen.');
-      }
-
-      const now = new Date();
-      const wasCompleted = point.status === 'COMPLETED';
-
-      let newStatus = point.status;
-      let updateData: Prisma.ElectionRemovalPointUncheckedUpdateInput = {};
-
-      if (action === 'START') {
-        newStatus = 'IN_PROGRESS';
-        updateData = {
-          status: newStatus,
-          startedAt: point.startedAt ?? now,
-        };
-      } else if (action === 'COMPLETE') {
-        newStatus = 'COMPLETED';
-        updateData = {
-          status: newStatus,
-          completedAt: now,
-          completedByUserId: auth.user.id,
-          issueType: null,
-          issueNote: null,
-        };
-
-        if (!wasCompleted) {
-          await tx.electionCampaign.update({
-            where: {
-              id: point.campaignId,
-              organizationId: auth.organizationId,
-            },
-            data: {
-              completedPoints: { increment: 1 },
-            },
-          });
-        }
-      } else if (action === 'REPORT_ISSUE') {
-        newStatus = 'ISSUE';
-        updateData = {
-          status: newStatus,
-          issueType: body.issueType || 'OTHER',
-          issueNote: body.issueNote?.trim() || null,
-          issueReportedAt: now,
-          issueReportedByUserId: auth.user.id,
-        };
-
-        if (wasCompleted) {
-          await tx.electionCampaign.update({
-            where: {
-              id: point.campaignId,
-              organizationId: auth.organizationId,
-            },
-            data: {
-              completedPoints: { decrement: 1 },
-            },
-          });
-        }
-      } else if (action === 'RESET') {
-        newStatus = point.assignedFieldPlanId ? 'ASSIGNED' : 'PENDING';
-        updateData = {
-          status: newStatus,
-          completedAt: null,
-          completedByUserId: null,
-          issueType: null,
-          issueNote: null,
-        };
-
-        if (wasCompleted) {
-          await tx.electionCampaign.update({
-            where: {
-              id: point.campaignId,
-              organizationId: auth.organizationId,
-            },
-            data: {
-              completedPoints: { decrement: 1 },
-            },
-          });
-        }
-      }
-
-      return await tx.electionRemovalPoint.update({
-        where: { id: point.id, organizationId: auth.organizationId },
-        data: updateData,
-      });
-    });
-
-    return NextResponse.json({ success: true, point: updatedPoint });
-  } catch (error: unknown) {
-    console.error('Chyba při aktualizaci stavu bodu:', error);
-    const message =
-      error instanceof Error ? error.message : 'Chyba při změně stavu bodu.';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+    const { id } = await params; const body = await req.json();
+    if (typeof body.stepId !== 'string' || !body.stepId) throw new Error('Otevřete aktuální trasu a zvolte konkrétní krok práce.');
+    const step = await prisma.fieldWorkStep.findFirst({ where: { organizationId: auth.organizationId, pointId: id, ...(body.stepId ? { id: body.stepId } : { status: { not: 'COMPLETED' } }) }, orderBy: { sequence: 'asc' } });
+    if (!step?.assignedFieldPlanId) throw new Error('Práce nemá aktuálně přiřazený krok. Otevřete Moje trasa.');
+    const action = ({ START: 'start', COMPLETE: 'complete', REPORT_ISSUE: 'problem' } as Record<string, string>)[body.action];
+    const result = await executeStop({ ...body, planId: step.assignedFieldPlanId, workOrderId: '', jobId: 'field-step:' + step.id, action,
+      problemType: body.issueType, note: body.issueNote }, auth.user);
+    return NextResponse.json({ ...result, point: await prisma.electionRemovalPoint.findFirst({ where: { id, organizationId: auth.organizationId } }) });
+  } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'Změna selhala.' }, { status: 409 }); }
 }

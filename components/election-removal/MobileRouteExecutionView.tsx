@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import type { ElectionRemovalPoint, Photo } from '@prisma/client';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
-import { detectOperationTypeFromText } from '@/lib/election-removal/kml-parser';
+
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import {
   parsePointMetadata,
@@ -163,7 +163,7 @@ export function MobileRouteExecutionView({
   const googleRouteUrl = useMemo(() => {
     const uncompleted = displayedPoints.filter((p) => p.status !== 'COMPLETED');
     const targetPoints = uncompleted.length > 0 ? uncompleted : displayedPoints;
-    return buildGoogleMapsRouteUrl(targetPoints);
+    return buildGoogleMapsRouteUrl(targetPoints.slice(0, 1));
   }, [displayedPoints]);
 
   // Handle Point status update
@@ -550,9 +550,7 @@ export function MobileRouteExecutionView({
             const meta = parsePointMetadata(point.description);
             const cleanLayer = cleanLayerName(point.layerName);
 
-            const operationType = detectOperationTypeFromText(
-              `${point.layerName || ''} ${point.label || ''} ${point.description || ''}`
-            );
+            const operationType = point.operationType ?? 'OTHER';
 
             // Measured duration if completed
             const actualMinutes =

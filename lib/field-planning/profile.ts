@@ -39,6 +39,7 @@ export function parseProfile(value: unknown): PlanningProfile {
     workdayStart: p.workdayStart as string, workdayEnd: p.workdayEnd as string,
     breakMinutes: bounded(p.breakMinutes, 0, 240, 'přestávka'), overtimeMinutes: bounded(p.overtimeMinutes, 0, 480, 'přesčas'),
     flexibleHours, maxShiftHours, vehicleCapacitySlots, warehouseUnloadMinutes,
+    routeMode: p.routeMode === 'SEPARATE_MEDIA' ? 'SEPARATE_MEDIA' : 'MIXED',
     strategy: p.strategy as PlanningProfile['strategy'], serviceMinutes,
     customActivities,
     fallbackSpeedKph: bounded(p.fallbackSpeedKph, 1, 130, 'odhad rychlosti'), fallbackDistanceFactor: bounded(p.fallbackDistanceFactor, 1, 5, 'koeficient vzdálenosti'),

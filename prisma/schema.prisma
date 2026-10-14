@@ -834,6 +834,7 @@ enum FieldPlanStatus {
   ACTIVE
   COMPLETED
   CANCELLED
+  SUPERSEDED
 }
 
 model OrganizationFieldPlanningProfile {
@@ -1410,6 +1411,8 @@ model Vehicle {
   repairNotes              String?
   photoUrl                 String?
   note                     String?
+  capacitySlots            Int?
+  equipment                String[]      @default([])
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
@@ -2368,6 +2371,8 @@ model Photo {
   surveyCandidatePointId String?
   surveyNavigationPointId String?
   electionRemovalPointId String?
+  fieldWorkStepId String?
+  fieldWorkStep FieldWorkStep? @relation(fields: [fieldWorkStepId, organizationId], references: [id, organizationId], onDelete: Restrict)
   url                    String
   driveFileId            String?
   fileName               String?
@@ -4747,6 +4752,7 @@ model ElectionCampaign {
   kmlFileName     String?
   kmlRawContent   String?           @db.Text
   mediaDefaults   Json?
+  clientName      String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -4773,6 +4779,28 @@ model ElectionRemovalPoint {
   baseServiceMinutes  Int                        @default(10)
   serviceMinutes      Int                        @default(10)
   status              ElectionRemovalPointStatus @default(PENDING)
+  // Explicit task specification. Null operation is legacy data awaiting review.
+  operationType       String?
+  deadlineAt          DateTime?
+  windowStart         DateTime?
+  windowEnd           DateTime?
+  objectType          String?
+  carrierId           String?
+  surfaceId           String?
+  materialDisposition String?
+  materialInstructions String?
+  destinationName     String?
+  destinationLatitude Float?
+  destinationLongitude Float?
+  referenceUrl        String?
+  contact             String?
+  accessInstructions  String?
+  requiredWorkers     Int @default(1)
+  requiredPositions   String[] @default([])
+  requiredEquipment   String[] @default([])
+  loadSlots           Int?
+  reviewRequired      Boolean @default(true)
+  steps               FieldWorkStep[]
 
   assignedFieldPlanId String?
   assignedCrewId      String?
@@ -4800,5 +4828,38 @@ model ElectionRemovalPoint {
   @@index([organizationId, campaignId, status])
   @@index([organizationId, latitude, longitude])
   @@index([organizationId, assignedFieldPlanId])
+  @@unique([id, organizationId])
   @@index([campaignId])
+}
+
+// Operational steps only; no accounting/inventory movements are inferred.
+model FieldWorkStep {
+  id String @id @default(cuid())
+  organizationId String
+  pointId String
+  sequence Int
+  kind String
+  label String
+  latitude Float
+  longitude Float
+  serviceMinutes Int
+  quantity Int
+  completedQuantity Int @default(0)
+  status String @default("PENDING")
+  loadDelta Int @default(0)
+  photoType PhotoType?
+  assignedFieldPlanId String?
+  assignedCrewId String?
+  startedAt DateTime?
+  completedAt DateTime?
+  issueNote String?
+  custodyNote String?
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  point ElectionRemovalPoint @relation(fields: [pointId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  photos Photo[]
+  @@unique([pointId, sequence])
+  @@unique([id, organizationId])
+  @@index([organizationId, assignedFieldPlanId, status])
 }

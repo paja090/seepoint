@@ -1,97 +1,20 @@
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import {
-  requireElectionRemovalAccess,
-  isElectionRemovalAccessDenied,
-} from '@/lib/election-removal/guard';
-import {
-  setPointOperationTypeInDescription,
-} from '@/lib/election-removal/kml-parser';
-import {
-  calculateServiceMinutes,
-  type ElectionRemovalOperationType,
-} from '@/lib/election-removal/constants';
-
-export const runtime = 'nodejs';
-
-/**
- * POST /api/election-removal/points/batch
- * Hromadná změna typu operace pro vybrané body kampaně.
- */
-export async function POST(req: Request) {
-  const auth = await requireElectionRemovalAccess();
-  if (isElectionRemovalAccessDenied(auth)) return auth;
-
-  try {
-    const body = await req.json();
-    const { pointIds, operationType, relocationDestination } = body as {
-      pointIds?: string[];
-      operationType?: ElectionRemovalOperationType;
-      relocationDestination?: string | null;
-    };
-
-    if (!Array.isArray(pointIds) || pointIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Musí být předán alespoň jeden identifikátor bodu.' },
-        { status: 400 }
-      );
-    }
-
-    if (!operationType) {
-      return NextResponse.json(
-        { error: 'Typ operace je povinný (FULL_REMOVAL, RELOCATION, BANNER_CHANGE).' },
-        { status: 400 }
-      );
-    }
-
-    const points = await prisma.electionRemovalPoint.findMany({
-      where: {
-        id: { in: pointIds },
-        organizationId: auth.organizationId,
-      },
-    });
-
-    if (points.length === 0) {
-      return NextResponse.json(
-        { error: 'Nebyly nalezeny žádné odpovídající body k úpravě.' },
-        { status: 404 }
-      );
-    }
-
-    const updatedPoints = await prisma.$transaction(
-      points.map((pt) => {
-        const updatedDescription = setPointOperationTypeInDescription(
-          pt.description,
-          operationType,
-          relocationDestination
-        );
-
-        const calculated = calculateServiceMinutes(
-          pt.mediaType,
-          pt.quantity,
-          null,
-          operationType
-        );
-
-        return prisma.electionRemovalPoint.update({
-          where: { id: pt.id },
-          data: {
-            description: updatedDescription || null,
-            serviceMinutes: calculated.totalMinutes,
-          },
-        });
-      })
-    );
-
-    return NextResponse.json({
-      success: true,
-      updatedCount: updatedPoints.length,
-      points: updatedPoints,
-    });
-  } catch (error: unknown) {
-    console.error('Chyba při hromadné aktualizaci bodů:', error);
-    const message =
-      error instanceof Error ? error.message : 'Nepodařilo se hromadně aktualizovat body.';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+import { requireElectionRemovalAccess, isElectionRemovalAccessDenied } from '@/lib/election-removal/guard';
+import { saveFieldTaskTx } from '@/lib/election-removal/tasks';
+import { plannerTransaction } from '@/lib/field-planning/service';
+export async function PATCH(req: Request) {
+  const auth = await requireElectionRemovalAccess(true); if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
+  try { const body = await req.json();
+    if (!Array.isArray(body.pointIds) || !body.pointIds.length || body.pointIds.length > 200) throw new Error('Vyberte 1–200 prací.');
+    if (!body.changes || typeof body.changes !== 'object' || Object.keys(body.changes).some(k => !['operationType','mediaType','deadlineAt','description','objectType'].includes(k))) throw new Error('Nepovolená hromadná změna.');
+    const points = await plannerTransaction(async tx => {
+      const rows = await tx.electionRemovalPoint.findMany({ where: { organizationId: auth.organizationId, id: { in: body.pointIds } }, include: { steps: true } });
+      if (rows.length !== new Set(body.pointIds).size) throw new Error('Některá práce nebyla nalezena.');
+      const result = [];
+      for (const p of rows) result.push(await saveFieldTaskTx(tx, p.campaignId, { ...p, deliveryMinutes: p.steps.find(s => s.kind === 'DELIVERY')?.serviceMinutes, ...body.changes, gpsConfirmed: !p.reviewRequired, destinationGpsConfirmed: !p.reviewRequired }, auth.user, p.id));
+      return result;
+    }); return NextResponse.json({ points });
+  } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'Hromadná změna selhala.' }, { status: 409 }); }
 }

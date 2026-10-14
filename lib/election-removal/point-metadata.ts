@@ -208,10 +208,10 @@ export function buildGoogleMapsRouteUrl(
     (p) =>
       typeof p.latitude === 'number' &&
       typeof p.longitude === 'number' &&
-      !Number.isNaN(p.latitude) &&
-      !Number.isNaN(p.longitude) &&
-      p.latitude !== 0 &&
-      p.longitude !== 0
+      Number.isFinite(p.latitude) &&
+      Number.isFinite(p.longitude) &&
+      Math.abs(p.latitude) <= 90 &&
+      Math.abs(p.longitude) <= 180
   );
 
   if (valid.length === 0) return 'https://www.google.com/maps';
@@ -227,7 +227,8 @@ export function buildGoogleMapsRouteUrl(
   const origin = `${valid[0].latitude},${valid[0].longitude}`;
   const destination = `${valid[valid.length - 1].latitude},${valid[valid.length - 1].longitude}`;
 
-  const intermediate = valid.slice(1, -1).slice(0, 8);
+  if (valid.length > 5) throw new Error('Delší navigaci rozdělte pomocí buildGoogleMapsRouteSegments; žádná zastávka se nesmí vynechat.');
+  const intermediate = valid.slice(1, -1);
   const waypoints = intermediate.map((p) => `${p.latitude},${p.longitude}`).join('|');
 
   const params = new URLSearchParams({
@@ -246,5 +247,16 @@ export function buildGoogleMapsRouteUrl(
 
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Mobile Maps supports three intermediate waypoints. Adjacent segments share their boundary. */
+export function buildGoogleMapsRouteSegments(points: Array<{ latitude: number; longitude: number }>) {
+  if (points.length <= 5) return [{ from: 1, to: points.length, url: buildGoogleMapsRouteUrl(points) }];
+  const result = [];
+  for (let i = 0; i < points.length - 1; i += 4) {
+    const part = points.slice(i, i + 5);
+    result.push({ from: i + 1, to: i + part.length, url: buildGoogleMapsRouteUrl(part) });
+  }
+  return result;
 }
 

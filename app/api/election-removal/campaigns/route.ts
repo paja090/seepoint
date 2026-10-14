@@ -1,3 +1,5 @@
+import { plannerTransaction } from '@/lib/field-planning/service';
+import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { Prisma, type ElectionRemovalMediaType } from '@prisma/client';
@@ -10,7 +12,7 @@ import {
   calculateServiceMinutes,
   type ElectionRemovalOperationType,
 } from '@/lib/election-removal/constants';
-import { setPointOperationTypeInDescription } from '@/lib/election-removal/kml-parser';
+import { normalizeOperation } from '@/lib/election-removal/task-spec';
 
 export const runtime = 'nodejs';
 
@@ -19,8 +21,9 @@ export const runtime = 'nodejs';
  * Seznam volebních demontážních kampaní pro přihlášený tenant.
  */
 export async function GET() {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   try {
     const campaigns = await prisma.electionCampaign.findMany({
@@ -58,6 +61,7 @@ interface CreatePointPayload {
 }
 
 interface CreateCampaignPayload {
+  clientName?: string;
   name: string;
   description?: string;
   targetDate?: string | null;
@@ -71,8 +75,9 @@ interface CreateCampaignPayload {
  * Vytvoření nové volební kampaně a import bodů z KML po revizi manažera.
  */
 export async function POST(req: Request) {
-  const auth = await requireElectionRemovalAccess();
+  const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
+  enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
 
   try {
     const body = (await req.json()) as CreateCampaignPayload;
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!Array.isArray(body.points) || body.points.length === 0) {
+    if (!Array.isArray(body.points) || body.points.length > 200) {
       return NextResponse.json(
         { error: 'Kampaň musí obsahovat alespoň jeden bod demontáže.' },
         { status: 400 }
@@ -105,18 +110,19 @@ export async function POST(req: Request) {
       );
     });
 
-    if (validPoints.length === 0) {
+    if (validPoints.length !== body.points.length) {
       return NextResponse.json(
         { error: 'Žádný z předaných bodů nemá platné GPS souřadnice.' },
         { status: 400 }
       );
     }
 
-    const campaign = await prisma.$transaction(async (tx) => {
+    const campaign = await plannerTransaction(async (tx) => {
       const createdCampaign = await tx.electionCampaign.create({
         data: {
           organizationId: auth.organizationId,
           name: body.name.trim(),
+          clientName: body.clientName?.trim() || null,
           description: body.description?.trim() || null,
           targetDate: body.targetDate ? new Date(body.targetDate) : null,
           kmlFileName: body.kmlFileName || null,
@@ -145,15 +151,17 @@ export async function POST(req: Request) {
 
         const opType = (pt as unknown as { operationType?: ElectionRemovalOperationType }).operationType;
         const relocDest = (pt as unknown as { relocationDestination?: string }).relocationDestination;
-        const finalDescription = opType
-          ? setPointOperationTypeInDescription(pt.description, opType, relocDest)
-          : pt.description?.trim() || null;
+        const finalDescription = pt.description?.trim() || null;
+
 
         return {
           organizationId: auth.organizationId,
           campaignId: createdCampaign.id,
           label: pt.name?.trim() || 'Bod demontáže',
           description: finalDescription,
+          destinationName: relocDest?.trim() || null,
+          operationType: opType ? normalizeOperation(opType) : null,
+          reviewRequired: true,
           layerName: pt.layerName?.trim() || null,
           mediaType: pt.mediaType,
           latitude: pt.latitude,
@@ -165,10 +173,13 @@ export async function POST(req: Request) {
         };
       });
 
-      await tx.electionRemovalPoint.createMany({
+      if (pointsToCreate.length) await tx.electionRemovalPoint.createMany({
         data: pointsToCreate,
       });
 
+      await tx.crmAuditLog.create({ data: { organizationId: auth.organizationId, entityType: 'ElectionCampaign', entityId: createdCampaign.id,
+        userId: auth.user.id, userEmail: auth.user.email, action: 'FIELD_ACTION_CREATED',
+        detailsJson: JSON.stringify({ name: createdCampaign.name, importedPoints: pointsToCreate.length }) } });
       return createdCampaign;
     });
 

@@ -1,4 +1,4 @@
-import type { ElectionCampaign, ElectionRemovalPoint, Prisma } from '@prisma/client';
+import type { ElectionRemovalPoint, FieldWorkStep, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import {
   getTenantContext,
@@ -9,25 +9,22 @@ import {
   electionRemovalJobId,
   type PlanningJob,
   type PlanningInput,
-  type PlanningProfile,
-  type CrewInput,
   type PlanningResult,
 } from '@/lib/field-planning/contracts';
 import { loadProfile } from '@/lib/field-planning/data';
 import { planFieldWork } from '@/lib/field-planning/planning-engine';
 import { googleTravelProvider } from '@/lib/field-planning/travel';
 import {
-  DEFAULT_MEDIA_SERVICE_MINUTES,
-  DEFAULT_BANNER_CHANGE_SERVICE_MINUTES,
-  DEFAULT_RELOCATION_SERVICE_MINUTES,
   calculateServiceMinutes,
   calculateMediaLoadSlots,
   DEFAULT_VEHICLE_CAPACITY_SLOTS,
   DEFAULT_WAREHOUSE_UNLOAD_MINUTES,
 } from './constants';
-import { detectOperationTypeFromText } from './kml-parser';
+import { fieldAvailability } from './availability';
+import { approveFieldDraft, persistFieldDraft } from './approval';
+import { parseProfile, zonedTime } from '@/lib/field-planning/profile';
 import { plannerTransaction } from '@/lib/field-planning/service';
-import { zonedTime } from '@/lib/field-planning/profile';
+import { validateFieldPlanInput } from './plan-input';
 
 /**
  * Transforms an ElectionRemovalPoint record into a PlanningJob for the routing engine.
@@ -37,22 +34,27 @@ import { zonedTime } from '@/lib/field-planning/profile';
  * Even if 2 points share the exact same GPS, they remain distinct individual jobs.
  */
 export function convertElectionPointToJob(
-  point: ElectionRemovalPoint,
+  point: ElectionRemovalPoint & { steps?: FieldWorkStep[] },
   campaign: { id: string; name: string; targetDate: Date | null; createdAt: Date }
 ): PlanningJob {
-  const rawText = `${point.layerName || ''} ${point.mediaTypeRaw || ''} ${point.description || ''}`;
-  const operationType = detectOperationTypeFromText(rawText);
+  const operationType = point.operationType ?? 'OTHER';
+  const legacyOperation = operationType === 'REPLACE_AD' || operationType === 'REMOVE_AD' || operationType === 'INSTALL_AD' ? 'BANNER_CHANGE' : operationType === 'RELOCATION' ? 'RELOCATION' : operationType === 'OTHER' ? 'OTHER' : 'FULL_REMOVAL';
+  const steps = point.steps?.filter(s => s.status !== 'COMPLETED').sort((a, b) => a.sequence - b.sequence) ?? [];
+  const first = steps[0];
+  const delivery = steps[1];
 
-  const calculated = calculateServiceMinutes(point.mediaType, point.quantity, null, operationType);
-  const serviceMinutes = point.serviceMinutes ?? calculated.baseMinutes;
-  const loadSlots = calculateMediaLoadSlots(point.mediaType, operationType, point.quantity);
+  const calculated = calculateServiceMinutes(point.mediaType, point.quantity, null, legacyOperation);
+  const serviceMinutes = first?.serviceMinutes ?? point.serviceMinutes ?? calculated.totalMinutes;
+  const loadSlots = first ? Math.max(0, first.loadDelta) : calculateMediaLoadSlots(point.mediaType, legacyOperation, point.quantity);
 
   return {
-    id: electionRemovalJobId(point.id),
+    id: first ? `field-step:${first.id}` : electionRemovalJobId(point.id),
+    fieldWorkStepId: first?.id,
+    delivery: delivery ? { id: delivery.id, title: delivery.label, location: { latitude: delivery.latitude, longitude: delivery.longitude }, serviceMinutes: delivery.serviceMinutes } : undefined,
     sourceType: 'ELECTION_REMOVAL_POINT',
     sourceId: point.id,
     organizationId: point.organizationId,
-    title: `${point.label} (${point.layerName || point.mediaType})`,
+    title: first?.label ?? `${point.label} (${point.layerName || point.mediaType})`,
     workType: 'ELECTION_REMOVAL',
     priority: 'NORMAL',
     status:
@@ -62,18 +64,19 @@ export function convertElectionPointToJob(
         ? 'CANCELLED'
         : 'PLANNED',
     scheduledAt: (campaign.targetDate ?? campaign.createdAt).toISOString(),
+    deadlineAt: point.deadlineAt?.toISOString(),
     campaignDateFrom: (campaign.targetDate ?? campaign.createdAt).toISOString(),
     location: {
-      latitude: point.latitude,
-      longitude: point.longitude,
+      latitude: first?.latitude ?? point.latitude,
+      longitude: first?.longitude ?? point.longitude,
     },
     serviceMinutes,
-    constraints: {},
+    constraints: { windowStart: point.windowStart?.toISOString(), windowEnd: point.windowEnd?.toISOString(), requiredWorkers: point.requiredWorkers, requiredPositions: point.requiredPositions, requiredEquipment: point.requiredEquipment, vehicleRequired: loadSlots > 0 },
     blockedReason:
-      point.status === 'ISSUE'
+      point.reviewRequired || !first ? 'Vyžaduje kontrolu: doplňte strukturované zadání a kroky.' : point.startedAt && first.kind !== 'HANDOFF' ? 'Zahájenou práci nelze přeplánovat bez explicitního předání.' : point.status === 'ISSUE'
         ? point.issueNote || 'Hlášen problém na stanovišti'
         : undefined,
-    updatedAt: point.updatedAt.toISOString(),
+    updatedAt: point.updatedAt.toISOString() + steps.map(s => '/' + s.updatedAt.toISOString()).join(''),
     electionCampaignId: campaign.id,
     electionRemovalPointId: point.id,
     mediaType: point.mediaType,
@@ -96,12 +99,13 @@ export async function loadElectionPlanningResources(
     getTenantContext()?.organizationId ||
     requireTenantContext().organizationId;
 
-  return runWithTenantContext({ organizationId, source: 'session' }, async () => {
+  return runWithTenantContext({ organizationId, userId: getTenantContext()?.userId, source: 'session' }, async () => {
     const [campaign, employees, vehicles, profile] = await Promise.all([
       prisma.electionCampaign.findFirst({
         where: { id: campaignId, organizationId },
         include: {
           points: {
+            include: { steps: { orderBy: { sequence: 'asc' } } },
             where: {
               status: { in: ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'] },
             },
@@ -126,28 +130,8 @@ export async function loadElectionPlanningResources(
     if (!campaign) {
       throw new Error('Volební kampaň nebyla nalezena.');
     }
+    if (!profile?.enabled) throw new Error('Nejdříve zapněte plánování a potvrďte vlastní depo v Nastavení depa.');
 
-    // Provide fallback profile if organization depot profile is not configured yet
-    const effectiveProfile: PlanningProfile = profile ?? {
-      timezone: 'Europe/Prague',
-      country: 'CZ',
-      depot: { latitude: 50.08804, longitude: 14.42076 }, // Praha centrum výchozí
-      endLocation: { latitude: 50.08804, longitude: 14.42076 },
-      workdayStart: '07:30',
-      workdayEnd: '16:00',
-      breakMinutes: 30,
-      overtimeMinutes: 60,
-      strategy: 'BALANCED',
-      serviceMinutes: {
-        ELECTION_REMOVAL: 10,
-      },
-      fallbackSpeedKph: 50,
-      fallbackDistanceFactor: 1.3,
-      maximumJobsPerRoute: 50,
-      vehicleRequired: false,
-      requireHumanApproval: true,
-      enabled: true,
-    };
 
     return {
       campaign,
@@ -162,13 +146,17 @@ export async function loadElectionPlanningResources(
         id: v.id,
         name: v.name,
         registrationNumber: v.registrationNumber,
+        capacitySlots: v.capacitySlots,
+        equipment: v.equipment,
       })),
-      profile: effectiveProfile,
+      profile,
     };
   });
 }
 
 export interface PlanRoutesPayload {
+  parentPlanId?: string;
+  routeMode?: 'SEPARATE_MEDIA' | 'MIXED';
   date: string;
   startTime?: string;
   endTime?: string;
@@ -196,35 +184,37 @@ export async function optimizeElectionRemovalRoutes(
 ): Promise<{
   input: PlanningInput;
   result: PlanningResult;
+  draftPlanId: string;
 }> {
+  validateFieldPlanInput(payload);
   const organizationId =
     explicitOrganizationId ||
     getTenantContext()?.organizationId ||
     requireTenantContext().organizationId;
 
-  return runWithTenantContext({ organizationId, source: 'session' }, async () => {
+  return runWithTenantContext({ organizationId, userId: getTenantContext()?.userId, source: 'session' }, async () => {
     const { campaign, points, profile } = await loadElectionPlanningResources(
       campaignId,
       payload.date,
       organizationId
     );
+    if (payload.selectedPointIds !== undefined && (!Array.isArray(payload.selectedPointIds) || !payload.selectedPointIds.length || payload.selectedPointIds.some(id => typeof id !== 'string' || !points.some(p => p.id === id)))) throw new Error('Výběr obsahuje nedostupnou práci nebo bod jiné akce.');
 
     const selectedPoints = payload.selectedPointIds?.length
       ? points.filter((p) => payload.selectedPointIds!.includes(p.id))
       : payload.filterMediaType && payload.filterMediaType !== 'ALL'
       ? points.filter((p) => {
-          const rawText = `${p.layerName || ''} ${p.label || ''} ${p.description || ''}`;
-          const op = detectOperationTypeFromText(rawText);
+          const op = p.operationType;
           if (payload.filterMediaType === 'BANNER_CHANGE') {
-            return op === 'BANNER_CHANGE';
+            return op === 'REPLACE_AD';
           }
           if (payload.filterMediaType === 'RELOCATION') {
             return op === 'RELOCATION';
           }
           if (payload.filterMediaType === 'WAREHOUSE') {
-            return op === 'FULL_REMOVAL';
+            return op === 'REMOVE_OBJECT';
           }
-          if (op === 'BANNER_CHANGE') {
+          if (op === 'REPLACE_AD') {
             return false;
           }
           return p.mediaType === payload.filterMediaType;
@@ -241,37 +231,14 @@ export async function optimizeElectionRemovalRoutes(
 
     // Apply vehicle capacity and warehouse unloading parameters
     profile.vehicleCapacitySlots = payload.vehicleCapacitySlots ?? DEFAULT_VEHICLE_CAPACITY_SLOTS;
+    profile.routeMode = payload.routeMode ?? 'SEPARATE_MEDIA';
     profile.warehouseUnloadMinutes = payload.warehouseUnloadMinutes ?? DEFAULT_WAREHOUSE_UNLOAD_MINUTES;
 
     // Apply custom warehouse (depot) location if provided
-    if (
-      payload.depot &&
-      typeof payload.depot.latitude === 'number' &&
-      typeof payload.depot.longitude === 'number' &&
-      !Number.isNaN(payload.depot.latitude) &&
-      !Number.isNaN(payload.depot.longitude) &&
-      payload.depot.latitude !== 0 &&
-      payload.depot.longitude !== 0
-    ) {
+    if (payload.depot) {
       profile.depot = { latitude: payload.depot.latitude, longitude: payload.depot.longitude };
       profile.endLocation = { latitude: payload.depot.latitude, longitude: payload.depot.longitude };
 
-      if (payload.saveDepotAsDefault) {
-        try {
-          await prisma.organizationFieldPlanningProfile.upsert({
-            where: { organizationId },
-            create: {
-              organizationId,
-              configuration: profile as unknown as Prisma.InputJsonValue,
-            },
-            update: {
-              configuration: profile as unknown as Prisma.InputJsonValue,
-            },
-          });
-        } catch (saveDepotErr) {
-          console.warn('Nepodařilo se uložit výchozí depo organizace:', saveDepotErr);
-        }
-      }
     }
 
     // Apply user-configured start time
@@ -294,58 +261,42 @@ export async function optimizeElectionRemovalRoutes(
       }
     }
 
+    parseProfile(profile);
+    if (payload.saveDepotAsDefault && payload.depot) {
+      await plannerTransaction(async tx => {
+        await tx.organizationFieldPlanningProfile.update({ where: { organizationId }, data: { configuration: profile as unknown as Prisma.InputJsonValue } });
+        await tx.crmAuditLog.create({ data: { organizationId, entityType: 'OrganizationFieldPlanningProfile', entityId: organizationId,
+          userId: getTenantContext()?.userId ?? 'system', userEmail: '', action: 'FIELD_DEPOT_UPDATED', detailsJson: JSON.stringify({ depot: profile.depot }) } });
+      });
+    }
+
     // Ensure start of planned route begins at configured start time in local timezone (never shifted by UTC offset)
     const planStartTime = payload.startTime || profile.workdayStart || '07:30';
     const startTimestamp = zonedTime(payload.date, planStartTime, profile.timezone);
     const planNow = new Date(startTimestamp).toISOString();
 
-    // Load all employees and vehicles in full format for the engine
-    const [allEmployees, allVehicles] = await Promise.all([
-      prisma.employee.findMany({ where: { organizationId, isActive: true } }),
-      prisma.vehicle.findMany({ where: { organizationId } }),
-    ]);
-
-    const planningJobs: PlanningJob[] = selectedPoints.map((pt) =>
-      convertElectionPointToJob(pt, campaign)
-    );
-
-    const planningEmployees = allEmployees.map((e) => ({
-      id: e.id,
-      organizationId,
-      name: `${e.firstName} ${e.lastName}`.trim(),
-      userId: e.userId,
-      isActive: e.isActive,
-      positions: e.position ? [e.position] : [],
-      roles: [e.role],
-      available: true,
-    }));
-
-    const planningVehicles = allVehicles.map((v) => ({
-      id: v.id,
-      organizationId,
-      name: v.name,
-      status: v.status,
-      reserved: false,
-    }));
-
+    const availability = await fieldAvailability(prisma, organizationId, payload.date, payload.parentPlanId, profile.timezone);
+    const planningJobs: PlanningJob[] = selectedPoints.map(pt => {
+      const job = convertElectionPointToJob(pt, campaign);
+      if (pt.assignedFieldPlanId && pt.assignedFieldPlanId !== payload.parentPlanId) job.blockedReason = 'Práce již patří jinému výjezdu.';
+      return job;
+    });
     const planningInput: PlanningInput = {
       organizationId,
       date: payload.date,
       now: planNow,
       profile,
       jobs: planningJobs,
-      employees: planningEmployees,
-      vehicles: planningVehicles,
+      employees: availability.employees,
+      vehicles: availability.vehicles,
       crews: payload.crews,
     };
 
     const travel = googleTravelProvider(profile);
     const result = await planFieldWork(planningInput, travel);
 
-    return {
-      input: planningInput,
-      result,
-    };
+    const draft = await persistFieldDraft(campaignId, planningInput, result, payload.parentPlanId);
+    return { input: planningInput, result, draftPlanId: draft.id };
   });
 }
 
@@ -359,81 +310,6 @@ export async function approveAndSaveElectionPlan(
   actor: { id: string; email: string; role: string },
   explicitOrganizationId?: string
 ) {
-  const organizationId =
-    explicitOrganizationId ||
-    getTenantContext()?.organizationId ||
-    requireTenantContext().organizationId;
-
-  return runWithTenantContext(
-    { organizationId, userId: actor.id, source: 'session' },
-    () =>
-      plannerTransaction(async (tx) => {
-    // Generate latest version
-    const latest = await tx.fieldPlan.findFirst({
-      where: { organizationId, date: planningInput.date },
-      orderBy: { version: 'desc' },
-    });
-    const version = (latest?.version ?? 0) + 1;
-    const requestKey = `election-${campaignId}-${planningInput.date}-v${version}`;
-
-    // Mark previous active/approved plans for this campaign as COMPLETED so old superseded plans aren't running concurrently
-    await tx.fieldPlan.updateMany({
-      where: {
-        organizationId,
-        electionCampaignId: campaignId,
-        status: { in: ['APPROVED', 'ACTIVE'] },
-      },
-      data: {
-        status: 'COMPLETED',
-      },
-    });
-
-    // Create the FieldPlan
-    const fieldPlan = await tx.fieldPlan.create({
-      data: {
-        organizationId,
-        date: planningInput.date,
-        version,
-        requestKey,
-        requestHash: `el-${Date.now()}`,
-        status: 'APPROVED',
-        electionCampaignId: campaignId,
-        createdByUserId: actor.id,
-        approvedByUserId: actor.id,
-        approvedAt: new Date(),
-        planningInputSnapshot: JSON.parse(JSON.stringify(planningInput)),
-        planningSummary: JSON.parse(JSON.stringify(planningResult)),
-      },
-    });
-
-    // Update assigned points (never overwrite points that are already completed)
-    for (const crew of planningResult.crews) {
-      for (const stop of crew.stops) {
-        if (stop.electionRemovalPointId) {
-          await tx.electionRemovalPoint.updateMany({
-            where: {
-              id: stop.electionRemovalPointId,
-              organizationId,
-              status: { not: 'COMPLETED' },
-            },
-            data: {
-              assignedFieldPlanId: fieldPlan.id,
-              assignedCrewId: crew.id,
-              plannedArrivalAt: new Date(stop.arrivalAt),
-              plannedOrder: stop.routeOrder,
-              status: 'ASSIGNED',
-            },
-          });
-        }
-      }
-    }
-
-    // Update election campaign status to PLANNED
-    await tx.electionCampaign.update({
-      where: { id: campaignId, organizationId },
-      data: { status: 'PLANNED' },
-    });
-
-    return fieldPlan;
-  }));
+  if (explicitOrganizationId && explicitOrganizationId !== requireTenantContext().organizationId) throw new Error('Cross-tenant reference rejected.');
+  return approveFieldDraft(campaignId, planningInput, actor);
 }

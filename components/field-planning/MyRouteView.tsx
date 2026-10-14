@@ -1,8 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { useState, useMemo, useEffect } from 'react';
+import { buildGoogleMapsRouteSegments } from '@/lib/election-removal/point-metadata';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
 import { computeRouteLiveETA, formatLiveClock } from '@/lib/field-planning/live-eta';
+import { dayInZone } from '@/lib/field-planning/profile';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
   Navigation,
@@ -32,6 +34,9 @@ function formatHoursMinutes(totalMinutes: number): string {
 
 export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [data, setData] = useState(initial);
+  const pendingKeys = useRef(new Map<string, string>());
+  const [fieldInputs, setFieldInputs] = useState<Record<string, { quantity?: string; custodyNote?: string }>>({});
+  function keyFor(value: string) { const existing = pendingKeys.current.get(value); if (existing) return existing; const key = crypto.randomUUID(); pendingKeys.current.set(value, key); return key; }
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [photoCarrier, setPhotoCarrier] = useState<MyRouteCarrier>(null);
@@ -40,12 +45,18 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [hideDoneStops, setHideDoneStops] = useState(true);
   const [groupByOrder, setGroupByOrder] = useState(false);
 
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [todayStr, setTodayStr] = useState(() => dayInZone(new Date(), initial.timezone || 'Europe/Prague'));
+  useEffect(() => {
+    const updateDay = () => setTodayStr(dayInZone(new Date(), data.timezone || 'Europe/Prague'));
+    updateDay();
+    const timer = window.setInterval(updateDay, 60000);
+    return () => window.clearInterval(timer);
+  }, [data.timezone]);
   const tomorrowStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
+    const d = new Date(`${todayStr}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
     return d.toISOString().slice(0, 10);
-  }, []);
+  }, [todayStr]);
   const [currentDate, setCurrentDate] = useState<string>(initial.date || todayStr);
 
   const routesWithLiveETA = useMemo(() => {
@@ -149,12 +160,11 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   async function loadDateRoute(date: string) {
     setBusy(true);
     setError('');
-    setCurrentDate(date);
     try {
       const refreshed = await fetch(`/api/work/route/mine?date=${date}`);
-      if (refreshed.ok) {
-        setData(await refreshed.json());
-      }
+      if (!refreshed.ok) throw new Error('Načtení trasy selhalo.');
+      setData(await refreshed.json());
+      setCurrentDate(date);
     } catch {
       setError('Nepodařilo se načíst trasu.');
     } finally {
@@ -165,6 +175,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   async function run(planId: string, workOrderId: string, action: string, form?: FormData, jobId?: string) {
     setBusy(true);
     setError('');
+    const entry = jobId ? fieldInputs[jobId] : undefined;
+    const payloadKey = JSON.stringify([planId, jobId, action, entry, form?.get('note'), form?.get('type')]);
     try {
       const response = await fetch('/api/work/route/mine', {
         method: 'POST',
@@ -176,14 +188,19 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
           action,
           problemType: form?.get('type'),
           note: form?.get('note'),
-          requestKey: form?.get('key'),
+          requestKey: keyFor(payloadKey),
+          quantity: action === 'complete' && entry?.quantity ? Number(entry.quantity) : undefined,
+          custodyNote: entry?.custodyNote,
         }),
       });
       const value = await response.json();
       if (!response.ok) throw new Error(value.error);
-      setActiveProblemModalStopId(null);
       const refreshed = await fetch(`/api/work/route/mine?date=${currentDate}`);
-      if (refreshed.ok) setData(await refreshed.json());
+      if (!refreshed.ok) throw new Error('Změna byla přijata, ale obnovení trasy selhalo. Zopakujte požadavek.');
+      setData(await refreshed.json());
+      setActiveProblemModalStopId(null);
+      pendingKeys.current.delete(payloadKey);
+      if (jobId) setFieldInputs(prev => ({ ...prev, [jobId]: {} }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Operace selhala.');
       if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -198,6 +215,9 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
     form.set('planId', planId);
     form.set('workOrderId', workOrderId);
     form.set('jobId', jobId);
+    const photo = form.get('afterPhoto');
+    if (photo) form.set('file', photo);
+    form.set('requestKey', keyFor('photo:' + jobId + ':' + (photo instanceof File ? photo.name + photo.size + photo.lastModified : '')));
     try {
       const response = await fetch('/api/work/route/mine/photo', { method: 'POST', body: form });
       const value = await response.json();
@@ -335,6 +355,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         </div>
       )}
 
+      {routesWithLiveETA.length > 0 && <MyRouteMap routes={routesWithLiveETA} height="h-[320px]" />}
+
       {/* Route Cards */}
       {routesWithLiveETA.map((route) => {
         const doneCount = route.stops.filter((s) => s.status === 'DONE').length;
@@ -460,7 +482,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                       {s.title}
                     </h2>
                     <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      {s.clientName} · {s.carrier?.code ? `Nosič ${s.carrier.code}` : s.workType}
+                      {s.clientName} · {s.carrier?.code ? `Nosič ${s.carrier.code}` : s.fieldWorkStepId ? 'Terénní práce' : s.workType}
                     </p>
                   </div>
                 </div>
@@ -570,7 +592,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               {s.instructions && (
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
                   <span className="font-bold text-slate-900 block uppercase tracking-wider text-[10px]">
-                    Instrukce k montáži:
+                    Pokyny k práci:
                   </span>
                   <p className="whitespace-pre-wrap">{s.instructions}</p>
                 </div>
@@ -591,6 +613,12 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 </div>
               )}
 
+              {s.referenceUrl && <a className="text-sm underline text-sky-700" href={s.referenceUrl} target="_blank" rel="noreferrer">Referenční fotografie / montážní podklad</a>}
+              {s.fieldWorkStepId && !isDone && <div className="rounded border p-3 space-y-2 text-sm">
+                <p>Provedeno {s.completedQuantity ?? 0} z {s.quantity}. Zbývá {(s.quantity ?? 0) - (s.completedQuantity ?? 0)}.</p>
+                <label className="block">Nyní provedené množství<input aria-label="Nyní provedené množství" className="ml-2 w-20 rounded border p-2" type="number" min="1" max={(s.quantity ?? 0) - (s.completedQuantity ?? 0)} value={fieldInputs[s.jobId]?.quantity ?? ''} placeholder={String((s.quantity ?? 0) - (s.completedQuantity ?? 0))} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], quantity: e.target.value } }))} /></label>
+                <label className="block">Kde je materiál / kdo jej převzal<input className="block w-full rounded border p-2" value={fieldInputs[s.jobId]?.custodyNote ?? ''} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], custodyNote: e.target.value } }))} /></label>
+              </div>}
               {/* Primary Action Row */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {/* Navigate Button */}
@@ -641,7 +669,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 )}
 
                 {/* Upload Photo Button */}
-                {(s.navigationPointId || s.workOrderItemId) && !isDone && (
+                {(s.navigationPointId || s.workOrderItemId || s.fieldWorkStepId) && !isDone && (
                   <button
                     type="button"
                     onClick={() =>
@@ -680,13 +708,13 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               {/* Inline Photo Upload Drawer */}
               {activePhotoModalStopId === s.jobId && (
                 <form
-                  action={(form) => upload(route.planId, s.workOrderId, s.jobId, form)}
+                  onSubmit={event => { event.preventDefault(); void upload(route.planId, s.workOrderId, s.jobId, new FormData(event.currentTarget)); }}
                   className="rounded-2xl border border-sky-200 bg-sky-50/50 p-4 space-y-3 mt-3"
                 >
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
                       <Camera size={14} />
-                      <span>Vyfotit doklad a dokončit montáž</span>
+                      <span>{s.fieldWorkStepId ? 'Doložit tento krok fotografií' : 'Vyfotit doklad a dokončit montáž'}</span>
                     </h4>
                     <button
                       type="button"
@@ -727,7 +755,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     disabled={busy}
                     className="w-full rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 transition"
                   >
-                    {busy ? 'Ukládám…' : 'Odeslat fotku a dokončit zastávku ✓'}
+                    {busy ? 'Ukládám…' : s.fieldWorkStepId ? 'Uložit fotografii kroku' : 'Odeslat fotku a dokončit zastávku ✓'}
                   </button>
                 </form>
               )}
@@ -735,9 +763,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               {/* Inline Problem Report Drawer */}
               {activeProblemModalStopId === s.jobId && (
                 <form
-                  action={(form) =>
-                    run(route.planId, s.workOrderId, 'problem', form, s.jobId)
-                  }
+                  onSubmit={event => { event.preventDefault(); void run(route.planId, s.workOrderId, 'problem', new FormData(event.currentTarget), s.jobId); }}
                   className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3 mt-3"
                 >
                   <div className="flex items-center justify-between">
@@ -1072,7 +1098,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
             </div>
 
             {/* LIVE MAP */}
-            <MyRouteMap route={route} height="h-[280px]" />
+
 
             {/* Google Maps Full Route (active uncompleted stops only) */}
             {(() => {
@@ -1084,27 +1110,14 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   Boolean(loc)
                 );
               if (points.length < 2) return null;
-              const origin = `${points[0].latitude},${points[0].longitude}`;
-              const dest = `${points[points.length - 1].latitude},${points[points.length - 1].longitude}`;
-              const waypoints = points
-                .slice(1, -1)
-                .map((p) => `${p.latitude},${p.longitude}`)
-                .join('|');
-              const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}${
-                waypoints ? `&waypoints=${waypoints}` : ''
-              }`;
-
-              return (
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 mt-2 border border-indigo-200/50"
-                >
-                  <MapPin size={16} />
-                  <span>Zobrazit trasu na mapě (zbývající zastávky)</span>
-                </a>
-              );
+                return <div className="space-y-2">
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${points[0].latitude},${points[0].longitude}`} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700">
+                    <Navigation size={16} /> Navigovat z aktuální polohy na další zastávku
+                  </a>
+                  {points.length > 1 && <details className="rounded border p-3 text-sm"><summary>Celá trasa po úsecích ({points.length} zastávek)</summary>
+                    <div className="flex flex-wrap gap-3 pt-2">{buildGoogleMapsRouteSegments(points).map((segment, i) => <a key={segment.from} href={segment.url} target="_blank" rel="noreferrer" className="underline text-indigo-700">Úsek {i+1}: zbývající zastávky {segment.from}–{segment.to}</a>)}</div>
+                  </details>}
+                </div>;
             })()}
 
             {/* Done stops toggle banner */}

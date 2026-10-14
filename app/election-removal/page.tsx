@@ -51,7 +51,7 @@ export default async function ElectionRemovalPage() {
   const totalCompleted = processedCampaigns.reduce((acc, c) => acc + c.completedPoints, 0);
 
   const canManage = user.role === 'ADMIN' || user.role === 'MANAGER';
-  const canImport = canManage || user.role === 'TECHNICIAN';
+  const canImport = canManage;
 
   return (
     <AppShell>
@@ -66,7 +66,7 @@ export default async function ElectionRemovalPage() {
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mt-1 flex items-center gap-2">
               <Truck className="w-7 h-7 text-sky-600" />
-              Přesuny a deinstalace
+              Terénní práce
             </h1>
             <p className="text-sm text-slate-500 mt-1">
               Plánování přejezdů, přesunů nosičů, výměn plachet a deinstalací – přímo v interaktivní mapě nebo importem z KML.
