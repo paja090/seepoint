@@ -616,8 +616,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               {s.referenceUrl && <a className="text-sm underline text-sky-700" href={s.referenceUrl} target="_blank" rel="noreferrer">Referenční fotografie / montážní podklad</a>}
               {s.fieldWorkStepId && !isDone && <div className="rounded border p-3 space-y-2 text-sm">
                 <p>Provedeno {s.completedQuantity ?? 0} z {s.quantity}. Zbývá {(s.quantity ?? 0) - (s.completedQuantity ?? 0)}.</p>
-                <label className="block">Nyní provedené množství<input aria-label="Nyní provedené množství" className="ml-2 w-20 rounded border p-2" type="number" min="1" max={(s.quantity ?? 0) - (s.completedQuantity ?? 0)} value={fieldInputs[s.jobId]?.quantity ?? ''} placeholder={String((s.quantity ?? 0) - (s.completedQuantity ?? 0))} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], quantity: e.target.value } }))} /></label>
-                <label className="block">Kde je materiál / kdo jej převzal<input className="block w-full rounded border p-2" value={fieldInputs[s.jobId]?.custodyNote ?? ''} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], custodyNote: e.target.value } }))} /></label>
+                {isInProgress && <label className="block">Nyní provedené množství<input aria-label="Nyní provedené množství" className="ml-2 w-20 rounded border p-2" type="number" min="1" max={(s.quantity ?? 0) - (s.completedQuantity ?? 0)} value={fieldInputs[s.jobId]?.quantity ?? ''} placeholder={String((s.quantity ?? 0) - (s.completedQuantity ?? 0))} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], quantity: e.target.value } }))} /></label>}
+                {(isInProgress || isIssue) && (isIssue || ['DELIVERY','HANDOFF'].includes(s.fieldWorkStepKind ?? '')) && <label className="block">Kde je materiál / kdo jej převzal<input className="block w-full rounded border p-2" value={fieldInputs[s.jobId]?.custodyNote ?? ''} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], custodyNote: e.target.value } }))} /></label>}
               </div>}
               {/* Primary Action Row */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -630,7 +630,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     href={`https://www.google.com/maps/dir/?api=1&destination=${s.location.latitude},${s.location.longitude}`}
                   >
                     <Navigation size={14} />
-                    <span>Navigovat 🗺️</span>
+                    <span>Navigovat</span>
                   </a>
                 )}
 
@@ -658,7 +658,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     <Clock size={14} />
                     <span>
                       {isInProgress
-                        ? 'Označit za hotové ✓'
+                        ? 'Dokončit práci'
                         : isIssue
                         ? 'Zkusit znovu / Zahájit'
                         : currentDate > todayStr
@@ -680,7 +680,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm"
                   >
                     <Camera size={14} className="text-sky-600" />
-                    <span>Doklad / Fotka 📸</span>
+                    <span>Přidat fotku</span>
                   </button>
                 )}
 

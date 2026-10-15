@@ -94,7 +94,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
             const completedAt = step ? step.completedAt : ep.completedAt;
             return [{
               fieldWorkStepId: step?.id, quantity: step?.quantity ?? ep.quantity, completedQuantity: step?.completedQuantity ?? 0,
-              referenceUrl: ep.referenceUrl, photoType: step?.photoType,
+              referenceUrl: ep.referenceUrl, photoType: step?.photoType, fieldWorkStepKind: step?.kind,
               jobId: stopId(s),
               workOrderItemId: null,
               navigationPointId: null,

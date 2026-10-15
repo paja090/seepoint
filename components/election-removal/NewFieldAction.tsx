@@ -8,9 +8,9 @@ export function NewFieldAction() {
     try { const r = await fetch('/api/election-removal/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...Object.fromEntries(form), points: [] }) });
       const data = await r.json(); if (!r.ok) throw new Error(data.error); router.push('/election-removal/' + data.campaignId);
     } catch (e) { setError(e instanceof Error ? e.message : 'Založení selhalo.'); } finally { setBusy(false); }
-  }}><h2 className="text-xl font-semibold">1. Nová akce / zakázka terénních prací</h2>
+  }}><h2 className="text-xl font-semibold">Základní údaje</h2>
     <label className="block">Název<input className="block w-full rounded border p-2" name="name" required /></label>
-    <label className="block">Klient / interní účel<input className="block w-full rounded border p-2" name="clientName" /></label>
+    <label className="block">Pro koho (nepovinné)<input className="block w-full rounded border p-2" name="clientName" /></label>
     <label className="block">Termín<input className="block rounded border p-2" name="targetDate" type="date" required /></label>
     <label className="block">Společné instrukce<textarea className="block w-full rounded border p-2" name="description" /></label>
     {error && <p role="alert" className="text-red-700">{error}</p>}<button disabled={busy} className="rounded bg-sky-700 px-4 py-2 text-white">Založit a zadat práci</button>
