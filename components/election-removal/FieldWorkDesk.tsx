@@ -40,7 +40,7 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
     const form = new FormData(event.currentTarget);
-    const payload = { ...Object.fromEntries(form), campaignId, id: edit?.id, ...gps,
+    const payload = { ...Object.fromEntries(form), objectType: form.get('objectType') || ELECTION_REMOVAL_MEDIA_LABELS[form.get('mediaType') as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS], campaignId, id: edit?.id, ...gps,
       carrierId: source === 'CARRIER' ? carrier?.id ?? edit?.carrierId ?? null : null, surfaceId: source === 'CARRIER' ? (form.has('surfaceId') ? form.get('surfaceId') || null : edit?.surfaceId ?? null) : null,
       gpsConfirmed: form.get('gpsConfirmed') === 'on', destinationGpsConfirmed: form.get('destinationGpsConfirmed') === 'on',
       destinationLatitude: destination?.latitude, destinationLongitude: destination?.longitude,
@@ -90,7 +90,6 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       <div className="grid gap-3 sm:grid-cols-2">
         <label>Název místa / objektu<input className={input} required name="label" defaultValue={edit?.label ?? ''} /></label>
         <label>Typ objektu<select name="mediaType" className={input} defaultValue={edit?.mediaType ?? 'OTHER'}>{Object.entries(ELECTION_REMOVAL_MEDIA_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label>Upřesnění objektu (nepovinné)<input className={input} name="objectType" defaultValue={edit?.objectType ?? 'Samostatný objekt'} /></label>
         <label>Co se má udělat<select className={input} name="operationType" defaultValue={edit?.operationType ?? 'INSPECTION'} onChange={e => { if (e.target.value === 'RELOCATION') { setDisposition('TRANSFER'); setTransport(true); } }}>{Object.entries(operations).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label>Množství<input className={input} name="quantity" type="number" min="1" required defaultValue={edit?.quantity ?? 1} /></label>
       </div>
@@ -108,6 +107,7 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       </div>}
       <div hidden={!transport} className="rounded-lg bg-slate-50 p-3"><label>Velikost nákladu (kapacitní jednotky)<input className={input} name="loadSlots" type="number" min="0" required defaultValue={edit?.loadSlots ?? 0} /></label><p className="mt-1 text-xs text-slate-500">Kapacita pro celý náklad: áčko 1, mini tower 6, tower 30 jednotek. U jiného objektu zadejte nárok podle vozidla.</p></div>
       <details className="rounded-lg border p-4"><summary className="cursor-pointer font-medium">Další údaje: čas, kontakt, podklady a vybavení</summary><div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label>Upřesnění objektu (nepovinné)<input className={input} name="objectType" defaultValue={edit?.objectType ?? ''} /></label>
         <label>Termín práce<input className={input} name="deadlineAt" type="date" defaultValue={edit?.deadlineAt ? new Date(edit.deadlineAt).toISOString().slice(0,10) : ''} /></label>
         <label>Odhad práce (min)<input className={input} name="serviceMinutes" type="number" min="1" placeholder="Automaticky podle operace, objektu a množství" defaultValue={edit?.serviceMinutes ?? ''} /></label>
 {(['windowStart', 'windowEnd'] as const).map(key => <label key={key}>{key === 'windowStart' ? 'Přístup od (místní čas)' : 'Dokončit do (místní čas)'}<input className={input} type="datetime-local" name={key} defaultValue={edit?.[key] ? new Date(new Date(edit[key]!).getTime() - new Date(edit[key]!).getTimezoneOffset() * 60000).toISOString().slice(0,16) : ''} /></label>)}

@@ -70,6 +70,7 @@ test('field work: dispatcher to mobile, photo and partial completion', async ({ 
     expect(await mobile.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBeTruthy();
     await expect(card.getByLabel('Nyní provedené množství')).not.toBeVisible();
     await expect(card.getByText('Kde je materiál / kdo jej převzal', {exact:true})).not.toBeVisible();
+    await expect(mobile.getByText('Předpokládaný konec směny (Live ETA)', {exact:true})).not.toBeVisible();
     const start=mobile.waitForResponse(r=>r.url().endsWith('/api/work/route/mine')&&r.request().method()==='POST');
     await card.getByRole('button',{name:'Zahájit práci',exact:true}).click(); expect((await start).ok()).toBeTruthy();
     await card.getByRole('button',{name:'Přidat fotku'}).click();

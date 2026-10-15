@@ -864,18 +864,6 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               </div>
             </div>
 
-            {/* Timing Breakdown Card (Travel, Planned Service, Shift Total, Measured Actual) */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Timer size={14} className="text-sky-600" />
-                  <span>Časová náročnost výjezdu</span>
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400">
-                  Kalkulace a měření časů
-                </span>
-              </div>
-
               {/* Trip Controls (Start Departure from Warehouse / Complete Return to Warehouse) */}
               <div
                 className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl border transition ${
@@ -976,6 +964,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 </div>
               </div>
 
+            <details className="rounded-2xl border border-slate-200 bg-white p-3.5"><summary className="cursor-pointer text-sm font-medium text-slate-700"><Timer size={14} className="mr-2 inline text-sky-600" />Časy a měření výjezdu · návrat ~{formatLiveClock(route.liveEstimatedEndAt, data.timezone)}</summary><div className="mt-3 space-y-2">
               {/* Live Shift ETA Banner */}
               <div className="rounded-xl border border-sky-200 bg-linear-to-r from-sky-50/90 via-indigo-50/30 to-white p-3 space-y-1.5 shadow-2xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1095,7 +1084,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </span>
                 </div>
               </div>
-            </div>
+            </div></details>
 
             {/* LIVE MAP */}
 
