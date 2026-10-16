@@ -20,7 +20,7 @@ const config = [
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
-    files: ['scripts/**/*.js'],
+    files: ['scripts/**/*.js', 'scripts/**/*.cjs', 'scripts/**/*.mjs'],
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
 ];

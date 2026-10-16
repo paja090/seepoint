@@ -187,6 +187,9 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
               carrier.surfaces.some((s) => s.photos.some((p) => p.type === 'DAMAGE')) ||
               carrier.note?.includes('ZÁVADA');
 
+            const primaryNavSurface = carrier.surfaces.find((s) => s.destinationName || s.directionDescription) || carrier.surfaces[0];
+            const displayName = isNavigation && primaryNavSurface?.name ? primaryNavSurface.name : carrier.name;
+
             return (
               <article
                 key={carrier.id}
@@ -201,7 +204,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={primaryPhoto.id ? `/api/photos/${encodeURIComponent(primaryPhoto.id)}/thumbnail` : primaryPhoto.url}
-                        alt={carrier.name}
+                        alt={displayName}
                         loading="lazy"
                         decoding="async"
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -259,7 +262,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                       <div>
                         <h3 className="font-extrabold text-base text-slate-950 leading-tight">
                           <Link href={`/carriers/${carrier.id}`} className="hover:text-sky-700 hover:underline">
-                            {carrier.name}
+                            {displayName}
                           </Link>
                         </h3>
                         <p className="text-xs text-slate-500 font-medium mt-0.5">
@@ -402,7 +405,8 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                   carrier.surfaces.some((s) => s.photos.some((p) => p.type === 'DAMAGE')) ||
                   carrier.note?.includes('ZÁVADA');
 
-                const primaryNavSurface = carrier.surfaces.find((s) => s.destinationName || s.directionDescription);
+                const primaryNavSurface = carrier.surfaces.find((s) => s.destinationName || s.directionDescription) || carrier.surfaces[0];
+                const displayName = isNavigation && primaryNavSurface?.name ? primaryNavSurface.name : carrier.name;
 
                 return (
                   <tr
@@ -437,7 +441,7 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={primaryPhoto.id ? `/api/photos/${encodeURIComponent(primaryPhoto.id)}/thumbnail` : primaryPhoto.url}
-                              alt={carrier.name}
+                              alt={displayName}
                               loading="lazy"
                               decoding="async"
                               className="w-full h-full object-cover"
@@ -465,11 +469,21 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
 
                     {/* Název nosiče */}
                     <TableCell>
-                      <b>{carrier.name}</b>
-                      <br />
-                      <span className="text-slate-500 text-xs">
-                        {carrier.carrierTypeRef?.name || carrierTypeLabel(carrier.type)}
-                      </span>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Link href={`/carriers/${carrier.id}`} className="font-extrabold text-slate-950 hover:text-sky-700 hover:underline">
+                            {displayName}
+                          </Link>
+                          {isNavigation && carrier.surfaces.length > 1 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200" title={`${carrier.surfaces.length} navigační pozice na sloupu`}>
+                              +{carrier.surfaces.length - 1} další
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-slate-500 text-xs block">
+                          {carrier.carrierTypeRef?.name || carrierTypeLabel(carrier.type)}
+                        </span>
+                      </div>
                     </TableCell>
 
                     {/* 🧭 Pozice (GPS souřadnice & Navigace) */}
@@ -518,9 +532,12 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                           {clients.join(', ') || <span className="text-slate-400 italic">Bez klienta</span>}
                         </div>
                         {isNavigation && primaryNavSurface && (
-                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md" title={primaryNavSurface.name}>
-                            <span>{getDirectionArrow(primaryNavSurface.directionDescription)}</span>
-                            <span className="truncate max-w-[200px]">{primaryNavSurface.name}</span>
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md" title={primaryNavSurface.name}>
+                            <span className="text-sky-700 font-black">{getDirectionArrow(primaryNavSurface.directionDescription)}</span>
+                            <span>{primaryNavSurface.directionDescription || 'směr'}</span>
+                            {primaryNavSurface.destinationName && (
+                              <span className="text-emerald-800">· 🎯 {primaryNavSurface.destinationName}</span>
+                            )}
                           </div>
                         )}
                       </div>

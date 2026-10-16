@@ -508,17 +508,22 @@ export function NavigationSurfaceManager({
                 }`}
               />
 
-              <div className="pl-2 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-200/80 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-lg bg-slate-950 px-2 py-0.5 text-[11px] font-black text-white shadow-sm shrink-0">
+              <div className="pl-2 space-y-3.5">
+                {/* Card Header: Position badge + Title + Status */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="rounded-lg bg-slate-900 px-2 py-0.5 text-xs font-black text-white shadow-2xs shrink-0">
                         #{index + 1}
                       </span>
-                      <h4 className="font-extrabold text-base text-slate-900 break-words">{surface.name}</h4>
+                      <h4 className="font-extrabold text-base text-slate-950 break-words leading-tight">
+                        {surface.name}
+                      </h4>
                     </div>
                     {surface.sourcePosition && (
-                      <span className="text-[11px] font-medium text-slate-500">Kód pozice: {surface.sourcePosition}</span>
+                      <span className="text-[11px] font-semibold text-slate-500 block">
+                        Kód pozice: <strong className="text-slate-700 font-mono">{surface.sourcePosition}</strong>
+                      </span>
                     )}
                   </div>
                   <div className="shrink-0 self-start sm:self-auto">
@@ -526,108 +531,130 @@ export function NavigationSurfaceManager({
                   </div>
                 </div>
 
-                {/* Client & Rental Status */}
-                <div className="rounded-2xl bg-white/80 p-3 shadow-inner border border-slate-200/50 space-y-1.5 text-xs text-slate-700">
-                  <p className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900">👤 Klient:</span>
-                    {surface.currentClient ? (
-                      <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-bold text-emerald-900 border border-emerald-300">
-                        {surface.currentClient.name}
-                      </span>
-                    ) : (
-                      <span className="italic text-slate-400">Volná pozice bez klienta</span>
-                    )}
-                  </p>
+                {/* Client & Rental Status Bar */}
+                <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200/70 space-y-2 text-xs">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wide">Klient:</span>
+                      {surface.currentClient ? (
+                        <span className="rounded-lg bg-emerald-100 px-2.5 py-0.5 font-black text-emerald-900 border border-emerald-300">
+                          👤 {surface.currentClient.name}
+                        </span>
+                      ) : (
+                        <span className="italic text-slate-400">Volná pozice bez klienta</span>
+                      )}
+                    </div>
+                  </div>
 
                   {activeOccupancy && (
-                    <p className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-900">📅 Pronajato do:</span>
-                      <span className="font-extrabold text-slate-900">{activeOccupancy.dateTo}</span>
-                      <span className="text-[11px] text-slate-500">(od {activeOccupancy.dateFrom})</span>
-                    </p>
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200/60 text-[11px] text-slate-700 flex-wrap">
+                      <span className="font-bold text-slate-500 uppercase tracking-wide">Pronajato do:</span>
+                      <span className="font-black text-slate-950 font-mono">{activeOccupancy.dateTo}</span>
+                      <span className="text-slate-400">(od {activeOccupancy.dateFrom})</span>
+                    </div>
                   )}
                 </div>
 
-                {/* Direction, Destination & Distance Grid */}
+                {/* 🧭 Road Navigation Directional Signboard (Modern, clear & spacious) */}
                 {!isInline ? (
-                  <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-4 text-white shadow-xl space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-300 border-b border-slate-800 pb-2">
-                      <span className="flex items-center gap-1.5 text-sky-400">
-                        🧭 <span className="uppercase tracking-wider font-extrabold text-[11px]">Parametry navigace</span>
+                  <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/40 p-3.5 shadow-2xs space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-sky-100 pb-2">
+                      <span className="flex items-center gap-1.5 font-black text-sky-950 text-xs">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-sky-600 text-white text-[11px] shadow-2xs font-bold">
+                          🧭
+                        </span>
+                        <span className="uppercase tracking-wider text-[11px]">Parametry směrové navigace</span>
                       </span>
                       {canEdit && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button
-                            className="rounded-xl bg-sky-500/20 hover:bg-sky-500/35 border border-sky-400/30 px-2.5 py-1 text-[11px] font-bold text-sky-200 transition shadow-2xs"
+                            className="rounded-xl bg-white hover:bg-slate-50 border border-slate-300 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition shadow-2xs cursor-pointer flex items-center gap-1"
                             onClick={() => openInlineEdit(surface)}
                             type="button"
                           >
-                            ✏️ Upravit
+                            <span>✏️</span>
+                            <span>Upravit</span>
                           </button>
                           <button
-                            className="rounded-xl bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/30 px-2.5 py-1 text-[11px] font-bold text-emerald-200 transition shadow-2xs disabled:opacity-50"
+                            className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-white transition shadow-2xs cursor-pointer disabled:opacity-50 flex items-center gap-1"
                             disabled={aiExtractingSurfaceId === surface.id}
                             onClick={() => void handleExtractPhotoData(surface.id)}
                             type="button"
                           >
-                            {aiExtractingSurfaceId === surface.id ? '⌛ Čtení...' : '🔍 Rozpoznat z fotky'}
+                            <span>{aiExtractingSurfaceId === surface.id ? '⌛' : '✨'}</span>
+                            <span>{aiExtractingSurfaceId === surface.id ? 'Čtení...' : 'Rozpoznat z fotky'}</span>
                           </button>
                         </div>
                       )}
                     </div>
 
-                    <div className="grid gap-2.5 text-xs grid-cols-1 sm:grid-cols-3">
-                      <div className="rounded-xl bg-slate-800/90 p-2.5 border border-slate-700/70 shadow-inner flex flex-col justify-center">
-                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Směr</span>
-                        <p className="font-extrabold text-sky-300 text-sm flex items-center gap-1.5">
-                          <span className="text-xl">{arrowIcon}</span>
-                          <span className="truncate">{surface.directionDescription || 'neuvedeno'}</span>
-                        </p>
+                    {/* 🛣️ Road Sign Banner: Arrow + Direction + Destination + Distance */}
+                    <div className="rounded-xl bg-white border border-sky-200/80 p-3 shadow-2xs flex items-center gap-3">
+                      {/* High-visibility directional arrow badge */}
+                      <div
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white text-2xl font-black shadow-sm border border-sky-500"
+                        title={`Směr: ${surface.directionDescription || 'neuveden'}`}
+                      >
+                        {arrowIcon}
                       </div>
 
-                      <div className="rounded-xl bg-slate-800/90 p-2.5 border border-slate-700/70 shadow-inner flex flex-col justify-center">
-                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Cíl / Prodejna</span>
-                        <p className="font-extrabold text-emerald-300 text-sm truncate">
-                          🎯 {surface.destinationName || 'neuvedeno'}
-                        </p>
-                      </div>
+                      {/* Target & details */}
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-slate-900 truncate" title={surface.destinationName || 'Cíl neuveden'}>
+                            🎯 {surface.destinationName || 'Cíl / Prodejna neuvedena'}
+                          </span>
+                          {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
+                            <span className="shrink-0 text-xs font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs font-mono">
+                              📏 {surface.distanceMeters >= 1000 ? `${(surface.distanceMeters / 1000).toFixed(1).replace('.0', '').replace('.', ',')} km` : `${surface.distanceMeters} m`}
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="rounded-xl bg-slate-800/90 p-2.5 border border-slate-700/70 shadow-inner flex flex-col justify-center">
-                        <span className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Vzdálenost</span>
-                        <p className="font-extrabold text-amber-300 text-sm truncate">
-                          📏 {surface.distanceMeters !== undefined && surface.distanceMeters !== null ? `${surface.distanceMeters} m po silnici` : 'neuvedeno'}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className="font-bold text-sky-900 bg-sky-100/80 px-2 py-0.5 rounded-md border border-sky-200">
+                            Směr: <strong className="text-sky-950 font-black">{surface.directionDescription || 'neuvedeno'}</strong>
+                          </span>
+                          {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
+                            <span className="text-slate-500 font-medium">
+                              ({surface.distanceMeters} m po trase)
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 ) : (
                   /* Inline Edit Form */
-                  <div className="rounded-2xl border border-sky-300 bg-sky-50 p-3 space-y-2 text-xs">
-                    <h5 className="font-bold text-sky-950">Rychlá úprava směru, cíle a vzdálenosti</h5>
+                  <div className="rounded-2xl border border-sky-300 bg-sky-50/80 p-3.5 space-y-3 text-xs">
+                    <h5 className="font-extrabold text-sky-950 text-xs flex items-center gap-1.5">
+                      <span>✏️</span>
+                      <span>Rychlá úprava směru, cíle a vzdálenosti</span>
+                    </h5>
                     <div className="grid gap-2 sm:grid-cols-3">
                       <label>
-                        <span className="block mb-0.5 font-semibold text-slate-700">Směr</span>
+                        <span className="block mb-1 font-bold text-slate-700">Směr šipky</span>
                         <input
-                          className="w-full rounded-xl border border-slate-300 p-2"
-                          placeholder="vpravo / ul. Hlavní"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2 shadow-2xs text-xs font-semibold"
+                          placeholder="vpravo / vlevo"
                           value={directionDescription}
                           onChange={(e) => setDirectionDescription(e.target.value)}
                         />
                       </label>
                       <label>
-                        <span className="block mb-0.5 font-semibold text-slate-700">Cíl / Prodejna</span>
+                        <span className="block mb-1 font-bold text-slate-700">Cíl / Prodejna</span>
                         <input
-                          className="w-full rounded-xl border border-slate-300 p-2"
-                          placeholder="Albert"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2 shadow-2xs text-xs font-semibold"
+                          placeholder="např. BILLA"
                           value={destinationName}
                           onChange={(e) => setDestinationName(e.target.value)}
                         />
                       </label>
                       <label>
-                        <span className="block mb-0.5 font-semibold text-slate-700">Vzdálenost (m)</span>
+                        <span className="block mb-1 font-bold text-slate-700">Vzdálenost (m)</span>
                         <input
-                          className="w-full rounded-xl border border-slate-300 p-2"
-                          placeholder="350"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2 shadow-2xs text-xs font-semibold font-mono"
+                          placeholder="např. 1500"
                           type="number"
                           value={distanceMeters}
                           onChange={(e) => setDistanceMeters(e.target.value)}
@@ -636,19 +663,19 @@ export function NavigationSurfaceManager({
                     </div>
                     <div className="flex justify-end gap-2 pt-1">
                       <button
-                        className="rounded-xl border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-700 hover:bg-slate-100"
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-100 cursor-pointer transition shadow-2xs"
                         onClick={() => setInlineEditingSurfaceId(null)}
                         type="button"
                       >
                         Zrušit
                       </button>
                       <button
-                        className="rounded-xl bg-sky-600 px-3 py-1 font-bold text-white hover:bg-sky-700 disabled:opacity-50"
+                        className="rounded-xl bg-sky-600 px-3.5 py-1.5 font-extrabold text-white hover:bg-sky-500 disabled:opacity-50 cursor-pointer transition shadow-2xs"
                         disabled={saving}
                         onClick={() => void handleSaveInlineEdit(surface)}
                         type="button"
                       >
-                        Uložit
+                        {saving ? 'Ukládám...' : 'Uložit změny'}
                       </button>
                     </div>
                   </div>
@@ -659,7 +686,7 @@ export function NavigationSurfaceManager({
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-slate-700">
                       <span>📸 Fotografie pozice ({surface.photos.length})</span>
-                      <a href="#photo-gallery" className="text-[11px] text-sky-600 hover:underline">
+                      <a href="#photo-gallery" className="text-[11px] text-sky-600 hover:underline font-bold">
                         Otevřít celou galerii
                       </a>
                     </div>
@@ -672,8 +699,9 @@ export function NavigationSurfaceManager({
                           rel="noreferrer"
                           className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-300 bg-slate-900 group shadow-2xs"
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={p.url}
+                            src={p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : p.url}
                             alt={p.note || surface.name}
                             className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200"
                           />

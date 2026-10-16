@@ -1,0 +1,11 @@
+const fs=require('node:fs'),{spawn}=require('node:child_process');
+require('dotenv').config({path:'.env.local',quiet:true});
+const u=new URL(fs.readFileSync('tmp/product-film-url.txt','utf8').trim());
+if(u.pathname!='/seepoint_film')throw Error('Film database required');
+const env={...process.env};for(const k of ['DATABASE_URL','DIRECT_URL','POSTGRES_PRISMA_URL','POSTGRES_URL','POSTGRES_URL_NON_POOLING'])env[k]=u.href;
+env.APP_URL='http://127.0.0.1:3125';env.NEXT_PUBLIC_APP_URL=env.APP_URL;env.SEEPOINT_STORAGE_PROVIDER='DATABASE';env.NODE_OPTIONS='--max-old-space-size=6144';
+const mode=process.argv[2];
+const args=mode==='schema'?['node_modules/prisma/build/index.js','db','push','--schema','prisma/schema.prisma','--skip-generate']:mode==='server'?['node_modules/next/dist/bin/next','dev','-p','3125','-H','127.0.0.1']:mode==='seed'?['scripts/product-film/seed.cjs']:null;
+if(!args)throw Error('Expected schema, server or seed');
+console.log('Isolated film environment:',mode,'AI key present:',Boolean(env.GEMINI_API_KEY||env.GOOGLE_GEMINI_API_KEY||env.GOOGLE_AI_KEY));
+const p=spawn(process.execPath,args,{env,stdio:'inherit'});p.on('exit',c=>process.exit(c??1));

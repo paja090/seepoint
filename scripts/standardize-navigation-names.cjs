@@ -166,7 +166,31 @@ async function main() {
     }
   }
 
-  console.log(`Done! Successfully standardized ${totalUpdated} of ${surfaces.length} navigation surfaces in database.`);
+  console.log(`Standardized ${totalUpdated} of ${surfaces.length} navigation surfaces in database.`);
+
+  const navigationCarriers = await prisma.advertisingCarrier.findMany({
+    where: { type: 'NAVIGATION' },
+    include: {
+      surfaces: {
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      }
+    }
+  });
+
+  let carriersUpdated = 0;
+  for (const c of navigationCarriers) {
+    const desired = c.surfaces[0]?.name || (`P1 - ${cleanStreetName(c.street, c.address, c.city)}`);
+    if (c.name !== desired) {
+      await prisma.advertisingCarrier.update({
+        where: { id: c.id },
+        data: { name: desired }
+      });
+      carriersUpdated++;
+    }
+  }
+
+  console.log(`Done! Successfully standardized ${carriersUpdated} of ${navigationCarriers.length} navigation carriers in database.`);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
