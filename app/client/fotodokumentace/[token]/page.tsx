@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
 import {
   PublicCampaignAlbumView,
   type PublicPointItem,
@@ -14,10 +16,10 @@ export default async function PublicFotodokumentacePage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; client?: string }>;
 }) {
   const { token } = await params;
-  const { month } = await searchParams;
+  const { month, client } = await searchParams;
 
   const campaignId = verifyCampaignAlbumSlug(token);
   if (!campaignId) notFound();
@@ -25,35 +27,47 @@ export default async function PublicFotodokumentacePage({
   const campaignMeta = await enterPublicCampaignAlbumTenant(token);
   if (!campaignMeta) notFound();
 
-  const campaign = await prisma.electionCampaign.findFirst({
-    where: { id: campaignMeta.id, organizationId: campaignMeta.organizationId },
-    include: {
-      points: {
+  const campaign = await runWithTenantContext(
+    { organizationId: campaignMeta.organizationId, source: 'public-token' },
+    () =>
+      prisma.electionCampaign.findFirst({
+        where: { id: campaignMeta.id, organizationId: campaignMeta.organizationId },
         include: {
-          photos: {
-            where: { isPrivate: false },
-            select: {
-              id: true,
-              type: true,
-              fileName: true,
-              createdAt: true,
-              capturedLatitude: true,
-              capturedLongitude: true,
-              capturedByWorkerName: true,
+          points: {
+            include: {
+              photos: {
+                where: { isPrivate: false },
+                select: {
+                  id: true,
+                  type: true,
+                  fileName: true,
+                  createdAt: true,
+                  capturedLatitude: true,
+                  capturedLongitude: true,
+                  capturedByWorkerName: true,
+                },
+                orderBy: { createdAt: 'desc' },
+              },
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { label: 'asc' },
           },
         },
-        orderBy: { label: 'asc' },
-      },
-    },
-  });
+      })
+  );
 
   if (!campaign) notFound();
 
-  // Extract all available periods (year-month) across all photos
+  const clientFilter = client?.trim() || null;
+  const filteredRawPoints = clientFilter
+    ? campaign.points.filter((p) => {
+        const resolved = resolvePointClientName(p, campaign.clientName) || campaign.clientName || '';
+        return resolved.trim().toLowerCase() === clientFilter.toLowerCase();
+      })
+    : campaign.points;
+
+  // Extract all available periods (year-month) across matching photos
   const periodsSet = new Set<string>();
-  for (const point of campaign.points) {
+  for (const point of filteredRawPoints) {
     for (const photo of point.photos) {
       const d = new Date(photo.createdAt);
       if (!Number.isNaN(d.getTime())) {
@@ -65,7 +79,7 @@ export default async function PublicFotodokumentacePage({
   }
   const availablePeriods = Array.from(periodsSet).sort().reverse();
 
-  const points: PublicPointItem[] = campaign.points.map((p) => ({
+  const points: PublicPointItem[] = filteredRawPoints.map((p) => ({
     id: p.id,
     label: p.label,
     description: p.description,
@@ -92,12 +106,13 @@ export default async function PublicFotodokumentacePage({
       token={token}
       campaign={{
         id: campaign.id,
-        name: campaign.name,
-        clientName: campaign.clientName,
+        name: clientFilter ? `${clientFilter} — ${campaign.name}` : campaign.name,
+        clientName: clientFilter || campaign.clientName,
         description: campaign.description,
         targetDate: campaign.targetDate ? campaign.targetDate.toISOString() : null,
-        totalPoints: campaign.totalPoints,
-        completedPoints: campaign.completedPoints,
+        createdAt: campaign.createdAt ? campaign.createdAt.toISOString() : null,
+        totalPoints: filteredRawPoints.length,
+        completedPoints: filteredRawPoints.filter((p) => p.status === 'COMPLETED').length,
       }}
       points={points}
       availablePeriods={availablePeriods}

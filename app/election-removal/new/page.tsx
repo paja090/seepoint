@@ -3,7 +3,6 @@ import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { checkElectionRemovalPageAccess } from '@/lib/election-removal/guard';
 import { NewCampaignTabsView } from '@/components/election-removal/NewCampaignTabsView';
-import { NewFieldAction } from '@/components/election-removal/NewFieldAction';
 import { ArrowLeft, Truck } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -39,17 +38,14 @@ export default async function NewElectionRemovalCampaignPage() {
                 Nová zakázka terénních prací
               </h1>
               <p className="text-sm text-slate-500">
-                Zvolte účel zakázky a termín. Jednotlivá místa a práce doplníte v dalším kroku.
+                Vyberte plochy přímo ze systému podle klientů (např. kontrola navigací, laviček či billboardů), nahrajte KML mapu nebo naklikejte body v mapě.
               </p>
             </div>
           </div>
         </div>
 
         {/* Campaign Creator Tabs Component */}
-        <NewFieldAction clients={clients} />
-        <details className="rounded-xl border bg-white p-5"><summary className="cursor-pointer font-medium">Mám soubor KML/KMZ nebo chci zadat více míst v mapě</summary><div className="mt-4 space-y-3">
-        <p>Importované operace jsou návrhy klasifikace. Před plánováním potvrďte zadání, materiál a cílovou GPS.</p>
-        <NewCampaignTabsView /></div></details>
+        <NewCampaignTabsView clients={clients} />
       </div>
     </AppShell>
   );

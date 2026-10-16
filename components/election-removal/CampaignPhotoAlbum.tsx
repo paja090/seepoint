@@ -7,15 +7,12 @@ import {
   Calendar,
   Download,
   Filter,
-  CheckCircle2,
   X,
   ChevronLeft,
   ChevronRight,
-  Share2,
   Copy,
   Check,
   ExternalLink,
-  MapPin,
   Clock,
 } from 'lucide-react';
 
@@ -35,6 +32,8 @@ export interface InternalPointWithPhotos {
   id: string;
   label: string;
   description?: string | null;
+  layerName?: string | null;
+  clientName?: string | null;
   quantity: number;
   operationType?: string | null;
   latitude: number;
@@ -48,6 +47,9 @@ export interface CampaignPhotoAlbumProps {
   campaignName: string;
   clientName?: string | null;
   points: InternalPointWithPhotos[];
+  publicShareUrl?: string;
+  downloadZipUrl?: string;
+  createdAt?: string | Date;
 }
 
 const MONTH_NAMES_CS: Record<string, string> = {
@@ -84,11 +86,14 @@ function formatCzechDate(dateVal?: string | Date | null): string {
 }
 
 export function CampaignPhotoAlbum({
-  campaignId,
+  campaignId: _campaignId,
   albumSlug,
-  campaignName,
+  campaignName: _campaignName,
   clientName,
   points,
+  publicShareUrl,
+  downloadZipUrl,
+  createdAt,
 }: CampaignPhotoAlbumProps) {
   // Extract all available periods across all photos
   const availablePeriods = useMemo(() => {
@@ -106,9 +111,23 @@ export function CampaignPhotoAlbum({
     return Array.from(set).sort().reverse();
   }, [points]);
 
+  // Extract distinct clients across points
+  const availableClients = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of points) {
+      const resolved = (p.clientName || p.layerName || clientName || '').trim();
+      if (!resolved) continue;
+      counts.set(resolved, (counts.get(resolved) || 0) + p.photos.length);
+    }
+    return Array.from(counts.entries())
+      .map(([name, photoCount]) => ({ name, photoCount }))
+      .sort((a, b) => b.photoCount - a.photoCount || a.name.localeCompare(b.name, 'cs'));
+  }, [points, clientName]);
+
   const [selectedPeriod, setSelectedPeriod] = useState<string>(
     availablePeriods.length > 0 ? availablePeriods[0] : 'ALL'
   );
+  const [selectedClient, setSelectedClient] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'INSTALL' | 'DEINSTALL' | 'CONTROL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
@@ -116,13 +135,20 @@ export function CampaignPhotoAlbum({
 
   // Flatten photos with matching point
   const flatPhotosWithPoint = useMemo(() => {
-    const list: Array<{ photo: InternalPhotoItem; point: InternalPointWithPhotos }> = [];
+    const list: Array<{ photo: InternalPhotoItem; point: InternalPointWithPhotos; pointClient: string | null }> = [];
 
     for (const point of points) {
+      const pointClient = (point.clientName || point.layerName || clientName || '').trim() || null;
+
+      if (selectedClient !== 'ALL' && pointClient !== selectedClient) {
+        continue;
+      }
+
       if (
         searchQuery.trim() &&
         !point.label.toLocaleLowerCase('cs').includes(searchQuery.toLocaleLowerCase('cs')) &&
-        !point.description?.toLocaleLowerCase('cs').includes(searchQuery.toLocaleLowerCase('cs'))
+        !point.description?.toLocaleLowerCase('cs').includes(searchQuery.toLocaleLowerCase('cs')) &&
+        !(pointClient && pointClient.toLocaleLowerCase('cs').includes(searchQuery.toLocaleLowerCase('cs')))
       ) {
         continue;
       }
@@ -143,21 +169,33 @@ export function CampaignPhotoAlbum({
         if (typeFilter === 'DEINSTALL' && !isDeinstall) continue;
         if (typeFilter === 'CONTROL' && !isControl) continue;
 
-        list.push({ photo, point });
+        list.push({ photo, point, pointClient });
       }
     }
 
     return list;
-  }, [points, selectedPeriod, typeFilter, searchQuery]);
+  }, [points, clientName, selectedClient, selectedPeriod, typeFilter, searchQuery]);
 
   const slug = albumSlug;
 
+  const querySuffix = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedPeriod !== 'ALL') params.set('month', selectedPeriod);
+    if (selectedClient !== 'ALL') params.set('client', selectedClient);
+    const qs = params.toString();
+    return qs ? `?${qs}` : '';
+  }, [selectedPeriod, selectedClient]);
+
   const clientShareUrl = useMemo(() => {
-    if (typeof window === 'undefined') return `/client/fotodokumentace/${slug}`;
+    if (publicShareUrl) {
+      if (typeof window === 'undefined') return publicShareUrl;
+      const base = window.location.origin;
+      return publicShareUrl.startsWith('http') ? publicShareUrl : `${base}${publicShareUrl}`;
+    }
+    if (typeof window === 'undefined') return `/client/fotodokumentace/${slug}${querySuffix}`;
     const base = window.location.origin;
-    const periodQuery = selectedPeriod !== 'ALL' ? `?month=${encodeURIComponent(selectedPeriod)}` : '';
-    return `${base}/client/fotodokumentace/${slug}${periodQuery}`;
-  }, [slug, selectedPeriod]);
+    return `${base}/client/fotodokumentace/${slug}${querySuffix}`;
+  }, [publicShareUrl, slug, querySuffix]);
 
   const handleCopyLink = async () => {
     try {
@@ -191,16 +229,14 @@ export function CampaignPhotoAlbum({
 
   const totalPhotosCount = points.reduce((sum, p) => sum + p.photos.length, 0);
 
-  const downloadZipUrl = `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip${
-    selectedPeriod !== 'ALL' ? `?month=${encodeURIComponent(selectedPeriod)}` : ''
-  }`;
+  const resolvedDownloadZipUrl = downloadZipUrl || `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip${querySuffix}`;
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-6 shadow-sm">
       {/* Header and Sharing Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="p-1 rounded bg-sky-50 text-sky-700">
               <Camera className="w-4 h-4" />
             </span>
@@ -210,9 +246,15 @@ export function CampaignPhotoAlbum({
             <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
               {totalPhotosCount} fotografií celkem
             </span>
+            {createdAt && (
+              <span className="inline-flex items-center gap-1 text-xs text-slate-500 font-medium">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                Vytvořeno: <strong className="text-slate-700">{formatCzechDate(createdAt)}</strong>
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Všechny fotografie z terénních realizací na jednom místě s možností snadného odeslání klientovi.
+            Fotografie jsou automaticky rozděleny podle klientů a typu operace (Kontrola, Instalace, Deinstalace).
           </p>
         </div>
 
@@ -229,11 +271,17 @@ export function CampaignPhotoAlbum({
               title="Zkopíruje odkaz na klientské fotoalbum do schránky"
             >
               {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
-              <span>{copiedLink ? 'Odkaz zkopírován!' : 'Kopírovat odkaz pro klienta'}</span>
+              <span>
+                {copiedLink
+                  ? 'Odkaz zkopírován!'
+                  : selectedClient !== 'ALL'
+                    ? `Odkaz pro: ${selectedClient}`
+                    : 'Kopírovat odkaz pro klienta'}
+              </span>
             </button>
 
             <Link
-              href={`/client/fotodokumentace/${slug}${selectedPeriod !== 'ALL' ? `?month=${selectedPeriod}` : ''}`}
+              href={clientShareUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition text-xs font-semibold"
@@ -244,11 +292,13 @@ export function CampaignPhotoAlbum({
             </Link>
 
             <a
-              href={downloadZipUrl}
+              href={resolvedDownloadZipUrl}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition text-xs font-semibold"
             >
               <Download className="w-4 h-4" />
-              <span>Stáhnout ZIP</span>
+              <span>
+                {selectedClient !== 'ALL' ? `Stáhnout ZIP (${selectedClient})` : 'Stáhnout ZIP'}
+              </span>
             </a>
           </div>
         )}
@@ -317,6 +367,46 @@ export function CampaignPhotoAlbum({
             </div>
           )}
 
+          {/* Client Filter Pills (Rozdělení podle klientů) */}
+          {availableClients.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5" />
+                Rozdělení podle klienta:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedClient('ALL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                    selectedClient === 'ALL'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Všichni klienti ({totalPhotosCount})
+                </button>
+                {availableClients.map((cl) => {
+                  const isActive = selectedClient === cl.name;
+                  return (
+                    <button
+                      key={cl.name}
+                      type="button"
+                      onClick={() => setSelectedClient(cl.name)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                        isActive
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cl.name} ({cl.photoCount})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Operation & Search Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -346,7 +436,7 @@ export function CampaignPhotoAlbum({
             <div className="sm:max-w-xs w-full">
               <input
                 type="text"
-                placeholder="Hledat místo nebo popis…"
+                placeholder="Hledat klienta, místo nebo popis…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500"
@@ -356,7 +446,7 @@ export function CampaignPhotoAlbum({
 
           {/* Photo Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-2">
-            {flatPhotosWithPoint.map(({ photo, point }, index) => {
+            {flatPhotosWithPoint.map(({ photo, point, pointClient }, index) => {
               const isInstall = ['AFTER_INSTALLATION', 'INSTALLATION', 'BEFORE_INSTALLATION'].includes(photo.type);
               const isDeinstall = photo.type === 'AFTER_DEINSTALLATION';
 
@@ -389,6 +479,11 @@ export function CampaignPhotoAlbum({
                   </div>
 
                   <div className="p-2.5 flex-1 flex flex-col justify-between space-y-1">
+                    {pointClient && (
+                      <span className="inline-block truncate text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 w-fit max-w-full">
+                        {pointClient}
+                      </span>
+                    )}
                     <p className="text-xs font-bold text-slate-900 truncate" title={point.label}>
                       {point.label}
                     </p>

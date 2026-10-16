@@ -7,6 +7,7 @@ import { FieldWorkDesk } from '@/components/election-removal/FieldWorkDesk';
 import { CampaignPhotoAlbum } from '@/components/election-removal/CampaignPhotoAlbum';
 import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
 import { buildCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { Route, ArrowLeft, Truck, Calendar, Camera, Sparkles, BriefcaseBusiness } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -67,6 +68,8 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
     id: p.id,
     label: p.label,
     description: p.description,
+    layerName: p.layerName,
+    clientName: resolvePointClientName(p, campaign.clientName),
     quantity: p.quantity,
     operationType: p.operationType,
     latitude: p.latitude,
@@ -247,6 +250,7 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
           campaignName={campaign.name}
           clientName={campaign.clientName}
           points={pointsForAlbum}
+          createdAt={campaign.createdAt}
         />
 
         {/* Dispatcher Task Management Desk */}

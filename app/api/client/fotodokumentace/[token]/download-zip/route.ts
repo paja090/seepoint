@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
 import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
 
 export const runtime = 'nodejs';
@@ -115,6 +116,7 @@ export async function GET(
     const url = new URL(req.url);
     const monthFilter = url.searchParams.get('month'); // "2026-10"
     const typeFilter = url.searchParams.get('type');
+    const clientFilter = url.searchParams.get('client')?.trim() || null;
     const photoIdsParam = url.searchParams.get('photoIds'); // comma-separated ids
     const photoIdSet = photoIdsParam ? new Set(photoIdsParam.split(',').filter(Boolean)) : null;
 
@@ -141,6 +143,13 @@ export async function GET(
     let fileIndex = 1;
 
     for (const point of fullCampaign.points) {
+      if (clientFilter) {
+        const resolved = resolvePointClientName(point, fullCampaign.clientName) || fullCampaign.clientName || '';
+        if (resolved.trim().toLowerCase() !== clientFilter.toLowerCase()) {
+          continue;
+        }
+      }
+
       for (const photo of point.photos) {
         if (photoIdSet && !photoIdSet.has(photo.id)) continue;
 
@@ -203,7 +212,7 @@ export async function GET(
     }
 
     const zipBuffer = buildZipArchive(zipFiles);
-    const campaignSlug = sanitizeFileName(fullCampaign.name || 'zakazka');
+    const campaignSlug = sanitizeFileName(clientFilter ? `${clientFilter}-${fullCampaign.name}` : fullCampaign.name || 'zakazka');
     const periodSlug = monthFilter ? `-${monthFilter}` : '';
     const filename = `Fotodokumentace-${campaignSlug}${periodSlug}.zip`;
 
