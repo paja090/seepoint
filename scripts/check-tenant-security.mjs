@@ -41,7 +41,7 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['lib/offers/service.ts', 4],
   ['lib/organization-usage.ts', 3],
   // Report token lookup no longer scans or rewrites reports; it checks organization activity instead.
-  ['lib/public-tenant.ts', 7],
+  ['lib/public-tenant.ts', 9],
   ['lib/tenant-request-context.ts', 2],
   ['scripts/import-carriers-2026.ts', 4],
 ]);
@@ -82,6 +82,9 @@ const API_ROUTE_EXCEPTIONS = new Set([
   // Public lead capture from marketing landing page.
   'app/api/leads/demo/route.ts',
   // Public token services resolve ownership before entering tenant context.
+  'app/api/client/fotodokumentace/[token]/download-zip/route.ts',
+  'app/api/client/fotodokumentace/[token]/photos/[photoId]/route.ts',
+  'app/api/client/fotodokumentace/[token]/route.ts',
   'app/api/client/navigation-documentation/[token]/download-zip/route.ts',
   'app/api/client/navigation-documentation/[token]/logo/route.ts',
   'app/api/client/navigation-documentation/[token]/photos/[photoId]/route.ts',

@@ -108,6 +108,24 @@ export function ElectionRoutePlanner({
     ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'].includes(p.status)
   );
 
+  const [planOperationFilter, setPlanOperationFilter] = useState<'ALL' | 'INSTALL' | 'REMOVE' | 'RELOCATION'>('ALL');
+
+  const filteredPendingPoints = useMemo(() => {
+    return pendingPoints.filter((p) => {
+      if (planOperationFilter === 'ALL') return true;
+      if (planOperationFilter === 'INSTALL') {
+        return (p.operationType && p.operationType.startsWith('INSTALL')) || p.operationType === 'REPLACE_AD';
+      }
+      if (planOperationFilter === 'REMOVE') {
+        return p.operationType && p.operationType.startsWith('REMOVE');
+      }
+      if (planOperationFilter === 'RELOCATION') {
+        return p.operationType === 'RELOCATION';
+      }
+      return true;
+    });
+  }, [pendingPoints, planOperationFilter]);
+
   // Point Selection Mode: 'ALL' (all pending points) vs 'CUSTOM' (hand-picked on map)
   const [pointSelectionMode, setPointSelectionMode] = useState<'ALL' | 'CUSTOM'>(
     initialSelectedPointIds && initialSelectedPointIds.length > 0 ? 'CUSTOM' : 'ALL'
@@ -277,6 +295,8 @@ export function ElectionRoutePlanner({
           selectedPointIds:
             pointSelectionMode === 'CUSTOM'
               ? Array.from(selectedPointIds)
+              : planOperationFilter !== 'ALL'
+              ? filteredPendingPoints.map((p) => p.id)
               : undefined,
           depot: {
             latitude: parseFloat(depotLat) || 50.08804,
@@ -376,6 +396,95 @@ export function ElectionRoutePlanner({
                 ✓ {campaign.points.length - pendingPoints.length} hotovo
               </span>
             )}
+          </div>
+        </div>
+
+        {/* Trip Purpose / Operation Selector */}
+        <div className="space-y-2 rounded-xl bg-slate-50/70 p-3.5 border border-slate-200">
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+            Typ výjezdu – co se bude dělat? *
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setPlanOperationFilter('ALL');
+                if (pointSelectionMode === 'CUSTOM') setSelectedPointIds(new Set(pendingPoints.map((p) => p.id)));
+              }}
+              className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-0.5 ${
+                planOperationFilter === 'ALL'
+                  ? 'border-sky-600 bg-white text-sky-900 font-semibold ring-2 ring-sky-600/20 shadow-sm'
+                  : 'border-slate-200 bg-white/60 hover:bg-white text-slate-700'
+              }`}
+            >
+              <span className="text-xs font-bold">🌐 Všechny práce</span>
+              <span className="text-[11px] text-slate-500 font-normal">
+                {pendingPoints.length} prací celkem
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPlanOperationFilter('INSTALL');
+                const matchIds = pendingPoints
+                  .filter((p) => (p.operationType?.startsWith('INSTALL') || p.operationType === 'REPLACE_AD'))
+                  .map((p) => p.id);
+                setSelectedPointIds(new Set(matchIds));
+              }}
+              className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-0.5 ${
+                planOperationFilter === 'INSTALL'
+                  ? 'border-emerald-600 bg-white text-emerald-900 font-semibold ring-2 ring-emerald-600/20 shadow-sm'
+                  : 'border-slate-200 bg-white/60 hover:bg-white text-slate-700'
+              }`}
+            >
+              <span className="text-xs font-bold">🛠️ Instalace</span>
+              <span className="text-[11px] text-slate-500 font-normal">
+                {pendingPoints.filter((p) => (p.operationType?.startsWith('INSTALL') || p.operationType === 'REPLACE_AD')).length} k instalaci
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPlanOperationFilter('REMOVE');
+                const matchIds = pendingPoints
+                  .filter((p) => p.operationType?.startsWith('REMOVE'))
+                  .map((p) => p.id);
+                setSelectedPointIds(new Set(matchIds));
+              }}
+              className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-0.5 ${
+                planOperationFilter === 'REMOVE'
+                  ? 'border-amber-600 bg-white text-amber-900 font-semibold ring-2 ring-amber-600/20 shadow-sm'
+                  : 'border-slate-200 bg-white/60 hover:bg-white text-slate-700'
+              }`}
+            >
+              <span className="text-xs font-bold">🗑️ Deinstalace</span>
+              <span className="text-[11px] text-slate-500 font-normal">
+                {pendingPoints.filter((p) => p.operationType?.startsWith('REMOVE')).length} k demontáži
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setPlanOperationFilter('RELOCATION');
+                const matchIds = pendingPoints
+                  .filter((p) => p.operationType === 'RELOCATION')
+                  .map((p) => p.id);
+                setSelectedPointIds(new Set(matchIds));
+              }}
+              className={`p-2.5 rounded-xl border text-left transition flex flex-col gap-0.5 ${
+                planOperationFilter === 'RELOCATION'
+                  ? 'border-purple-600 bg-white text-purple-900 font-semibold ring-2 ring-purple-600/20 shadow-sm'
+                  : 'border-slate-200 bg-white/60 hover:bg-white text-slate-700'
+              }`}
+            >
+              <span className="text-xs font-bold">🚚 Převozy</span>
+              <span className="text-[11px] text-slate-500 font-normal">
+                {pendingPoints.filter((p) => p.operationType === 'RELOCATION').length} k přesunu
+              </span>
+            </button>
           </div>
         </div>
 
