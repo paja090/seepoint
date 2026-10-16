@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Download } from 'lucide-react';
 import { apiResponseMessage, prepareImageForUpload, validateImageFile } from '@/lib/client-image-upload';
 import type { Photo, PhotoType, Surface } from '@/lib/types';
 
@@ -693,11 +694,20 @@ export function PhotoGallery({
             <div className="text-sm font-semibold">
               {photos[activePhotoIndex].targetLabel} ({activePhotoIndex + 1} / {photos.length})
             </div>
-            <div className="flex gap-4 items-center">
+            <div className="flex gap-3 items-center">
+              <a
+                href={`/api/photos/${photos[activePhotoIndex].id}/file?download=1`}
+                download
+                className="text-xs bg-sky-700 hover:bg-sky-600 text-white px-3 py-1.5 rounded-lg transition-colors font-bold flex items-center gap-1.5 shadow-sm"
+                title="Stáhnout fotografii"
+              >
+                <Download size={14} />
+                <span>Stáhnout</span>
+              </a>
               <button
                 type="button"
                 onClick={() => setZoomScale((s) => (s === 1 ? 1.6 : 1))}
-                className="text-sm bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                className="text-xs bg-slate-800/80 hover:bg-slate-700/80 px-3 py-1.5 rounded-lg transition-colors font-medium"
               >
                 {zoomScale === 1 ? 'Přiblížit' : 'Oddálit'}
               </button>

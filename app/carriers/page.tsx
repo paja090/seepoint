@@ -312,14 +312,14 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                                 key={s.id}
                                 className="flex items-center justify-between text-xs p-1.5 px-2 rounded-lg bg-slate-100/70 border border-slate-200/60"
                               >
-                                <span className="font-semibold text-slate-900 truncate">
-                                  {isNavigation && (s.directionDescription || s.destinationName) ? (
+                                <span className="font-semibold text-slate-900 truncate" title={s.name}>
+                                  {isNavigation && s.directionDescription ? (
                                     <span className="flex items-center gap-1">
-                                      <span className="text-sky-700 font-black">{arrow}</span>
-                                      <span>{s.destinationName || s.name}</span>
+                                      <span className="text-sky-700 font-black shrink-0">{arrow}</span>
+                                      <span className="truncate">{s.name}</span>
                                     </span>
                                   ) : (
-                                    s.name
+                                    <span className="truncate">{s.name}</span>
                                   )}
                                 </span>
                                 <span className="text-[11px] shrink-0 font-bold ml-2">
@@ -517,13 +517,10 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                         <div className="font-semibold text-slate-900">
                           {clients.join(', ') || <span className="text-slate-400 italic">Bez klienta</span>}
                         </div>
-                        {isNavigation && primaryNavSurface && (primaryNavSurface.destinationName || primaryNavSurface.directionDescription) && (
-                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md">
+                        {isNavigation && primaryNavSurface && (
+                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md" title={primaryNavSurface.name}>
                             <span>{getDirectionArrow(primaryNavSurface.directionDescription)}</span>
-                            <span className="truncate max-w-[160px]">{primaryNavSurface.destinationName || primaryNavSurface.directionDescription}</span>
-                            {primaryNavSurface.distanceMeters && (
-                              <span className="text-sky-600">({primaryNavSurface.distanceMeters}m)</span>
-                            )}
+                            <span className="truncate max-w-[200px]">{primaryNavSurface.name}</span>
                           </div>
                         )}
                       </div>
