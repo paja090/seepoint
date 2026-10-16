@@ -11,14 +11,11 @@ import {
   Filter,
   Download,
   Share2,
-  Copy,
   Check,
-  ExternalLink,
   ChevronRight,
   ArrowLeft,
-  Truck,
-  Sparkles,
   Calendar,
+  Building2,
   X,
   Maximize2,
   Image as ImageIcon,
@@ -33,8 +30,15 @@ export interface UnifiedAlbumItem {
   source: 'FIELD_WORK' | 'NAVIGATION';
   sourceLabel: string;
   title: string;
+  displayTitle?: string;
+  displaySubtitle?: string | null;
+  displayBadge?: string | null;
   clientName?: string | null;
   createdAt: string | Date;
+  year?: number;
+  month?: number;
+  quarter?: number;
+  periodLabel?: string;
   photosCount: number;
   pointsCount: number;
   coverPhotoUrl?: string | null;
@@ -80,24 +84,165 @@ export function UnifiedPhotoDocumentationView({
       ? 'NAVIGATION'
       : 'ALL'
   );
+  const [selectedYear, setSelectedYear] = useState<string>('ALL');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL');
+  const [selectedClient, setSelectedClient] = useState<string>('ALL');
+  const [groupBy, setGroupBy] = useState<'PERIOD' | 'CLIENT' | 'NONE'>('PERIOD');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(initialAlbumId || null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<RecentPhotoItem | null>(null);
 
+  // Available filter options dynamically extracted from albums
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    albums.forEach((a) => {
+      if (a.year) {
+        years.add(a.year);
+      } else {
+        const y = new Date(a.createdAt).getFullYear();
+        if (y) years.add(y);
+      }
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [albums]);
+
+  const availableClients = useMemo(() => {
+    const clientMap = new Map<string, number>();
+    albums.forEach((a) => {
+      const client = a.clientName?.trim();
+      if (client) {
+        clientMap.set(client, (clientMap.get(client) || 0) + 1);
+      }
+    });
+    return Array.from(clientMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], 'cs'))
+      .map(([name, count]) => ({ name, count }));
+  }, [albums]);
+
+  const periodOptions = [
+    { value: 'ALL', label: 'Všechna období' },
+    { value: 'Q1', label: '1. čtvrtletí (Q1)' },
+    { value: 'Q2', label: '2. čtvrtletí (Q2)' },
+    { value: 'Q3', label: '3. čtvrtletí (Q3)' },
+    { value: 'Q4', label: '4. čtvrtletí (Q4)' },
+  ];
+
   // Filtered albums list
   const filteredAlbums = useMemo(() => {
     return albums.filter((a) => {
       if (sourceFilter !== 'ALL' && a.source !== sourceFilter) return false;
+
+      // Year filter
+      if (selectedYear !== 'ALL') {
+        const albumYear = a.year || new Date(a.createdAt).getFullYear();
+        if (albumYear.toString() !== selectedYear) return false;
+      }
+
+      // Period filter (quarter)
+      if (selectedPeriod !== 'ALL') {
+        const albumQuarter = a.quarter || Math.ceil((a.month || (new Date(a.createdAt).getMonth() + 1)) / 3);
+        if (selectedPeriod === 'Q1' && albumQuarter !== 1) return false;
+        if (selectedPeriod === 'Q2' && albumQuarter !== 2) return false;
+        if (selectedPeriod === 'Q3' && albumQuarter !== 3) return false;
+        if (selectedPeriod === 'Q4' && albumQuarter !== 4) return false;
+      }
+
+      // Client filter
+      if (selectedClient !== 'ALL') {
+        if (a.clientName?.trim() !== selectedClient) return false;
+      }
+
+      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLocaleLowerCase('cs');
-        const matchTitle = a.title.toLocaleLowerCase('cs').includes(q);
+        const matchTitle = (a.displayTitle || a.title).toLocaleLowerCase('cs').includes(q);
+        const matchRawTitle = a.title.toLocaleLowerCase('cs').includes(q);
         const matchClient = a.clientName?.toLocaleLowerCase('cs').includes(q);
-        if (!matchTitle && !matchClient) return false;
+        const matchBadge = a.displayBadge?.toLocaleLowerCase('cs').includes(q);
+        if (!matchTitle && !matchRawTitle && !matchClient && !matchBadge) return false;
       }
+
       return true;
     });
-  }, [albums, sourceFilter, searchQuery]);
+  }, [albums, sourceFilter, selectedYear, selectedPeriod, selectedClient, searchQuery]);
+
+  // Grouped albums for sections
+  interface AlbumGroup {
+    key: string;
+    title: string;
+    iconType: 'period' | 'client';
+    totalPhotos: number;
+    totalAlbums: number;
+    albums: UnifiedAlbumItem[];
+  }
+
+  const groupedAlbums = useMemo((): AlbumGroup[] => {
+    if (groupBy === 'NONE') {
+      return [
+        {
+          key: 'all',
+          title: 'Všechna fotoalba',
+          iconType: 'period',
+          totalPhotos: filteredAlbums.reduce((sum, a) => sum + a.photosCount, 0),
+          totalAlbums: filteredAlbums.length,
+          albums: filteredAlbums,
+        },
+      ];
+    }
+
+    if (groupBy === 'PERIOD') {
+      const groupsMap = new Map<string, UnifiedAlbumItem[]>();
+
+      filteredAlbums.forEach((a) => {
+        const y = a.year || new Date(a.createdAt).getFullYear();
+        const q = a.quarter || Math.ceil((a.month || (new Date(a.createdAt).getMonth() + 1)) / 3);
+        const key = a.periodLabel || `${q}. čtvrtletí ${y}`;
+        if (!groupsMap.has(key)) {
+          groupsMap.set(key, []);
+        }
+        groupsMap.get(key)!.push(a);
+      });
+
+      return Array.from(groupsMap.entries()).map(([periodTitle, items]) => {
+        return {
+          key: periodTitle,
+          title: periodTitle,
+          iconType: 'period',
+          totalPhotos: items.reduce((sum, a) => sum + a.photosCount, 0),
+          totalAlbums: items.length,
+          albums: items,
+        };
+      });
+    }
+
+    if (groupBy === 'CLIENT') {
+      const groupsMap = new Map<string, UnifiedAlbumItem[]>();
+
+      filteredAlbums.forEach((a) => {
+        const key = a.clientName?.trim() || 'Ostatní zakázky / Interní';
+        if (!groupsMap.has(key)) {
+          groupsMap.set(key, []);
+        }
+        groupsMap.get(key)!.push(a);
+      });
+
+      return Array.from(groupsMap.entries())
+        .sort((a, b) => b[1].length - a[1].length)
+        .map(([clientTitle, items]) => {
+          return {
+            key: clientTitle,
+            title: clientTitle,
+            iconType: 'client',
+            totalPhotos: items.reduce((sum, a) => sum + a.photosCount, 0),
+            totalAlbums: items.length,
+            albums: items,
+          };
+        });
+    }
+
+    return [];
+  }, [filteredAlbums, groupBy]);
 
   // Selected album object
   const activeAlbum = useMemo(() => {
@@ -138,35 +283,42 @@ export function UnifiedPhotoDocumentationView({
       const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
       await navigator.clipboard.writeText(fullUrl);
       setCopiedLink(id);
-      setTimeout(() => setCopiedLink(null), 3000);
-    } catch {
-      // Fallback
+      setTimeout(() => setCopiedLink(null), 2500);
+    } catch (e) {
+      console.error('Failed to copy link', e);
     }
   };
 
-  // Format date helper
-  const formatDate = (dVal?: string | Date | null) => {
-    if (!dVal) return '';
-    const d = new Date(dVal);
-    if (Number.isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat('cs-CZ', {
+  const formatDate = (date: string | Date) => {
+    const d = new Date(date);
+    return d.toLocaleString('cs-CZ', {
       day: 'numeric',
       month: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(d);
+    });
   };
 
-  // Leaflet Map component reference
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  // Leaflet map reference
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (activeTab !== 'MAP' || !mapContainerRef.current) return;
+    if (activeTab !== 'MAP') return;
+
     let isCancelled = false;
 
     async function initMap() {
       const L = (await import('leaflet')).default;
+
+      if (!document.getElementById('leaflet-css-fotodokumentace')) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css-fotodokumentace';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+
       if (isCancelled || !mapContainerRef.current) return;
 
       // Clean existing map instance if any
@@ -224,6 +376,105 @@ export function UnifiedPhotoDocumentationView({
       isCancelled = true;
     };
   }, [activeTab, filteredRecentPhotos]);
+
+  // Render individual album card
+  const renderAlbumCard = (album: UnifiedAlbumItem) => (
+    <div
+      key={album.id}
+      className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-xs hover:shadow-md hover:border-sky-300 transition flex flex-col justify-between"
+    >
+      <div className="space-y-3">
+        {/* Cover Image or Placeholder */}
+        <div
+          onClick={() => setSelectedAlbumId(album.id)}
+          className="relative h-40 w-full overflow-hidden rounded-xl bg-slate-100 cursor-pointer"
+        >
+          {album.coverPhotoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={album.coverPhotoUrl}
+              alt={album.displayTitle || album.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-300">
+              <Camera className="w-12 h-12 stroke-[1.2]" />
+            </div>
+          )}
+          <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+            <span className="rounded-lg bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold text-white shadow-xs">
+              {album.sourceLabel}
+            </span>
+          </div>
+          <div className="absolute bottom-2.5 right-2.5 rounded-lg bg-slate-900/80 backdrop-blur-xs px-2 py-0.5 text-[11px] font-bold text-white shadow-xs flex items-center gap-1">
+            <Camera className="w-3 h-3 text-sky-400" />
+            <span>{album.photosCount} fotek</span>
+          </div>
+        </div>
+
+        {/* Title and Badges (Proposal 2: Clean headline, period badge) */}
+        <div>
+          <h3
+            onClick={() => setSelectedAlbumId(album.id)}
+            className="font-bold text-slate-900 text-sm group-hover:text-sky-700 transition cursor-pointer line-clamp-1"
+            title={album.title}
+          >
+            {album.displayTitle || album.title}
+          </h3>
+
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+            {album.displayBadge && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-100">
+                <Calendar className="w-3 h-3 text-sky-600" />
+                {album.displayBadge}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
+              {album.pointsCount} {album.pointsCount === 1 ? 'bod' : album.pointsCount < 5 ? 'body' : 'bodů'}
+            </span>
+            {album.clientName && !album.displayTitle?.toLowerCase().includes(album.clientName.toLowerCase().slice(0, 5)) && (
+              <span className="text-[11px] text-slate-400 truncate max-w-[150px]" title={album.clientName}>
+                {album.clientName}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="border-t border-slate-100 pt-3 mt-4 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setSelectedAlbumId(album.id)}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
+        >
+          <span>Prohlédnout</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleCopyLink(album.publicShareUrl, album.id)}
+          title="Kopírovat veřejný odkaz pro klienta"
+          className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition"
+        >
+          {copiedLink === album.id ? (
+            <Check className="w-4 h-4 text-emerald-600" />
+          ) : (
+            <Share2 className="w-4 h-4" />
+          )}
+        </button>
+
+        <a
+          href={album.downloadZipUrl}
+          title="Stáhnout ZIP archiv všech fotografií"
+          className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition"
+        >
+          <Download className="w-4 h-4" />
+        </a>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -339,25 +590,146 @@ export function UnifiedPhotoDocumentationView({
         </div>
       </div>
 
-      {/* Search Input Filter */}
-      {activeTab !== 'MAP' && !activeAlbum && (
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Hledat zakázku, klienta, montéra nebo kód nosiče..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-xs"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+      {/* FILTER TOOLBAR FOR ALBUMS (Period, Year, Client, Grouping) */}
+      {activeTab === 'ALBUMS' && !activeAlbum && (
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Search Bar */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Hledat zakázku, klienta, lokalitu, kód..."
+                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Seskupení / Rozdělení přepínač */}
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 self-start sm:self-auto shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
+                <Layers className="w-3 h-3" />
+                Rozdělit:
+              </span>
+              <button
+                type="button"
+                onClick={() => setGroupBy('PERIOD')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                  groupBy === 'PERIOD'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Calendar className="w-3 h-3" />
+                Měsíc & Rok
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupBy('CLIENT')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                  groupBy === 'CLIENT'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Building2 className="w-3 h-3" />
+                Zakázky / Klienti
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroupBy('NONE')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                  groupBy === 'NONE'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                Vše
+              </button>
+            </div>
+          </div>
+
+          {/* Dropdowns for Year, Period, Client, Reset */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200/60 text-xs">
+            <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              <span>Filtrovat:</span>
+            </div>
+
+            {/* Rok */}
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
             >
-              Vymazat
-            </button>
-          )}
+              <option value="ALL">Všechny roky</option>
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr.toString()}>
+                  Rok {yr}
+                </option>
+              ))}
+            </select>
+
+            {/* Období / Čtvrtletí */}
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              {periodOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Klient / Zakázka */}
+            {availableClients.length > 0 && (
+              <select
+                value={selectedClient}
+                onChange={(e) => setSelectedClient(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 max-w-[200px] truncate"
+              >
+                <option value="ALL">Všichni klienti ({availableClients.length})</option>
+                {availableClients.map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name} ({c.count})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Reset button if any filter active */}
+            {(selectedYear !== 'ALL' ||
+              selectedPeriod !== 'ALL' ||
+              selectedClient !== 'ALL' ||
+              searchQuery ||
+              sourceFilter !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedYear('ALL');
+                  setSelectedPeriod('ALL');
+                  setSelectedClient('ALL');
+                  setSearchQuery('');
+                  setSourceFilter('ALL');
+                }}
+                className="ml-auto inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-600 font-semibold transition"
+              >
+                <X className="w-3 h-3" />
+                Vymazat filtry
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -394,110 +766,72 @@ export function UnifiedPhotoDocumentationView({
               <CampaignPhotoAlbum
                 campaignId={activeAlbum.id}
                 albumSlug={activeAlbum.albumSlug}
-                campaignName={activeAlbum.title}
+                campaignName={activeAlbum.displayTitle || activeAlbum.title}
                 clientName={activeAlbum.clientName}
                 points={activeAlbum.points}
               />
             </div>
           ) : (
-            /* Album Grid Cards */
-            <div className="space-y-4">
+            /* Album Grid Cards grouped into sections */
+            <div className="space-y-6">
               {filteredAlbums.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center bg-white space-y-3">
                   <ImageIcon className="w-10 h-10 text-slate-300 mx-auto" />
                   <p className="text-sm font-semibold text-slate-700">Nebylo nalezeno žádné fotoalbum.</p>
                   <p className="text-xs text-slate-500 max-w-md mx-auto">
-                    Fotografie se do alb automaticky ukládají při realizaci terénních prací, výjezdů a navigačních reportů.
+                    Zkuste upravit nebo zrušit filtry období, roku či klienta.
                   </p>
+                  {(selectedYear !== 'ALL' ||
+                    selectedPeriod !== 'ALL' ||
+                    selectedClient !== 'ALL' ||
+                    searchQuery ||
+                    sourceFilter !== 'ALL') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedYear('ALL');
+                        setSelectedPeriod('ALL');
+                        setSelectedClient('ALL');
+                        setSearchQuery('');
+                        setSourceFilter('ALL');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Zrušit všechny filtry
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredAlbums.map((album) => (
-                    <div
-                      key={album.id}
-                      className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-xs hover:shadow-md hover:border-sky-300 transition flex flex-col justify-between"
-                    >
-                      <div className="space-y-3">
-                        {/* Cover Image or Placeholder */}
-                        <div
-                          onClick={() => setSelectedAlbumId(album.id)}
-                          className="relative h-40 w-full overflow-hidden rounded-xl bg-slate-100 cursor-pointer"
-                        >
-                          {album.coverPhotoUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={album.coverPhotoUrl}
-                              alt={album.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                            />
+                groupedAlbums.map((group) => (
+                  <section key={group.key} className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100">
+                          {group.iconType === 'period' ? (
+                            <Calendar className="w-4 h-4" />
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center text-slate-300">
-                              <Camera className="w-12 h-12 stroke-[1.2]" />
-                            </div>
+                            <Building2 className="w-4 h-4" />
                           )}
-                          <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                            <span className="rounded-lg bg-slate-900/80 backdrop-blur-xs px-2.5 py-1 text-[10px] font-bold text-white shadow-xs">
-                              {album.sourceLabel}
-                            </span>
-                          </div>
-                          <div className="absolute bottom-2.5 right-2.5 rounded-lg bg-slate-900/80 backdrop-blur-xs px-2 py-0.5 text-[11px] font-bold text-white shadow-xs flex items-center gap-1">
-                            <Camera className="w-3 h-3 text-sky-400" />
-                            <span>{album.photosCount} fotek</span>
-                          </div>
                         </div>
-
-                        {/* Title and Client */}
-                        <div>
-                          <h3
-                            onClick={() => setSelectedAlbumId(album.id)}
-                            className="font-bold text-slate-900 text-sm group-hover:text-sky-700 transition cursor-pointer line-clamp-1"
-                            title={album.title}
-                          >
-                            {album.title}
-                          </h3>
-                          <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                            <span>{album.clientName || 'Interní projekt'}</span>
-                            <span>•</span>
-                            <span>{album.pointsCount} bodů</span>
-                          </p>
-                        </div>
+                        <h2 className="text-sm font-bold text-slate-900">{group.title}</h2>
                       </div>
-
-                      {/* Action Buttons */}
-                      <div className="border-t border-slate-100 pt-3 mt-4 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedAlbumId(album.id)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
-                        >
-                          <span>Prohlédnout</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleCopyLink(album.publicShareUrl, album.id)}
-                          title="Kopírovat veřejný odkaz pro klienta"
-                          className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition"
-                        >
-                          {copiedLink === album.id ? (
-                            <Check className="w-4 h-4 text-emerald-600" />
-                          ) : (
-                            <Share2 className="w-4 h-4" />
-                          )}
-                        </button>
-
-                        <a
-                          href={album.downloadZipUrl}
-                          title="Stáhnout ZIP archiv všech fotografií"
-                          className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition"
-                        >
-                          <Download className="w-4 h-4" />
-                        </a>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                          {group.totalAlbums} {group.totalAlbums === 1 ? 'album' : group.totalAlbums < 5 ? 'alba' : 'alb'}
+                        </span>
+                        <span className="text-xs text-slate-300">•</span>
+                        <span className="text-[11px] font-medium text-slate-500">
+                          {group.totalPhotos} fotek
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {group.albums.map((album) => renderAlbumCard(album))}
+                    </div>
+                  </section>
+                ))
               )}
             </div>
           )}
