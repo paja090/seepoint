@@ -109,6 +109,7 @@ export type MyRouteStop = {
   completedQuantity?: number;
   referenceUrl?: string | null;
   photoType?: string | null;
+  fieldWorkStepKind?: string;
   jobId: string;
   workOrderItemId: string | null;
   navigationPointId: string | null;

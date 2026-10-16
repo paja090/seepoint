@@ -347,16 +347,6 @@ export function ElectionRoutePlanner({
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <label className="block rounded border p-3">Režim tras<select className="ml-3 rounded border p-2" value={routeMode} onChange={e => setRouteMode(e.target.value)}><option value="SEPARATE_MEDIA">Odděleně podle média</option><option value="MIXED">Společně podle oblasti</option></select></label>
-      <details className="rounded border p-3"><summary>Ověřená kapacita a vybavení konkrétních vozidel</summary>
-        {vehicles.map(v => <form key={v.id} className="my-3 flex flex-wrap items-end gap-2" onSubmit={async e => {
-          e.preventDefault(); const f = new FormData(e.currentTarget);
-          try { const r = await fetch('/api/election-removal/vehicles', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vehicleId: v.id, capacitySlots: Number(f.get('capacity')), equipment: String(f.get('equipment') || '').split(',').map(x => x.trim()).filter(Boolean) }) });
-            const d = await r.json(); if (!r.ok) throw new Error(d.error); setPlanningResult(null); setPlanningInput(null); router.refresh();
-          } catch (e) { setCalculationError(e instanceof Error ? e.message : 'Uložení vozidla selhalo.'); }
-        }}><strong>{v.name}</strong><label>Sloty<input className="block w-24 rounded border p-2" name="capacity" type="number" min="1" required defaultValue={v.capacitySlots ?? ''} /></label>
-          <label>Vybavení (čárkou)<input className="block rounded border p-2" name="equipment" defaultValue={v.equipment?.join(', ') ?? ''} /></label><button className="rounded border p-2">Uložit ověřené údaje</button></form>)}
-      </details>
       {/* Configuration Card */}
       <div className="card p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
@@ -431,6 +421,139 @@ export function ElectionRoutePlanner({
           </div>
         </div>
 
+        {/* Crews Setup */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+              <Users className="w-4 h-4 text-sky-600" />
+              Pracovní posádky a vozidla ({crews.length})
+            </h3>
+
+            <button
+              type="button"
+              onClick={handleAddCrew}
+              className="btn bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 text-xs font-semibold inline-flex items-center gap-1.5 py-1.5 px-3"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Přidat posádku</span>
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {crews.map((crew, idx) => (
+              <div
+                key={crew.id}
+                className="p-4 border border-slate-200 rounded-xl space-y-4 bg-slate-50/40 relative"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                    <span className="w-6 h-6 rounded-full bg-sky-100 text-sky-700 text-xs flex items-center justify-center font-bold">
+                      {idx + 1}
+                    </span>
+                    {crew.name}
+                  </span>
+
+                  {crews.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCrew(crew.id)}
+                      className="text-slate-400 hover:text-rose-500 p-1 transition"
+                      title="Odebrat posádku"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Vehicle Selection */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Car className="w-3.5 h-3.5 text-slate-400" />
+                    Vozidlo posádky
+                  </label>
+                  <select
+                    value={crew.vehicleId || ''}
+                    onChange={(e) => handleVehicleChange(crew.id, e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none"
+                  >
+                    <option value="">– Bez vybraného vozidla –</option>
+                    {vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} {v.registrationNumber ? `(${v.registrationNumber})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Employees Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-slate-400" />
+                      Členové posádky ({crew.employeeIds.length})
+                    </label>
+                  </div>
+
+                  {/* Summary of assigned employee names */}
+                  {crew.employeeIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {crew.employeeIds.map((id) => {
+                        const emp = employees.find((e) => e.id === id);
+                        return emp ? (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-200"
+                          >
+                            👤 {emp.name}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+
+                  <div className="max-h-36 overflow-y-auto space-y-1 bg-white border border-slate-200 rounded-lg p-2 text-xs">
+                    {employees.map((emp) => {
+                      const isSelected = crew.employeeIds.includes(emp.id);
+                      return (
+                        <label
+                          key={emp.id}
+                          className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition ${
+                            isSelected ? 'bg-sky-50 text-sky-900 font-semibold' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleEmployee(crew.id, emp.id)}
+                            className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          />
+                          <span>{emp.name}</span>
+                          {emp.position && (
+                            <span className="text-[10px] text-slate-400 font-normal ml-auto">
+                              {emp.position}
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <details className="rounded-xl border p-4"><summary className="cursor-pointer font-semibold">Výběr prací a pravidla tras</summary><div className="mt-4 space-y-4">
+      <label className="block rounded border p-3">Režim tras<select className="ml-3 rounded border p-2" value={routeMode} onChange={e => setRouteMode(e.target.value)}><option value="SEPARATE_MEDIA">Odděleně podle média</option><option value="MIXED">Společně podle oblasti</option></select></label>
+      <details className="rounded border p-3"><summary>Ověřená kapacita a vybavení konkrétních vozidel</summary>
+        {vehicles.map(v => <form key={v.id} className="my-3 flex flex-wrap items-end gap-2" onSubmit={async e => {
+          e.preventDefault(); const f = new FormData(e.currentTarget);
+          try { const r = await fetch('/api/election-removal/vehicles', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vehicleId: v.id, capacitySlots: Number(f.get('capacity')), equipment: String(f.get('equipment') || '').split(',').map(x => x.trim()).filter(Boolean) }) });
+            const d = await r.json(); if (!r.ok) throw new Error(d.error); setPlanningResult(null); setPlanningInput(null); router.refresh();
+          } catch (e) { setCalculationError(e instanceof Error ? e.message : 'Uložení vozidla selhalo.'); }
+        }}><strong>{v.name}</strong><label>Sloty<input className="block w-24 rounded border p-2" name="capacity" type="number" min="1" required defaultValue={v.capacitySlots ?? ''} /></label>
+          <label>Vybavení (čárkou)<input className="block rounded border p-2" name="equipment" defaultValue={v.equipment?.join(', ') ?? ''} /></label><button className="rounded border p-2">Uložit ověřené údaje</button></form>)}
+      </details>
         {/* Flexible Working Hours Toggle */}
         <div className="p-3.5 bg-sky-50/70 border border-sky-100 rounded-xl flex items-start gap-3">
           <input
@@ -444,7 +567,7 @@ export function ElectionRoutePlanner({
             <span className="font-semibold text-slate-900 block">
               Pružná pracovní doba (posádky mohou zůstat déle v terénu)
             </span>
-            Povolí přesčasy a umožní posádkám obsloužit všechny zadané body bez jejich odmítnutí z důvodu konce pevné směny.
+            Povolí plánovat i po uvedeném konci směny, v rámci nastavení organizace.
           </label>
         </div>
 
@@ -457,7 +580,7 @@ export function ElectionRoutePlanner({
                 <span>Výběr bodů pro trasu výjezdu</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Zvolte, zda má AI optimalizovat trasu pro celou kampaň, nebo chcete posádce naklikat jen určitá stanoviště.
+                Standardně se plánují zbývající práce. Zde můžete výběr omezit.
               </p>
             </div>
 
@@ -750,10 +873,10 @@ export function ElectionRoutePlanner({
             <span className="text-base shrink-0">💡</span>
             <span>
               {selectedMediumFilter === 'ACKO' && (
-                <>Výjezd je omezen <strong>pouze na A-stojany</strong>. Na vozík se naloží až 30 ks, při překročení následuje vykládka na skladě.</>
+                <>Výjezd je omezen <strong>pouze na A-stojany</strong>. Kapacita se ověří podle vybraného vozidla.</>
               )}
               {selectedMediumFilter === 'MINI_TOWER' && (
-                <>Výjezd je sestaven <strong>pouze pro MiniTowery</strong>. Na jedno naložení se vejde max. 5 ks, poté se odváží na sklad.</>
+                <>Výjezd je sestaven <strong>pouze pro MiniTowery</strong>. Kapacita a místo vykládky se řídí zadáním a vozidlem.</>
               )}
               {selectedMediumFilter === 'TOWER' && (
                 <>Výjezd je určen <strong>pouze pro Velké věže</strong>. Nakládání a cílové zastávky odpovídají zadání jednotlivých prací.</>
@@ -771,6 +894,8 @@ export function ElectionRoutePlanner({
           </div>
         </div>
 
+        </div></details>
+        <details open={!initialDepot} className="rounded-xl border p-4"><summary className="cursor-pointer font-semibold">Výchozí místo, návrat a vykládka</summary><div className="mt-4">
         {/* Logistics & Capacity Constraints */}
         <div className="grid gap-4 sm:grid-cols-2 p-4 bg-slate-50 border border-slate-200 rounded-xl">
           <div>
@@ -787,7 +912,7 @@ export function ElectionRoutePlanner({
               className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:outline-none bg-white"
             />
             <p className="text-[11px] text-slate-500 mt-1">
-              30 Áček (á 1) = 5 MiniTowerů (á 6) = 1 velká věž (30). Při naplnění plánovač automaticky vloží vykládku na centrálním skladě.
+              Použije se ověřená kapacita vybraného vozidla. Tento údaj slouží jako výchozí hodnota pro původní zadání.
             </p>
           </div>
 
@@ -909,132 +1034,11 @@ export function ElectionRoutePlanner({
           </div>
         </div>
 
-        {/* Crews Setup */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Users className="w-4 h-4 text-sky-600" />
-              Pracovní posádky a vozidla ({crews.length})
-            </h3>
-
-            <button
-              type="button"
-              onClick={handleAddCrew}
-              className="btn bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 text-xs font-semibold inline-flex items-center gap-1.5 py-1.5 px-3"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Přidat posádku</span>
-            </button>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {crews.map((crew, idx) => (
-              <div
-                key={crew.id}
-                className="p-4 border border-slate-200 rounded-xl space-y-4 bg-slate-50/40 relative"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                    <span className="w-6 h-6 rounded-full bg-sky-100 text-sky-700 text-xs flex items-center justify-center font-bold">
-                      {idx + 1}
-                    </span>
-                    {crew.name}
-                  </span>
-
-                  {crews.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCrew(crew.id)}
-                      className="text-slate-400 hover:text-rose-500 p-1 transition"
-                      title="Odebrat posádku"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Vehicle Selection */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Car className="w-3.5 h-3.5 text-slate-400" />
-                    Vozidlo posádky
-                  </label>
-                  <select
-                    value={crew.vehicleId || ''}
-                    onChange={(e) => handleVehicleChange(crew.id, e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none"
-                  >
-                    <option value="">– Bez vybraného vozidla –</option>
-                    {vehicles.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} {v.registrationNumber ? `(${v.registrationNumber})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Employees Selection */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5 text-slate-400" />
-                      Členové posádky ({crew.employeeIds.length})
-                    </label>
-                  </div>
-
-                  {/* Summary of assigned employee names */}
-                  {crew.employeeIds.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {crew.employeeIds.map((id) => {
-                        const emp = employees.find((e) => e.id === id);
-                        return emp ? (
-                          <span
-                            key={id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-200"
-                          >
-                            👤 {emp.name}
-                          </span>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-
-                  <div className="max-h-36 overflow-y-auto space-y-1 bg-white border border-slate-200 rounded-lg p-2 text-xs">
-                    {employees.map((emp) => {
-                      const isSelected = crew.employeeIds.includes(emp.id);
-                      return (
-                        <label
-                          key={emp.id}
-                          className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition ${
-                            isSelected ? 'bg-sky-50 text-sky-900 font-semibold' : 'hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleToggleEmployee(crew.id, emp.id)}
-                            className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                          />
-                          <span>{emp.name}</span>
-                          {emp.position && (
-                            <span className="text-[10px] text-slate-400 font-normal ml-auto">
-                              {emp.position}
-                            </span>
-                          )}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
+        </div></details>
         {/* Action Button: Calculate */}
         <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-t border-slate-100">
           <p className="text-xs text-slate-500">
-            Routing engine optimalizuje přejezdy podle reálných silničních vzdáleností a servisních časů médií.
+            Nejdřív zkontrolujete navrženou trasu. Pracovníci ji dostanou až po schválení.
           </p>
 
           <button
@@ -1056,7 +1060,7 @@ export function ElectionRoutePlanner({
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Vypočítat a optimalizovat trasy</span>
+                <span>Navrhnout trasu</span>
               </>
             )}
           </button>
@@ -1081,7 +1085,7 @@ export function ElectionRoutePlanner({
                   Výsledek optimalizace
                 </span>
                 <h3 className="text-xl font-bold text-white mt-0.5">
-                  Navržené demontážní trasy
+                  Kontrola výjezdu
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -1099,7 +1103,7 @@ export function ElectionRoutePlanner({
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Schválit a uložit plán do realizace</span>
+                      <span>Schválit výjezd</span>
                     </>
                   )}
                 </button>

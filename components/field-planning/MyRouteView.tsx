@@ -32,7 +32,9 @@ function formatHoursMinutes(totalMinutes: number): string {
   return `${hours} h ${minutes} min`;
 }
 
-export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
+export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; initialNow: string }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setReady(true); }, []);
   const [data, setData] = useState(initial);
   const pendingKeys = useRef(new Map<string, string>());
   const [fieldInputs, setFieldInputs] = useState<Record<string, { quantity?: string; custodyNote?: string }>>({});
@@ -45,9 +47,10 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [hideDoneStops, setHideDoneStops] = useState(true);
   const [groupByOrder, setGroupByOrder] = useState(false);
 
-  const [todayStr, setTodayStr] = useState(() => dayInZone(new Date(), initial.timezone || 'Europe/Prague'));
+  const [now, setNow] = useState(() => new Date(initialNow));
+  const todayStr = dayInZone(now, data.timezone || 'Europe/Prague');
   useEffect(() => {
-    const updateDay = () => setTodayStr(dayInZone(new Date(), data.timezone || 'Europe/Prague'));
+    const updateDay = () => setNow(new Date());
     updateDay();
     const timer = window.setInterval(updateDay, 60000);
     return () => window.clearInterval(timer);
@@ -69,7 +72,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
           tripCompletedAt: route.tripCompletedAt,
           stops: route.stops,
         },
-        { targetDate: currentDate }
+        { targetDate: currentDate, now }
       );
       return {
         ...route,
@@ -78,7 +81,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         stops: live.stops,
       };
     });
-  }, [data, currentDate]);
+  }, [data, currentDate, now]);
 
   // Live GPS tracking when trip is active (from start_trip until complete_trip)
   useEffect(() => {
@@ -616,8 +619,8 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
               {s.referenceUrl && <a className="text-sm underline text-sky-700" href={s.referenceUrl} target="_blank" rel="noreferrer">Referenční fotografie / montážní podklad</a>}
               {s.fieldWorkStepId && !isDone && <div className="rounded border p-3 space-y-2 text-sm">
                 <p>Provedeno {s.completedQuantity ?? 0} z {s.quantity}. Zbývá {(s.quantity ?? 0) - (s.completedQuantity ?? 0)}.</p>
-                <label className="block">Nyní provedené množství<input aria-label="Nyní provedené množství" className="ml-2 w-20 rounded border p-2" type="number" min="1" max={(s.quantity ?? 0) - (s.completedQuantity ?? 0)} value={fieldInputs[s.jobId]?.quantity ?? ''} placeholder={String((s.quantity ?? 0) - (s.completedQuantity ?? 0))} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], quantity: e.target.value } }))} /></label>
-                <label className="block">Kde je materiál / kdo jej převzal<input className="block w-full rounded border p-2" value={fieldInputs[s.jobId]?.custodyNote ?? ''} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], custodyNote: e.target.value } }))} /></label>
+                {isInProgress && <label className="block">Nyní provedené množství<input aria-label="Nyní provedené množství" className="ml-2 w-20 rounded border p-2" type="number" min="1" max={(s.quantity ?? 0) - (s.completedQuantity ?? 0)} value={fieldInputs[s.jobId]?.quantity ?? ''} placeholder={String((s.quantity ?? 0) - (s.completedQuantity ?? 0))} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], quantity: e.target.value } }))} /></label>}
+                {(isInProgress || isIssue) && (isIssue || ['DELIVERY','HANDOFF'].includes(s.fieldWorkStepKind ?? '')) && <label className="block">Kde je materiál / kdo jej převzal<input className="block w-full rounded border p-2" value={fieldInputs[s.jobId]?.custodyNote ?? ''} onChange={e => setFieldInputs(prev => ({ ...prev, [s.jobId]: { ...prev[s.jobId], custodyNote: e.target.value } }))} /></label>}
               </div>}
               {/* Primary Action Row */}
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -630,14 +633,14 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     href={`https://www.google.com/maps/dir/?api=1&destination=${s.location.latitude},${s.location.longitude}`}
                   >
                     <Navigation size={14} />
-                    <span>Navigovat 🗺️</span>
+                    <span>Navigovat</span>
                   </a>
                 )}
 
                 {/* Start / Finish Button */}
                 {!isDone && s.status !== 'CANCELLED' && (
                   <button
-                    disabled={busy}
+                    disabled={!ready || busy}
                     onClick={() =>
                       void run(
                         route.planId,
@@ -658,7 +661,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     <Clock size={14} />
                     <span>
                       {isInProgress
-                        ? 'Označit za hotové ✓'
+                        ? 'Dokončit práci'
                         : isIssue
                         ? 'Zkusit znovu / Zahájit'
                         : currentDate > todayStr
@@ -680,7 +683,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                     className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm"
                   >
                     <Camera size={14} className="text-sky-600" />
-                    <span>Doklad / Fotka 📸</span>
+                    <span>Přidat fotku</span>
                   </button>
                 )}
 
@@ -752,7 +755,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </div>
 
                   <button
-                    disabled={busy}
+                    disabled={!ready || busy}
                     className="w-full rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 transition"
                   >
                     {busy ? 'Ukládám…' : s.fieldWorkStepId ? 'Uložit fotografii kroku' : 'Odeslat fotku a dokončit zastávku ✓'}
@@ -814,7 +817,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </div>
 
                   <button
-                    disabled={busy}
+                    disabled={!ready || busy}
                     className={`w-full rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition ${
                       isIssue ? 'bg-rose-700 hover:bg-rose-600' : 'bg-amber-700 hover:bg-amber-600'
                     }`}
@@ -863,18 +866,6 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 </span>
               </div>
             </div>
-
-            {/* Timing Breakdown Card (Travel, Planned Service, Shift Total, Measured Actual) */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Timer size={14} className="text-sky-600" />
-                  <span>Časová náročnost výjezdu</span>
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400">
-                  Kalkulace a měření časů
-                </span>
-              </div>
 
               {/* Trip Controls (Start Departure from Warehouse / Complete Return to Warehouse) */}
               <div
@@ -943,7 +934,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   {!route.tripStartedAt && (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={!ready || busy}
                       onClick={() => run(route.planId, '', 'start_trip')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
                     >
@@ -957,7 +948,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   {route.tripStartedAt && !route.tripCompletedAt && (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={!ready || busy}
                       onClick={() => run(route.planId, '', 'complete_trip')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
                     >
@@ -976,6 +967,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 </div>
               </div>
 
+            <details className="rounded-2xl border border-slate-200 bg-white p-3.5"><summary className="cursor-pointer text-sm font-medium text-slate-700"><Timer size={14} className="mr-2 inline text-sky-600" />Časy a měření výjezdu · návrat ~{formatLiveClock(route.liveEstimatedEndAt, data.timezone)}</summary><div className="mt-3 space-y-2">
               {/* Live Shift ETA Banner */}
               <div className="rounded-xl border border-sky-200 bg-linear-to-r from-sky-50/90 via-indigo-50/30 to-white p-3 space-y-1.5 shadow-2xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1095,7 +1087,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </span>
                 </div>
               </div>
-            </div>
+            </div></details>
 
             {/* LIVE MAP */}
 

@@ -12,6 +12,6 @@ export default async function MyRoutePage({
   const user = await requirePageAccess('myTasks', 'workRoute');
   enterTenantContext({ organizationId: user.organizationId!, userId: user.id, source: 'session' });
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  return <AppShell><MyRouteView initial={await myRoute(user.id, resolvedSearchParams?.date)} /></AppShell>;
+  return <AppShell><MyRouteView initial={await myRoute(user.id, resolvedSearchParams?.date)} initialNow={new Date().toISOString()} /></AppShell>;
 }
 

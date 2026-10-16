@@ -13,7 +13,7 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
     <Link href="/election-removal">← Terénní práce</Link>
     <h1 className="text-2xl font-bold">{campaign.name}</h1><p>{campaign.clientName} {campaign.description}</p>
     <Link href="/my-route">Moje trasa</Link>
-    <div className="flex flex-wrap gap-3">{campaign.fieldPlans.map(p => <div className="rounded border p-2" key={p.id}>Výjezd {p.date} / v{p.version} · {p.status} {['APPROVED','ACTIVE'].includes(p.status) && <Link className="underline" href={`/election-removal/${id}/plan?parentPlanId=${p.id}`}>Revize tohoto výjezdu</Link>}</div>)}</div>
+    <details className="rounded-xl border bg-white p-4"><summary className="cursor-pointer font-medium">Výjezdy a historie ({campaign.fieldPlans.length})</summary><div className="mt-3 flex flex-wrap gap-3">{campaign.fieldPlans.map(p => <div className="rounded border p-2" key={p.id}>Výjezd {p.date} / v{p.version} · {({ DRAFT: 'Návrh', APPROVED: 'Schváleno', ACTIVE: 'Probíhá', COMPLETED: 'Hotovo', SUPERSEDED: 'Nahrazeno', CANCELLED: 'Zrušeno' } as Record<string,string>)[p.status] ?? p.status} {['APPROVED','ACTIVE'].includes(p.status) && <Link className="underline" href={`/election-removal/${id}/plan?parentPlanId=${p.id}`}>Revize tohoto výjezdu</Link>}</div>)}</div></details>
     {['ADMIN','MANAGER'].includes(user.role) && <FieldWorkDesk campaignId={id} points={campaign.points} />}
   </div></AppShell>;
 }
