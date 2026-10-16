@@ -80,6 +80,11 @@ export function CarrierMapCard({
           >
             {badgeMeta.label}
           </span>
+          {carrier.structureCode && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black bg-sky-100 text-sky-950 border border-sky-300">
+              ⚡ Sloup #{carrier.structureCode}
+            </span>
+          )}
         </div>
         <h2 className="text-xl font-black text-slate-950 mt-2 leading-snug">{carrier.name}</h2>
       </div>
