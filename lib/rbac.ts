@@ -46,7 +46,8 @@ export type AppSection =
   | 'realization'
   | 'commercial'
   | 'fieldSurvey'
-  | 'electionRemoval';
+  | 'electionRemoval'
+  | 'photoDocumentation';
 
 const permissions: Record<AppRole, AppSection[]> = {
   ADMIN: [
@@ -82,6 +83,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'commercial',
     'fieldSurvey',
     'electionRemoval',
+    'photoDocumentation',
   ],
   MANAGER: [
     'dashboard',
@@ -114,6 +116,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'commercial',
     'fieldSurvey',
     'electionRemoval',
+    'photoDocumentation',
   ],
   SALES: [
     'dashboard',
@@ -140,6 +143,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'realization',
     'commercial',
     'fieldSurvey',
+    'photoDocumentation',
   ],
   TECHNICIAN: [
     'dashboard',
@@ -158,6 +162,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'printProduction',
     'fieldSurvey',
     'electionRemoval',
+    'photoDocumentation',
   ],
   WORKER: [
     'dashboard',
@@ -170,6 +175,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'navigationProjects',
     'team',
     'fieldSurvey',
+    'photoDocumentation',
   ],
   ACCOUNTANT: [
     'dashboard',
@@ -185,6 +191,7 @@ const permissions: Record<AppRole, AppSection[]> = {
     'map',
     'carriers',
     'team',
+    'photoDocumentation',
   ],
 };
 

@@ -228,6 +228,13 @@ export const SYSTEM_MODULES: SystemModule[] = [
     badge: 'SeePoint Interní',
     routes: ['/election-removal'],
   },
+  {
+    id: 'photoDocumentation',
+    name: 'Fotodokumentace',
+    description: 'Centrální přehled fotodokumentace, alba zakázek, časová osa realizací a klientské odkazy',
+    category: 'operations',
+    routes: ['/fotodokumentace'],
+  },
 
 
   // Management
@@ -264,6 +271,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'occupancy',
     'myTasks',
     'import',
+    'photoDocumentation',
   ],
   BUSINESS: [
     'dashboard',
@@ -287,6 +295,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'commercial',
     'crmIntelligence',
     'aiRealization',
+    'photoDocumentation',
   ],
   PRO: [
     'dashboard',
@@ -316,6 +325,7 @@ export const PLAN_MODULE_PRESETS: Record<string, string[]> = {
     'warehouse',
     'printProduction',
     'aiRealization',
+    'photoDocumentation',
     'employees',
     'import',
   ],
@@ -369,6 +379,7 @@ export function getModuleIdForPath(pathname: string): string | null {
 // Shared effective availability for page/API guards and navigation.
 export function isModuleAvailable(organization: Parameters<typeof isModuleEnabled>[0], moduleId: string): boolean {
   return isModuleEnabled(organization, moduleId)
+    || (moduleId === 'photoDocumentation' && (isModuleEnabled(organization, 'work') || isModuleEnabled(organization, 'carriers') || isModuleEnabled(organization, 'electionRemoval') || isModuleEnabled(organization, 'navigation')))
     || (moduleId === 'aiRealization' && isModuleEnabled(organization, 'work'))
     || (moduleId === 'fieldSurvey' && isModuleEnabled(organization, 'carriers'));
 }

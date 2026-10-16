@@ -59,6 +59,7 @@ export const navigationHubs: NavigationHub[] = [
       ["/work","Plán práce","briefcaseBusiness","work"],
       ["/work/route","Pracovní výjezd","route","work"],
       ["/election-removal","Terénní práce","truck","electionRemoval"],
+      ["/fotodokumentace","Fotodokumentace","camera","photoDocumentation"],
       ["/tasks","Všechny úkoly","clipboardList","tasks"],
       ["/production","Výroba, Tisk & Grafika","printer","printProduction"]
     ] },
