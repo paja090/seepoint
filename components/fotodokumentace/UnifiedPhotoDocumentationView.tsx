@@ -438,12 +438,6 @@ export function UnifiedPhotoDocumentationView({
               </span>
             )}
           </div>
-
-          {/* Creation date */}
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-2">
-            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-            <span>Vytvořeno: <strong className="text-slate-600 font-medium">{formatDate(album.createdAt)}</strong></span>
-          </div>
         </div>
       </div>
 
@@ -755,23 +749,16 @@ export function UnifiedPhotoDocumentationView({
                   <span>Zpět na přehled všech alb</span>
                 </button>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500">
                     Zdroj: <strong className="text-slate-800">{activeAlbum.sourceLabel}</strong>
                   </span>
-                  <span className="text-xs text-slate-300">•</span>
-                  <span className="text-xs text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    Vytvořeno: <strong className="text-slate-700">{formatDate(activeAlbum.createdAt)}</strong>
-                  </span>
-                  {activeAlbum.source === 'FIELD_WORK' && (
-                    <Link
-                      href={`/election-removal/${activeAlbum.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-sky-700 underline ml-2"
-                    >
-                      Detail zakázky →
-                    </Link>
-                  )}
+                  <Link
+                    href={`/election-removal/${activeAlbum.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-sky-700 underline"
+                  >
+                    Detail zakázky →
+                  </Link>
                 </div>
               </div>
 
@@ -782,9 +769,6 @@ export function UnifiedPhotoDocumentationView({
                 campaignName={activeAlbum.displayTitle || activeAlbum.title}
                 clientName={activeAlbum.clientName}
                 points={activeAlbum.points}
-                publicShareUrl={activeAlbum.publicShareUrl}
-                downloadZipUrl={activeAlbum.downloadZipUrl}
-                createdAt={activeAlbum.createdAt}
               />
             </div>
           ) : (

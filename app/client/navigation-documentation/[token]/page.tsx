@@ -55,7 +55,7 @@ export default async function PublicNavigationDocumentationPage({
     },
   });
 
-  if (!report) {
+  if (!report || report.status === 'ARCHIVED') {
     notFound();
   }
 
