@@ -200,8 +200,10 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                     <a href={primaryPhoto.url} target="_blank" rel="noreferrer" title="Zvětšit fotografii v plné velikosti">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={primaryPhoto.url}
+                        src={primaryPhoto.id ? `/api/photos/${encodeURIComponent(primaryPhoto.id)}/thumbnail` : primaryPhoto.url}
                         alt={carrier.name}
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </a>
@@ -433,7 +435,13 @@ export default async function Carriers({ searchParams }: { searchParams: Promise
                             title="Otevřít fotografii v plné velikosti"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={primaryPhoto.url} alt={carrier.name} className="w-full h-full object-cover" />
+                            <img
+                              src={primaryPhoto.id ? `/api/photos/${encodeURIComponent(primaryPhoto.id)}/thumbnail` : primaryPhoto.url}
+                              alt={carrier.name}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover"
+                            />
                           </a>
                           <div className="flex flex-col text-[11px]">
                             <a

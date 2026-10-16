@@ -61,8 +61,13 @@ export function CarrierMapCard({
   const hasCoords = typeof carrier.latitude === 'number' && typeof carrier.longitude === 'number';
 
   // Primary photo from carrier or first surface
-  const primaryPhoto =
-    carrier.photos?.[0]?.url || primarySurface?.photos?.[0]?.url;
+  const primaryPhotoObj = carrier.photos?.[0] || primarySurface?.photos?.[0];
+  const primaryPhoto = primaryPhotoObj?.url;
+  const primaryThumbnail = primaryPhotoObj
+    ? primaryPhotoObj.id
+      ? `/api/photos/${encodeURIComponent(primaryPhotoObj.id)}/thumbnail`
+      : primaryPhotoObj.url
+    : null;
 
   const inBasket = primarySurface ? isSurfaceSelected(primarySurface.id) : false;
 
@@ -122,14 +127,26 @@ export function CarrierMapCard({
       </div>
 
       {/* Photo Preview Thumbnail */}
-      {primaryPhoto ? (
-        <div className="relative h-48 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-2xs group">
+      {primaryThumbnail ? (
+        <a
+          href={primaryPhoto ?? primaryThumbnail}
+          target="_blank"
+          rel="noreferrer"
+          title="Zvětšit fotografii v plné velikosti"
+          className="relative block h-48 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 shadow-2xs group cursor-pointer"
+        >
           <img
-            src={primaryPhoto}
+            src={primaryThumbnail}
             alt={carrier.name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-        </div>
+          <span className="absolute bottom-2 right-2 rounded-lg bg-slate-950/80 px-2 py-1 text-[11px] font-bold text-white shadow-md flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <span>Otevřít originál</span>
+            <ExternalLink size={11} />
+          </span>
+        </a>
       ) : (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-xs text-slate-400">
           📷 K tomuto nosiči zatím není nahraná fotografie
