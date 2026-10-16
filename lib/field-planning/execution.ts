@@ -58,7 +58,15 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
         select: { id: true, navigationOrderId: true, label: true, address: true, status: true, issueReported: true, issueType: true, issueNote: true, installedPhotoId: true, sitePhotoId: true, isSelectedByClient: true, installerUserId: true, clientNote: true } }) : [];
       const electionPoints = await db.electionRemovalPoint.findMany({
         where: { organizationId, id: { in: crew.stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : []) } },
-        include: { steps: true, campaign: { select: { id: true, name: true, description: true, clientName: true } } }
+        include: {
+          steps: true,
+          campaign: { select: { id: true, name: true, description: true, clientName: true } },
+          photos: {
+            where: { organizationId, isPrivate: false },
+            select: { id: true, url: true, type: true, createdAt: true },
+            orderBy: { createdAt: 'desc' }
+          }
+        }
       });
       const crewUsers = await db.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
       const starts = await db.crmAuditLog.findMany({ where: { organizationId, entityType: 'NavigationPoint', entityId: { in: points.map(p => p.id) }, action: 'FIELD_POINT_STARTED' }, select: { entityId: true, createdAt: true } });
@@ -101,6 +109,13 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
               campaignName: ep.campaign?.name,
             });
 
+            const stopPhotos = ep.photos?.map(ph => ({
+              id: ph.id,
+              url: `/api/photos/${encodeURIComponent(ph.id)}/file`,
+              type: ph.type,
+              createdAt: ph.createdAt.toISOString(),
+            })) ?? [];
+
             return [{
               fieldWorkStepId: step?.id, quantity: step?.quantity ?? ep.quantity, completedQuantity: step?.completedQuantity ?? 0,
               referenceUrl: ep.referenceUrl, photoType: step?.photoType, fieldWorkStepKind: step?.kind,
@@ -109,7 +124,8 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
               navigationPointId: null,
               electionRemovalPointId: ep.id,
               address: null,
-              pointPhotoUrl: null,
+              pointPhotoUrl: stopPhotos[0]?.url ?? null,
+              photos: stopPhotos,
               workOrderId: ep.campaignId,
               orderTitle: ep.campaign?.name ? `Akce: ${ep.campaign.name}` : 'Terénní práce',
               campaignName: ep.campaign?.name ?? 'Terénní práce',

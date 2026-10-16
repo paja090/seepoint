@@ -46,6 +46,83 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
   const [hideDoneStops, setHideDoneStops] = useState(true);
   const [groupByOrder, setGroupByOrder] = useState(false);
+  const [uploadingJobId, setUploadingJobId] = useState<string | null>(null);
+  const [activeCameraStop, setActiveCameraStop] = useState<{ planId: string; workOrderId: string; jobId: string } | null>(null);
+  const [photoSuccessToast, setPhotoSuccessToast] = useState<{ jobId: string; message: string } | null>(null);
+  const [selectedLightboxPhoto, setSelectedLightboxPhoto] = useState<string | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  function triggerDirectCamera(planId: string, workOrderId: string, jobId: string) {
+    setActiveCameraStop({ planId, workOrderId, jobId });
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
+    }
+  }
+
+  async function handleCameraFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !activeCameraStop) return;
+    const { planId, workOrderId, jobId } = activeCameraStop;
+    setUploadingJobId(jobId);
+    setError('');
+
+    try {
+      const form = new FormData();
+      form.set('planId', planId);
+      form.set('workOrderId', workOrderId);
+      form.set('jobId', jobId);
+      form.set('file', file);
+      form.set('afterPhoto', file);
+      form.set('requestKey', crypto.randomUUID());
+
+      // Attempt quick GPS capture (max 3s timeout)
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        try {
+          const pos = await new Promise<GeolocationPosition | null>((resolve) => {
+            const timer = setTimeout(() => resolve(null), 3000);
+            navigator.geolocation.getCurrentPosition(
+              (p) => { clearTimeout(timer); resolve(p); },
+              () => { clearTimeout(timer); resolve(null); },
+              { enableHighAccuracy: true, timeout: 3000, maximumAge: 20000 }
+            );
+          });
+          if (pos) {
+            form.set('latitude', String(pos.coords.latitude));
+            form.set('longitude', String(pos.coords.longitude));
+            form.set('accuracy', String(pos.coords.accuracy));
+          }
+        } catch {
+          // Proceed without GPS if unavailable
+        }
+      }
+
+      const response = await fetch('/api/work/route/mine/photo', {
+        method: 'POST',
+        body: form,
+      });
+      const value = await response.json();
+      if (!response.ok) throw new Error(value.error || 'Nahrání fotografie selhalo.');
+
+      setPhotoSuccessToast({
+        jobId,
+        message: 'Fotografie uložena do fotodokumentace ✓',
+      });
+      setTimeout(() => {
+        setPhotoSuccessToast((prev) => (prev?.jobId === jobId ? null : prev));
+      }, 4000);
+
+      const refreshed = await fetch(`/api/work/route/mine?date=${currentDate}`);
+      if (refreshed.ok) setData(await refreshed.json());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Nahrání fotografie selhalo.');
+    } finally {
+      setUploadingJobId(null);
+      setActiveCameraStop(null);
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  }
+
 
   const [now, setNow] = useState(() => new Date(initialNow));
   const todayStr = dayInZone(now, data.timezone || 'Europe/Prague');
@@ -683,8 +760,32 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                   </button>
                 )}
 
-                {/* Upload Photo Button */}
-                {(s.navigationPointId || s.workOrderItemId || s.fieldWorkStepId) && !isDone && (
+                {/* Direct 1-Click Camera Shutter Button */}
+                <button
+                  type="button"
+                  disabled={!ready || busy || uploadingJobId === s.jobId}
+                  onClick={() => triggerDirectCamera(route.planId, s.workOrderId, s.jobId)}
+                  className={`flex items-center justify-center gap-1.5 rounded-2xl px-3.5 py-3 text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer ${
+                    uploadingJobId === s.jobId
+                      ? 'bg-sky-100 text-sky-800 border border-sky-300 animate-pulse'
+                      : s.photos && s.photos.length > 0
+                      ? 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
+                      : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                  }`}
+                  title="Otevřít fotoaparát v telefonu a vyfotit do fotodokumentace zakázky"
+                >
+                  <Camera size={15} className="text-sky-600" />
+                  <span>
+                    {uploadingJobId === s.jobId
+                      ? 'Ukládám foto…'
+                      : s.photos && s.photos.length > 0
+                      ? `Vyfotit (${s.photos.length})`
+                      : 'Vyfotit'}
+                  </span>
+                </button>
+
+                {/* Optional drawer trigger for uploading with custom note */}
+                {(s.navigationPointId || s.workOrderItemId || s.fieldWorkStepId || s.electionRemovalPointId) && !isDone && (
                   <button
                     type="button"
                     onClick={() =>
@@ -692,10 +793,10 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                         activePhotoModalStopId === s.jobId ? null : s.jobId
                       )
                     }
-                    className="flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm"
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline px-1 py-1 cursor-pointer"
+                    title="Nahrát fotografii z disku s podrobnou textovou poznámkou"
                   >
-                    <Camera size={14} className="text-sky-600" />
-                    <span>Přidat fotku</span>
+                    S poznámkou…
                   </button>
                 )}
 
@@ -719,6 +820,62 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                   </button>
                 )}
               </div>
+
+              {/* Photo documentation strip / thumbnails */}
+              {((s.photos && s.photos.length > 0) || photoSuccessToast?.jobId === s.jobId || uploadingJobId === s.jobId) && (
+                <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-sky-950 flex items-center gap-1.5">
+                      <Camera size={13} className="text-sky-600" />
+                      <span>Fotodokumentace k zakázce {s.photos?.length ? `(${s.photos.length})` : ''}</span>
+                    </span>
+                    {uploadingJobId === s.jobId ? (
+                      <span className="text-[11px] font-semibold text-sky-700 animate-pulse flex items-center gap-1">
+                        <Clock size={11} className="animate-spin" />
+                        <span>Ukládám foto do zakázky…</span>
+                      </span>
+                    ) : photoSuccessToast?.jobId === s.jobId ? (
+                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-2xs">
+                        <CheckCircle2 size={11} />
+                        <span>{photoSuccessToast.message}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => triggerDirectCamera(route.planId, s.workOrderId, s.jobId)}
+                        className="text-[11px] font-bold text-sky-700 hover:text-sky-900 underline cursor-pointer"
+                      >
+                        + Vyfotit další
+                      </button>
+                    )}
+                  </div>
+
+                  {s.photos && s.photos.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto py-1">
+                      {s.photos.map((ph, idx) => (
+                        <button
+                          key={ph.id || idx}
+                          type="button"
+                          onClick={() => setSelectedLightboxPhoto(ph.url)}
+                          className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-sky-200 bg-white shadow-2xs hover:ring-2 hover:ring-sky-500 transition cursor-pointer"
+                          title="Kliknutím zvětšit náhled"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={ph.url}
+                            alt={`Fotodokumentace ${idx + 1}`}
+                            className="h-full w-full object-cover group-hover:scale-105 transition"
+                            loading="lazy"
+                          />
+                          <span className="absolute bottom-0 inset-x-0 bg-slate-900/60 text-white text-[9px] font-bold text-center py-0.5">
+                            #{idx + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Inline Photo Upload Drawer */}
               {activePhotoModalStopId === s.jobId && (
@@ -1325,6 +1482,58 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
           }]}
           onSuccess={() => setPhotoCarrier(null)}
         />
+      )}
+
+      {/* Hidden camera input that directly opens phone camera */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={handleCameraFileChange}
+      />
+
+      {/* Lightbox Modal */}
+      {selectedLightboxPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-xs"
+          onClick={() => setSelectedLightboxPhoto(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[90vh] bg-black rounded-2xl overflow-hidden shadow-2xl p-2 flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setSelectedLightboxPhoto(null)}
+              className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-slate-900/80 text-white hover:bg-slate-800 transition cursor-pointer"
+              aria-label="Zavřít náhled"
+            >
+              ✕
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selectedLightboxPhoto}
+              alt="Zvětšená fotodokumentace"
+              className="max-h-[80vh] w-auto max-w-full rounded-xl object-contain"
+            />
+            <div className="pt-2 text-center">
+              <a
+                href={selectedLightboxPhoto}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-sky-400 hover:underline"
+              >
+                Otevřít fotografii v plném rozlišení ↗
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
