@@ -32,7 +32,7 @@ function formatHoursMinutes(totalMinutes: number): string {
   return `${hours} h ${minutes} min`;
 }
 
-export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
+export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; initialNow: string }) {
   const [ready, setReady] = useState(false);
   useEffect(() => { setReady(true); }, []);
   const [data, setData] = useState(initial);
@@ -47,9 +47,10 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
   const [hideDoneStops, setHideDoneStops] = useState(true);
   const [groupByOrder, setGroupByOrder] = useState(false);
 
-  const [todayStr, setTodayStr] = useState(() => dayInZone(new Date(), initial.timezone || 'Europe/Prague'));
+  const [now, setNow] = useState(() => new Date(initialNow));
+  const todayStr = dayInZone(now, data.timezone || 'Europe/Prague');
   useEffect(() => {
-    const updateDay = () => setTodayStr(dayInZone(new Date(), data.timezone || 'Europe/Prague'));
+    const updateDay = () => setNow(new Date());
     updateDay();
     const timer = window.setInterval(updateDay, 60000);
     return () => window.clearInterval(timer);
@@ -71,7 +72,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
           tripCompletedAt: route.tripCompletedAt,
           stops: route.stops,
         },
-        { targetDate: currentDate }
+        { targetDate: currentDate, now }
       );
       return {
         ...route,
@@ -80,7 +81,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
         stops: live.stops,
       };
     });
-  }, [data, currentDate]);
+  }, [data, currentDate, now]);
 
   // Live GPS tracking when trip is active (from start_trip until complete_trip)
   useEffect(() => {
