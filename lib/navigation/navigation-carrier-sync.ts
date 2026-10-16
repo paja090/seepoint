@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { formatNavigationPositionName } from './navigation-naming';
 
 export interface SyncPointInput {
   id?: string;
@@ -161,7 +162,19 @@ export async function syncNavigationPointToCarrierAndSurface(
     ? await tx.advertisingSurface.findFirst({ where: { id: point.surfaceId, organizationId } })
     : null;
 
-  const surfaceName = point.label || `Směrová tabule · ${meta.targetName || 'Cíl'}`;
+  let surfaceName = point.label;
+  if (!surfaceName || !/^P\d+/i.test(surfaceName)) {
+    const pMatch = point.label?.match(/\b(?:P|Bod|#)?\s*(\d+)\b/i);
+    const posNum = pMatch ? parseInt(pMatch[1], 10) : 1;
+    surfaceName = formatNavigationPositionName({
+      positionNumber: posNum,
+      street: point.address?.split(',')[0]?.trim() || carrier.street || carrier.address,
+      city: carrier.city,
+      distanceMeters: point.calculatedDistanceMeters,
+      direction: point.arrowDirection,
+      rawDistanceAndDirection: point.label,
+    });
+  }
   const rentStart = meta.rentStart || new Date();
   const rentEnd = meta.rentEnd || new Date(rentStart.getTime() + 365 * 24 * 60 * 60 * 1000);
 

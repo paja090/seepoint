@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { RefreshCw, ShieldCheck, ChevronDown, Check } from 'lucide-react';
 import type { AppRole } from '@/lib/rbac';
 import { roleLabel } from '@/lib/rbac';
@@ -18,6 +18,18 @@ export function RoleSwitcherButton({
 }: RoleSwitcherButtonProps) {
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
 
   // If user only has 1 role, don't display the switcher
   if (!allowedRoles || allowedRoles.length <= 1) {
@@ -47,35 +59,41 @@ export function RoleSwitcherButton({
   }
 
   return (
-    <div className="w-full">
+    <div ref={containerRef} className={compact ? 'relative shrink-0' : 'w-full'}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
         disabled={switching}
-        className={`flex w-full items-center justify-between gap-2 rounded-xl border text-xs font-bold transition active:scale-[0.98] ${
+        className={`flex items-center justify-between gap-2 rounded-xl border text-xs font-bold transition active:scale-[0.98] ${
           compact
-            ? 'bg-slate-900 border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800'
-            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 px-3 py-2'
+            ? 'h-9 whitespace-nowrap bg-slate-900 border-slate-700 px-2.5 text-slate-200 hover:bg-slate-800'
+            : 'w-full bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 px-3 py-2'
         }`}
-        title="Přepnout roli"
+        title="Přepnout aktivní roli"
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-1.5 truncate">
           <RefreshCw size={13} className={`text-emerald-400 shrink-0 ${switching ? 'animate-spin' : ''}`} />
           <span className="truncate">
             {compact ? roleLabel(currentRole) : `Role: ${roleLabel(currentRole)}`}
           </span>
         </div>
         <div className="flex items-center gap-1 text-[11px] text-emerald-400 shrink-0">
-          <span>Přepnout</span>
+          {!compact && <span>Přepnout</span>}
           <ChevronDown size={13} className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
         </div>
       </button>
 
       {open && (
-        <div className="mt-2 space-y-1 rounded-xl bg-slate-950 p-2 text-white border border-slate-800 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+        <div
+          className={`${
+            compact
+              ? 'absolute right-0 top-full z-50 mt-2 w-56'
+              : 'mt-2 w-full'
+          } space-y-1 rounded-xl bg-slate-950 p-2 text-white border border-slate-800 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150`}
+        >
           <div className="px-2.5 py-1.5 border-b border-slate-800 mb-1 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Přepnutí role</span>
-            <span className="text-[10px] text-slate-500">Zvolte pohled</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Přepnutí profilu</span>
+            <span className="text-[10px] text-slate-500">Zvolte roli</span>
           </div>
 
           <div className="space-y-1">

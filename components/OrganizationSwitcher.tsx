@@ -22,19 +22,22 @@ export function OrganizationSwitcher({ activeId, organizations }: { activeId: st
   }
 
   return (
-    <label className="relative flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700">
-      <Building2 aria-hidden="true" className="shrink-0 text-sky-700" size={16} />
+    <label className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700">
+      <Building2 aria-hidden="true" className="shrink-0 text-sky-700" size={14} />
       <span className="sr-only">Aktivní organizace</span>
       <select
         aria-label="Aktivní organizace"
-        className="max-w-44 bg-transparent pr-1 outline-none"
+        className="max-w-32 truncate bg-transparent pr-1 outline-none"
         disabled={busy || organizations.length === 1}
         onChange={(event) => void switchOrganization(event.target.value)}
         value={activeId}
       >
-        {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+        {organizations.map((organization) => (
+          <option key={organization.id} value={organization.id} className="bg-slate-900 text-white">
+            {organization.name}
+          </option>
+        ))}
       </select>
     </label>
   );
 }
-

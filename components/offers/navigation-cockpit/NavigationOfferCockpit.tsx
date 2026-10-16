@@ -6,6 +6,7 @@ import type { OfferView } from '@/lib/offers/view-model';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 import { compressImageFile } from '@/lib/image-compress';
 import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
+import { formatNavigationPositionName } from '@/lib/navigation/navigation-naming';
 import {
   CARRIER_PIN_COLORS,
   detectCarrierCategory,
@@ -325,17 +326,23 @@ export function NavigationOfferCockpit({
     }
 
     const streetPart = addr ? addr.split(',')[0]?.trim() : '';
-    const isHeritage = isOstravaRestrictedZone(lat, lng, addr || '');
-    const isHighway = isRestrictedHighwayOr1stClassRoad(addr || '');
 
     const nextIdx = points.length + 1;
-    let autoLabel = `Navigační bod #${nextIdx}`;
-    if (isHeritage) autoLabel = `⚠️ Památková zóna (${streetPart || 'centrum'})`;
-    else if (isHighway) autoLabel = `⚠️ I. třída (${streetPart || 'hlavní tah'})`;
-    else if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) autoLabel = `Příjezd na ${streetPart}`;
-
     const defaultVariant = city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm';
     const ptTarget = targets[0];
+
+    let routeInfo: { calculatedDistanceMeters?: number; routePolyline?: string; routeDistanceMeters?: number } = {};
+    if (ptTarget?.latitude && ptTarget?.longitude) {
+      routeInfo = await fetchRouteInfo(lat, lng, ptTarget.latitude, ptTarget.longitude);
+    }
+
+    const autoLabel = formatNavigationPositionName({
+      positionNumber: nextIdx,
+      street: streetPart || addr || city,
+      city,
+      distanceMeters: routeInfo.calculatedDistanceMeters,
+      direction: 'rovně',
+    });
 
     const newPoint: DraftPoint = {
       id: `point-${Date.now()}`,
@@ -356,12 +363,8 @@ export function NavigationOfferCockpit({
       targetLongitude: ptTarget?.longitude,
       arrowDirectionEnum: 'STRAIGHT',
       isSelectedByClient: true,
+      ...routeInfo,
     };
-
-    if (ptTarget?.latitude && ptTarget?.longitude) {
-      const routeInfo = await fetchRouteInfo(lat, lng, ptTarget.latitude, ptTarget.longitude);
-      Object.assign(newPoint, routeInfo);
-    }
 
     setPoints((curr) => [...curr, newPoint]);
     setHasUnsavedChanges(true);

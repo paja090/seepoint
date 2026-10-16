@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
 import { canReadPhoto } from '@/lib/photo-access';
+import { formatNavigationPositionName, getNavigationPhotoDownloadName } from '@/lib/navigation/navigation-naming';
 
 export const runtime = 'nodejs';
 
@@ -33,7 +34,46 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         isPrivate: true,
         carrierId: true,
         surfaceId: true,
-        siteNavigationPoints: { take: 1, select: { id: true } },
+        carrier: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            type: true,
+            street: true,
+            address: true,
+            city: true,
+          },
+        },
+        surface: {
+          select: {
+            id: true,
+            name: true,
+            mediaType: true,
+            directionDescription: true,
+            distanceMeters: true,
+            carrier: {
+              select: {
+                type: true,
+                code: true,
+                street: true,
+                address: true,
+                city: true,
+              },
+            },
+          },
+        },
+        siteNavigationPoints: {
+          take: 1,
+          select: {
+            id: true,
+            label: true,
+            address: true,
+            arrowDirection: true,
+            distanceValue: true,
+            sortOrder: true,
+          },
+        },
       },
     });
 
@@ -50,9 +90,40 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       'Cache-Control': 'private, no-store',
       'Referrer-Policy': 'no-referrer',
     } });
+
+    const urlObj = new URL(request.url);
+    const isDownload = urlObj.searchParams.get('download') === '1';
+    const dispositionType = isDownload ? 'attachment' : 'inline';
+
+    const ext = photo.fileName ? photo.fileName.split('.').pop() || 'jpg' : 'jpg';
+    let computedFileName = photo.fileName || `foto-${photo.id}.${ext}`;
+
+    const isNavigation =
+      photo.surface?.mediaType === 'NAVIGATION_SIGN' ||
+      photo.surface?.carrier?.type === 'NAVIGATION' ||
+      photo.carrier?.type === 'NAVIGATION' ||
+      (photo.siteNavigationPoints && photo.siteNavigationPoints.length > 0);
+
+    if (isNavigation) {
+      if (photo.surface?.name && /^P\d+/i.test(photo.surface.name)) {
+        computedFileName = getNavigationPhotoDownloadName(photo.surface.name, ext);
+      } else if (photo.siteNavigationPoints?.[0]?.label && /^P\d+/i.test(photo.siteNavigationPoints[0].label)) {
+        computedFileName = getNavigationPhotoDownloadName(photo.siteNavigationPoints[0].label, ext);
+      } else {
+        const street = photo.surface?.carrier?.street || photo.carrier?.street || photo.surface?.carrier?.address || photo.carrier?.address;
+        const distAndDir = photo.surface?.directionDescription || (photo.surface?.distanceMeters ? `${photo.surface.distanceMeters}m` : null);
+        const nameCandidate = formatNavigationPositionName({
+          positionNumber: 1,
+          street,
+          rawDistanceAndDirection: distAndDir,
+        });
+        computedFileName = getNavigationPhotoDownloadName(nameCandidate, ext);
+      }
+    }
+
     return new Response(stored.body, { status: 200, headers: {
       'Content-Type': stored.contentType ?? photo.mimeType ?? 'application/octet-stream',
-      'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? 'photo')}`,
+      'Content-Disposition': `${dispositionType}; filename*=UTF-8''${encodeURIComponent(computedFileName)}`,
       'Cache-Control': 'private, max-age=3600',
       'X-Content-Type-Options': 'nosniff',
     } });

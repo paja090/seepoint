@@ -118,9 +118,9 @@ export function QuickSearchInput() {
       results.vehicles.length > 0);
 
   return (
-    <div ref={containerRef} className="relative min-w-72 max-w-xl flex-1">
+    <div ref={containerRef} className="relative min-w-[160px] max-w-md flex-1">
       <div className="relative flex items-center">
-        <Search size={16} className="absolute left-3 text-slate-400 pointer-events-none" />
+        <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" />
         <input
           ref={inputRef}
           type="text"
@@ -130,8 +130,8 @@ export function QuickSearchInput() {
             setQuery(e.target.value);
             setOpen(true);
           }}
-          placeholder="Rychlé hledání nosičů, klientů, týmu nebo vozidel… (Ctrl + K)"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-16 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition shadow-2xs"
+          placeholder="Hledat nosiče, klienty, tým…"
+          className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-14 text-xs xl:text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition shadow-2xs"
         />
         {query ? (
           <button
@@ -139,12 +139,12 @@ export function QuickSearchInput() {
               setQuery('');
               setResults(null);
             }}
-            className="absolute right-3 rounded-lg p-0.5 text-slate-400 hover:text-slate-700"
+            className="absolute right-2.5 rounded-lg p-0.5 text-slate-400 hover:text-slate-700"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         ) : (
-          <kbd className="absolute right-3 hidden rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-400 sm:inline-block shadow-2xs">
+          <kbd className="absolute right-2.5 hidden rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-400 sm:inline-block shadow-2xs">
             Ctrl K
           </kbd>
         )}
