@@ -22,7 +22,7 @@ export async function saveFieldTaskTx(tx: Prisma.TransactionClient, campaignId: 
     if (previous && ((!legacyReview && previous.assignedFieldPlanId) || previous.startedAt || ['COMPLETED', 'CANCELLED'].includes(previous.status) || previous.steps.some(s => s.assignedFieldPlanId || s.startedAt))) throw new Error('Přiřazené nebo zahájené zadání nelze přepsat. Nejprve řešte revizi výjezdu.');
     const { deliveryMinutes: _delivery, ...fields } = spec;
     void _delivery; // Delivery duration belongs to its step only.
-    const data = { ...fields, ...(legacyReview ? { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING' as const } : {}), reviewRequired: false, baseServiceMinutes: Math.max(1, Math.ceil(spec.serviceMinutes / spec.quantity)) };
+    const data = { ...fields, layerName: spec.layerName ?? previous?.layerName ?? null, ...(legacyReview ? { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING' as const } : {}), reviewRequired: false, baseServiceMinutes: Math.max(1, Math.ceil(spec.serviceMinutes / spec.quantity)) };
     const point = previous ? await tx.electionRemovalPoint.update({ where: { id: previous.id, organizationId }, data })
       : await tx.electionRemovalPoint.create({ data: { ...data, organizationId, campaignId } });
     if (previous) await tx.fieldWorkStep.deleteMany({ where: { organizationId, pointId: point.id } });

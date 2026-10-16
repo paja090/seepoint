@@ -26,7 +26,7 @@ import {
 } from '@/lib/election-removal/constants';
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import { LocationPickerMap } from './LocationPickerMap';
-import { parsePointMetadata, cleanLayerName } from '@/lib/election-removal/point-metadata';
+import { parsePointMetadata, cleanLayerName, isGenericLayerName } from '@/lib/election-removal/point-metadata';
 
 
 interface CampaignPointsViewProps {
@@ -873,7 +873,17 @@ export function CampaignPointsView({
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 font-medium">
-                        {cleanLayer || '–'}
+                        {cleanLayer ? (
+                          !isGenericLayerName(cleanLayer) ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200">
+                              🎯 {cleanLayer}
+                            </span>
+                          ) : (
+                            cleanLayer
+                          )
+                        ) : (
+                          '–'
+                        )}
                       </td>
                       <td className="py-2.5 px-3">
                         <div className="flex flex-col gap-1.5 items-start">

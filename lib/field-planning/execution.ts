@@ -1,5 +1,6 @@
 import { executeFieldStep, type FieldExecutionInput } from '../election-removal/step-execution';
 import { taskInstructions } from '../election-removal/task-spec';
+import { resolvePointClientName } from '../election-removal/point-metadata';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
@@ -92,6 +93,14 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
             if (step ? step.assignedFieldPlanId !== plan.id || step.assignedCrewId !== crew.id : ep.assignedFieldPlanId !== plan.id || ep.assignedCrewId !== crew.id) return [];
             const startedAt = step ? step.startedAt : ep.startedAt;
             const completedAt = step ? step.completedAt : ep.completedAt;
+
+            const resolvedClient = resolvePointClientName({
+              layerName: ep.layerName,
+              description: ep.description,
+              campaignClientName: ep.campaign?.clientName,
+              campaignName: ep.campaign?.name,
+            });
+
             return [{
               fieldWorkStepId: step?.id, quantity: step?.quantity ?? ep.quantity, completedQuantity: step?.completedQuantity ?? 0,
               referenceUrl: ep.referenceUrl, photoType: step?.photoType, fieldWorkStepKind: step?.kind,
@@ -105,8 +114,9 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
               orderTitle: ep.campaign?.name ? `Akce: ${ep.campaign.name}` : 'Terénní práce',
               campaignName: ep.campaign?.name ?? 'Terénní práce',
               title: step?.label ?? ep.label,
-              clientName: ep.campaign.clientName || ep.campaign.name,
-              instructions: taskInstructions(ep) + (ep.campaign.description ? '. Společné instrukce: ' + ep.campaign.description : '') + ep.steps.filter(x => x.custodyNote).map(x => '. Materiál: ' + x.custodyNote).join(''),
+              clientName: resolvedClient || ep.campaign?.clientName || ep.campaign?.name || 'Terénní práce',
+              layerName: ep.layerName,
+              instructions: taskInstructions({ ...ep, clientName: resolvedClient }) + (ep.campaign?.description ? '. Společné instrukce: ' + ep.campaign.description : '') + ep.steps.filter(x => x.custodyNote).map(x => '. Materiál: ' + x.custodyNote).join(''),
               status: (step?.status ?? ep.status) === 'COMPLETED' ? 'DONE' : (step?.status ?? ep.status) === 'ISSUE' ? 'ISSUE' : (step?.status ?? ep.status) === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'PLANNED',
               issueType: ep.status === 'ISSUE' ? ep.issueType : null,
               issueNote: step?.issueNote ?? (ep.status === 'ISSUE' ? ep.issueNote : null),

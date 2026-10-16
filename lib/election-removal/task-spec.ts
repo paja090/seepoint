@@ -1,5 +1,6 @@
 import { coordinates, zonedTime, parseConstraints } from '../field-planning/profile';
-import { calculateMediaLoadSlots, calculateServiceMinutes, type ElectionRemovalMediaType } from './constants';
+import { calculateMediaLoadSlots, calculateServiceMinutes, ELECTION_REMOVAL_MEDIA_LABELS, type ElectionRemovalMediaType } from './constants';
+import { cleanLayerName, isGenericLayerName } from './point-metadata';
 
 export const operations = {
   INSTALL_OBJECT: 'Instalace konstrukce / objektu',
@@ -26,6 +27,7 @@ export type TaskSpec = {
   contact: string; accessInstructions: string; serviceMinutes: number; deliveryMinutes: number;
   loadSlots: number; requiredWorkers: number; requiredPositions: string[]; requiredEquipment: string[];
   deadlineAt: Date | null; windowStart: Date | null; windowEnd: Date | null;
+  layerName?: string | null;
 };
 const text = (v: unknown, max = 4000) => { if (v == null) return ''; if (typeof v !== 'string' || v.length > max) throw new Error('Neplatný nebo příliš dlouhý text.'); return v.trim(); };
 const integer = (v: unknown, min: number, max: number) => { if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max) throw new Error(`Zadejte celé číslo ${min}–${max}.`); return v; };
@@ -64,6 +66,7 @@ export function parseTaskSpec(raw: unknown): TaskSpec {
     destinationLatitude: transport ? Number(p.destinationLatitude) : null, destinationLongitude: transport ? Number(p.destinationLongitude) : null,
     carrierId: text(p.carrierId, 100) || null, surfaceId: text(p.surfaceId, 100) || null, referenceUrl,
     contact: text(p.contact, 500), accessInstructions: text(p.accessInstructions),
+    layerName: text(p.layerName, 200) || null,
     serviceMinutes: integer(p.serviceMinutes ?? calculateServiceMinutes(mediaType, quantity, null, legacyOp).totalMinutes, 1, 1440),
     deliveryMinutes: integer(p.deliveryMinutes ?? Math.max(5, quantity * 3), 1, 1440), loadSlots,
     requiredWorkers: integer(p.requiredWorkers ?? 1, 1, 20), requiredPositions: list(p.requiredPositions), requiredEquipment: list(p.requiredEquipment) };
@@ -82,8 +85,37 @@ export function taskSteps(spec: TaskSpec) {
     loadDelta: -spec.loadSlots, photoType: spec.operationType.startsWith('INSTALL') ? 'AFTER_INSTALLATION' as const : 'CONTROL' as const }] : [source];
 }
 
-export function taskInstructions(p: { operationType?: string | null; label: string; objectType?: string | null; mediaType: string; quantity: number; description?: string | null; materialDisposition?: string | null; materialInstructions?: string | null; destinationName?: string | null; contact?: string | null; accessInstructions?: string | null }) {
-  return [p.operationType && operations[p.operationType as Operation], `${p.objectType || p.mediaType} — ${p.quantity} ks`, p.description,
-    p.materialDisposition && dispositions[p.materialDisposition as Disposition], p.materialInstructions,
-    p.destinationName && `Cíl: ${p.destinationName}`, p.contact && `Kontakt: ${p.contact}`, p.accessInstructions].filter(Boolean).join('. ');
+export function taskInstructions(p: {
+  operationType?: string | null;
+  label: string;
+  objectType?: string | null;
+  mediaType: string;
+  quantity: number;
+  description?: string | null;
+  materialDisposition?: string | null;
+  materialInstructions?: string | null;
+  destinationName?: string | null;
+  contact?: string | null;
+  accessInstructions?: string | null;
+  clientName?: string | null;
+  layerName?: string | null;
+}) {
+  const mediaLabel =
+    (p.objectType && !['BENCH', 'ACKO', 'TOWER', 'MINI_TOWER', 'BANNER', 'CITY_POSTER', 'PLOT', 'OTHER'].includes(p.objectType))
+      ? p.objectType
+      : (ELECTION_REMOVAL_MEDIA_LABELS[p.mediaType as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS] || p.objectType || p.mediaType);
+
+  const clientOrMotif = p.clientName || (p.layerName && !isGenericLayerName(p.layerName) ? cleanLayerName(p.layerName) : null);
+
+  return [
+    p.operationType && operations[p.operationType as Operation],
+    `${mediaLabel} — ${p.quantity} ks`,
+    clientOrMotif ? `Klient / Motiv: ${clientOrMotif}` : null,
+    p.description,
+    p.materialDisposition && dispositions[p.materialDisposition as Disposition],
+    p.materialInstructions,
+    p.destinationName && `Cíl: ${p.destinationName}`,
+    p.contact && `Kontakt: ${p.contact}`,
+    p.accessInstructions,
+  ].filter(Boolean).join('. ');
 }

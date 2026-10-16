@@ -6,6 +6,7 @@ import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants'
 import {
   parsePointMetadata,
   cleanLayerName,
+  isGenericLayerName,
   buildGoogleMapsRouteUrl,
 } from '@/lib/election-removal/point-metadata';
 import { Maximize2, ExternalLink } from 'lucide-react';
@@ -370,7 +371,7 @@ export function ElectionRemovalMap({
           <div style="font-size:14px;font-weight:800;color:#0f172a;margin-bottom:2px;">
             ${escapeHtml(point.label)}
           </div>
-          ${cleanLayer ? `<div style="font-size:10px;color:#64748b;margin-bottom:4px;">Vrstva: ${escapeHtml(cleanLayer)}</div>` : ''}
+          ${cleanLayer ? `<div style="font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:4px;">${!isGenericLayerName(cleanLayer) ? '🎯 ' : ''}${escapeHtml(cleanLayer)}</div>` : ''}
           ${localityHtml}
           ${addressHtml}
 

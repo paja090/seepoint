@@ -167,13 +167,14 @@ export function MyRouteMap({
           });
           
           const crewLabel = r.crewName ? `<span style="color: ${routeColor}; font-weight: bold;">Posádka: ${escapeHtml(r.crewName)}</span><br/>` : '';
+          const clientText = stop.clientName ? `🎯 ${escapeHtml(stop.clientName)}` : escapeHtml(stop.workType);
           const tooltipHtml = `
             <div style="font-weight: bold; font-family: sans-serif; font-size: 12px; color: ${isIssue ? '#dc2626' : '#0f172a'};">
               ${isIssue ? '⚠️ ' : ''}#${stopNumber}. ${escapeHtml(stop.title)}
             </div>
             ${crewLabel}
-            <div style="font-size: 11px; color: ${isIssue ? '#b91c1c' : '#64748b'}; font-family: sans-serif; margin-top: 2px;">
-              ${escapeHtml(stop.issueType || stop.clientName || stop.workType)}
+            <div style="font-size: 11px; color: ${isIssue ? '#b91c1c' : '#0369a1'}; font-weight: 600; font-family: sans-serif; margin-top: 2px;">
+              ${stop.issueType ? escapeHtml(stop.issueType) : clientText}
             </div>
           `;
           

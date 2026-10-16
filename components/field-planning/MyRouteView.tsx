@@ -484,9 +484,21 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                     >
                       {s.title}
                     </h2>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      {s.clientName} · {s.carrier?.code ? `Nosič ${s.carrier.code}` : s.fieldWorkStepId ? 'Terénní práce' : s.workType}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      {s.clientName && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
+                          🎯 {s.clientName}
+                        </span>
+                      )}
+                      {s.campaignName && s.campaignName !== s.clientName && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200" title="Akce / kampaň">
+                          📁 {s.campaignName}
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-500 font-medium">
+                        {s.carrier?.code ? `Nosič ${s.carrier.code}` : s.fieldWorkStepId ? 'Terénní práce' : s.workType}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1197,11 +1209,25 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                             <Briefcase size={14} className="text-sky-600 shrink-0" />
                             <span>{group.title}</span>
                           </h3>
-                          {group.clientName && group.clientName !== group.title && (
-                            <p className="text-xs text-slate-500 font-medium">
-                              Klient: {group.clientName}
-                            </p>
-                          )}
+                          {(() => {
+                            const distinctClients = Array.from(new Set(group.stops.map((st) => st.clientName).filter(Boolean))) as string[];
+                            if (distinctClients.length > 1) {
+                              return (
+                                <p className="text-xs text-sky-800 font-semibold flex items-center gap-1">
+                                  <span>🎯 Motivy na trase:</span>
+                                  <span className="font-bold">{distinctClients.join(' · ')}</span>
+                                </p>
+                              );
+                            }
+                            if (group.clientName && group.clientName !== group.title) {
+                              return (
+                                <p className="text-xs text-slate-500 font-medium">
+                                  Klient: {group.clientName}
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
                           <span className="font-semibold text-slate-500">
@@ -1244,6 +1270,11 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                             s.campaignName ||
                             s.workOrderId));
 
+                    const isClientChange =
+                      !isNewOrder &&
+                      prevStop &&
+                      Boolean(prevStop.clientName && s.clientName && prevStop.clientName !== s.clientName);
+
                     return (
                       <div key={s.jobId} className="space-y-2">
                         {isNewOrder && (
@@ -1259,6 +1290,16 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                               </span>
                             </span>
                             <div className="h-px bg-slate-200 flex-1" />
+                          </div>
+                        )}
+                        {isClientChange && (
+                          <div className="flex items-center gap-2 py-2 px-1">
+                            <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent flex-1" />
+                            <span className="text-[11px] font-black text-amber-900 bg-amber-100/90 px-3 py-1 rounded-xl border border-amber-300 shadow-xs flex items-center gap-1.5">
+                              <span>🎯 Změna motivu / klienta:</span>
+                              <span className="underline decoration-amber-500 font-extrabold">{s.clientName}</span>
+                            </span>
+                            <div className="h-0.5 bg-gradient-to-r from-transparent via-amber-300 to-transparent flex-1" />
                           </div>
                         )}
                         {renderSingleStop(s, stopIndexMap.get(s.jobId) ?? (i + 1))}
