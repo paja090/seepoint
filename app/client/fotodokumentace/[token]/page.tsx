@@ -110,7 +110,6 @@ export default async function PublicFotodokumentacePage({
         clientName: clientFilter || campaign.clientName,
         description: campaign.description,
         targetDate: campaign.targetDate ? campaign.targetDate.toISOString() : null,
-        createdAt: campaign.createdAt ? campaign.createdAt.toISOString() : null,
         totalPoints: filteredRawPoints.length,
         completedPoints: filteredRawPoints.filter((p) => p.status === 'COMPLETED').length,
       }}
