@@ -352,7 +352,7 @@ export function UnifiedPhotoDocumentationView({
 
           const popupContent = `
             <div style="font-family: sans-serif; font-size: 12px; line-height: 1.4; max-width: 220px;">
-              <img src="${photo.url}" style="width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 6px;" />
+              <img src="${photo.id ? `/api/photos/${encodeURIComponent(photo.id)}/thumbnail` : photo.url}" style="width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 6px;" loading="lazy" />
               <strong style="color: #0f172a; display: block;">${photo.sourceTitle}</strong>
               <div style="color: #475569; font-size: 11px;">
                 ${photo.pointLabel ? `Bod: ${photo.pointLabel}<br>` : ''}
@@ -864,8 +864,10 @@ export function UnifiedPhotoDocumentationView({
                   <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={photo.url}
+                      src={photo.id ? `/api/photos/${encodeURIComponent(photo.id)}/thumbnail` : photo.url}
                       alt={photo.fileName || photo.sourceTitle}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                     />
                     <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
