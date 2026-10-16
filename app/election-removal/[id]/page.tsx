@@ -7,7 +7,7 @@ import { FieldWorkDesk } from '@/components/election-removal/FieldWorkDesk';
 import { CampaignPhotoAlbum } from '@/components/election-removal/CampaignPhotoAlbum';
 import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
 import { buildCampaignAlbumSlug } from '@/lib/election-removal/album-token';
-import { Route, ArrowLeft, Truck, Calendar } from 'lucide-react';
+import { Route, ArrowLeft, Truck, Calendar, Camera } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -129,6 +129,15 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
                   variant="header"
                 />
               )}
+
+              <Link
+                href={`/fotodokumentace?albumId=${campaign.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition shadow-xs"
+                title="Otevřít v centrální fotodokumentaci"
+              >
+                <Camera className="w-3.5 h-3.5 text-sky-600" />
+                <span>Všechna fotoalba</span>
+              </Link>
 
               <Link
                 href="/my-route"

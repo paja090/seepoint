@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
 import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
+import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,13 @@ export default async function ElectionRemovalPage() {
   return (
     <AppShell>
       <div className="space-y-6 max-w-6xl mx-auto">
+        <ProjectSubNav
+          items={[
+            { href: '/election-removal', label: '🚚 Zakázky a akce', badge: totalCampaigns },
+            { href: '/fotodokumentace?source=FIELD_WORK', label: '📷 Fotodokumentace zakázek' },
+          ]}
+        />
+
         {/* Header */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
