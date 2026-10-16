@@ -1,3 +1,4 @@
+import type { PhotoType } from '@prisma/client';
 import type { PlannerActor } from '../field-planning/service';
 import { hash, plannerTransaction } from '../field-planning/service';
 import { executeStop } from '../field-planning/execution';
@@ -9,12 +10,18 @@ import type { PlanningResult } from '../field-planning/contracts';
 import { prisma } from '../db';
 import { createHash, randomUUID } from 'node:crypto';
 
+type VerifiedStopResult = {
+  fieldWorkStepId?: string | null;
+  electionRemovalPointId?: string | null;
+  photoType?: PhotoType | null;
+};
+
 export async function uploadFieldPhoto(form: FormData, actor: PlannerActor) {
   const { organizationId } = requireTenantContext();
   const input = { planId: String(form.get('planId') || ''), jobId: String(form.get('jobId') || ''), workOrderId: '', action: 'inspect' };
-  const verified = await executeStop(input, actor);
-  const targetStepId = ('fieldWorkStepId' in verified && verified.fieldWorkStepId) ? (verified.fieldWorkStepId as string) : null;
-  const targetPointId = ('electionRemovalPointId' in verified && verified.electionRemovalPointId) ? (verified.electionRemovalPointId as string) : null;
+  const verified = (await executeStop(input, actor)) as unknown as VerifiedStopResult;
+  const targetStepId = verified.fieldWorkStepId || null;
+  const targetPointId = verified.electionRemovalPointId || null;
   if (!targetStepId && !targetPointId) throw new Error('Krok ani bod nebyl nalezen.');
 
   const rawKey = String(form.get('requestKey') || form.get('key') || '');
@@ -61,7 +68,7 @@ export async function uploadFieldPhoto(form: FormData, actor: PlannerActor) {
     const capturedLongitude = lngStr ? parseFloat(String(lngStr)) : null;
     const capturedAccuracyMeters = accStr ? parseFloat(String(accStr)) : null;
 
-    const photoType = (verified as any).photoType
+    const photoType = verified.photoType
       ?? (pointMeta?.operationType === 'INSTALL_AD' ? 'AFTER_INSTALLATION' : 'AFTER_INSTALLATION');
 
     const photo = await tx.photo.create({
