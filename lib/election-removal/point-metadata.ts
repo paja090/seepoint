@@ -59,12 +59,15 @@ export function isGenericLayerName(layerName?: string | null): boolean {
  * 3. Campaign-level client name
  * 4. Fallback to campaign name or null
  */
-export function resolvePointClientName(point: {
-  layerName?: string | null;
-  description?: string | null;
-  campaignClientName?: string | null;
-  campaignName?: string | null;
-}): string | null {
+export function resolvePointClientName(
+  point: {
+    layerName?: string | null;
+    description?: string | null;
+    campaignClientName?: string | null;
+    campaignName?: string | null;
+  },
+  fallbackCampaignClientName?: string | null
+): string | null {
   // 1. Explicit client in description
   const meta = parsePointMetadata(point.description);
   if (meta.client) {
@@ -81,8 +84,9 @@ export function resolvePointClientName(point: {
   }
 
   // 3. Campaign client name
-  if (point.campaignClientName?.trim()) {
-    return point.campaignClientName.trim();
+  const campaignClient = point.campaignClientName?.trim() || fallbackCampaignClientName?.trim();
+  if (campaignClient) {
+    return campaignClient;
   }
 
   // 4. Fallback to campaign name if provided

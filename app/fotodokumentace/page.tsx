@@ -10,6 +10,8 @@ import {
 } from '@/components/fotodokumentace/UnifiedPhotoDocumentationView';
 import type { InternalPointWithPhotos } from '@/components/election-removal/CampaignPhotoAlbum';
 import { formatAlbumDisplay } from '@/lib/fotodokumentace/format';
+import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
+import { getDeterministicReportToken } from '@/lib/navigation-documentation';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,6 +118,8 @@ export default async function PhotoDocumentationHubPage({
         select: {
           id: true,
           label: true,
+          layerName: true,
+          description: true,
           campaign: { select: { id: true, name: true, clientName: true } },
         },
       },
@@ -131,13 +135,21 @@ export default async function PhotoDocumentationHubPage({
     take: 60,
   });
 
-  // Transform Election Campaigns into Unified Albums
-  const fieldWorkAlbums: UnifiedAlbumItem[] = electionCampaigns.map((c) => {
+  // Transform Election Campaigns into Unified Albums (grouped by client when a campaign spans multiple clients)
+  const fieldWorkAlbums: UnifiedAlbumItem[] = electionCampaigns.flatMap((c) => {
     const slug = buildCampaignAlbumSlug(c.id);
-    const points: InternalPointWithPhotos[] = c.points.map((p) => ({
+    const d = new Date(c.createdAt);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const periodLabel = `${quarter}. čtvrtletí ${year}`;
+
+    const mappedPoints: InternalPointWithPhotos[] = c.points.map((p) => ({
       id: p.id,
       label: p.label,
       description: p.description,
+      layerName: p.layerName,
+      clientName: resolvePointClientName(p, c.clientName),
       quantity: p.quantity,
       operationType: p.operationType,
       latitude: p.latitude,
@@ -155,37 +167,86 @@ export default async function PhotoDocumentationHubPage({
       })),
     }));
 
-    const allPhotos = points.flatMap((p) => p.photos);
-    const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;
-    const d = new Date(c.createdAt);
-    const year = d.getFullYear();
-    const month = d.getMonth() + 1;
-    const quarter = Math.ceil(month / 3);
-    const periodLabel = `${quarter}. čtvrtletí ${year}`;
-    const formatted = formatAlbumDisplay(c.name, c.clientName, periodLabel);
+    // Group points by resolved client name
+    const pointsByClient = new Map<string, InternalPointWithPhotos[]>();
+    for (const pt of mappedPoints) {
+      const clientKey = (pt.clientName || c.clientName || '').trim();
+      if (!clientKey) continue;
+      const list = pointsByClient.get(clientKey) || [];
+      list.push(pt);
+      pointsByClient.set(clientKey, list);
+    }
 
-    return {
-      id: c.id,
-      source: 'FIELD_WORK',
-      sourceLabel: 'Terénní práce',
-      title: c.name,
-      displayTitle: formatted.displayTitle,
-      displaySubtitle: formatted.displayLocation || null,
-      displayBadge: formatted.displayPeriod || periodLabel,
-      clientName: c.clientName,
-      createdAt: c.createdAt,
-      year,
-      month,
-      quarter,
-      periodLabel,
-      photosCount: allPhotos.length,
-      pointsCount: points.length,
-      coverPhotoUrl,
-      albumSlug: slug,
-      publicShareUrl: `/client/fotodokumentace/${slug}`,
-      downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip`,
-      points,
-    };
+    // If campaign has multiple distinct clients, create per-client albums so Fotodokumentace organizes them by client
+    if (pointsByClient.size > 1) {
+      const clientAlbums: UnifiedAlbumItem[] = [];
+      for (const [clientKey, clientPoints] of pointsByClient.entries()) {
+        const clientPhotos = clientPoints.flatMap((p) => p.photos);
+        const coverPhotoUrl = clientPhotos.length > 0 ? clientPhotos[0].url : null;
+        const formatted = formatAlbumDisplay(`${clientKey} — ${c.name}`, clientKey, periodLabel);
+        const encodedClient = encodeURIComponent(clientKey);
+        const hasInspection = clientPoints.some((p) => p.operationType === 'INSPECTION');
+
+        clientAlbums.push({
+          id: `${c.id}::client::${clientKey}`,
+          source: 'FIELD_WORK',
+          sourceLabel: hasInspection ? 'Kontrola ploch' : 'Terénní práce',
+          title: `${clientKey} (${c.name})`,
+          displayTitle: clientKey,
+          displaySubtitle: c.name,
+          displayBadge: hasInspection ? `Kontrola • ${periodLabel}` : formatted.displayPeriod || periodLabel,
+          clientName: clientKey,
+          createdAt: c.createdAt,
+          year,
+          month,
+          quarter,
+          periodLabel,
+          photosCount: clientPhotos.length,
+          pointsCount: clientPoints.length,
+          coverPhotoUrl,
+          albumSlug: slug,
+          publicShareUrl: `/client/fotodokumentace/${slug}?client=${encodedClient}`,
+          downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip?client=${encodedClient}`,
+          points: clientPoints,
+        });
+      }
+      return clientAlbums;
+    }
+
+    // Single client (or unassigned) campaign album
+    const singleClient =
+      pointsByClient.size === 1
+        ? Array.from(pointsByClient.keys())[0]
+        : c.clientName;
+    const allPhotos = mappedPoints.flatMap((p) => p.photos);
+    const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;
+    const formatted = formatAlbumDisplay(c.name, singleClient, periodLabel);
+    const hasInspection = mappedPoints.some((p) => p.operationType === 'INSPECTION');
+
+    return [
+      {
+        id: c.id,
+        source: 'FIELD_WORK',
+        sourceLabel: hasInspection ? 'Kontrola ploch' : 'Terénní práce',
+        title: c.name,
+        displayTitle: formatted.displayTitle,
+        displaySubtitle: formatted.displayLocation || null,
+        displayBadge: hasInspection ? `Kontrola • ${periodLabel}` : formatted.displayPeriod || periodLabel,
+        clientName: singleClient,
+        createdAt: c.createdAt,
+        year,
+        month,
+        quarter,
+        periodLabel,
+        photosCount: allPhotos.length,
+        pointsCount: mappedPoints.length,
+        coverPhotoUrl,
+        albumSlug: slug,
+        publicShareUrl: `/client/fotodokumentace/${slug}`,
+        downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip`,
+        points: mappedPoints,
+      },
+    ];
   });
 
   // Transform Navigation Documentation into Unified Albums
@@ -196,6 +257,7 @@ export default async function PhotoDocumentationHubPage({
         id: it.id,
         label: it.navigationPoint?.label || it.carrier?.name || `Bod ${it.carrier?.code || it.id.slice(-4)}`,
         description: it.carrier?.code ? `Nosič: ${it.carrier.code}` : null,
+        clientName: r.client?.name || 'Klient VO',
         quantity: 1,
         operationType: 'INSPECTION',
         latitude: it.navigationPoint?.latitude || 0,
@@ -226,6 +288,8 @@ export default async function PhotoDocumentationHubPage({
     const periodLabel = `${quarter}. čtvrtletí ${year}`;
     const formatted = formatAlbumDisplay(r.title, r.client?.name, periodLabel);
 
+    const { token } = getDeterministicReportToken(r.id);
+
     return {
       id: r.id,
       source: 'NAVIGATION',
@@ -243,9 +307,9 @@ export default async function PhotoDocumentationHubPage({
       photosCount: allPhotos.length,
       pointsCount: points.length,
       coverPhotoUrl,
-      albumSlug: r.id,
-      publicShareUrl: `/navigation/documentation`,
-      downloadZipUrl: `/api/client/navigation-documentation/${encodeURIComponent(r.id)}/download-zip`,
+      albumSlug: token,
+      publicShareUrl: `/client/navigation-documentation/${token}`,
+      downloadZipUrl: `/api/client/navigation-documentation/${encodeURIComponent(token)}/download-zip`,
       points,
     };
   });
@@ -261,12 +325,15 @@ export default async function PhotoDocumentationHubPage({
   // Transform Recent Photos for Live Feed and Map
   const recentPhotos: RecentPhotoItem[] = rawRecentPhotos.map((p) => {
     let sourceTitle = 'Záznam v terénu';
-    let clientName = null;
-    let pointLabel = null;
+    let clientName: string | null = null;
+    let pointLabel: string | null = null;
 
     if (p.electionRemovalPoint) {
       sourceTitle = p.electionRemovalPoint.campaign?.name || 'Terénní práce';
-      clientName = p.electionRemovalPoint.campaign?.clientName || null;
+      clientName =
+        resolvePointClientName(p.electionRemovalPoint, p.electionRemovalPoint.campaign?.clientName) ||
+        p.electionRemovalPoint.campaign?.clientName ||
+        null;
       pointLabel = p.electionRemovalPoint.label;
     } else if (p.carrier) {
       sourceTitle = p.carrier.name || `Nosič ${p.carrier.code}`;

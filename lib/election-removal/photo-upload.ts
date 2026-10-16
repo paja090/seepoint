@@ -68,8 +68,13 @@ export async function uploadFieldPhoto(form: FormData, actor: PlannerActor) {
     const capturedLongitude = lngStr ? parseFloat(String(lngStr)) : null;
     const capturedAccuracyMeters = accStr ? parseFloat(String(accStr)) : null;
 
-    const photoType = verified.photoType
-      ?? (pointMeta?.operationType === 'INSTALL_AD' ? 'AFTER_INSTALLATION' : 'AFTER_INSTALLATION');
+    const fallbackPhotoType: PhotoType =
+      pointMeta?.operationType === 'INSPECTION' || pointMeta?.operationType === 'REPAIR'
+        ? 'CONTROL'
+        : pointMeta?.operationType === 'REMOVE_AD' || pointMeta?.operationType === 'REMOVE_OBJECT'
+          ? 'AFTER_DEINSTALLATION'
+          : 'AFTER_INSTALLATION';
+    const photoType = verified.photoType ?? fallbackPhotoType;
 
     const photo = await tx.photo.create({
       data: {
