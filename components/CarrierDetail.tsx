@@ -546,15 +546,20 @@ export function CarrierDetail({
 
       {/* 🧭 NAVIGATION-SPECIFIC SURFACE MANAGER VS STANDARD CARRIER OCCUPANCY */}
       {isNavigation ? (
-        <section className="rounded-2xl border border-sky-200 bg-sky-50/30 p-5 shadow-xs">
-          <div className="mb-4">
-            <h3 className="font-black text-sky-950 text-base flex items-center gap-2">
-              <Compass size={18} className="text-sky-600" />
-              <span>Správa Navigačních Tabulí & Směrových Šipek</span>
-            </h3>
-            <p className="text-xs text-sky-800 mt-0.5">
-              Navigační cedule umístěné na sloupech VO a trolejového vedení s evidencí šipek, textů a klientů.
-            </p>
+        <section className="rounded-3xl border border-sky-200 bg-sky-50/40 p-5 sm:p-6 shadow-xs">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-sky-100 pb-3.5">
+            <div>
+              <h3 className="font-black text-sky-950 text-base sm:text-lg flex items-center gap-2">
+                <Compass size={20} className="text-sky-600" />
+                <span>Správa Navigačních Tabulí & Směrových Šipek</span>
+              </h3>
+              <p className="text-xs text-sky-800 mt-0.5">
+                Navigační cedule umístěné na sloupech VO a trolejového vedení s evidencí šipek, textů a klientů.
+              </p>
+            </div>
+            <span className="text-xs font-black px-3 py-1 rounded-xl bg-white text-sky-900 border border-sky-200 shadow-2xs">
+              {carrier.surfaces.length === 1 ? '1 navigační pozice' : `${carrier.surfaces.length} navigační pozice na sloupu`}
+            </span>
           </div>
           <NavigationSurfaceManager
             canEdit={canEdit}

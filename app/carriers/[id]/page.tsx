@@ -60,7 +60,7 @@ export default async function CarrierPage({ params }: { params: Promise<{ id: st
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="card">
             <CarrierDetail
               carrier={carrier}

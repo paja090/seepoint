@@ -477,7 +477,7 @@ export function NavigationSurfaceManager({
         </div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className={`grid gap-6 ${surfaces.length > 1 ? 'grid-cols-1 2xl:grid-cols-2' : 'grid-cols-1'}`}>
         {surfaces.map((surface, index) => {
           const activeOccupancy = surface.occupancies?.find(
             (o) => o.status === 'OCCUPIED' || o.status === 'RESERVED',
@@ -492,258 +492,282 @@ export function NavigationSurfaceManager({
 
           return (
             <div
-              className={`relative overflow-hidden rounded-3xl border-2 p-5 shadow-sm transition-all duration-200 ${
+              className={`relative overflow-hidden rounded-3xl border-2 p-5 sm:p-6 shadow-sm transition-all duration-200 ${
                 isOutOfService
                   ? 'border-slate-300 bg-slate-100 opacity-80'
                   : isOccupied
-                  ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/30'
+                  ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/40 via-white to-emerald-50/20'
                   : 'border-sky-300 bg-gradient-to-br from-sky-50/40 via-white to-blue-50/20'
               }`}
               key={surface.id}
             >
               {/* Colored left accent line */}
               <div
-                className={`absolute left-0 top-0 bottom-0 w-2.5 ${
+                className={`absolute left-0 top-0 bottom-0 w-3 ${
                   isOutOfService ? 'bg-slate-400' : isOccupied ? 'bg-emerald-500' : 'bg-sky-500'
                 }`}
               />
 
-              <div className="pl-2 space-y-3.5">
+              <div className="pl-2 sm:pl-3 space-y-4">
                 {/* Card Header: Position badge + Title + Status */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3.5">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="rounded-lg bg-slate-900 px-2 py-0.5 text-xs font-black text-white shadow-2xs shrink-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="rounded-xl bg-slate-900 px-3 py-1 text-xs font-black text-white shadow-2xs shrink-0">
                         #{index + 1}
                       </span>
-                      <h4 className="font-extrabold text-base text-slate-950 break-words leading-tight">
+                      <h4 className="font-extrabold text-base sm:text-xl text-slate-950 break-words leading-tight">
                         {surface.name}
                       </h4>
+                      {surface.sourcePosition && (
+                        <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200 font-mono">
+                          Pozice: {surface.sourcePosition}
+                        </span>
+                      )}
                     </div>
-                    {surface.sourcePosition && (
-                      <span className="text-[11px] font-semibold text-slate-500 block">
-                        Kód pozice: <strong className="text-slate-700 font-mono">{surface.sourcePosition}</strong>
-                      </span>
-                    )}
                   </div>
-                  <div className="shrink-0 self-start sm:self-auto">
+                  <div className="shrink-0 self-start sm:self-auto flex items-center gap-2">
                     <StatusBadge value={isOutOfService ? 'OUT_OF_SERVICE' : isOccupied ? 'OCCUPIED' : 'AVAILABLE'} />
                   </div>
                 </div>
 
-                {/* Client & Rental Status Bar */}
-                <div className="rounded-2xl bg-slate-50 p-3 border border-slate-200/70 space-y-2 text-xs">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wide">Klient:</span>
-                      {surface.currentClient ? (
-                        <span className="rounded-lg bg-emerald-100 px-2.5 py-0.5 font-black text-emerald-900 border border-emerald-300">
-                          👤 {surface.currentClient.name}
-                        </span>
+                {/* 🧭 Main Area: Spacious 2-column or wide layout for Road Sign + Details + Photo */}
+                <div className="grid gap-4 lg:grid-cols-12 items-stretch">
+                  {/* Left: Road Signboard + Client Rental Details */}
+                  <div className={`${surface.photos && surface.photos.length > 0 ? 'lg:col-span-8 xl:col-span-8' : 'lg:col-span-12'} space-y-3.5 flex flex-col justify-between`}>
+                    {!isInline ? (
+                      <div className="rounded-2xl border border-sky-300 bg-gradient-to-br from-sky-50/80 via-white to-blue-50/50 p-4 sm:p-5 shadow-xs space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-sky-200/70 pb-2.5">
+                          <span className="flex items-center gap-2 font-black text-sky-950 text-xs">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-600 text-white text-xs shadow-2xs font-bold">
+                              🧭
+                            </span>
+                            <span className="uppercase tracking-wider text-[11px] font-black text-sky-900">Směrová navigační cedule</span>
+                          </span>
+                          {canEdit && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                className="rounded-xl bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+                                onClick={() => openInlineEdit(surface)}
+                                type="button"
+                              >
+                                <span>✏️</span>
+                                <span>Upravit parametry</span>
+                              </button>
+                              <button
+                                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white transition shadow-2xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                disabled={aiExtractingSurfaceId === surface.id}
+                                onClick={() => void handleExtractPhotoData(surface.id)}
+                                type="button"
+                              >
+                                <span>{aiExtractingSurfaceId === surface.id ? '⌛' : '✨'}</span>
+                                <span>{aiExtractingSurfaceId === surface.id ? 'Čtení...' : 'Rozpoznat z fotky'}</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 🛣️ Road Sign Banner: Big Arrow + Direction + Destination + Distance */}
+                        <div className="rounded-2xl bg-white border border-sky-200 p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+                          {/* High-visibility directional arrow badge */}
+                          <div
+                            className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 flex-col items-center justify-center rounded-2xl bg-sky-600 text-white shadow-sm border-2 border-sky-500 gap-0.5"
+                            title={`Směr: ${surface.directionDescription || 'neuveden'}`}
+                          >
+                            <span className="text-3xl sm:text-4xl font-black leading-none">{arrowIcon}</span>
+                            <span className="text-[10px] font-black uppercase tracking-wider leading-none opacity-90">
+                              {surface.directionDescription ? surface.directionDescription.toUpperCase() : 'SMĚR'}
+                            </span>
+                          </div>
+
+                          {/* Target & details */}
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-base sm:text-xl font-black text-slate-950 truncate" title={surface.destinationName || 'Cíl neuveden'}>
+                                🎯 {surface.destinationName || 'Cíl / Prodejna neuvedena'}
+                              </span>
+                              {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
+                                <span className="shrink-0 text-xs sm:text-sm font-black text-amber-900 bg-amber-100 border border-amber-300 px-3 py-1 rounded-xl shadow-2xs font-mono">
+                                  📏 {surface.distanceMeters >= 1000 ? `${(surface.distanceMeters / 1000).toFixed(1).replace('.0', '').replace('.', ',')} km` : `${surface.distanceMeters} m`}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="font-bold text-sky-900 bg-sky-100/90 px-2.5 py-1 rounded-lg border border-sky-200">
+                                Směr: <strong className="text-sky-950 font-black">{surface.directionDescription || 'neuvedeno'}</strong>
+                              </span>
+                              {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
+                                <span className="text-slate-600 font-semibold bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                                  {surface.distanceMeters} metrů po trase k cíli
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Inline Edit Form */
+                      <div className="rounded-2xl border border-sky-300 bg-sky-50/80 p-4 space-y-3 text-xs">
+                        <h5 className="font-extrabold text-sky-950 text-xs flex items-center gap-1.5">
+                          <span>✏️</span>
+                          <span>Rychlá úprava směru, cíle a vzdálenosti</span>
+                        </h5>
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <label>
+                            <span className="block mb-1 font-bold text-slate-700">Směr šipky</span>
+                            <input
+                              className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-2xs text-xs font-semibold"
+                              placeholder="vpravo / vlevo"
+                              value={directionDescription}
+                              onChange={(e) => setDirectionDescription(e.target.value)}
+                            />
+                          </label>
+                          <label>
+                            <span className="block mb-1 font-bold text-slate-700">Cíl / Prodejna</span>
+                            <input
+                              className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-2xs text-xs font-semibold"
+                              placeholder="např. BILLA"
+                              value={destinationName}
+                              onChange={(e) => setDestinationName(e.target.value)}
+                            />
+                          </label>
+                          <label>
+                            <span className="block mb-1 font-bold text-slate-700">Vzdálenost (m)</span>
+                            <input
+                              className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-2xs text-xs font-semibold font-mono"
+                              placeholder="např. 1500"
+                              type="number"
+                              value={distanceMeters}
+                              onChange={(e) => setDistanceMeters(e.target.value)}
+                            />
+                          </label>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            className="rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 font-bold text-slate-700 hover:bg-slate-100 cursor-pointer transition shadow-2xs"
+                            onClick={() => setInlineEditingSurfaceId(null)}
+                            type="button"
+                          >
+                            Zrušit
+                          </button>
+                          <button
+                            className="rounded-xl bg-sky-600 px-4 py-1.5 font-extrabold text-white hover:bg-sky-500 disabled:opacity-50 cursor-pointer transition shadow-2xs"
+                            disabled={saving}
+                            onClick={() => void handleSaveInlineEdit(surface)}
+                            type="button"
+                          >
+                            {saving ? 'Ukládám...' : 'Uložit změny'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Client & Rental Status Bar */}
+                    <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-200/80 text-xs flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-500 uppercase tracking-wide text-[11px]">Klient:</span>
+                        {surface.currentClient ? (
+                          <span className="rounded-xl bg-emerald-100 px-3 py-1 font-black text-emerald-900 border border-emerald-300 shadow-2xs">
+                            👤 {surface.currentClient.name}
+                          </span>
+                        ) : (
+                          <span className="italic text-slate-500 bg-white px-2.5 py-1 rounded-xl border border-slate-200">
+                            Volná pozice bez klienta
+                          </span>
+                        )}
+                      </div>
+
+                      {activeOccupancy ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-700 flex-wrap">
+                          <span className="font-bold text-slate-500 uppercase tracking-wide text-[11px]">Pronajato do:</span>
+                          <span className="font-black text-slate-950 font-mono bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                            📅 {activeOccupancy.dateTo}
+                          </span>
+                          <span className="text-slate-400 text-[11px]">(od {activeOccupancy.dateFrom})</span>
+                        </div>
                       ) : (
-                        <span className="italic text-slate-400">Volná pozice bez klienta</span>
+                        <span className="text-emerald-700 font-bold text-xs bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                          K dispozici k okamžitému pronájmu
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {activeOccupancy && (
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200/60 text-[11px] text-slate-700 flex-wrap">
-                      <span className="font-bold text-slate-500 uppercase tracking-wide">Pronajato do:</span>
-                      <span className="font-black text-slate-950 font-mono">{activeOccupancy.dateTo}</span>
-                      <span className="text-slate-400">(od {activeOccupancy.dateFrom})</span>
+                  {/* Right: Photo Preview (if attached to this surface) */}
+                  {surface.photos && surface.photos.length > 0 ? (
+                    <div className="lg:col-span-4 xl:col-span-4 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 flex flex-col justify-between space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                        <span>📸 Fotografie pozice ({surface.photos.length})</span>
+                        <a href="#photo-gallery" className="text-[11px] text-sky-600 hover:underline font-bold">
+                          Celá galerie
+                        </a>
+                      </div>
+                      <div className="flex flex-wrap gap-2.5 justify-center sm:justify-start">
+                        {surface.photos.map((p) => (
+                          <a
+                            key={p.id}
+                            href={p.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="relative h-32 sm:h-36 w-full max-w-[220px] overflow-hidden rounded-xl border border-slate-300 bg-slate-900 group shadow-xs block"
+                            title="Klikněte pro zobrazení fotky v plné velikosti"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : p.url}
+                              alt={p.note || surface.name}
+                              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                            <span className="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded-md font-mono">
+                              🔍 Zvětšit
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-slate-500 italic text-center sm:text-left">
+                        Fotka navigační cedule na sloupu
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="lg:col-span-4 xl:col-span-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4 flex flex-col items-center justify-center text-center text-xs text-slate-500 space-y-1">
+                      <span className="text-2xl">📷</span>
+                      <span className="font-semibold text-slate-700">Žádná přiřazená fotka pozice</span>
+                      <span className="text-[11px] text-slate-400">Fotky nosiče najdete v hlavní fotogalerii níže.</span>
                     </div>
                   )}
                 </div>
 
-                {/* 🧭 Road Navigation Directional Signboard (Modern, clear & spacious) */}
-                {!isInline ? (
-                  <div className="rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/40 p-3.5 shadow-2xs space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-sky-100 pb-2">
-                      <span className="flex items-center gap-1.5 font-black text-sky-950 text-xs">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-sky-600 text-white text-[11px] shadow-2xs font-bold">
-                          🧭
-                        </span>
-                        <span className="uppercase tracking-wider text-[11px]">Parametry směrové navigace</span>
-                      </span>
-                      {canEdit && (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            className="rounded-xl bg-white hover:bg-slate-50 border border-slate-300 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition shadow-2xs cursor-pointer flex items-center gap-1"
-                            onClick={() => openInlineEdit(surface)}
-                            type="button"
-                          >
-                            <span>✏️</span>
-                            <span>Upravit</span>
-                          </button>
-                          <button
-                            className="rounded-xl bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 text-[11px] font-bold text-white transition shadow-2xs cursor-pointer disabled:opacity-50 flex items-center gap-1"
-                            disabled={aiExtractingSurfaceId === surface.id}
-                            onClick={() => void handleExtractPhotoData(surface.id)}
-                            type="button"
-                          >
-                            <span>{aiExtractingSurfaceId === surface.id ? '⌛' : '✨'}</span>
-                            <span>{aiExtractingSurfaceId === surface.id ? 'Čtení...' : 'Rozpoznat z fotky'}</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 🛣️ Road Sign Banner: Arrow + Direction + Destination + Distance */}
-                    <div className="rounded-xl bg-white border border-sky-200/80 p-3 shadow-2xs flex items-center gap-3">
-                      {/* High-visibility directional arrow badge */}
-                      <div
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-600 text-white text-2xl font-black shadow-sm border border-sky-500"
-                        title={`Směr: ${surface.directionDescription || 'neuveden'}`}
-                      >
-                        {arrowIcon}
-                      </div>
-
-                      {/* Target & details */}
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-black text-slate-900 truncate" title={surface.destinationName || 'Cíl neuveden'}>
-                            🎯 {surface.destinationName || 'Cíl / Prodejna neuvedena'}
-                          </span>
-                          {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
-                            <span className="shrink-0 text-xs font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs font-mono">
-                              📏 {surface.distanceMeters >= 1000 ? `${(surface.distanceMeters / 1000).toFixed(1).replace('.0', '').replace('.', ',')} km` : `${surface.distanceMeters} m`}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                          <span className="font-bold text-sky-900 bg-sky-100/80 px-2 py-0.5 rounded-md border border-sky-200">
-                            Směr: <strong className="text-sky-950 font-black">{surface.directionDescription || 'neuvedeno'}</strong>
-                          </span>
-                          {surface.distanceMeters !== undefined && surface.distanceMeters !== null && (
-                            <span className="text-slate-500 font-medium">
-                              ({surface.distanceMeters} m po trase)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* Inline Edit Form */
-                  <div className="rounded-2xl border border-sky-300 bg-sky-50/80 p-3.5 space-y-3 text-xs">
-                    <h5 className="font-extrabold text-sky-950 text-xs flex items-center gap-1.5">
-                      <span>✏️</span>
-                      <span>Rychlá úprava směru, cíle a vzdálenosti</span>
-                    </h5>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <label>
-                        <span className="block mb-1 font-bold text-slate-700">Směr šipky</span>
-                        <input
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2 shadow-2xs text-xs font-semibold"
-                          placeholder="vpravo / vlevo"
-                          value={directionDescription}
-                          onChange={(e) => setDirectionDescription(e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        <span className="block mb-1 font-bold text-slate-700">Cíl / Prodejna</span>
-                        <input
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2 shadow-2xs text-xs font-semibold"
-                          placeholder="např. BILLA"
-                          value={destinationName}
-                          onChange={(e) => setDestinationName(e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        <span className="block mb-1 font-bold text-slate-700">Vzdálenost (m)</span>
-                        <input
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2 shadow-2xs text-xs font-semibold font-mono"
-                          placeholder="např. 1500"
-                          type="number"
-                          value={distanceMeters}
-                          onChange={(e) => setDistanceMeters(e.target.value)}
-                        />
-                      </label>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-1">
-                      <button
-                        className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 font-bold text-slate-700 hover:bg-slate-100 cursor-pointer transition shadow-2xs"
-                        onClick={() => setInlineEditingSurfaceId(null)}
-                        type="button"
-                      >
-                        Zrušit
-                      </button>
-                      <button
-                        className="rounded-xl bg-sky-600 px-3.5 py-1.5 font-extrabold text-white hover:bg-sky-500 disabled:opacity-50 cursor-pointer transition shadow-2xs"
-                        disabled={saving}
-                        onClick={() => void handleSaveInlineEdit(surface)}
-                        type="button"
-                      >
-                        {saving ? 'Ukládám...' : 'Uložit změny'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 📸 Photos attached to this individual surface */}
-                {surface.photos && surface.photos.length > 0 ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                      <span>📸 Fotografie pozice ({surface.photos.length})</span>
-                      <a href="#photo-gallery" className="text-[11px] text-sky-600 hover:underline font-bold">
-                        Otevřít celou galerii
-                      </a>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {surface.photos.map((p) => (
-                        <a
-                          key={p.id}
-                          href={p.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-300 bg-slate-900 group shadow-2xs"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : p.url}
-                            alt={p.note || surface.name}
-                            className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-200"
-                          />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-2.5 text-center text-xs text-slate-500">
-                    <span>📷 K této pozici zatím není vybraná konkrétní fotka (fotky nosiče najdete v hlavní galerii níže).</span>
-                  </div>
-                )}
                 {isAiActive && aiResult && (
-                  <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-3 text-xs space-y-2 shadow-sm">
+                  <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-4 text-xs space-y-2.5 shadow-sm">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-emerald-950 flex items-center gap-1">
+                      <span className="font-bold text-emerald-950 flex items-center gap-1.5 text-sm">
                         ✨ Návrh rozpoznaný z fotky nosiče ({aiResult.confidence} jistota)
                       </span>
                       <button
-                        className="text-emerald-700 hover:text-emerald-950 font-bold"
+                        className="text-emerald-700 hover:text-emerald-950 font-bold px-2 py-1"
                         onClick={() => setAiResult(null)}
                         type="button"
                       >
                         ✕
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white/80 p-2 rounded-xl border border-emerald-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white/90 p-3 rounded-xl border border-emerald-200">
                       <div>
-                        <span className="text-[10px] text-slate-500 font-semibold block">Rozpoznaný směr</span>
-                        <span className="font-bold text-slate-900">{aiResult.directionArrow} {aiResult.directionDescription || 'neuvedeno'}</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Rozpoznaný směr</span>
+                        <span className="font-black text-slate-900 text-sm">{aiResult.directionArrow} {aiResult.directionDescription || 'neuvedeno'}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-500 font-semibold block">Cíl</span>
-                        <span className="font-bold text-slate-900">🎯 {aiResult.destinationName || 'neuvedeno'}</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Cíl</span>
+                        <span className="font-black text-slate-900 text-sm">🎯 {aiResult.destinationName || 'neuvedeno'}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-500 font-semibold block">Vzdálenost</span>
-                        <span className="font-bold text-slate-900">📏 {aiResult.distanceMeters ? `${aiResult.distanceMeters} m` : 'neuvedeno'}</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Vzdálenost</span>
+                        <span className="font-black text-slate-900 text-sm">📏 {aiResult.distanceMeters ? `${aiResult.distanceMeters} m` : 'neuvedeno'}</span>
                       </div>
                     </div>
                     <button
-                      className="w-full rounded-xl bg-emerald-700 py-1.5 font-bold text-white hover:bg-emerald-800 shadow"
+                      className="w-full rounded-xl bg-emerald-700 py-2 font-bold text-white hover:bg-emerald-800 shadow cursor-pointer transition"
                       disabled={saving}
                       onClick={() => void handleApplyAiResult(surface)}
                       type="button"
@@ -755,10 +779,10 @@ export function NavigationSurfaceManager({
 
                 {/* Main Card Actions */}
                 {canEdit && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/80 text-xs">
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3.5 border-t border-slate-200/80 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
-                        className={`rounded-xl px-4 py-2 font-bold transition shadow-sm ${
+                        className={`rounded-xl px-4 py-2 font-bold transition shadow-sm cursor-pointer ${
                           isOccupied
                             ? 'bg-amber-600 text-white hover:bg-amber-700'
                             : 'bg-emerald-600 text-white hover:bg-emerald-700'
@@ -771,7 +795,7 @@ export function NavigationSurfaceManager({
 
                       {isOccupied && (
                         <button
-                          className="rounded-xl border border-rose-300 bg-white px-3 py-2 font-semibold text-rose-700 hover:bg-rose-50 shadow-sm"
+                          className="rounded-xl border border-rose-300 bg-white px-3.5 py-2 font-semibold text-rose-700 hover:bg-rose-50 shadow-sm cursor-pointer transition"
                           onClick={() => void handleOccupySurface(surface.id, true)}
                           type="button"
                         >
@@ -780,14 +804,14 @@ export function NavigationSurfaceManager({
                       )}
 
                       <button
-                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+                        className="rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-semibold text-slate-700 hover:bg-slate-50 shadow-sm cursor-pointer transition"
                         onClick={() => void handleToggleOutOfService(surface)}
                         type="button"
                       >
                         {isOutOfService ? 'Obnovit provoz' : 'Mimo provoz'}
                       </button>
                       <button
-                        className={`rounded-xl px-3 py-2 font-bold transition shadow-2xs ${
+                        className={`rounded-xl px-3.5 py-2 font-bold transition shadow-2xs cursor-pointer ${
                           isSurfaceSelected(surface.id)
                             ? 'bg-sky-500 text-slate-950 hover:bg-sky-400'
                             : 'border border-sky-300 bg-sky-50 text-sky-900 hover:bg-sky-100'
@@ -812,7 +836,7 @@ export function NavigationSurfaceManager({
                     </div>
 
                     <button
-                      className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 font-bold text-sky-900 hover:bg-sky-100 shadow-sm"
+                      className="rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-2 font-bold text-sky-900 hover:bg-sky-100 shadow-sm cursor-pointer transition"
                       onClick={() => setMoveModalSurfaceId(surface.id)}
                       type="button"
                     >

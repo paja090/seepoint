@@ -87,7 +87,7 @@ export async function enterPublicCampaignAlbumTenant(slug: string) {
     select: { id: true, organizationId: true, name: true, clientName: true, status: true },
   });
 
-  if (!campaign || campaign.status === 'ARCHIVED') return null;
+  if (!campaign) return null;
 
   const organization = await platformPrisma.organization.findUnique({
     where: { id: campaign.organizationId },

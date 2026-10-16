@@ -432,6 +432,12 @@ export function UnifiedPhotoDocumentationView({
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
               {album.pointsCount} {album.pointsCount === 1 ? 'bod' : album.pointsCount < 5 ? 'body' : 'bodů'}
             </span>
+            {album.createdAt && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-50 text-slate-600 border border-slate-200" title={`Vytvořeno ${formatDate(album.createdAt)}`}>
+                <Clock className="w-3 h-3 text-slate-400" />
+                Vytvořeno: {new Date(album.createdAt).toLocaleDateString('cs-CZ')}
+              </span>
+            )}
             {album.clientName && !album.displayTitle?.toLowerCase().includes(album.clientName.toLowerCase().slice(0, 5)) && (
               <span className="text-[11px] text-slate-400 truncate max-w-[150px]" title={album.clientName}>
                 {album.clientName}
@@ -769,6 +775,9 @@ export function UnifiedPhotoDocumentationView({
                 campaignName={activeAlbum.displayTitle || activeAlbum.title}
                 clientName={activeAlbum.clientName}
                 points={activeAlbum.points}
+                publicShareUrl={activeAlbum.publicShareUrl}
+                downloadZipUrl={activeAlbum.downloadZipUrl}
+                createdAt={activeAlbum.createdAt}
               />
             </div>
           ) : (

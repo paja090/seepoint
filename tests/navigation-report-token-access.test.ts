@@ -10,6 +10,7 @@ test('public report lookup only reads a matching active published token and neve
   const loader = Module as unknown as { _load: (...args: any[]) => any };
   const original = loader._load;
   loader._load = function(id: string, ...args: any[]) {
+    if (id === 'server-only') return {};
     if (id === './db') return { platformPrisma: {
       navigationDocumentationReport: {
         findFirst: async ({ where }: any) => {
