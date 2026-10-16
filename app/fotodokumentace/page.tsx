@@ -9,6 +9,7 @@ import {
   type RecentPhotoItem,
 } from '@/components/fotodokumentace/UnifiedPhotoDocumentationView';
 import type { InternalPointWithPhotos } from '@/components/election-removal/CampaignPhotoAlbum';
+import { formatAlbumDisplay } from '@/lib/fotodokumentace/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -156,14 +157,27 @@ export default async function PhotoDocumentationHubPage({
 
     const allPhotos = points.flatMap((p) => p.photos);
     const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;
+    const d = new Date(c.createdAt);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const periodLabel = `${quarter}. čtvrtletí ${year}`;
+    const formatted = formatAlbumDisplay(c.name, c.clientName, periodLabel);
 
     return {
       id: c.id,
       source: 'FIELD_WORK',
       sourceLabel: 'Terénní práce',
       title: c.name,
+      displayTitle: formatted.displayTitle,
+      displaySubtitle: formatted.displayLocation || null,
+      displayBadge: formatted.displayPeriod || periodLabel,
       clientName: c.clientName,
       createdAt: c.createdAt,
+      year,
+      month,
+      quarter,
+      periodLabel,
       photosCount: allPhotos.length,
       pointsCount: points.length,
       coverPhotoUrl,
@@ -204,14 +218,28 @@ export default async function PhotoDocumentationHubPage({
 
     const allPhotos = points.flatMap((p) => p.photos);
     const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;
+    const year = r.year;
+    const quarter = r.quarter || Math.ceil((new Date(r.periodFrom || r.createdAt).getMonth() + 1) / 3);
+    const month = r.periodFrom
+      ? new Date(r.periodFrom).getMonth() + 1
+      : (quarter - 1) * 3 + 1;
+    const periodLabel = `${quarter}. čtvrtletí ${year}`;
+    const formatted = formatAlbumDisplay(r.title, r.client?.name, periodLabel);
 
     return {
       id: r.id,
       source: 'NAVIGATION',
       sourceLabel: 'Navigační reklama VO',
       title: r.title,
+      displayTitle: formatted.displayTitle,
+      displaySubtitle: formatted.displayLocation || null,
+      displayBadge: formatted.displayPeriod || periodLabel,
       clientName: r.client?.name || 'Klient VO',
       createdAt: r.createdAt,
+      year,
+      month,
+      quarter,
+      periodLabel,
       photosCount: allPhotos.length,
       pointsCount: points.length,
       coverPhotoUrl,
