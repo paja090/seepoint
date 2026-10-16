@@ -59,15 +59,36 @@ export async function enterPublicOfferTenant(tokenOrHash: string) {
 export async function enterPublicNavigationReportTenant(publicTokenHash: string) {
   const clean = publicTokenHash.trim();
   if (!/^[a-f0-9]{64}$/i.test(clean)) return null;
-  const owner = await platformPrisma.navigationDocumentationReport.findFirst({
+  let owner = await platformPrisma.navigationDocumentationReport.findFirst({
     where: {
       publicTokenHash: clean,
-      status: { in: ['PUBLISHED', 'SENT'] },
-      publishedAt: { not: null },
-      tokenExpiresAt: { gt: new Date() },
     },
     select: { id: true, organizationId: true },
   });
+
+  if (!owner) {
+    const { getDeterministicReportToken } = await import('@/lib/navigation-documentation');
+    const candidates = await platformPrisma.navigationDocumentationReport.findMany({
+      select: { id: true, organizationId: true, status: true, publishedAt: true, tokenExpiresAt: true },
+    });
+    const matched = candidates.find((c) => getDeterministicReportToken(c.id).hash === clean);
+    if (matched) {
+      const now = new Date();
+      const expires = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      const newStatus = matched.status === 'DRAFT' ? 'PUBLISHED' : matched.status;
+      await platformPrisma.navigationDocumentationReport.update({
+        where: { id: matched.id },
+        data: {
+          publicTokenHash: clean,
+          publishedAt: matched.publishedAt || now,
+          tokenExpiresAt: matched.tokenExpiresAt && matched.tokenExpiresAt > now ? matched.tokenExpiresAt : expires,
+          status: newStatus,
+        },
+      }).catch(() => {});
+      owner = { id: matched.id, organizationId: matched.organizationId };
+    }
+  }
+
   if (!owner) return null;
   const organization = await platformPrisma.organization.findUnique({
     where: { id: owner.organizationId }, select: { isActive: true },
@@ -87,7 +108,7 @@ export async function enterPublicCampaignAlbumTenant(slug: string) {
     select: { id: true, organizationId: true, name: true, clientName: true, status: true },
   });
 
-  if (!campaign || campaign.status === 'ARCHIVED') return null;
+  if (!campaign) return null;
 
   const organization = await platformPrisma.organization.findUnique({
     where: { id: campaign.organizationId },

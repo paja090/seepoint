@@ -214,5 +214,12 @@ export async function syncNavigationPointToCarrierAndSurface(
     });
   }
 
+  if (carrier.name !== surfaceName) {
+    await tx.advertisingCarrier.update({
+      where: { id: carrier.id },
+      data: { name: surfaceName },
+    });
+  }
+
   return { carrierId: carrier.id, surfaceId: surface.id };
 }

@@ -49,6 +49,7 @@ export interface PublicCampaignAlbumViewProps {
     clientName?: string | null;
     description?: string | null;
     targetDate?: string | null;
+    createdAt?: string | null;
     totalPoints: number;
     completedPoints: number;
   };
@@ -175,13 +176,19 @@ export function PublicCampaignAlbumView({
             <img src="/seepoint-logo.svg" alt="SeePoint" className="h-8 w-auto" />
             <div className="h-6 w-px bg-slate-200 hidden sm:block" />
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-100">
                   Fotodokumentace zakázky
                 </span>
                 {campaign.clientName && (
                   <span className="text-xs text-slate-500 font-medium">
                     pro {campaign.clientName}
+                  </span>
+                )}
+                {campaign.createdAt && (
+                  <span className="text-xs text-slate-400 flex items-center gap-1 font-normal">
+                    <Clock className="w-3 h-3 text-slate-400" />
+                    Vytvořeno {formatCzechDate(campaign.createdAt)}
                   </span>
                 )}
               </div>
