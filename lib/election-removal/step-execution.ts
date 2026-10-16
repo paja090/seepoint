@@ -11,6 +11,7 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
   if (!point || point.status === 'CANCELLED') throw new Error('Práce již není dostupná.');
   const step = point.steps.find(s => s.id === stop.fieldWorkStepId);
   if (!step) {
+    if (input.action === 'inspect') return { ok: true, fieldWorkStepId: null, electionRemovalPointId: point.id, photoType: 'AFTER_INSTALLATION' };
     // Historic links remain readable; legacy work must be reviewed before new execution.
     throw new Error('Tato starší práce vyžaduje kontrolu a doplnění kroků dispečerem.');
   }

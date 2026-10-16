@@ -103,6 +103,13 @@ export type MyRouteCarrier = {
   photoUrl?: string | null;
 } | null;
 
+export type MyRouteStopPhoto = {
+  id: string;
+  url: string;
+  type?: string | null;
+  createdAt: string;
+};
+
 export type MyRouteStop = {
   fieldWorkStepId?: string;
   quantity?: number;
@@ -116,6 +123,7 @@ export type MyRouteStop = {
   electionRemovalPointId: string | null;
   address: string | null;
   pointPhotoUrl: string | null;
+  photos?: MyRouteStopPhoto[];
   workOrderId: string;
   orderTitle?: string | null;
   campaignName?: string | null;
@@ -143,6 +151,7 @@ export type MyRouteStop = {
   liveEstimatedEndAt?: string;
   delayMinutes?: number;
 };
+
 
 export type MyRouteDTO = {
   timezone: string;

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const input = { planId: String(form.get('planId') ?? ''), workOrderId: String(form.get('workOrderId') ?? ''), jobId: String(form.get('jobId') ?? ''), action: 'inspect' };
     // Check ownership before accepting bytes; repeat inside the installation transaction.
     const verified = await executeStop(input, user);
-    if ('fieldWorkStepId' in verified && verified.fieldWorkStepId) return NextResponse.json(await uploadFieldPhoto(form, user));
+    if (('fieldWorkStepId' in verified && verified.fieldWorkStepId) || ('electionRemovalPointId' in verified && verified.electionRemovalPointId)) return NextResponse.json(await uploadFieldPhoto(form, user));
     if ('workOrderItemId' in verified && verified.workOrderItemId) return NextResponse.json(await uploadInstallationPhotos(form, organizationId, input.workOrderId, verified.workOrderItemId, photos => executeStop({ ...input, action: 'photo' }, user, undefined, photos)));
     if (!('navigationPointId' in verified) || !verified.navigationPointId || !verified.navigationOrderId) throw new Error('Bod není dostupný.');
     const result = await uploadInstallationPhotos(form, organizationId, verified.navigationOrderId, verified.navigationPointId,
