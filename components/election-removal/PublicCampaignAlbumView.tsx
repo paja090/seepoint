@@ -49,6 +49,7 @@ export interface PublicCampaignAlbumViewProps {
     clientName?: string | null;
     description?: string | null;
     targetDate?: string | null;
+    createdAt?: string | null;
     totalPoints: number;
     completedPoints: number;
   };
@@ -182,6 +183,12 @@ export function PublicCampaignAlbumView({
                 {campaign.clientName && (
                   <span className="text-xs text-slate-500 font-medium">
                     pro {campaign.clientName}
+                  </span>
+                )}
+                {campaign.createdAt && (
+                  <span className="text-xs text-slate-500 font-medium inline-flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-slate-400" />
+                    Vytvořeno: {formatCzechDate(campaign.createdAt)}
                   </span>
                 )}
               </div>

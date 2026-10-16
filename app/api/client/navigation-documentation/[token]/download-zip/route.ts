@@ -132,7 +132,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       },
     });
 
-    if (!report || report.status === 'ARCHIVED') {
+    if (!report) {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
 
