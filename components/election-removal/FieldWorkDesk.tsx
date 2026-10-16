@@ -7,7 +7,7 @@ import { operations, dispositions } from '@/lib/election-removal/task-spec';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import { LocationPickerMap } from './LocationPickerMap';
 
-type Point = ElectionRemovalPoint & { steps: FieldWorkStep[]; photos?: { id: string }[] };
+type Point = ElectionRemovalPoint & { steps: FieldWorkStep[]; photos?: { id: string; type?: string; fileName?: string | null; createdAt?: string | Date; capturedLatitude?: number | null; capturedLongitude?: number | null; capturedByWorkerName?: string | null }[] };
 type Carrier = { id: string; name: string; latitude: number | null; longitude: number | null; surfaces: { id: string; name: string }[] };
 export function FieldWorkDesk({ campaignId, points }: { campaignId: string; points: Point[] }) {
   const router = useRouter();
@@ -37,10 +37,18 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
     setDestination(point?.destinationLatitude != null && point.destinationLongitude != null ? { latitude: point.destinationLatitude, longitude: point.destinationLongitude } : null);
     setDisposition(point?.materialDisposition ?? 'LEAVE'); setTransport(['WAREHOUSE','TRANSFER','CLIENT'].includes(point?.materialDisposition ?? 'LEAVE')); setCarrier(null); setFormKey(k => k + 1);
   }
+  function duplicatePoint(point: Point) {
+    setFormOpen(true); setSource(point.carrierId ? 'CARRIER' : 'MAP'); setError('');
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    setEdit({ ...point, id: '', label: `${point.label} (kopie)` } as unknown as Point);
+    setGps({ latitude: point.latitude, longitude: point.longitude });
+    setDestination(point.destinationLatitude != null && point.destinationLongitude != null ? { latitude: point.destinationLatitude, longitude: point.destinationLongitude } : null);
+    setDisposition(point.materialDisposition ?? 'LEAVE'); setTransport(['WAREHOUSE','TRANSFER','CLIENT'].includes(point.materialDisposition ?? 'LEAVE')); setCarrier(null); setFormKey(k => k + 1);
+  }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
     const form = new FormData(event.currentTarget);
-    const payload = { ...Object.fromEntries(form), objectType: form.get('objectType') || ELECTION_REMOVAL_MEDIA_LABELS[form.get('mediaType') as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS], campaignId, id: edit?.id, ...gps,
+    const payload = { ...Object.fromEntries(form), objectType: form.get('objectType') || ELECTION_REMOVAL_MEDIA_LABELS[form.get('mediaType') as keyof typeof ELECTION_REMOVAL_MEDIA_LABELS], campaignId, id: edit?.id ? edit.id : undefined, ...gps,
       carrierId: source === 'CARRIER' ? carrier?.id ?? edit?.carrierId ?? null : null, surfaceId: source === 'CARRIER' ? (form.has('surfaceId') ? form.get('surfaceId') || null : edit?.surfaceId ?? null) : null,
       gpsConfirmed: form.get('gpsConfirmed') === 'on', destinationGpsConfirmed: form.get('destinationGpsConfirmed') === 'on',
       destinationLatitude: destination?.latitude, destinationLongitude: destination?.longitude,
@@ -90,7 +98,36 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       <div className="grid gap-3 sm:grid-cols-2">
         <label>Název místa / objektu<input className={input} required name="label" defaultValue={edit?.label ?? ''} /></label>
         <label>Typ objektu<select name="mediaType" className={input} defaultValue={edit?.mediaType ?? 'OTHER'}>{Object.entries(ELECTION_REMOVAL_MEDIA_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <label>Co se má udělat<select className={input} name="operationType" defaultValue={edit?.operationType ?? 'INSPECTION'} onChange={e => { if (e.target.value === 'RELOCATION') { setDisposition('TRANSFER'); setTransport(true); } }}>{Object.entries(operations).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Co se má udělat
+          <select
+            className={input}
+            name="operationType"
+            defaultValue={edit?.operationType ?? 'INSPECTION'}
+            onChange={e => {
+              if (e.target.value === 'RELOCATION') { setDisposition('TRANSFER'); setTransport(true); }
+              else if (e.target.value.startsWith('INSTALL')) { setDisposition('LEAVE'); setTransport(false); }
+              else if (e.target.value.startsWith('REMOVE')) { setDisposition('WAREHOUSE'); setTransport(false); }
+            }}
+          >
+            <optgroup label="🛠️ Instalace a montáže">
+              <option value="INSTALL_AD">Instalace reklamního materiálu</option>
+              <option value="INSTALL_OBJECT">Instalace konstrukce / objektu</option>
+              <option value="REPLACE_AD">Výměna reklamního materiálu</option>
+            </optgroup>
+            <optgroup label="🗑️ Deinstalace a demontáže">
+              <option value="REMOVE_AD">Odstranění reklamního materiálu</option>
+              <option value="REMOVE_OBJECT">Demontáž konstrukce / objektu</option>
+            </optgroup>
+            <optgroup label="🚚 Převozy a přesuny">
+              <option value="RELOCATION">Přesun na jiné místo / sklad</option>
+            </optgroup>
+            <optgroup label="🔍 Ostatní operace">
+              <option value="REPAIR">Oprava</option>
+              <option value="INSPECTION">Kontrola</option>
+              <option value="OTHER">Jiná práce</option>
+            </optgroup>
+          </select>
+        </label>
         <label>Množství<input className={input} name="quantity" type="number" min="1" required defaultValue={edit?.quantity ?? 1} /></label>
       </div>
       <label className="block">Přesný pokyn<textarea className={input} name="description" required defaultValue={edit?.description ?? ''} /></label>
@@ -126,9 +163,33 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
     <div className="space-y-2">{filteredPoints.slice(0,visibleCount).map(p => <article key={p.id} className="rounded-xl border bg-white p-4">
       <div className="flex gap-3 items-center"><input aria-label={`Vybrat ${p.label}`} type="checkbox" checked={selected.includes(p.id)} onChange={e => setSelected(e.target.checked ? [...selected, p.id] : selected.filter(id => id !== p.id))} />
         <strong>{p.label} · {p.quantity} ks · {p.operationType && operations[p.operationType as keyof typeof operations] || 'Vyžaduje kontrolu'}</strong>
-        <span className="ml-auto rounded-full bg-slate-100 px-2 py-1 text-xs">{groups[category(p)]}</span>{(!p.assignedFieldPlanId || (p.reviewRequired && p.steps.length === 0 && !p.startedAt)) && !p.startedAt && !p.steps.some(s => s.startedAt || s.completedQuantity > 0) && p.status !== 'COMPLETED' && <button className="text-sm underline" onClick={() => editPoint(p)}>Upravit</button>}</div>
+        <span className="ml-auto rounded-full bg-slate-100 px-2 py-1 text-xs">{groups[category(p)]}</span>
+        {(!p.assignedFieldPlanId || (p.reviewRequired && p.steps.length === 0 && !p.startedAt)) && !p.startedAt && !p.steps.some(s => s.startedAt || s.completedQuantity > 0) && p.status !== 'COMPLETED' && (
+          <button type="button" className="text-sm underline text-sky-700" onClick={() => editPoint(p)}>Upravit</button>
+        )}
+        <button type="button" className="text-sm underline text-slate-500 hover:text-sky-700" onClick={() => duplicatePoint(p)}>Duplikovat</button>
+      </div>
       <p className="mt-2 text-sm">{p.description} {p.materialInstructions}</p>
-      {p.photos?.map(photo => <a key={photo.id} className="mr-3 text-sm underline text-sky-700" href={`/api/photos/${photo.id}/file`} target="_blank" rel="noreferrer">Fotodokumentace</a>)}
+      {p.photos && p.photos.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2 items-center">
+          {p.photos.slice(0, 5).map(photo => (
+            <a
+              key={photo.id}
+              href={`/api/photos/${encodeURIComponent(photo.id)}/file`}
+              target="_blank"
+              rel="noreferrer"
+              className="block w-12 h-12 rounded-lg overflow-hidden border border-slate-200 hover:opacity-80 transition relative shadow-xs"
+              title="Zobrazit fotografii v plném rozlišení"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/photos/${encodeURIComponent(photo.id)}/file`} alt="Foto" loading="lazy" className="w-full h-full object-cover" />
+            </a>
+          ))}
+          {p.photos.length > 5 && (
+            <span className="text-xs text-slate-500 font-medium">+{p.photos.length - 5} dalších</span>
+          )}
+        </div>
+      )}
       {p.steps.map(s => <p className="text-sm text-slate-600" key={s.id}>{s.sequence}. {s.label}: {s.completedQuantity}/{s.quantity} · {({ PENDING: 'Čeká', ASSIGNED: 'Naplánováno', IN_PROGRESS: 'Probíhá', ISSUE: 'Problém', COMPLETED: 'Hotovo', CANCELLED: 'Zrušeno' } as Record<string,string>)[s.status] ?? s.status}{s.custodyNote ? ` · ${s.custodyNote}` : ''}{s.issueNote ? ` · ${s.issueNote}` : ''}</p>)}
       {p.steps.some(s => s.status === 'COMPLETED' && s.loadDelta > 0) && p.steps.some(s => s.kind === 'DELIVERY' && !s.startedAt && s.status !== 'COMPLETED') && <details className="mt-3 rounded border p-3"><summary>Předat naložený materiál jiné posádce</summary>
         <form className="mt-3 space-y-2" onSubmit={async e => {

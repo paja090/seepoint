@@ -40,7 +40,11 @@ export async function uploadFieldPhoto(form: FormData, actor: PlannerActor) {
       if (existing.contentChecksum !== stored.contentChecksum) throw new Error('Klíč nahrávání patří jiné fotografii.');
       return { ok: true, photo: { id: existing.id } };
     }
+    const pointMeta = verified.electionRemovalPointId
+      ? await tx.electionRemovalPoint.findFirst({ where: { id: verified.electionRemovalPointId, organizationId }, select: { carrierId: true, surfaceId: true } })
+      : null;
     const photo = await tx.photo.create({ data: { id: photoId, organizationId,
+      carrierId: pointMeta?.carrierId ?? null, surfaceId: pointMeta?.surfaceId ?? null,
       electionRemovalPointId: verified.electionRemovalPointId, fieldWorkStepId: verified.fieldWorkStepId,
       type: verified.photoType ?? 'CONTROL', url: `/api/photos/${photoId}/file`, fileName, mimeType: file.type, size: file.size,
       capturedByWorkerUserId: actor.id, capturedByWorkerName: actor.email, storageProvider: stored.storageProvider,

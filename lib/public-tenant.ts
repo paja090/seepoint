@@ -76,3 +76,27 @@ export async function enterPublicNavigationReportTenant(publicTokenHash: string)
   enterTenantContext({ organizationId: owner.organizationId, source: 'public-token' });
   return owner;
 }
+
+export async function enterPublicCampaignAlbumTenant(slug: string) {
+  const { verifyCampaignAlbumSlug } = await import('@/lib/election-removal/album-token');
+  const campaignId = verifyCampaignAlbumSlug(slug);
+  if (!campaignId) return null;
+
+  const campaign = await platformPrisma.electionCampaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true, organizationId: true, name: true, clientName: true, status: true },
+  });
+
+  if (!campaign || campaign.status === 'ARCHIVED') return null;
+
+  const organization = await platformPrisma.organization.findUnique({
+    where: { id: campaign.organizationId },
+    select: { isActive: true },
+  });
+
+  if (!organization?.isActive) return null;
+
+  enterTenantContext({ organizationId: campaign.organizationId, source: 'public-token' });
+  return campaign;
+}
+

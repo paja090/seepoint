@@ -14,6 +14,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
+import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -233,6 +234,15 @@ export default async function ElectionRemovalPage() {
                         {c._count.fieldPlans} tras
                       </span>
                       <div className="flex items-center gap-2">
+                        {canManage && (
+                          <DuplicateCampaignButton
+                            campaignId={c.id}
+                            campaignName={c.name}
+                            clientName={c.clientName}
+                            totalPoints={c.totalPoints}
+                            variant="button"
+                          />
+                        )}
                         <Link
                           href={`/election-removal/${c.id}/route`}
                           className="btn btn-sm bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 text-xs font-semibold inline-flex items-center gap-1 py-1 px-2"
