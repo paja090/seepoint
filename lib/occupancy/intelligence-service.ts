@@ -9,6 +9,7 @@ import {
   BLOCKING_OCCUPANCY_STATUSES,
 } from './availability-service';
 import { getOrganizationOccupancyProfile } from './intelligence-profile';
+import { generateDeterministicFallbackEnrichment, enrichInsightWithAI } from './intelligence-ai';
 
 export type RawFinding = {
   type: OccupancyInsightType;
@@ -49,6 +50,7 @@ export async function runOccupancyAudit(
   organizationId: string,
   options: {
     userId?: string;
+    enrichWithAi?: boolean;
   } = {}
 ): Promise<AuditSummary> {
   return runWithTenantContext(
@@ -565,6 +567,17 @@ export async function runOccupancyAudit(
         processedFingerprintsInBatch.add(finding.fingerprint);
 
         const existing = existingMap.get(finding.fingerprint);
+        const surface = finding.surfaceId ? surfaceMap.get(finding.surfaceId) : undefined;
+        const fallback = generateDeterministicFallbackEnrichment({
+          id: existing?.id || 'new',
+          type: finding.type,
+          severity: finding.severity,
+          title: finding.title,
+          deterministicReason: finding.deterministicReason,
+          surfaceName: surface?.name,
+          carrierCode: surface?.carrier.code,
+          carrierCity: surface?.carrier.city,
+        });
 
         if (existing) {
           // Re-activate if previously RESOLVED; preserve IGNORED or REVIEWED status
@@ -575,6 +588,8 @@ export async function runOccupancyAudit(
             data: {
               title: finding.title,
               deterministicReason: finding.deterministicReason,
+              aiExplanation: fallback.aiExplanation,
+              aiRecommendation: fallback.aiRecommendation,
               severity: finding.severity,
               status: nextStatus,
               resolvedAt: isIgnored ? undefined : null,
@@ -598,6 +613,8 @@ export async function runOccupancyAudit(
             clientId: finding.clientId,
             title: finding.title,
             deterministicReason: finding.deterministicReason,
+            aiExplanation: fallback.aiExplanation,
+            aiRecommendation: fallback.aiRecommendation,
             suggestedActionType: finding.suggestedActionType,
             metadata: finding.metadata ? (JSON.parse(JSON.stringify(finding.metadata)) as Prisma.InputJsonValue) : undefined,
             detectedAt: now,
@@ -629,6 +646,40 @@ export async function runOccupancyAudit(
             })
           )
         );
+      }
+
+      // Optionally enrich critical findings with Gemini AI
+      if (options.enrichWithAi) {
+        const criticalFindings = rawFindings.filter((f) => f.severity === 'CRITICAL').slice(0, 5);
+        for (const cr of criticalFindings) {
+          const surf = cr.surfaceId ? surfaceMap.get(cr.surfaceId) : undefined;
+          try {
+            const aiRes = await enrichInsightWithAI(
+              organizationId,
+              {
+                id: cr.fingerprint,
+                type: cr.type,
+                severity: cr.severity,
+                title: cr.title,
+                deterministicReason: cr.deterministicReason,
+                surfaceName: surf?.name,
+                carrierCode: surf?.carrier.code,
+                carrierCity: surf?.carrier.city,
+              },
+              options.userId
+            );
+
+            await prisma.occupancyInsight.updateMany({
+              where: { organizationId, fingerprint: cr.fingerprint },
+              data: {
+                aiExplanation: aiRes.aiExplanation,
+                aiRecommendation: aiRes.aiRecommendation,
+              },
+            });
+          } catch (aiErr) {
+            console.warn('[Occupancy Intelligence] AI enrichment warning:', aiErr);
+          }
+        }
       }
 
       // Auto-resolve OPEN or REVIEWED insights whose issue is no longer present via batch updateMany

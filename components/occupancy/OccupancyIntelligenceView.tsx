@@ -171,9 +171,10 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
         setProfile(profData.profile || profData);
       }
 
-      setScanMessage(
-        `Audit dokončen: zkontrolováno ${data.summary?.surfacesCount || 0} ploch. Vytvořeno ${data.summary?.createdCount || 0} nových nálezů, automaticky vyřešeno ${data.summary?.autoResolvedCount || 0}.`,
-      );
+      const scanSummaryText =
+        data.message ||
+        `Audit dokončen: zkontrolováno ${data.summary?.checkedSurfaces ?? data.summary?.surfacesCount ?? 0} ploch. Vytvořeno ${data.summary?.newInsights ?? data.summary?.createdCount ?? 0} nových nálezů, automaticky vyřešeno ${data.summary?.autoResolvedInsights ?? data.summary?.autoResolvedCount ?? 0}.`;
+      setScanMessage(scanSummaryText);
     } catch (err) {
       setScanMessage(`Chyba: ${err instanceof Error ? err.message : String(err)}`);
     } finally {

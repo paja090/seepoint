@@ -98,7 +98,7 @@ export function WeatherClockWidget({ compact = false }: { compact?: boolean }) {
     return (
       <button
         onClick={cycleRegion}
-        className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-2.5 py-1 text-[11px] text-slate-300 font-bold hover:bg-slate-800 transition"
+        className="flex h-9 shrink-0 whitespace-nowrap items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-2.5 text-[11px] text-slate-300 font-bold hover:bg-slate-800 transition"
         title="Přepnout region počasí"
       >
         <span className="font-mono font-black text-white">{timeStr || '—'}</span>

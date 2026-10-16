@@ -60,7 +60,7 @@ export default async function OccupancyIntelligencePage() {
       const items = await prisma.occupancyInsight.findMany({
         where: { organizationId },
         orderBy: [{ status: 'asc' }, { severity: 'asc' }, { createdAt: 'desc' }],
-        take: 200,
+        take: 1000,
         include: {
           surface: {
             select: {
