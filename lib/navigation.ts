@@ -12,7 +12,8 @@ export const navigationHubs: NavigationHub[] = [
     { label: 'AI obchod', items: [
       ["/commercial","AI Obchodní centrum","briefcaseBusiness","commercial"],
       ["/ai-inbox","AI Inbox","mail","aiInbox"],
-      ["/sales/opportunities","AI Obchodní radar","radar","clients"]
+      ["/sales/opportunities","AI Obchodní radar","radar","clients"],
+      ["/occupancy/ai","AI Obsazenost","calendarRange","aiOccupancy"]
     ] },
     { label: 'AI provoz', items: [
       ["/realization","AI Řízení realizace","workflow","realization"]
