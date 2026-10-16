@@ -329,7 +329,7 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       <label className="block">Přesný pokyn<textarea className={input} name="description" required defaultValue={edit?.description ?? ''} /></label>
       <LocationPickerMap latitude={gps?.latitude} longitude={gps?.longitude} onChange={setGps} />
       <p>{gps ? `${gps.latitude}, ${gps.longitude}` : 'Klikněte do mapy nebo vyhledejte adresu.'}</p>
-      <label className="flex gap-2"><input name="gpsConfirmed" type="checkbox" required />Potvrzuji GPS místa práce / vyzvednutí</label>
+      <label className="flex gap-2"><input name="gpsConfirmed" type="checkbox" required defaultChecked={Boolean(edit || gps)} />Potvrzuji GPS místa práce / vyzvednutí</label>
       <label className="block">Nakládání s materiálem<select className={input} name="materialDisposition" value={disposition} onChange={e => { setDisposition(e.target.value); setTransport(['WAREHOUSE','TRANSFER','CLIENT'].includes(e.target.value)); }}>{Object.entries(dispositions).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
       <label className="block">Co vzít s sebou / co odvézt / co ponechat<textarea className={input} name="materialInstructions" defaultValue={edit?.materialInstructions ?? ''} /></label>
       {transport && <div className="space-y-3 rounded border p-3">
