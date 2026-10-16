@@ -17,9 +17,7 @@ import {
   ExternalLink,
   MapPin,
   Clock,
-  Sparkles,
 } from 'lucide-react';
-import { buildCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 
 export interface InternalPhotoItem {
   id: string;
@@ -46,6 +44,7 @@ export interface InternalPointWithPhotos {
 
 export interface CampaignPhotoAlbumProps {
   campaignId: string;
+  albumSlug: string;
   campaignName: string;
   clientName?: string | null;
   points: InternalPointWithPhotos[];
@@ -86,6 +85,7 @@ function formatCzechDate(dateVal?: string | Date | null): string {
 
 export function CampaignPhotoAlbum({
   campaignId,
+  albumSlug,
   campaignName,
   clientName,
   points,
@@ -150,7 +150,7 @@ export function CampaignPhotoAlbum({
     return list;
   }, [points, selectedPeriod, typeFilter, searchQuery]);
 
-  const slug = useMemo(() => buildCampaignAlbumSlug(campaignId), [campaignId]);
+  const slug = albumSlug;
 
   const clientShareUrl = useMemo(() => {
     if (typeof window === 'undefined') return `/client/fotodokumentace/${slug}`;

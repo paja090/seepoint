@@ -1,3 +1,4 @@
+import 'server-only';
 import * as crypto from 'node:crypto';
 
 function getSecret(): string {

@@ -6,6 +6,7 @@ import { checkElectionRemovalPageAccess } from '@/lib/election-removal/guard';
 import { FieldWorkDesk } from '@/components/election-removal/FieldWorkDesk';
 import { CampaignPhotoAlbum } from '@/components/election-removal/CampaignPhotoAlbum';
 import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
+import { buildCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 import { Route, ArrowLeft, Truck, Calendar } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -175,6 +176,7 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
         {/* Campaign Photo Album */}
         <CampaignPhotoAlbum
           campaignId={id}
+          albumSlug={buildCampaignAlbumSlug(id)}
           campaignName={campaign.name}
           clientName={campaign.clientName}
           points={pointsForAlbum}
