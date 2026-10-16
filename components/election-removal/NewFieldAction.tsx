@@ -1,7 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 export function NewFieldAction() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setReady(true); }, []);
   const router = useRouter(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   return <form className="rounded-xl border bg-white p-5 space-y-3" onSubmit={async e => {
     e.preventDefault(); setBusy(true); setError(''); const form = new FormData(e.currentTarget);
@@ -13,6 +15,6 @@ export function NewFieldAction() {
     <label className="block">Pro koho (nepovinné)<input className="block w-full rounded border p-2" name="clientName" /></label>
     <label className="block">Termín<input className="block rounded border p-2" name="targetDate" type="date" required /></label>
     <label className="block">Společné instrukce<textarea className="block w-full rounded border p-2" name="description" /></label>
-    {error && <p role="alert" className="text-red-700">{error}</p>}<button disabled={busy} className="rounded bg-sky-700 px-4 py-2 text-white">Založit a zadat práci</button>
+    {error && <p role="alert" className="text-red-700">{error}</p>}<button disabled={!ready || busy} className="rounded bg-sky-700 px-4 py-2 text-white">Založit a zadat práci</button>
   </form>;
 }

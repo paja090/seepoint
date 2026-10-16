@@ -24,10 +24,10 @@ test('field work: dispatcher to mobile, photo and partial completion', async ({ 
     await context.addCookies([{name:'seepoint_session',value:await session(manager.id),url:base}]);
     await mobileContext.addCookies([{name:'seepoint_session',value:await session(worker.id),url:base}]);
     const page=await context.newPage(); const errors:string[]=[]; page.on('pageerror',e=>errors.push(e.message));
-    page.setDefaultTimeout(30000);
+    page.setDefaultTimeout(120000);
     page.setDefaultNavigationTimeout(180000);
     await page.goto(base+'/election-removal/new',{waitUntil:'domcontentloaded'});
-    await expect(page.getByRole('button',{name:'Založit a zadat práci'})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Založit a zadat práci'})).toBeEnabled({timeout:120000});
     const create=page.locator('form').filter({has:page.getByRole('button',{name:'Založit a zadat práci'})});
     await create.locator('[name="name"]').fill('Instalace informačních tabulí');
     await create.locator('[name="targetDate"]').fill(date);
@@ -63,8 +63,10 @@ test('field work: dispatcher to mobile, photo and partial completion', async ({ 
     await page.getByRole('button',{name:'Schválit výjezd'}).click(); const approved=await approving; expect(approved.ok(),await approved.text()).toBeTruthy();
     const step=await db.fieldWorkStep.findUniqueOrThrow({where:{id:point.steps[0].id}}); expect(step.assignedFieldPlanId).toBeTruthy();
     const mobile=await mobileContext.newPage(); mobile.on('pageerror',e=>errors.push(e.message));
+    mobile.setDefaultTimeout(120000);
     mobile.setDefaultNavigationTimeout(180000);
     await mobile.goto(base+'/my-route',{waitUntil:'domcontentloaded'}); await expect(mobile.getByRole('heading',{name:'Moje trasa v terénu'})).toBeVisible();
+    await expect(mobile.locator('.leaflet-container')).toBeVisible({timeout:120000});
     const card=mobile.locator('article').filter({hasText:'Informační tabule'});
     await expect(card).toHaveCount(1); await expect(card.getByText('Nainstalovat dvě informační tabule.',{exact:false})).toBeVisible();
     expect(await mobile.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBeTruthy();

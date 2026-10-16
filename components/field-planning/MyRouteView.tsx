@@ -33,6 +33,8 @@ function formatHoursMinutes(totalMinutes: number): string {
 }
 
 export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => { setReady(true); }, []);
   const [data, setData] = useState(initial);
   const pendingKeys = useRef(new Map<string, string>());
   const [fieldInputs, setFieldInputs] = useState<Record<string, { quantity?: string; custodyNote?: string }>>({});
@@ -637,7 +639,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                 {/* Start / Finish Button */}
                 {!isDone && s.status !== 'CANCELLED' && (
                   <button
-                    disabled={busy}
+                    disabled={!ready || busy}
                     onClick={() =>
                       void run(
                         route.planId,
@@ -752,7 +754,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </div>
 
                   <button
-                    disabled={busy}
+                    disabled={!ready || busy}
                     className="w-full rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 transition"
                   >
                     {busy ? 'Ukládám…' : s.fieldWorkStepId ? 'Uložit fotografii kroku' : 'Odeslat fotku a dokončit zastávku ✓'}
@@ -814,7 +816,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   </div>
 
                   <button
-                    disabled={busy}
+                    disabled={!ready || busy}
                     className={`w-full rounded-xl py-2.5 text-xs font-bold text-white shadow-sm transition ${
                       isIssue ? 'bg-rose-700 hover:bg-rose-600' : 'bg-amber-700 hover:bg-amber-600'
                     }`}
@@ -931,7 +933,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   {!route.tripStartedAt && (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={!ready || busy}
                       onClick={() => run(route.planId, '', 'start_trip')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
                     >
@@ -945,7 +947,7 @@ export function MyRouteView({ initial }: { initial: MyRouteDTO }) {
                   {route.tripStartedAt && !route.tripCompletedAt && (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={!ready || busy}
                       onClick={() => run(route.planId, '', 'complete_trip')}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-xs transition cursor-pointer"
                     >
