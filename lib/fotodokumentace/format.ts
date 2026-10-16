@@ -16,7 +16,7 @@ export function formatAlbumDisplay(
   periodFallback?: string | null
 ): FormattedAlbumTitle {
   // Strip redundant "Fotodokumentace" or "Fotoalbum" from the beginning
-  let cleaned = (rawTitle || '').replace(/^(?:fotodokumentace|fotoalbum)\s*[-–—:]*\s*/i, '').trim();
+  const cleaned = (rawTitle || '').replace(/^(?:fotodokumentace|fotoalbum)\s*[-–—:]*\s*/i, '').trim();
 
   let period = periodFallback || '';
   let locationOrAction = '';
