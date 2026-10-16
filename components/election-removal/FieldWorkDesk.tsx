@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Sparkles, Wrench, Trash2, Truck, CheckSquare, Square } from 'lucide-react';
 import type { ElectionRemovalPoint, FieldWorkStep } from '@prisma/client';
 import { operations, dispositions } from '@/lib/election-removal/task-spec';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
@@ -65,28 +66,223 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
     } catch (e) { setError(e instanceof Error ? e.message : 'Uložení selhalo. Zadání zůstává zachováno.'); }
     finally { setBusy(false); }
   }
+
+  async function applyBatchChanges(changes: Record<string, unknown>) {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await fetch('/api/election-removal/points/batch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointIds: selected, changes }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Změna selhala.');
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Změna selhala.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const filteredPoints = points.filter(p => (filter === 'ALL' || category(p) === filter) && `${p.label} ${p.description}`.toLocaleLowerCase('cs').includes(search.toLocaleLowerCase('cs')));
   const input = 'block w-full rounded-lg border border-slate-300 p-2 text-sm';
   return <section className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-xl font-semibold">Práce v akci</h2><p className="text-sm text-slate-500">Přidejte práci, potom vyberte posádku a datum výjezdu.</p></div>
-      <div className="flex flex-wrap gap-2"><button className="rounded-lg border border-sky-700 px-4 py-2 font-medium text-sky-700" onClick={() => editPoint(null)}>+ Přidat práci</button>
-      {points.some(p => !p.reviewRequired && p.status !== 'COMPLETED') && <Link className="rounded-lg bg-sky-700 px-4 py-2 font-medium text-white" href={`/election-removal/${campaignId}/plan${selected.length ? '?points=' + selected.join(',') : ''}`}>Naplánovat výjezd{selected.length ? ` (${selected.length})` : ''}</Link>}</div>
+      <div>
+        <h2 className="text-xl font-bold text-slate-900">Práce v akci</h2>
+        <p className="text-sm text-slate-500">Zadejte nebo hromadně upravte body, a naplánujte trasu výjezdu s AI.</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          className="rounded-xl border border-sky-600 bg-white px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-50 transition shadow-2xs"
+          onClick={() => editPoint(null)}
+        >
+          + Přidat práci
+        </button>
+        {points.some((p) => !p.reviewRequired && p.status !== 'COMPLETED') && (
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition"
+            href={`/election-removal/${campaignId}/plan${selected.length ? '?points=' + selected.join(',') : ''}`}
+            title="Spustit AI optimalizaci trasy"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>⚡ Naplánovat trasu (AI){selected.length ? ` (${selected.length})` : ''}</span>
+          </Link>
+        )}
+      </div>
     </div>
-    {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">{error}</p>}
-    {points.length > 0 && <div className="flex flex-wrap gap-3"><input aria-label="Hledat práci" className={input + ' sm:max-w-xs'} placeholder="Hledat místo nebo práci…" value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(25); }} /><select aria-label="Stav práce" className={input + ' sm:max-w-xs'} value={filter} onChange={e => { setFilter(e.target.value); setVisibleCount(25); }}>{Object.entries(groups).map(([key, label]) => <option key={key} value={key}>{label} ({key === 'ALL' ? points.length : points.filter(p => category(p) === key).length})</option>)}</select></div>}
-    {selected.length > 0 && <form className="flex flex-wrap gap-3 rounded border p-3" onSubmit={async e => {
-      e.preventDefault(); setBusy(true); setError(''); const f = new FormData(e.currentTarget);
-      const changes = Object.fromEntries([...f.entries()].filter(([,v]) => v !== ''));
-      try { const r = await fetch('/api/election-removal/points/batch', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pointIds: selected, changes }) });
-        const d = await r.json(); if (!r.ok) throw new Error(d.error); router.refresh();
-      } catch (e) { setError(e instanceof Error ? e.message : 'Změna selhala.'); } finally { setBusy(false); }
-    }}><strong>Hromadná změna ({selected.length})</strong>
-      <label>Co se má udělat<select name="operationType" className={input}><option value="">Beze změny</option>{Object.entries(operations).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-      <label>Typ objektu<select name="mediaType" className={input}><option value="">Beze změny</option>{Object.entries(ELECTION_REMOVAL_MEDIA_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-      <label>Termín<input type="date" name="deadlineAt" className={input} /></label>
-      <label>Společné instrukce<input name="description" className={input} /></label><button disabled={busy} className="rounded border p-2">Použít na vybrané</button>
-    </form>}
+    {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 font-medium text-xs">{error}</p>}
+    {points.length > 0 && (
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 p-3 rounded-2xl">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+          <input
+            aria-label="Hledat práci"
+            className={input + ' sm:max-w-xs bg-white shadow-2xs'}
+            placeholder="Hledat místo nebo práci…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setVisibleCount(25);
+            }}
+          />
+          <select
+            aria-label="Stav práce"
+            className={input + ' sm:max-w-xs bg-white shadow-2xs'}
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setVisibleCount(25);
+            }}
+          >
+            {Object.entries(groups).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label} ({key === 'ALL' ? points.length : points.filter((p) => category(p) === key).length})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Global Select All / Clear Selection */}
+        <div className="flex items-center gap-2">
+          {selected.length === filteredPoints.length && filteredPoints.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 bg-white shadow-2xs transition"
+            >
+              <Square className="w-3.5 h-3.5 text-slate-400" />
+              <span>Zrušit výběr ({selected.length})</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSelected(filteredPoints.map((p) => p.id))}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900 px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50 shadow-2xs transition"
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-sky-600" />
+              <span>Označit všechny body ({filteredPoints.length})</span>
+            </button>
+          )}
+        </div>
+      </div>
+    )}
+    {selected.length > 0 && (
+      <div className="rounded-2xl border border-sky-300 bg-sky-50/70 p-4 space-y-3 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-black text-sm text-slate-900">
+              Vybráno {selected.length} {selected.length === 1 ? 'bod' : selected.length < 5 ? 'body' : 'bodů'}:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="text-xs text-slate-500 hover:text-slate-800 underline"
+            >
+              Zrušit výběr
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick 1-click batch actions */}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => applyBatchChanges({ operationType: 'INSTALL_AD' })}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition"
+              title="Nastavit všem vybraným bodům montáž/instalaci"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              <span>🛠️ Nastavit Instalaci</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => applyBatchChanges({ operationType: 'REMOVE_AD' })}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition"
+              title="Nastavit všem vybraným bodům demontáž/odstranění"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>🗑️ Nastavit Deinstalaci</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => applyBatchChanges({ operationType: 'RELOCATION' })}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition"
+              title="Nastavit všem vybraným bodům přesun"
+            >
+              <Truck className="w-3.5 h-3.5" />
+              <span>🚚 Nastavit Přesun</span>
+            </button>
+
+            <Link
+              href={`/election-removal/${campaignId}/plan?points=${selected.join(',')}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold shadow-sm transition"
+              title="Otevřít AI plánovač tras přímo pro tyto vybrané body"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>⚡ Naplánovat trasu (AI)</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Collapsible custom bulk changes */}
+        <details className="text-xs pt-2 border-t border-sky-200">
+          <summary className="cursor-pointer font-bold text-sky-800 hover:text-sky-950">
+            Další hromadné změny (typ nosiče, termín, instrukce pro montéry...)
+          </summary>
+          <form
+            className="mt-3 flex flex-wrap items-end gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const changes = Object.fromEntries(
+                [...f.entries()].filter(([, v]) => v !== '')
+              );
+              await applyBatchChanges(changes);
+            }}
+          >
+            <label className="text-[11px] font-bold text-slate-700">
+              Přesný typ operace
+              <select name="operationType" className={input + ' mt-1 bg-white'}>
+                <option value="">Beze změny</option>
+                {Object.entries(operations).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[11px] font-bold text-slate-700">
+              Typ objektu
+              <select name="mediaType" className={input + ' mt-1 bg-white'}>
+                <option value="">Beze změny</option>
+                {Object.entries(ELECTION_REMOVAL_MEDIA_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[11px] font-bold text-slate-700">
+              Termín
+              <input type="date" name="deadlineAt" className={input + ' mt-1 bg-white'} />
+            </label>
+            <label className="flex-1 min-w-[200px] text-[11px] font-bold text-slate-700">
+              Společné instrukce pro montéry
+              <input name="description" placeholder="Např. Výlep plakátů A1, nutné žebříky" className={input + ' mt-1 bg-white'} />
+            </label>
+            <button disabled={busy} className="rounded-xl bg-slate-900 text-white font-bold px-4 py-2 text-xs hover:bg-slate-800 transition">
+              {busy ? 'Ukládám…' : 'Použít změny'}
+            </button>
+          </form>
+        </details>
+      </div>
+    )}
     {formOpen && <form ref={formRef} key={formKey} onSubmit={save} className="space-y-4 rounded-xl border bg-white p-5">
       <h2 className="text-xl font-semibold">{edit ? 'Upravit práci' : 'Nová práce'}</h2>
       <div className="flex gap-2" role="group" aria-label="Odkud vybrat objekt">{([['MAP','Místo v mapě'],['CARRIER','Nosič z databáze']] as const).map(([key,label]) => <button key={key} type="button" aria-pressed={source === key} className={`rounded-lg border px-3 py-2 text-sm ${source === key ? 'border-sky-700 bg-sky-50 text-sky-800' : ''}`} onClick={() => setSource(key)}>{label}</button>)}</div>
