@@ -119,7 +119,7 @@ type OccupancyRow = Prisma.OccupancyGetPayload<Record<string, never>>;
 
 export type SurfaceTemplate = { name: string; mediaType: Surface['mediaType']; orientation?: string };
 export type CarrierArchiveInput = { archivedBy?: string; archiveReason?: string };
-export type CarrierFilters = { q?: string; carrierType?: CarrierType; carrierTypeId?: string; mediaType?: MediaType; city?: string; locality?: string; street?: string; client?: string; surfaceStatus?: SurfaceStatus; gps?: 'missing' | 'present' | GpsStatus; photo?: 'missing' | 'present'; damage?: 'missing' | 'present'; description?: 'missing' | 'present'; occupancy?: 'missing' | 'present'; archived?: 'active' | 'archived' | 'all'; importBatchId?: string; page?: number; pageSize?: number };
+export type CarrierFilters = { q?: string; carrierType?: CarrierType; carrierTypeId?: string; mediaType?: MediaType; city?: string; locality?: string; street?: string; client?: string; surfaceStatus?: SurfaceStatus; gps?: 'missing' | 'present' | GpsStatus; photo?: 'missing' | 'present'; damage?: 'missing' | 'present'; description?: 'missing' | 'present'; occupancy?: 'missing' | 'present'; archived?: 'active' | 'archived' | 'all'; importBatchId?: string; page?: number; pageSize?: number; view?: 'table' | 'cards' };
 export type CarrierResultMeta = { total: number; returned: number; limit: number; page: number; pageSize: number; hasMore: boolean; missingGpsCount: number; archivedCount: number };
 export type CarrierFilterOptions = { cities: string[]; localities: string[]; streets: string[]; clients: string[]; importBatches: { id: string; label: string }[] };
 

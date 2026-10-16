@@ -72,6 +72,8 @@ export function parseCarrierFilters(searchParams: Record<string, string | string
   const archived = clean(searchParams.archived);
   const page = Number(clean(searchParams.page));
   const pageSize = Number(clean(searchParams.pageSize));
+  const rawView = clean(searchParams.view);
+  const view = rawView === 'cards' ? 'cards' : rawView === 'table' ? 'table' : undefined;
 
   return {
     q: clean(searchParams.q),
@@ -92,6 +94,7 @@ export function parseCarrierFilters(searchParams: Record<string, string | string
     importBatchId: clean(searchParams.importBatchId),
     page: Number.isFinite(page) && page > 0 ? page : undefined,
     pageSize: Number.isFinite(pageSize) && pageSize > 0 ? pageSize : undefined,
+    view,
   };
 }
 
