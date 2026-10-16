@@ -18,6 +18,7 @@ const additions = [
   { href: '/election-removal', section: 'electionRemoval' as AppSection, module: 'electionRemoval' },
   { href: '/fotodokumentace', section: 'photoDocumentation' as AppSection, module: 'photoDocumentation' },
   { href: '/academy', section: 'academy' as AppSection, module: 'academy' },
+  { href: '/occupancy/ai', section: 'aiOccupancy' as AppSection, module: 'aiOccupancy' },
 ];
 const current = [...original, ...additions];
 
@@ -70,7 +71,8 @@ test('nested paths choose the most specific item and hub without prefix collisio
     ['/work/123', '/work', 'operations'],
     ['/settings/company', '/settings/company', 'management'],
     ['/sales/opportunities/123', '/sales/opportunities', 'ai'],
-    ['/occupancy/ai', '/occupancy', 'spaces'],
+    ['/occupancy/ai', '/occupancy/ai', 'ai'],
+    ['/occupancy/detail', '/occupancy', 'spaces'],
   ]) {
     const active = findActiveNavigation(navigationHubs, path);
     assert.equal(active?.item[0], href);
