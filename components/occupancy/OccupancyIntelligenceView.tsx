@@ -14,6 +14,9 @@ import {
   TrendingUp,
   Boxes,
   CalendarRange,
+  CheckCircle2,
+  CalendarDays,
+  Zap,
 } from 'lucide-react';
 import { Button, EmptyState } from '@/components/ui';
 import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
@@ -21,6 +24,20 @@ import { OccupancyInsightDetailModal, type InsightItem } from './OccupancyInsigh
 import { OccupancySettingsModal } from './OccupancySettingsModal';
 import { OccupancyAssistantChat } from './OccupancyAssistantChat';
 import type { OrganizationOccupancyAIProfileData } from '@/lib/occupancy/intelligence-profile';
+
+function formatCsDate(d: string | Date | null | undefined): string {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return String(d);
+  return `${dt.getDate()}. ${dt.getMonth() + 1}. ${dt.getFullYear()}`;
+}
+
+function cleanReasonText(text: string): string {
+  return text
+    .replaceAll(' (Klient neurčen)', '')
+    .replaceAll('(Klient neurčen, ', '(')
+    .replaceAll('(Klient neurčen)', '');
+}
 
 const inventoryNavItems = [
   { href: '/projects/city-inventory', label: '📊 Přehled & Nástěnka' },
@@ -63,8 +80,10 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [timeFilter, setTimeFilter] = useState<'ACTIVE_ONLY' | 'ALL'>('ACTIVE_ONLY');
 
   const [isScanning, setIsScanning] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -86,10 +105,23 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
 
   // Filtered insights list
   const filteredInsights = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
     return insights.filter((item) => {
       if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
       if (typeFilter !== 'ALL' && item.type !== typeFilter) return false;
       if (severityFilter !== 'ALL' && item.severity !== severityFilter) return false;
+
+      // Time filter (hide concluded collisions or expired events when set to ACTIVE_ONLY)
+      if (timeFilter === 'ACTIVE_ONLY') {
+        const meta = (item.metadata || {}) as Record<string, unknown>;
+        const pEnd =
+          item.periodEnd ||
+          (typeof meta.periodEnd === 'string' ? meta.periodEnd : null) ||
+          (typeof meta.overlapEnd === 'string' ? meta.overlapEnd : null);
+        if (pEnd && pEnd < todayStr) {
+          return false;
+        }
+      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -110,7 +142,7 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
 
       return true;
     });
-  }, [insights, statusFilter, typeFilter, severityFilter, searchQuery]);
+  }, [insights, statusFilter, typeFilter, severityFilter, searchQuery, timeFilter]);
 
   // Trigger manual audit scan
   const handleRunScan = async () => {
@@ -149,6 +181,28 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
     }
   };
 
+  // Trigger bulk clean of expired campaigns & sync surfaces
+  const handleCleanExpired = async () => {
+    setIsCleaning(true);
+    setScanMessage(null);
+    try {
+      const res = await fetch('/api/occupancy/intelligence/clean-expired', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Čištění selhalo.');
+      setScanMessage(data.message || 'Prošlé kampaně byly úspěšně vyčištěny a stavy synchronizovány.');
+
+      const listRes = await fetch('/api/occupancy/intelligence/insights?status=ALL');
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        if (listData.insights) setInsights(listData.insights);
+      }
+    } catch (err) {
+      setScanMessage(err instanceof Error ? err.message : 'Čištění selhalo.');
+    } finally {
+      setIsCleaning(false);
+    }
+  };
+
   // 1-Click resolve action
   const handleExecuteAction = async (insightId: string, actionType: string) => {
     const res = await fetch('/api/occupancy/intelligence/resolve', {
@@ -159,8 +213,10 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Akci se nepodařilo provést.');
 
-    const newStatus = data.insight?.status || (actionType === 'IGNORE' ? 'IGNORED' : actionType === 'REOPEN' ? 'OPEN' : 'RESOLVED');
-    const newResolvedAt = newStatus === 'OPEN' ? null : (data.insight?.resolvedAt ? String(data.insight.resolvedAt) : new Date().toISOString());
+    const newStatus =
+      data.insight?.status || (actionType === 'IGNORE' ? 'IGNORED' : actionType === 'REOPEN' ? 'OPEN' : 'RESOLVED');
+    const newResolvedAt =
+      newStatus === 'OPEN' ? null : data.insight?.resolvedAt ? String(data.insight.resolvedAt) : new Date().toISOString();
 
     // Update local state
     setInsights((prev) =>
@@ -202,6 +258,16 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
         <div className="flex flex-wrap items-center gap-2.5">
           <Button
             variant="secondary"
+            onClick={handleCleanExpired}
+            disabled={isCleaning || isScanning}
+            className="rounded-xl border-amber-300 bg-amber-50/80 text-amber-900 hover:bg-amber-100 hover:border-amber-400"
+          >
+            <Zap size={15} className={`mr-1.5 text-amber-600 ${isCleaning ? 'animate-spin' : ''}`} />
+            {isCleaning ? 'Uzavírám...' : 'Uzavřít prošlé kampaně'}
+          </Button>
+
+          <Button
+            variant="secondary"
             onClick={() => setIsSettingsOpen(true)}
             className="rounded-xl"
           >
@@ -212,7 +278,7 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
           <Button
             variant="primary"
             onClick={handleRunScan}
-            disabled={isScanning}
+            disabled={isScanning || isCleaning}
             className="rounded-xl shadow-xs"
           >
             <RefreshCw size={15} className={`mr-1.5 ${isScanning ? 'animate-spin' : ''}`} />
@@ -246,105 +312,191 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
         </div>
       )}
 
-      {/* KPI Cards Row */}
+      {/* KPI Cards Row - Interactive quick filters */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setTypeFilter((prev) => (prev === 'DOUBLE_BOOKING' ? 'ALL' : 'DOUBLE_BOOKING'))}
+          className={`rounded-xl border p-4 shadow-xs text-left transition cursor-pointer ${
+            typeFilter === 'DOUBLE_BOOKING'
+              ? 'border-rose-400 bg-rose-100/70 ring-2 ring-rose-500 shadow-sm'
+              : 'border-rose-200 bg-rose-50/50 hover:border-rose-300 hover:bg-rose-100/40'
+          }`}
+          title="Kliknutím vyfiltrujete pouze kolize"
+        >
           <div className="flex items-center justify-between text-rose-700">
             <span className="text-xs font-semibold uppercase">Kolize termínů</span>
             <AlertTriangle size={17} />
           </div>
           <div className="mt-2 text-2xl font-bold text-rose-950">{kpiStats.criticalCount}</div>
           <p className="text-[11px] text-rose-600 mt-0.5">Dvojité rezervace v kalendáři</p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setTypeFilter((prev) => (prev === 'STATUS_MISMATCH' ? 'ALL' : 'STATUS_MISMATCH'))}
+          className={`rounded-xl border p-4 shadow-xs text-left transition cursor-pointer ${
+            typeFilter === 'STATUS_MISMATCH'
+              ? 'border-orange-400 bg-orange-100/70 ring-2 ring-orange-500 shadow-sm'
+              : 'border-orange-200 bg-orange-50/50 hover:border-orange-300 hover:bg-orange-100/40'
+          }`}
+          title="Kliknutím vyfiltrujete neshody stavů"
+        >
           <div className="flex items-center justify-between text-orange-700">
             <span className="text-xs font-semibold uppercase">Neshody stavu</span>
             <ShieldAlert size={17} />
           </div>
           <div className="mt-2 text-2xl font-bold text-orange-950">{kpiStats.mismatchCount}</div>
           <p className="text-[11px] text-orange-600 mt-0.5">Plocha vs. kalendář nesouhlasí</p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setTypeFilter((prev) => (prev === 'EXPIRED_OCCUPANCY' ? 'ALL' : 'EXPIRED_OCCUPANCY'))}
+          className={`rounded-xl border p-4 shadow-xs text-left transition cursor-pointer ${
+            typeFilter === 'EXPIRED_OCCUPANCY'
+              ? 'border-amber-400 bg-amber-100/70 ring-2 ring-amber-500 shadow-sm'
+              : 'border-amber-200 bg-amber-50/50 hover:border-amber-300 hover:bg-amber-100/40'
+          }`}
+          title="Kliknutím vyfiltrujete expirované neuzavřené kampaně"
+        >
           <div className="flex items-center justify-between text-amber-700">
             <span className="text-xs font-semibold uppercase">Expirované</span>
             <Clock size={17} />
           </div>
           <div className="mt-2 text-2xl font-bold text-amber-950">{kpiStats.expiredCount}</div>
           <p className="text-[11px] text-amber-600 mt-0.5">Skončené neuzavřené kampaně</p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setTypeFilter((prev) => (prev === 'EXPIRING_CAMPAIGN' ? 'ALL' : 'EXPIRING_CAMPAIGN'))}
+          className={`rounded-xl border p-4 shadow-xs text-left transition cursor-pointer ${
+            typeFilter === 'EXPIRING_CAMPAIGN'
+              ? 'border-blue-400 bg-blue-100/70 ring-2 ring-blue-500 shadow-sm'
+              : 'border-blue-200 bg-blue-50/50 hover:border-blue-300 hover:bg-blue-100/40'
+          }`}
+          title="Kliknutím vyfiltrujete kampaně končící brzy"
+        >
           <div className="flex items-center justify-between text-blue-700">
             <span className="text-xs font-semibold uppercase">Končí brzy</span>
             <CalendarRange size={17} />
           </div>
           <div className="mt-2 text-2xl font-bold text-blue-950">{kpiStats.expiringCount}</div>
           <p className="text-[11px] text-blue-600 mt-0.5">Příležitost k prodloužení</p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setTypeFilter((prev) => (prev === 'UNDERUTILIZED_MEDIA' ? 'ALL' : 'UNDERUTILIZED_MEDIA'))}
+          className={`rounded-xl border p-4 shadow-xs text-left transition cursor-pointer ${
+            typeFilter === 'UNDERUTILIZED_MEDIA'
+              ? 'border-slate-400 bg-slate-200 ring-2 ring-slate-500 shadow-sm'
+              : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/70'
+          }`}
+          title="Kliknutím vyfiltrujete ležáky"
+        >
           <div className="flex items-center justify-between text-slate-700">
             <span className="text-xs font-semibold uppercase">Ležáky</span>
             <Boxes size={17} />
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-950">{kpiStats.underutilizedCount}</div>
           <p className="text-[11px] text-slate-500 mt-0.5">&gt; {profile.underutilizedAfterDays} dní bez kampaně</p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setTypeFilter((prev) => (prev === 'CALENDAR_GAP' ? 'ALL' : 'CALENDAR_GAP'))}
+          className={`rounded-xl border p-4 shadow-xs text-left transition cursor-pointer ${
+            typeFilter === 'CALENDAR_GAP'
+              ? 'border-purple-400 bg-purple-100/70 ring-2 ring-purple-500 shadow-sm'
+              : 'border-purple-200 bg-purple-50/50 hover:border-purple-300 hover:bg-purple-100/40'
+          }`}
+          title="Kliknutím vyfiltrujete okna a mezery v kalendáři"
+        >
           <div className="flex items-center justify-between text-purple-700">
             <span className="text-xs font-semibold uppercase">Okna & Mezery</span>
             <TrendingUp size={17} />
           </div>
           <div className="mt-2 text-2xl font-bold text-purple-950">{kpiStats.gapCount}</div>
           <p className="text-[11px] text-purple-600 mt-0.5">Krátká okna mezi kampaněmi</p>
-        </div>
+        </button>
       </div>
 
       {/* Main Grid: Left = Insights List (2/3), Right = AI Assistant Chat (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Filter and Insights */}
         <div className="lg:col-span-8 space-y-4">
-          {/* Status Tabs Bar */}
+          {/* Status Tabs Bar & Time Filter */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-            <div className="flex items-center gap-1.5">
-              {(['OPEN', 'RESOLVED', 'IGNORED', 'ALL'] as const).map((st) => {
-                const count =
-                  st === 'ALL'
-                    ? insights.length
-                    : insights.filter((i) => i.status === st).length;
-                const label =
-                  st === 'OPEN'
-                    ? 'K řešení'
-                    : st === 'RESOLVED'
-                    ? 'Vyřešeno'
-                    : st === 'IGNORED'
-                    ? 'Ignorováno'
-                    : 'Vše';
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-1.5">
+                {(['OPEN', 'RESOLVED', 'IGNORED', 'ALL'] as const).map((st) => {
+                  const count =
+                    st === 'ALL'
+                      ? insights.length
+                      : insights.filter((i) => i.status === st).length;
+                  const label =
+                    st === 'OPEN'
+                      ? 'K řešení'
+                      : st === 'RESOLVED'
+                      ? 'Vyřešeno'
+                      : st === 'IGNORED'
+                      ? 'Ignorováno'
+                      : 'Vše';
 
-                return (
-                  <button
-                    key={st}
-                    onClick={() => setStatusFilter(st)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === st
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-                    }`}
-                  >
-                    {label}
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        statusFilter === st ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setStatusFilter(st)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                        statusFilter === st
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
                       }`}
                     >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+                      {label}
+                      <span
+                        className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                          statusFilter === st ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Time Filter Switcher */}
+              <div className="flex items-center rounded-lg bg-slate-100 p-0.5 text-xs border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => setTimeFilter('ACTIVE_ONLY')}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition cursor-pointer ${
+                    timeFilter === 'ACTIVE_ONLY'
+                      ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  title="Skrýt minulé ukončené kolize a expirované záznamy"
+                >
+                  <CalendarDays size={13} className="text-emerald-600" />
+                  <span>Aktivní & budoucí</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeFilter('ALL')}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition cursor-pointer ${
+                    timeFilter === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                  title="Zobrazit včetně historických záznamů"
+                >
+                  <span>Včetně historie</span>
+                </button>
+              </div>
             </div>
 
             <span className="text-xs text-slate-500">
@@ -416,6 +568,22 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
                     ? meta.differenceInDays
                     : null;
 
+                const hasOverlapDates = Boolean(meta.overlapStart && meta.overlapEnd);
+                const dateLabel = hasOverlapDates
+                  ? `${formatCsDate(meta.overlapStart as string)} – ${formatCsDate(meta.overlapEnd as string)}`
+                  : meta.periodEnd
+                  ? `Konec: ${formatCsDate(meta.periodEnd as string)}`
+                  : `Zjištěno: ${formatCsDate(insight.createdAt)}`;
+
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const isConcludedInPast = Boolean(
+                  (meta.overlapEnd && (meta.overlapEnd as string) < todayStr) ||
+                  (meta.periodEnd && (meta.periodEnd as string) < todayStr)
+                );
+
+                const isDoubleBooking = insight.type === 'DOUBLE_BOOKING';
+                const hasDualCampaigns = Boolean(meta.campaignA || meta.startA || meta.campaignB);
+
                 return (
                   <div
                     key={insight.id}
@@ -430,71 +598,207 @@ export function OccupancyIntelligenceView({ initialInsights, initialProfile, org
                         : 'border-slate-200 hover:border-indigo-300'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                              isCritical
-                                ? 'bg-rose-100 text-rose-800'
-                                : isHigh
-                                ? 'bg-orange-100 text-orange-800'
-                                : isMedium
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {isCritical && <AlertTriangle size={11} />}
-                            {isHigh && <ShieldAlert size={11} />}
-                            {isMedium && <Clock size={11} />}
-                            {TYPE_LABELS[insight.type] || insight.type}
+                    {/* Header Row */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                            isCritical
+                              ? 'bg-rose-100 text-rose-800'
+                              : isHigh
+                              ? 'bg-orange-100 text-orange-800'
+                              : isMedium
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {isCritical && <AlertTriangle size={11} />}
+                          {isHigh && <ShieldAlert size={11} />}
+                          {isMedium && <Clock size={11} />}
+                          {TYPE_LABELS[insight.type] || insight.type}
+                        </span>
+
+                        <span className="text-xs font-semibold text-slate-800">
+                          {insight.surface?.name || 'Plocha'}
+                        </span>
+
+                        {(insight.carrier?.code || insight.surface?.carrier?.code) && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
+                            {insight.carrier?.code || insight.surface?.carrier?.code}
                           </span>
+                        )}
 
-                          <span className="text-xs font-semibold text-slate-700">
-                            {insight.surface?.name || 'Plocha'}
+                        {(insight.carrier?.city || insight.surface?.carrier?.city) && (
+                          <span className="text-xs text-slate-400 font-medium">
+                            • {insight.carrier?.city || insight.surface?.carrier?.city}
                           </span>
+                        )}
 
-                          {(insight.carrier?.city || insight.surface?.carrier?.city) && (
-                            <span className="text-xs text-slate-400 font-medium">
-                              • {insight.carrier?.city || insight.surface?.carrier?.city}
-                            </span>
-                          )}
-
-                          {diffDays !== null && (
-                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600">
-                              {diffDays} dní
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition">
-                          {insight.title}
-                        </h3>
-
-                        <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                          {insight.deterministicReason || insight.description}
-                        </p>
+                        {diffDays !== null && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-slate-600">
+                            {diffDays} dní
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className="text-[11px] text-slate-400">
-                          {new Date(insight.createdAt).toLocaleDateString('cs-CZ')}
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-start sm:self-auto">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100/90 border border-slate-200 rounded-lg px-2 py-0.5">
+                          <Calendar size={12} className="text-slate-400" />
+                          {dateLabel}
                         </span>
-                        <ChevronRight
-                          size={18}
-                          className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition"
-                        />
+                        {isConcludedInPast && (
+                          <span className="text-[10px] text-amber-700 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            Historické
+                          </span>
+                        )}
                       </div>
                     </div>
 
+                    {/* Title */}
+                    <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition mt-2">
+                      {cleanReasonText(insight.title)}
+                    </h3>
+
+                    {/* Comparative 2-Box for Double Booking, or Clean Text */}
+                    {isDoubleBooking && hasDualCampaigns ? (
+                      <div className="mt-2.5 space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {/* Box A */}
+                          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-slate-500 uppercase text-[10px]">Kampaň 1</span>
+                              <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                                {meta.statusA === 'OCCUPIED' ? 'Obsazeno' : meta.statusA === 'RESERVED' ? 'Rezervace' : String(meta.statusA || 'Obsazeno')}
+                              </span>
+                            </div>
+                            <div className="font-bold text-slate-900 text-sm">{String(meta.campaignA || 'Kampaň 1')}</div>
+                            {Boolean(meta.clientA && meta.clientA !== 'Klient neurčen') && (
+                              <div className="text-slate-600 text-[11px]">Klient: <strong className="text-slate-800">{String(meta.clientA)}</strong></div>
+                            )}
+                            <div className="text-slate-500 text-[11px] flex items-center gap-1 pt-0.5">
+                              <Calendar size={12} className="text-slate-400 shrink-0" />
+                              <span>{formatCsDate(meta.startA as string)} – {formatCsDate(meta.endA as string)}</span>
+                            </div>
+                          </div>
+
+                          {/* Box B */}
+                          <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-3 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-rose-600 uppercase text-[10px]">Kampaň 2 (V kolizi)</span>
+                              <span className="rounded bg-rose-200 px-1.5 py-0.5 text-[10px] font-medium text-rose-800">
+                                {meta.statusB === 'OCCUPIED' ? 'Obsazeno' : meta.statusB === 'RESERVED' ? 'Rezervace' : String(meta.statusB || 'Obsazeno')}
+                              </span>
+                            </div>
+                            <div className="font-bold text-slate-900 text-sm">{String(meta.campaignB || 'Kampaň 2')}</div>
+                            {Boolean(meta.clientB && meta.clientB !== 'Klient neurčen') && (
+                              <div className="text-slate-600 text-[11px]">Klient: <strong className="text-slate-800">{String(meta.clientB)}</strong></div>
+                            )}
+                            <div className="text-slate-500 text-[11px] flex items-center gap-1 pt-0.5">
+                              <Calendar size={12} className="text-rose-400 shrink-0" />
+                              <span>{formatCsDate(meta.startB as string)} – {formatCsDate(meta.endB as string)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {hasOverlapDates && (
+                          <div className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-1.5 text-xs text-rose-900 border border-rose-200">
+                            <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                            <span>
+                              Souběh termínů na ploše: <strong>{formatCsDate(meta.overlapStart as string)} – {formatCsDate(meta.overlapEnd as string)}</strong>
+                              {diffDays ? ` (${diffDays} dní překryvu)` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                        {cleanReasonText(insight.deterministicReason || insight.description || '')}
+                      </p>
+                    )}
+
                     {/* AI Recommendation hint */}
                     {(insight.aiRecommendation || insight.actionRecommendation) && (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-950 border border-indigo-100">
+                      <div className="mt-3 flex items-center gap-2 rounded-xl bg-indigo-50/70 px-3 py-2 text-xs text-indigo-950 border border-indigo-100">
                         <Sparkles size={13} className="text-indigo-600 shrink-0" />
                         <span className="font-semibold shrink-0">Doporučení:</span>
-                        <span className="truncate">{insight.aiRecommendation || insight.actionRecommendation}</span>
+                        <span className="truncate">{cleanReasonText(insight.aiRecommendation || insight.actionRecommendation || '')}</span>
                       </div>
                     )}
+
+                    {/* Card Actions Footer */}
+                    <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {insight.surfaceId && (
+                          <a
+                            href={`/occupancy?surfaceId=${insight.surfaceId}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition"
+                          >
+                            <Calendar size={12} />
+                            Otevřít v kalendáři
+                          </a>
+                        )}
+
+                        {insight.type === 'STATUS_MISMATCH' && insight.status === 'OPEN' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExecuteAction(insight.id, 'SYNC_STATUS');
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                          >
+                            <RefreshCw size={12} />
+                            Synchronizovat stav
+                          </button>
+                        )}
+
+                        {insight.type === 'EXPIRED_OCCUPANCY' && insight.status === 'OPEN' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExecuteAction(insight.id, 'FINISH_EXPIRED_OCCUPANCY');
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                          >
+                            <CheckCircle2 size={12} />
+                            Uzavřít kampaň
+                          </button>
+                        )}
+
+                        {insight.status === 'OPEN' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExecuteAction(insight.id, 'IGNORE');
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                          >
+                            Ignorovat
+                          </button>
+                        )}
+
+                        {insight.status === 'IGNORED' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExecuteAction(insight.id, 'REOPEN');
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                          >
+                            Obnovit
+                          </button>
+                        )}
+                      </div>
+
+                      <span className="text-xs font-semibold text-indigo-600 group-hover:text-indigo-800 flex items-center gap-1">
+                        Detail nálezu
+                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition" />
+                      </span>
+                    </div>
                   </div>
                 );
               })}

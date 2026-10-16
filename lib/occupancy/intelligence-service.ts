@@ -245,11 +245,40 @@ export async function runOccupancyAudit(
               const b = blocking[j];
 
               if (periodsOverlap(a.dateFrom, a.dateTo, b.dateFrom, b.dateTo)) {
+                // Ignore historical double bookings where the collision period ended in the past
+                const overlapEndMs = Math.min(
+                  normalizeDateOnly(a.dateTo).getTime(),
+                  normalizeDateOnly(b.dateTo).getTime()
+                );
+                if (overlapEndMs < todayTime) {
+                  continue;
+                }
+
                 const overlapDays = getOverlapDaysCount(a.dateFrom, a.dateTo, b.dateFrom, b.dateTo);
                 const dFromA = normalizeDateOnly(a.dateFrom).toISOString().slice(0, 10);
                 const dToA = normalizeDateOnly(a.dateTo).toISOString().slice(0, 10);
                 const dFromB = normalizeDateOnly(b.dateFrom).toISOString().slice(0, 10);
                 const dToB = normalizeDateOnly(b.dateTo).toISOString().slice(0, 10);
+
+                const overlapStartStr = new Date(
+                  Math.max(normalizeDateOnly(a.dateFrom).getTime(), normalizeDateOnly(b.dateFrom).getTime())
+                )
+                  .toISOString()
+                  .slice(0, 10);
+                const overlapEndStr = new Date(overlapEndMs).toISOString().slice(0, 10);
+
+                const csDate = (iso: string) => {
+                  const [y, m, d] = iso.split('-');
+                  return `${parseInt(d, 10)}. ${parseInt(m, 10)}. ${y}`;
+                };
+
+                const cleanClient = (cl?: string | null) => {
+                  if (!cl || cl === 'Klient neurčen') return '';
+                  return cl;
+                };
+
+                const clientPartA = cleanClient(a.clientName) ? ` (${cleanClient(a.clientName)})` : '';
+                const clientPartB = cleanClient(b.clientName) ? ` (${cleanClient(b.clientName)})` : '';
 
                 // Stable sorted IDs for deterministic fingerprint
                 const pairKey = [a.id, b.id].sort().join('_');
@@ -262,12 +291,25 @@ export async function runOccupancyAudit(
                   carrierId: surface.carrier.id,
                   occupancyId: a.id,
                   clientId: a.clientId,
-                  title: `Dvojitá rezervace: ${surface.name} (${surface.carrier.code})`,
-                  deterministicReason: `Plocha ${surface.name} má překrývající se blokace: Kampaň '${a.campaignName}' (${a.clientName}, ${dFromA}–${dToA}) a kampaň '${b.campaignName}' (${b.clientName}, ${dFromB}–${dToB}). Překryv trvá ${overlapDays} dní.`,
+                  title: `Kolize: '${a.campaignName}' se překrývá s '${b.campaignName}'`,
+                  deterministicReason: `Na ploše ${surface.name} probíhá souběh rezervací: Kampaň '${a.campaignName}'${clientPartA} [${csDate(dFromA)} – ${csDate(dToA)}] a kampaň '${b.campaignName}'${clientPartB} [${csDate(dFromB)} – ${csDate(dToB)}]. Překryv trvá ${overlapDays} dní (${csDate(overlapStartStr)} – ${csDate(overlapEndStr)}).`,
                   suggestedActionType: 'RESOLVE_COLLISION',
                   metadata: {
-                    occupancyA: { id: a.id, client: a.clientName, campaign: a.campaignName, dateFrom: dFromA, dateTo: dToA, status: a.status },
-                    occupancyB: { id: b.id, client: b.clientName, campaign: b.campaignName, dateFrom: dFromB, dateTo: dToB, status: b.status },
+                    campaignA: a.campaignName,
+                    clientA: cleanClient(a.clientName),
+                    startA: dFromA,
+                    endA: dToA,
+                    statusA: a.status,
+                    campaignB: b.campaignName,
+                    clientB: cleanClient(b.clientName),
+                    startB: dFromB,
+                    endB: dToB,
+                    statusB: b.status,
+                    overlapStart: overlapStartStr,
+                    overlapEnd: overlapEndStr,
+                    differenceInDays: overlapDays,
+                    occupancyA: { id: a.id, client: cleanClient(a.clientName), campaign: a.campaignName, dateFrom: dFromA, dateTo: dToA, status: a.status },
+                    occupancyB: { id: b.id, client: cleanClient(b.clientName), campaign: b.campaignName, dateFrom: dFromB, dateTo: dToB, status: b.status },
                     overlapDays,
                   },
                 });
@@ -449,6 +491,14 @@ export async function runOccupancyAudit(
           );
 
           for (const coll of collisions) {
+            const overlapEndMs = Math.min(
+              normalizeDateOnly(item.dateTo).getTime(),
+              normalizeDateOnly(coll.dateTo).getTime()
+            );
+            if (overlapEndMs < todayTime) {
+              continue;
+            }
+
             const dFromItem = normalizeDateOnly(item.dateFrom).toISOString().slice(0, 10);
             const dToItem = normalizeDateOnly(item.dateTo).toISOString().slice(0, 10);
             const dFromColl = normalizeDateOnly(coll.dateFrom).toISOString().slice(0, 10);
@@ -864,7 +914,121 @@ export async function executeInsightAction(
         return { success: true, message: 'Kampaň byla úspěšně označena jako ukončená (FINISHED).', insight: updated };
       }
 
+      if (action === 'CLEAN_ALL_EXPIRED') {
+        const res = await cleanExpiredOccupancies(organizationId, user);
+        return { success: res.success, message: res.message };
+      }
+
       throw new Error(`Neznámá akce: ${action}`);
+    }
+  );
+}
+
+/**
+ * Bulk cleans all expired occupancies in the organization:
+ * 1. Finds all occupancies where dateTo < today and status in ('OCCUPIED', 'RESERVED')
+ * 2. Updates their status to 'FINISHED'
+ * 3. Synchronizes surface availability status for all affected surfaces
+ * 4. Runs an audit scan to automatically resolve expired occupancy insights
+ */
+export async function cleanExpiredOccupancies(
+  organizationId: string,
+  user: { id: string; name?: string | null; email?: string | null }
+): Promise<{ success: boolean; finishedCount: number; surfacesUpdatedCount: number; message: string }> {
+  return runWithTenantContext(
+    {
+      organizationId,
+      userId: user.id,
+      source: 'session',
+    },
+    async () => {
+      const now = new Date();
+      const today = normalizeDateOnly(now);
+
+      // Find all occupancies where dateTo < today and status is blocking
+      const expiredOccupancies = await prisma.occupancy.findMany({
+        where: {
+          organizationId,
+          dateTo: { lt: today },
+          status: { in: ['OCCUPIED', 'RESERVED'] },
+        },
+        select: {
+          id: true,
+          surfaceId: true,
+          campaignName: true,
+          dateTo: true,
+        },
+      });
+
+      if (expiredOccupancies.length === 0) {
+        return {
+          success: true,
+          finishedCount: 0,
+          surfacesUpdatedCount: 0,
+          message: 'Všechny kampaně jsou aktuální. Žádné prošlé kampaně k uzavření nebyly nalezeny.',
+        };
+      }
+
+      // 1. Mark them as FINISHED
+      const expiredIds = expiredOccupancies.map((o) => o.id);
+      await prisma.occupancy.updateMany({
+        where: {
+          id: { in: expiredIds },
+          organizationId,
+        },
+        data: {
+          status: 'FINISHED',
+        },
+      });
+
+      // 2. Identify affected surfaces and synchronize their status
+      const affectedSurfaceIds = Array.from(
+        new Set(expiredOccupancies.map((o) => o.surfaceId).filter(Boolean))
+      ) as string[];
+
+      for (const surfaceId of affectedSurfaceIds) {
+        const occupancies = await prisma.occupancy.findMany({
+          where: { surfaceId, organizationId },
+          select: { id: true, clientId: true, status: true, dateFrom: true, dateTo: true },
+        });
+
+        const derived = getSurfaceAvailabilityState(occupancies, now);
+        await prisma.advertisingSurface.update({
+          where: { id: surfaceId },
+          data: {
+            status: derived.status,
+            currentClientId: derived.currentClientId,
+            currentRentStart: derived.currentRentStart,
+            currentRentEnd: derived.currentRentEnd,
+          },
+        });
+      }
+
+      // 3. Write audit log
+      await prisma.crmAuditLog.create({
+        data: {
+          organizationId,
+          userId: user.id,
+          userEmail: user.email || 'unknown',
+          action: 'OCCUPANCY_BULK_CLEAN_EXPIRED',
+          entityType: 'Occupancy',
+          entityId: expiredIds[0],
+          detailsJson: JSON.stringify({
+            finishedCount: expiredIds.length,
+            affectedSurfacesCount: affectedSurfaceIds.length,
+          }),
+        },
+      });
+
+      // 4. Run an audit scan to auto-resolve closed insights immediately
+      await runOccupancyAudit(organizationId, { userId: user.id });
+
+      return {
+        success: true,
+        finishedCount: expiredIds.length,
+        surfacesUpdatedCount: affectedSurfaceIds.length,
+        message: `Úspěšně uzavřeno ${expiredIds.length} prošlých kampaní a aktualizován stav u ${affectedSurfaceIds.length} ploch.`,
+      };
     }
   );
 }
