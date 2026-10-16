@@ -11,7 +11,86 @@ export interface ParsedPointMetadata {
   photoUrl: string | null;
   otherNotes: string | null;
   relocationDestination: string | null;
+  client: string | null;
+  campaign: string | null;
   raw: string;
+}
+
+/**
+ * Checks whether a layer name is a generic placeholder (e.g. from KML/Google My Maps defaults)
+ * rather than a meaningful campaign/client name.
+ */
+export function isGenericLayerName(layerName?: string | null): boolean {
+  if (!layerName) return true;
+  const normalized = layerName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  if (!normalized) return true;
+
+  const genericPatterns = [
+    /^obecna vrstva$/,
+    /^vrstva bez nazvu$/,
+    /^bez nazvu$/,
+    /^bez nazvu vrstvy$/,
+    /^rucne pridane body$/,
+    /^untitled layer$/,
+    /^untitled$/,
+    /^default layer$/,
+    /^default$/,
+    /^layer\s*\d*$/,
+    /^vrstva\s*\d*$/,
+    /^body$/,
+    /^points$/,
+    /^placemarks$/,
+    /^znacky$/,
+    /^import$/,
+  ];
+
+  return genericPatterns.some((pattern) => pattern.test(normalized));
+}
+
+/**
+ * Resolves the client or motif name for a point, taking into account:
+ * 1. Explicit Client / Zadavatel extracted from point description
+ * 2. KML / My Maps Layer Name (if not a generic placeholder like 'Obecná vrstva')
+ * 3. Campaign-level client name
+ * 4. Fallback to campaign name or null
+ */
+export function resolvePointClientName(point: {
+  layerName?: string | null;
+  description?: string | null;
+  campaignClientName?: string | null;
+  campaignName?: string | null;
+}): string | null {
+  // 1. Explicit client in description
+  const meta = parsePointMetadata(point.description);
+  if (meta.client) {
+    return meta.client;
+  }
+  if (meta.campaign) {
+    return meta.campaign;
+  }
+
+  // 2. Meaningful layer name (e.g. "BB CALIN", "Komorní scéna aréna", "NEW ÁČKA HUJDUS")
+  const cleanedLayer = cleanLayerName(point.layerName);
+  if (cleanedLayer && !isGenericLayerName(cleanedLayer)) {
+    return cleanedLayer;
+  }
+
+  // 3. Campaign client name
+  if (point.campaignClientName?.trim()) {
+    return point.campaignClientName.trim();
+  }
+
+  // 4. Fallback to campaign name if provided
+  if (point.campaignName?.trim()) {
+    return point.campaignName.trim();
+  }
+
+  return null;
 }
 
 /**
@@ -54,6 +133,8 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
       photoUrl: null,
       otherNotes: null,
       relocationDestination: null,
+      client: null,
+      campaign: null,
       raw: '',
     };
   }
@@ -78,6 +159,10 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
   // Helper to extract a named field value
   // Matches "Key: Value" until the next known key or end of string
   const knownKeys = [
+    'Klient',
+    'Zadavatel',
+    'Kampa[nň]',
+    'Motiv',
     'Lokalita',
     'M[eě]sto',
     'Obec',
@@ -112,6 +197,8 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
     return null;
   }
 
+  const client = extractField(['Klient', 'Zadavatel']);
+  const campaign = extractField(['Kampa[nň]', 'Motiv']);
   const locality = extractField(['Lokalita']);
   const city = extractField(['M[eě]sto', 'Obec']);
   const district = extractField(['[CČ][aá]st', 'M[eě]stsk[aá]\\s+[cč][aá]st']);
@@ -141,6 +228,12 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
     .replace(/(?:lon|lng|longitude)\s*[:=]\s*[-+]?[0-9]*\.?[0-9]+/gi, '');
 
   // Remove recognized structured key-values
+  if (client) {
+    notesCleaned = notesCleaned.replace(new RegExp(`(?:Klient|Zadavatel)\\s*[:=]\\s*${escapeRegex(client)}`, 'gi'), '');
+  }
+  if (campaign) {
+    notesCleaned = notesCleaned.replace(new RegExp(`(?:Kampa[nň]|Motiv)\\s*[:=]\\s*${escapeRegex(campaign)}`, 'gi'), '');
+  }
   if (locality) {
     notesCleaned = notesCleaned.replace(new RegExp(`Lokalita\\s*[:=]\\s*${escapeRegex(locality)}`, 'gi'), '');
   }
@@ -190,6 +283,8 @@ export function parsePointMetadata(description?: string | null): ParsedPointMeta
     photoUrl,
     otherNotes,
     relocationDestination,
+    client,
+    campaign,
     raw,
   };
 }

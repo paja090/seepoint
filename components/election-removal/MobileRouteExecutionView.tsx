@@ -26,6 +26,7 @@ import { ElectionRemovalMap } from './ElectionRemovalMap';
 import {
   parsePointMetadata,
   cleanLayerName,
+  isGenericLayerName,
   buildGoogleMapsRouteUrl,
 } from '@/lib/election-removal/point-metadata';
 import {
@@ -631,10 +632,14 @@ export function MobileRouteExecutionView({
                       )}
                       {cleanLayer && (
                         <span
-                          className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md"
-                          title={point.layerName || undefined}
+                          className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md font-bold ${
+                            !isGenericLayerName(cleanLayer)
+                              ? 'bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs font-black'
+                              : 'text-slate-500 font-medium bg-slate-100'
+                          }`}
+                          title={`Vrstva / Motiv: ${point.layerName || cleanLayer}`}
                         >
-                          {cleanLayer}
+                          {!isGenericLayerName(cleanLayer) ? `🎯 ${cleanLayer}` : cleanLayer}
                         </span>
                       )}
                     </div>

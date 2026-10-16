@@ -6,6 +6,7 @@ import { Sparkles, Wrench, Trash2, Truck, CheckSquare, Square } from 'lucide-rea
 import type { ElectionRemovalPoint, FieldWorkStep } from '@prisma/client';
 import { operations, dispositions } from '@/lib/election-removal/task-spec';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
+import { cleanLayerName, isGenericLayerName } from '@/lib/election-removal/point-metadata';
 import { LocationPickerMap } from './LocationPickerMap';
 
 type Point = ElectionRemovalPoint & { steps: FieldWorkStep[]; photos?: { id: string; type?: string; fileName?: string | null; createdAt?: string | Date; capturedLatitude?: number | null; capturedLongitude?: number | null; capturedByWorkerName?: string | null }[] };
@@ -291,6 +292,7 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       <div className="flex flex-wrap gap-2">{carriers.map(c => <button type="button" key={c.id} className="rounded border p-2 text-sm" onClick={() => { setCarrier(c); setCarriers([]); const label = formRef.current?.elements.namedItem('label') as HTMLInputElement | null; if (label && !label.value) label.value = c.name; if (c.latitude != null && c.longitude != null) setGps({ latitude: c.latitude, longitude: c.longitude }); }}>{c.name}</button>)}</div>
       {carrier && <label>Plocha<select className={input} name="surfaceId"><option value="">Celý objekt</option>{carrier.surfaces.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
       </div>
+      <input type="hidden" name="layerName" defaultValue={edit?.layerName ?? ''} />
       <div className="grid gap-3 sm:grid-cols-2">
         <label>Název místa / objektu<input className={input} required name="label" defaultValue={edit?.label ?? ''} /></label>
         <label>Typ objektu<select name="mediaType" className={input} defaultValue={edit?.mediaType ?? 'OTHER'}>{Object.entries(ELECTION_REMOVAL_MEDIA_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></label>
@@ -357,8 +359,15 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       <button type="button" disabled={busy} className="ml-4 text-sm underline" onClick={() => setFormOpen(false)}>Zrušit</button>
     </form>}
     <div className="space-y-2">{filteredPoints.slice(0,visibleCount).map(p => <article key={p.id} className="rounded-xl border bg-white p-4">
-      <div className="flex gap-3 items-center"><input aria-label={`Vybrat ${p.label}`} type="checkbox" checked={selected.includes(p.id)} onChange={e => setSelected(e.target.checked ? [...selected, p.id] : selected.filter(id => id !== p.id))} />
-        <strong>{p.label} · {p.quantity} ks · {p.operationType && operations[p.operationType as keyof typeof operations] || 'Vyžaduje kontrolu'}</strong>
+      <div className="flex gap-3 items-center flex-wrap"><input aria-label={`Vybrat ${p.label}`} type="checkbox" checked={selected.includes(p.id)} onChange={e => setSelected(e.target.checked ? [...selected, p.id] : selected.filter(id => id !== p.id))} />
+        <div className="flex flex-wrap items-center gap-2">
+          <strong>{p.label} · {p.quantity} ks · {p.operationType && operations[p.operationType as keyof typeof operations] || 'Vyžaduje kontrolu'}</strong>
+          {p.layerName && !isGenericLayerName(p.layerName) && (
+            <span className="rounded-md bg-sky-50 text-sky-800 px-2 py-0.5 text-xs font-bold border border-sky-200 shadow-2xs">
+              🎯 {cleanLayerName(p.layerName)}
+            </span>
+          )}
+        </div>
         <span className="ml-auto rounded-full bg-slate-100 px-2 py-1 text-xs">{groups[category(p)]}</span>
         {(!p.assignedFieldPlanId || (p.reviewRequired && p.steps.length === 0 && !p.startedAt)) && !p.startedAt && !p.steps.some(s => s.startedAt || s.completedQuantity > 0) && p.status !== 'COMPLETED' && (
           <button type="button" className="text-sm underline text-sky-700" onClick={() => editPoint(p)}>Upravit</button>

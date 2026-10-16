@@ -121,6 +121,7 @@ export type MyRouteStop = {
   campaignName?: string | null;
   title: string;
   clientName: string | null;
+  layerName?: string | null;
   instructions: string | null;
   status: string;
   issueType: string | null;

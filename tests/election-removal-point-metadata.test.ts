@@ -86,3 +86,85 @@ test('cleanLayerName: cleans file extensions and noisy prefixes', () => {
   assert.equal(cleanLayerName('Towery'), 'Towery');
   assert.equal(cleanLayerName(null), null);
 });
+
+test('isGenericLayerName: distinguishes generic placeholders from client/motive layers', async () => {
+  const { isGenericLayerName } = await import('../lib/election-removal/point-metadata');
+  assert.equal(isGenericLayerName('Obecná vrstva'), true);
+  assert.equal(isGenericLayerName('Vrstva bez názvu'), true);
+  assert.equal(isGenericLayerName('Ručně přidané body'), true);
+  assert.equal(isGenericLayerName('Bez názvu'), true);
+  assert.equal(isGenericLayerName('Untitled Layer'), true);
+  assert.equal(isGenericLayerName(null), true);
+  assert.equal(isGenericLayerName(''), true);
+
+  // Real client/motive layers
+  assert.equal(isGenericLayerName('BB CALIN'), false);
+  assert.equal(isGenericLayerName('Komorní scéna aréna'), false);
+  assert.equal(isGenericLayerName('NEW ÁČKA HUJDUS'), false);
+  assert.equal(isGenericLayerName('Áčka SeePOINT'), false);
+});
+
+test('resolvePointClientName: resolves client from description, layer or campaign', async () => {
+  const { resolvePointClientName } = await import('../lib/election-removal/point-metadata');
+
+  // Case 1: Point has meaningful KML layer
+  const clientFromLayer = resolvePointClientName({
+    layerName: 'BB CALIN',
+    campaignName: 'Tomáš lavičky BB + KSA',
+  });
+  assert.equal(clientFromLayer, 'BB CALIN');
+
+  const clientFromLayer2 = resolvePointClientName({
+    layerName: 'Komorní scéna aréna',
+    campaignName: 'Tomáš lavičky BB + KSA',
+  });
+  assert.equal(clientFromLayer2, 'Komorní scéna aréna');
+
+  // Case 2: Explicit Klient in description takes top priority
+  const clientFromDesc = resolvePointClientName({
+    layerName: 'BB CALIN',
+    description: 'Klient: Bageterie Boulevard\nMěsto: Ostrava',
+    campaignName: 'Tomáš lavičky BB + KSA',
+  });
+  assert.equal(clientFromDesc, 'Bageterie Boulevard');
+
+  // Case 3: Generic layer falls back to campaign client or campaign name
+  const clientGenericLayer = resolvePointClientName({
+    layerName: 'Obecná vrstva',
+    campaignClientName: 'Klient XYZ',
+    campaignName: 'Kampaň Ostrava',
+  });
+  assert.equal(clientGenericLayer, 'Klient XYZ');
+
+  // Case 4: Generic layer without campaignClientName falls back to campaignName
+  const clientFallback = resolvePointClientName({
+    layerName: 'Vrstva bez názvu',
+    campaignName: 'Kampaň Ostrava',
+  });
+  assert.equal(clientFallback, 'Kampaň Ostrava');
+});
+
+test('parsePointMetadata: extracts Klient and Kampaň from description', () => {
+  const textWithClient = 'Klient: Calin Motiv: Jarní menu Město: Ostrava Ulice: Hlavní';
+  const meta = parsePointMetadata(textWithClient);
+  assert.equal(meta.client, 'Calin');
+  assert.equal(meta.campaign, 'Jarní menu');
+  assert.equal(meta.city, 'Ostrava');
+  assert.equal(meta.street, 'Hlavní');
+});
+
+test('taskInstructions: includes Czech media label and Klient / Motiv', async () => {
+  const { taskInstructions } = await import('../lib/election-removal/task-spec');
+  const instructions = taskInstructions({
+    operationType: 'INSTALL_AD',
+    label: 'Výstavní MHD 1A',
+    mediaType: 'BENCH',
+    quantity: 1,
+    clientName: 'BB CALIN',
+    description: 'KÓD: OP37',
+  });
+  assert.ok(instructions.includes('Instalace reklamního materiálu'));
+  assert.ok(instructions.includes('Lavička — 1 ks'));
+  assert.ok(instructions.includes('Klient / Motiv: BB CALIN'));
+  assert.ok(instructions.includes('KÓD: OP37'));
+});
