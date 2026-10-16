@@ -59,6 +59,7 @@ const DIRECT_CLIENT_BASELINE = new Map([
   ['lib/db.ts', 1],
   ['scripts/check_database_settlements.js', 1],
   ['scripts/check_seeding_status.js', 1],
+  ['scripts/heal-navigation-documentation-photos.mjs', 1],
   ['scripts/import-carriers-2026.ts', 1],
   ['scripts/inspect-and-purge-orders.js', 1],
   ['scripts/list_employees.js', 1],

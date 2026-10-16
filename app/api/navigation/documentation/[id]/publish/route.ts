@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, documentationPhotoSelect, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
+import {
+  buildSnapshotItem,
+  documentationPhotoSelect,
+  getDeterministicReportToken,
+  isSurfaceForClients,
+  resolveDocumentationPhotos,
+  resolveDocumentationDirection,
+  runPrePublishChecks,
+} from '@/lib/navigation-documentation';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('navigationDocumentation');
@@ -20,10 +28,48 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               include: {
                 installedPhoto: { select: documentationPhotoSelect },
                 sitePhoto: { select: documentationPhotoSelect },
+                surface: {
+                  include: {
+                    photos: { where: { isPrivate: false }, orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }], select: documentationPhotoSelect },
+                    occupancies: { select: { clientId: true } },
+                  },
+                },
+                carrier: {
+                  include: {
+                    photos: { where: { isPrivate: false }, orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }], select: documentationPhotoSelect },
+                    surfaces: {
+                      include: {
+                        photos: { where: { isPrivate: false }, orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }], select: documentationPhotoSelect },
+                        occupancies: { select: { clientId: true } },
+                      },
+                    },
+                  },
+                },
               },
             },
-            carrier: true,
-            selectedPhoto: { select: documentationPhotoSelect },
+            carrier: {
+              include: {
+                photos: { where: { isPrivate: false }, orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }], select: documentationPhotoSelect },
+                surfaces: {
+                  include: {
+                    photos: { where: { isPrivate: false }, orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }], select: documentationPhotoSelect },
+                    occupancies: { select: { clientId: true } },
+                  },
+                },
+              },
+            },
+            selectedPhoto: {
+              include: {
+                surface: {
+                  select: {
+                    id: true,
+                    name: true,
+                    currentClientId: true,
+                    occupancies: { select: { clientId: true } },
+                  },
+                },
+              },
+            },
           },
           orderBy: { sortOrder: 'asc' },
         },
@@ -46,23 +92,45 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const updated = await prisma.$transaction(async (tx) => {
       for (const item of report.items) {
         if (!item.isVisible) continue;
+        const carrier = item.carrier || item.navigationPoint?.carrier;
+        const clientIds = [report.clientId];
+
+        const isPhotoDisallowed =
+          item.selectedPhoto?.surface &&
+          !isSurfaceForClients(item.selectedPhoto.surface, clientIds);
+
+        const preferredPhotoId = isPhotoDisallowed ? null : item.selectedPhotoId;
+
+        const { selectedPhoto } = resolveDocumentationPhotos({
+          point: item.navigationPoint,
+          carrier,
+          allClientIds: clientIds,
+          preferredPhotoId,
+        });
+
         const currentCustomDirection =
           item.snapshot && typeof item.snapshot === 'object' && 'direction' in item.snapshot
             ? String((item.snapshot as Record<string, unknown>).direction || '')
-            : item.navigationPoint?.orientation || null;
-        const effectivePhoto = item.selectedPhoto || item.navigationPoint?.installedPhoto || item.navigationPoint?.sitePhoto || null;
+            : resolveDocumentationDirection({
+                point: item.navigationPoint,
+                carrier,
+                allClientIds: clientIds,
+              }) || item.navigationPoint?.orientation || null;
+
         const snapshotData = buildSnapshotItem({
           id: item.id,
           clientNote: item.clientNote,
           customDirection: currentCustomDirection,
+          surface: item.navigationPoint?.surface ?? null,
           navigationPoint: item.navigationPoint,
-          carrier: item.carrier,
-          selectedPhoto: effectivePhoto,
+          carrier,
+          selectedPhoto,
         });
+
         await tx.navigationDocumentationItem.update({
           where: { id: item.id, organizationId: auth.organizationId },
           data: {
-            ...(effectivePhoto && !item.selectedPhotoId ? { selectedPhotoId: effectivePhoto.id } : {}),
+            selectedPhotoId: selectedPhoto?.id ?? (isPhotoDisallowed ? null : item.selectedPhotoId),
             snapshot: snapshotData as unknown as object,
           },
         });

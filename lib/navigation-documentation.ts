@@ -30,6 +30,261 @@ export const documentationPhotoSelect = {
   surfaceId: true,
 } as const;
 
+export const documentationSurfaceSelect = {
+  id: true,
+  name: true,
+  currentClientId: true,
+  directionDescription: true,
+  destinationName: true,
+  orientation: true,
+  photos: {
+    where: { isPrivate: false },
+    orderBy: [{ isClientVisible: 'desc' as const }, { isPrimary: 'desc' as const }, { createdAt: 'desc' as const }],
+    select: documentationPhotoSelect,
+  },
+  occupancies: {
+    select: { clientId: true },
+  },
+} as const;
+
+export type DocumentationPhoto = {
+  id: string;
+  url: string;
+  isClientVisible?: boolean | null;
+  isPrivate?: boolean | null;
+  isPrimary?: boolean | null;
+  createdAt?: Date | string | null;
+  carrierId?: string | null;
+  surfaceId?: string | null;
+};
+
+export type DocumentationSurface = {
+  id: string;
+  name?: string | null;
+  currentClientId?: string | null;
+  directionDescription?: string | null;
+  destinationName?: string | null;
+  orientation?: string | null;
+  photos?: DocumentationPhoto[] | null;
+  occupancies?: Array<{ clientId?: string | null }> | null;
+};
+
+export type DocumentationCarrier = {
+  id: string;
+  code?: string | null;
+  name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  district?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  photos?: DocumentationPhoto[] | null;
+  surfaces?: DocumentationSurface[] | null;
+};
+
+export type DocumentationPoint = {
+  id?: string;
+  label?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  status?: string | null;
+  orientation?: string | null;
+  variant?: string | null;
+  surfaceId?: string | null;
+  surface?: DocumentationSurface | null;
+  installedPhotoId?: string | null;
+  installedPhoto?: DocumentationPhoto | null;
+  sitePhotoId?: string | null;
+  sitePhoto?: DocumentationPhoto | null;
+  carrierId?: string | null;
+  carrier?: DocumentationCarrier | null;
+  updatedAt?: Date | null;
+};
+
+/**
+ * Determines whether a surface belongs to one of the given client IDs (directly or via occupancy).
+ */
+export function isSurfaceForClients(surface?: DocumentationSurface | null, allClientIds: string[] = []): boolean {
+  if (!surface) return false;
+  if (surface.currentClientId && allClientIds.includes(surface.currentClientId)) return true;
+  if (surface.occupancies?.some((occ) => occ.clientId && allClientIds.includes(occ.clientId))) return true;
+  return false;
+}
+
+/**
+ * Resolves available photos strictly isolated to the specified client / surface.
+ * Guarantees that photos attached to surfaces of other clients on the same carrier
+ * are NEVER included or auto-selected.
+ */
+export function resolveDocumentationPhotos(params: {
+  point?: DocumentationPoint | null;
+  carrier?: DocumentationCarrier | null;
+  surface?: DocumentationSurface | null;
+  allClientIds: string[];
+  preferredPhotoId?: string | null;
+}): {
+  availablePhotos: DocumentationPhoto[];
+  selectedPhoto: DocumentationPhoto | null;
+  matchedSurface: DocumentationSurface | null;
+} {
+  const { point, carrier, surface: directSurface, allClientIds, preferredPhotoId } = params;
+
+  // 1. Identify matched surface for this item
+  let matchedSurface: DocumentationSurface | null = directSurface ?? point?.surface ?? null;
+  if (!matchedSurface && point?.surfaceId && carrier?.surfaces) {
+    matchedSurface = carrier.surfaces.find((s) => s.id === point.surfaceId) ?? null;
+  }
+  if (!matchedSurface && carrier?.surfaces) {
+    matchedSurface = carrier.surfaces.find((s) => isSurfaceForClients(s, allClientIds)) ?? null;
+  }
+
+  // 2. Identify allowed vs disallowed surface IDs on this carrier
+  const allowedSurfaceIds = new Set<string>();
+  const disallowedSurfaceIds = new Set<string>();
+
+  if (matchedSurface) {
+    allowedSurfaceIds.add(matchedSurface.id);
+  }
+  if (carrier?.surfaces) {
+    for (const s of carrier.surfaces) {
+      if (matchedSurface && s.id === matchedSurface.id) {
+        allowedSurfaceIds.add(s.id);
+      } else if (!point?.surfaceId && isSurfaceForClients(s, allClientIds)) {
+        allowedSurfaceIds.add(s.id);
+      } else {
+        disallowedSurfaceIds.add(s.id);
+      }
+    }
+  }
+
+  // 3. Collect candidates in priority order
+  const rawCandidates: DocumentationPhoto[] = [];
+
+  // Priority 1: Point installed photo (exact photo of installed board)
+  if (point?.installedPhoto && !point.installedPhoto.isPrivate) {
+    rawCandidates.push(point.installedPhoto);
+  }
+
+  // Priority 2: Photos from matched surface(s)
+  const surfacePhotos: DocumentationPhoto[] = [];
+  if (matchedSurface?.photos) {
+    surfacePhotos.push(...matchedSurface.photos);
+  } else if (!point?.surfaceId && carrier?.surfaces) {
+    for (const s of carrier.surfaces) {
+      if (allowedSurfaceIds.has(s.id) && s.photos) {
+        surfacePhotos.push(...s.photos);
+      }
+    }
+  }
+
+  const sortedSurfacePhotos = surfacePhotos
+    .filter((p) => !p.isPrivate)
+    .sort((a, b) => {
+      if (Boolean(a.isClientVisible) !== Boolean(b.isClientVisible)) return a.isClientVisible ? -1 : 1;
+      if (Boolean(a.isPrimary) !== Boolean(b.isPrimary)) return a.isPrimary ? -1 : 1;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  rawCandidates.push(...sortedSurfacePhotos);
+
+  // Priority 3: Carrier-neutral photos (ONLY photos with surfaceId === null/undefined)
+  const neutralCarrierPhotos = (carrier?.photos || [])
+    .filter((p) => !p.isPrivate && !p.surfaceId)
+    .sort((a, b) => {
+      if (Boolean(a.isClientVisible) !== Boolean(b.isClientVisible)) return a.isClientVisible ? -1 : 1;
+      if (Boolean(a.isPrimary) !== Boolean(b.isPrimary)) return a.isPrimary ? -1 : 1;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+  rawCandidates.push(...neutralCarrierPhotos);
+
+  // Priority 4: Point site photo
+  if (point?.sitePhoto && !point.sitePhoto.isPrivate) {
+    rawCandidates.push(point.sitePhoto);
+  }
+
+  // 4. Strict filtering and de-duplication
+  const uniqueMap = new Map<string, DocumentationPhoto>();
+  for (const photo of rawCandidates) {
+    if (!photo || !photo.id) continue;
+    // CRITICAL: NEVER include photos belonging to a disallowed surface
+    if (photo.surfaceId && disallowedSurfaceIds.has(photo.surfaceId)) {
+      continue;
+    }
+    // If we have an exact matched surface, any photo with a DIFFERENT surfaceId is dropped
+    if (matchedSurface && photo.surfaceId && photo.surfaceId !== matchedSurface.id) {
+      continue;
+    }
+    if (!uniqueMap.has(photo.id)) {
+      uniqueMap.set(photo.id, photo);
+    }
+  }
+
+  const availablePhotos = Array.from(uniqueMap.values());
+
+  // 5. Determine selectedPhoto
+  let selectedPhoto: DocumentationPhoto | null = null;
+  if (preferredPhotoId) {
+    selectedPhoto = availablePhotos.find((p) => p.id === preferredPhotoId) ?? null;
+  }
+  if (!selectedPhoto && availablePhotos.length > 0) {
+    selectedPhoto = availablePhotos[0];
+  }
+
+  return {
+    availablePhotos,
+    selectedPhoto,
+    matchedSurface,
+  };
+}
+
+/**
+ * Resolves the direction/orientation description strictly isolated to the specified client / surface.
+ * Never pulls descriptions from competitor/other clients' surfaces sharing the same carrier pole.
+ */
+export function resolveDocumentationDirection(params: {
+  point?: { orientation?: string | null; variant?: string | null; surfaceId?: string | null; surface?: DocumentationSurface | null } | null;
+  carrier?: DocumentationCarrier | null;
+  surface?: DocumentationSurface | null;
+  allClientIds: string[];
+  customDirection?: string | null;
+}): string | undefined {
+  const { point, carrier, surface: directSurface, allClientIds, customDirection } = params;
+
+  if (customDirection && customDirection.trim() !== '') {
+    return customDirection.trim();
+  }
+
+  const directOrientation = point?.orientation;
+  if (directOrientation && directOrientation.trim() !== '') {
+    return directOrientation.trim();
+  }
+
+  // Find target surface strictly for this client
+  let targetSurface: DocumentationSurface | null = directSurface ?? point?.surface ?? null;
+  if (!targetSurface && point?.surfaceId && carrier?.surfaces) {
+    targetSurface = carrier.surfaces.find((s) => s.id === point.surfaceId) ?? null;
+  }
+  if (!targetSurface && carrier?.surfaces) {
+    targetSurface = carrier.surfaces.find((s) => isSurfaceForClients(s, allClientIds)) ?? null;
+  }
+
+  if (targetSurface) {
+    const desc = targetSurface.directionDescription?.trim();
+    if (desc) return desc;
+    const dest = targetSurface.destinationName?.trim();
+    if (dest) return dest;
+    const surfOrient = targetSurface.orientation?.trim();
+    if (surfOrient) return surfOrient;
+  }
+
+  const variant = point?.variant;
+  if (variant && variant.trim() !== '') {
+    return variant.trim();
+  }
+
+  return undefined;
+}
+
 export type SnapshotItemData = {
   id: string;
   pointCode: string;
@@ -70,10 +325,10 @@ export function runPrePublishChecks(
       city?: string | null;
     } | null;
     selectedPhoto?: {
-      url?: string;
-      isClientVisible?: boolean;
-      isPrivate?: boolean;
-      createdAt?: Date;
+      url?: string | null;
+      isClientVisible?: boolean | null;
+      isPrivate?: boolean | null;
+      createdAt?: Date | string | null;
     } | null;
     isVisible?: boolean;
   }>,
@@ -109,7 +364,7 @@ export function runPrePublishChecks(
       if (item.selectedPhoto.isClientVisible === false || item.selectedPhoto.isPrivate === true) {
         unapprovedPhotosCount++;
       }
-      if (periodFrom && item.selectedPhoto.createdAt && item.selectedPhoto.createdAt < periodFrom) {
+      if (periodFrom && item.selectedPhoto.createdAt && new Date(item.selectedPhoto.createdAt) < periodFrom) {
         oldPhotosCount++;
       }
     }
@@ -160,6 +415,12 @@ export function buildSnapshotItem(item: {
   id: string;
   clientNote?: string | null;
   customDirection?: string | null;
+  surface?: {
+    id: string;
+    name?: string | null;
+    directionDescription?: string | null;
+    orientation?: string | null;
+  } | null;
   navigationPoint?: {
     id: string;
     label: string;
@@ -183,11 +444,11 @@ export function buildSnapshotItem(item: {
   } | null;
   selectedPhoto?: {
     id: string;
-    url: string;
-    createdAt: Date;
+    url?: string | null;
+    createdAt?: Date | string | null;
   } | null;
 }): SnapshotItemData {
-  const code = item.navigationPoint?.label || item.carrier?.code || item.carrier?.name || 'NAV';
+  const code = item.surface?.name || item.navigationPoint?.label || item.carrier?.code || item.carrier?.name || 'NAV';
   const address = item.navigationPoint?.address || item.carrier?.address || 'Adresa neuvedena';
   const city = item.carrier?.city || 'Lokalita neuvedena';
   const locality = item.carrier?.district || item.carrier?.city || '';
@@ -195,10 +456,12 @@ export function buildSnapshotItem(item: {
   const lng = item.navigationPoint?.longitude ?? item.carrier?.longitude ?? null;
   const status = item.navigationPoint?.status || 'INSTALLED';
   const lastCheckDate = item.navigationPoint?.updatedAt ? item.navigationPoint.updatedAt.toISOString() : null;
-  const photoDate = item.selectedPhoto?.createdAt ? item.selectedPhoto.createdAt.toISOString() : null;
+  const photoDate = item.selectedPhoto?.createdAt ? new Date(item.selectedPhoto.createdAt).toISOString() : null;
   const direction =
     item.customDirection ||
     [item.navigationPoint?.orientation, item.navigationPoint?.variant].filter(Boolean).join(' · ') ||
+    item.surface?.directionDescription ||
+    item.surface?.orientation ||
     'Obousměrný (A/B)';
 
   return {
