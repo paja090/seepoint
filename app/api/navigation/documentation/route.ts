@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, documentationPhotoSelect, getDeterministicReportToken } from '@/lib/navigation-documentation';
+import {
+  buildSnapshotItem,
+  documentationPhotoSelect,
+  getDeterministicReportToken,
+  isSurfaceForClients,
+  resolveDocumentationPhotos,
+  resolveDocumentationDirection,
+} from '@/lib/navigation-documentation';
 import {
   NavigationDocumentationValidationError,
   parseNavigationReportStatus,
@@ -122,22 +129,21 @@ export async function POST(request: Request) {
       if (!navigationOffer) return NextResponse.json({ error: 'Navigační nabídka nepatří vybranému klientovi.' }, { status: 400 });
     }
 
-    // Helper to extract direction/orientation
-    type DirectionPoint = { orientation?: string | null; variant?: string | null };
-    type DirectionCarrier = { surfaces?: Array<{ directionDescription?: string | null; orientation?: string | null }> };
-    const extractDirection = (point?: DirectionPoint | null, carrier?: DirectionCarrier | null) => {
-      const direct = point?.orientation;
-      if (direct && direct.trim() !== '') return direct.trim();
-      const surf = carrier?.surfaces?.[0]?.directionDescription || carrier?.surfaces?.[0]?.orientation;
-      if (surf && surf.trim() !== '') return surf.trim();
-      const variant = point?.variant;
-      if (variant && variant.trim() !== '') return variant.trim();
-      return undefined;
-    };
-
     const pointInclude = {
       installedPhoto: { select: documentationPhotoSelect },
       sitePhoto: { select: documentationPhotoSelect },
+      surface: {
+        include: {
+          photos: {
+            where: { isPrivate: false },
+            orderBy: [{ isClientVisible: 'desc' as const }, { isPrimary: 'desc' as const }, { createdAt: 'desc' as const }],
+            select: documentationPhotoSelect,
+          },
+          occupancies: {
+            select: { clientId: true },
+          },
+        },
+      },
       carrier: {
         include: {
           photos: {
@@ -151,6 +157,9 @@ export async function POST(request: Request) {
                 where: { isPrivate: false },
                 orderBy: [{ isClientVisible: 'desc' as const }, { isPrimary: 'desc' as const }, { createdAt: 'desc' as const }],
                 select: documentationPhotoSelect,
+              },
+              occupancies: {
+                select: { clientId: true },
               },
             },
           },
@@ -208,25 +217,23 @@ export async function POST(request: Request) {
 
     if (points.length > 0) {
       itemInputs = points.map((point, index) => {
-        const rawPhotos = [
-          ...(point.installedPhoto && !point.installedPhoto.isPrivate ? [point.installedPhoto] : []),
-          ...(point.sitePhoto && !point.sitePhoto.isPrivate ? [point.sitePhoto] : []),
-          ...(point.carrier?.photos || []),
-          ...((point.carrier?.surfaces || []).flatMap((surface) => surface.photos || [])),
-        ];
-        const uniquePhotos = Array.from(new Map(rawPhotos.map((p) => [p.id, p])).values());
-        const availablePhotos = uniquePhotos.sort((a, b) => {
-          if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
-          if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        const { selectedPhoto } = resolveDocumentationPhotos({
+          point,
+          carrier: point.carrier ?? null,
+          allClientIds,
         });
 
-        const selectedPhoto = availablePhotos[0] ?? null;
-        const customDirection = extractDirection(point, point.carrier);
+        const customDirection = resolveDocumentationDirection({
+          point,
+          carrier: point.carrier ?? null,
+          allClientIds,
+        });
+
         const snapshot = buildSnapshotItem({
           id: `item-${index}`,
           clientNote: null,
           customDirection,
+          surface: point.surface ?? null,
           navigationPoint: point,
           carrier: point.carrier ?? null,
           selectedPhoto,
@@ -270,6 +277,9 @@ export async function POST(request: Request) {
                 orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
                 select: documentationPhotoSelect,
               },
+              occupancies: {
+                select: { clientId: true },
+              },
             },
           },
         },
@@ -285,36 +295,75 @@ export async function POST(request: Request) {
         });
       }
 
-      itemInputs = carriers.map((carrier, index) => {
-        const availablePhotos = [
-          ...(carrier.photos || []),
-          ...((carrier.surfaces || []).flatMap((surface) => surface.photos || [])),
-        ].sort((a, b) => {
-          if (a.isClientVisible !== b.isClientVisible) return a.isClientVisible ? -1 : 1;
-          if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        });
+      const generatedItems: typeof itemInputs = [];
+      let sortOrderIdx = 0;
 
-        const selectedPhoto = availablePhotos[0] ?? null;
-        const customDirection = extractDirection(null, carrier);
-        const snapshot = buildSnapshotItem({
-          id: `item-${index}`,
-          clientNote: null,
-          customDirection,
-          navigationPoint: null,
-          carrier,
-          selectedPhoto,
-        });
+      for (const carrier of carriers) {
+        const clientSurfaces = (carrier.surfaces || []).filter((surface) =>
+          isSurfaceForClients(surface, allClientIds)
+        );
 
-        return {
-          carrierId: carrier.id,
-          selectedPhotoId: selectedPhoto?.id ?? undefined,
-          customDirection,
-          sortOrder: index,
-          isVisible: true,
-          snapshot: snapshot as unknown as object,
-        };
-      });
+        if (clientSurfaces.length > 0) {
+          for (const surface of clientSurfaces) {
+            const { selectedPhoto } = resolveDocumentationPhotos({
+              surface,
+              carrier,
+              allClientIds,
+            });
+            const customDirection = resolveDocumentationDirection({
+              surface,
+              carrier,
+              allClientIds,
+            });
+            const snapshot = buildSnapshotItem({
+              id: `item-${sortOrderIdx}`,
+              clientNote: null,
+              customDirection,
+              surface,
+              navigationPoint: null,
+              carrier,
+              selectedPhoto,
+            });
+
+            generatedItems.push({
+              carrierId: carrier.id,
+              selectedPhotoId: selectedPhoto?.id ?? undefined,
+              customDirection,
+              sortOrder: sortOrderIdx++,
+              isVisible: true,
+              snapshot: snapshot as unknown as object,
+            });
+          }
+        } else {
+          const { selectedPhoto } = resolveDocumentationPhotos({
+            carrier,
+            allClientIds,
+          });
+          const customDirection = resolveDocumentationDirection({
+            carrier,
+            allClientIds,
+          });
+          const snapshot = buildSnapshotItem({
+            id: `item-${sortOrderIdx}`,
+            clientNote: null,
+            customDirection,
+            navigationPoint: null,
+            carrier,
+            selectedPhoto,
+          });
+
+          generatedItems.push({
+            carrierId: carrier.id,
+            selectedPhotoId: selectedPhoto?.id ?? undefined,
+            customDirection,
+            sortOrder: sortOrderIdx++,
+            isVisible: true,
+            snapshot: snapshot as unknown as object,
+          });
+        }
+      }
+
+      itemInputs = generatedItems;
     }
 
     const now = new Date();

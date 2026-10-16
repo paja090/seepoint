@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { prisma } from '@/lib/db';
-import { buildSnapshotItem, documentationPhotoSelect, getDeterministicReportToken, runPrePublishChecks } from '@/lib/navigation-documentation';
+import {
+  buildSnapshotItem,
+  documentationPhotoSelect,
+  getDeterministicReportToken,
+  isSurfaceForClients,
+  resolveDocumentationPhotos,
+  resolveDocumentationDirection,
+  runPrePublishChecks,
+} from '@/lib/navigation-documentation';
 import {
   isPublicNavigationReportStatus,
   NavigationDocumentationValidationError,
@@ -25,10 +33,21 @@ const reportInclude = {
         include: {
           installedPhoto: { select: documentationPhotoSelect },
           sitePhoto: { select: documentationPhotoSelect },
+          surface: {
+            include: {
+              photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
+              occupancies: { select: { clientId: true } },
+            },
+          },
           carrier: {
             include: {
               photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
-              surfaces: { include: { photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect } } },
+              surfaces: {
+                include: {
+                  photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
+                  occupancies: { select: { clientId: true } },
+                },
+              },
             },
           },
         },
@@ -36,10 +55,26 @@ const reportInclude = {
       carrier: {
         include: {
           photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
-          surfaces: { include: { photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect } } },
+          surfaces: {
+            include: {
+              photos: { where: clientPhotoWhere, orderBy: photoOrder, select: documentationPhotoSelect },
+              occupancies: { select: { clientId: true } },
+            },
+          },
         },
       },
-      selectedPhoto: { select: documentationPhotoSelect },
+      selectedPhoto: {
+        include: {
+          surface: {
+            select: {
+              id: true,
+              name: true,
+              currentClientId: true,
+              occupancies: { select: { clientId: true } },
+            },
+          },
+        },
+      },
     },
     orderBy: { sortOrder: 'asc' as const },
     take: 250,
@@ -58,23 +93,49 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const items = report.items.map((item) => {
     const carrier = item.carrier || item.navigationPoint?.carrier;
-    const pointPhotos = [
-      ...(item.navigationPoint?.installedPhoto && !item.navigationPoint.installedPhoto.isPrivate ? [item.navigationPoint.installedPhoto] : []),
-      ...(item.navigationPoint?.sitePhoto && !item.navigationPoint.sitePhoto.isPrivate ? [item.navigationPoint.sitePhoto] : []),
-    ];
-    const rawPhotos = [
-      ...pointPhotos,
-      ...(carrier ? [...carrier.photos, ...carrier.surfaces.flatMap((surface) => surface.photos)] : []),
-    ];
-    const mergedPhotos = Array.from(new Map(rawPhotos.map((photo) => [photo.id, photo])).values());
+    const clientIds = [report.clientId];
+
+    // Check if the currently assigned selectedPhoto belongs to another client
+    const isPhotoDisallowed =
+      item.selectedPhoto?.surface &&
+      !isSurfaceForClients(item.selectedPhoto.surface, clientIds);
+
+    const preferredPhotoId = isPhotoDisallowed ? null : item.selectedPhotoId;
+
+    const { availablePhotos, selectedPhoto } = resolveDocumentationPhotos({
+      point: item.navigationPoint,
+      carrier,
+      allClientIds: clientIds,
+      preferredPhotoId,
+    });
+
+    const customDirection =
+      item.snapshot && typeof item.snapshot === 'object' && 'direction' in item.snapshot
+        ? String(item.snapshot.direction || '')
+        : resolveDocumentationDirection({
+            point: item.navigationPoint,
+            carrier,
+            allClientIds: clientIds,
+          }) || item.navigationPoint?.orientation || null;
+
     return {
       ...item,
+      selectedPhotoId: selectedPhoto?.id ?? (isPhotoDisallowed ? null : item.selectedPhotoId),
+      selectedPhoto: selectedPhoto ?? (isPhotoDisallowed ? null : item.selectedPhoto),
       carrierId: item.carrierId || item.navigationPoint?.carrierId || null,
-      carrier: carrier ? { ...carrier, photos: mergedPhotos } : (mergedPhotos.length > 0 ? { id: 'virtual', code: item.navigationPoint?.label || 'Navigace', city: '', address: item.navigationPoint?.address || '', photos: mergedPhotos, surfaces: [] } : null),
-      customDirection:
-        item.snapshot && typeof item.snapshot === 'object' && 'direction' in item.snapshot
-          ? String(item.snapshot.direction || '')
-          : item.navigationPoint?.orientation || null,
+      carrier: carrier
+        ? { ...carrier, photos: availablePhotos }
+        : availablePhotos.length > 0
+        ? {
+            id: 'virtual',
+            code: item.navigationPoint?.label || 'Navigace',
+            city: '',
+            address: item.navigationPoint?.address || '',
+            photos: availablePhotos,
+            surfaces: [],
+          }
+        : null,
+      customDirection,
     };
   });
 
@@ -102,7 +163,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json();
     const existing = await prisma.navigationDocumentationReport.findFirst({
       where: { id, organizationId: auth.organizationId },
-      select: { id: true, status: true, publishedAt: true, publicTokenHash: true, tokenExpiresAt: true },
+      select: { id: true, clientId: true, status: true, publishedAt: true, publicTokenHash: true, tokenExpiresAt: true },
     });
     if (!existing) return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     if (existing.status === 'ARCHIVED') return NextResponse.json({ error: 'Archivovaný report nelze upravovat.' }, { status: 409 });
@@ -144,6 +205,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             select: documentationPhotoSelect,
           });
           if (!selectedPhoto) throw new NavigationDocumentationValidationError('Vybraná fotografie nebyla nalezena nebo je soukromá.');
+
+          // Verify photo does not belong to a different client
+          if (selectedPhoto.surfaceId) {
+            const photoSurface = await tx.advertisingSurface.findFirst({
+              where: { id: selectedPhoto.surfaceId, organizationId: auth.organizationId },
+              include: { occupancies: { select: { clientId: true } } },
+            });
+            if (photoSurface && !isSurfaceForClients(photoSurface, [existing.clientId])) {
+              throw new NavigationDocumentationValidationError('Vybraná fotografie patří jiné reklamní ploše jiného klienta.');
+            }
+          }
         }
 
         const clientNote = input.clientNote !== undefined ? parseOptionalText(input.clientNote, 'Poznámka', 1_000) : item.clientNote;

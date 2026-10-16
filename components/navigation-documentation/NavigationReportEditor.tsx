@@ -160,10 +160,8 @@ export function NavigationReportEditor({
           const effectiveCarrier = item.carrier || item.navigationPoint?.carrier;
           const currentDir =
             item.customDirection ||
-            item.navigationPoint?.orientation ||
-            effectiveCarrier?.surfaces?.[0]?.directionDescription ||
-            effectiveCarrier?.surfaces?.[0]?.orientation ||
             item.snapshot?.direction ||
+            item.navigationPoint?.orientation ||
             'Obousměrný (A/B)';
 
           const availablePhotos = effectiveCarrier?.photos || [];
