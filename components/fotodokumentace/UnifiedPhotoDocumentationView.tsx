@@ -314,10 +314,8 @@ export function UnifiedPhotoDocumentationView({
 
     try {
       setDeletingAlbumId(album.id);
-      const url =
-        album.source === 'NAVIGATION'
-          ? `/api/navigation/documentation/${encodeURIComponent(album.id)}`
-          : `/api/election-removal/campaigns/${encodeURIComponent(album.id)}`;
+      const clientParam = album.clientName ? `&client=${encodeURIComponent(album.clientName)}` : '';
+      const url = `/api/fotodokumentace/albums/${encodeURIComponent(album.id)}?source=${encodeURIComponent(album.source)}${clientParam}`;
 
       const res = await fetch(url, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
