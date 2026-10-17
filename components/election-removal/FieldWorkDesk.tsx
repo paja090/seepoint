@@ -454,7 +454,7 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
               title="Zobrazit fotografii v plném rozlišení"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/photos/${encodeURIComponent(photo.id)}/file`} alt="Foto" loading="lazy" className="w-full h-full object-cover" />
+              <img src={`/api/photos/${encodeURIComponent(photo.id)}/thumbnail`} alt="Foto" loading="lazy" className="w-full h-full object-cover" />
             </a>
           ))}
           {p.photos.length > 5 && (

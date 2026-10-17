@@ -4,6 +4,7 @@ import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { isClientApprovedPhoto } from '@/lib/navigation-documentation-policy';
+import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 
@@ -72,54 +73,79 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
     const urlObj = new URL(request.url);
     const isDownload = urlObj.searchParams.get('download') === '1';
+    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
     const disposition = isDownload
       ? `attachment; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? `foto-${photoId}.jpg`)}`
       : 'inline';
 
-    // 1. Direct Binary Content in Database
+    let rawBuffer: Buffer | null = null;
+    let originalMime: string = photo.mimeType ?? 'image/jpeg';
+
     if (photo.content && photo.content.length > 0) {
-      return new Response(photo.content, {
+      rawBuffer = Buffer.from(photo.content);
+    } else if (photo.url && photo.url.startsWith('data:')) {
+      const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        originalMime = match[1];
+        rawBuffer = Buffer.from(match[2], 'base64');
+      }
+    } else if (photo.driveFileId) {
+      const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
+      if (file.ok && file.body) {
+        if (Buffer.isBuffer(file.body)) {
+          rawBuffer = file.body;
+        } else if (file.body instanceof ArrayBuffer) {
+          rawBuffer = Buffer.from(file.body);
+        } else if (file.body instanceof Uint8Array) {
+          rawBuffer = Buffer.from(file.body);
+        } else {
+          const ab = await new Response(file.body as BodyInit).arrayBuffer();
+          rawBuffer = Buffer.from(ab);
+        }
+        if (file.headers.get('Content-Type')) {
+          originalMime = file.headers.get('Content-Type')!;
+        }
+      }
+    }
+
+    if (isThumbnail && !isDownload && rawBuffer) {
+      try {
+        const resized = await sharp(rawBuffer)
+          .rotate()
+          .resize({
+            width: 600,
+            height: 600,
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .webp({ quality: 80 })
+          .toBuffer();
+
+        return new Response(new Uint8Array(resized), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/webp',
+            'Content-Disposition': 'inline',
+            'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        });
+      } catch (sharpError) {
+        console.warn('[client navigation photo] Sharp resize failed, falling back to original', sharpError);
+      }
+    }
+
+    // Serve rawBuffer if already extracted
+    if (rawBuffer) {
+      return new Response(new Uint8Array(rawBuffer), {
         status: 200,
         headers: {
-          'Content-Type': photo.mimeType ?? 'image/jpeg',
+          'Content-Type': originalMime,
           'Content-Disposition': disposition,
           'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff',
         },
       });
-    }
-
-    // 2. Base64 Data URI in photo.url
-    if (photo.url && photo.url.startsWith('data:')) {
-      const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
-      if (match) {
-        const mime = match[1];
-        const buffer = Buffer.from(match[2], 'base64');
-        return new Response(buffer, {
-          status: 200,
-          headers: {
-            'Content-Type': mime,
-            'Content-Disposition': disposition,
-            'Cache-Control': 'private, no-store',
-          },
-        });
-      }
-    }
-
-    // 3. Google Drive Storage
-    if (photo.driveFileId) {
-      const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
-      if (file.ok && file.body) {
-        return new Response(file.body, {
-          status: 200,
-          headers: {
-            'Content-Type': photo.mimeType ?? file.headers.get('Content-Type') ?? 'image/jpeg',
-            'Content-Disposition': disposition,
-            'Cache-Control': 'private, no-store',
-            'X-Content-Type-Options': 'nosniff',
-          },
-        });
-      }
     }
 
     // 4. External HTTP URL

@@ -862,7 +862,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={ph.url}
+                            src={ph.id ? `/api/photos/${encodeURIComponent(ph.id)}/thumbnail` : ph.url}
                             alt={`Fotodokumentace ${idx + 1}`}
                             className="h-full w-full object-cover group-hover:scale-105 transition"
                             loading="lazy"

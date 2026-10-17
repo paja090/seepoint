@@ -3,12 +3,13 @@ import { prisma } from '@/lib/db';
 import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
 import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
+import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string; photoId: string }> }
 ) {
   try {
@@ -47,6 +48,49 @@ export async function GET(
 
     if (file.redirectUrl) {
       return NextResponse.redirect(file.redirectUrl, 307);
+    }
+
+    const urlObj = new URL(request.url);
+    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
+
+    if (isThumbnail && file.body) {
+      let inputBuffer: Buffer | null = null;
+      if (Buffer.isBuffer(file.body)) {
+        inputBuffer = file.body;
+      } else if (file.body instanceof ArrayBuffer) {
+        inputBuffer = Buffer.from(file.body);
+      } else if (file.body instanceof Uint8Array) {
+        inputBuffer = Buffer.from(file.body);
+      } else {
+        const ab = await new Response(file.body as BodyInit).arrayBuffer();
+        inputBuffer = Buffer.from(ab);
+      }
+
+      if (inputBuffer) {
+        try {
+          const resized = await sharp(inputBuffer)
+            .rotate()
+            .resize({
+              width: 600,
+              height: 600,
+              fit: 'inside',
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+          return new Response(new Uint8Array(resized), {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/webp',
+              'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          });
+        } catch (sharpError) {
+          console.warn('[client fotodokumentace photo] Sharp resize failed, falling back to original', sharpError);
+        }
+      }
     }
 
     const contentType = file.contentType || photo.mimeType || 'image/jpeg';

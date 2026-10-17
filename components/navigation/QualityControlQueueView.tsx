@@ -25,6 +25,7 @@ export type QcPointItem = {
   label: string;
   navigationType: string;
   installedPhotoUrl?: string | null;
+  installedPhotoThumbnailUrl?: string | null;
   carrierCode?: string | null;
   surfaceName?: string | null;
   qcStatus: string;
@@ -253,7 +254,7 @@ export function QualityControlQueueView({
                 <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-900 group">
                   {p.installedPhotoUrl ? (
                     <>
-                      <img src={p.installedPhotoUrl} alt={p.label} className="w-full h-full object-cover" />
+                      <img src={p.installedPhotoThumbnailUrl || p.installedPhotoUrl} alt={p.label} className="w-full h-full object-cover" />
                       <button
                         onClick={() => setZoomPhotoUrl(p.installedPhotoUrl!)}
                         className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-white font-bold text-xs gap-1"
