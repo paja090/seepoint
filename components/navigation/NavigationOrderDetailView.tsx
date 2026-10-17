@@ -728,8 +728,21 @@ export function NavigationOrderDetailView({
                       <span className="text-[10px] text-slate-500 font-medium">{p.navigationType}</span>
                     </div>
                     {p.installedPhotoUrl ? (
-                      <div className="aspect-video rounded-lg overflow-hidden border border-slate-300 relative bg-slate-900">
-                        <img src={p.installedPhotoUrl} alt={p.label} className="w-full h-full object-cover" />
+                      <div className="aspect-video rounded-lg overflow-hidden border border-slate-300 relative bg-slate-900 group">
+                        <img
+                          src={p.installedPhotoId ? `/api/photos/${encodeURIComponent(p.installedPhotoId)}/thumbnail` : p.installedPhotoUrl}
+                          alt={p.label}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                        />
+                        <a
+                          href={p.installedPhotoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-semibold"
+                          title="Zobrazit plné rozlišení"
+                        >
+                          Zvětšit foto
+                        </a>
                       </div>
                     ) : (
                       <div className="aspect-video rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400">

@@ -24,7 +24,7 @@ export default async function NavigationQcPage() {
       },
       carrier: { select: { code: true } },
       surface: { select: { name: true } },
-      installedPhoto: { select: { url: true } },
+      installedPhoto: { select: { id: true, url: true } },
     },
     orderBy: { updatedAt: 'desc' },
   });
@@ -38,6 +38,9 @@ export default async function NavigationQcPage() {
     label: p.label,
     navigationType: p.navigationType,
     installedPhotoUrl: p.installedPhoto?.url || null,
+    installedPhotoThumbnailUrl: p.installedPhoto?.id
+      ? `/api/photos/${encodeURIComponent(p.installedPhoto.id)}/thumbnail`
+      : p.installedPhoto?.url || null,
     carrierCode: p.carrier?.code || null,
     surfaceName: p.surface?.name || null,
     qcStatus: p.qcStatus || 'PENDING',

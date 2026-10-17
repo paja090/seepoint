@@ -212,7 +212,7 @@ export function PublicNavigationClientView({
             <div style="margin-top: 4px; font-size: 11px; color: #0284c7; font-weight: 700;">
               Směr: ${item.direction || 'Obousměrný'}
             </div>
-            ${item.photoUrl ? `<img src="${item.photoUrl}" style="width: 100%; height: 95px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #cbd5e1;"/>` : ''}
+            ${item.photoUrl ? `<img src="${item.photoUrl}?thumbnail=1" style="width: 100%; height: 95px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid #cbd5e1;"/>` : ''}
             <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
               <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 8px; background: #0284c7; color: #ffffff; border-radius: 6px; font-size: 11px; font-weight: 700; text-decoration: none;">
                 Navigovat v Google Maps ↗
@@ -571,7 +571,7 @@ export function PublicNavigationClientView({
                           <img
                             alt={item.pointCode}
                             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                            src={item.photoUrl}
+                            src={`${item.photoUrl}?thumbnail=1`}
                           />
 
                           {/* Hover action overlay with Download & Expand */}

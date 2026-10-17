@@ -426,7 +426,7 @@ export function PhotoGallery({
               {/* Photo Area */}
               <div className="relative aspect-video w-full bg-slate-100 cursor-pointer overflow-hidden" onClick={(e) => openLightbox(index, e)}>
                 <img
-                  src={photo.url}
+                  src={photo.id ? `/api/photos/${encodeURIComponent(photo.id)}/thumbnail` : photo.url}
                   alt={photo.note || `${photo.type} – ${photo.targetLabel}`}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   loading="lazy"

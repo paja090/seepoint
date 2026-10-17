@@ -459,7 +459,7 @@ export function CampaignPhotoAlbum({
                   <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/api/photos/${encodeURIComponent(photo.id)}/file`}
+                      src={`/api/photos/${encodeURIComponent(photo.id)}/thumbnail`}
                       alt={point.label}
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
