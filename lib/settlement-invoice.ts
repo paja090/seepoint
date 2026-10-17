@@ -72,6 +72,8 @@ export type SettlementInvoiceData = {
   vatAmount: number;
   grossAmount: number;
   note?: string | null;
+  qrPaymentString?: string | null;
+  paymentIban?: string | null;
 };
 
 const csDateFormatter = new Intl.DateTimeFormat('cs-CZ', { timeZone: 'Europe/Prague' });
@@ -85,6 +87,70 @@ function formatPartyAddress(party: SettlementParty): string {
   return [party.street, [party.postalCode, party.city].filter(Boolean).join(' '), party.country]
     .filter(Boolean)
     .join(', ') || 'Nespecifikováno';
+}
+
+/**
+ * Converts a Czech bank account number (e.g. "123456789/0800" or "19-123456789/0100")
+ * to a standardized Czech IBAN with valid MOD-97 checksum.
+ */
+export function czechAccountToIban(accountStr: string | null | undefined): string | null {
+  if (!accountStr) return null;
+  const clean = accountStr.replace(/\s+/g, '');
+  if (/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/i.test(clean)) {
+    return clean.toUpperCase();
+  }
+  const match = clean.match(/^(?:(\d{1,6})-)?(\d{1,10})\/(\d{4})$/);
+  if (!match) return null;
+  const [, prefix = '', num, bankCode] = match;
+  const paddedPrefix = prefix.padStart(6, '0');
+  const paddedNum = num.padStart(10, '0');
+  const bban = bankCode + paddedPrefix + paddedNum;
+  const numeric = bban + '123500';
+  const remainder = BigInt(numeric) % BigInt(97);
+  const checkDigits = String(BigInt(98) - remainder).padStart(2, '0');
+  return `CZ${checkDigits}${bban}`;
+}
+
+/**
+ * Generates an official Czech SPAYD (Short Payment Descriptor) string for QR platba.
+ */
+export function generateSpaydString(params: {
+  iban: string;
+  amount: number;
+  currency?: string;
+  variableSymbol?: string | null;
+  message?: string | null;
+  recipientName?: string | null;
+}): string {
+  const cleanIban = params.iban.replace(/\s+/g, '').toUpperCase();
+  const parts: string[] = ['SPD*1.0', `ACC:${cleanIban}`];
+  if (params.amount > 0) {
+    parts.push(`AM:${params.amount.toFixed(2)}`);
+  }
+  parts.push(`CC:${params.currency || 'CZK'}`);
+  if (params.variableSymbol) {
+    const cleanVs = params.variableSymbol.replace(/\D/g, '').slice(0, 10);
+    if (cleanVs) parts.push(`X-VS:${cleanVs}`);
+  }
+  if (params.message) {
+    const cleanMsg = params.message
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[*%]/g, ' ')
+      .trim()
+      .slice(0, 60);
+    if (cleanMsg) parts.push(`MSG:${cleanMsg}`);
+  }
+  if (params.recipientName) {
+    const cleanName = params.recipientName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[*%]/g, ' ')
+      .trim()
+      .slice(0, 35);
+    if (cleanName) parts.push(`RN:${cleanName}`);
+  }
+  return parts.join('*') + '*';
 }
 
 /**
@@ -225,6 +291,21 @@ export async function buildSettlementInvoiceData(
   const vatAmount = supplier.isVatPayer ? Math.round(netPayableAmount * ((Number(org?.defaultVatRate) || 21) / 100) * 100) / 100 : 0;
   const grossAmount = netPayableAmount + vatAmount;
 
+  const rawAccount = supplier.bankAccount || bp?.accountNumber || null;
+  const paymentIban = supplier.iban || czechAccountToIban(rawAccount) || null;
+
+  let qrPaymentString: string | null = null;
+  if (paymentIban && grossAmount > 0) {
+    qrPaymentString = generateSpaydString({
+      iban: paymentIban,
+      amount: grossAmount,
+      currency: 'CZK',
+      variableSymbol: variableSymbol,
+      message: `Vyuctovani ${periodTitle}`,
+      recipientName: supplier.name,
+    });
+  }
+
   return {
     invoiceNumber,
     variableSymbol,
@@ -247,6 +328,8 @@ export async function buildSettlementInvoiceData(
     vatAmount,
     grossAmount,
     note: settlement.note || `Vyúčtování odpracovaných prací a nákladů za ${periodTitle}`,
+    qrPaymentString,
+    paymentIban,
   };
 }
 
@@ -603,8 +686,16 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
               ...(data.supplier.bankAccount ? [{ text: `Vyplatit na bankovní účet: ${data.supplier.bankAccount}`, fontSize: 8.5, bold: true, color: NAVY, margin: [0, 5, 0, 0] }] : []),
             ],
           },
+          ...(data.qrPaymentString ? [{
+            width: 80,
+            stack: [
+              { text: 'QR PLATBA', bold: true, fontSize: 7.5, color: BLUE, alignment: 'center', characterSpacing: 0.8 },
+              { qr: data.qrPaymentString, fit: 64, alignment: 'center', margin: [0, 3, 0, 3] },
+              { text: 'Naskenujte v bance', fontSize: 6, color: MUTED, alignment: 'center' },
+            ],
+          }] : []),
           {
-            width: 220,
+            width: 210,
             table: {
               widths: ['*', 90],
               body: [
@@ -624,7 +715,7 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
             },
           },
         ],
-        columnGap: 16,
+        columnGap: 14,
       },
 
       // Footer notice

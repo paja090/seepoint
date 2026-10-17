@@ -314,33 +314,35 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
               </div>
 
               {/* Financial Recap & Final Payable */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                <div className="space-y-1.5 text-xs text-slate-600 rounded-xl bg-slate-50 p-4 border border-slate-200">
-                  <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] mb-2">
-                    Rekapitulace složek vyúčtování
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
+                <div className="space-y-1.5 text-xs text-slate-600 rounded-xl bg-slate-50 p-4 border border-slate-200 md:col-span-5 flex flex-col justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] mb-2">
+                      Rekapitulace složek vyúčtování
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Odměna za práci (hodiny & úkoly):</span>
+                      <strong className="font-mono text-slate-900">{data.totalWorkAmount.toLocaleString('cs-CZ')} Kč</strong>
+                    </div>
+                    {data.totalReimbursements > 0 && (
+                      <div className="flex justify-between text-emerald-700">
+                        <span>Náhrady výdajů (palivo, auto...):</span>
+                        <strong className="font-mono">+{data.totalReimbursements.toLocaleString('cs-CZ')} Kč</strong>
+                      </div>
+                    )}
+                    {data.totalDeductions > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Srážky / odpočty:</span>
+                        <strong className="font-mono">-{data.totalDeductions.toLocaleString('cs-CZ')} Kč</strong>
+                      </div>
+                    )}
+                    {data.totalAdvances > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Vyplacené zálohy:</span>
+                        <strong className="font-mono">-{data.totalAdvances.toLocaleString('cs-CZ')} Kč</strong>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span>Odměna za práci (hodiny & úkoly):</span>
-                    <strong className="font-mono text-slate-900">{data.totalWorkAmount.toLocaleString('cs-CZ')} Kč</strong>
-                  </div>
-                  {data.totalReimbursements > 0 && (
-                    <div className="flex justify-between text-emerald-700">
-                      <span>Náhrady výdajů (auto, palivo, telefon):</span>
-                      <strong className="font-mono">+{data.totalReimbursements.toLocaleString('cs-CZ')} Kč</strong>
-                    </div>
-                  )}
-                  {data.totalDeductions > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>Srážky / odpočty:</span>
-                      <strong className="font-mono">-{data.totalDeductions.toLocaleString('cs-CZ')} Kč</strong>
-                    </div>
-                  )}
-                  {data.totalAdvances > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>Vyplacené zálohy:</span>
-                      <strong className="font-mono">-{data.totalAdvances.toLocaleString('cs-CZ')} Kč</strong>
-                    </div>
-                  )}
                   {data.note && (
                     <div className="mt-3 pt-2 border-t border-slate-200 text-slate-500 italic text-[11px]">
                       {data.note}
@@ -348,24 +350,59 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
                   )}
                 </div>
 
-                <div className="rounded-xl bg-slate-900 text-white p-5 flex flex-col justify-between shadow-sm">
+                {/* QR Platba Card */}
+                {data.qrPaymentString ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5 flex flex-col items-center justify-between text-center shadow-2xs md:col-span-3">
+                    <div>
+                      <span className="text-[10px] font-black tracking-widest text-blue-600 uppercase">
+                        QR PLATBA
+                      </span>
+                      <div className="mt-1 flex items-center justify-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(data.qrPaymentString)}`}
+                          alt="QR Platba"
+                          width={110}
+                          height={110}
+                          className="rounded-md border border-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <span className="text-[9px] text-slate-400 mt-1">
+                      Naskenujte v bankovní aplikaci
+                    </span>
+                  </div>
+                ) : (
+                  <div className="hidden md:flex md:col-span-3 rounded-xl border border-dashed border-slate-200 p-3 items-center justify-center text-center text-slate-400 text-[11px]">
+                    Pro QR platbu doplňte číslo účtu nebo IBAN
+                  </div>
+                )}
+
+                {/* Total Payout Banner */}
+                <div className="rounded-xl bg-slate-900 text-white p-4.5 flex flex-col justify-between shadow-sm md:col-span-4">
                   <div>
-                    <div className="text-xs uppercase tracking-wider text-slate-400 font-bold">
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
                       Celková částka k převodu
                     </div>
-                    <div className="text-3xl font-black font-mono mt-1 text-emerald-400">
+                    <div className="text-2xl lg:text-3xl font-black font-mono mt-1 text-emerald-400">
                       {data.grossAmount.toLocaleString('cs-CZ')} Kč
                     </div>
                     {data.supplier.isVatPayer && (
-                      <div className="text-xs text-slate-400 mt-1">
-                        Základ: {data.netPayableAmount.toLocaleString('cs-CZ')} Kč | DPH 21%: {data.vatAmount.toLocaleString('cs-CZ')} Kč
+                      <div className="text-[11px] text-slate-400 mt-1">
+                        Základ: {data.netPayableAmount.toLocaleString('cs-CZ')} Kč | DPH: {data.vatAmount.toLocaleString('cs-CZ')} Kč
                       </div>
                     )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex flex-wrap justify-between items-center gap-2">
-                    <span>Vyplatit na: <strong className="text-white font-mono">{data.supplier.bankAccount || 'Neuveden'}</strong></span>
-                    <span>VS: <strong className="text-white font-mono">{data.variableSymbol}</strong></span>
+                  <div className="mt-3 pt-2.5 border-t border-slate-800 text-[11px] text-slate-400 flex flex-col gap-1">
+                    <div className="flex justify-between">
+                      <span>Účet:</span>
+                      <strong className="text-white font-mono">{data.supplier.bankAccount || data.paymentIban || 'Neuveden'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Var. symbol:</span>
+                      <strong className="text-white font-mono">{data.variableSymbol}</strong>
+                    </div>
                   </div>
                 </div>
               </div>

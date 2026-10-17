@@ -4,6 +4,8 @@ import test from 'node:test';
 import { Prisma } from '@prisma/client';
 import {
   getCzechMonthName,
+  czechAccountToIban,
+  generateSpaydString,
   buildSettlementInvoiceData,
   generateSettlementInvoice,
   createSettlementInvoicePdf,
@@ -169,6 +171,10 @@ test('Settlement Invoice: buildSettlementInvoiceData compiles work items, other 
   assert.equal(result.totalAdvances, 2000);
   assert.equal(result.netPayableAmount, 17300);
   assert.equal(result.grossAmount, 17300);
+  assert.equal(result.paymentIban, 'CZ650800000000123456789');
+  assert.ok(result.qrPaymentString);
+  assert.match(result.qrPaymentString, /^SPD\*1\.0\*ACC:CZ650800000000123456789\*AM:17300\.00\*CC:CZK\*/);
+  assert.match(result.qrPaymentString, /\*RN:Petr Novak - Montaze\*/);
 
   // Check line items: 3 work items + 3 adjustments = 6 line items
   assert.equal(result.items.length, 6);
@@ -358,6 +364,8 @@ test('Settlement Invoice: createSettlementInvoicePdf generates valid PDF buffer'
     vatAmount: 0,
     grossAmount: 6200,
     note: 'Měsíční vyúčtování za Říjen 2026',
+    qrPaymentString: 'SPD*1.0*ACC:CZ650800000000123456789*AM:6200.00*CC:CZK*X-VS:2026101234*MSG:Vyuctovani Rijen 2026*RN:Karel Novotny*',
+    paymentIban: 'CZ650800000000123456789',
   };
 
   const buffer = await createSettlementInvoicePdf(invoiceData);
@@ -369,3 +377,52 @@ test('Settlement Invoice: createSettlementInvoicePdf generates valid PDF buffer'
   const magic = buffer.subarray(0, 5).toString('ascii');
   assert.equal(magic, '%PDF-');
 });
+
+test('Settlement Invoice: czechAccountToIban converts Czech account numbers to standard IBAN', () => {
+  // Standard account without prefix
+  const iban1 = czechAccountToIban('123456789/0800');
+  assert.equal(iban1, 'CZ7508000000000123456789');
+
+  // Account with prefix
+  const iban2 = czechAccountToIban('19-2000145399/0800');
+  assert.ok(iban2);
+  assert.match(iban2, /^CZ\d{2}08000000192000145399$/);
+
+  // Account with whitespace
+  const iban3 = czechAccountToIban('  123456789 / 0800 ');
+  assert.equal(iban3, 'CZ7508000000000123456789');
+
+  // Already an IBAN
+  const iban4 = czechAccountToIban('cz7508000000000123456789');
+  assert.equal(iban4, 'CZ7508000000000123456789');
+
+  // Invalid accounts return null
+  assert.equal(czechAccountToIban(null), null);
+  assert.equal(czechAccountToIban(undefined), null);
+  assert.equal(czechAccountToIban(''), null);
+  assert.equal(czechAccountToIban('invalid-account'), null);
+  assert.equal(czechAccountToIban('12345/12'), null); // bank code must be 4 digits
+});
+
+test('Settlement Invoice: generateSpaydString produces valid SPAYD format with diacritics stripping', () => {
+  const spayd = generateSpaydString({
+    iban: 'CZ650800000000123456789',
+    amount: 15450.5,
+    currency: 'CZK',
+    variableSymbol: '202610001',
+    message: 'Vyúčtování montáží za Říjen 2026',
+    recipientName: 'Jan Dvořák - Montáže',
+  });
+
+  assert.ok(spayd);
+  assert.ok(spayd.startsWith('SPD*1.0*'));
+  assert.ok(spayd.endsWith('*'));
+  assert.ok(spayd.includes('ACC:CZ650800000000123456789*'));
+  assert.ok(spayd.includes('AM:15450.50*'));
+  assert.ok(spayd.includes('CC:CZK*'));
+  assert.ok(spayd.includes('X-VS:202610001*'));
+  // Diacritics should be stripped
+  assert.ok(spayd.includes('MSG:Vyuctovani montazi za Rijen 2026*'));
+  assert.ok(spayd.includes('RN:Jan Dvorak - Montaze*'));
+});
+
