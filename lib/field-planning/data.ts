@@ -40,7 +40,7 @@ export async function loadPlanningData(date: string, options: {
     db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } }, orderBy: { createdAt: 'desc' }, select: { entityId: true, action: true } }),
     navigation ? db.navigationOrder.findMany({ where: { organizationId, workOrders: { none: {} }, ...(options.jobIds ? { points: { some: { id: { in: options.jobIds.filter(id => id.startsWith('navigation-point:')).map(id => id.slice(17)) } } } } : { status: { in: ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE'] } }) },
       include: { points: { include: { carrier: true, surface: true } }, crmOrder: { include: { client: true } } }, orderBy: { id: 'asc' }, take: 201 }) : Promise.resolve([]),
-    db.plannerBlock.findMany({ where: { organizationId, startAt: { lt: new Date(end) }, endAt: { gt: new Date(start) } }, select: { userId: true } }),
+    db.plannerBlock?.findMany ? db.plannerBlock.findMany({ where: { organizationId, startAt: { lt: new Date(end) }, endAt: { gt: new Date(start) } }, select: { userId: true } }) : Promise.resolve([]),
   ]);
   if (orders.length > 200) throw new Error('V1 podporuje nejvýše 200 úkolů na jeden návrh; omezte výběr.');
 

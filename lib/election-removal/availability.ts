@@ -14,7 +14,7 @@ export async function fieldAvailability(tx: Prisma.TransactionClient, organizati
     tx.vehicleReservation.findMany({ where: { organizationId, status: { in: ['RESERVED', 'ACTIVE'] }, dateFrom: { lt: end }, dateTo: { gte: day } } }),
     tx.fieldPlan.findMany({ where: { organizationId, status: { in: ['APPROVED', 'ACTIVE'] }, ...(excludedPlanId ? { id: { not: excludedPlanId } } : {}) } }),
     tx.workTask.findMany({ where: { organizationId, status: { in: ['TODO', 'IN_PROGRESS'] }, scheduledDate: { gte: day, lt: end } } }),
-    tx.plannerBlock.findMany({ where: { organizationId, startAt: { lt: end }, endAt: { gt: day } }, select: { userId: true } }),
+    tx.plannerBlock?.findMany ? tx.plannerBlock.findMany({ where: { organizationId, startAt: { lt: end }, endAt: { gt: day } }, select: { userId: true } }) : Promise.resolve([]),
   ]);
   const busyUserIds = new Set(plannerBlocks.map(b => b.userId));
   const crews = plans.flatMap(p => (p.planningSummary as unknown as PlanningResult).crews.filter(c => p.date === date || (Date.parse(c.departureAt) < end.getTime() && Date.parse(c.endAt) >= day.getTime())));
