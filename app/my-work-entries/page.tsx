@@ -75,8 +75,8 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     }
   }
 
-  // 3. Fetch organization categories and recent workOrders
-  const [workCategories, workOrders, entries] = await Promise.all([
+  // 3. Fetch organization categories, recent workOrders, entries, and rate catalog
+  const [workCategories, workOrders, entries, companyRates, employeeRates] = await Promise.all([
     user.organizationId ? getOrganizationWorkCategories(user.organizationId) : Promise.resolve([]),
     prisma.workOrder.findMany({
       where: { status: { not: 'CANCELLED' } },
@@ -98,6 +98,14 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
         client: true,
       },
       orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
+    }),
+    prisma.companyRate.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }, { validFrom: 'desc' }],
+    }),
+    prisma.employeeRate.findMany({
+      where: { employeeId: employee.id, isActive: true },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }, { validFrom: 'desc' }],
     }),
   ]);
 
@@ -122,6 +130,30 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     workOrder: entry.workOrder ? { title: entry.workOrder.title } : null,
   }));
 
+  const formattedCompanyRates = companyRates.map((r) => ({
+    id: r.id,
+    source: 'COMPANY' as const,
+    type: r.type,
+    name: r.name,
+    workType: r.workType,
+    carrierTypeLabel: r.carrierTypeLabel,
+    amount: r.amount.toString(),
+    unit: r.unit,
+  }));
+
+  const formattedEmployeeRates = employeeRates.map((r) => ({
+    id: r.id,
+    source: 'EMPLOYEE' as const,
+    employeeId: r.employeeId,
+    employeeName: `${employee.firstName} ${employee.lastName}`,
+    type: r.type,
+    name: r.name,
+    workType: r.workType,
+    carrierTypeLabel: r.carrierTypeLabel,
+    amount: r.amount.toString(),
+    unit: r.unit,
+  }));
+
   return (
     <AppShell>
       <MyWorkEntriesManager
@@ -137,6 +169,8 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
           ...wo,
           price: wo.price ? Number(wo.price) : null,
         }))}
+        companyRates={formattedCompanyRates}
+        employeeRates={formattedEmployeeRates}
       />
     </AppShell>
   );

@@ -353,6 +353,7 @@ export async function POST(request: Request) {
         workOrderId,
         carrierType,
         carrierTypeId,
+        activityTitle: carrierTypeLabel,
       }, tx);
 
       if (cleanManualRate !== null) {

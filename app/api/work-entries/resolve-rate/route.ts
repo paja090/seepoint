@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   const workDate = searchParams.get('workDate');
   const remunerationMethod = searchParams.get('remunerationMethod');
   const workOrderId = searchParams.get('workOrderId');
+  const activityTitle = searchParams.get('activityTitle');
 
   if (!canAccess(user.role, 'workEntries') && !canAccess(user.role, 'myWorkEntries')) {
     return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
@@ -57,11 +58,17 @@ export async function GET(request: Request) {
       workDate: parseDateOnly(workDate, 'Datum práce'),
       remunerationMethod: parseRateType(remunerationMethod),
       workOrderId: cleanWorkOrderId,
+      activityTitle: activityTitle || null,
     });
 
-    if (!resolved) return NextResponse.json({ rate: null, unit: 'ks', source: null });
+    if (!resolved) return NextResponse.json({ rate: null, unit: 'ks', source: null, name: null });
 
-    return NextResponse.json({ rate: resolved.amount.toString(), unit: resolved.unit, source: resolved.source });
+    return NextResponse.json({
+      rate: resolved.amount.toString(),
+      unit: resolved.unit,
+      source: resolved.source,
+      name: resolved.name ?? null,
+    });
   } catch (error) {
     if (error instanceof WorkEntryValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });

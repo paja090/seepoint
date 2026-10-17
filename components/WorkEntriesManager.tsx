@@ -7,6 +7,7 @@ import type { WorkCategory } from '@/lib/work-categories';
 import { DEFAULT_WORK_CATEGORIES } from '@/lib/work-categories';
 import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
 import { QuickOtherCostForm } from '@/components/QuickOtherCostForm';
+import { WorkRateCatalogPanel, type RateCatalogItem } from '@/components/WorkRateCatalogPanel';
 import { resolveActivityName } from '@/lib/work-entry-stats';
 
 type EmployeePayload = {
@@ -62,6 +63,8 @@ type WorkEntriesManagerProps = {
   initialEntries: EntryPayload[];
   workCategories?: WorkCategory[];
   workOrders?: WorkOrderOption[];
+  companyRates?: RateCatalogItem[];
+  employeeRates?: RateCatalogItem[];
 };
 
 const rateTypeLabels: Record<string, string> = {
@@ -89,6 +92,8 @@ export function WorkEntriesManager({
   initialEntries,
   workCategories,
   workOrders = [],
+  companyRates = [],
+  employeeRates = [],
 }: WorkEntriesManagerProps) {
   const categories = workCategories && workCategories.length > 0 ? workCategories : DEFAULT_WORK_CATEGORIES;
   const [entries, setEntries] = useState<EntryPayload[]>(initialEntries);
@@ -130,15 +135,34 @@ export function WorkEntriesManager({
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Auto-resolve rate from backend when employee / workType / remunerationMethod / workDate / order changes
+  const findCatalogRateForTitle = (title: string) => {
+    const norm = title.trim().toLowerCase();
+    if (!norm) return null;
+    const empMatch = employeeRates.find(
+      (r) =>
+        (!r.employeeId || r.employeeId === targetEmployeeId) &&
+        (r.name.trim().toLowerCase() === norm ||
+          r.carrierTypeLabel?.trim().toLowerCase() === norm)
+    );
+    if (empMatch) return empMatch;
+    const compMatch = companyRates.find(
+      (r) =>
+        r.name.trim().toLowerCase() === norm ||
+        r.carrierTypeLabel?.trim().toLowerCase() === norm
+    );
+    return compMatch || null;
+  };
+
+  // Auto-resolve rate from backend when employee / workType / remunerationMethod / workDate / order / activityTitle changes
   useEffect(() => {
     if (activeFormPanel !== 'work' || !targetEmployeeId || editingEntry) return;
     let cancelled = false;
     const fetchRate = async () => {
       try {
         const orderParam = selectedOrderId ? `&workOrderId=${selectedOrderId}` : '';
+        const titleParam = activityTitle ? `&activityTitle=${encodeURIComponent(activityTitle)}` : '';
         const res = await fetch(
-          `/api/work-entries/resolve-rate?employeeId=${targetEmployeeId}&workType=${workType}&workDate=${workDate}&remunerationMethod=${remunerationMethod}${orderParam}`
+          `/api/work-entries/resolve-rate?employeeId=${targetEmployeeId}&workType=${workType}&workDate=${workDate}&remunerationMethod=${remunerationMethod}${orderParam}${titleParam}`
         );
         const data = await res.json();
         if (!cancelled && res.ok && data.rate) {
@@ -153,11 +177,21 @@ export function WorkEntriesManager({
     return () => {
       cancelled = true;
     };
-  }, [activeFormPanel, targetEmployeeId, workType, remunerationMethod, workDate, selectedOrderId, editingEntry]);
+  }, [activeFormPanel, targetEmployeeId, workType, remunerationMethod, workDate, selectedOrderId, activityTitle, editingEntry]);
 
   const handleSelectCategory = (cat: WorkCategory) => {
     setActivityTitle(cat.label);
     setWorkType(cat.defaultWorkType);
+    const catalogMatch = findCatalogRateForTitle(cat.label);
+    if (catalogMatch) {
+      const m = (catalogMatch.type as 'HOURLY' | 'TASK' | 'FIXED') || 'TASK';
+      setRemunerationMethod(m);
+      setUnit(catalogMatch.unit || (m === 'HOURLY' ? 'hod' : m === 'FIXED' ? 'zakázka' : 'ks'));
+      if (m === 'FIXED') setQuantity('1');
+      setUnitRate(String(Number(catalogMatch.amount)));
+      return;
+    }
+
     if (cat.defaultPriceType === 'PIECE_RATE') {
       setRemunerationMethod('TASK');
       setUnit('ks');
@@ -454,6 +488,24 @@ export function WorkEntriesManager({
         </div>
       )}
 
+      {/* Rate Catalog Preview & Quick Manager */}
+      <WorkRateCatalogPanel
+        companyRates={companyRates}
+        employeeRates={employeeRates}
+        selectedEmployeeId={employeeFilter || targetEmployeeId}
+        workCategories={categories}
+        canManage={true}
+        onSelectRate={(r) => {
+          setActiveFormPanel('work');
+          setActivityTitle(r.name);
+          setWorkType(r.workType || 'INSTALLATION');
+          setRemunerationMethod(r.type);
+          setUnit(r.unit || (r.type === 'HOURLY' ? 'hod' : r.type === 'FIXED' ? 'zakázka' : 'ks'));
+          if (r.type === 'FIXED') setQuantity('1');
+          setUnitRate(String(Number(r.amount)));
+        }}
+      />
+
       {/* PANEL 1: Simplified Work Form */}
       {activeFormPanel === 'work' && (
         <section className="rounded-2xl border-2 border-slate-900 bg-white p-5 shadow-sm space-y-5">
@@ -487,6 +539,12 @@ export function WorkEntriesManager({
               <div className="flex flex-wrap gap-1.5">
                 {categories.map((cat) => {
                   const isSelected = activityTitle === cat.label;
+                  const matchedRate = findCatalogRateForTitle(cat.label);
+                  const rateBadge = matchedRate
+                    ? `${Number(matchedRate.amount).toLocaleString('cs-CZ')} Kč/${matchedRate.unit || (matchedRate.type === 'HOURLY' ? 'hod' : 'ks')}`
+                    : cat.defaultRate
+                    ? `${cat.defaultRate.toLocaleString('cs-CZ')} Kč`
+                    : null;
                   return (
                     <button
                       key={cat.key}
@@ -500,6 +558,17 @@ export function WorkEntriesManager({
                     >
                       <span>{cat.icon}</span>
                       <span>{cat.label}</span>
+                      {rateBadge && (
+                        <span
+                          className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : 'bg-indigo-100 text-indigo-800'
+                          }`}
+                        >
+                          {rateBadge}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
