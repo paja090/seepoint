@@ -15,6 +15,10 @@ import {
   ArrowRight,
   ExternalLink,
   Info,
+  Wrench,
+  Trash2,
+  Truck,
+  Search,
 } from 'lucide-react';
 import type { ElectionRemovalMediaType } from '@prisma/client';
 import {
@@ -23,6 +27,8 @@ import {
 } from '@/lib/election-removal/constants';
 import type { KmlParseResult, ParsedKmlLayer, ParsedKmlPoint } from '@/lib/election-removal/kml-parser';
 import { ElectionRemovalMap, type ElectionRemovalMapPoint } from './ElectionRemovalMap';
+
+export type CampaignPurpose = 'REMOVAL' | 'INSTALLATION' | 'RELOCATION' | 'INSPECTION';
 
 interface LayerMappingState {
   layerName: string;
@@ -44,6 +50,7 @@ export function KmlImportWizard() {
   const [isParsing, setIsParsing] = useState<boolean>(false);
 
   // Campaign Form State
+  const [purpose, setPurpose] = useState<CampaignPurpose>('REMOVAL');
   const [campaignName, setCampaignName] = useState<string>('');
   const [targetDate, setTargetDate] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -83,6 +90,20 @@ export function KmlImportWizard() {
       const parsed: KmlParseResult = data.parseResult;
       setParseResult(parsed);
       setCampaignName(parsed.suggestedCampaignName || file.name.replace(/\.[^/.]+$/, ''));
+
+      // Auto-detect purpose from file name or suggested campaign name
+      const lowerName = (file.name + ' ' + (parsed.suggestedCampaignName || '')).toLowerCase();
+      let detectedPurpose: CampaignPurpose = 'REMOVAL';
+      if (lowerName.includes('instal') || lowerName.includes('montaz') || lowerName.includes('montáž') || lowerName.includes('vylep') || lowerName.includes('výlep')) {
+        detectedPurpose = 'INSTALLATION';
+      } else if (lowerName.includes('presun') || lowerName.includes('přesun') || lowerName.includes('reloc') || lowerName.includes('prevoz')) {
+        detectedPurpose = 'RELOCATION';
+      } else if (lowerName.includes('kontrol') || lowerName.includes('servis') || lowerName.includes('reviz')) {
+        detectedPurpose = 'INSPECTION';
+      } else if (lowerName.includes('deinstal') || lowerName.includes('demont') || lowerName.includes('odstran') || lowerName.includes('volby') || lowerName.includes('removal')) {
+        detectedPurpose = 'REMOVAL';
+      }
+      setPurpose(detectedPurpose);
 
       // Initialize layer mappings from parsed suggestions
       const initialMappings: Record<string, LayerMappingState> = {};
@@ -241,6 +262,11 @@ export function KmlImportWizard() {
     setSaveError(null);
 
     try {
+      const defaultOp =
+        purpose === 'REMOVAL' ? 'REMOVE_AD' :
+        purpose === 'INSTALLATION' ? 'INSTALL_AD' :
+        purpose === 'RELOCATION' ? 'RELOCATION' : 'INSPECTION';
+
       const validPointsPayload = adjustedPoints
         .filter((pt) => pt.isValid)
         .map((pt) => ({
@@ -252,6 +278,8 @@ export function KmlImportWizard() {
           longitude: pt.longitude,
           quantity: pt.quantity,
           serviceMinutes: pt.serviceMinutes,
+          operationType: defaultOp,
+          reviewRequired: false,
         }));
 
       const res = await fetch('/api/election-removal/campaigns', {
@@ -262,7 +290,11 @@ export function KmlImportWizard() {
           description: description.trim() || undefined,
           targetDate: targetDate ? new Date(targetDate).toISOString() : undefined,
           kmlFileName: fileName,
-          mediaDefaults: { layerMappings },
+          mediaDefaults: {
+            purpose,
+            defaultOperation: defaultOp,
+            layerMappings,
+          },
           points: validPointsPayload,
         }),
       });
@@ -372,6 +404,71 @@ export function KmlImportWizard() {
               <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
                 <FileText className="w-4 h-4 text-slate-400" />
                 <span>Soubor: <strong>{fileName}</strong></span>
+              </div>
+            </div>
+
+            {/* Purpose Selection */}
+            <div className="space-y-2 pt-1 pb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                Účel zakázky (Co se bude v terénu provádět?) *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  {
+                    id: 'REMOVAL' as const,
+                    title: 'Deinstalace & Demontáž',
+                    badge: 'Odstranění / úklid / odvoz na sklad',
+                    icon: Trash2,
+                  },
+                  {
+                    id: 'INSTALLATION' as const,
+                    title: 'Instalace & Montáž',
+                    badge: 'Montáž nosičů / výlep / bannery',
+                    icon: Wrench,
+                  },
+                  {
+                    id: 'RELOCATION' as const,
+                    title: 'Přesun & Přemístění',
+                    badge: 'Převoz z místa A na místo B',
+                    icon: Truck,
+                  },
+                  {
+                    id: 'INSPECTION' as const,
+                    title: 'Kontrola & Servis',
+                    badge: 'Revize stavu, oprava nebo fotodokumentace',
+                    icon: Search,
+                  },
+                ].map((opt) => {
+                  const Icon = opt.icon;
+                  const isSelected = purpose === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setPurpose(opt.id)}
+                      className={`text-left p-3.5 rounded-xl border-2 transition relative flex flex-col justify-between gap-2 cursor-pointer ${
+                        isSelected
+                          ? 'border-sky-600 bg-sky-50/60 shadow-xs ring-1 ring-sky-600/20'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            isSelected ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        {isSelected && <CheckCircle2 className="w-5 h-5 text-sky-600" />}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900">{opt.title}</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">{opt.badge}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

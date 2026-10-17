@@ -2,7 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wrench, Trash2, Truck, Search, CheckCircle2, ArrowRight } from 'lucide-react';
+import type { ParsedKmlPoint } from '@/lib/election-removal/kml-parser';
+import {
+  Wrench,
+  Trash2,
+  Truck,
+  Search,
+  CheckCircle2,
+  ArrowRight,
+  UploadCloud,
+  FileText,
+  Clock,
+} from 'lucide-react';
 
 interface NewFieldActionProps {
   clients?: Array<{ id: string; name: string }>;
@@ -13,6 +24,36 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
   const [purpose, setPurpose] = useState<'INSTALLATION' | 'REMOVAL' | 'RELOCATION' | 'INSPECTION'>('INSTALLATION');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // KML import state
+  const [kmlFile, setKmlFile] = useState<File | null>(null);
+  const [isParsingKml, setIsParsingKml] = useState(false);
+  const [parsedKmlPoints, setParsedKmlPoints] = useState<ParsedKmlPoint[]>([]);
+  const [kmlError, setKmlError] = useState<string | null>(null);
+
+  const handleKmlUpload = async (file: File) => {
+    if (!file) return;
+    setKmlFile(file);
+    setIsParsingKml(true);
+    setKmlError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/election-removal/kml/parse', {
+        method: 'POST',
+        body: fd,
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) throw new Error(d.error || 'Nepodařilo se zpracovat KML soubor.');
+      const validPts = (d.parseResult.points || []).filter((p: ParsedKmlPoint) => p.isValid);
+      setParsedKmlPoints(validPts);
+    } catch (err: unknown) {
+      setKmlError(err instanceof Error ? err.message : 'Chyba při čtení KML souboru.');
+      setParsedKmlPoints([]);
+    } finally {
+      setIsParsingKml(false);
+    }
+  };
 
   const purposeOptions = [
     {
@@ -65,6 +106,19 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
         const description = String(form.get('description') || '').trim();
 
         try {
+          const pointsPayload = parsedKmlPoints.map((pt) => ({
+            name: pt.name,
+            description: pt.description,
+            layerName: pt.layerName,
+            mediaType: pt.mediaType,
+            latitude: pt.latitude,
+            longitude: pt.longitude,
+            quantity: pt.quantity,
+            serviceMinutes: pt.serviceMinutes,
+            operationType: currentOption.defaultOp,
+            reviewRequired: false,
+          }));
+
           const r = await fetch('/api/election-removal/campaigns', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -73,11 +127,12 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
               clientName: clientName || null,
               targetDate: targetDate ? new Date(targetDate).toISOString() : null,
               description: description || null,
+              kmlFileName: kmlFile?.name || null,
               mediaDefaults: {
                 purpose,
                 defaultOperation: currentOption.defaultOp,
               },
-              points: [],
+              points: pointsPayload,
             }),
           });
           const data = await r.json();
@@ -206,6 +261,78 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
         </div>
       </div>
 
+      {/* Krok 3: Import bodů z KML / KMZ (volitelné) */}
+      <div className="space-y-4 pt-4 border-t border-slate-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold">
+              3
+            </span>
+            <h2 className="text-base font-bold text-slate-900">
+              Import bodů z KML / KMZ mapy (volitelné)
+            </h2>
+          </div>
+          <span className="text-xs text-slate-500 font-medium">Lze přidat i později</span>
+        </div>
+
+        {!kmlFile ? (
+          <label className="border-2 border-dashed border-slate-200 hover:border-sky-400 bg-slate-50/50 hover:bg-sky-50/30 rounded-xl p-5 flex flex-col items-center justify-center text-center cursor-pointer transition">
+            <UploadCloud className="w-7 h-7 text-sky-600 mb-1" />
+            <span className="text-sm font-bold text-slate-800">
+              Přetáhněte sem KML soubor nebo klikněte pro výběr
+            </span>
+            <span className="text-xs text-slate-500 mt-0.5">
+              Body budou automaticky nastaveny na {currentOption.title.toLowerCase()}
+            </span>
+            <input
+              type="file"
+              accept=".kml,application/vnd.google-earth.kml+xml,text/xml"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleKmlUpload(e.target.files[0]);
+                }
+              }}
+              className="hidden"
+            />
+          </label>
+        ) : (
+          <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3.5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-sky-600 text-white flex items-center justify-center">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">{kmlFile.name}</p>
+                {isParsingKml ? (
+                  <p className="text-xs text-sky-600 flex items-center gap-1 mt-0.5 animate-pulse">
+                    <Clock className="w-3.5 h-3.5 animate-spin" />
+                    Zpracovávám body z KML...
+                  </p>
+                ) : kmlError ? (
+                  <p className="text-xs text-rose-600 mt-0.5 font-medium">{kmlError}</p>
+                ) : (
+                  <p className="text-xs text-emerald-700 font-bold mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Načteno {parsedKmlPoints.length} platných bodů připravených k {currentOption.title.toLowerCase()}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setKmlFile(null);
+                setParsedKmlPoints([]);
+                setKmlError(null);
+              }}
+              className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-2.5 py-1 rounded-lg hover:bg-white transition cursor-pointer"
+            >
+              Odebrat
+            </button>
+          </div>
+        )}
+      </div>
+
       {error && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 font-medium">
           {error}
@@ -214,14 +341,16 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
 
       <div className="pt-2 flex items-center justify-between">
         <p className="text-xs text-slate-500">
-          V dalším kroku zadáte body v mapě nebo nahrajete soubor KML/Excel.
+          {parsedKmlPoints.length > 0
+            ? `Zakázka bude vytvořena s ${parsedKmlPoints.length} body.`
+            : 'V dalším kroku můžete body přidat v mapě nebo je importovat z KML.'}
         </p>
         <button
           disabled={busy}
           type="submit"
-          className="inline-flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold px-5 py-2.5 text-sm shadow-sm transition disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold px-5 py-2.5 text-sm shadow-sm transition disabled:opacity-50 cursor-pointer"
         >
-          <span>{busy ? 'Zakládám…' : 'Založit zakázku a pokračovat'}</span>
+          <span>{busy ? 'Zakládám…' : parsedKmlPoints.length > 0 ? `Založit zakázku (${parsedKmlPoints.length} bodů)` : 'Založit zakázku a pokračovat'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

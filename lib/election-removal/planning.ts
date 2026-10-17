@@ -198,7 +198,14 @@ export async function optimizeElectionRemovalRoutes(
       payload.date,
       organizationId
     );
-    if (payload.selectedPointIds !== undefined && (!Array.isArray(payload.selectedPointIds) || !payload.selectedPointIds.length || payload.selectedPointIds.some(id => typeof id !== 'string' || !points.some(p => p.id === id)))) throw new Error('Výběr obsahuje nedostupnou práci nebo bod jiné akce.');
+    if (payload.selectedPointIds !== undefined) {
+      if (!Array.isArray(payload.selectedPointIds) || !payload.selectedPointIds.length) {
+        throw new Error('Nebyly vybrány žádné body k naplánování. Zvolte alespoň jeden bod v mapě nebo vyberte jiný typ výjezdu.');
+      }
+      if (payload.selectedPointIds.some((id) => typeof id !== 'string' || !points.some((p) => p.id === id))) {
+        throw new Error('Výběr obsahuje nedostupnou práci nebo bod jiné akce.');
+      }
+    }
 
     const selectedPoints = payload.selectedPointIds?.length
       ? points.filter((p) => payload.selectedPointIds!.includes(p.id))

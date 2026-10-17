@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Wrench, Trash2, Truck, CheckSquare, Square } from 'lucide-react';
+import { Sparkles, Wrench, Trash2, Truck, CheckSquare, Square, RotateCcw, CheckCircle2 } from 'lucide-react';
 import type { ElectionRemovalPoint, FieldWorkStep } from '@prisma/client';
 import { operations, dispositions } from '@/lib/election-removal/task-spec';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
@@ -30,6 +30,27 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
   const [selected, setSelected] = useState<string[]>([]);
   const [filter, setFilter] = useState('ALL');
   const [formKey, setFormKey] = useState(0);
+
+  async function markPointStatus(pointIds: string[], status: 'COMPLETED' | 'PENDING') {
+    if (!pointIds.length) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/election-removal/points/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pointIds, status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Změna stavu selhala.');
+      setSelected([]);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Změna stavu selhala.');
+    } finally {
+      setBusy(false);
+    }
+  }
   const category = (p: Point) => p.status === 'COMPLETED' ? 'DONE' : p.reviewRequired ? 'REVIEW' : p.status === 'ISSUE' ? 'ISSUE' : p.steps.some(s => s.completedQuantity > 0) ? 'PARTIAL' : p.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : p.assignedFieldPlanId ? 'ASSIGNED' : 'PENDING';
   const groups = { ALL: 'Vše', REVIEW: 'Vyžaduje kontrolu', PENDING: 'Nenaplánované', ASSIGNED: 'Naplánované', IN_PROGRESS: 'Rozpracované', PARTIAL: 'Částečně hotové', DONE: 'Hotové', ISSUE: 'Problémy / opakování' };
   function editPoint(point: Point | null) {
@@ -220,6 +241,29 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
               <span>🚚 Nastavit Přesun</span>
             </button>
 
+            {/* Manual completion / reset buttons */}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => markPointStatus(selected, 'COMPLETED')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition"
+              title="Označit vybrané body jako hotové přímo z PC"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>✅ Označit hotovo ({selected.length})</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => markPointStatus(selected, 'PENDING')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition"
+              title="Vrátit vybrané body zpět k rozpracování"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>↩ Vrátit k rozpracování</span>
+            </button>
+
             <Link
               href={`/election-removal/${campaignId}/plan?points=${selected.join(',')}`}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold shadow-sm transition"
@@ -369,10 +413,33 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
           )}
         </div>
         <span className="ml-auto rounded-full bg-slate-100 px-2 py-1 text-xs">{groups[category(p)]}</span>
-        {(!p.assignedFieldPlanId || (p.reviewRequired && p.steps.length === 0 && !p.startedAt)) && !p.startedAt && !p.steps.some(s => s.startedAt || s.completedQuantity > 0) && p.status !== 'COMPLETED' && (
-          <button type="button" className="text-sm underline text-sky-700" onClick={() => editPoint(p)}>Upravit</button>
+        {!p.startedAt && !p.steps.some(s => s.startedAt || s.completedQuantity > 0) && p.status !== 'COMPLETED' && (
+          <button type="button" className="text-sm underline text-sky-700 font-medium" onClick={() => editPoint(p)}>Upravit</button>
         )}
         <button type="button" className="text-sm underline text-slate-500 hover:text-sky-700" onClick={() => duplicatePoint(p)}>Duplikovat</button>
+        {p.status === 'COMPLETED' ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => markPointStatus([p.id], 'PENDING')}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline inline-flex items-center gap-1"
+            title="Vrátit bod k rozpracování"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Vrátit</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => markPointStatus([p.id], 'COMPLETED')}
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg px-2 py-0.5 inline-flex items-center gap-1 shadow-2xs transition"
+            title="Označit bod jako hotový přímo z PC"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Hotovo</span>
+          </button>
+        )}
       </div>
       <p className="mt-2 text-sm">{p.description} {p.materialInstructions}</p>
       {p.photos && p.photos.length > 0 && (
