@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { ParsedKmlPoint } from '@/lib/election-removal/kml-parser';
 import {
   Wrench,
   Trash2,
@@ -27,7 +28,7 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
   // KML import state
   const [kmlFile, setKmlFile] = useState<File | null>(null);
   const [isParsingKml, setIsParsingKml] = useState(false);
-  const [parsedKmlPoints, setParsedKmlPoints] = useState<any[]>([]);
+  const [parsedKmlPoints, setParsedKmlPoints] = useState<ParsedKmlPoint[]>([]);
   const [kmlError, setKmlError] = useState<string | null>(null);
 
   const handleKmlUpload = async (file: File) => {
@@ -44,7 +45,7 @@ export function NewFieldAction({ clients = [] }: NewFieldActionProps) {
       });
       const d = await res.json();
       if (!res.ok || !d.success) throw new Error(d.error || 'Nepodařilo se zpracovat KML soubor.');
-      const validPts = (d.parseResult.points || []).filter((p: any) => p.isValid);
+      const validPts = (d.parseResult.points || []).filter((p: ParsedKmlPoint) => p.isValid);
       setParsedKmlPoints(validPts);
     } catch (err: unknown) {
       setKmlError(err instanceof Error ? err.message : 'Chyba při čtení KML souboru.');
