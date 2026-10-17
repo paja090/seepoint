@@ -5,10 +5,25 @@ import { getModuleIdForPath, isModuleAvailable } from './organization-modules';
 // String icon IDs keep the server-to-client navigation payload serializable.
 export type NavItem = [href: string, label: string, icon: AppNavIcon, section: AppSection];
 export type NavGroup = { label: string; items: NavItem[] };
-export type NavigationHub = { id: string; label: string; icon: 'sparkles' | 'briefcaseBusiness' | 'mapPinned' | 'wrench' | 'settings'; groups: NavGroup[] };
+export type NavigationHubIcon =
+  | 'sparkles'
+  | 'briefcaseBusiness'
+  | 'mapPinned'
+  | 'wrench'
+  | 'calendarCheck'
+  | 'package'
+  | 'settings';
+
+export type NavigationHub = {
+  id: string;
+  label: string;
+  shortLabel?: string;
+  icon: NavigationHubIcon;
+  groups: NavGroup[];
+};
 
 export const navigationHubs: NavigationHub[] = [
-  { id: 'ai', label: 'AI Hub', icon: 'sparkles', groups: [
+  { id: 'ai', label: 'AI Hub', shortLabel: 'AI', icon: 'sparkles', groups: [
     { label: 'AI obchod', items: [
       ["/commercial","AI Obchodní centrum","briefcaseBusiness","commercial"],
       ["/ai-inbox","AI Inbox","mail","aiInbox"],
@@ -19,28 +34,26 @@ export const navigationHubs: NavigationHub[] = [
       ["/realization","AI Řízení realizace","workflow","realization"]
     ] }
   ] },
-  { id: 'sales', label: 'Obchod & CRM', icon: 'briefcaseBusiness', groups: [
-    { label: 'Obchod', items: [
+  { id: 'sales', label: 'Obchod & CRM', shortLabel: 'Obchod', icon: 'briefcaseBusiness', groups: [
+    { label: 'Obchod & Přehled', items: [
       ["/dashboard","Nástěnka / Přehled","barChart3","dashboard"],
-      ["/academy","Návody & Akademie","fileText","academy"],
-      ["/analytics","Analytics & Tržby","barChart3","clients"],
       ["/offers","Nabídky","badgeDollarSign","offers"],
+      ["/analytics","Analytics & Tržby","barChart3","clients"],
       ["/network","B2B Media Network","globe","offers"]
     ] },
-    { label: 'CRM', items: [
+    { label: 'CRM & Podpora', items: [
       ["/clients/dashboard","CRM Dashboard","barChart3","clients"],
-      ["/clients","Klienti & Adresář","users","clients"]
+      ["/clients","Klienti & Adresář","users","clients"],
+      ["/academy","Návody & Akademie","fileText","academy"]
     ] }
   ] },
-  { id: 'spaces', label: 'Plochy & Obsazenost', icon: 'mapPinned', groups: [
-    { label: 'Evidence', items: [
+  { id: 'spaces', label: 'Plochy & Sítě', shortLabel: 'Plochy', icon: 'mapPinned', groups: [
+    { label: 'Evidence & Obsazenost', items: [
       ["/map","Mapa nosičů","map","map"],
       ["/carriers","Evidence nosičů","panelsTopLeft","carriers"],
+      ["/occupancy","Obsazenost ploch","calendarRange","occupancy"],
       ["/field-survey","Terénní průzkum ploch","camera","fieldSurvey"],
       ["/mobile-surveys","Průzkum lokalit","mapPinned","navigationProjects"]
-    ] },
-    { label: 'Plánování', items: [
-      ["/occupancy","Obsazenost ploch","calendarRange","occupancy"]
     ] },
     { label: 'Reklamní sítě & Projekty', items: [
       ["/navigation","Navigační reklama (VO)","mapPinned","navigationProjects"],
@@ -48,31 +61,41 @@ export const navigationHubs: NavigationHub[] = [
       ["/projects/city-inventory","Městský inventář & Mobiliář","panelsTopLeft","carriers"]
     ] }
   ] },
-  { id: 'operations', label: 'Provoz & Realizace', icon: 'wrench', groups: [
-    { label: 'Realizace', items: [
+  { id: 'operations', label: 'Realizace & Terén', shortLabel: 'Realizace', icon: 'wrench', groups: [
+    { label: 'Terén & Fotodokumentace', items: [
       ["/fotodokumentace","Fotodokumentace","camera","photoDocumentation"],
       ["/election-removal","Terénní práce","truck","electionRemoval"],
-      ["/work/route","Pracovní výjezd","route","work"],
-      ["/work","Plán práce","briefcaseBusiness","work"],
-      ["/tasks","Všechny úkoly","clipboardList","tasks"],
-      ["/production","Výroba, Tisk & Grafika","printer","printProduction"]
+      ["/work/route","Pracovní výjezd","route","work"]
     ] },
-    { label: 'Moje agenda', items: [
+    { label: 'Zakázky & Výroba', items: [
+      ["/work","Plán práce","briefcaseBusiness","work"],
+      ["/production","Výroba, Tisk & Grafika","printer","printProduction"],
+      ["/tasks","Všechny úkoly","clipboardList","tasks"]
+    ] }
+  ] },
+  { id: 'agenda', label: 'Plánovač & Moje agenda', shortLabel: 'Agenda', icon: 'calendarCheck', groups: [
+    { label: 'Můj plán & Úkoly', items: [
       ["/planner","Planner","calendarRange","planner"],
-      ["/my-tasks","Moje úkoly","calendarCheck","myTasks"],
+      ["/my-tasks","Moje úkoly","calendarCheck","myTasks"]
+    ] },
+    { label: 'Moje výkazy & Volno', items: [
       ["/my-work-entries","Moje odvedená práce","clipboardCheck","myWorkEntries"],
       ["/my-settlements","Moje vyúčtování","fileText","mySettlements"],
       ["/vacations","Dovolená & Volno","calendarRange","team"]
-    ] },
-    { label: 'Interní provoz', items: [
-      ["/shopping","Nákupy","shoppingBag","team"],
-      ["/work-entries","Odvedená práce (všichni)","fileText","workEntries"],
-      ["/settlements","Vyúčtování firemní","fileText","settlements"],
-      ["/vehicles","Vozidla a vozíky","car","vehicles"],
-      ["/warehouse","Sklad & Materiál","clipboardList","warehouse"]
     ] }
   ] },
-  { id: 'management', label: 'Správa', icon: 'settings', groups: [
+  { id: 'backoffice', label: 'Sklad, Flotila & Výkazy', shortLabel: 'Zázemí', icon: 'package', groups: [
+    { label: 'Sklad, Flotila & Nákupy', items: [
+      ["/warehouse","Sklad & Materiál","clipboardList","warehouse"],
+      ["/vehicles","Vozidla a vozíky","car","vehicles"],
+      ["/shopping","Nákupy","shoppingBag","team"]
+    ] },
+    { label: 'Firemní výkazy', items: [
+      ["/work-entries","Odvedená práce (všichni)","fileText","workEntries"],
+      ["/settlements","Vyúčtování firemní","fileText","settlements"]
+    ] }
+  ] },
+  { id: 'management', label: 'Správa', shortLabel: 'Správa', icon: 'settings', groups: [
     { label: 'Tým & Data', items: [
       ["/employees","Zaměstnanci & Tým","userRound","employees"],
       ["/import","Import dat","fileUp","import"]
@@ -88,7 +111,7 @@ export const navigationHubs: NavigationHub[] = [
   ] }
 ];
 
-export const quickAccessHrefs = ['/dashboard', '/my-tasks', '/commercial', '/academy'];
+export const quickAccessHrefs = ['/dashboard', '/my-tasks', '/commercial', '/fotodokumentace'];
 export const mobileHrefs = ['/dashboard', '/warehouse', '/my-tasks'];
 
 export function matchesNavigationPath(pathname: string, href: string) {
