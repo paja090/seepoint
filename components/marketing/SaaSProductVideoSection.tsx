@@ -4,18 +4,12 @@ import { useState, useRef } from 'react';
 import { Play, Pause, Sparkles, MapPin, FileText, Camera, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
-/**
- * Konfigurace produktového videa SeePoint OS.
- * Až bude MP4 video připraveno:
- * 1. Nahrajte soubor např. do public/videos/seepoint-demo.mp4
- * 2. Případně přidejte cover do public/images/video/seepoint-demo-cover.jpg
- * 3. Přepněte `enabled: true`.
- */
+/** Produktové video: živé ukázky AI funkcí na demonstračních datech. */
 export const PRODUCT_VIDEO_CONFIG = {
-  enabled: false,
-  src: '/videos/seepoint-demo.mp4',
+  enabled: true,
+  src: '/images/video/seepoint-demo.mp4',
   poster: '/images/video/seepoint-demo-cover.jpg',
-  title: 'SeePoint OS – Reálné workflow za 60 sekund',
+  title: 'SeePoint OS – AI v každodenní praxi',
 };
 
 export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
@@ -59,11 +53,11 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            SeePoint OS za 60 sekund.
+            SeePoint OS v praxi.
           </h2>
 
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-            Od vyhledání volné plochy přes vytvoření klientské nabídky až po realizaci a fotodokumentaci v terénu.
+            Podívejte se na skutečnou tvorbu návrhu nabídky, AI checklistu a vyhledání volných ploch v aplikaci.
           </p>
         </div>
 
@@ -80,7 +74,9 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
                   playsInline
                   preload="metadata"
                   onEnded={handleVideoEnded}
-                  className="w-full h-full object-cover"
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  className="w-full h-full object-contain"
                 />
 
                 {!isPlaying && (
@@ -143,30 +139,30 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-purple-400">
               <MapPin className="w-4 h-4" />
-              <strong className="text-sm font-black text-white">1. Mapa a obsazenost</strong>
+              <strong className="text-sm font-black text-white">1. AI obsazenost</strong>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Filtrování volných nosičů v reálném čase, památkové zóny a detailní technické parametry plochy.
+              Zeptejte se přirozenou češtinou na volné reklamní plochy ve vybraném městě a termínu.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-indigo-400">
               <FileText className="w-4 h-4" />
-              <strong className="text-sm font-black text-white">2. Nabídka klientovi</strong>
+              <strong className="text-sm font-black text-white">2. AI návrh nabídky</strong>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Vygenerování reprezentativní prezentace s fotografiemi a veřejným klientským odkazem do 60 sekund.
+              Zadejte požadavek klienta a rozpočet. AI Copilot připraví návrh ploch k vaší kontrole.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-emerald-400">
               <Camera className="w-4 h-4" />
-              <strong className="text-sm font-black text-white">3. Realizace a fotodokumentace</strong>
+              <strong className="text-sm font-black text-white">3. AI úkoly pro tým</strong>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Automatické předání zakázky do mobilu montážníka, GPS navigace a okamžité nahrání hotové instalace.
+              Z jedné věty vytvořte přehledný checklist úkolů přiřazených členovi týmu.
             </p>
           </div>
         </div>

@@ -28,7 +28,7 @@ export default async function PhotoDocumentationHubPage({
 
   // 1. Fetch Field Work (Terénní práce) campaigns with photos
   const electionCampaigns = await prisma.electionCampaign.findMany({
-    where: { organizationId },
+    where: { organizationId, status: { not: 'ARCHIVED' } },
     include: {
       points: {
         include: {
@@ -55,7 +55,7 @@ export default async function PhotoDocumentationHubPage({
 
   // 2. Fetch Navigation Documentation (Navigační reklama VO) reports with items
   const navigationReports = await prisma.navigationDocumentationReport.findMany({
-    where: { organizationId },
+    where: { organizationId, status: { not: 'ARCHIVED' } },
     include: {
       client: { select: { id: true, name: true } },
       items: {
