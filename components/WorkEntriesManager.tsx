@@ -1,12 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { dateOnly } from '@/lib/internal-format';
+import type { WorkCategory } from '@/lib/work-categories';
+import { DEFAULT_WORK_CATEGORIES } from '@/lib/work-categories';
+import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
+import { QuickOtherCostForm } from '@/components/QuickOtherCostForm';
+import { resolveActivityName } from '@/lib/work-entry-stats';
 
 type EmployeePayload = {
   id: string;
   firstName: string;
   lastName: string;
+};
+
+type WorkOrderOption = {
+  id: string;
+  title: string;
+  workType: string;
+  clientName: string;
+  price: number | null;
 };
 
 type ExpensePayload = {
@@ -26,6 +40,7 @@ type EntryPayload = {
   workTaskId: string;
   workOrderId: string | null;
   workType: string;
+  carrierTypeLabel?: string | null;
   remunerationMethod: string;
   quantity: string;
   unit: string;
@@ -45,28 +60,14 @@ type EntryPayload = {
 type WorkEntriesManagerProps = {
   employees: EmployeePayload[];
   initialEntries: EntryPayload[];
-};
-
-const workTypeLabels: Record<string, string> = {
-  INSTALLATION: 'Instalace',
-  REINSTALLATION: 'Reinstalace',
-  DEINSTALLATION: 'Deinstalace',
-  REPAIR: 'Oprava',
-  CHECK: 'Kontrola',
-  TRANSPORT: 'Převoz',
-  OTHER: 'Jiná práce',
+  workCategories?: WorkCategory[];
+  workOrders?: WorkOrderOption[];
 };
 
 const rateTypeLabels: Record<string, string> = {
-  HOURLY: 'Hodinová',
-  TASK: 'Úkolová',
-  FIXED: 'Pevná částka',
-};
-
-const rateSourceLabels: Record<string, string> = {
-  EMPLOYEE_RATE: 'Individuální sazba',
-  COMPANY_RATE: 'Firemní sazba',
-  MANUAL: 'Manuální zadání',
+  HOURLY: '⏱️ Hodinová práce',
+  TASK: '📦 Úkolová práce (ks)',
+  FIXED: '💰 Cena za zakázku',
 };
 
 const statusLabels: Record<string, string> = {
@@ -83,72 +84,137 @@ const statusClasses: Record<string, string> = {
   RETURNED: 'bg-red-100 text-red-800 border border-red-200 font-semibold',
 };
 
-const expenseStatusLabels: Record<string, string> = {
-  PENDING: 'Čeká',
-  APPROVED: 'Schváleno',
-  REJECTED: 'Zamítnuto',
-};
-
-const expenseStatusClasses: Record<string, string> = {
-  PENDING: 'bg-amber-100 text-amber-800',
-  APPROVED: 'bg-emerald-100 text-emerald-800',
-  REJECTED: 'bg-red-100 text-red-800',
-};
-
-export function WorkEntriesManager({ employees, initialEntries }: WorkEntriesManagerProps) {
+export function WorkEntriesManager({
+  employees,
+  initialEntries,
+  workCategories,
+  workOrders = [],
+}: WorkEntriesManagerProps) {
+  const categories = workCategories && workCategories.length > 0 ? workCategories : DEFAULT_WORK_CATEGORIES;
   const [entries, setEntries] = useState<EntryPayload[]>(initialEntries);
 
   // Filters
   const [employeeFilter, setEmployeeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [dateFromFilter, setDateFromFilter] = useState('');
-  const [dateToFilter, setDateToFilter] = useState('');
+  const [activityFilter, setActivityFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
   const [orderQuery, setOrderQuery] = useState('');
 
-  // Form states (Creating manual/additional work entry)
-  const [showForm, setShowForm] = useState(false);
-  const [targetEmployeeId, setTargetEmployeeId] = useState('');
-  const [workTaskId, setWorkTaskId] = useState('');
+  // Active form panel: 'work' | 'cost' | null
+  const [activeFormPanel, setActiveFormPanel] = useState<'work' | 'cost' | null>(null);
+  const [editingEntry, setEditingEntry] = useState<EntryPayload | null>(null);
+
+  // Simplified Work Entry Form state
+  const [targetEmployeeId, setTargetEmployeeId] = useState(employees[0]?.id || '');
+  const [activityTitle, setActivityTitle] = useState(
+    categories[0]?.label || 'Instalace lavičky / městského mobiliáře'
+  );
+  const [selectedOrderId, setSelectedOrderId] = useState('');
   const [workDate, setWorkDate] = useState(new Date().toISOString().slice(0, 10));
-  const [workType, setWorkType] = useState('INSTALLATION');
-  const [remunerationMethod, setRemunerationMethod] = useState('HOURLY');
+  const [workType, setWorkType] = useState<string>(categories[0]?.defaultWorkType || 'INSTALLATION');
+  const [remunerationMethod, setRemunerationMethod] = useState<'HOURLY' | 'TASK' | 'FIXED'>('HOURLY');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('hod');
+  const [unitRate, setUnitRate] = useState('');
   const [note, setNote] = useState('');
-  const [manualRate, setManualRate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  // Additional entry bypass
-  const [isAdditional, setIsAdditional] = useState(false);
-  const [additionalReason, setAdditionalReason] = useState('');
-
-  // Detail Modal state
+  // Detail / Correction Modal state
   const [activeDetail, setActiveDetail] = useState<EntryPayload | null>(null);
-
-  // Actions Prompts Modals state
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnReason, setReturnReason] = useState('');
-
   const [showApproveReasonModal, setShowApproveReasonModal] = useState(false);
   const [approveReason, setApproveReason] = useState('');
-
-  // Correction Mode state (in detail modal)
-  const [isCorrecting, setIsCorrecting] = useState(false);
-  const [correctionQty, setCorrectionQty] = useState('');
-  const [correctionRate, setCorrectionRate] = useState('');
-  const [correctionNote, setCorrectionNote] = useState('');
-  const [correctionReason, setCorrectionReason] = useState('');
-
-  // Rejection modal for WorkExpense
-  const [rejectingExpenseId, setRejectingExpenseId] = useState<string | null>(null);
-  const [expenseRejectReason, setExpenseRejectReason] = useState('');
 
   // Error/Success messages
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Duplicate Warning Modal (for additional entries)
-  const [showDuplicateBypassForm, setShowDuplicateBypassForm] = useState(false);
+  // Auto-resolve rate from backend when employee / workType / remunerationMethod / workDate / order changes
+  useEffect(() => {
+    if (activeFormPanel !== 'work' || !targetEmployeeId || editingEntry) return;
+    let cancelled = false;
+    const fetchRate = async () => {
+      try {
+        const orderParam = selectedOrderId ? `&workOrderId=${selectedOrderId}` : '';
+        const res = await fetch(
+          `/api/work-entries/resolve-rate?employeeId=${targetEmployeeId}&workType=${workType}&workDate=${workDate}&remunerationMethod=${remunerationMethod}${orderParam}`
+        );
+        const data = await res.json();
+        if (!cancelled && res.ok && data.rate) {
+          setUnitRate(String(Number(data.rate)));
+          if (remunerationMethod === 'TASK' && data.unit) {
+            setUnit(data.unit);
+          }
+        }
+      } catch {}
+    };
+    fetchRate();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFormPanel, targetEmployeeId, workType, remunerationMethod, workDate, selectedOrderId, editingEntry]);
+
+  const handleSelectCategory = (cat: WorkCategory) => {
+    setActivityTitle(cat.label);
+    setWorkType(cat.defaultWorkType);
+    if (cat.defaultPriceType === 'PIECE_RATE') {
+      setRemunerationMethod('TASK');
+      setUnit('ks');
+    } else if (cat.defaultPriceType === 'FIXED') {
+      setRemunerationMethod('FIXED');
+      setQuantity('1');
+      setUnit('zakázka');
+    } else if (cat.defaultPriceType === 'HOURLY') {
+      setRemunerationMethod('HOURLY');
+      setUnit('hod');
+    }
+    if (cat.defaultRate !== undefined && cat.defaultRate > 0) {
+      setUnitRate(String(cat.defaultRate));
+    }
+  };
+
+  const handleSelectMethod = (method: 'HOURLY' | 'TASK' | 'FIXED') => {
+    setRemunerationMethod(method);
+    if (method === 'HOURLY') {
+      setUnit('hod');
+      if (quantity === '1' && remunerationMethod === 'FIXED') setQuantity('');
+    } else if (method === 'TASK') {
+      setUnit('ks');
+    } else {
+      setQuantity('1');
+      setUnit('zakázka');
+      const ord = workOrders.find((o) => o.id === selectedOrderId);
+      if (ord?.price && !unitRate) {
+        setUnitRate(String(ord.price));
+      }
+    }
+  };
+
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    const ord = workOrders.find((o) => o.id === orderId);
+    if (ord) {
+      setWorkType(ord.workType || 'INSTALLATION');
+      if (!activityTitle) setActivityTitle(ord.title);
+      if (ord.price && remunerationMethod === 'FIXED') {
+        setUnitRate(String(ord.price));
+      }
+    }
+  };
+
+  const previewAmount = (() => {
+    const r = parseFloat(unitRate.replace(',', '.')) || 0;
+    if (remunerationMethod === 'FIXED') return r;
+    let q = 0;
+    if (quantity.includes(':')) {
+      const [h, m] = quantity.split(':').map((v) => parseInt(v, 10) || 0);
+      q = h + m / 60;
+    } else {
+      q = parseFloat(quantity.replace(',', '.')) || 0;
+    }
+    return Math.round(q * r * 100) / 100;
+  })();
 
   const refreshList = async () => {
     try {
@@ -158,354 +224,297 @@ export function WorkEntriesManager({ employees, initialEntries }: WorkEntriesMan
         setEntries(data);
         if (activeDetail) {
           const freshDetail = data.find((e: EntryPayload) => e.id === activeDetail.id);
-          if (freshDetail) {
-            setActiveDetail(freshDetail);
-          }
+          if (freshDetail) setActiveDetail(freshDetail);
         }
       }
     } catch {}
   };
 
-  // Handle new entry submit
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setEditingEntry(null);
+    setQuantity('');
+    setNote('');
+  };
+
+  const handleSubmitWork = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    const bodyData = {
-      employeeId: targetEmployeeId,
-      workTaskId,
-      workDate,
-      workType,
-      remunerationMethod,
-      quantity,
-      unit,
-      note,
-      creationSource: 'MANUAL',
-      allowAdditionalEntry: isAdditional,
-      additionalEntryReason: additionalReason,
-      manualRate: manualRate ? parseFloat(manualRate) : undefined,
-    };
-
-    try {
-      const res = await fetch('/api/work-entries', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(bodyData),
-      });
-
-      const out = await res.json();
-      if (!res.ok) {
-        if (out.error === 'ZÁPIS_DUPLICITNÍ') {
-          setShowDuplicateBypassForm(true);
-          return;
-        }
-        throw new Error(out.error || 'Uložení selhalo.');
-      }
-
-      setSuccessMsg('Záznam byl úspěšně vytvořen.');
-      setShowForm(false);
-      setShowDuplicateBypassForm(false);
-      resetForm();
-      await refreshList();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
-      setErrorMsg(message);
-    }
-  };
-
-  // Submit bypass warning
-  const handleBypassSubmit = async () => {
-    if (!additionalReason.trim()) {
-      setErrorMsg('Pro dodatečný zápis duplicitní práce musíte vyplnit odůvodnění.');
+    if (!targetEmployeeId && !editingEntry) {
+      setErrorMsg('Vyberte pracovníka.');
       return;
     }
-    setErrorMsg('');
-    const bodyData = {
-      employeeId: targetEmployeeId,
-      workTaskId,
-      workDate,
-      workType,
-      remunerationMethod,
-      quantity,
-      unit,
-      note,
-      creationSource: 'MANUAL',
-      allowAdditionalEntry: true,
-      additionalEntryReason: additionalReason,
-      manualRate: manualRate ? parseFloat(manualRate) : undefined,
-    };
 
+    const effectiveQty = remunerationMethod === 'FIXED' ? '1' : quantity;
+    if (!effectiveQty || !String(effectiveQty).trim()) {
+      setErrorMsg(remunerationMethod === 'HOURLY' ? 'Zadejte počet odpracovaných hodin.' : 'Zadejte počet kusů / úkolů.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      const res = await fetch('/api/work-entries', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(bodyData),
-      });
+      const payload = {
+        employeeId: editingEntry ? editingEntry.employeeId : targetEmployeeId,
+        workTaskId: editingEntry ? editingEntry.workTaskId : undefined,
+        workOrderId: selectedOrderId || undefined,
+        activityTitle: activityTitle.trim() || 'Odvedená práce',
+        workDate,
+        workType,
+        remunerationMethod,
+        quantity: effectiveQty,
+        unit: remunerationMethod === 'HOURLY' ? 'hod' : unit || 'ks',
+        unitRate: unitRate !== '' ? unitRate : undefined,
+        note: note.trim() || undefined,
+        autoApprove: true,
+      };
+
+      const res = editingEntry
+        ? await fetch(`/api/work-entries/${editingEntry.id}`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch('/api/work-entries', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
 
       const out = await res.json();
       if (!res.ok) {
-        throw new Error(out.error || 'Uložení selhalo.');
+        throw new Error(out.error || 'Uložení práce selhalo.');
       }
 
-      setSuccessMsg('Záznam práce byl úspěšně uložen s duplicitním odůvodněním.');
-      setShowForm(false);
-      setShowDuplicateBypassForm(false);
+      setSuccessMsg(
+        editingEntry
+          ? 'Záznam práce byl upraven a přepočítán ve vyúčtování.'
+          : 'Záznam práce byl vytvořen a rovnou započítán do vyúčtování pracovníka.'
+      );
+      setActiveFormPanel(null);
       resetForm();
       await refreshList();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
-      setErrorMsg(message);
+      setErrorMsg(err instanceof Error ? err.message : 'Operace se nezdařila.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setTargetEmployeeId('');
-    setWorkTaskId('');
-    setWorkDate(new Date().toISOString().slice(0, 10));
-    setWorkType('INSTALLATION');
-    setRemunerationMethod('HOURLY');
-    setQuantity('');
-    setUnit('hod');
-    setNote('');
-    setManualRate('');
-    setIsAdditional(false);
-    setAdditionalReason('');
+  const handleEdit = (entry: EntryPayload) => {
+    setEditingEntry(entry);
+    setTargetEmployeeId(entry.employeeId);
+    setActivityTitle(resolveActivityName(entry));
+    setSelectedOrderId(entry.workOrderId || '');
+    setWorkDate(entry.workDate.slice(0, 10));
+    setWorkType(entry.workType);
+    setRemunerationMethod((entry.remunerationMethod as 'HOURLY' | 'TASK' | 'FIXED') || 'HOURLY');
+    setQuantity(entry.quantity);
+    setUnit(entry.unit);
+    setUnitRate(entry.appliedUnitRate ? String(Number(entry.appliedUnitRate)) : '');
+    setNote(entry.note || '');
+    setActiveFormPanel('work');
+    setErrorMsg('');
+    setSuccessMsg('');
   };
 
-  // Approve action
+  const handleDelete = async (entryId: string) => {
+    if (!window.confirm('Opravdu chcete smazat tento záznam práce?')) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`/api/work-entries/${entryId}`, { method: 'DELETE' });
+      const out = await res.json();
+      if (!res.ok) throw new Error(out.error || 'Smazání selhalo.');
+      setSuccessMsg('Záznam práce byl smazán.');
+      await refreshList();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Chyba při mazání.');
+    }
+  };
+
   const handleApprove = async (entryId: string, reason?: string) => {
     setErrorMsg('');
     setSuccessMsg('');
-
     try {
       const res = await fetch(`/api/work-entries/${entryId}/confirm`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ reason }),
       });
-
       const out = await res.json();
       if (!res.ok) {
         if (out.error && out.error.includes('je nutné uvést důvod')) {
-          // Late approval triggers reason modal
           setShowApproveReasonModal(true);
           return;
         }
         throw new Error(out.error || 'Schválení selhalo.');
       }
-
-      setSuccessMsg('Záznam práce byl schválen.');
+      setSuccessMsg('Záznam práce byl schválen a zapsán do vyúčtování.');
       setShowApproveReasonModal(false);
       setApproveReason('');
       setActiveDetail(null);
       await refreshList();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
-      setErrorMsg(message);
+      setErrorMsg(err instanceof Error ? err.message : 'Operace se nezdařila.');
     }
   };
 
-  // Return action
   const handleReturn = async (entryId: string) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-
     if (!returnReason.trim()) {
       setErrorMsg('Důvod pro vrácení je povinný.');
       return;
     }
-
     try {
       const res = await fetch(`/api/work-entries/${entryId}/return`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ reason: returnReason }),
       });
-
       const out = await res.json();
-      if (!res.ok) {
-        throw new Error(out.error || 'Vrácení selhalo.');
-      }
-
+      if (!res.ok) throw new Error(out.error || 'Vrácení selhalo.');
       setSuccessMsg('Záznam byl vrácen pracovníkovi k opravě.');
       setShowReturnModal(false);
       setReturnReason('');
       setActiveDetail(null);
       await refreshList();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
-      setErrorMsg(message);
+      setErrorMsg(err instanceof Error ? err.message : 'Operace se nezdařila.');
     }
   };
 
-  // Correct Action (For APPROVED items)
-  const handleCorrect = async (entryId: string) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    if (!correctionReason.trim()) {
-      setErrorMsg('Důvod pro provedení opravy je povinný.');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/work-entries/${entryId}/correct`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          quantity: correctionQty ? parseFloat(correctionQty) : undefined,
-          unitPrice: correctionRate ? parseFloat(correctionRate) : undefined,
-          note: correctionNote || undefined,
-          reason: correctionReason,
-        }),
-      });
-
-      const out = await res.json();
-      if (!res.ok) {
-        throw new Error(out.error || 'Oprava selhala.');
-      }
-
-      setSuccessMsg('Oprava záznamu práce byla uložena.');
-      setIsCorrecting(false);
-      setCorrectionQty('');
-      setCorrectionRate('');
-      setCorrectionNote('');
-      setCorrectionReason('');
-      setActiveDetail(null);
-      await refreshList();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Oprava se nezdařila.';
-      setErrorMsg(message);
-    }
-  };
-
-  // Approve WorkExpense
-  const handleApproveExpense = async (expenseId: string) => {
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      const res = await fetch(`/api/work-expenses/${expenseId}/approve`, {
-        method: 'POST',
-      });
-      const out = await res.json();
-      if (!res.ok) {
-        throw new Error(out.error || 'Schválení výdaje selhalo.');
-      }
-
-      setSuccessMsg('Výdaj byl schválen a zapsán do vyúčtování.');
-      await refreshList();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
-      setErrorMsg(message);
-    }
-  };
-
-  // Reject WorkExpense
-  const handleRejectExpense = async () => {
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    if (!expenseRejectReason.trim()) {
-      setErrorMsg('Důvod zamítnutí výdaje je povinný.');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/work-expenses/${rejectingExpenseId}/reject`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ reason: expenseRejectReason }),
-      });
-      const out = await res.json();
-      if (!res.ok) {
-        throw new Error(out.error || 'Zamítnutí výdaje selhalo.');
-      }
-
-      setSuccessMsg('Výdaj byl zamítnut.');
-      setRejectingExpenseId(null);
-      setExpenseRejectReason('');
-      await refreshList();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Operace se nezdařila.';
-      setErrorMsg(message);
-    }
-  };
-
-  // Filter entries in memory
   const filteredEntries = entries.filter((entry) => {
     if (employeeFilter && entry.employeeId !== employeeFilter) return false;
     if (statusFilter && entry.status !== statusFilter) return false;
-    if (typeFilter && entry.workType !== typeFilter) return false;
-    if (dateFromFilter && entry.workDate < dateFromFilter) return false;
-    if (dateToFilter && entry.workDate.slice(0, 10) > dateToFilter) return false;
+    if (monthFilter && !entry.workDate.startsWith(monthFilter)) return false;
+    if (activityFilter && resolveActivityName(entry) !== activityFilter) return false;
     if (orderQuery) {
       const q = orderQuery.toLowerCase();
+      const act = resolveActivityName(entry).toLowerCase();
       const orderTitle = entry.workOrder?.title.toLowerCase() || '';
-      const orderId = entry.workOrderId?.toLowerCase() || '';
-      if (!orderTitle.includes(q) && !orderId.includes(q)) return false;
+      const empName = `${entry.employee.firstName} ${entry.employee.lastName}`.toLowerCase();
+      if (!act.includes(q) && !orderTitle.includes(q) && !empName.includes(q)) return false;
     }
     return true;
   });
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Odvedená práce</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Odvedená práce & Statistiky úkolů</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Správa a schvalování záznamů odvedené práce zaměstnanců vaší organizace.
+            Přehled hodinové a úkolové práce, cen za zakázku, rozdělení podle činností a ostatních nákladů všech pracovníků.
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
-        >
-          Zapsat dodatečnou práci
-        </button>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              if (employeeFilter) setTargetEmployeeId(employeeFilter);
+              setActiveFormPanel(activeFormPanel === 'work' ? null : 'work');
+            }}
+            className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition"
+          >
+            ➕ Zapsat práci (Hodiny / Úkol / Zakázka)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (employeeFilter) setTargetEmployeeId(employeeFilter);
+              setActiveFormPanel(activeFormPanel === 'cost' ? null : 'cost');
+            }}
+            className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-900 shadow-sm hover:bg-indigo-100 transition"
+          >
+            🚗 + Ostatní náklad (Auto, Nájem, Telefon, Záloha)
+          </button>
+
+          <Link
+            href="/settlements"
+            className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-900 hover:bg-emerald-100 transition shadow-sm"
+          >
+            📊 Přehled vyúčtování →
+          </Link>
+        </div>
       </div>
 
       {successMsg && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800" role="status">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900" role="status">
           {successMsg}
         </div>
       )}
 
       {errorMsg && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-900" role="alert">
           {errorMsg}
         </div>
       )}
 
-      {showForm && (
-        <section className="card">
-          <div className="mb-4 flex items-center justify-between border-b pb-3">
-            <h2 className="text-xl font-bold">Zápis dodatečné/ruční práce</h2>
+      {/* PANEL 1: Simplified Work Form */}
+      {activeFormPanel === 'work' && (
+        <section className="rounded-2xl border-2 border-slate-900 bg-white p-5 shadow-sm space-y-5">
+          <div className="flex items-center justify-between border-b pb-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                {editingEntry ? '✏️ Upravit záznam práce' : '⚡ Zápis odvedené práce pracovníka'}
+              </h2>
+              <p className="text-xs text-slate-500">
+                Vyberte pracovníka, klikněte na činnost (např. Instalace lavičky, Lepení billboardu), zadejte hodiny, kusy nebo cenu za zakázku.
+              </p>
+            </div>
             <button
+              type="button"
               onClick={() => {
-                setShowForm(false);
-                setShowDuplicateBypassForm(false);
+                setActiveFormPanel(null);
                 resetForm();
               }}
-              className="text-sm font-semibold text-slate-500 hover:text-slate-800"
+              className="text-xs font-bold text-slate-500 hover:text-slate-800"
             >
-              Zrušit
+              Zavřít ✕
             </button>
           </div>
 
-          {!showDuplicateBypassForm ? (
-            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <label className="text-sm font-semibold">
-                Pracovník <span className="text-red-500">*</span>
+          <form onSubmit={handleSubmitWork} className="space-y-4">
+            {/* Activity chips */}
+            <div>
+              <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                1. Vyberte úkol / činnost (nebo napište vlastní)
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map((cat) => {
+                  const isSelected = activityTitle === cat.label;
+                  return (
+                    <button
+                      key={cat.key}
+                      type="button"
+                      onClick={() => handleSelectCategory(cat)}
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
+                        isSelected
+                          ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{cat.icon}</span>
+                      <span>{cat.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs font-bold text-slate-700">
+                Pracovník *
                 <select
-                  className="input mt-1 w-full"
                   required
+                  disabled={!!editingEntry}
                   value={targetEmployeeId}
                   onChange={(e) => setTargetEmployeeId(e.target.value)}
+                  className="input mt-1 w-full text-sm font-semibold"
                 >
                   <option value="">Vyberte pracovníka...</option>
                   {employees.map((emp) => (
@@ -516,163 +525,187 @@ export function WorkEntriesManager({ employees, initialEntries }: WorkEntriesMan
                 </select>
               </label>
 
-              <label className="text-sm font-semibold">
-                ID Úkolu (WorkTask CUID) <span className="text-red-500">*</span>
+              <label className="text-xs font-bold text-slate-700">
+                Název úkolu / činnosti *
                 <input
-                  className="input mt-1 w-full"
                   required
-                  value={workTaskId}
-                  onChange={(e) => setWorkTaskId(e.target.value)}
-                  placeholder="Zadejte ID úkolu..."
+                  value={activityTitle}
+                  onChange={(e) => setActivityTitle(e.target.value)}
+                  placeholder="např. Instalace lavičky, Lepení billboardu..."
+                  className="input mt-1 w-full text-sm font-semibold"
                 />
               </label>
 
-              <label className="text-sm font-semibold">
-                Datum práce <span className="text-red-500">*</span>
+              <label className="text-xs font-bold text-slate-700">
+                Zakázka (volitelné)
+                <select
+                  value={selectedOrderId}
+                  onChange={(e) => handleSelectOrder(e.target.value)}
+                  className="input mt-1 w-full text-sm font-normal"
+                >
+                  <option value="">— Obecná práce / Bez zakázky —</option>
+                  {workOrders.map((ord) => (
+                    <option key={ord.id} value={ord.id}>
+                      {ord.title} {ord.clientName ? `(${ord.clientName})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-xs font-bold text-slate-700">
+                Datum práce *
                 <input
                   type="date"
-                  className="input mt-1 w-full"
                   required
                   value={workDate}
                   onChange={(e) => setWorkDate(e.target.value)}
+                  className="input mt-1 w-full text-sm font-normal"
                 />
               </label>
+            </div>
 
-              <label className="text-sm font-semibold">
-                Druh práce <span className="text-red-500">*</span>
-                <select
-                  className="input mt-1 w-full"
-                  value={workType}
-                  onChange={(e) => setWorkType(e.target.value)}
-                >
-                  {Object.entries(workTypeLabels).map(([val, label]) => (
-                    <option key={val} value={val}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {/* Remuneration Method */}
+            <div>
+              <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                2. Typ odměny
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(['HOURLY', 'TASK', 'FIXED'] as const).map((method) => {
+                  const active = remunerationMethod === method;
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      onClick={() => handleSelectMethod(method)}
+                      className={`rounded-xl border p-2.5 text-left transition ${
+                        active
+                          ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                          : 'border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="text-sm font-bold">{rateTypeLabels[method]}</div>
+                      <div className={`text-[11px] ${active ? 'text-slate-300' : 'text-slate-500'}`}>
+                        {method === 'HOURLY' && 'Odpracované hodiny × hodinová sazba'}
+                        {method === 'TASK' && 'Počet kusů / úkolů × sazba za kus'}
+                        {method === 'FIXED' && 'Pevná částka za celou zakázku'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-              <label className="text-sm font-semibold">
-                Forma odměny <span className="text-red-500">*</span>
-                <select
-                  className="input mt-1 w-full"
-                  value={remunerationMethod}
-                  onChange={(e) => setRemunerationMethod(e.target.value)}
-                >
-                  {Object.entries(rateTypeLabels).map(([val, label]) => (
-                    <option key={val} value={val}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {/* Quantity & Rate */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 items-end">
+              {remunerationMethod !== 'FIXED' && (
+                <label className="text-xs font-bold text-slate-700">
+                  {remunerationMethod === 'HOURLY' ? 'Počet hodin *' : 'Počet kusů / úkolů *'}
+                  <input
+                    required
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder={remunerationMethod === 'HOURLY' ? 'např. 4.5 nebo 4:30' : 'např. 8'}
+                    className="input mt-1 w-full text-base font-bold"
+                  />
+                </label>
+              )}
 
-              <label className="text-sm font-semibold">
-                Množství <span className="text-red-500">*</span>
+              {remunerationMethod === 'TASK' && (
+                <label className="text-xs font-bold text-slate-700">
+                  Jednotka
+                  <input
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="ks, m2, výlep..."
+                    className="input mt-1 w-full text-sm font-normal"
+                  />
+                </label>
+              )}
+
+              <label className="text-xs font-bold text-slate-700">
+                {remunerationMethod === 'HOURLY'
+                  ? 'Hodinová sazba (Kč / hod)'
+                  : remunerationMethod === 'TASK'
+                  ? `Sazba za ${unit || 'ks'} (Kč)`
+                  : 'Cena za zakázku (Kč) *'}
                 <input
-                  className="input mt-1 w-full"
-                  required
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  placeholder={remunerationMethod === 'HOURLY' ? 'např. 2:30 nebo 2.5' : 'např. 5'}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required={remunerationMethod === 'FIXED'}
+                  value={unitRate}
+                  onChange={(e) => setUnitRate(e.target.value)}
+                  placeholder={remunerationMethod === 'HOURLY' ? 'např. 350' : remunerationMethod === 'TASK' ? 'např. 250' : 'např. 5000'}
+                  className="input mt-1 w-full text-base font-bold"
                 />
               </label>
 
-              <label className="text-sm font-semibold">
-                Jednotka <span className="text-red-500">*</span>
+              <label className="text-xs font-bold text-slate-700">
+                Poznámka (volitelné)
                 <input
-                  className="input mt-1 w-full"
-                  required
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder="hod, ks..."
-                  disabled={remunerationMethod === 'HOURLY'}
-                />
-              </label>
-
-              <label className="text-sm font-semibold bg-amber-50 border border-amber-100 p-2 rounded-lg">
-                Sazba (ruční zadání - volitelné)
-                <input
-                  className="input mt-1 w-full bg-white"
-                  value={manualRate}
-                  onChange={(e) => setManualRate(e.target.value)}
-                  placeholder="Zadejte částku..."
-                />
-              </label>
-
-              <label className="md:col-span-2 lg:col-span-3 text-sm font-semibold">
-                Poznámka
-                <textarea
-                  className="input mt-1 w-full h-20"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Zadejte poznámku..."
+                  placeholder="Upřesnění..."
+                  className="input mt-1 w-full text-sm font-normal"
                 />
               </label>
+            </div>
 
-              <div className="md:col-span-2 lg:col-span-3 flex justify-end gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-500">Celková částka:</span>
+                <span className="text-xl font-black text-slate-900">
+                  {previewAmount.toLocaleString('cs-CZ')} Kč
+                </span>
+              </div>
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    setShowForm(false);
+                    setActiveFormPanel(null);
                     resetForm();
                   }}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
                 >
                   Zrušit
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
+                  disabled={submitting}
+                  className="rounded-xl bg-slate-950 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
                 >
-                  Uložit koncept
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              <h3 className="text-lg font-bold">Upozornění na duplicitní zápis</h3>
-              <p>Pro tohoto pracovníka a úkol již existuje evidovaný zápis práce ve stejný den.</p>
-              <label className="block text-sm font-semibold text-amber-950 mt-2">
-                Zdůvodnění zápisu duplicity (povinné) <span className="text-red-500">*</span>
-                <input
-                  className="input mt-1 w-full bg-white text-slate-900"
-                  required
-                  value={additionalReason}
-                  onChange={(e) => setAdditionalReason(e.target.value)}
-                  placeholder="Zadejte věcné odůvodnění např. vícepracování, opakovaná montáž..."
-                />
-              </label>
-              <div className="flex gap-3 justify-end mt-4">
-                <button
-                  onClick={() => setShowDuplicateBypassForm(false)}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Zpět na formulář
-                </button>
-                <button
-                  onClick={handleBypassSubmit}
-                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition"
-                >
-                  Potvrdit a uložit duplicitu
+                  {submitting ? 'Ukládám...' : editingEntry ? '💾 Uložit změny' : '✅ Uložit práci a započítat'}
                 </button>
               </div>
             </div>
-          )}
+          </form>
         </section>
       )}
 
-      {/* Filters Form */}
-      <div className="card grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-        <label className="text-sm font-semibold">
+      {/* PANEL 2: Quick Other Costs Form */}
+      {activeFormPanel === 'cost' && (
+        <QuickOtherCostForm
+          settlementId="current"
+          employeeId={employeeFilter || targetEmployeeId}
+          employees={employees}
+          onSuccess={(msg) => {
+            setSuccessMsg(msg);
+            setActiveFormPanel(null);
+          }}
+          onCancel={() => setActiveFormPanel(null)}
+        />
+      )}
+
+      {/* Filters Bar */}
+      <div className="card grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-xs font-bold text-slate-700">
           Pracovník
           <select
-            className="input mt-1 w-full font-normal"
+            className="input mt-1 w-full font-normal text-sm"
             value={employeeFilter}
             onChange={(e) => setEmployeeFilter(e.target.value)}
           >
-            <option value="">Všichni pracovníci</option>
+            <option value="">Všichni pracovníci ({employees.length})</option>
             {employees.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {emp.firstName} {emp.lastName}
@@ -681,483 +714,225 @@ export function WorkEntriesManager({ employees, initialEntries }: WorkEntriesMan
           </select>
         </label>
 
-        <label className="text-sm font-semibold">
+        <label className="text-xs font-bold text-slate-700">
+          Období (měsíc)
+          <input
+            type="month"
+            className="input mt-1 w-full font-normal text-sm"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+          />
+        </label>
+
+        <label className="text-xs font-bold text-slate-700">
           Stav
           <select
-            className="input mt-1 w-full font-normal"
+            className="input mt-1 w-full font-normal text-sm"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="">Všechny stavy</option>
-            <option value="DRAFT">Koncept (DRAFT)</option>
-            <option value="SUBMITTED">Odesláno (SUBMITTED)</option>
-            <option value="APPROVED">Schváleno (APPROVED)</option>
-            <option value="RETURNED">Vráceno (RETURNED)</option>
+            <option value="APPROVED">Schváleno (vč. vyúčtování)</option>
+            <option value="SUBMITTED">Čeká na schválení</option>
+            <option value="DRAFT">Koncept</option>
+            <option value="RETURNED">Vráceno</option>
           </select>
         </label>
 
-        <label className="text-sm font-semibold">
-          Druh práce
-          <select
-            className="input mt-1 w-full font-normal"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="">Všechny druhy</option>
-            {Object.entries(workTypeLabels).map(([val, label]) => (
-              <option key={val} value={val}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-sm font-semibold">
-          Od data
+        <label className="text-xs font-bold text-slate-700">
+          Hledat úkol / zakázku
           <input
-            type="date"
-            className="input mt-1 w-full font-normal"
-            value={dateFromFilter}
-            onChange={(e) => setDateFromFilter(e.target.value)}
-          />
-        </label>
-
-        <label className="text-sm font-semibold">
-          Do data
-          <input
-            type="date"
-            className="input mt-1 w-full font-normal"
-            value={dateToFilter}
-            onChange={(e) => setDateToFilter(e.target.value)}
-          />
-        </label>
-
-        <label className="text-sm font-semibold">
-          Hledat zakázku
-          <input
-            className="input mt-1 w-full font-normal"
+            className="input mt-1 w-full font-normal text-sm"
             value={orderQuery}
             onChange={(e) => setOrderQuery(e.target.value)}
-            placeholder="Název nebo ID..."
+            placeholder="např. lavičky, billboard..."
           />
         </label>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={() => {
+              setEmployeeFilter('');
+              setStatusFilter('');
+              setMonthFilter('');
+              setActivityFilter('');
+              setOrderQuery('');
+            }}
+            className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition w-full"
+          >
+            Zrušit filtry
+          </button>
+        </div>
       </div>
+
+      {/* Statistics & Activity Breakdown */}
+      <WorkStatisticsPanel
+        items={filteredEntries}
+        title="Statistika celkového počtu hodin a rozdělení podle úkolů"
+        selectedActivity={activityFilter}
+        onSelectActivity={setActivityFilter}
+      />
 
       {/* Main List */}
       <section className="card overflow-x-auto">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Přehled odvedené práce zaměstnanců</h2>
-          <span className="text-sm text-slate-500">Nalezeno {filteredEntries.length} záznamů</span>
+          <h2 className="text-xl font-bold">Přehled záznamů odvedené práce</h2>
+          <span className="text-sm text-slate-500">Zobrazeno {filteredEntries.length} záznamů</span>
         </div>
 
         {filteredEntries.length === 0 ? (
-          <p className="text-sm text-slate-500 py-4">Nebyly nalezeny žádné záznamy práce.</p>
+          <p className="text-sm text-slate-500 py-6 text-center">Nebyly nalezeny žádné záznamy práce pro zvolený filtr.</p>
         ) : (
-          <table className="w-full min-w-[1000px] text-left text-sm">
+          <table className="w-full min-w-[950px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-500 border-b">
               <tr>
-                <th className="py-2 pr-3">Pracovník</th>
-                <th className="py-2 pr-3">Datum</th>
-                <th className="py-2 pr-3">Úkol / Zakázka</th>
-                <th className="py-2 pr-3">Druh práce</th>
-                <th className="py-2 pr-3">Množství</th>
-                <th className="py-2 pr-3">Sazba</th>
-                <th className="py-2 pr-3">Částka</th>
-                <th className="py-2 pr-3">Stav</th>
-                <th className="py-2 text-right">Akce</th>
+                <th className="py-2.5 pr-3">Pracovník</th>
+                <th className="py-2.5 pr-3">Datum</th>
+                <th className="py-2.5 pr-3">Úkol / Činnost / Zakázka</th>
+                <th className="py-2.5 pr-3">Typ odměny</th>
+                <th className="py-2.5 pr-3">Množství</th>
+                <th className="py-2.5 pr-3">Sazba</th>
+                <th className="py-2.5 pr-3">Částka</th>
+                <th className="py-2.5 pr-3">Stav</th>
+                <th className="py-2.5 text-right">Akce</th>
               </tr>
             </thead>
             <tbody>
-              {filteredEntries.map((entry) => (
-                <tr className="border-b last:border-0 hover:bg-slate-50/50" key={entry.id}>
-                  <td className="py-3 pr-3 font-semibold text-slate-900">
-                    {entry.employee.firstName} {entry.employee.lastName}
-                  </td>
-                  <td className="py-3 pr-3">{dateOnly(new Date(entry.workDate))}</td>
-                  <td className="py-3 pr-3">
-                    <div className="font-semibold text-slate-900">{entry.workTask?.title || 'Interní úkol'}</div>
-                    <div className="text-xs text-slate-500">
-                      Zakázka: {entry.workOrder?.title || 'Bez zakázky'}
-                    </div>
-                    {entry.status === 'RETURNED' && entry.rejectionReason && (
-                      <div className="mt-1 text-[11px] text-red-700 bg-red-50 border border-red-100 rounded px-1.5 py-0.5 inline-block">
-                        Důvod vrácení: {entry.rejectionReason}
-                      </div>
-                    )}
-                  </td>
-                  <td className="py-3 pr-3 text-slate-700">{workTypeLabels[entry.workType] || entry.workType}</td>
-                  <td className="py-3 pr-3">
-                    {Number(entry.quantity).toLocaleString('cs-CZ')} {entry.unit}
-                  </td>
-                  <td className="py-3 pr-3 text-slate-700">
-                    {entry.appliedUnitRate ? (
-                      <>
-                        {Number(entry.appliedUnitRate).toLocaleString('cs-CZ')} CZK
-                        {entry.rateSource && (
-                          <span className="ml-1.5 rounded bg-slate-100 px-1 py-0.5 text-[10px] font-medium text-slate-600">
-                            {rateSourceLabels[entry.rateSource] || entry.rateSource}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
-                        Chybí sazba
+              {filteredEntries.map((entry) => {
+                const activityName = resolveActivityName(entry);
+                return (
+                  <tr className="border-b last:border-0 hover:bg-slate-50/50" key={entry.id}>
+                    <td className="py-3 pr-3 font-semibold text-slate-900 whitespace-nowrap">
+                      {entry.employee.firstName} {entry.employee.lastName}
+                    </td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{dateOnly(new Date(entry.workDate))}</td>
+                    <td className="py-3 pr-3">
+                      <div className="font-bold text-slate-900">{activityName}</div>
+                      {entry.workOrder?.title && (
+                        <div className="text-xs text-slate-500">Zakázka: {entry.workOrder.title}</div>
+                      )}
+                      {entry.note && <div className="text-xs text-slate-500 italic">{entry.note}</div>}
+                    </td>
+                    <td className="py-3 pr-3 text-xs font-semibold text-slate-600">
+                      {entry.remunerationMethod === 'HOURLY'
+                        ? '⏱️ Hodinová'
+                        : entry.remunerationMethod === 'FIXED'
+                        ? '💰 Zakázka'
+                        : '📦 Úkolová'}
+                    </td>
+                    <td className="py-3 pr-3 font-semibold text-slate-800 whitespace-nowrap">
+                      {entry.remunerationMethod === 'FIXED'
+                        ? '1 zakázka'
+                        : `${Number(entry.quantity).toLocaleString('cs-CZ')} ${entry.unit}`}
+                    </td>
+                    <td className="py-3 pr-3 text-slate-700 whitespace-nowrap">
+                      {entry.appliedUnitRate ? (
+                        `${Number(entry.appliedUnitRate).toLocaleString('cs-CZ')} Kč`
+                      ) : (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                          Chybí sazba
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-3 font-extrabold text-slate-900 whitespace-nowrap font-mono">
+                      {Number(entry.calculatedAmount).toLocaleString('cs-CZ')} Kč
+                    </td>
+                    <td className="py-3 pr-3 whitespace-nowrap">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          statusClasses[entry.status] || statusClasses.DRAFT
+                        }`}
+                      >
+                        {statusLabels[entry.status] || entry.status}
                       </span>
-                    )}
-                  </td>
-                  <td className="py-3 pr-3 font-semibold text-slate-900">
-                    {Number(entry.calculatedAmount).toLocaleString('cs-CZ')} CZK
-                  </td>
-                  <td className="py-3 pr-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClasses[entry.status]}`}>
-                      {statusLabels[entry.status] || entry.status}
-                    </span>
-                  </td>
-                  <td className="py-3 text-right">
-                    <button
-                      onClick={() => {
-                        setActiveDetail(entry);
-                        setIsCorrecting(false);
-                      }}
-                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
-                    >
-                      Detail / Akce
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 text-right whitespace-nowrap space-x-1.5">
+                      {entry.status !== 'APPROVED' && entry.appliedUnitRate && (
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(entry.id)}
+                          className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+                        >
+                          Schválit
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(entry)}
+                        className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Upravit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(entry.id)}
+                        className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition"
+                      >
+                        Smazat
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </section>
 
-      {/* Detail & Action Modal */}
-      {activeDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl space-y-6">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-xl font-bold">Detail záznamu odvedené práce</h3>
+      {/* Late Approval Reason Modal */}
+      {showApproveReasonModal && activeDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+            <h3 className="text-lg font-bold">Schválení práce po uzávěrce</h3>
+            <input
+              className="input w-full"
+              value={approveReason}
+              onChange={(e) => setApproveReason(e.target.value)}
+              placeholder="Zadejte důvod..."
+            />
+            <div className="flex justify-end gap-2">
               <button
-                onClick={() => {
-                  setActiveDetail(null);
-                  setIsCorrecting(false);
-                }}
-                className="text-slate-400 hover:text-slate-600"
+                onClick={() => setShowApproveReasonModal(false)}
+                className="rounded-xl border px-4 py-2 text-xs font-bold"
               >
-                ✕
+                Zrušit
+              </button>
+              <button
+                onClick={() => handleApprove(activeDetail.id, approveReason)}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white"
+              >
+                Schválit
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="text-sm space-y-2.5">
-                <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-2">Základní údaje</h4>
-                <div className="grid grid-cols-2">
-                  <span className="text-slate-500">Pracovník:</span>
-                  <strong>
-                    {activeDetail.employee.firstName} {activeDetail.employee.lastName}
-                  </strong>
-                </div>
-                <div className="grid grid-cols-2">
-                  <span className="text-slate-500">Datum práce:</span>
-                  <strong>{dateOnly(new Date(activeDetail.workDate))}</strong>
-                </div>
-                <div className="grid grid-cols-2">
-                  <span className="text-slate-500">Druh práce:</span>
-                  <strong>{workTypeLabels[activeDetail.workType]}</strong>
-                </div>
-                <div className="grid grid-cols-2">
-                  <span className="text-slate-500">Forma odměny:</span>
-                  <strong>{rateTypeLabels[activeDetail.remunerationMethod]}</strong>
-                </div>
-                <div className="grid grid-cols-2">
-                  <span className="text-slate-500">Množství:</span>
-                  <strong>
-                    {Number(activeDetail.quantity).toLocaleString('cs-CZ')} {activeDetail.unit}
-                  </strong>
-                </div>
-                <div className="grid grid-cols-2 border-t pt-2">
-                  <span className="text-slate-500">Aplikovaná sazba:</span>
-                  <strong>
-                    {activeDetail.appliedUnitRate ? (
-                      `${Number(activeDetail.appliedUnitRate).toLocaleString('cs-CZ')} CZK`
-                    ) : (
-                      <span className="text-red-600">Chybí sazba</span>
-                    )}
-                  </strong>
-                </div>
-                <div className="grid grid-cols-2">
-                  <span className="text-slate-500">Vypočtená částka:</span>
-                  <strong className="text-slate-900">
-                    {Number(activeDetail.calculatedAmount).toLocaleString('cs-CZ')} CZK
-                  </strong>
-                </div>
-                {activeDetail.note && (
-                  <div className="border-t pt-2 mt-2">
-                    <span className="text-slate-500 block mb-1">Poznámka pracovníka:</span>
-                    <p className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700 whitespace-pre-wrap">
-                      {activeDetail.note}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[11px]">Výdaje k vyúčtování</h4>
-                {activeDetail.expenses.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">K této práci nejsou připojeny žádné výdaje.</p>
-                ) : (
-                  <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
-                    {activeDetail.expenses.map((expense) => (
-                      <div className="rounded-xl border p-3 text-xs bg-slate-50 relative space-y-1.5" key={expense.id}>
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold">{expense.type}</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${expenseStatusClasses[expense.status]}`}>
-                            {expenseStatusLabels[expense.status]}
-                          </span>
-                        </div>
-                        <p className="text-slate-600">{expense.description}</p>
-                        <div className="flex justify-between items-center font-bold">
-                          <span>Částka:</span>
-                          <span>{Number(expense.amount).toLocaleString('cs-CZ')} CZK</span>
-                        </div>
-                        {expense.receiptUrl && (
-                          <div className="mt-1">
-                            <a
-                              href={expense.receiptUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-blue-600 hover:underline font-semibold block"
-                            >
-                              📎 Zobrazit účtenku (Receipt)
-                            </a>
-                          </div>
-                        )}
-                        {expense.status === 'REJECTED' && expense.rejectionReason && (
-                          <p className="text-red-700 font-medium">Důvod zamítnutí: {expense.rejectionReason}</p>
-                        )}
-                        {expense.status === 'PENDING' && (
-                          <div className="flex gap-2 justify-end pt-2 border-t mt-2">
-                            <button
-                              onClick={() => {
-                                setRejectingExpenseId(expense.id);
-                                setExpenseRejectReason('');
-                              }}
-                              className="rounded bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 font-semibold hover:bg-red-100 transition"
-                            >
-                              Zamítnout
-                            </button>
-                            <button
-                              onClick={() => handleApproveExpense(expense.id)}
-                              className="rounded bg-emerald-600 text-white px-2.5 py-1 font-semibold hover:bg-emerald-700 transition"
-                            >
-                              Schválit
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+      {showReturnModal && activeDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl space-y-4">
+            <h3 className="text-lg font-bold">Vrátit záznam k opravě</h3>
+            <input
+              className="input w-full"
+              value={returnReason}
+              onChange={(e) => setReturnReason(e.target.value)}
+              placeholder="Důvod vrácení..."
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowReturnModal(false)}
+                className="rounded-xl border px-4 py-2 text-xs font-bold"
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={() => handleReturn(activeDetail.id)}
+                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white"
+              >
+                Vrátit
+              </button>
             </div>
-
-            {/* Rejection of WorkExpense Form */}
-            {rejectingExpenseId && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
-                <h5 className="font-bold text-red-900 text-sm">Zdůvodnění zamítnutí výdaje</h5>
-                <textarea
-                  className="input bg-white w-full h-16 text-xs"
-                  required
-                  value={expenseRejectReason}
-                  onChange={(e) => setExpenseRejectReason(e.target.value)}
-                  placeholder="Zadejte povinné zdůvodnění (min. 5 znaků)..."
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setRejectingExpenseId(null)}
-                    className="rounded border bg-white px-3 py-1 text-xs font-semibold text-slate-700"
-                  >
-                    Zrušit
-                  </button>
-                  <button
-                    onClick={handleRejectExpense}
-                    className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                  >
-                    Potvrdit zamítnutí
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Correction Form for APPROVED entry */}
-            {isCorrecting && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4 animate-in fade-in">
-                <h4 className="font-bold text-slate-800 text-sm">Oprava schváleného záznamu (Carry-over)</h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-semibold">
-                    Nové množství (Množství)
-                    <input
-                      className="input bg-white w-full mt-1"
-                      value={correctionQty}
-                      onChange={(e) => setCorrectionQty(e.target.value)}
-                      placeholder={activeDetail.quantity}
-                    />
-                  </label>
-                  <label className="text-xs font-semibold">
-                    Nová jednotková sazba (CZK)
-                    <input
-                      className="input bg-white w-full mt-1"
-                      value={correctionRate}
-                      onChange={(e) => setCorrectionRate(e.target.value)}
-                      placeholder={activeDetail.appliedUnitRate || '0'}
-                    />
-                  </label>
-                </div>
-                <label className="block text-xs font-semibold">
-                  Nová poznámka
-                  <input
-                    className="input bg-white w-full mt-1"
-                    value={correctionNote}
-                    onChange={(e) => setCorrectionNote(e.target.value)}
-                    placeholder={activeDetail.note || ''}
-                  />
-                </label>
-                <label className="block text-xs font-semibold">
-                  Důvod opravy (povinný) <span className="text-red-500">*</span>
-                  <input
-                    className="input bg-white w-full mt-1"
-                    required
-                    value={correctionReason}
-                    onChange={(e) => setCorrectionReason(e.target.value)}
-                    placeholder="Zadejte povinné zdůvodnění (min. 5 znaků)..."
-                  />
-                </label>
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setIsCorrecting(false)}
-                    className="rounded border bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-                  >
-                    Zrušit opravu
-                  </button>
-                  <button
-                    onClick={() => handleCorrect(activeDetail.id)}
-                    className="rounded bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-                  >
-                    Uložit opravu
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Return reason prompt modal */}
-            {showReturnModal && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
-                <h4 className="font-bold text-red-900 text-sm">Vrácení práce k opravě</h4>
-                <p className="text-xs text-red-700">Uveďte prosím pracovníkovi důvod vrácení výkazu práce.</p>
-                <textarea
-                  className="input bg-white w-full h-16 text-xs"
-                  required
-                  value={returnReason}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  placeholder="Zadejte povinný důvod vrácení (min. 5 znaků)..."
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setShowReturnModal(false);
-                      setReturnReason('');
-                    }}
-                    className="rounded border bg-white px-3 py-1 text-xs font-semibold text-slate-700"
-                  >
-                    Zrušit
-                  </button>
-                  <button
-                    onClick={() => handleReturn(activeDetail.id)}
-                    className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                  >
-                    Vrátit k opravě
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Approve late reason prompt modal */}
-            {showApproveReasonModal && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-                <h4 className="font-bold text-amber-900 text-sm">Schválení práce po uzávěrce</h4>
-                <p className="text-xs text-amber-700">Tento záznam spadá do již uzamčeného období. Zadejte povinné odůvodnění schválení:</p>
-                <textarea
-                  className="input bg-white w-full h-16 text-xs"
-                  required
-                  value={approveReason}
-                  onChange={(e) => setApproveReason(e.target.value)}
-                  placeholder="Zadejte důvod (min. 5 znaků)..."
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setShowApproveReasonModal(false);
-                      setApproveReason('');
-                    }}
-                    className="rounded border bg-white px-3 py-1 text-xs font-semibold text-slate-700"
-                  >
-                    Zrušit
-                  </button>
-                  <button
-                    onClick={() => handleApprove(activeDetail.id, approveReason)}
-                    className="rounded bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700"
-                  >
-                    Schválit s odůvodněním
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Modal Action Controls Footer */}
-            {!isCorrecting && !showReturnModal && !showApproveReasonModal && (
-              <div className="flex flex-wrap gap-2 justify-end pt-3 border-t">
-                <button
-                  onClick={() => {
-                    setActiveDetail(null);
-                  }}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Zavřít
-                </button>
-
-                {activeDetail.status === 'SUBMITTED' && (
-                  <>
-                    <button
-                      onClick={() => setShowReturnModal(true)}
-                      className="rounded-xl bg-red-50 text-red-700 border border-red-200 px-4 py-2 text-sm font-semibold hover:bg-red-100 transition"
-                    >
-                      Vrátit k opravě
-                    </button>
-
-                    <button
-                      onClick={() => handleApprove(activeDetail.id)}
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
-                    >
-                      Schválit práci
-                    </button>
-                  </>
-                )}
-
-                {activeDetail.status === 'APPROVED' && (
-                  <button
-                    onClick={() => {
-                      setIsCorrecting(true);
-                      setCorrectionQty(activeDetail.quantity);
-                      setCorrectionRate(activeDetail.appliedUnitRate || '');
-                      setCorrectionNote(activeDetail.note || '');
-                    }}
-                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
-                  >
-                    Provést opravu
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}

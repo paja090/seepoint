@@ -3,6 +3,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { canAccess } from '@/lib/rbac';
 import { AccessDenied } from '@/lib/rbac';
 import { prisma } from '@/lib/db';
+import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
 import { MyWorkEntriesManager } from '@/components/MyWorkEntriesManager';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +53,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
   let prefilledTask = null;
   if (taskId) {
     const task = await prisma.workTask.findFirst({
-      where: { id: taskId, assignedToEmployeeId: employee.id },
+      where: { id: taskId },
       include: { workOrder: true },
     });
     if (task) {
@@ -74,16 +75,31 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     }
   }
 
-  // 3. Fetch initial entries
-  const entries = await prisma.workEntry.findMany({
-    where: { employeeId: employee.id },
-    include: {
-      workTask: true,
-      workOrder: true,
-      client: true,
-    },
-    orderBy: { workDate: 'desc' },
-  });
+  // 3. Fetch organization categories and recent workOrders
+  const [workCategories, workOrders, entries] = await Promise.all([
+    user.organizationId ? getOrganizationWorkCategories(user.organizationId) : Promise.resolve([]),
+    prisma.workOrder.findMany({
+      where: { status: { not: 'CANCELLED' } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        title: true,
+        workType: true,
+        clientName: true,
+        price: true,
+      },
+    }),
+    prisma.workEntry.findMany({
+      where: { employeeId: employee.id },
+      include: {
+        workTask: true,
+        workOrder: true,
+        client: true,
+      },
+      orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
+    }),
+  ]);
 
   const formattedEntries = entries.map((entry) => ({
     id: entry.id,
@@ -91,6 +107,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     workTaskId: entry.workTaskId,
     workOrderId: entry.workOrderId,
     workType: entry.workType,
+    carrierTypeLabel: entry.carrierTypeLabel,
     remunerationMethod: entry.remunerationMethod,
     quantity: entry.quantity.toString(),
     unit: entry.unit,
@@ -100,6 +117,7 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
     note: entry.note,
     status: entry.status,
     creationSource: entry.creationSource,
+    rejectionReason: entry.rejectionReason,
     workTask: entry.workTask ? { title: entry.workTask.title } : null,
     workOrder: entry.workOrder ? { title: entry.workOrder.title } : null,
   }));
@@ -114,6 +132,11 @@ export default async function MyWorkEntriesPage({ searchParams }: { searchParams
         }}
         initialEntries={formattedEntries}
         prefilledTask={prefilledTask}
+        workCategories={workCategories}
+        workOrders={workOrders.map((wo) => ({
+          ...wo,
+          price: wo.price ? Number(wo.price) : null,
+        }))}
       />
     </AppShell>
   );

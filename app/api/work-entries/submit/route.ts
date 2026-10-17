@@ -4,13 +4,13 @@ import { canAccess } from '@/lib/rbac';
 import { submitWorkEntries } from '@/lib/work-entry-actions';
 
 export async function POST(request: Request) {
-  const user = await requireApiAccess('workEntries');
+  const user = await requireApiAccess(['workEntries', 'myWorkEntries']);
   if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }
 
-  if (!canAccess(user.role, 'myWorkEntries')) {
+  if (!canAccess(user.role, 'myWorkEntries') && !canAccess(user.role, 'workEntries')) {
     return NextResponse.json({ error: 'Nemáte oprávnění k odesílání výkazů práce.' }, { status: 403 });
   }
 

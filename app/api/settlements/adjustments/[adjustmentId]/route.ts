@@ -6,7 +6,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ adjustmentId: string }> }
 ) {
-  const user = await requireApiAccess('settlements');
+  const user = await requireApiAccess(['settlements', 'mySettlements', 'workEntries', 'myWorkEntries']);
   if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
@@ -21,14 +21,14 @@ export async function DELETE(
     body = {};
   }
 
-  const { reason } = body;
-  if (!reason) {
-    return NextResponse.json({ error: 'Pro smazání korekce musíte vyplnit důvod.' }, { status: 400 });
-  }
+  const finalReason =
+    typeof body.reason === 'string' && body.reason.trim().length >= 5
+      ? body.reason.trim()
+      : 'Smazání položky nákladů / korekce';
 
   try {
     const actor = { id: user.id, email: user.email, role: user.role };
-    await deleteManualAdjustment(adjustmentId, reason, actor);
+    await deleteManualAdjustment(adjustmentId, finalReason, actor);
 
     return NextResponse.json({ success: true, message: 'Korekce byla úspěšně smazána.' });
   } catch (error: unknown) {

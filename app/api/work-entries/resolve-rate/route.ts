@@ -13,7 +13,7 @@ import {
 } from '@/lib/work-entry-policy';
 
 export async function GET(request: Request) {
-  const user = await requireApiAccess('workEntries');
+  const user = await requireApiAccess(['workEntries', 'myWorkEntries']);
   if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });

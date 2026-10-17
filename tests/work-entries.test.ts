@@ -494,3 +494,72 @@ test('26. PATCH re-resolution retains WorkOrderRate and does not incorrectly fal
   assert.equal(resolvedWithoutOrder.source, 'COMPANY_RATE'); // falls back to CompanyRate incorrectly!
   assert.equal(resolvedWithoutOrder.amount.toFixed(2), '300.00');
 });
+
+test('28. computeWorkStatistics aggregates hourly, task, fixed work and groups by activity (e.g. Instalace lavičky, Lepení billboardu)', async () => {
+  const { computeWorkStatistics, OTHER_COST_PRESETS } = await import('../lib/work-entry-stats.ts');
+
+  const stats = computeWorkStatistics([
+    {
+      quantity: '4.5',
+      unit: 'hod',
+      remunerationMethod: 'HOURLY',
+      calculatedAmount: '1575.00',
+      workType: 'INSTALLATION',
+      carrierTypeLabel: 'Instalace lavičky / městského mobiliáře',
+    },
+    {
+      quantity: '2.0',
+      unit: 'hod',
+      remunerationMethod: 'HOURLY',
+      calculatedAmount: '700.00',
+      workType: 'INSTALLATION',
+      carrierTypeLabel: 'Instalace lavičky / městského mobiliáře',
+    },
+    {
+      quantity: '6',
+      unit: 'ks',
+      remunerationMethod: 'TASK',
+      calculatedAmount: '2700.00',
+      workType: 'INSTALLATION',
+      carrierTypeLabel: 'Lepení billboardu / výlep plakátů',
+    },
+    {
+      quantity: '1',
+      unit: 'zakázka',
+      remunerationMethod: 'FIXED',
+      calculatedAmount: '5000.00',
+      workType: 'REPAIR',
+      taskTitle: 'Servis osvětlení vitríny',
+    },
+  ]);
+
+  assert.equal(stats.totalHours, 6.5);
+  assert.equal(stats.hourlyAmount, 2275);
+  assert.equal(stats.totalTaskUnits, 6);
+  assert.equal(stats.taskAmount, 2700);
+  assert.equal(stats.totalFixedJobs, 1);
+  assert.equal(stats.fixedAmount, 5000);
+  assert.equal(stats.totalWorkAmount, 9975);
+  assert.equal(stats.entriesCount, 4);
+
+  // Breakdown should have 3 distinct activities sorted by totalAmount descending
+  assert.equal(stats.byActivity.length, 3);
+  assert.equal(stats.byActivity[0].activity, 'Servis osvětlení vitríny');
+  assert.equal(stats.byActivity[0].fixedCount, 1);
+  assert.equal(stats.byActivity[0].totalAmount, 5000);
+
+  assert.equal(stats.byActivity[1].activity, 'Lepení billboardu / výlep plakátů');
+  assert.equal(stats.byActivity[1].taskUnits, 6);
+  assert.equal(stats.byActivity[1].totalAmount, 2700);
+
+  assert.equal(stats.byActivity[2].activity, 'Instalace lavičky / městského mobiliáře');
+  assert.equal(stats.byActivity[2].hours, 6.5);
+  assert.equal(stats.byActivity[2].totalAmount, 2275);
+
+  // Verify presets for other costs include company car, rent, phone
+  const presetKeys = OTHER_COST_PRESETS.map((p) => p.key);
+  assert.ok(presetKeys.includes('COMPANY_CAR'));
+  assert.ok(presetKeys.includes('RENT'));
+  assert.ok(presetKeys.includes('PHONE'));
+});
+

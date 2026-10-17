@@ -361,6 +361,8 @@ export async function addManualAdjustment(
     description: string;
     reason: string;
     category?: string;
+    adjustmentType?: 'REIMBURSEMENT' | 'BONUS' | 'DEDUCTION' | 'ADVANCE';
+    isRecurring?: boolean;
   },
   actor: { id: string; email: string; role: string },
   tx?: Prisma.TransactionClient
@@ -368,9 +370,7 @@ export async function addManualAdjustment(
   const cleanDescription = (params.description || '').trim();
   const cleanReason = validateReason(params.reason);
 
-  if (actor.role !== 'ADMIN' && actor.role !== 'MANAGER') {
-    throw new Error('Nemáte oprávnění přidat korekci.');
-  }
+  const isPrivileged = actor.role === 'ADMIN' || actor.role === 'MANAGER' || actor.role === 'ACCOUNTANT';
 
   if (!cleanDescription) throw new Error('Popis korekce je povinný.');
   if (cleanDescription.length > 250) throw new Error('Popis korekce je příliš dlouhý (maximálně 250 znaků).');
@@ -394,13 +394,45 @@ export async function addManualAdjustment(
       throw new Error(`Vyúčtování s ID ${params.settlementId} nebylo nalezeno.`);
     }
 
+    if (!isPrivileged) {
+      const employee = await transaction.employee.findFirst({
+        where: { OR: [{ userId: actor.id }, { email: actor.email }] },
+      });
+      if (!employee || settlement.employeeId !== employee.id) {
+        throw new Error('Nemáte oprávnění přidat korekci.');
+      }
+      if (settlement.status !== 'DRAFT' && settlement.status !== 'REJECTED') {
+        throw new Error('Náklad lze přidat pouze do rozpracovaného vyúčtování.');
+      }
+    }
+
     if (!EDITABLE_SETTLEMENT_STATUSES.includes(settlement.status)) {
       throw new Error('Korekci lze přidat pouze do otevřeného vyúčtování.');
     }
 
-    const type = signedAmount.gt(0) ? 'BONUS' : 'DEDUCTION';
+    const type = params.adjustmentType
+      ? params.adjustmentType
+      : signedAmount.gt(0)
+      ? 'BONUS'
+      : 'DEDUCTION';
     const absAmount = signedAmount.abs();
     const finalCategory = (params.category || 'OTHER') as AdjustmentCategory;
+
+    let recurringAdjustmentId: string | undefined;
+    if (params.isRecurring && transaction.recurringAdjustment) {
+      const recurring = await transaction.recurringAdjustment.create({
+        data: {
+          employeeId: settlement.employeeId,
+          type,
+          category: finalCategory,
+          description: cleanDescription,
+          amount: absAmount,
+          isActive: true,
+          validFrom: settlement.periodFrom,
+        },
+      });
+      recurringAdjustmentId = recurring.id;
+    }
 
     const adjustment = await transaction.settlementAdjustment.create({
       data: {
@@ -411,6 +443,7 @@ export async function addManualAdjustment(
         amount: absAmount,
         reason: cleanReason,
         changedByUserId: actor.id,
+        ...(recurringAdjustmentId ? { recurringAdjustmentId } : {}),
       },
     });
 
@@ -442,10 +475,7 @@ export async function deleteManualAdjustment(
   tx?: Prisma.TransactionClient
 ) {
   const cleanReason = validateReason(reason);
-
-  if (actor.role !== 'ADMIN' && actor.role !== 'MANAGER') {
-    throw new Error('Nemáte oprávnění smazat korekci.');
-  }
+  const isPrivileged = actor.role === 'ADMIN' || actor.role === 'MANAGER' || actor.role === 'ACCOUNTANT';
 
   return await runInTx(tx, async (transaction: Prisma.TransactionClient) => {
     const adjustment = await transaction.settlementAdjustment.findUnique({
@@ -455,6 +485,18 @@ export async function deleteManualAdjustment(
 
     if (!adjustment) {
       throw new Error(`Korekce s ID ${adjustmentId} nebyla nalezena.`);
+    }
+
+    if (!isPrivileged) {
+      const employee = await transaction.employee.findFirst({
+        where: { OR: [{ userId: actor.id }, { email: actor.email }] },
+      });
+      if (!employee || adjustment.settlement.employeeId !== employee.id) {
+        throw new Error('Nemáte oprávnění smazat korekci.');
+      }
+      if (adjustment.settlement.status !== 'DRAFT' && adjustment.settlement.status !== 'REJECTED') {
+        throw new Error('Položku lze smazat pouze z rozpracovaného vyúčtování.');
+      }
     }
 
     if (!EDITABLE_SETTLEMENT_STATUSES.includes(adjustment.settlement.status)) {

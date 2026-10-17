@@ -3,11 +3,16 @@ import { getCurrentUser } from './auth';
 import { canAccess, type AppSection } from './rbac';
 import { hasModuleAccess, moduleForSection } from './module-policy';
 
-export async function requireApiAccess(section: AppSection, moduleId = moduleForSection(section)) {
+export async function requireApiAccess(section: AppSection | AppSection[], moduleId?: string | null) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
-  if (!canAccess(user.role, section)) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
-  if (moduleId && !hasModuleAccess(user, moduleId, section)) return NextResponse.json({ error: 'Modul není dostupný.' }, { status: 403 });
+  const sections = Array.isArray(section) ? section : [section];
+  const matchedSection = sections.find((s) => canAccess(user.role, s));
+  if (!matchedSection) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+  const resolvedModuleId = moduleId !== undefined ? moduleId : moduleForSection(matchedSection);
+  if (resolvedModuleId && !hasModuleAccess(user, resolvedModuleId, matchedSection)) {
+    return NextResponse.json({ error: 'Modul není dostupný.' }, { status: 403 });
+  }
   return user;
 }
 

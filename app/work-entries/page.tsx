@@ -3,6 +3,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { canAccess } from '@/lib/rbac';
 import { AccessDenied } from '@/lib/rbac';
 import { prisma } from '@/lib/db';
+import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
 import { WorkEntriesManager } from '@/components/WorkEntriesManager';
 
 export const dynamic = 'force-dynamic';
@@ -17,28 +18,40 @@ export default async function WorkEntriesPage() {
     );
   }
 
-  // Load active employees for filter/dropdown
-  const employees = await prisma.employee.findMany({
-    where: { isActive: true },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-    },
-  });
-
-  // Load all initial entries
-  const entries = await prisma.workEntry.findMany({
-    include: {
-      employee: true,
-      workTask: true,
-      workOrder: true,
-      client: true,
-      expenses: true,
-    },
-    orderBy: { workDate: 'desc' },
-  });
+  const [employees, workCategories, workOrders, entries] = await Promise.all([
+    prisma.employee.findMany({
+      where: { isActive: true },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+      },
+    }),
+    user.organizationId ? getOrganizationWorkCategories(user.organizationId) : Promise.resolve([]),
+    prisma.workOrder.findMany({
+      where: { status: { not: 'CANCELLED' } },
+      orderBy: { createdAt: 'desc' },
+      take: 150,
+      select: {
+        id: true,
+        title: true,
+        workType: true,
+        clientName: true,
+        price: true,
+      },
+    }),
+    prisma.workEntry.findMany({
+      include: {
+        employee: true,
+        workTask: true,
+        workOrder: true,
+        client: true,
+        expenses: true,
+      },
+      orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
+    }),
+  ]);
 
   const formattedEntries = entries.map((entry) => ({
     id: entry.id,
@@ -47,6 +60,7 @@ export default async function WorkEntriesPage() {
     workTaskId: entry.workTaskId,
     workOrderId: entry.workOrderId,
     workType: entry.workType,
+    carrierTypeLabel: entry.carrierTypeLabel,
     remunerationMethod: entry.remunerationMethod,
     quantity: entry.quantity.toString(),
     unit: entry.unit,
@@ -56,6 +70,7 @@ export default async function WorkEntriesPage() {
     note: entry.note,
     status: entry.status,
     creationSource: entry.creationSource,
+    rejectionReason: entry.rejectionReason,
     employee: {
       firstName: entry.employee.firstName,
       lastName: entry.employee.lastName,
@@ -78,6 +93,11 @@ export default async function WorkEntriesPage() {
       <WorkEntriesManager
         employees={employees}
         initialEntries={formattedEntries}
+        workCategories={workCategories}
+        workOrders={workOrders.map((wo) => ({
+          ...wo,
+          price: wo.price ? Number(wo.price) : null,
+        }))}
       />
     </AppShell>
   );

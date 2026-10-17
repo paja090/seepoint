@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { dateOnly } from '@/lib/internal-format';
+import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
+import { QuickOtherCostForm } from '@/components/QuickOtherCostForm';
 
 type SettlementDetail = {
   id: string;
@@ -35,6 +37,7 @@ type SettlementDetail = {
     rateType: string | null;
     rateSource: string | null;
     workType: string | null;
+    carrierTypeLabel?: string | null;
     task: { title: string } | null;
     note: string | null;
   }>;
@@ -155,10 +158,6 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
 
   // Manual Adjustment Form state
   const [showAdjForm, setShowAdjForm] = useState(false);
-  const [adjAmount, setAdjAmount] = useState('');
-  const [adjCategory, setAdjCategory] = useState('OTHER');
-  const [adjDescription, setAdjDescription] = useState('');
-  const [adjReason, setAdjReason] = useState('');
 
   // Deletion modal for Adjustment
   const [deletingAdjId, setDeletingAdjId] = useState<string | null>(null);
@@ -210,52 +209,6 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
       setSuccessMsg('Vyúčtování bylo zamítnuto.');
       setShowRejectModal(false);
       setRejectReason('');
-      await refreshData();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Nastala chyba.';
-      setErrorMsg(message);
-    }
-  };
-
-  const handleAddAdjustment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    const normalizedAmount = adjAmount.trim().replace(',', '.');
-    if (!/^-?\d+(?:\.\d{1,2})?$/.test(normalizedAmount) || Number(normalizedAmount) === 0) {
-      setErrorMsg('Částka musí být platné číslo různé od nuly.');
-      return;
-    }
-    if (!adjDescription.trim()) {
-      setErrorMsg('Popis korekce je povinný.');
-      return;
-    }
-    if (!adjReason.trim()) {
-      setErrorMsg('Důvod korekce je povinný.');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/settlements/${settlement.id}/adjustments`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          amount: normalizedAmount,
-          category: adjCategory,
-          description: adjDescription,
-          reason: adjReason,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Přidání korekce selhalo.');
-      }
-      setSuccessMsg('Korekce byla přidána.');
-      setShowAdjForm(false);
-      setAdjAmount('');
-      setAdjDescription('');
-      setAdjReason('');
       await refreshData();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Nastala chyba.';
@@ -420,126 +373,51 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
         </section>
       )}
 
-      {/* Cost breakdown cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Práce</div>
-          <div className="text-xl font-extrabold text-slate-900">
-            {Number(settlement.totalWorkAmount).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Výdaje / Náhrady</div>
-          <div className="text-xl font-extrabold text-slate-900 text-emerald-700">
-            +{Number(settlement.totalReimbursements).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Srážky</div>
-          <div className="text-xl font-extrabold text-slate-900 text-red-700">
-            -{Number(settlement.totalDeductions).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Zálohy</div>
-          <div className="text-xl font-extrabold text-slate-900 text-red-700">
-            -{Number(settlement.totalAdvances).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1 border-2 border-emerald-500 bg-emerald-50/50">
-          <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">K výplatě (Čistá suma)</div>
-          <div className="text-2xl font-black text-emerald-950">
-            {Number(settlement.finalPayableAmount).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-      </div>
+      {/* Work Statistics & Activity Breakdown + Financial Totals */}
+      <WorkStatisticsPanel
+        items={settlement.items}
+        title="Statistika odpracovaných hodin a rozdělení podle úkolů v období"
+        financialExtras={{
+          reimbursements: Number(settlement.totalReimbursements) || 0,
+          deductions: Number(settlement.totalDeductions) || 0,
+          advances: Number(settlement.totalAdvances) || 0,
+          finalPayable: Number(settlement.finalPayableAmount) || 0,
+        }}
+      />
 
-      {/* Add Adjustment Form */}
-      {showAdjForm && (
-        <section className="card">
-          <div className="mb-4 flex items-center justify-between border-b pb-3">
-            <h3 className="text-xl font-bold">Přidat ruční finanční korekci (adjustment)</h3>
-            <button
-              onClick={() => setShowAdjForm(false)}
-              className="text-sm font-semibold text-slate-500 hover:text-slate-800"
-            >
-              Zrušit
-            </button>
-          </div>
-
-          <form onSubmit={handleAddAdjustment} className="grid gap-4 md:grid-cols-3">
-            <label className="text-sm font-semibold">
-              Částka (Kladná zvyšuje, záporná snižuje) <span className="text-red-500">*</span>
-              <input
-                type="number"
-                step="0.01"
-                max="9999999999.99"
-                min="-9999999999.99"
-                required
-                className="input mt-1 w-full"
-                value={adjAmount}
-                onChange={(e) => setAdjAmount(e.target.value)}
-                placeholder="např. 1500 nebo -800"
-              />
-            </label>
-
-            <label className="text-sm font-semibold">
-              Kategorie <span className="text-red-500">*</span>
-              <select
-                className="input mt-1 w-full"
-                value={adjCategory}
-                onChange={(e) => setAdjCategory(e.target.value)}
-              >
-                {Object.entries(categoryLabels).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="text-sm font-semibold">
-              Popis korekce <span className="text-red-500">*</span>
-              <input
-                required
-                maxLength={250}
-                className="input mt-1 w-full"
-                value={adjDescription}
-                onChange={(e) => setAdjDescription(e.target.value)}
-                placeholder="např. Prémie za mimořádný výkon"
-              />
-            </label>
-
-            <label className="md:col-span-3 text-sm font-semibold">
-              Důvod pro provedení korekce (povinný) <span className="text-red-500">*</span>
-              <input
-                required
-                minLength={5}
-                maxLength={500}
-                className="input mt-1 w-full"
-                value={adjReason}
-                onChange={(e) => setAdjReason(e.target.value)}
-                placeholder="Zadejte důvod uložení do auditu (min. 5 znaků)..."
-              />
-            </label>
-
-            <div className="md:col-span-3 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAdjForm(false)}
-                className="rounded-xl border px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Zrušit
-              </button>
-              <button
-                type="submit"
-                className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition"
-              >
-                Uložit korekci
-              </button>
+      {/* Quick Cost / Adjustment Action Bar */}
+      {isEditable && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4">
+          <div>
+            <div className="text-sm font-bold text-indigo-950">
+              🚗 Ostatní náklady, auto, nájem, telefon, palivo a zálohy
             </div>
-          </form>
-        </section>
+            <div className="text-xs text-indigo-800">
+              Přidejte využití služebního auta, nájem dílny, tarif telefonu, proplacení paliva/materiálu nebo zálohu jedním kliknutím.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAdjForm(!showAdjForm)}
+            className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition"
+          >
+            {showAdjForm ? 'Zavřít formulář ✕' : '➕ Přidat ostatní náklad / srážku / zálohu'}
+          </button>
+        </div>
+      )}
+
+      {/* Quick Cost Form */}
+      {showAdjForm && (
+        <QuickOtherCostForm
+          settlementId={settlement.id}
+          employeeId={settlement.employee.id}
+          onSuccess={(msg) => {
+            setSuccessMsg(msg);
+            setShowAdjForm(false);
+            refreshData();
+          }}
+          onCancel={() => setShowAdjForm(false)}
+        />
       )}
 
       {/* Deletion modal for Adjustment */}
@@ -717,12 +595,7 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
               <h3 className="text-lg font-bold">Korekce, náhrady a adjustments</h3>
               {isEditable && (
                 <button
-                  onClick={() => {
-                    setShowAdjForm(true);
-                    setAdjAmount('');
-                    setAdjDescription('');
-                    setAdjReason('');
-                  }}
+                  onClick={() => setShowAdjForm(true)}
                   className="rounded bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
                 >
                   Přidat ruční korekci

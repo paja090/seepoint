@@ -12,7 +12,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; action: string }> }
 ) {
-  const user = await requireApiAccess('settlements');
+  const user = await requireApiAccess(['settlements', 'mySettlements']);
   if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
