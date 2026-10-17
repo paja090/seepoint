@@ -1,5 +1,6 @@
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
 import { approveWorkEntry } from '@/lib/work-entry-actions';
 import { ConcurrencyError } from '@/lib/transaction-retry';
 
@@ -25,6 +26,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch {}
 
   try {
+    const current = await prisma.workEntry.findUnique({ where: { id }, select: { status: true } });
+    if (current && (current.status === 'DRAFT' || current.status === 'RETURNED')) {
+      await prisma.workEntry.update({ where: { id }, data: { status: 'SUBMITTED' } });
+    }
     const confirmed = await approveWorkEntry(id, user.id, { reason });
 
     return NextResponse.json({

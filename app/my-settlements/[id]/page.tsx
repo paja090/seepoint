@@ -120,6 +120,7 @@ export default async function MySettlementDetailPage({ params }: { params: Promi
       appliedRate: item.appliedRate.toString(),
       rateType: item.rateType,
       workType: item.workType,
+      carrierTypeLabel: item.carrierTypeLabel,
       task: item.task ? { title: item.task.title } : null,
       note: item.note,
     })),

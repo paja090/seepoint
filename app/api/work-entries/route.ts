@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { canAccess } from '@/lib/rbac';
 import { resolveWorkEntryRate } from '@/lib/work-entry-rates';
+import { getOrCreateSettlement, getPragueYearMonth } from '@/lib/settlement-generation';
+import { recalculateSettlementTotals } from '@/lib/settlement-recalculation';
+import { EDITABLE_SETTLEMENT_STATUSES } from '@/lib/settlement-statuses';
 import { Prisma, RateSource } from '@prisma/client';
 import {
   assertCalculatedAmountFits,
@@ -20,15 +23,23 @@ import {
   WorkEntryValidationError,
 } from '@/lib/work-entry-policy';
 
+const DEFAULT_WORK_TYPE_TITLES: Record<string, string> = {
+  INSTALLATION: 'Instalace',
+  REINSTALLATION: 'Reinstalace',
+  DEINSTALLATION: 'Deinstalace',
+  REPAIR: 'Oprava / Servis',
+  CHECK: 'Kontrola / Zaměření',
+  TRANSPORT: 'Doprava / Převoz',
+  OTHER: 'Ostatní práce',
+};
+
 export async function GET(request: Request) {
-  const user = await requireApiAccess('workEntries');
+  const user = await requireApiAccess(['workEntries', 'myWorkEntries']);
   if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }
 
-  // Administrators and Managers can view all entries.
-  // Employees (Workers, Technicians) can only view their own.
   const hasGlobalAccess = canAccess(user.role, 'workEntries');
   const hasMyAccess = canAccess(user.role, 'myWorkEntries');
 
@@ -69,7 +80,6 @@ export async function GET(request: Request) {
       }
     }
   } else {
-    // Restrict employee to their own records
     const employee = await prisma.employee.findFirst({
       where: { OR: [{ userId: user.id }, { email: user.email }] }
     });
@@ -86,24 +96,33 @@ export async function GET(request: Request) {
       workTask: true,
       workOrder: true,
       client: true,
+      expenses: true,
     },
-    orderBy: { workDate: 'desc' },
+    orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
     take: WORK_ENTRY_PAGE_LIMIT,
   });
 
-  // Map Decimal values to strings for JSON safety
   const formatted = entries.map(entry => ({
     ...entry,
     quantity: entry.quantity.toString(),
     appliedUnitRate: entry.appliedUnitRate?.toString() ?? null,
     calculatedAmount: entry.calculatedAmount.toString(),
+    expenses: entry.expenses.map(exp => ({
+      id: exp.id,
+      type: exp.type,
+      description: exp.description,
+      amount: exp.amount.toString(),
+      status: exp.status,
+      rejectionReason: exp.rejectionReason,
+      receiptUrl: exp.receiptPhotoId ? `/api/photos/${exp.receiptPhotoId}/file` : null,
+    })),
   }));
 
   return NextResponse.json(formatted);
 }
 
 export async function POST(request: Request) {
-  const user = await requireApiAccess('workEntries');
+  const user = await requireApiAccess(['workEntries', 'myWorkEntries']);
   if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
@@ -115,31 +134,42 @@ export async function POST(request: Request) {
   }
 
   const {
-    employeeId,
-    workTaskId,
+    employeeId: rawEmployeeId,
+    workTaskId: rawWorkTaskId,
+    workOrderId: rawWorkOrderId,
+    activityTitle: rawActivityTitle,
     workDate,
-    workType,
-    remunerationMethod,
-    quantity,
+    workType = 'INSTALLATION',
+    remunerationMethod = 'HOURLY',
+    quantity: rawQuantity,
     unit,
     note,
     allowAdditionalEntry,
     additionalEntryReason,
     manualRate,
+    unitRate,
     manualOverride,
+    requireOverrideConfirmation,
+    strictDuplicateCheck,
+    autoApprove = true,
   } = input;
 
-  if (!employeeId || !workTaskId || !workDate || !workType || !remunerationMethod || quantity === undefined) {
-    return NextResponse.json({ error: 'Chybí povinná pole.' }, { status: 400 });
+  const effectiveManualRate = manualRate !== undefined && manualRate !== '' ? manualRate : unitRate;
+  const effectiveQuantity = remunerationMethod === 'FIXED' && (rawQuantity === undefined || rawQuantity === '') ? '1' : rawQuantity;
+
+  if (!workDate || !workType || !remunerationMethod || effectiveQuantity === undefined || effectiveQuantity === '') {
+    return NextResponse.json({ error: 'Chybí povinná pole (datum, typ odměny nebo množství).' }, { status: 400 });
   }
 
-  const isManagerOrAdmin = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const isManagerOrAdmin = user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'ACCOUNTANT';
   if (!canAccess(user.role, 'workEntries') && !canAccess(user.role, 'myWorkEntries')) {
     return NextResponse.json({ error: 'Nemáte oprávnění vytvářet výkazy práce.' }, { status: 403 });
   }
 
-  let cleanEmployeeId: string;
-  let cleanWorkTaskId: string;
+  let cleanEmployeeId: string | undefined;
+  let cleanWorkTaskId: string | undefined;
+  let cleanWorkOrderId: string | undefined;
+  let cleanActivityTitle: string | undefined;
   let dateObj: Date;
   let cleanWorkType: ReturnType<typeof parseWorkType>;
   let cleanRemunerationMethod: ReturnType<typeof parseRateType>;
@@ -149,73 +179,128 @@ export async function POST(request: Request) {
   let cleanAdditionalReason: string | undefined;
   let cleanManualRate: Prisma.Decimal | null = null;
   try {
-    cleanEmployeeId = parseId(employeeId, 'Pracovník');
-    cleanWorkTaskId = parseId(workTaskId, 'Úkol');
+    if (rawEmployeeId) cleanEmployeeId = parseId(rawEmployeeId, 'Pracovník');
+    if (rawWorkTaskId && String(rawWorkTaskId).trim()) cleanWorkTaskId = parseId(rawWorkTaskId, 'Úkol');
+    if (rawWorkOrderId && String(rawWorkOrderId).trim()) cleanWorkOrderId = parseId(rawWorkOrderId, 'Zakázka');
+    if (typeof rawActivityTitle === 'string' && rawActivityTitle.trim()) {
+      cleanActivityTitle = rawActivityTitle.trim().slice(0, 160);
+    }
     dateObj = parseDateOnly(workDate, 'Datum práce');
     cleanWorkType = parseWorkType(workType);
     cleanRemunerationMethod = parseRateType(remunerationMethod);
-    qtyDecimal = parseQuantity(quantity);
+    qtyDecimal = parseQuantity(effectiveQuantity);
     cleanUnit = parseUnit(unit);
     cleanNote = parseNote(note);
     cleanAdditionalReason = parseReason(additionalEntryReason, 'Důvod dodatečného zápisu');
-    if (manualRate !== undefined && manualRate !== null && manualRate !== '') cleanManualRate = parseMoney(manualRate, 'Ruční sazba');
+    if (effectiveManualRate !== undefined && effectiveManualRate !== null && effectiveManualRate !== '') {
+      cleanManualRate = parseMoney(effectiveManualRate, 'Sazba / Cena');
+    }
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Neplatná data výkazu.' }, { status: 400 });
   }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Validate employee
-      const targetEmployee = await tx.employee.findUnique({ where: { id: cleanEmployeeId } });
+      // 1. Validate / resolve employee
+      let targetEmployee = cleanEmployeeId
+        ? await tx.employee.findUnique({ where: { id: cleanEmployeeId } })
+        : await tx.employee.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
+
       if (!targetEmployee) {
         throw new Error('Zaměstnanec nebyl nalezen.');
       }
+      const resolvedEmployeeId = targetEmployee.id;
 
       const isOwnRecord = targetEmployee.userId === user.id || targetEmployee.email === user.email;
       if (!isOwnRecord && !isManagerOrAdmin) {
         throw new Error('Nemáte oprávnění vytvářet záznamy pro jiného pracovníka.');
       }
 
-      // 2. Validate WorkTask and WorkOrder
-      const workTask = await tx.workTask.findUnique({
-        where: { id: cleanWorkTaskId },
-        include: {
-          workOrder: {
-            include: {
-              items: {
-                include: {
-                  carrier: {
-                    include: {
-                      carrierTypeRef: { select: { id: true, name: true } },
-                    },
-                  },
-                },
+      // 2. Resolve or Auto-create WorkTask & WorkOrder context
+      const workOrderInclude = {
+        items: {
+          include: {
+            carrier: {
+              include: {
+                carrierTypeRef: { select: { id: true, name: true } },
               },
             },
           },
         },
-      });
-      if (!workTask) {
+      };
+
+      let workTask = cleanWorkTaskId
+        ? await tx.workTask.findUnique({
+            where: { id: cleanWorkTaskId },
+            include: { workOrder: { include: workOrderInclude } },
+          })
+        : null;
+
+      if (cleanWorkTaskId && !workTask) {
         throw new Error('Přiřazený úkol nebyl nalezen.');
       }
 
-      const workOrderId = workTask.workOrderId;
+      if (!workTask) {
+        let linkedOrder = null;
+        if (cleanWorkOrderId) {
+          linkedOrder = await tx.workOrder.findUnique({
+            where: { id: cleanWorkOrderId },
+            include: workOrderInclude,
+          });
+          if (!linkedOrder) {
+            throw new Error('Vybraná zakázka nebyla nalezena.');
+          }
+        }
+
+        const desiredTitle =
+          cleanActivityTitle ||
+          linkedOrder?.title ||
+          DEFAULT_WORK_TYPE_TITLES[cleanWorkType] ||
+          'Odvedená práce';
+
+        // Find existing task for this employee + order + title, or create one
+        const existingTask = await tx.workTask.findFirst({
+          where: {
+            assignedToEmployeeId: resolvedEmployeeId,
+            workOrderId: linkedOrder ? linkedOrder.id : null,
+            title: desiredTitle,
+          },
+          include: { workOrder: { include: workOrderInclude } },
+        });
+
+        if (existingTask) {
+          workTask = existingTask;
+        } else {
+          workTask = await tx.workTask.create({
+            data: {
+              title: desiredTitle,
+              description: cleanNote || null,
+              status: 'DONE',
+              priority: linkedOrder?.priority || 'NORMAL',
+              scheduledDate: dateObj,
+              assignedToEmployeeId: resolvedEmployeeId,
+              workOrderId: linkedOrder ? linkedOrder.id : null,
+            },
+            include: { workOrder: { include: workOrderInclude } },
+          });
+        }
+      } else if (cleanActivityTitle && workTask.title !== cleanActivityTitle && !cleanWorkTaskId) {
+        // Keep custom activity title if needed
+      }
+
+      const finalWorkTaskId = workTask.id;
+      const workOrderId = workTask.workOrderId || cleanWorkOrderId || null;
       const clientId = workTask.workOrder?.clientId || null;
       const clientName = workTask.workOrder?.clientName || null;
       const carrier = workTask.workOrder?.items?.[0]?.carrier;
       const carrierType = carrier?.type || null;
       const carrierTypeId = carrier?.carrierTypeId || null;
-      const carrierTypeLabel = carrier?.carrierTypeRef?.name || carrier?.type || null;
-
-      // WORKER and TECHNICIAN validation
-      if (!isManagerOrAdmin) {
-        if (workTask.assignedToEmployeeId !== cleanEmployeeId) {
-          throw new Error('Tento úkol není přiřazen vám.');
-        }
-        if (workTask.status !== 'DONE') {
-          throw new Error('Práci lze vykazovat pouze u dokončených úkolů (DONE).');
-        }
-      }
+      const carrierTypeLabel =
+        cleanActivityTitle ||
+        workTask.title ||
+        carrier?.carrierTypeRef?.name ||
+        carrier?.type ||
+        null;
 
       // Remuneration Rules
       let finalQuantity = qtyDecimal;
@@ -224,32 +309,34 @@ export async function POST(request: Request) {
         finalUnit = 'hod';
       } else if (cleanRemunerationMethod === 'FIXED') {
         finalQuantity = new Prisma.Decimal(1);
-        finalUnit = 'ks';
+        finalUnit = cleanUnit || 'ks';
       }
 
-      // 4. Duplicate prevention INSIDE the transaction
-      const startOfDay = new Date(dateObj);
-      const endOfDay = new Date(dateObj.getTime() + 86_400_000 - 1);
+      // Optional Duplicate check (only when explicitly requested or when raw workTaskId was used with strict flag)
+      if (strictDuplicateCheck === true) {
+        const startOfDay = new Date(dateObj);
+        const endOfDay = new Date(dateObj.getTime() + 86_400_000 - 1);
 
-      const existingDuplicate = await tx.workEntry.findFirst({
-        where: {
-          workTaskId: cleanWorkTaskId,
-          employeeId: cleanEmployeeId,
-          workType: cleanWorkType,
-          workDate: {
-            gte: startOfDay,
-            lte: endOfDay,
+        const existingDuplicate = await tx.workEntry.findFirst({
+          where: {
+            workTaskId: finalWorkTaskId,
+            employeeId: resolvedEmployeeId,
+            workType: cleanWorkType,
+            workDate: {
+              gte: startOfDay,
+              lte: endOfDay,
+            },
           },
-        },
-      });
+        });
 
-      if (existingDuplicate) {
-        const canBypass = isManagerOrAdmin && allowAdditionalEntry === true && Boolean(cleanAdditionalReason);
-        if (!canBypass) {
-          if (isManagerOrAdmin) {
-            throw new Error('DUPLICATE_CHECK_FAILED_MANAGER');
-          } else {
-            throw new Error('Záznam práce pro tento úkol, den a druh práce již existuje.');
+        if (existingDuplicate) {
+          const canBypass = isManagerOrAdmin && allowAdditionalEntry === true && Boolean(cleanAdditionalReason);
+          if (!canBypass) {
+            if (isManagerOrAdmin) {
+              throw new Error('DUPLICATE_CHECK_FAILED_MANAGER');
+            } else {
+              throw new Error('Záznam práce pro tento úkol, den a druh práce již existuje.');
+            }
           }
         }
       }
@@ -259,7 +346,7 @@ export async function POST(request: Request) {
       let finalSource: RateSource | null = null;
 
       const resolved = await resolveWorkEntryRate({
-        employeeId: cleanEmployeeId,
+        employeeId: resolvedEmployeeId,
         workType: cleanWorkType,
         workDate: dateObj,
         remunerationMethod: cleanRemunerationMethod,
@@ -268,25 +355,21 @@ export async function POST(request: Request) {
         carrierTypeId,
       }, tx);
 
-      if (cleanManualRate) {
-        if (!isManagerOrAdmin) {
-          throw new Error('Pouze manažer nebo administrátor může zadat sazbu ručně.');
-        }
-        if (resolved) {
-          if (manualOverride !== true || !cleanNote) {
-            throw new Error('RUČNÍ_PŘEPSÁNÍ_VYŽADOVÁNO');
-          }
+      if (cleanManualRate !== null) {
+        if (requireOverrideConfirmation === true && resolved && (manualOverride !== true || !cleanNote)) {
+          throw new Error('RUČNÍ_PŘEPSÁNÍ_VYŽADOVÁNO');
         }
         finalRate = cleanManualRate;
         finalSource = 'MANUAL';
-      } else {
-        if (resolved) {
-          finalRate = resolved.amount;
-          finalSource = resolved.source;
-          if (cleanRemunerationMethod === 'TASK' && resolved.unit) {
-            finalUnit = resolved.unit;
-          }
+      } else if (resolved) {
+        finalRate = resolved.amount;
+        finalSource = resolved.source;
+        if (cleanRemunerationMethod === 'TASK' && resolved.unit && !cleanUnit) {
+          finalUnit = resolved.unit;
         }
+      } else if (workTask.workOrder?.price && cleanRemunerationMethod === 'FIXED') {
+        finalRate = new Prisma.Decimal(workTask.workOrder.price);
+        finalSource = 'WORK_ORDER_RATE';
       }
 
       assertCalculatedAmountFits(finalQuantity, finalRate);
@@ -298,11 +381,14 @@ export async function POST(request: Request) {
 
       const finalCreationSource = isManagerOrAdmin ? 'MANUAL' : 'AUTOMATIC';
 
+      // Determine if we can auto-approve and sync directly into the employee's Settlement
+      const shouldAutoApprove = autoApprove !== false && finalRate !== null && finalRate.gte(0);
+
       const entry = await tx.workEntry.create({
         data: {
-          employeeId: cleanEmployeeId,
+          employeeId: resolvedEmployeeId,
           workDate: dateObj,
-          workTaskId: cleanWorkTaskId,
+          workTaskId: finalWorkTaskId,
           workOrderId,
           clientId,
           clientName,
@@ -316,10 +402,80 @@ export async function POST(request: Request) {
           calculatedAmount,
           rateSource: finalSource,
           note: finalNote,
-          status: 'DRAFT',
+          status: shouldAutoApprove ? 'APPROVED' : 'DRAFT',
           creationSource: finalCreationSource,
         },
       });
+
+      if (shouldAutoApprove && finalRate !== null) {
+        const settlement = await getOrCreateSettlement(
+          {
+            employeeId: resolvedEmployeeId,
+            workDate: dateObj,
+          },
+          tx
+        );
+
+        const originalYearMonth = getPragueYearMonth(dateObj);
+        const isOriginalMonth =
+          settlement.periodYear === originalYearMonth.year &&
+          settlement.periodMonth === originalYearMonth.month;
+
+        if (isOriginalMonth && EDITABLE_SETTLEMENT_STATUSES.includes(settlement.status)) {
+          const itemDescription =
+            finalNote ||
+            cleanActivityTitle ||
+            workTask.title ||
+            `Práce ${DEFAULT_WORK_TYPE_TITLES[cleanWorkType] || cleanWorkType}`;
+
+          await tx.settlementItem.upsert({
+            where: { workEntryId: entry.id },
+            create: {
+              settlementId: settlement.id,
+              workEntryId: entry.id,
+              taskId: finalWorkTaskId,
+              date: dateObj,
+              description: itemDescription,
+              quantity: finalQuantity,
+              unit: finalUnit,
+              unitPrice: finalRate,
+              amount: calculatedAmount,
+              appliedRate: finalRate,
+              rateType: cleanRemunerationMethod,
+              rateSource: finalSource,
+              carrierType,
+              carrierTypeLabel,
+              workType: cleanWorkType,
+              note: finalNote || null,
+            },
+            update: {
+              settlementId: settlement.id,
+              date: dateObj,
+              description: itemDescription,
+              quantity: finalQuantity,
+              unit: finalUnit,
+              unitPrice: finalRate,
+              amount: calculatedAmount,
+              appliedRate: finalRate,
+              rateType: cleanRemunerationMethod,
+              rateSource: finalSource,
+              carrierType,
+              carrierTypeLabel,
+              workType: cleanWorkType,
+              note: finalNote || null,
+            },
+          });
+
+          await recalculateSettlementTotals(settlement.id, tx);
+        } else {
+          // If the target month is already locked/submitted, keep entry as SUBMITTED for manager review
+          await tx.workEntry.update({
+            where: { id: entry.id },
+            data: { status: 'SUBMITTED' },
+          });
+          entry.status = 'SUBMITTED';
+        }
+      }
 
       return entry;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

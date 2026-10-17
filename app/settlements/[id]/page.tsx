@@ -119,6 +119,7 @@ export default async function SettlementDetailPage({ params }: { params: Promise
       rateType: item.rateType,
       rateSource: item.rateSource,
       workType: item.workType,
+      carrierTypeLabel: item.carrierTypeLabel,
       task: item.task ? { title: item.task.title } : null,
       note: item.note,
     })),

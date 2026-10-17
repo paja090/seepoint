@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { StatusPill } from '@/lib/internal-format';
+import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
+import { QuickOtherCostForm } from '@/components/QuickOtherCostForm';
 
 interface MySettlementDetailViewProps {
   settlement: {
@@ -33,6 +37,7 @@ interface MySettlementDetailViewProps {
       appliedRate: string;
       rateType: string | null;
       workType: string | null;
+      carrierTypeLabel?: string | null;
       task: { title: string } | null;
       note: string | null;
     }>;
@@ -91,12 +96,42 @@ const expenseStatusLabels: Record<string, string> = {
 };
 
 export function MySettlementDetailView({ settlement }: MySettlementDetailViewProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'work' | 'expenses' | 'adjustments' | 'logs'>('work');
+  const [showCostForm, setShowCostForm] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
 
   const formattedPeriod = `${settlement.periodMonth}/${settlement.periodYear}`;
+  const isEditable = settlement.status === 'DRAFT' || settlement.status === 'REJECTED';
+
+  const handleSubmitSettlement = async () => {
+    setNotice('');
+    setError('');
+    try {
+      const res = await fetch(`/api/settlements/${settlement.id}/submit`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Odeslání selhalo.');
+      setNotice('Vyúčtování bylo odesláno ke schválení.');
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Chyba při odesílání.');
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">
+          {notice}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-900">
+          {error}
+        </div>
+      )}
+
       {/* Header Info Card */}
       <section className="card p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -115,41 +150,58 @@ export function MySettlementDetailView({ settlement }: MySettlementDetailViewPro
             </p>
           )}
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/my-work-entries"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition"
+          >
+            ➕ Zapsat další práci
+          </Link>
+          {isEditable && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowCostForm(!showCostForm)}
+                className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-900 hover:bg-indigo-100 transition"
+              >
+                🚗 + Ostatní náklad (Auto, Nájem, Telefon, Palivo)
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitSettlement}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm"
+              >
+                Odeslat vyúčtování ke schválení
+              </button>
+            </>
+          )}
+        </div>
       </section>
 
-      {/* Cost breakdown cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Odvedená práce</div>
-          <div className="text-xl font-extrabold text-slate-900">
-            {Number(settlement.totalWorkAmount).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Výdaje / Náhrady</div>
-          <div className="text-xl font-extrabold text-slate-900 text-emerald-700">
-            +{Number(settlement.totalReimbursements).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Srážky</div>
-          <div className="text-xl font-extrabold text-slate-900 text-red-700">
-            -{Number(settlement.totalDeductions).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Odečtené zálohy</div>
-          <div className="text-xl font-extrabold text-slate-900 text-red-700">
-            -{Number(settlement.totalAdvances).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-        <div className="card p-4 space-y-1 border-2 border-emerald-500 bg-emerald-50/50">
-          <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Čistá částka k výplatě</div>
-          <div className="text-2xl font-black text-emerald-950">
-            {Number(settlement.finalPayableAmount).toLocaleString('cs-CZ')} CZK
-          </div>
-        </div>
-      </div>
+      {showCostForm && (
+        <QuickOtherCostForm
+          settlementId={settlement.id}
+          onSuccess={(msg) => {
+            setNotice(msg);
+            setShowCostForm(false);
+            router.refresh();
+          }}
+          onCancel={() => setShowCostForm(false)}
+        />
+      )}
+
+      {/* Statistics & Activity Breakdown + Net Payable */}
+      <WorkStatisticsPanel
+        items={settlement.items}
+        title="Statistika odpracovaných hodin a rozdělení podle úkolů v období"
+        financialExtras={{
+          reimbursements: Number(settlement.totalReimbursements) || 0,
+          deductions: Number(settlement.totalDeductions) || 0,
+          advances: Number(settlement.totalAdvances) || 0,
+          finalPayable: Number(settlement.finalPayableAmount) || 0,
+        }}
+      />
 
       {/* Tabs navigation */}
       <div className="border-b flex flex-wrap gap-2">

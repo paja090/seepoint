@@ -133,36 +133,101 @@ export async function PATCH(
       }
     }
 
-    // If DONE, automatically create WorkEntry in Odvedená práce if employee found and workTask exists
+    // If DONE, automatically create WorkEntry in Odvedená práce and sync into Settlement
     if (status === 'DONE') {
       const employee = await prisma.employee.findFirst({
         where: { OR: [{ userId: user.id }, { email: user.email }] },
       });
 
-      const firstTask = existing.workTasks[0];
+      let firstTask = existing.workTasks[0];
       const carrier = existing.items[0]?.carrier;
-      const carrierTypeLabel = carrier?.carrierTypeRef?.name || carrier?.type || null;
+      const carrierTypeLabel = carrier?.carrierTypeRef?.name || carrier?.type || existing.title || null;
 
-      if (employee && firstTask) {
-        await prisma.workEntry.create({
+      if (employee) {
+        if (!firstTask) {
+          firstTask = await prisma.workTask.create({
+            data: {
+              title: existing.title,
+              description: existing.description,
+              status: 'DONE',
+              priority: existing.priority || 'NORMAL',
+              scheduledDate: existing.scheduledAt || new Date(),
+              assignedToEmployeeId: employee.id,
+              workOrderId: existing.id,
+            },
+          });
+        }
+
+        const nowDate = new Date();
+        const orderPrice = existing.price ?? 0;
+        const entry = await prisma.workEntry.create({
           data: {
             employeeId: employee.id,
-            workDate: new Date(),
+            workDate: nowDate,
             workTaskId: firstTask.id,
             workOrderId: existing.id,
             clientId: existing.clientId || undefined,
             clientName: existing.clientName,
             workType: existing.workType,
             carrierTypeLabel,
-            remunerationMethod: 'HOURLY',
+            remunerationMethod: 'FIXED',
             quantity: 1,
             unit: 'ks',
-            calculatedAmount: existing.price || 0,
-            note: note || `Dokončení zakázky ${existing.title} z mobilní aplikace Moje úkoly.`,
+            appliedUnitRate: orderPrice,
+            calculatedAmount: orderPrice,
+            rateSource: 'WORK_ORDER_RATE',
+            note: note || `Dokončení zakázky: ${existing.title}`,
             status: 'APPROVED',
-            creationSource: 'MANUAL',
+            creationSource: 'AUTOMATIC',
           },
         });
+
+        try {
+          const { getOrCreateSettlement, getPragueYearMonth } = await import('@/lib/settlement-generation');
+          const { recalculateSettlementTotals } = await import('@/lib/settlement-recalculation');
+          const { EDITABLE_SETTLEMENT_STATUSES } = await import('@/lib/settlement-statuses');
+
+          await prisma.$transaction(async (tx) => {
+            const settlement = await getOrCreateSettlement(
+              { employeeId: employee.id, workDate: nowDate },
+              tx
+            );
+            const ym = getPragueYearMonth(nowDate);
+            if (
+              settlement.periodYear === ym.year &&
+              settlement.periodMonth === ym.month &&
+              EDITABLE_SETTLEMENT_STATUSES.includes(settlement.status)
+            ) {
+              await tx.settlementItem.upsert({
+                where: { workEntryId: entry.id },
+                create: {
+                  settlementId: settlement.id,
+                  workEntryId: entry.id,
+                  taskId: firstTask.id,
+                  date: nowDate,
+                  description: note || `Zakázka: ${existing.title}`,
+                  quantity: 1,
+                  unit: 'ks',
+                  unitPrice: orderPrice,
+                  amount: orderPrice,
+                  appliedRate: orderPrice,
+                  rateType: 'FIXED',
+                  rateSource: 'WORK_ORDER_RATE',
+                  carrierTypeLabel,
+                  workType: existing.workType,
+                },
+                update: {
+                  amount: orderPrice,
+                  unitPrice: orderPrice,
+                  appliedRate: orderPrice,
+                },
+              });
+              await recalculateSettlementTotals(settlement.id, tx);
+            }
+          });
+        } catch (settlementErr) {
+          console.error('Failed to sync completed workOrder into settlement:', settlementErr);
+        }
       }
 
       // Log to carrier history if carrier linked

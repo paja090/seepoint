@@ -30,6 +30,8 @@ export const WORK_CATEGORY_PRESETS: Record<string, WorkCategoryPreset> = {
       { key: 'PACKAGING', label: 'Expedice & Balení zakázek', scope: 'WORKSHOP', defaultWorkType: 'TRANSPORT', icon: '📦', defaultPriceType: 'HOURLY' },
       { key: 'FIELD_WRAPPING', label: 'Polep výlohy / polep vozidla', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '🚗', defaultPriceType: 'FIXED' },
       { key: 'FIELD_INSTALL', label: 'Montáž reklamy / banneru na fasádu', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '🪧', defaultPriceType: 'HOURLY' },
+      { key: 'BILLBOARD_POSTING', label: 'Lepení billboardu / výlep plakátů', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '📋', defaultPriceType: 'PIECE_RATE' },
+      { key: 'BENCH_INSTALL', label: 'Instalace lavičky / městského mobiliáře', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '🪑', defaultPriceType: 'PIECE_RATE' },
       { key: 'FIELD_SURVEY', label: 'Předvýrobní zaměření na místě', scope: 'FIELD', defaultWorkType: 'CHECK', icon: '📐', defaultPriceType: 'FIXED' },
       { key: 'FIELD_SERVICE', label: 'Servis / Demontáž reklamy', scope: 'FIELD', defaultWorkType: 'REPAIR', icon: '🔧', defaultPriceType: 'HOURLY' },
       { key: 'INTERNAL', label: 'Interní provoz & Údržba strojů', scope: 'WORKSHOP', defaultWorkType: 'OTHER', icon: '⚙️', defaultPriceType: 'HOURLY' },
@@ -58,6 +60,7 @@ export const WORK_CATEGORY_PRESETS: Record<string, WorkCategoryPreset> = {
     icon: '🪧',
     categories: [
       { key: 'BILLBOARD_POSTING', label: 'Výlep papírového billboardu (Euroformát)', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '📋', defaultPriceType: 'PIECE_RATE' },
+      { key: 'BENCH_INSTALL', label: 'Instalace lavičky / reklamního nosiče', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '🪑', defaultPriceType: 'PIECE_RATE' },
       { key: 'BIGBOARD_BANNER', label: 'Montáž bigboardového banneru', scope: 'FIELD', defaultWorkType: 'INSTALLATION', icon: '🪧', defaultPriceType: 'FIXED' },
       { key: 'NIGHT_CHECK', label: 'Noční kontrola osvětlení & fotoreport', scope: 'FIELD', defaultWorkType: 'CHECK', icon: '💡', defaultPriceType: 'HOURLY' },
       { key: 'FRAME_REPAIR', label: 'Oprava rámu, osvětlení & technická revize', scope: 'FIELD', defaultWorkType: 'REPAIR', icon: '🔧', defaultPriceType: 'HOURLY' },
