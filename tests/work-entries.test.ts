@@ -563,3 +563,69 @@ test('28. computeWorkStatistics aggregates hourly, task, fixed work and groups b
   assert.ok(presetKeys.includes('PHONE'));
 });
 
+test('29. resolveWorkEntryRate matches exact activityTitle in price catalog before falling back to generic workType', async () => {
+  const mockTx = {
+    employeeRate: { findMany: async () => [] },
+    workOrderRate: { findMany: async () => [] },
+    companyRate: {
+      findMany: async () => [
+        {
+          id: 'rate-bench',
+          type: 'TASK',
+          name: 'Instalace lavičky / městského mobiliáře',
+          carrierTypeLabel: 'Instalace lavičky / městského mobiliáře',
+          amount: dec('650.00'),
+          unit: 'ks',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-01'),
+          validTo: null,
+          isActive: true,
+        },
+        {
+          id: 'rate-billboard',
+          type: 'TASK',
+          name: 'Lepení billboardu / výlep plakátů',
+          carrierTypeLabel: 'Lepení billboardu / výlep plakátů',
+          amount: dec('350.00'),
+          unit: 'ks',
+          workType: 'INSTALLATION',
+          validFrom: new Date('2026-01-02'),
+          validTo: null,
+          isActive: true,
+        },
+      ],
+    },
+  } as unknown as Prisma.TransactionClient;
+
+  const benchRate = await resolveWorkEntryRate(
+    {
+      employeeId: 'emp-1',
+      workType: 'INSTALLATION',
+      workDate: new Date('2026-06-15'),
+      remunerationMethod: 'TASK',
+      activityTitle: 'Instalace lavičky / městského mobiliáře',
+    },
+    mockTx
+  );
+
+  assert.ok(benchRate);
+  assert.equal(benchRate.amount.toFixed(2), '650.00');
+  assert.equal(benchRate.name, 'Instalace lavičky / městského mobiliáře');
+
+  const billboardRate = await resolveWorkEntryRate(
+    {
+      employeeId: 'emp-1',
+      workType: 'INSTALLATION',
+      workDate: new Date('2026-06-15'),
+      remunerationMethod: 'TASK',
+      activityTitle: 'Lepení billboardu / výlep plakátů',
+    },
+    mockTx
+  );
+
+  assert.ok(billboardRate);
+  assert.equal(billboardRate.amount.toFixed(2), '350.00');
+  assert.equal(billboardRate.name, 'Lepení billboardu / výlep plakátů');
+});
+
+

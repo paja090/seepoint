@@ -18,7 +18,7 @@ export default async function WorkEntriesPage() {
     );
   }
 
-  const [employees, workCategories, workOrders, entries] = await Promise.all([
+  const [employees, workCategories, workOrders, entries, companyRates, employeeRates] = await Promise.all([
     prisma.employee.findMany({
       where: { isActive: true },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -51,6 +51,15 @@ export default async function WorkEntriesPage() {
       },
       orderBy: [{ workDate: 'desc' }, { createdAt: 'desc' }],
     }),
+    prisma.companyRate.findMany({
+      where: { isActive: true },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }, { validFrom: 'desc' }],
+    }),
+    prisma.employeeRate.findMany({
+      where: { isActive: true },
+      include: { employee: { select: { firstName: true, lastName: true } } },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }, { validFrom: 'desc' }],
+    }),
   ]);
 
   const formattedEntries = entries.map((entry) => ({
@@ -77,7 +86,7 @@ export default async function WorkEntriesPage() {
     },
     workTask: entry.workTask ? { title: entry.workTask.title } : null,
     workOrder: entry.workOrder ? { title: entry.workOrder.title } : null,
-    expenses: entry.expenses.map(exp => ({
+    expenses: entry.expenses.map((exp) => ({
       id: exp.id,
       type: exp.type,
       description: exp.description,
@@ -86,6 +95,30 @@ export default async function WorkEntriesPage() {
       rejectionReason: exp.rejectionReason,
       receiptUrl: exp.receiptPhotoId ? `/api/photos/${exp.receiptPhotoId}/file` : null,
     })),
+  }));
+
+  const formattedCompanyRates = companyRates.map((r) => ({
+    id: r.id,
+    source: 'COMPANY' as const,
+    type: r.type,
+    name: r.name,
+    workType: r.workType,
+    carrierTypeLabel: r.carrierTypeLabel,
+    amount: r.amount.toString(),
+    unit: r.unit,
+  }));
+
+  const formattedEmployeeRates = employeeRates.map((r) => ({
+    id: r.id,
+    source: 'EMPLOYEE' as const,
+    employeeId: r.employeeId,
+    employeeName: `${r.employee.firstName} ${r.employee.lastName}`,
+    type: r.type,
+    name: r.name,
+    workType: r.workType,
+    carrierTypeLabel: r.carrierTypeLabel,
+    amount: r.amount.toString(),
+    unit: r.unit,
   }));
 
   return (
@@ -98,6 +131,8 @@ export default async function WorkEntriesPage() {
           ...wo,
           price: wo.price ? Number(wo.price) : null,
         }))}
+        companyRates={formattedCompanyRates}
+        employeeRates={formattedEmployeeRates}
       />
     </AppShell>
   );

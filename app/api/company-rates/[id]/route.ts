@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { parseRateInput } from '@/lib/worker-rates';
 import { intervalsOverlap } from '@/lib/rate-intervals';
 import { Prisma, RateType, WorkType } from '@prisma/client';
@@ -14,7 +14,8 @@ async function assertNoCompanyRateConflict(
     where: {
       type: candidate.type,
       workType: candidate.workType,
-      ...(candidate.type === 'HOURLY' ? {} : { name: { equals: candidate.name, mode: 'insensitive' } }),
+      name: { equals: candidate.name, mode: 'insensitive' },
+      isActive: true,
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
     select: { validFrom: true, validTo: true },
@@ -26,13 +27,14 @@ async function assertNoCompanyRateConflict(
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
+  const user = await requireApiAccess(['workEntries', 'myWorkEntries', 'settlements', 'mySettlements', 'settings']);
+  if (isApiDenied(user)) return user;
   if (!user) {
     return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
   }
 
-  if (user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Sazby může spravovat pouze administrátor.' }, { status: 403 });
+  if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+    return NextResponse.json({ error: 'Sazby může spravovat pouze administrátor nebo manažer.' }, { status: 403 });
   }
 
   const { id: rateId } = await params;
@@ -44,12 +46,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Sazba nebyla nalezena.' }, { status: 404 });
   }
 
-  const raw = await request.json().catch(() => null) as Record<string, unknown> | null;
+  const raw = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   try {
     if (!raw) throw new Error('Neplatná data.');
 
-    if (raw.action === 'end') {
-      const validTo = new Date(String(raw.validTo ?? ''));
+    if (raw.action === 'end' || (raw.validTo && !raw.name)) {
+      const validTo = new Date(String(raw.validTo ?? new Date().toISOString().slice(0, 10)));
       if (Number.isNaN(validTo.getTime()) || validTo < old.validFrom) {
         throw new Error('Zadejte platné datum ukončení.');
       }
@@ -67,52 +69,56 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const data = parseRateInput(raw);
     const amountChanged = !old.amount.equals(data.amount) || old.currency !== data.currency;
 
-    if (amountChanged) {
-      if (data.validFrom <= old.validFrom) {
-        throw new Error('Nová sazba musí začínat po začátku původní sazby.');
-      }
+    if (amountChanged && data.validFrom > old.validFrom) {
       const previousEnd = new Date(data.validFrom);
       previousEnd.setUTCDate(previousEnd.getUTCDate() - 1);
 
-      await prisma.$transaction(async (tx) => {
-        await assertNoCompanyRateConflict(tx, data, rateId);
-        await tx.companyRate.update({
-          where: { id: rateId },
-          data: {
-            validTo: previousEnd,
-            isActive: false,
-            updatedByUserId: user.id,
-          },
-        });
-        await tx.companyRate.create({
-          data: {
-            ...data,
-            createdByUserId: user.id,
-            updatedByUserId: user.id,
-          },
-        });
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      await prisma.$transaction(
+        async (tx) => {
+          await assertNoCompanyRateConflict(tx, data, rateId);
+          await tx.companyRate.update({
+            where: { id: rateId },
+            data: {
+              validTo: previousEnd,
+              isActive: false,
+              updatedByUserId: user.id,
+            },
+          });
+          await tx.companyRate.create({
+            data: {
+              ...data,
+              createdByUserId: user.id,
+              updatedByUserId: user.id,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
 
       return NextResponse.json({ versioned: true });
     }
 
-    await prisma.$transaction(async (tx) => {
-      await assertNoCompanyRateConflict(tx, data, rateId);
-      await tx.companyRate.update({
-        where: { id: rateId },
-        data: {
-          name: data.name,
-          type: data.type,
-          workType: data.workType,
-          unit: data.unit,
-          note: data.note,
-          validFrom: data.validFrom,
-          validTo: data.validTo,
-          isActive: true,
-          updatedByUserId: user.id,
-        },
-      });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    await prisma.$transaction(
+      async (tx) => {
+        await assertNoCompanyRateConflict(tx, data, rateId);
+        await tx.companyRate.update({
+          where: { id: rateId },
+          data: {
+            name: data.name,
+            type: data.type,
+            amount: data.amount,
+            workType: data.workType,
+            unit: data.unit,
+            note: data.note,
+            validFrom: data.validFrom,
+            validTo: data.validTo,
+            isActive: true,
+            updatedByUserId: user.id,
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -130,4 +136,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     );
   }
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireApiAccess(['workEntries', 'myWorkEntries', 'settlements', 'mySettlements', 'settings']);
+  if (isApiDenied(user)) return user;
+  if (!user) {
+    return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
+  }
+
+  if (user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+    return NextResponse.json({ error: 'Sazby může mazat pouze administrátor nebo manažer.' }, { status: 403 });
+  }
+
+  const { id: rateId } = await params;
+  const existing = await prisma.companyRate.findUnique({ where: { id: rateId } });
+  if (!existing) {
+    return NextResponse.json({ error: 'Sazba nebyla nalezena.' }, { status: 404 });
+  }
+
+  await prisma.companyRate.delete({ where: { id: rateId } });
+  return NextResponse.json({ ok: true });
 }
