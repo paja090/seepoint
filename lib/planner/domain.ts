@@ -1,7 +1,7 @@
 export type Visibility = 'FREE_BUSY' | 'WORK_DETAILS' | 'FULL';
-export type SourceKind = 'WORK_TASK' | 'CRM_TASK' | 'QUICK_TASK';
+export type SourceKind = 'WORK_TASK' | 'CRM_TASK' | 'QUICK_TASK' | 'FIELD_TASK';
 export type Interval = { startAt: string; endAt: string };
-export type PlannerItem = Interval & { id: string; title: string; source: 'GOOGLE' | 'INTERNAL' | 'ABSENCE'; busy: boolean; allDay?: boolean; location?: string; editable?: boolean; version?: number; category?: string };
+export type PlannerItem = Interval & { id: string; title: string; source: 'GOOGLE' | 'INTERNAL' | 'ABSENCE' | 'FIELD_TRIP'; busy: boolean; allDay?: boolean; location?: string; editable?: boolean; version?: number; category?: string; href?: string };
 export type PlannerTask = { id: string; sourceKind: SourceKind; title: string; dueAt: string | null; priority: string; href: string; plannedMinutes: number | null };
 export type PlannerConfig = {
   timezone: string; workingDays: number[]; workingStart: string; workingEnd: string;

@@ -13,10 +13,27 @@ export async function userTimeline(actor: AuthenticatedPlannerActor, userId: str
   const members = await activeMembers(organizationId);
   if (!members.some(m => m.userId === userId) || (userId !== actor.id && !canSeeTeam(actor))) throw new PlannerError('Člen týmu není dostupný.', 403);
   const memberIds = members.map(m => m.userId);
-  const [blocks, calendars, absences] = await Promise.all([
+  const fromDateStr = from.toISOString().slice(0, 10);
+  const toDateStr = to.toISOString().slice(0, 10);
+  const [blocks, calendars, absences, employee, fieldPlans] = await Promise.all([
     prisma.plannerBlock.findMany({ where: { organizationId, userId, startAt: { lt: to }, endAt: { gt: from } }, orderBy: { startAt: 'asc' } }),
     hasModuleAccess(actor, 'googleCalendar', 'planner') ? prisma.externalCalendar.findMany({ where: { organizationId, selected: true, connection: { organizationId, status: 'CONNECTED', userId: { in: memberIds } }, OR: [{ connection: { userId } }, ...(shared ? [{ kind: 'COMPANY' }] : [])] }, include: { connection: { select: { userId: true } }, events: { where: { organizationId, startAt: { lt: to }, endAt: { gt: from } } } } }) : Promise.resolve([]),
     prisma.employeeAbsence.findMany({ where: { organizationId, employee: { userId, organizationId, isActive: true }, status: 'APPROVED', dateFrom: { lt: to }, dateTo: { gte: new Date(+from - 86400000) } }, select: { id: true, dateFrom: true, dateTo: true } }),
+    prisma.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } }),
+    prisma.fieldPlan.findMany({
+      where: {
+        organizationId,
+        date: { gte: fromDateStr, lte: toDateStr },
+        status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] },
+      },
+      select: {
+        id: true,
+        date: true,
+        planningSummary: true,
+        electionCampaignId: true,
+        electionCampaign: { select: { id: true, name: true } },
+      },
+    }),
   ]);
   const p = await preferencesFor(organizationId, userId, actor.organization?.plannerDefaults);
   const result: PlannerItem[] = blocks.map(b => ({ id: b.id, title: userId === actor.id ? b.title : 'Pracovní blok', startAt: b.startAt.toISOString(), endAt: b.endAt.toISOString(), source: 'INTERNAL', busy: true, editable: userId === actor.id, ...(userId === actor.id ? { version: b.version, category: b.category } : {}) }));
@@ -25,6 +42,40 @@ export async function userTimeline(actor: AuthenticatedPlannerActor, userId: str
     if (safe) result.push({ ...safe, busy: safe.busy && c.connection.userId === userId });
   }
   for (const a of absences) result.push({ id: a.id, title: 'Nepřítomnost', startAt: localInstant(a.dateFrom.toISOString().slice(0, 10), '00:00', p.timezone).toISOString(), endAt: localInstant(plusDays(a.dateTo.toISOString().slice(0, 10), 1), '00:00', p.timezone).toISOString(), source: 'ABSENCE', busy: true, allDay: true });
+  if (employee) {
+    for (const plan of fieldPlans) {
+      const summary = plan.planningSummary as unknown as { crews?: import('@/lib/field-planning/contracts').PlannedCrew[] };
+      if (Array.isArray(summary?.crews)) {
+        for (const crew of summary.crews) {
+          if (crew.employeeIds?.includes(employee.id) && crew.departureAt && crew.endAt) {
+            const stopCount = crew.stops?.length ?? 0;
+            if (stopCount > 0 && new Date(crew.endAt).getTime() > new Date(crew.departureAt).getTime()) {
+              const stopLabel = stopCount === 1 ? '1 zastávka' : stopCount < 5 ? `${stopCount} zastávky` : `${stopCount} zastávek`;
+              const title = plan.electionCampaign?.name
+                ? (userId === actor.id || canSeeTeam(actor) ? `Výjezd: ${plan.electionCampaign.name}` : 'Terénní výjezd')
+                : (userId === actor.id || canSeeTeam(actor) ? `Terénní výjezd (${stopLabel})` : 'Terénní výjezd');
+              const location = crew.vehicleName
+                ? `Vozidlo: ${crew.vehicleName} · ${stopLabel}`
+                : `${stopLabel} na trase`;
+              const href = plan.electionCampaignId
+                ? `/election-removal/${plan.electionCampaignId}/route`
+                : '/my-route';
+              result.push({
+                id: `field-plan:${plan.id}:${crew.id}`,
+                title,
+                startAt: crew.departureAt,
+                endAt: crew.endAt,
+                source: 'FIELD_TRIP',
+                busy: true,
+                location,
+                href,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
   return result.sort((a, b) => a.startAt.localeCompare(b.startAt));
 }
 export async function readPlanner(actor: AuthenticatedPlannerActor, date: string, view: string) {
