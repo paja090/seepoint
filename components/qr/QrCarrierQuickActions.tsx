@@ -377,11 +377,22 @@ export function QrCarrierQuickActions({
             <span className="text-[10px] text-slate-400 font-bold">{carrier.photosCount} fotek celkem</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {recentPhotos.map((p) => (
-              <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
-                <img src={p.url} alt="Nosič photo" className="w-full h-full object-cover" />
-              </div>
-            ))}
+            {recentPhotos.map((p) => {
+              const thumbSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : p.url;
+              const fullSrc = p.url || `/api/photos/${encodeURIComponent(p.id)}/file`;
+              return (
+                <a
+                  key={p.id}
+                  href={fullSrc}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Kliknutím otevřete fotografii v plném rozlišení"
+                  className="relative aspect-square rounded-xl overflow-hidden border border-slate-700 bg-slate-950 block"
+                >
+                  <img src={thumbSrc} alt="Nosič photo" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                </a>
+              );
+            })}
           </div>
         </div>
       )}

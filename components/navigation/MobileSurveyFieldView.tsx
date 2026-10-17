@@ -708,11 +708,12 @@ export function MobileSurveyFieldView({
                   {c.photos.length > 0 && (
                     <div className="flex items-center gap-2 overflow-x-auto pb-1">
                       {c.photos.map((p) => {
-                        const photoSrc = p.url || `/api/photos/${p.id}/file`;
+                        const thumbSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : p.url;
+                        const fullSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/file` : p.url;
                         return (
-                          <div key={p.id} className="relative size-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
-                            <Image src={photoSrc} alt={c.label} fill unoptimized className="object-cover" />
-                          </div>
+                          <a key={p.id} href={fullSrc} target="_blank" rel="noreferrer" className="relative size-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 block">
+                            <Image src={thumbSrc} alt={c.label} fill unoptimized className="object-cover" />
+                          </a>
                         );
                       })}
                     </div>

@@ -595,8 +595,10 @@ export function FieldSurveyPointDetail({
               <div className="relative group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={point.photos[0].url}
+                  src={`${point.photos[0].url}${point.photos[0].url.includes('?') ? '&' : '?'}thumbnail=1`}
                   alt="Fotografie bodu"
+                  loading="lazy"
+                  decoding="async"
                   onClick={() => window.open(point.photos[0].url, '_blank')}
                   className="w-full h-48 rounded-xl object-cover border border-slate-200 cursor-pointer"
                   title="Kliknutím otevřete fotografii v plném rozlišení"
@@ -628,8 +630,10 @@ export function FieldSurveyPointDetail({
                     <div key={photo.id || i} className="relative group flex-none">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={photo.url}
+                        src={`${photo.url}${photo.url.includes('?') ? '&' : '?'}thumbnail=1`}
                         alt={`Foto ${i + 2}`}
+                        loading="lazy"
+                        decoding="async"
                         onClick={() => window.open(photo.url, '_blank')}
                         className="h-16 w-16 rounded-lg object-cover border border-slate-200 cursor-pointer"
                         title="Kliknutím otevřete v plném rozlišení"

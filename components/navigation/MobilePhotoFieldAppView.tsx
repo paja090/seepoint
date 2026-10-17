@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { MOBILE_PHOTO_DAMAGE_TYPES, type MobilePhotoDamageType } from '@/lib/mobile-photo-damage';
 import { MobileCreateCarrierModal } from '@/components/navigation/MobileCreateCarrierModal';
+import { toPhotoFullUrl, toPhotoThumbnailUrl } from '@/lib/photo-url';
 import {
   processPhotoForUpload,
   getFriendlyPhotoErrorMessage,
@@ -785,9 +786,14 @@ export function MobilePhotoFieldAppView() {
 
                         <div className="flex items-center gap-2 shrink-0">
                           {surf.installedPhotoUrl && (
-                            <div className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0">
-                              <Image src={surf.installedPhotoUrl} alt="Foto" fill unoptimized className="object-cover" />
-                            </div>
+                            <a
+                              href={toPhotoFullUrl(surf.installedPhotoUrl)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0 block"
+                            >
+                              <Image src={toPhotoThumbnailUrl(surf.installedPhotoUrl)} alt="Foto" fill unoptimized className="object-cover" />
+                            </a>
                           )}
                           <button
                             type="button"
@@ -877,7 +883,8 @@ export function MobilePhotoFieldAppView() {
           const isSelected = selectedCarrier?.id === c.id;
           const distM = c.distanceKm ? Math.round(c.distanceKm * 1000) : null;
           const distText = distM !== null ? (distM < 1000 ? `${distM} m` : `${c.distanceKm?.toFixed(1)} km`) : null;
-          const thumbnail = c.surfaces.find((surface) => surface.latestPhotoUrl)?.latestPhotoUrl || c.photos[0]?.url || null;
+          const rawThumbnail = c.surfaces.find((surface) => surface.latestPhotoUrl)?.latestPhotoUrl || c.photos[0]?.url || null;
+          const thumbnail = rawThumbnail ? toPhotoThumbnailUrl(rawThumbnail, c.photos[0]?.id) : null;
 
           return (
             <div
@@ -1278,13 +1285,19 @@ export function MobilePhotoFieldAppView() {
               <span className="text-[11px] font-bold text-slate-400 block mb-2">Všechny fotografie nosiče i ploch ({selectedCarrier.photos.length}):</span>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {selectedCarrier.photos.map((p) => (
-                  <div key={p.id} className="shrink-0 relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 group">
-                    <Image src={p.url} alt="Fotografie nosiče" fill sizes="80px" unoptimized className="object-cover" />
+                  <a
+                    key={p.id}
+                    href={toPhotoFullUrl(p.url, p.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-900 group block"
+                  >
+                    <Image src={toPhotoThumbnailUrl(p.url, p.id)} alt="Fotografie nosiče" fill sizes="80px" unoptimized className="object-cover" />
                     <div className="absolute bottom-0 inset-x-0 bg-slate-950/80 px-1 py-0.5 text-[9px] text-slate-300 text-center truncate flex items-center justify-center gap-0.5">
                       {p.storageProvider === 'GOOGLE_DRIVE' ? <Cloud size={9} className="text-sky-400" /> : <HardDrive size={9} className="text-emerald-400" />}
                       {new Date(p.createdAt).toLocaleDateString('cs-CZ')}
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>

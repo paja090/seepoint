@@ -8,6 +8,7 @@ import type { OfferView, OfferItemView } from '@/lib/offers/view-model';
 import { CampaignLiveMap } from './CampaignLiveMap';
 import { PrintApprovalModule } from './PrintApprovalModule';
 import { getGoogleMapsRouteUrl } from '@/lib/navigation-documentation-export';
+import { toPhotoFullUrl, toPhotoThumbnailUrl } from '@/lib/photo-url';
 import {
   MapPin,
   Calendar,
@@ -847,13 +848,13 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                       {card.isInstallation ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Camera className="h-3.5 w-3.5" />}
                       <span>{card.badgeText}</span>
                     </div>
-                    <img src={card.url} alt={card.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                    <img src={toPhotoThumbnailUrl(card.url)} alt={card.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                     <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white font-black text-xs flex items-center justify-center shadow-md border-2 border-white">
                       {card.index}
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSelectedPhoto({ url: card.url, title: card.title, address: card.address, carrierCode: card.carrierCode, format: card.format, isInstallation: card.isInstallation })}
+                      onClick={() => setSelectedPhoto({ url: toPhotoFullUrl(card.url), title: card.title, address: card.address, carrierCode: card.carrierCode, format: card.format, isInstallation: card.isInstallation })}
                       className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
                     >
                       <span className="px-3.5 py-2 rounded-xl bg-white/95 text-slate-900 font-bold text-xs shadow-lg flex items-center gap-1.5">
@@ -905,7 +906,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         <span>Nainstalováno</span>
                       </div>
-                      <img src={primaryInstallPhoto.url} alt={carrierTitle} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                      <img src={toPhotoThumbnailUrl(primaryInstallPhoto.url, primaryInstallPhoto.id)} alt={carrierTitle} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
                       <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white font-black text-xs flex items-center justify-center shadow-md border-2 border-white">
                         {idx + 1}
                       </div>
@@ -916,7 +917,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                       )}
                       <button
                         type="button"
-                        onClick={() => setSelectedPhoto({ url: primaryInstallPhoto.url, title: carrierTitle, address: locationStr, carrierCode: carrier.code || 'Neznám', format, isInstallation: true })}
+                        onClick={() => setSelectedPhoto({ url: toPhotoFullUrl(primaryInstallPhoto.url, primaryInstallPhoto.id), title: carrierTitle, address: locationStr, carrierCode: carrier.code || 'Neznám', format, isInstallation: true })}
                         className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
                       >
                         <span className="px-3.5 py-2 rounded-xl bg-white/95 text-slate-900 font-bold text-xs shadow-lg flex items-center gap-1.5">

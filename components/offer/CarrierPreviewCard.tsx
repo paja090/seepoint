@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MapPin, CheckCircle, Sparkles, Maximize2, Camera } from 'lucide-react';
 import type { ProposalCarrier } from '@/lib/offers/presentation';
 import { MEDIA_TYPE_META, TONE_CLASSES, formatCzk } from '@/lib/offers/presentation';
+import { toPhotoThumbnailUrl, toPhotoFullUrl } from '@/lib/photo-url';
 
 const statusMeta: Record<string, { label: string; className: string }> = {
   AVAILABLE: { label: 'Volný', className: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
@@ -35,7 +36,10 @@ export function CarrierPreviewCard({
 
   const handlePhotoClick = () => {
     if (onOpenPhoto && currentPhoto.url) {
-      onOpenPhoto(currentPhoto.url, `${carrier.code} – ${carrier.city}, ${carrier.locality}`);
+      onOpenPhoto(
+        toPhotoFullUrl(currentPhoto.url, 'id' in currentPhoto ? currentPhoto.id : undefined),
+        `${carrier.code} – ${carrier.city}, ${carrier.locality}`
+      );
     }
   };
 
@@ -53,8 +57,10 @@ export function CarrierPreviewCard({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt={carrier.imageAlt}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer"
-          src={currentPhoto.url || '/placeholder.svg'}
+          src={toPhotoThumbnailUrl(currentPhoto.url, 'id' in currentPhoto ? currentPhoto.id : undefined) || '/placeholder.svg'}
           onClick={handlePhotoClick}
         />
 
@@ -120,7 +126,7 @@ export function CarrierPreviewCard({
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" className="size-full object-cover" />
+              <img src={toPhotoThumbnailUrl(p.url, p.id)} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
             </button>
           ))}
         </div>
