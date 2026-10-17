@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import type { OfferItemView } from '@/lib/offers/view-model';
 import { getPointPinColor } from '@/lib/offers/navigation-carrier-types';
 import { getGoogleMapsRouteUrl } from '@/lib/navigation-documentation-export';
+import { toPhotoThumbnailUrl } from '@/lib/photo-url';
 
 export interface NavigationMapPointInput {
   id: string;
@@ -270,7 +271,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         validNavPoints.forEach((point, index) => {
           bounds.extend([point.latitude, point.longitude]);
 
-          const photo = point.installedPhotoUrl;
+          const photo = toPhotoThumbnailUrl(point.installedPhotoUrl);
           const isInstalled = point.status === 'INSTALLED' || Boolean(point.installedPhotoUrl);
           const arrowStr = formatArrowText(point.arrowDirectionEnum);
           const distStr = formatDistance(point);
@@ -308,7 +309,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
 
           const popupContent = `
             <div style="font-family: sans-serif; min-width: 230px; max-width: 290px; padding: 2px;">
-              ${photo ? `<img src="${photo}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0;" />` : ''}
+              ${photo ? `<img src="${photo}" loading="lazy" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e2e8f0;" />` : ''}
               <div style="font-size: 10px; font-weight: 800; color: #009EE2; text-transform: uppercase;">
                 ${point.pillarNumber ? `SLOUP VO ${point.pillarNumber}` : `BOD ${index + 1}`} · ${point.navigationType || 'SMĚROVÁ TABULE'}${variantBadge}
               </div>
@@ -359,7 +360,8 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
           const lat = item.surface.carrier.latitude!;
           const lng = item.surface.carrier.longitude!;
           const carrier = item.surface.carrier;
-          const photo = item.surface.photos?.[0]?.url;
+          const firstPhoto = item.surface.photos?.[0];
+          const photo = toPhotoThumbnailUrl(firstPhoto?.url, firstPhoto?.id);
 
           bounds.extend([lat, lng]);
 

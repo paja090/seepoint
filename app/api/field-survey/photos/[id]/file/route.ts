@@ -4,6 +4,7 @@ import { enterTenantContext } from '@/lib/tenant-context';
 import { canAccess } from '@/lib/rbac';
 import { prisma } from '@/lib/db';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
+import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +16,7 @@ export const runtime = 'nodejs';
  * Přístup je podmíněn RBAC sekcí 'fieldSurvey' a tenant isolation.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getCurrentUser();
@@ -57,6 +58,60 @@ export async function GET(
     const stored = await readStoredPhoto(photo);
     if (!stored) {
       return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
+    }
+
+    const urlObj = new URL(request.url);
+    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
+
+    if (isThumbnail) {
+      let inputBuffer: Buffer | null = null;
+      if (stored.body) {
+        if (Buffer.isBuffer(stored.body)) {
+          inputBuffer = stored.body;
+        } else if (stored.body instanceof ArrayBuffer) {
+          inputBuffer = Buffer.from(stored.body);
+        } else if (stored.body instanceof Uint8Array) {
+          inputBuffer = Buffer.from(stored.body);
+        } else {
+          const ab = await new Response(stored.body as BodyInit).arrayBuffer();
+          inputBuffer = Buffer.from(ab);
+        }
+      } else if (stored.redirectUrl) {
+        try {
+          const remoteRes = await fetch(stored.redirectUrl, { cache: 'no-store' });
+          if (remoteRes.ok) {
+            inputBuffer = Buffer.from(await remoteRes.arrayBuffer());
+          }
+        } catch (fetchErr) {
+          console.warn('[field-survey/photos/file] Remote fetch for thumbnail failed', fetchErr);
+        }
+      }
+
+      if (inputBuffer) {
+        try {
+          const resized = await sharp(inputBuffer)
+            .rotate()
+            .resize({
+              width: 600,
+              height: 600,
+              fit: 'inside',
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+          return new Response(new Uint8Array(resized), {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/webp',
+              'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          });
+        } catch (sharpErr) {
+          console.warn('[field-survey/photos/file] Sharp resize failed, falling back to original', sharpErr);
+        }
+      }
     }
 
     if (stored.redirectUrl) {

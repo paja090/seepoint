@@ -27,6 +27,7 @@ import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/
 import { canUploadNavigationArtwork } from '@/lib/offers/navigation-artwork-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
+import { toPhotoFullUrl, toPhotoThumbnailUrl } from '@/lib/photo-url';
 
 const money = (val: string | number | null | undefined) =>
   new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(
@@ -811,12 +812,13 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         className="mt-3 overflow-hidden rounded-xl border border-slate-200 cursor-zoom-in relative group"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveLightboxImage(String(activePhoto));
+                          setActiveLightboxImage(toPhotoFullUrl(String(activePhoto)));
                         }}
                       >
                         <img
-                          src={String(activePhoto)}
+                          src={toPhotoThumbnailUrl(String(activePhoto))}
                           alt={`Fotografie a vizualizace nosiče – ${point.label}`}
+                          loading="lazy"
                           className="h-48 w-full object-cover group-hover:scale-105 transition duration-300"
                         />
                         <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-xs">

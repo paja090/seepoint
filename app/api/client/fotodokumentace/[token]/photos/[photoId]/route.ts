@@ -46,24 +46,31 @@ export async function GET(
       return NextResponse.json({ error: 'Soubor fotografie není dostupný.' }, { status: 404 });
     }
 
-    if (file.redirectUrl) {
-      return NextResponse.redirect(file.redirectUrl, 307);
-    }
-
     const urlObj = new URL(request.url);
     const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
 
-    if (isThumbnail && file.body) {
+    if (isThumbnail) {
       let inputBuffer: Buffer | null = null;
-      if (Buffer.isBuffer(file.body)) {
-        inputBuffer = file.body;
-      } else if (file.body instanceof ArrayBuffer) {
-        inputBuffer = Buffer.from(file.body);
-      } else if (file.body instanceof Uint8Array) {
-        inputBuffer = Buffer.from(file.body);
-      } else {
-        const ab = await new Response(file.body as BodyInit).arrayBuffer();
-        inputBuffer = Buffer.from(ab);
+      if (file.body) {
+        if (Buffer.isBuffer(file.body)) {
+          inputBuffer = file.body;
+        } else if (file.body instanceof ArrayBuffer) {
+          inputBuffer = Buffer.from(file.body);
+        } else if (file.body instanceof Uint8Array) {
+          inputBuffer = Buffer.from(file.body);
+        } else {
+          const ab = await new Response(file.body as BodyInit).arrayBuffer();
+          inputBuffer = Buffer.from(ab);
+        }
+      } else if (file.redirectUrl) {
+        try {
+          const remoteRes = await fetch(file.redirectUrl, { cache: 'no-store' });
+          if (remoteRes.ok) {
+            inputBuffer = Buffer.from(await remoteRes.arrayBuffer());
+          }
+        } catch (fetchErr) {
+          console.warn('[client fotodokumentace photo] Remote fetch for thumbnail failed', fetchErr);
+        }
       }
 
       if (inputBuffer) {
@@ -91,6 +98,10 @@ export async function GET(
           console.warn('[client fotodokumentace photo] Sharp resize failed, falling back to original', sharpError);
         }
       }
+    }
+
+    if (file.redirectUrl) {
+      return NextResponse.redirect(file.redirectUrl, 307);
     }
 
     const contentType = file.contentType || photo.mimeType || 'image/jpeg';
