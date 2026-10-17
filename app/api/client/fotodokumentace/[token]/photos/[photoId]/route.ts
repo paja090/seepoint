@@ -1,129 +1,141 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { resolvePublicCampaignPortalToken } from '@/lib/election-removal/client-portal';
-import { downloadFileFromGoogleDrive } from '@/lib/storage/google-drive';
+import { prisma } from '@/lib/db';
+import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
+import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { readStoredPhoto } from '@/lib/storage/photo-storage';
 import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
-type RouteContext = {
-  params: Promise<{ token: string; photoId: string }>;
-};
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request, context: RouteContext) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ token: string; photoId: string }> }
+) {
   try {
-    const { token, photoId } = await context.params;
-    const url = new URL(request.url);
-    const isThumbnail = url.searchParams.get('thumbnail') === '1';
-
-    const resolved = await resolvePublicCampaignPortalToken(token);
-    if (!resolved) {
-      return NextResponse.json({ error: 'Neplatný nebo expirovaný odkaz.' }, { status: 404 });
+    const { token, photoId } = await params;
+    const campaignId = verifyCampaignAlbumSlug(token);
+    if (!campaignId) {
+      return NextResponse.json({ error: 'Neplatný token.' }, { status: 400 });
     }
 
-    const link = await prisma.electionPointPhoto.findFirst({
-      where: {
-        photoId,
-        point: {
-          campaignId: resolved.campaignId,
+    const campaign = await enterPublicCampaignAlbumTenant(token);
+    if (!campaign) {
+      return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+    }
+
+    const urlObj = new URL(request.url);
+    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
+    const cacheKey = `photo:${photoId}`;
+
+    if (isThumbnail) {
+      const photoMeta = await prisma.photo.findFirst({
+        where: {
+          id: photoId,
+          organizationId: campaign.organizationId,
+          isPrivate: false,
         },
-      },
-      select: {
-        photoId: true,
-        point: {
-          select: {
-            clientName: true,
-            layerName: true,
+        select: {
+          id: true,
+          electionRemovalPoint: {
+            select: { campaignId: true },
           },
         },
-      },
-    });
-
-    if (!link) {
-      return NextResponse.json({ error: 'Fotografie nenalezena v tomto albu.' }, { status: 404 });
-    }
-
-    if (resolved.clientFilter) {
-      const normalizedFilter = resolved.clientFilter.trim().toLocaleLowerCase('cs');
-      const pClient = (link.point.clientName || link.point.layerName || '').trim().toLocaleLowerCase('cs');
-      if (pClient !== normalizedFilter) {
-        return NextResponse.json({ error: 'Fotografie nepatří do klientského filtru.' }, { status: 403 });
+      });
+      if (!photoMeta || photoMeta.electionRemovalPoint?.campaignId !== campaign.id) {
+        return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
       }
-    }
-
-    const cacheKey = `photo:${photoId}`;
-    if (isThumbnail) {
       const cachedThumb = getCachedThumbnail(cacheKey);
       if (cachedThumb) {
-        return new NextResponse(new Uint8Array(cachedThumb), {
+        return new Response(new Uint8Array(cachedThumb), {
           status: 200,
           headers: {
             'Content-Type': 'image/webp',
             'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+            'X-Content-Type-Options': 'nosniff',
           },
         });
       }
     }
 
-    const photo = await prisma.photo.findUnique({
-      where: { id: photoId },
-      select: {
-        id: true,
-        fileName: true,
-        filePath: true,
-        mimeType: true,
-        content: true,
+    const photo = await prisma.photo.findFirst({
+      where: {
+        id: photoId,
+        organizationId: campaign.organizationId,
+        isPrivate: false,
+      },
+      include: {
+        electionRemovalPoint: {
+          select: { campaignId: true },
+        },
       },
     });
 
-    if (!photo) {
-      return NextResponse.json({ error: 'Fotografie nenalezena.' }, { status: 404 });
+    if (!photo || photo.electionRemovalPoint?.campaignId !== campaign.id) {
+      return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
     }
 
-    let rawBuffer: Buffer | null = null;
-    let mimeType = photo.mimeType || 'image/jpeg';
-
-    if (photo.filePath.startsWith('gdrive:')) {
-      const fileId = photo.filePath.slice('gdrive:'.length).trim();
-      if (fileId) {
-        const downloaded = await downloadFileFromGoogleDrive(fileId);
-        rawBuffer = downloaded.buffer;
-        mimeType = downloaded.mimeType || mimeType;
-      }
-    }
-
-    if (!rawBuffer && photo.content) {
-      rawBuffer = Buffer.from(photo.content);
-    }
-
-    if (!rawBuffer) {
-      return NextResponse.json({ error: 'Obsah fotografie nenalezen.' }, { status: 404 });
+    const file = await readStoredPhoto(photo);
+    if (!file) {
+      return NextResponse.json({ error: 'Soubor fotografie není dostupný.' }, { status: 404 });
     }
 
     if (isThumbnail) {
-      try {
-        const thumbBuffer = await generateWebpThumbnail(cacheKey, rawBuffer);
+      let inputBuffer: Buffer | null = null;
+      if (file.body) {
+        if (Buffer.isBuffer(file.body)) {
+          inputBuffer = file.body;
+        } else if (file.body instanceof ArrayBuffer) {
+          inputBuffer = Buffer.from(file.body);
+        } else if (file.body instanceof Uint8Array) {
+          inputBuffer = Buffer.from(file.body);
+        } else {
+          const ab = await new Response(file.body as BodyInit).arrayBuffer();
+          inputBuffer = Buffer.from(ab);
+        }
+      } else if (file.redirectUrl) {
+        try {
+          const remoteRes = await fetch(file.redirectUrl, { cache: 'no-store' });
+          if (remoteRes.ok) {
+            inputBuffer = Buffer.from(await remoteRes.arrayBuffer());
+          }
+        } catch (fetchErr) {
+          console.warn('[client fotodokumentace photo] Remote fetch for thumbnail failed', fetchErr);
+        }
+      }
 
-        return new NextResponse(new Uint8Array(thumbBuffer), {
-          status: 200,
-          headers: {
-            'Content-Type': 'image/webp',
-            'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
-          },
-        });
-      } catch {
-        // Fallback to original image if sharp resize fails
+      if (inputBuffer) {
+        try {
+          const resized = await generateWebpThumbnail(cacheKey, inputBuffer);
+
+          return new Response(new Uint8Array(resized), {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/webp',
+              'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          });
+        } catch (sharpError) {
+          console.warn('[client fotodokumentace photo] Sharp resize failed, falling back to original', sharpError);
+        }
       }
     }
 
-    return new NextResponse(new Uint8Array(rawBuffer), {
+    if (file.redirectUrl) {
+      return NextResponse.redirect(file.redirectUrl, 307);
+    }
+
+    const contentType = file.contentType || photo.mimeType || 'image/jpeg';
+    return new Response(file.body, {
       status: 200,
       headers: {
-        'Content-Type': mimeType,
-        'Content-Disposition': `inline; filename="${encodeURIComponent(photo.fileName)}"`,
-        'Cache-Control': 'public, max-age=86400',
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
       },
     });
   } catch (error) {
-    console.error('Failed to serve public campaign photo:', error);
-    return NextResponse.json({ error: 'Chyba při načítání fotografie.' }, { status: 500 });
+    console.error('Chyba při servírování klientské fotografie:', error);
+    return NextResponse.json({ error: 'Chyba při čtení fotografie.' }, { status: 500 });
   }
 }
