@@ -25,6 +25,7 @@ export default async function ElectionRemovalPage() {
   const campaigns = await prisma.electionCampaign.findMany({
     where: {
       organizationId: user.organization!.id,
+      status: { not: 'ARCHIVED' },
     },
     orderBy: {
       createdAt: 'desc',

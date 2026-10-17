@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Camera,
   Layers,
@@ -19,6 +20,8 @@ import {
   X,
   Maximize2,
   Image as ImageIcon,
+  Trash2,
+  Loader2,
 } from 'lucide-react';
 import {
   CampaignPhotoAlbum,
@@ -76,6 +79,14 @@ export function UnifiedPhotoDocumentationView({
   initialAlbumId,
   initialSource,
 }: UnifiedPhotoDocumentationViewProps) {
+  const router = useRouter();
+  const [albumItems, setAlbumItems] = useState<UnifiedAlbumItem[]>(albums);
+  const [deletingAlbumId, setDeletingAlbumId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAlbumItems(albums);
+  }, [albums]);
+
   const [activeTab, setActiveTab] = useState<'ALBUMS' | 'FEED' | 'MAP'>('ALBUMS');
   const [sourceFilter, setSourceFilter] = useState<'ALL' | 'FIELD_WORK' | 'NAVIGATION'>(
     initialSource === 'FIELD_WORK'
@@ -96,7 +107,7 @@ export function UnifiedPhotoDocumentationView({
   // Available filter options dynamically extracted from albums
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    albums.forEach((a) => {
+    albumItems.forEach((a) => {
       if (a.year) {
         years.add(a.year);
       } else {
@@ -105,11 +116,11 @@ export function UnifiedPhotoDocumentationView({
       }
     });
     return Array.from(years).sort((a, b) => b - a);
-  }, [albums]);
+  }, [albumItems]);
 
   const availableClients = useMemo(() => {
     const clientMap = new Map<string, number>();
-    albums.forEach((a) => {
+    albumItems.forEach((a) => {
       const client = a.clientName?.trim();
       if (client) {
         clientMap.set(client, (clientMap.get(client) || 0) + 1);
@@ -118,7 +129,7 @@ export function UnifiedPhotoDocumentationView({
     return Array.from(clientMap.entries())
       .sort((a, b) => a[0].localeCompare(b[0], 'cs'))
       .map(([name, count]) => ({ name, count }));
-  }, [albums]);
+  }, [albumItems]);
 
   const periodOptions = [
     { value: 'ALL', label: 'Všechna období' },
@@ -130,7 +141,7 @@ export function UnifiedPhotoDocumentationView({
 
   // Filtered albums list
   const filteredAlbums = useMemo(() => {
-    return albums.filter((a) => {
+    return albumItems.filter((a) => {
       if (sourceFilter !== 'ALL' && a.source !== sourceFilter) return false;
 
       // Year filter
@@ -165,7 +176,7 @@ export function UnifiedPhotoDocumentationView({
 
       return true;
     });
-  }, [albums, sourceFilter, selectedYear, selectedPeriod, selectedClient, searchQuery]);
+  }, [albumItems, sourceFilter, selectedYear, selectedPeriod, selectedClient, searchQuery]);
 
   // Grouped albums for sections
   interface AlbumGroup {
@@ -247,8 +258,8 @@ export function UnifiedPhotoDocumentationView({
   // Selected album object
   const activeAlbum = useMemo(() => {
     if (!selectedAlbumId) return null;
-    return albums.find((a) => a.id === selectedAlbumId) || null;
-  }, [albums, selectedAlbumId]);
+    return albumItems.find((a) => a.id === selectedAlbumId) || null;
+  }, [albumItems, selectedAlbumId]);
 
   // Filtered recent photos for live feed and map
   const filteredRecentPhotos = useMemo(() => {
@@ -267,16 +278,16 @@ export function UnifiedPhotoDocumentationView({
   }, [recentPhotos, searchQuery]);
 
   const totalPhotosCount = useMemo(() => {
-    return albums.reduce((sum, a) => sum + a.photosCount, 0);
-  }, [albums]);
+    return albumItems.reduce((sum, a) => sum + a.photosCount, 0);
+  }, [albumItems]);
 
   const uniqueClientsCount = useMemo(() => {
     const clients = new Set<string>();
-    albums.forEach((a) => {
+    albumItems.forEach((a) => {
       if (a.clientName) clients.add(a.clientName.trim());
     });
     return clients.size;
-  }, [albums]);
+  }, [albumItems]);
 
   const handleCopyLink = async (url: string, id: string) => {
     try {
@@ -286,6 +297,44 @@ export function UnifiedPhotoDocumentationView({
       setTimeout(() => setCopiedLink(null), 2500);
     } catch (e) {
       console.error('Failed to copy link', e);
+    }
+  };
+
+  const handleDeleteAlbum = async (album: UnifiedAlbumItem, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const confirmed = window.confirm(
+      `Opravdu chcete smazat album „${album.displayTitle || album.title}“?\n\nFotografie zůstanou bezpečně uloženy v systému a na disku, odstraní se pouze toto album a jeho veřejný odkaz.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingAlbumId(album.id);
+      const url =
+        album.source === 'NAVIGATION'
+          ? `/api/navigation/documentation/${encodeURIComponent(album.id)}`
+          : `/api/election-removal/campaigns/${encodeURIComponent(album.id)}`;
+
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Nepodařilo se smazat album.');
+      }
+
+      setAlbumItems((prev) => prev.filter((a) => a.id !== album.id));
+      if (selectedAlbumId === album.id) {
+        setSelectedAlbumId(null);
+      }
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při mazání alba.');
+    } finally {
+      setDeletingAlbumId(null);
     }
   };
 
@@ -478,6 +527,20 @@ export function UnifiedPhotoDocumentationView({
         >
           <Download className="w-4 h-4" />
         </a>
+
+        <button
+          type="button"
+          onClick={(e) => handleDeleteAlbum(album, e)}
+          disabled={deletingAlbumId === album.id}
+          title="Smazat album (fotografie zůstanou bezpečně zachovány)"
+          className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition disabled:opacity-50"
+        >
+          {deletingAlbumId === album.id ? (
+            <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+        </button>
       </div>
     </div>
   );
@@ -509,7 +572,7 @@ export function UnifiedPhotoDocumentationView({
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-xs text-center">
             <div className="text-[11px] font-semibold text-slate-500 uppercase">Alba zakázek</div>
-            <div className="text-lg font-black text-slate-900">{albums.length}</div>
+            <div className="text-lg font-black text-slate-900">{albumItems.length}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-xs text-center">
             <div className="text-[11px] font-semibold text-slate-500 uppercase">Klienti</div>
@@ -759,12 +822,35 @@ export function UnifiedPhotoDocumentationView({
                   <span className="text-xs font-semibold text-slate-500">
                     Zdroj: <strong className="text-slate-800">{activeAlbum.sourceLabel}</strong>
                   </span>
-                  <Link
-                    href={`/election-removal/${activeAlbum.id}`}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-sky-700 underline"
+                  {activeAlbum.source === 'FIELD_WORK' && (
+                    <Link
+                      href={`/election-removal/${activeAlbum.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-sky-700 underline"
+                    >
+                      Detail zakázky →
+                    </Link>
+                  )}
+                  {activeAlbum.source === 'NAVIGATION' && (
+                    <Link
+                      href="/navigation/documentation"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-sky-700 underline"
+                    >
+                      Správa reportů →
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAlbum(activeAlbum)}
+                    disabled={deletingAlbumId === activeAlbum.id}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition disabled:opacity-50"
                   >
-                    Detail zakázky →
-                  </Link>
+                    {deletingAlbumId === activeAlbum.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>Smazat album</span>
+                  </button>
                 </div>
               </div>
 

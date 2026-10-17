@@ -31,7 +31,10 @@ export async function GET() {
 
   try {
     const campaigns = await prisma.electionCampaign.findMany({
-      where: { organizationId: auth.organizationId },
+      where: {
+        organizationId: auth.organizationId,
+        status: { not: 'ARCHIVED' },
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {

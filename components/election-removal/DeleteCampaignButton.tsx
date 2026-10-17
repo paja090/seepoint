@@ -29,7 +29,7 @@ export function DeleteCampaignButton({
     e.stopPropagation();
 
     const confirmed = window.confirm(
-      `Opravdu chcete smazat akci „${campaignName}“?\n\nBudou nevratně odstraněny všechny importované body, naplánované trasy a fotodokumentace.`
+      `Opravdu chcete smazat akci „${campaignName}“?\n\nAkce a naplánované trasy budou odstraněny. Fotografie zůstanou bezpečně uloženy v systému a na disku.`
     );
 
     if (!confirmed) return;
