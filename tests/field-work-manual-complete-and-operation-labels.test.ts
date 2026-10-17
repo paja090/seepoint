@@ -120,7 +120,7 @@ test('2. Fotodokumentace navigation album isolates client labels and photos on s
   const itemForAsko = {
     id: 'item-asko-1',
     carrierId: carrierWithSharedPole.id,
-    navigationPoint: null, // Legacy / carrier-based item
+    navigationPoint: null as { label?: string } | null, // Legacy / carrier-based item
     carrier: carrierWithSharedPole,
     selectedPhoto: {
       // Suppose it was mistakenly pointing to KFC's photo in legacy data

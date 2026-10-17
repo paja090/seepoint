@@ -276,7 +276,7 @@ export default async function PhotoDocumentationHubPage({
   // Transform Navigation Documentation into Unified Albums
   const navigationAlbums: UnifiedAlbumItem[] = navigationReports.map((r) => {
     const points: InternalPointWithPhotos[] = r.items
-      .map((it) => {
+      .map((it): InternalPointWithPhotos | null => {
         const clientSurface = it.carrier?.surfaces?.find((s) => s.currentClientId === r.clientId) ?? null;
         const snap = it.snapshot as { pointCode?: string; address?: string; direction?: string; city?: string } | null;
 
