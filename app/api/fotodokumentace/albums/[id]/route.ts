@@ -95,7 +95,6 @@ export async function DELETE(
             label: true,
             description: true,
             layerName: true,
-            clientName: true,
             photos: { select: { id: true } },
           },
         },
