@@ -137,11 +137,11 @@ export function getCampaignOperationLabel(
   }
 
   const nameLower = (campaignName || '').toLowerCase();
-  const isInstallByName = /montáž|instalac|osazení|výlep/i.test(nameLower);
+  const isRemovalByName = /demontáž|odstraněn|snesení|likvidac/i.test(nameLower);
+  const isInstallByName = !isRemovalByName && /montáž|instalac|osazení|výlep/i.test(nameLower);
   const isRelocationByName = /přesun|relokac/i.test(nameLower);
   const isReplaceByName = /výměn|přelep|prelep/i.test(nameLower);
   const isInspectionByName = /kontrol|reviz/i.test(nameLower);
-  const isRemovalByName = /demontáž|odstraněn|snesení|likvidac/i.test(nameLower);
 
   const installCount = (counts['INSTALL_OBJECT'] || 0) + (counts['INSTALL_AD'] || 0);
   const removalCount = (counts['REMOVE_OBJECT'] || 0) + (counts['REMOVE_AD'] || 0) + (counts['FULL_REMOVAL'] || 0);
