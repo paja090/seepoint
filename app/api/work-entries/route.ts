@@ -202,7 +202,7 @@ export async function POST(request: Request) {
   try {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Validate / resolve employee
-      let targetEmployee = cleanEmployeeId
+      const targetEmployee = cleanEmployeeId
         ? await tx.employee.findUnique({ where: { id: cleanEmployeeId } })
         : await tx.employee.findFirst({ where: { OR: [{ userId: user.id }, { email: user.email }] } });
 
