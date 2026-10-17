@@ -1,113 +1,123 @@
-import { enterTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
-import { prisma } from '@/lib/db';
-import { readStoredPhoto } from '@/lib/storage/photo-storage';
+import { prisma } from '@/lib/prisma';
+import { getRequestActor } from '@/lib/api-auth';
 import { canReadPhoto } from '@/lib/photo-access';
-import sharp from 'sharp';
+import { downloadFileFromGoogleDrive } from '@/lib/storage/google-drive';
+import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
-export const runtime = 'nodejs';
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: 'Přihlášení je vyžadováno.' }, { status: 401 });
-  if (!user.organizationId) return NextResponse.json({ error: 'Vyberte organizaci.' }, { status: 403 });
-  enterTenantContext({ organizationId: user.organizationId, userId: user.id, source: 'session' });
+const THUMBNAIL_HEADERS = {
+  'Content-Type': 'image/webp',
+  'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+};
 
-  const { id } = await params;
-
+export async function GET(_request: Request, context: RouteContext) {
   try {
-    const photo = await prisma.photo.findUnique({
-      where: { id, organizationId: user.organizationId },
+    const { id } = await context.params;
+    const actor = await getRequestActor();
+    if (!actor) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // First query lightweight metadata without pulling `content` bytea from PostgreSQL
+    const photoMeta = await prisma.photo.findUnique({
+      where: { id },
       select: {
         id: true,
-        url: true,
-        driveFileId: true,
-        storageKey: true,
-        storageProvider: true,
-        content: true,
-        fileName: true,
+        filePath: true,
         mimeType: true,
-        employeeId: true,
-        type: true,
-        workEntryId: true,
-        workOrderItemId: true,
-        isPrivate: true,
+        organizationId: true,
+        rentalId: true,
         carrierId: true,
         surfaceId: true,
-        siteNavigationPoints: { take: 1, select: { id: true } },
+        rental: {
+          select: {
+            organizationId: true,
+            carrier: {
+              select: {
+                organizationId: true,
+                ownerId: true,
+              },
+            },
+          },
+        },
+        carrier: {
+          select: {
+            organizationId: true,
+            ownerId: true,
+          },
+        },
+        surface: {
+          select: {
+            carrier: {
+              select: {
+                organizationId: true,
+                ownerId: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    if (!photo || (!photo.driveFileId && !photo.content && !photo.url)) {
-      return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
+    if (!photoMeta || !canReadPhoto(actor, photoMeta)) {
+      return NextResponse.json({ error: 'Fotografie nenalezena' }, { status: 404 });
     }
 
-    if (!await canReadPhoto(user, photo)) {
-      return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+    const cacheKey = `photo:${photoMeta.id}`;
+    const cachedThumb = getCachedThumbnail(cacheKey);
+    if (cachedThumb) {
+      return new NextResponse(new Uint8Array(cachedThumb), {
+        status: 200,
+        headers: THUMBNAIL_HEADERS,
+      });
     }
 
-    const stored = await readStoredPhoto(photo);
-    if (!stored) {
-      return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
-    }
+    let rawBuffer: Buffer | null = null;
 
-    // Extract raw bytes buffer
-    let inputBuffer: Buffer | null = null;
-    if (stored.body) {
-      if (Buffer.isBuffer(stored.body)) {
-        inputBuffer = stored.body;
-      } else if (stored.body instanceof ArrayBuffer) {
-        inputBuffer = Buffer.from(stored.body);
-      } else if (stored.body instanceof Uint8Array) {
-        inputBuffer = Buffer.from(stored.body);
-      } else {
-        const arrayBuf = await new Response(stored.body as BodyInit).arrayBuffer();
-        inputBuffer = Buffer.from(arrayBuf);
-      }
-    } else if (stored.redirectUrl) {
-      try {
-        const res = await fetch(stored.redirectUrl, { signal: AbortSignal.timeout(5000) });
-        if (res.ok) {
-          const arrayBuf = await res.arrayBuffer();
-          inputBuffer = Buffer.from(arrayBuf);
-        }
-      } catch {
-        // Fallback to redirect below
+    if (photoMeta.filePath.startsWith('gdrive:')) {
+      const fileId = photoMeta.filePath.slice('gdrive:'.length).trim();
+      if (fileId) {
+        const downloaded = await downloadFileFromGoogleDrive(fileId);
+        rawBuffer = downloaded.buffer;
       }
     }
 
-    if (!inputBuffer) {
-      return NextResponse.redirect(new URL(`/api/photos/${encodeURIComponent(id)}/file`, request.url), 307);
+    if (!rawBuffer) {
+      const photoContent = await prisma.photo.findUnique({
+        where: { id },
+        select: { content: true },
+      });
+      if (photoContent?.content) {
+        rawBuffer = Buffer.from(photoContent.content);
+      }
+    }
+
+    if (!rawBuffer) {
+      return NextResponse.json({ error: 'Obsah fotografie nenalezen' }, { status: 404 });
     }
 
     try {
-      const resized = await sharp(inputBuffer)
-        .rotate()
-        .resize({
-          width: 400,
-          height: 400,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 80 })
-        .toBuffer();
+      const thumbnailBuffer = await generateWebpThumbnail(cacheKey, rawBuffer);
 
-      return new Response(new Uint8Array(resized), {
+      return new NextResponse(new Uint8Array(thumbnailBuffer), {
+        status: 200,
+        headers: THUMBNAIL_HEADERS,
+      });
+    } catch {
+      return new NextResponse(new Uint8Array(rawBuffer), {
         status: 200,
         headers: {
-          'Content-Type': 'image/webp',
-          'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ? photo.fileName.replace(/\.[^/.]+$/, '.webp') : 'thumbnail.webp')}`,
-          'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
-          'X-Content-Type-Options': 'nosniff',
+          'Content-Type': photoMeta.mimeType || 'image/jpeg',
+          'Cache-Control': 'private, max-age=3600',
         },
       });
-    } catch (sharpError) {
-      console.warn('[thumbnail] Sharp resize failed, falling back to original file', sharpError);
-      return NextResponse.redirect(new URL(`/api/photos/${encodeURIComponent(id)}/file`, request.url), 307);
     }
   } catch (error) {
-    console.error('Photo thumbnail failed', error instanceof Error ? error.message : 'unknown error');
-    return NextResponse.redirect(new URL(`/api/photos/${encodeURIComponent(id)}/file`, request.url), 307);
+    console.error('Failed to serve photo thumbnail:', error);
+    return NextResponse.json({ error: 'Chyba při načítání náhledu fotografie' }, { status: 500 });
   }
 }

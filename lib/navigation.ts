@@ -49,20 +49,20 @@ export const navigationHubs: NavigationHub[] = [
     ] }
   ] },
   { id: 'operations', label: 'Provoz & Realizace', icon: 'wrench', groups: [
+    { label: 'Realizace', items: [
+      ["/fotodokumentace","Fotodokumentace","camera","photoDocumentation"],
+      ["/election-removal","Terénní práce","truck","electionRemoval"],
+      ["/work/route","Pracovní výjezd","route","work"],
+      ["/work","Plán práce","briefcaseBusiness","work"],
+      ["/tasks","Všechny úkoly","clipboardList","tasks"],
+      ["/production","Výroba, Tisk & Grafika","printer","printProduction"]
+    ] },
     { label: 'Moje agenda', items: [
       ["/planner","Planner","calendarRange","planner"],
       ["/my-tasks","Moje úkoly","calendarCheck","myTasks"],
       ["/my-work-entries","Moje odvedená práce","clipboardCheck","myWorkEntries"],
       ["/my-settlements","Moje vyúčtování","fileText","mySettlements"],
       ["/vacations","Dovolená & Volno","calendarRange","team"]
-    ] },
-    { label: 'Realizace', items: [
-      ["/work","Plán práce","briefcaseBusiness","work"],
-      ["/work/route","Pracovní výjezd","route","work"],
-      ["/election-removal","Terénní práce","truck","electionRemoval"],
-      ["/fotodokumentace","Fotodokumentace","camera","photoDocumentation"],
-      ["/tasks","Všechny úkoly","clipboardList","tasks"],
-      ["/production","Výroba, Tisk & Grafika","printer","printProduction"]
     ] },
     { label: 'Interní provoz', items: [
       ["/shopping","Nákupy","shoppingBag","team"],

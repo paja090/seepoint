@@ -26,138 +26,137 @@ export default async function PhotoDocumentationHubPage({
   const organizationId = user.organizationId;
   if (!organizationId) notFound();
 
-  // 1. Fetch Field Work (Terénní práce) campaigns with photos
-  const electionCampaigns = await prisma.electionCampaign.findMany({
-    where: { organizationId, status: { not: 'ARCHIVED' } },
-    include: {
-      points: {
-        include: {
-          photos: {
-            where: { isPrivate: false },
-            select: {
-              id: true,
-              type: true,
-              fileName: true,
-              createdAt: true,
-              capturedLatitude: true,
-              capturedLongitude: true,
-              capturedByWorkerName: true,
-              fieldWorkStepId: true,
+  // Load Field Work campaigns, Navigation Documentation reports, and Recent Photos in parallel
+  const [electionCampaigns, navigationReports, rawRecentPhotos] = await Promise.all([
+    prisma.electionCampaign.findMany({
+      where: { organizationId, status: { not: 'ARCHIVED' } },
+      include: {
+        points: {
+          include: {
+            photos: {
+              where: { isPrivate: false },
+              select: {
+                id: true,
+                type: true,
+                fileName: true,
+                createdAt: true,
+                capturedLatitude: true,
+                capturedLongitude: true,
+                capturedByWorkerName: true,
+                fieldWorkStepId: true,
+              },
+              orderBy: { createdAt: 'desc' },
             },
-            orderBy: { createdAt: 'desc' },
           },
+          orderBy: { label: 'asc' },
         },
-        orderBy: { label: 'asc' },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  // 2. Fetch Navigation Documentation (Navigační reklama VO) reports with items
-  const navigationReports = await prisma.navigationDocumentationReport.findMany({
-    where: { organizationId, status: { not: 'ARCHIVED' } },
-    include: {
-      client: { select: { id: true, name: true } },
-      items: {
-        where: { isVisible: true },
-        include: {
-          selectedPhoto: {
-            select: {
-              id: true,
-              type: true,
-              fileName: true,
-              createdAt: true,
-              capturedLatitude: true,
-              capturedLongitude: true,
-              capturedByWorkerName: true,
-              surfaceId: true,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.navigationDocumentationReport.findMany({
+      where: { organizationId, status: { not: 'ARCHIVED' } },
+      include: {
+        client: { select: { id: true, name: true } },
+        items: {
+          where: { isVisible: true },
+          include: {
+            selectedPhoto: {
+              select: {
+                id: true,
+                type: true,
+                fileName: true,
+                createdAt: true,
+                capturedLatitude: true,
+                capturedLongitude: true,
+                capturedByWorkerName: true,
+                surfaceId: true,
+              },
             },
-          },
-          navigationPoint: {
-            select: {
-              id: true,
-              label: true,
-              latitude: true,
-              longitude: true,
+            navigationPoint: {
+              select: {
+                id: true,
+                label: true,
+                latitude: true,
+                longitude: true,
+              },
             },
-          },
-          carrier: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              address: true,
-              city: true,
-              surfaces: {
-                select: {
-                  id: true,
-                  name: true,
-                  directionDescription: true,
-                  currentClientId: true,
-                  photos: {
-                    where: { isPrivate: false },
-                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
-                    select: {
-                      id: true,
-                      type: true,
-                      fileName: true,
-                      createdAt: true,
-                      capturedLatitude: true,
-                      capturedLongitude: true,
-                      capturedByWorkerName: true,
+            carrier: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                address: true,
+                city: true,
+                surfaces: {
+                  select: {
+                    id: true,
+                    name: true,
+                    directionDescription: true,
+                    currentClientId: true,
+                    photos: {
+                      where: { isPrivate: false },
+                      orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                      take: 1,
+                      select: {
+                        id: true,
+                        type: true,
+                        fileName: true,
+                        createdAt: true,
+                        capturedLatitude: true,
+                        capturedLongitude: true,
+                        capturedByWorkerName: true,
+                      },
                     },
                   },
                 },
               },
             },
           },
-        },
-        orderBy: { sortOrder: 'asc' },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  // 3. Fetch Recent Photos stream for live feed and map
-  const rawRecentPhotos = await prisma.photo.findMany({
-    where: {
-      organizationId,
-      isPrivate: false,
-      OR: [
-        { electionRemovalPointId: { not: null } },
-        { navigationDocumentationItems: { some: {} } },
-        { workOrderItemId: { not: null } },
-        { carrierId: { not: null } },
-      ],
-    },
-    select: {
-      id: true,
-      type: true,
-      fileName: true,
-      createdAt: true,
-      capturedLatitude: true,
-      capturedLongitude: true,
-      capturedByWorkerName: true,
-      electionRemovalPoint: {
-        select: {
-          id: true,
-          label: true,
-          layerName: true,
-          description: true,
-          campaign: { select: { id: true, name: true, clientName: true } },
+          orderBy: { sortOrder: 'asc' },
         },
       },
-      carrier: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.photo.findMany({
+      where: {
+        organizationId,
+        isPrivate: false,
+        OR: [
+          { electionRemovalPointId: { not: null } },
+          { navigationDocumentationItems: { some: {} } },
+          { workOrderItemId: { not: null } },
+          { carrierId: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        type: true,
+        fileName: true,
+        createdAt: true,
+        capturedLatitude: true,
+        capturedLongitude: true,
+        capturedByWorkerName: true,
+        electionRemovalPoint: {
+          select: {
+            id: true,
+            label: true,
+            layerName: true,
+            description: true,
+            campaign: { select: { id: true, name: true, clientName: true } },
+          },
+        },
+        carrier: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 60,
-  });
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+    }),
+  ]);
 
   // Transform Election Campaigns into Unified Albums (grouped by client when a campaign spans multiple clients)
   const fieldWorkAlbums: UnifiedAlbumItem[] = electionCampaigns.flatMap((c) => {

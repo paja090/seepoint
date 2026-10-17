@@ -377,6 +377,7 @@ export function PublicCampaignAlbumView({
                       src={`${photo.url}?thumbnail=1`}
                       alt={point.label}
                       loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">
@@ -487,6 +488,12 @@ export function PublicCampaignAlbumView({
             <img
               src={activeLightboxItem.photo.url}
               alt={activeLightboxItem.point.label}
+              style={{
+                backgroundImage: `url(${activeLightboxItem.photo.url}?thumbnail=1)`,
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
               className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl"
             />
 

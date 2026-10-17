@@ -441,6 +441,8 @@ export function UnifiedPhotoDocumentationView({
             <img
               src={album.coverPhotoUrl}
               alt={album.displayTitle || album.title}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
             />
           ) : (
@@ -1028,6 +1030,16 @@ export function UnifiedPhotoDocumentationView({
             <img
               src={lightboxPhoto.url}
               alt={lightboxPhoto.fileName || ''}
+              style={
+                lightboxPhoto.id
+                  ? {
+                      backgroundImage: `url(/api/photos/${encodeURIComponent(lightboxPhoto.id)}/thumbnail)`,
+                      backgroundSize: 'contain',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                    }
+                  : undefined
+              }
               className="max-h-[75vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl"
             />
 
