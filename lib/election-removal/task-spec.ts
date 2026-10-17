@@ -119,3 +119,58 @@ export function taskInstructions(p: {
     p.accessInstructions,
   ].filter(Boolean).join('. ');
 }
+
+export function getCampaignOperationLabel(
+  points: Array<{ operationType?: string | null }>,
+  campaignName?: string,
+): {
+  progressLabel: string;
+  badgeLabel: string;
+  verbDoneLabel: string;
+} {
+  const counts: Record<string, number> = {};
+  for (const p of points) {
+    const op = p.operationType;
+    if (op) {
+      counts[op] = (counts[op] || 0) + 1;
+    }
+  }
+
+  const nameLower = (campaignName || '').toLowerCase();
+  const isInstallByName = /montáž|instalac|osazení|výlep/i.test(nameLower);
+  const isRelocationByName = /přesun|relokac/i.test(nameLower);
+  const isReplaceByName = /výměn|přelep|prelep/i.test(nameLower);
+  const isInspectionByName = /kontrol|reviz/i.test(nameLower);
+  const isRemovalByName = /demontáž|odstraněn|snesení|likvidac/i.test(nameLower);
+
+  const installCount = (counts['INSTALL_OBJECT'] || 0) + (counts['INSTALL_AD'] || 0);
+  const removalCount = (counts['REMOVE_OBJECT'] || 0) + (counts['REMOVE_AD'] || 0) + (counts['FULL_REMOVAL'] || 0);
+  const relocationCount = counts['RELOCATION'] || 0;
+  const replaceCount = (counts['REPLACE_AD'] || 0) + (counts['BANNER_CHANGE'] || 0);
+  const inspectionCount = counts['INSPECTION'] || 0;
+
+  if (installCount > 0 && installCount >= removalCount && installCount >= relocationCount) {
+    return { progressLabel: 'Postup montáže', badgeLabel: 'Montáž', verbDoneLabel: 'namontováno' };
+  }
+  if (relocationCount > 0 && relocationCount >= removalCount && relocationCount >= installCount) {
+    return { progressLabel: 'Postup přesunu', badgeLabel: 'Přesun', verbDoneLabel: 'přesunuto' };
+  }
+  if (replaceCount > 0 && replaceCount >= removalCount && replaceCount >= installCount) {
+    return { progressLabel: 'Postup výměny', badgeLabel: 'Výměna', verbDoneLabel: 'vyměněno' };
+  }
+  if (inspectionCount > 0 && inspectionCount >= removalCount) {
+    return { progressLabel: 'Postup kontroly', badgeLabel: 'Kontrola', verbDoneLabel: 'zkontrolováno' };
+  }
+  if (removalCount > 0) {
+    return { progressLabel: 'Postup demontáže', badgeLabel: 'Demontáž', verbDoneLabel: 'demontováno' };
+  }
+
+  // Fallbacks by campaign name if points operationType is not explicitly set
+  if (isInstallByName) return { progressLabel: 'Postup montáže', badgeLabel: 'Montáž', verbDoneLabel: 'namontováno' };
+  if (isRelocationByName) return { progressLabel: 'Postup přesunu', badgeLabel: 'Přesun', verbDoneLabel: 'přesunuto' };
+  if (isReplaceByName) return { progressLabel: 'Postup výměny', badgeLabel: 'Výměna', verbDoneLabel: 'vyměněno' };
+  if (isInspectionByName) return { progressLabel: 'Postup kontroly', badgeLabel: 'Kontrola', verbDoneLabel: 'zkontrolováno' };
+  if (isRemovalByName) return { progressLabel: 'Postup demontáže', badgeLabel: 'Demontáž', verbDoneLabel: 'demontováno' };
+
+  return { progressLabel: 'Postup realizace', badgeLabel: 'Terénní práce', verbDoneLabel: 'dokončeno' };
+}

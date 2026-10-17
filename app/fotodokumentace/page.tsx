@@ -70,6 +70,7 @@ export default async function PhotoDocumentationHubPage({
               capturedLatitude: true,
               capturedLongitude: true,
               capturedByWorkerName: true,
+              surfaceId: true,
             },
           },
           navigationPoint: {
@@ -85,6 +86,29 @@ export default async function PhotoDocumentationHubPage({
               id: true,
               code: true,
               name: true,
+              address: true,
+              city: true,
+              surfaces: {
+                select: {
+                  id: true,
+                  name: true,
+                  directionDescription: true,
+                  currentClientId: true,
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: [{ isClientVisible: 'desc' }, { isPrimary: 'desc' }, { createdAt: 'desc' }],
+                    select: {
+                      id: true,
+                      type: true,
+                      fileName: true,
+                      createdAt: true,
+                      capturedLatitude: true,
+                      capturedLongitude: true,
+                      capturedByWorkerName: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -252,31 +276,60 @@ export default async function PhotoDocumentationHubPage({
   // Transform Navigation Documentation into Unified Albums
   const navigationAlbums: UnifiedAlbumItem[] = navigationReports.map((r) => {
     const points: InternalPointWithPhotos[] = r.items
-      .filter((it) => it.selectedPhoto)
-      .map((it) => ({
-        id: it.id,
-        label: it.navigationPoint?.label || it.carrier?.name || `Bod ${it.carrier?.code || it.id.slice(-4)}`,
-        description: it.carrier?.code ? `Nosič: ${it.carrier.code}` : null,
-        clientName: r.client?.name || 'Klient VO',
-        quantity: 1,
-        operationType: 'INSPECTION',
-        latitude: it.navigationPoint?.latitude || 0,
-        longitude: it.navigationPoint?.longitude || 0,
-        photos: it.selectedPhoto
-          ? [
-              {
-                id: it.selectedPhoto.id,
-                url: `/api/photos/${encodeURIComponent(it.selectedPhoto.id)}/file`,
-                type: it.selectedPhoto.type,
-                fileName: it.selectedPhoto.fileName,
-                createdAt: it.selectedPhoto.createdAt,
-                capturedLatitude: it.selectedPhoto.capturedLatitude,
-                capturedLongitude: it.selectedPhoto.capturedLongitude,
-                capturedByWorkerName: it.selectedPhoto.capturedByWorkerName,
-              },
-            ]
-          : [],
-      }));
+      .map((it) => {
+        const clientSurface = it.carrier?.surfaces?.find((s) => s.currentClientId === r.clientId) ?? null;
+        const snap = it.snapshot as { pointCode?: string; address?: string; direction?: string; city?: string } | null;
+
+        // Isolate selected photo: if it.selectedPhoto is attached to another surface, prefer client surface photo
+        let effectivePhoto = it.selectedPhoto;
+        if (clientSurface && effectivePhoto?.surfaceId && effectivePhoto.surfaceId !== clientSurface.id) {
+          if (clientSurface.photos && clientSurface.photos.length > 0) {
+            effectivePhoto = { ...clientSurface.photos[0], surfaceId: clientSurface.id };
+          }
+        }
+        if (!effectivePhoto && clientSurface?.photos && clientSurface.photos.length > 0) {
+          effectivePhoto = { ...clientSurface.photos[0], surfaceId: clientSurface.id };
+        }
+
+        if (!effectivePhoto) return null;
+
+        // Strict client-isolated label: NEVER use it.carrier?.name because on shared poles it belongs to another client
+        const label =
+          clientSurface?.name ||
+          it.navigationPoint?.label ||
+          (it.carrier?.address
+            ? `${it.carrier.address}${clientSurface?.directionDescription ? ` · ${clientSurface.directionDescription}` : ''}`
+            : `Bod ${it.carrier?.code || it.id.slice(-4)}`);
+
+        const description = [
+          it.carrier?.code ? `Nosič: ${it.carrier.code}` : null,
+          clientSurface?.directionDescription || snap?.direction || null,
+        ].filter(Boolean).join(' · ') || null;
+
+        return {
+          id: it.id,
+          label,
+          description,
+          clientName: r.client?.name || 'Klient VO',
+          quantity: 1,
+          operationType: 'INSPECTION',
+          latitude: it.navigationPoint?.latitude || effectivePhoto.capturedLatitude || 0,
+          longitude: it.navigationPoint?.longitude || effectivePhoto.capturedLongitude || 0,
+          photos: [
+            {
+              id: effectivePhoto.id,
+              url: `/api/photos/${encodeURIComponent(effectivePhoto.id)}/file`,
+              type: effectivePhoto.type,
+              fileName: effectivePhoto.fileName,
+              createdAt: effectivePhoto.createdAt,
+              capturedLatitude: effectivePhoto.capturedLatitude,
+              capturedLongitude: effectivePhoto.capturedLongitude,
+              capturedByWorkerName: effectivePhoto.capturedByWorkerName,
+            },
+          ],
+        };
+      })
+      .filter((p): p is InternalPointWithPhotos => p !== null);
 
     const allPhotos = points.flatMap((p) => p.photos);
     const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;

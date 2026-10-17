@@ -34,6 +34,7 @@ import {
   type ResourceEmployee,
   type ResourceVehicle,
 } from './EditCrewModal';
+import { getCampaignOperationLabel } from '@/lib/election-removal/task-spec';
 
 interface PointWithPhotos extends ElectionRemovalPoint {
   photos?: Photo[];
@@ -123,6 +124,7 @@ export function MobileRouteExecutionView({
   }, [points]);
 
   // Distinct crews
+  const opLabel = useMemo(() => getCampaignOperationLabel(points, campaign.name), [points, campaign.name]);
   const crews = useMemo(() => {
     const set = new Set<string>();
     points.forEach((p) => {
@@ -342,7 +344,7 @@ export function MobileRouteExecutionView({
         {/* Progress bar */}
         <div className="space-y-1">
           <div className="flex justify-between text-[11px] font-semibold text-slate-500">
-            <span>Postup demontáže trasy</span>
+            <span>{opLabel.progressLabel} trasy</span>
             <span>{percentDone} %</span>
           </div>
           <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">

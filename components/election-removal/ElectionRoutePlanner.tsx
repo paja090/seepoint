@@ -9,6 +9,7 @@ import {
   Users,
   Plus,
   Trash2,
+  Wrench,
   Sparkles,
   CheckCircle2,
   AlertTriangle,
@@ -56,6 +57,47 @@ interface ElectionRoutePlannerProps {
   initialDepot?: { latitude: number; longitude: number };
   initialSelectedPointIds?: string[];
   parentPlanId?: string;
+}
+
+function getCampaignDefaultOperation(campaign: ElectionCampaign): string {
+  if (campaign.mediaDefaults && typeof campaign.mediaDefaults === 'object') {
+    const md = campaign.mediaDefaults as Record<string, unknown>;
+    if (typeof md.defaultOperation === 'string' && md.defaultOperation) {
+      return md.defaultOperation;
+    }
+    if (md.purpose === 'INSTALLATION') return 'INSTALL_AD';
+    if (md.purpose === 'REMOVAL') return 'REMOVE_AD';
+    if (md.purpose === 'RELOCATION') return 'RELOCATION';
+    if (md.purpose === 'INSPECTION') return 'INSPECTION';
+  }
+  const name = (campaign.name || '').toLowerCase();
+  if (
+    name.includes('deinstal') ||
+    name.includes('demont') ||
+    name.includes('odstran') ||
+    name.includes('volby') ||
+    name.includes('removal')
+  ) {
+    return 'REMOVE_AD';
+  }
+  if (
+    name.includes('instal') ||
+    name.includes('montaz') ||
+    name.includes('montáž') ||
+    name.includes('vylep') ||
+    name.includes('výlep')
+  ) {
+    return 'INSTALL_AD';
+  }
+  if (
+    name.includes('presun') ||
+    name.includes('přesun') ||
+    name.includes('prevoz') ||
+    name.includes('převoz')
+  ) {
+    return 'RELOCATION';
+  }
+  return 'REMOVE_AD';
 }
 
 export function ElectionRoutePlanner({
@@ -108,23 +150,60 @@ export function ElectionRoutePlanner({
     ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'].includes(p.status)
   );
 
+  const campaignDefaultOp = useMemo(() => getCampaignDefaultOperation(campaign), [campaign]);
+
+  const getPointEffectiveOp = (p: ElectionRemovalPoint): string => {
+    return p.operationType || campaignDefaultOp;
+  };
+
+  const unassignedPoints = useMemo(
+    () => pendingPoints.filter((p) => !p.operationType),
+    [pendingPoints]
+  );
+  const [isBatchSetting, setIsBatchSetting] = useState(false);
+  const [batchSettingError, setBatchSettingError] = useState<string | null>(null);
+
+  const handleBatchSetOperation = async (operationType: string) => {
+    if (unassignedPoints.length === 0) return;
+    setIsBatchSetting(true);
+    setBatchSettingError(null);
+    try {
+      const res = await fetch('/api/election-removal/points/batch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pointIds: unassignedPoints.map((p) => p.id),
+          changes: { operationType, materialDisposition: 'LEAVE' },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Nastavení prací selhalo.');
+      router.refresh();
+    } catch (err: unknown) {
+      setBatchSettingError(err instanceof Error ? err.message : 'Nastavení prací selhalo.');
+    } finally {
+      setIsBatchSetting(false);
+    }
+  };
+
   const [planOperationFilter, setPlanOperationFilter] = useState<'ALL' | 'INSTALL' | 'REMOVE' | 'RELOCATION'>('ALL');
 
   const filteredPendingPoints = useMemo(() => {
     return pendingPoints.filter((p) => {
+      const op = getPointEffectiveOp(p);
       if (planOperationFilter === 'ALL') return true;
       if (planOperationFilter === 'INSTALL') {
-        return (p.operationType && p.operationType.startsWith('INSTALL')) || p.operationType === 'REPLACE_AD';
+        return (op && op.startsWith('INSTALL')) || op === 'REPLACE_AD';
       }
       if (planOperationFilter === 'REMOVE') {
-        return p.operationType && p.operationType.startsWith('REMOVE');
+        return op && op.startsWith('REMOVE');
       }
       if (planOperationFilter === 'RELOCATION') {
-        return p.operationType === 'RELOCATION';
+        return op === 'RELOCATION';
       }
       return true;
     });
-  }, [pendingPoints, planOperationFilter]);
+  }, [pendingPoints, planOperationFilter, campaignDefaultOp]);
 
   // Point Selection Mode: 'ALL' (all pending points) vs 'CUSTOM' (hand-picked on map)
   const [pointSelectionMode, setPointSelectionMode] = useState<'ALL' | 'CUSTOM'>(
@@ -275,6 +354,20 @@ export function ElectionRoutePlanner({
       return;
     }
 
+    const targetPointIds =
+      pointSelectionMode === 'CUSTOM'
+        ? Array.from(selectedPointIds)
+        : planOperationFilter !== 'ALL'
+        ? filteredPendingPoints.map((p) => p.id)
+        : undefined;
+
+    if (targetPointIds !== undefined && targetPointIds.length === 0) {
+      setCalculationError(
+        'Pro vybraný typ výjezdu nebyly nalezeny žádné body k naplánování. Vyberte jiný typ výjezdu nebo označte body v mapě.'
+      );
+      return;
+    }
+
     setIsCalculating(true);
     setCalculationError(null);
     setPlanningResult(null);
@@ -292,12 +385,7 @@ export function ElectionRoutePlanner({
           vehicleCapacitySlots,
           warehouseUnloadMinutes,
           filterMediaType: selectedMediumFilter,
-          selectedPointIds:
-            pointSelectionMode === 'CUSTOM'
-              ? Array.from(selectedPointIds)
-              : planOperationFilter !== 'ALL'
-              ? filteredPendingPoints.map((p) => p.id)
-              : undefined,
+          selectedPointIds: targetPointIds,
           depot: {
             latitude: parseFloat(depotLat) || 50.08804,
             longitude: parseFloat(depotLng) || 14.42076,
@@ -399,6 +487,48 @@ export function ElectionRoutePlanner({
           </div>
         </div>
 
+        {/* 1-Click Batch Fix Banner for unassigned points */}
+        {unassignedPoints.length > 0 && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <span className="text-xs font-bold text-amber-900">
+                  {unassignedPoints.length} {unassignedPoints.length === 1 ? 'bod nemá' : unassignedPoints.length < 5 ? 'body nemají' : 'bodů nemá'} v databázi explicitně zapsaný typ práce (převzato podle akce: {campaignDefaultOp === 'REMOVE_AD' ? 'Deinstalace' : campaignDefaultOp === 'INSTALL_AD' ? 'Instalace' : 'Přesun'})
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-700">
+                Chcete-li body trvale uložit, můžete jim jedním kliknutím nastavit typ:
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                disabled={isBatchSetting}
+                onClick={() => handleBatchSetOperation('REMOVE_AD')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isBatchSetting ? 'Ukládám…' : 'Zapsat všem Deinstalaci'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={isBatchSetting}
+                onClick={() => handleBatchSetOperation('INSTALL_AD')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                <Wrench className="w-3.5 h-3.5" />
+                <span>{isBatchSetting ? 'Ukládám…' : 'Zapsat všem Instalaci'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+        {batchSettingError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 font-medium">
+            {batchSettingError}
+          </div>
+        )}
+
         {/* Trip Purpose / Operation Selector */}
         <div className="space-y-2 rounded-xl bg-slate-50/70 p-3.5 border border-slate-200">
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -428,7 +558,10 @@ export function ElectionRoutePlanner({
               onClick={() => {
                 setPlanOperationFilter('INSTALL');
                 const matchIds = pendingPoints
-                  .filter((p) => (p.operationType?.startsWith('INSTALL') || p.operationType === 'REPLACE_AD'))
+                  .filter((p) => {
+                    const op = getPointEffectiveOp(p);
+                    return op?.startsWith('INSTALL') || op === 'REPLACE_AD';
+                  })
                   .map((p) => p.id);
                 setSelectedPointIds(new Set(matchIds));
               }}
@@ -440,7 +573,10 @@ export function ElectionRoutePlanner({
             >
               <span className="text-xs font-bold">🛠️ Instalace</span>
               <span className="text-[11px] text-slate-500 font-normal">
-                {pendingPoints.filter((p) => (p.operationType?.startsWith('INSTALL') || p.operationType === 'REPLACE_AD')).length} k instalaci
+                {pendingPoints.filter((p) => {
+                  const op = getPointEffectiveOp(p);
+                  return op?.startsWith('INSTALL') || op === 'REPLACE_AD';
+                }).length} k instalaci
               </span>
             </button>
 
@@ -449,7 +585,7 @@ export function ElectionRoutePlanner({
               onClick={() => {
                 setPlanOperationFilter('REMOVE');
                 const matchIds = pendingPoints
-                  .filter((p) => p.operationType?.startsWith('REMOVE'))
+                  .filter((p) => getPointEffectiveOp(p)?.startsWith('REMOVE'))
                   .map((p) => p.id);
                 setSelectedPointIds(new Set(matchIds));
               }}
@@ -461,7 +597,7 @@ export function ElectionRoutePlanner({
             >
               <span className="text-xs font-bold">🗑️ Deinstalace</span>
               <span className="text-[11px] text-slate-500 font-normal">
-                {pendingPoints.filter((p) => p.operationType?.startsWith('REMOVE')).length} k demontáži
+                {pendingPoints.filter((p) => getPointEffectiveOp(p)?.startsWith('REMOVE')).length} k demontáži
               </span>
             </button>
 
@@ -470,7 +606,7 @@ export function ElectionRoutePlanner({
               onClick={() => {
                 setPlanOperationFilter('RELOCATION');
                 const matchIds = pendingPoints
-                  .filter((p) => p.operationType === 'RELOCATION')
+                  .filter((p) => getPointEffectiveOp(p) === 'RELOCATION')
                   .map((p) => p.id);
                 setSelectedPointIds(new Set(matchIds));
               }}
@@ -482,7 +618,7 @@ export function ElectionRoutePlanner({
             >
               <span className="text-xs font-bold">🚚 Převozy</span>
               <span className="text-[11px] text-slate-500 font-normal">
-                {pendingPoints.filter((p) => p.operationType === 'RELOCATION').length} k přesunu
+                {pendingPoints.filter((p) => getPointEffectiveOp(p) === 'RELOCATION').length} k přesunu
               </span>
             </button>
           </div>

@@ -16,6 +16,7 @@ import {
 import { DeleteCampaignButton } from '@/components/election-removal/DeleteCampaignButton';
 import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
 import { ProjectSubNav } from '@/components/navigation/ProjectSubNav';
+import { getCampaignOperationLabel } from '@/lib/election-removal/task-spec';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,7 @@ export default async function ElectionRemovalPage() {
       createdAt: 'desc',
     },
     include: {
-      points: { select: { quantity: true, status: true } },
+      points: { select: { quantity: true, status: true, operationType: true } },
       _count: {
         select: {
           fieldPlans: true,
@@ -45,7 +46,8 @@ export default async function ElectionRemovalPage() {
     const completedPoints = c.points
       .filter((p) => p.status === 'COMPLETED')
       .reduce((sum, p) => sum + p.quantity, 0);
-    return { ...c, totalPoints, completedPoints };
+    const operationLabel = getCampaignOperationLabel(c.points, c.name);
+    return { ...c, totalPoints, completedPoints, operationLabel };
   });
 
   // Calculate totals
@@ -109,14 +111,14 @@ export default async function ElectionRemovalPage() {
               {totalCampaigns}
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Registrované přesuny a demontáže
+              Registrované terénní akce
             </p>
           </div>
 
           <div className="card p-5">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Nosičů k demontáži
+                Aktivních bodů k realizaci
               </p>
               <MapPin className="w-5 h-5 text-amber-600" />
             </div>
@@ -124,7 +126,7 @@ export default async function ElectionRemovalPage() {
               {totalPoints} ks
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Fyzických médií ze všech kampaní
+              Fyzických médií ze všech akcí
             </p>
           </div>
 
@@ -139,7 +141,7 @@ export default async function ElectionRemovalPage() {
               {totalCompleted} ks
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Úspěšně demontováno a ověřeno
+              Úspěšně realizováno a ověřeno
             </p>
           </div>
         </div>
@@ -224,7 +226,7 @@ export default async function ElectionRemovalPage() {
                     {/* Progress */}
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
                       <div className="flex justify-between text-xs text-slate-600 font-medium">
-                        <span>Postup demontáže</span>
+                        <span>{c.operationLabel.progressLabel}</span>
                         <span>
                           {c.completedPoints} / {c.totalPoints} ks ({percentDone} %)
                         </span>
