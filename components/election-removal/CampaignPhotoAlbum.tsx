@@ -124,9 +124,7 @@ export function CampaignPhotoAlbum({
       .sort((a, b) => b.photoCount - a.photoCount || a.name.localeCompare(b.name, 'cs'));
   }, [points, clientName]);
 
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(
-    availablePeriods.length > 0 ? availablePeriods[0] : 'ALL'
-  );
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL');
   const [selectedClient, setSelectedClient] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'INSTALL' | 'DEINSTALL' | 'CONTROL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -462,6 +460,7 @@ export function CampaignPhotoAlbum({
                       src={`/api/photos/${encodeURIComponent(photo.id)}/thumbnail`}
                       alt={point.label}
                       loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
 
@@ -554,6 +553,12 @@ export function CampaignPhotoAlbum({
             <img
               src={`/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/file`}
               alt={activeLightboxItem.point.label}
+              style={{
+                backgroundImage: `url(/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/thumbnail)`,
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
               className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl"
             />
 

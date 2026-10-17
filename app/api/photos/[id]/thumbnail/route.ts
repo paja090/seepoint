@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
 import { canReadPhoto } from '@/lib/photo-access';
-import sharp from 'sharp';
+import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +17,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   try {
-    const photo = await prisma.photo.findUnique({
+    // Check lightweight metadata first without reading large `content` bytea column
+    const photoMeta = await prisma.photo.findUnique({
       where: { id, organizationId: user.organizationId },
       select: {
         id: true,
@@ -25,7 +26,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         driveFileId: true,
         storageKey: true,
         storageProvider: true,
-        content: true,
         fileName: true,
         mimeType: true,
         employeeId: true,
@@ -39,12 +39,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (!photo || (!photo.driveFileId && !photo.content && !photo.url)) {
+    if (!photoMeta) {
       return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
     }
 
-    if (!await canReadPhoto(user, photo)) {
+    if (!await canReadPhoto(user, photoMeta)) {
       return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
+    }
+
+    const cacheKey = `photo:${photoMeta.id}`;
+    const cachedThumb = getCachedThumbnail(cacheKey);
+    if (cachedThumb) {
+      return new Response(new Uint8Array(cachedThumb), {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/webp',
+          'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photoMeta.fileName ? photoMeta.fileName.replace(/\.[^/.]+$/, '.webp') : 'thumbnail.webp')}`,
+          'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      });
+    }
+
+    const photoContentRow = await prisma.photo.findUnique({
+      where: { id, organizationId: user.organizationId },
+      select: { content: true },
+    });
+    const photo = { ...photoMeta, content: photoContentRow?.content ?? null };
+
+    if (!photo.driveFileId && !photo.content && !photo.url && !photo.storageKey) {
+      return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
     }
 
     const stored = await readStoredPhoto(photo);
@@ -82,16 +106,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 
     try {
-      const resized = await sharp(inputBuffer)
-        .rotate()
-        .resize({
-          width: 400,
-          height: 400,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .webp({ quality: 80 })
-        .toBuffer();
+      const resized = await generateWebpThumbnail(cacheKey, inputBuffer);
 
       return new Response(new Uint8Array(resized), {
         status: 200,

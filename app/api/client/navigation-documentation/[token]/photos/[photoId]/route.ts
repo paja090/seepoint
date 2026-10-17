@@ -4,7 +4,7 @@ import { hashToken } from '@/lib/navigation-documentation';
 import { downloadPhotoFromGoogleDrive, GoogleDriveConfigurationError } from '@/lib/google-drive';
 import { enterPublicNavigationReportTenant } from '@/lib/public-tenant';
 import { isClientApprovedPhoto } from '@/lib/navigation-documentation-policy';
-import sharp from 'sharp';
+import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
 export const runtime = 'nodejs';
 
@@ -74,6 +74,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     const urlObj = new URL(request.url);
     const isDownload = urlObj.searchParams.get('download') === '1';
     const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
+    const cacheKey = `photo:${photoId}`;
+
+    if (isThumbnail && !isDownload) {
+      const cachedThumb = getCachedThumbnail(cacheKey);
+      if (cachedThumb) {
+        return new Response(new Uint8Array(cachedThumb), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/webp',
+            'Content-Disposition': 'inline',
+            'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        });
+      }
+    }
+
     const disposition = isDownload
       ? `attachment; filename*=UTF-8''${encodeURIComponent(photo.fileName ?? `foto-${photoId}.jpg`)}`
       : 'inline';
@@ -110,16 +127,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
     if (isThumbnail && !isDownload && rawBuffer) {
       try {
-        const resized = await sharp(rawBuffer)
-          .rotate()
-          .resize({
-            width: 600,
-            height: 600,
-            fit: 'inside',
-            withoutEnlargement: true,
-          })
-          .webp({ quality: 80 })
-          .toBuffer();
+        const resized = await generateWebpThumbnail(cacheKey, rawBuffer);
 
         return new Response(new Uint8Array(resized), {
           status: 200,

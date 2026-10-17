@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
 import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
-import sharp from 'sharp';
+import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,6 +22,40 @@ export async function GET(
     const campaign = await enterPublicCampaignAlbumTenant(token);
     if (!campaign) {
       return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+    }
+
+    const urlObj = new URL(request.url);
+    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
+    const cacheKey = `photo:${photoId}`;
+
+    if (isThumbnail) {
+      const photoMeta = await prisma.photo.findFirst({
+        where: {
+          id: photoId,
+          organizationId: campaign.organizationId,
+          isPrivate: false,
+        },
+        select: {
+          id: true,
+          electionRemovalPoint: {
+            select: { campaignId: true },
+          },
+        },
+      });
+      if (!photoMeta || photoMeta.electionRemovalPoint?.campaignId !== campaign.id) {
+        return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
+      }
+      const cachedThumb = getCachedThumbnail(cacheKey);
+      if (cachedThumb) {
+        return new Response(new Uint8Array(cachedThumb), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/webp',
+            'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        });
+      }
     }
 
     const photo = await prisma.photo.findFirst({
@@ -45,9 +79,6 @@ export async function GET(
     if (!file) {
       return NextResponse.json({ error: 'Soubor fotografie není dostupný.' }, { status: 404 });
     }
-
-    const urlObj = new URL(request.url);
-    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
 
     if (isThumbnail) {
       let inputBuffer: Buffer | null = null;
@@ -75,16 +106,7 @@ export async function GET(
 
       if (inputBuffer) {
         try {
-          const resized = await sharp(inputBuffer)
-            .rotate()
-            .resize({
-              width: 600,
-              height: 600,
-              fit: 'inside',
-              withoutEnlargement: true,
-            })
-            .webp({ quality: 80 })
-            .toBuffer();
+          const resized = await generateWebpThumbnail(cacheKey, inputBuffer);
 
           return new Response(new Uint8Array(resized), {
             status: 200,
