@@ -1,19 +1,38 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, Wrench, Trash2, Truck, CheckSquare, Square, RotateCcw, CheckCircle2 } from 'lucide-react';
+import {
+  Sparkles,
+  Wrench,
+  Trash2,
+  Truck,
+  CheckSquare,
+  Square,
+  RotateCcw,
+  CheckCircle2,
+  MapPin,
+  Map as MapIcon,
+  LayoutList,
+  Columns,
+} from 'lucide-react';
 import type { ElectionRemovalPoint, FieldWorkStep } from '@prisma/client';
 import { operations, dispositions } from '@/lib/election-removal/task-spec';
 import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants';
 import { cleanLayerName, isGenericLayerName } from '@/lib/election-removal/point-metadata';
 import { LocationPickerMap } from './LocationPickerMap';
+import { ElectionRemovalMap, type ElectionRemovalMapPoint } from './ElectionRemovalMap';
 
 type Point = ElectionRemovalPoint & { steps: FieldWorkStep[]; photos?: { id: string; type?: string; fileName?: string | null; createdAt?: string | Date; capturedLatitude?: number | null; capturedLongitude?: number | null; capturedByWorkerName?: string | null }[] };
 type Carrier = { id: string; name: string; latitude: number | null; longitude: number | null; surfaces: { id: string; name: string }[] };
 export function FieldWorkDesk({ campaignId, points }: { campaignId: string; points: Point[] }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const [currentPoints, setCurrentPoints] = useState<Point[]>(points);
+  useEffect(() => {
+    setCurrentPoints(points);
+  }, [points]);
+  const [viewMode, setViewMode] = useState<'SPLIT' | 'MAP' | 'LIST'>('SPLIT');
   const [formOpen, setFormOpen] = useState(points.length === 0);
   const [source, setSource] = useState<'MAP' | 'CARRIER'>('MAP');
   const [search, setSearch] = useState('');
@@ -35,6 +54,10 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
     if (!pointIds.length) return;
     setBusy(true);
     setError('');
+    const prevPoints = currentPoints;
+    setCurrentPoints((prev) =>
+      prev.map((p) => (pointIds.includes(p.id) ? { ...p, status } : p))
+    );
     try {
       const res = await fetch('/api/election-removal/points/status', {
         method: 'PATCH',
@@ -46,13 +69,81 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
       setSelected([]);
       router.refresh();
     } catch (e) {
+      setCurrentPoints(prevPoints);
       setError(e instanceof Error ? e.message : 'Změna stavu selhala.');
     } finally {
       setBusy(false);
     }
   }
-  const category = (p: Point) => p.status === 'COMPLETED' ? 'DONE' : p.reviewRequired ? 'REVIEW' : p.status === 'ISSUE' ? 'ISSUE' : p.steps.some(s => s.completedQuantity > 0) ? 'PARTIAL' : p.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : p.assignedFieldPlanId ? 'ASSIGNED' : 'PENDING';
-  const groups = { ALL: 'Vše', REVIEW: 'Vyžaduje kontrolu', PENDING: 'Nenaplánované', ASSIGNED: 'Naplánované', IN_PROGRESS: 'Rozpracované', PARTIAL: 'Částečně hotové', DONE: 'Hotové', ISSUE: 'Problémy / opakování' };
+
+  const category = (p: Point) =>
+    p.status === 'COMPLETED'
+      ? 'DONE'
+      : p.reviewRequired
+      ? 'REVIEW'
+      : p.status === 'ISSUE'
+      ? 'ISSUE'
+      : p.steps.some((s) => s.completedQuantity > 0)
+      ? 'PARTIAL'
+      : p.status === 'IN_PROGRESS'
+      ? 'IN_PROGRESS'
+      : p.assignedFieldPlanId
+      ? 'ASSIGNED'
+      : 'PENDING';
+
+  const groups = {
+    ALL: 'Vše',
+    REVIEW: 'Vyžaduje kontrolu',
+    PENDING: 'Nenaplánované',
+    ASSIGNED: 'Naplánované',
+    IN_PROGRESS: 'Rozpracované',
+    PARTIAL: 'Částečně hotové',
+    DONE: 'Hotové',
+    ISSUE: 'Problémy / opakování',
+  };
+
+  const mapPoints: ElectionRemovalMapPoint[] = useMemo(() => {
+    return currentPoints.map((p, idx) => ({
+      id: p.id,
+      label: p.label,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      status: p.status,
+      mediaType: p.mediaType || 'OTHER',
+      layerName: p.layerName,
+      description: p.description,
+      plannedOrder: idx + 1,
+      photos: p.photos,
+    }));
+  }, [currentPoints]);
+
+  const pointsWithGps = useMemo(() => {
+    return currentPoints.filter(
+      (p) =>
+        typeof p.latitude === 'number' &&
+        typeof p.longitude === 'number' &&
+        !Number.isNaN(p.latitude) &&
+        !Number.isNaN(p.longitude) &&
+        p.latitude !== 0 &&
+        p.longitude !== 0
+    );
+  }, [currentPoints]);
+
+  const completedCount = useMemo(
+    () => currentPoints.filter((p) => p.status === 'COMPLETED').length,
+    [currentPoints]
+  );
+  const inProgressCount = useMemo(
+    () => currentPoints.filter((p) => p.status === 'IN_PROGRESS').length,
+    [currentPoints]
+  );
+  const issueCount = useMemo(
+    () => currentPoints.filter((p) => p.status === 'ISSUE').length,
+    [currentPoints]
+  );
+  const pendingCount = currentPoints.length - completedCount - inProgressCount - issueCount;
+  const progressPercent = currentPoints.length > 0 ? Math.round((completedCount / currentPoints.length) * 100) : 0;
+
   function editPoint(point: Point | null) {
     setFormOpen(true); setSource(point?.carrierId ? 'CARRIER' : 'MAP'); setError('');
     requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -108,36 +199,152 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
     }
   }
 
-  const filteredPoints = points.filter(p => (filter === 'ALL' || category(p) === filter) && `${p.label} ${p.description}`.toLocaleLowerCase('cs').includes(search.toLocaleLowerCase('cs')));
+  const filteredPoints = currentPoints.filter(
+    (p) =>
+      (filter === 'ALL' || category(p) === filter) &&
+      `${p.label} ${p.description}`.toLocaleLowerCase('cs').includes(search.toLocaleLowerCase('cs'))
+  );
   const input = 'block w-full rounded-lg border border-slate-300 p-2 text-sm';
-  return <section className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 className="text-xl font-bold text-slate-900">Práce v akci</h2>
-        <p className="text-sm text-slate-500">Zadejte nebo hromadně upravte body, a naplánujte trasu výjezdu s AI.</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          className="rounded-xl border border-sky-600 bg-white px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-50 transition shadow-2xs"
-          onClick={() => editPoint(null)}
-        >
-          + Přidat práci
-        </button>
-        {points.some((p) => !p.reviewRequired && p.status !== 'COMPLETED') && (
-          <Link
-            className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition"
-            href={`/election-removal/${campaignId}/plan${selected.length ? '?points=' + selected.join(',') : ''}`}
-            title="Spustit AI optimalizaci trasy"
+
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Práce v akci</h2>
+          <p className="text-sm text-slate-500">
+            Zadejte nebo hromadně upravte body, sledujte jejich stav v mapě a naplánujte trasu výjezdu s AI.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {pointsWithGps.length > 0 && (
+            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('SPLIT')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+                  viewMode === 'SPLIT'
+                    ? 'bg-white text-sky-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Zobrazit mapu i seznam bodů"
+              >
+                <Columns className="w-3.5 h-3.5" />
+                <span>Mapa + Seznam</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('MAP')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+                  viewMode === 'MAP'
+                    ? 'bg-white text-sky-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Zobrazit pouze velkou mapu"
+              >
+                <MapIcon className="w-3.5 h-3.5" />
+                <span>Pouze mapa ({pointsWithGps.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('LIST')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+                  viewMode === 'LIST'
+                    ? 'bg-white text-sky-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Zobrazit pouze seznam bodů"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>Pouze seznam</span>
+              </button>
+            </div>
+          )}
+          <button
+            className="rounded-xl border border-sky-600 bg-white px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-50 transition shadow-2xs"
+            onClick={() => editPoint(null)}
           >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>⚡ Naplánovat trasu (AI){selected.length ? ` (${selected.length})` : ''}</span>
-          </Link>
-        )}
+            + Přidat práci
+          </button>
+          {currentPoints.some((p) => !p.reviewRequired && p.status !== 'COMPLETED') && (
+            <Link
+              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition"
+              href={`/election-removal/${campaignId}/plan${selected.length ? '?points=' + selected.join(',') : ''}`}
+              title="Spustit AI optimalizaci trasy"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>⚡ Naplánovat trasu (AI){selected.length ? ` (${selected.length})` : ''}</span>
+            </Link>
+          )}
+        </div>
       </div>
-    </div>
-    {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 font-medium text-xs">{error}</p>}
-    {points.length > 0 && (
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 p-3 rounded-2xl">
+
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 font-medium text-xs">
+          {error}
+        </p>
+      )}
+
+      {/* Interaktivní mapa bodů zakázky pro dispečera */}
+      {viewMode !== 'LIST' && pointsWithGps.length > 0 && (
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-sky-600" />
+                Interaktivní mapa bodů zakázky ({pointsWithGps.length} v terénu)
+              </span>
+              <span className="text-xs text-slate-500 hidden sm:inline">
+                • Kliknutím na bod v mapě můžete přímo potvrdit splnění nebo bod upravit
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Hotovo: {completedCount} / {currentPoints.length} ({progressPercent} %)
+              </span>
+              {inProgressCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Rozpracováno: {inProgressCount}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 font-bold text-sky-800 bg-sky-50 border border-sky-200 px-3 py-1 rounded-full shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                Čeká: {pendingCount}
+              </span>
+              {issueCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 font-bold text-rose-800 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                  Problém: {issueCount}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <ElectionRemovalMap
+            points={mapPoints}
+            selectedPointId={edit?.id || null}
+            onSelectPoint={(pointId) => {
+              const found = currentPoints.find((p) => p.id === pointId);
+              if (found) editPoint(found);
+            }}
+            selectedPointIds={selected}
+            onTogglePointSelection={(pointId) => {
+              setSelected((prev) =>
+                prev.includes(pointId) ? prev.filter((id) => id !== pointId) : [...prev, pointId]
+              );
+            }}
+            onMarkPointStatus={(pointId, targetStatus) => markPointStatus([pointId], targetStatus)}
+            height={viewMode === 'MAP' ? '650px' : '440px'}
+            showLegend={true}
+          />
+        </div>
+      )}
+
+      {viewMode !== 'MAP' && (
+        <>
+          {currentPoints.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 p-3 rounded-2xl">
         <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
           <input
             aria-label="Hledat práci"
@@ -160,7 +367,7 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
           >
             {Object.entries(groups).map(([key, label]) => (
               <option key={key} value={key}>
-                {label} ({key === 'ALL' ? points.length : points.filter((p) => category(p) === key).length})
+                {label} ({key === 'ALL' ? currentPoints.length : currentPoints.filter((p) => category(p) === key).length})
               </option>
             ))}
           </select>
@@ -477,8 +684,10 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
           <button disabled={busy} className="rounded border p-2">Uvolnit doručení a naplánovat převzetí</button>
         </form></details>}
     </article>)}</div>
-    {points.length > 0 && filteredPoints.length === 0 && <p className="rounded-xl border border-dashed p-6 text-center text-slate-500">Žádná práce neodpovídá hledání.</p>}
+    {currentPoints.length > 0 && filteredPoints.length === 0 && <p className="rounded-xl border border-dashed p-6 text-center text-slate-500">Žádná práce neodpovídá hledání.</p>}
     {filteredPoints.length > visibleCount && <button className="rounded-lg border px-4 py-2 text-sm" onClick={() => setVisibleCount(n => n + 25)}>Zobrazit dalších {Math.min(25,filteredPoints.length-visibleCount)} prací ({filteredPoints.length-visibleCount} zbývá)</button>}
-
-  </section>;
+        </>
+      )}
+    </section>
+  );
 }

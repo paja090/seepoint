@@ -21,6 +21,7 @@ export interface ElectionRemovalMapPoint {
   layerName?: string | null;
   description?: string | null;
   plannedOrder?: number | null;
+  photos?: { id: string; fileName?: string | null }[];
 }
 
 export type GoogleMapType = 'roadmap' | 'hybrid' | 'terrain';
@@ -52,6 +53,7 @@ interface ElectionRemovalMapProps {
   onSelectPoint?: (pointId: string) => void;
   selectedPointIds?: Set<string> | string[];
   onTogglePointSelection?: (pointId: string) => void;
+  onMarkPointStatus?: (pointId: string, status: 'COMPLETED' | 'PENDING') => void;
   selectionMode?: boolean;
   onMapClick?: (coords: { latitude: number; longitude: number }) => void;
   isAddMode?: boolean;
@@ -75,6 +77,7 @@ export function ElectionRemovalMap({
   onSelectPoint,
   selectedPointIds,
   onTogglePointSelection,
+  onMarkPointStatus,
   selectionMode = false,
   onMapClick,
   isAddMode = false,
@@ -90,6 +93,8 @@ export function ElectionRemovalMap({
   onSelectPointRef.current = onSelectPoint;
   const onTogglePointSelectionRef = useRef(onTogglePointSelection);
   onTogglePointSelectionRef.current = onTogglePointSelection;
+  const onMarkPointStatusRef = useRef(onMarkPointStatus);
+  onMarkPointStatusRef.current = onMarkPointStatus;
 
   const selectedSet = useMemo(() => {
     if (!selectedPointIds) return null;
@@ -374,6 +379,33 @@ export function ElectionRemovalMap({
           ${cleanLayer ? `<div style="font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:4px;">${!isGenericLayerName(cleanLayer) ? '🎯 ' : ''}${escapeHtml(cleanLayer)}</div>` : ''}
           ${localityHtml}
           ${addressHtml}
+          ${
+            point.photos && point.photos.length > 0
+              ? `
+          <div style="display:flex;gap:4px;margin-top:6px;align-items:center;overflow-x:auto;padding-bottom:2px;">
+            ${point.photos
+              .slice(0, 3)
+              .map(
+                (ph) => `
+              <a href="/api/photos/${encodeURIComponent(ph.id)}/file" target="_blank" rel="noopener noreferrer" title="Fotografie" style="
+                width:36px;
+                height:36px;
+                border-radius:6px;
+                overflow:hidden;
+                display:inline-block;
+                border:1px solid #cbd5e1;
+                flex-shrink:0;
+              ">
+                <img src="/api/photos/${encodeURIComponent(ph.id)}/thumbnail" alt="Foto" style="width:100%;height:100%;object-fit:cover;" />
+              </a>
+            `
+              )
+              .join('')}
+            ${point.photos.length > 3 ? `<span style="font-size:10px;font-weight:700;color:#64748b;">+${point.photos.length - 3}</span>` : ''}
+          </div>
+          `
+              : ''
+          }
 
           <div style="display:flex;gap:4px;margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0;">
             <a href="https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}" target="_blank" rel="noopener noreferrer" style="
@@ -404,6 +436,34 @@ export function ElectionRemovalMap({
             ">Waze ↗</a>
             ${photoBtnHtml}
           </div>
+          ${
+            onMarkPointStatusRef.current
+              ? `
+          <div style="margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0;">
+            <button type="button" class="btn-mark-status-${point.id}" data-status="${isCompleted ? 'PENDING' : 'COMPLETED'}" style="
+              width:100%;
+              padding:7px 10px;
+              border-radius:8px;
+              font-size:11px;
+              font-weight:800;
+              cursor:pointer;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              gap:5px;
+              transition:background-color 0.15s, transform 0.1s;
+              ${
+                isCompleted
+                  ? 'background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;'
+                  : 'background:#10b981;color:#ffffff;border:1px solid #059669;box-shadow:0 1px 3px rgba(16,185,129,0.3);'
+              }
+            ">
+              ${isCompleted ? '↩ Vrátit k rozpracování' : '✓ Označit jako hotovo'}
+            </button>
+          </div>
+          `
+              : ''
+          }
           ${
             onTogglePointSelectionRef.current
               ? `
@@ -447,6 +507,16 @@ export function ElectionRemovalMap({
             ev.stopPropagation();
             if (onTogglePointSelectionRef.current) {
               onTogglePointSelectionRef.current(point.id);
+            }
+          });
+        }
+        const markBtn = document.querySelector(`.btn-mark-status-${point.id}`);
+        if (markBtn) {
+          markBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const targetStatus = markBtn.getAttribute('data-status') as 'COMPLETED' | 'PENDING';
+            if (onMarkPointStatusRef.current) {
+              onMarkPointStatusRef.current(point.id, targetStatus);
             }
           });
         }

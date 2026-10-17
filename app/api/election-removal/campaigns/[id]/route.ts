@@ -77,7 +77,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const auth = await requireElectionRemovalAccess(true);
   if (isElectionRemovalAccessDenied(auth)) return auth;
   enterTenantContext({ organizationId: auth.organizationId, userId: auth.user.id, source: 'session' });
-  const { id } = await params;
+  const { id: rawParamId } = await params;
+  const decodedParamId = decodeURIComponent(rawParamId);
+  const id = decodedParamId.includes('::client::') ? decodedParamId.split('::client::')[0] : decodedParamId;
   const { searchParams } = new URL(req.url);
   const permanent = searchParams.get('permanent') === 'true';
 
