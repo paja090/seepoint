@@ -9,8 +9,10 @@ export async function requireApiAccess(section: AppSection | AppSection[], modul
   const sections = Array.isArray(section) ? section : [section];
   const matchedSection = sections.find((s) => canAccess(user.role, s));
   if (!matchedSection) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
-  const resolvedModuleId = moduleId !== undefined ? moduleId : moduleForSection(matchedSection);
-  if (resolvedModuleId && !hasModuleAccess(user, resolvedModuleId, matchedSection)) {
+  if (moduleId === undefined) {
+    moduleId = moduleForSection(matchedSection);
+  }
+  if (moduleId && !hasModuleAccess(user, moduleId)) {
     return NextResponse.json({ error: 'Modul není dostupný.' }, { status: 403 });
   }
   return user;

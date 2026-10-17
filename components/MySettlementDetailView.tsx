@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { StatusPill } from '@/lib/internal-format';
 import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
 import { QuickOtherCostForm } from '@/components/QuickOtherCostForm';
+import { MonthlyInvoiceModal } from '@/components/MonthlyInvoiceModal';
 
 interface MySettlementDetailViewProps {
   settlement: {
@@ -99,6 +100,7 @@ export function MySettlementDetailView({ settlement }: MySettlementDetailViewPro
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'work' | 'expenses' | 'adjustments' | 'logs'>('work');
   const [showCostForm, setShowCostForm] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -116,6 +118,28 @@ export function MySettlementDetailView({ settlement }: MySettlementDetailViewPro
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chyba při odesílání.');
+    }
+  };
+
+  const handleCloseMonth = async () => {
+    if (!confirm('Opravdu chcete provést měsíční uzávěrku a vystavit finální doklad vyúčtování?')) {
+      return;
+    }
+    setNotice('');
+    setError('');
+    try {
+      const res = await fetch(`/api/settlements/${settlement.id}/invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ closeMonth: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Uzávěrka se nezdařila.');
+      setNotice('Měsíční uzávěrka byla úspěšně provedena.');
+      setShowInvoiceModal(true);
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Chyba při uzávěrce.');
     }
   };
 
@@ -152,6 +176,13 @@ export function MySettlementDetailView({ settlement }: MySettlementDetailViewPro
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setShowInvoiceModal(true)}
+            className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition shadow-sm flex items-center gap-1.5"
+          >
+            <span>📄</span> Faktura / Vyúčtování
+          </button>
           <Link
             href="/my-work-entries"
             className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition"
@@ -165,14 +196,21 @@ export function MySettlementDetailView({ settlement }: MySettlementDetailViewPro
                 onClick={() => setShowCostForm(!showCostForm)}
                 className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-900 hover:bg-indigo-100 transition"
               >
-                🚗 + Ostatní náklad (Auto, Nájem, Telefon, Palivo)
+                🚗 + Ostatní náklad
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseMonth}
+                className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 transition shadow-sm"
+              >
+                🔒 Uzavřít měsíc
               </button>
               <button
                 type="button"
                 onClick={handleSubmitSettlement}
                 className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm"
               >
-                Odeslat vyúčtování ke schválení
+                Odeslat ke schválení
               </button>
             </>
           )}
@@ -446,6 +484,14 @@ export function MySettlementDetailView({ settlement }: MySettlementDetailViewPro
           </div>
         )}
       </section>
+
+      {showInvoiceModal && (
+        <MonthlyInvoiceModal
+          settlementId={settlement.id}
+          onClose={() => setShowInvoiceModal(false)}
+          onSettlementUpdated={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }

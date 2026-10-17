@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { dateOnly } from '@/lib/internal-format';
 import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
 import { QuickOtherCostForm } from '@/components/QuickOtherCostForm';
+import { MonthlyInvoiceModal } from '@/components/MonthlyInvoiceModal';
 
 type SettlementDetail = {
   id: string;
@@ -158,6 +159,7 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
 
   // Manual Adjustment Form state
   const [showAdjForm, setShowAdjForm] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   // Deletion modal for Adjustment
   const [deletingAdjId, setDeletingAdjId] = useState<string | null>(null);
@@ -289,6 +291,14 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
         {canManage && <div className="flex flex-col gap-2 justify-end border-t md:border-t-0 pt-4 md:pt-0">
           <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-2 text-right">Akce vyúčtování</h4>
           
+          <button
+            type="button"
+            onClick={() => setShowInvoiceModal(true)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition w-full shadow-sm flex items-center justify-center gap-1.5"
+          >
+            <span>📄</span> Zobrazit fakturu / vyúčtování
+          </button>
+
           {(settlement.status === 'DRAFT' || settlement.status === 'REJECTED') && (
             <button
               onClick={() => handleAction('submit')}
@@ -695,6 +705,14 @@ export function SettlementDetailManager({ settlement, currentUser }: SettlementD
           </div>
         )}
       </section>
+
+      {showInvoiceModal && (
+        <MonthlyInvoiceModal
+          settlementId={settlement.id}
+          onClose={() => setShowInvoiceModal(false)}
+          onSettlementUpdated={refreshData}
+        />
+      )}
     </div>
   );
 }

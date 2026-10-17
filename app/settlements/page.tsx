@@ -4,8 +4,8 @@ import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { AccessDenied, canViewAllSettlements } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
-import { dateOnly, money, StatusPill } from '@/lib/internal-format';
 import { WorkStatisticsPanel } from '@/components/WorkStatisticsPanel';
+import { SettlementsManagerView } from '@/components/SettlementsManagerView';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,7 +56,7 @@ export default async function SettlementsPage({ searchParams }: { searchParams: 
       employee: true,
       items: { include: { task: true } },
     },
-    orderBy: [{ periodFrom: 'desc' }],
+    orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }, { periodFrom: 'desc' }],
     take: 500,
   });
 
@@ -80,13 +80,43 @@ export default async function SettlementsPage({ searchParams }: { searchParams: 
   const totalAdvances = settlements.reduce((acc, s) => acc + Number(s.totalAdvances), 0);
   const finalPayableAmount = settlements.reduce((acc, s) => acc + Number(s.finalPayableAmount), 0);
 
+  const formattedManagerSettlements = settlements.map((s) => ({
+    id: s.id,
+    periodYear: s.periodYear,
+    periodMonth: s.periodMonth,
+    periodFrom: s.periodFrom.toISOString(),
+    periodTo: s.periodTo.toISOString(),
+    status: s.status,
+    totalWorkAmount: s.totalWorkAmount.toString(),
+    totalReimbursements: s.totalReimbursements.toString(),
+    totalDeductions: s.totalDeductions.toString(),
+    totalAdvances: s.totalAdvances.toString(),
+    finalPayableAmount: s.finalPayableAmount.toString(),
+    employeeId: s.employeeId,
+    employeeName: `${s.employee.firstName} ${s.employee.lastName}`,
+    employee: {
+      firstName: s.employee.firstName,
+      lastName: s.employee.lastName,
+      email: s.employee.email,
+    },
+    items: s.items.map((i) => ({
+      id: i.id,
+      quantity: i.quantity?.toString() ?? null,
+      unit: i.unit,
+      rateType: i.rateType,
+      amount: i.amount.toString(),
+      workType: i.workType,
+      description: i.description,
+    })),
+  }));
+
   return (
     <AppShell>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Vyúčtování</h1>
+          <h1 className="text-3xl font-bold">Vyúčtování & Uzávěrky</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Přehled období, hodinových a úkolových prací, ostatních nákladů a stavu schvalování.
+            Přehled období, měsíčních uzávěrek, hodinových a úkolových prací, ostatních nákladů a podkladů k fakturaci.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -153,79 +183,10 @@ export default async function SettlementsPage({ searchParams }: { searchParams: 
         </div>
       </form>
 
-      <section className="card overflow-x-auto">
-        <div className="mb-3 flex justify-between">
-          <h2 className="text-xl font-bold">Seznam vyúčtování</h2>
-          <p className="text-sm text-slate-500">Zobrazeno {settlements.length}</p>
-        </div>
-        {settlements.length === 0 ? (
-          <p className="text-sm text-slate-500">Zatím není evidované žádné vyúčtování.</p>
-        ) : (
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="border-b py-2 pr-3">Zaměstnanec</th>
-                <th className="border-b py-2 pr-3">Období</th>
-                <th className="border-b py-2 pr-3">Stav</th>
-                <th className="border-b py-2 pr-3">Za práci</th>
-                <th className="border-b py-2 pr-3">Ostatní náklady</th>
-                <th className="border-b py-2 pr-3">K výplatě</th>
-                <th className="border-b py-2 pr-3">Položky</th>
-                <th className="border-b py-2 pr-3 text-right">Akce</th>
-              </tr>
-            </thead>
-            <tbody>
-              {settlements.map((settlement) => {
-                const netAdj =
-                  Number(settlement.totalReimbursements) -
-                  Number(settlement.totalDeductions) -
-                  Number(settlement.totalAdvances);
-                return (
-                  <tr className="border-b last:border-0 hover:bg-slate-50/50" key={settlement.id}>
-                    <td className="py-3 pr-3">
-                      <b>
-                        {settlement.employee.firstName} {settlement.employee.lastName}
-                      </b>
-                    </td>
-                    <td className="py-3 pr-3">
-                      {dateOnly(settlement.periodFrom)} – {dateOnly(settlement.periodTo)}
-                    </td>
-                    <td className="py-3 pr-3">
-                      <StatusPill value={settlement.status} />
-                    </td>
-                    <td className="py-3 pr-3 font-medium">{money(settlement.totalWorkAmount)}</td>
-                    <td
-                      className={`py-3 pr-3 font-medium ${
-                        netAdj < 0
-                          ? 'text-red-600'
-                          : netAdj > 0
-                            ? 'text-emerald-600'
-                            : 'text-slate-400'
-                      }`}
-                    >
-                      {netAdj === 0
-                        ? '0 Kč'
-                        : `${netAdj > 0 ? '+' : ''}${netAdj.toLocaleString('cs-CZ')} Kč`}
-                    </td>
-                    <td className="py-3 pr-3 font-black text-slate-900">
-                      {money(settlement.finalPayableAmount)}
-                    </td>
-                    <td className="py-3 pr-3">{settlement.items.length} položek</td>
-                    <td className="py-3 pr-3 text-right">
-                      <Link
-                        className="rounded bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 transition"
-                        href={`/settlements/${settlement.id}`}
-                      >
-                        Otevřít detail
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </section>
+      <SettlementsManagerView
+        settlements={formattedManagerSettlements}
+        filterEmployee={employee}
+      />
     </AppShell>
   );
 }
