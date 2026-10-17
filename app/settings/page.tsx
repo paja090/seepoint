@@ -48,13 +48,15 @@ export default async function Settings() {
         </a>
       </div>
 
-      <div className="card mt-6 flex items-center justify-between">
+      <div className="card mt-6 flex items-center justify-between border-indigo-200 bg-indigo-50/20">
         <div>
-          <h2 className="text-xl font-bold">🏭 Činnosti výroby & montáží</h2>
-          <p className="text-sm text-slate-600 mt-1">Vlastní katalog činností pro dílnu i výjezdy (tisk, DTP, polepy, montáže, zaměření) a oborové šablony.</p>
+          <h2 className="text-xl font-bold">🏭 Činnosti výroby, montáží & Ceník úkolů pro pracovníky</h2>
+          <p className="text-sm text-slate-600 mt-1">
+            Nastavení ceníku sazeb za úkoly a hodiny pro pracovníky (např. Lepení billboardu Kč/ks, Instalace lavičky Kč/ks, Montáž a dílna Kč/hod).
+          </p>
         </div>
         <a href="/settings/work" className="button button-primary text-sm font-bold">
-          Spravovat činnosti →
+          Spravovat činnosti & ceník úkolů →
         </a>
       </div>
 
