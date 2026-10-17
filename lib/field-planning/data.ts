@@ -27,7 +27,7 @@ export async function loadPlanningData(date: string, options: {
   const nextDay = new Date(Date.parse(`${date}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
   const end = zonedTime(nextDay, '00:00', profile.timezone);
   const day = new Date(`${date}T00:00:00Z`);
-  const [employees, absences, vehicles, reservations, orders, plans, otherTasks, problems, unlinkedNavigation] = await Promise.all([
+  const [employees, absences, vehicles, reservations, orders, plans, otherTasks, problems, unlinkedNavigation, plannerBlocks] = await Promise.all([
     db.employee.findMany({ where: { organizationId }, orderBy: { id: 'asc' } }),
     db.employeeAbsence.findMany({ where: { organizationId, status: 'APPROVED', dateFrom: { lte: day }, dateTo: { gte: day } } }),
     db.vehicle.findMany({ where: { organizationId }, orderBy: { id: 'asc' } }),
@@ -40,11 +40,16 @@ export async function loadPlanningData(date: string, options: {
     db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } }, orderBy: { createdAt: 'desc' }, select: { entityId: true, action: true } }),
     navigation ? db.navigationOrder.findMany({ where: { organizationId, workOrders: { none: {} }, ...(options.jobIds ? { points: { some: { id: { in: options.jobIds.filter(id => id.startsWith('navigation-point:')).map(id => id.slice(17)) } } } } : { status: { in: ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE'] } }) },
       include: { points: { include: { carrier: true, surface: true } }, crmOrder: { include: { client: true } } }, orderBy: { id: 'asc' }, take: 201 }) : Promise.resolve([]),
+    db.plannerBlock?.findMany ? db.plannerBlock.findMany({ where: { organizationId, startAt: { lt: new Date(end) }, endAt: { gt: new Date(start) } }, select: { userId: true } }) : Promise.resolve([]),
   ]);
   if (orders.length > 200) throw new Error('V1 podporuje nejvýše 200 úkolů na jeden návrh; omezte výběr.');
 
   const ids = new Set(orders.map(o => o.id));
   const busyEmployees = new Set(otherTasks.filter(t => !t.workOrderId || !ids.has(t.workOrderId)).map(t => t.assignedToEmployeeId));
+  const busyUserIds = new Set(plannerBlocks.map(b => b.userId));
+  for (const emp of employees) {
+    if (emp.userId && busyUserIds.has(emp.userId)) busyEmployees.add(emp.id);
+  }
   for (const plan of plans) {
     const snapshot = plan.planningInputSnapshot as unknown as PlanningInput;
     snapshot.crews.forEach(c => c.employeeIds.forEach(id => busyEmployees.add(id)));

@@ -27,7 +27,7 @@ function fixture() {
     organization:{findUnique:async()=>({plan:'ENTERPRISE',enabledModules:{navigation:false}})},
     organizationFieldPlanningProfile:{findUnique:async()=>({configuration:profile})},
     employee:{findMany:async()=>employees,findFirst:async({where}:any)=>employees.find(e=>e.userId===where.userId)},
-    employeeAbsence:{findMany:async()=>[]},vehicle:{findMany:async()=>[]},vehicleReservation:{findMany:async()=>[],updateMany:async()=>({count:0})},workTask:{findMany:async()=>[]},
+    employeeAbsence:{findMany:async()=>[]},vehicle:{findMany:async()=>[]},vehicleReservation:{findMany:async()=>[],updateMany:async()=>({count:0})},workTask:{findMany:async()=>[]},plannerBlock:{findMany:async()=>[]},
     workOrder:{findMany:async()=>[]},
     fieldPlan:{findFirst:async({where}:any)=>plans.find(p=>matches(p,where)),findMany:async({where}:any)=>plans.filter(p=>matches(p,where)),
       findUnique:async({where}:any)=>plans.find(p=>matches(p,where)),findUniqueOrThrow:async({where}:any)=>plans.find(p=>matches(p,where)),

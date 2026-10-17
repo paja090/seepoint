@@ -132,16 +132,40 @@ export async function loadElectionPlanningResources(
     }
     if (!profile?.enabled) throw new Error('Nejdříve zapněte plánování a potvrďte vlastní depo v Nastavení depa.');
 
+    const planningDate = targetDateStr || (campaign.targetDate ? campaign.targetDate.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+    const dayStart = new Date(`${planningDate}T00:00:00Z`);
+    const dayEnd = new Date(`${planningDate}T23:59:59.999Z`);
+    const [absences, plannerBlocks] = await Promise.all([
+      prisma.employeeAbsence.findMany({
+        where: { organizationId, status: 'APPROVED', dateFrom: { lte: dayEnd }, dateTo: { gte: dayStart } },
+        select: { employeeId: true },
+      }),
+      prisma.plannerBlock.findMany({
+        where: { organizationId, startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+        select: { userId: true, title: true },
+      }),
+    ]);
+    const absentEmpIds = new Set(absences.map(a => a.employeeId));
+    const busyUserMap = new Map(plannerBlocks.map(b => [b.userId, b.title]));
 
     return {
       campaign,
       points: campaign.points,
-      employees: employees.map((e) => ({
-        id: e.id,
-        name: `${e.firstName} ${e.lastName}`.trim(),
-        role: e.role,
-        position: e.position,
-      })),
+      employees: employees.map((e) => {
+        let busyReason: string | undefined;
+        if (absentEmpIds.has(e.id)) busyReason = 'Absence';
+        else if (e.userId && busyUserMap.has(e.userId)) {
+          const title = busyUserMap.get(e.userId);
+          busyReason = title ? `Plánovač: ${title}` : 'Zaneprázdněn v Plánovači';
+        }
+        return {
+          id: e.id,
+          name: `${e.firstName} ${e.lastName}`.trim(),
+          role: e.role,
+          position: e.position,
+          busyReason,
+        };
+      }),
       vehicles: vehicles.map((v) => ({
         id: v.id,
         name: v.name,

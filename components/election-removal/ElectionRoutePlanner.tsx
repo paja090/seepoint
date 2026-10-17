@@ -31,6 +31,7 @@ interface ResourceEmployee {
   name: string;
   role: string;
   position: string | null;
+  busyReason?: string | null;
 }
 
 interface ResourceVehicle {
@@ -773,11 +774,21 @@ export function ElectionRoutePlanner({
                             className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                           />
                           <span>{emp.name}</span>
-                          {emp.position && (
-                            <span className="text-[10px] text-slate-400 font-normal ml-auto">
-                              {emp.position}
-                            </span>
-                          )}
+                          <div className="ml-auto flex items-center gap-1.5">
+                            {emp.busyReason && (
+                              <span
+                                className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded font-medium"
+                                title={emp.busyReason}
+                              >
+                                ⚠️ {emp.busyReason}
+                              </span>
+                            )}
+                            {emp.position && (
+                              <span className="text-[10px] text-slate-400 font-normal">
+                                {emp.position}
+                              </span>
+                            )}
+                          </div>
                         </label>
                       );
                     })}
