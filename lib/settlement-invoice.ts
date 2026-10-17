@@ -565,7 +565,7 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
               { text: 'Sazba/MJ', fontSize: 8, bold: true, color: '#FFFFFF', alignment: 'right' },
               { text: 'Částka', fontSize: 8, bold: true, color: '#FFFFFF', alignment: 'right' },
             ],
-            ...data.items.map((item, index) => [
+            ...data.items.map((item) => [
               { text: item.description, fontSize: 8.5 },
               { text: csCurrencyFormatter.format(item.quantity), alignment: 'right', fontSize: 8.5 },
               { text: item.unit, fontSize: 8.5 },
@@ -617,7 +617,7 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
               ],
             },
             layout: {
-              fillColor: (rowIndex: number, node: any) =>
+              fillColor: (rowIndex: number, node: { table: { body: unknown[] } }) =>
                 rowIndex === node.table.body.length - 1 ? BLUE : '#F8FAFC',
               hLineColor: () => '#CBD5E1',
               vLineColor: () => '#CBD5E1',
