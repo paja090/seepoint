@@ -86,7 +86,40 @@ export function WorkRateCatalogPanel({
     ? employeeRates.filter((r) => !r.employeeId || r.employeeId === selectedEmployeeId)
     : employeeRates;
 
-  const allRates: RateCatalogItem[] = [...visibleEmployeeRates, ...companyRates];
+  // Also include any workCategories that have defaultRate > 0 and aren't already in companyRates
+  const categoryDerivedRates: RateCatalogItem[] = workCategories
+    .filter(
+      (cat) =>
+        cat.defaultRate !== undefined &&
+        cat.defaultRate > 0 &&
+        !companyRates.some(
+          (cr) => cr.name.trim().toLowerCase() === cat.label.trim().toLowerCase()
+        )
+    )
+    .map((cat) => {
+      const mappedType =
+        cat.defaultPriceType === 'PIECE_RATE'
+          ? 'TASK'
+          : cat.defaultPriceType === 'FIXED'
+          ? 'FIXED'
+          : 'HOURLY';
+      return {
+        id: `cat-${cat.key}`,
+        source: 'COMPANY' as const,
+        type: mappedType,
+        name: cat.label,
+        workType: cat.defaultWorkType || 'INSTALLATION',
+        carrierTypeLabel: cat.label,
+        amount: String(cat.defaultRate),
+        unit: mappedType === 'HOURLY' ? 'hod' : mappedType === 'FIXED' ? 'zakázka' : 'ks',
+      };
+    });
+
+  const allRates: RateCatalogItem[] = [
+    ...visibleEmployeeRates,
+    ...companyRates,
+    ...categoryDerivedRates,
+  ];
   const taskRatesCount = allRates.filter((r) => r.type === 'TASK').length;
   const hourlyRatesCount = allRates.filter((r) => r.type === 'HOURLY').length;
 
@@ -236,18 +269,26 @@ export function WorkRateCatalogPanel({
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canManage && (
-            <button
-              type="button"
-              onClick={() => {
-                setShowAddForm((v) => !v);
-                setIsExpanded(true);
-              }}
-              className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition"
-            >
-              {showAddForm ? 'Zavřít úpravu ceníku' : '+ Nastavit sazbu za úkol / hodinu'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddForm((v) => !v);
+                  setIsExpanded(true);
+                }}
+                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition"
+              >
+                {showAddForm ? 'Zavřít rychlou úpravu' : '+ Rychle nastavit sazbu'}
+              </button>
+              <a
+                href="/settings/work"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+              >
+                ⚙️ Správa ceníku úkolů v Nastavení →
+              </a>
+            </>
           )}
           <button
             type="button"
