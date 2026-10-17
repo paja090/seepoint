@@ -206,7 +206,10 @@ export default async function PhotoDocumentationHubPage({
       const clientAlbums: UnifiedAlbumItem[] = [];
       for (const [clientKey, clientPoints] of pointsByClient.entries()) {
         const clientPhotos = clientPoints.flatMap((p) => p.photos);
-        const coverPhotoUrl = clientPhotos.length > 0 ? clientPhotos[0].url : null;
+        const coverPhotoUrl =
+          clientPhotos.length > 0
+            ? `/api/photos/${encodeURIComponent(clientPhotos[0].id)}/thumbnail`
+            : null;
         const formatted = formatAlbumDisplay(`${clientKey} — ${c.name}`, clientKey, periodLabel);
         const encodedClient = encodeURIComponent(clientKey);
         const hasInspection = clientPoints.some((p) => p.operationType === 'INSPECTION');
@@ -243,7 +246,10 @@ export default async function PhotoDocumentationHubPage({
         ? Array.from(pointsByClient.keys())[0]
         : c.clientName;
     const allPhotos = mappedPoints.flatMap((p) => p.photos);
-    const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;
+    const coverPhotoUrl =
+      allPhotos.length > 0
+        ? `/api/photos/${encodeURIComponent(allPhotos[0].id)}/thumbnail`
+        : null;
     const formatted = formatAlbumDisplay(c.name, singleClient, periodLabel);
     const hasInspection = mappedPoints.some((p) => p.operationType === 'INSPECTION');
 
@@ -331,7 +337,10 @@ export default async function PhotoDocumentationHubPage({
     }
 
     const allPhotos = points.flatMap((p) => p.photos);
-    const coverPhotoUrl = allPhotos.length > 0 ? allPhotos[0].url : null;
+    const coverPhotoUrl =
+      allPhotos.length > 0
+        ? `/api/photos/${encodeURIComponent(allPhotos[0].id)}/thumbnail`
+        : null;
     const year = r.year;
     const quarter = r.quarter || Math.ceil((new Date(r.periodFrom || r.createdAt).getMonth() + 1) / 3);
     const month = r.periodFrom

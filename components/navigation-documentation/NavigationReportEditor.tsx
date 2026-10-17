@@ -170,8 +170,12 @@ export function NavigationReportEditor({
           const lng = item.navigationPoint?.longitude ?? item.carrier?.longitude;
           const hasGps = lat !== undefined && lat !== null && lng !== undefined && lng !== null && (lat !== 0 || lng !== 0);
 
-          const photoSrc =
-            item.selectedPhoto?.url || (item.selectedPhoto?.id ? `/api/photos/${item.selectedPhoto.id}/file` : null);
+          const photoThumbSrc = item.selectedPhoto?.id
+            ? `/api/photos/${encodeURIComponent(item.selectedPhoto.id)}/thumbnail`
+            : item.selectedPhoto?.url || null;
+          const photoFullSrc = item.selectedPhoto?.id
+            ? `/api/photos/${encodeURIComponent(item.selectedPhoto.id)}/file`
+            : item.selectedPhoto?.url || null;
 
           return (
             <div
@@ -182,13 +186,16 @@ export function NavigationReportEditor({
                 {/* Left Column: Photo Preview & Selection */}
                 <div className="space-y-2.5">
                   <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 group">
-                    {photoSrc ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        alt={label}
-                        className="h-full w-full object-cover"
-                        src={photoSrc}
-                      />
+                    {photoThumbSrc ? (
+                      <a href={photoFullSrc || photoThumbSrc} target="_blank" rel="noreferrer" className="block h-full w-full" title="Kliknutím otevřete originální rozlišení">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt={label}
+                          loading="lazy"
+                          className="h-full w-full object-cover group-hover:scale-105 transition duration-200"
+                          src={photoThumbSrc}
+                        />
+                      </a>
                     ) : (
                       <div className="flex h-full flex-col items-center justify-center p-3 text-center text-slate-400">
                         <Camera size={26} />

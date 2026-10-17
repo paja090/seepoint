@@ -260,7 +260,14 @@ export function OfferSurfaceBrowser({
 
       {active?.photos[0] && lightboxOpen && (
         <div className="fixed inset-0 z-[1010] flex items-center justify-center bg-slate-950/90 p-4" onClick={() => setLightboxOpen(false)}>
-          <Image alt={`${active.carrier.code} · ${active.name}`} className="max-h-[94vh] w-auto max-w-[96vw] object-contain" height={1400} src={active.photos[0].url} width={2000} unoptimized />
+          <Image
+            alt={`${active.carrier.code} · ${active.name}`}
+            className="max-h-[94vh] w-auto max-w-[96vw] object-contain"
+            height={1400}
+            src={active.photos[0].id ? `/api/photos/${encodeURIComponent(active.photos[0].id)}/file` : active.photos[0].url.replace(/\/thumbnail(?=[?#]|$)/, '/file')}
+            width={2000}
+            unoptimized
+          />
           <button className="absolute top-4 right-4 rounded-xl bg-white/10 p-2 text-white hover:bg-white/20" onClick={() => setLightboxOpen(false)} type="button"><X size={20} /></button>
         </div>
       )}

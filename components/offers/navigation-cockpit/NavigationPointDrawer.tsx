@@ -21,6 +21,7 @@ import {
   CARRIER_PIN_COLORS,
   getPointPinVisual,
 } from '@/lib/offers/navigation-carrier-types';
+import { toPhotoThumbnailUrl } from '@/lib/photo-url';
 
 interface NavigationPointDrawerProps {
   point: DraftPoint | null;
@@ -422,8 +423,9 @@ export function NavigationPointDrawer({
               {point.sitePhotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={point.sitePhotoUrl}
+                  src={toPhotoThumbnailUrl(point.sitePhotoUrl, point.sitePhotoId)}
                   alt={point.label}
+                  loading="lazy"
                   className="h-16 w-20 rounded-lg object-cover border"
                 />
               ) : (

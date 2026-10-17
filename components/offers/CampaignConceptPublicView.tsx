@@ -242,8 +242,31 @@ export function CampaignConceptPublicView({ offer, publicToken }: { offer: Offer
                           )}
 
                           {item.surface.photos.length > 0 && (
-                            <div className="relative h-36 w-full rounded-xl overflow-hidden bg-slate-900 cursor-pointer" onClick={() => setActivePhoto(item.surface.photos[0].url)}>
-                              <img src={item.surface.photos[0].url} alt={item.surface.name} className="h-full w-full object-cover group-hover:scale-105 transition duration-300" />
+                            <div
+                              className="relative h-36 w-full rounded-xl overflow-hidden bg-slate-900 cursor-pointer"
+                              onClick={() =>
+                                setActivePhoto(
+                                  item.surface.photos[0].url.includes('/api/proposals/')
+                                    ? item.surface.photos[0].url
+                                    : item.surface.photos[0].id
+                                      ? `/api/photos/${encodeURIComponent(item.surface.photos[0].id)}/file`
+                                      : item.surface.photos[0].url
+                                )
+                              }
+                            >
+                              <img
+                                src={
+                                  item.surface.photos[0].url.includes('/api/proposals/')
+                                    ? `${item.surface.photos[0].url}${item.surface.photos[0].url.includes('?') ? '&' : '?'}thumbnail=1`
+                                    : item.surface.photos[0].id
+                                      ? `/api/photos/${encodeURIComponent(item.surface.photos[0].id)}/thumbnail`
+                                      : item.surface.photos[0].url
+                                }
+                                alt={item.surface.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                              />
                               <div className="absolute bottom-2 right-2 px-2 py-1 rounded bg-slate-950/90 text-[10px] font-bold text-white border border-slate-800">🔍 Zvětšit</div>
                             </div>
                           )}
