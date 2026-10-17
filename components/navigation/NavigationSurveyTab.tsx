@@ -409,8 +409,8 @@ export function NavigationSurveyTab({ navigationOrderId }: { navigationOrderId: 
                   ) : (
                     <div className="flex items-center gap-2 overflow-x-auto">
                       {c.photos.map((p) => {
-                        const thumbSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : p.url;
-                        const fullSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/file` : p.url;
+                        const thumbSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/thumbnail` : (p.url || `/api/photos/${p.id}/thumbnail`);
+                        const fullSrc = p.id ? `/api/photos/${encodeURIComponent(p.id)}/file` : (p.url || `/api/photos/${p.id}/file`);
                         return (
                           <a key={p.id} href={fullSrc} target="_blank" rel="noreferrer" className="relative size-14 rounded-xl overflow-hidden border border-slate-300 shrink-0 block bg-slate-100">
                             <Image src={thumbSrc} alt={c.label} fill unoptimized className="object-cover" />
