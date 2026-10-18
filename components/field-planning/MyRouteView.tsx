@@ -263,7 +263,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           planId,
-          workOrderId,
+          workOrderId: workOrderId ?? '',
           jobId,
           action,
           problemType: form?.get('type'),
@@ -282,6 +282,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
       pendingKeys.current.delete(payloadKey);
       if (jobId) setFieldInputs(prev => ({ ...prev, [jobId]: {} }));
     } catch (e) {
+      pendingKeys.current.delete(payloadKey);
       setError(e instanceof Error ? e.message : 'Operace selhala.');
       if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -728,36 +729,59 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
 
                 {/* Start / Finish Button */}
                 {!isDone && s.status !== 'CANCELLED' && (
-                  <button
-                    disabled={!ready || busy}
-                    onClick={() =>
-                      void run(
-                        route.planId,
-                        s.workOrderId,
-                        isInProgress ? 'complete' : 'start',
-                        undefined,
-                        s.jobId
-                      )
-                    }
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-bold transition shadow-sm ${
-                      isInProgress
-                        ? 'bg-emerald-700 text-white hover:bg-emerald-600'
-                        : isIssue
-                        ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
-                        : 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Clock size={14} />
-                    <span>
-                      {isInProgress
-                        ? 'Dokončit práci'
-                        : isIssue
-                        ? 'Zkusit znovu / Zahájit'
-                        : currentDate > todayStr
-                        ? 'Zahájit v předstihu ⚡'
-                        : 'Zahájit práci'}
-                    </span>
-                  </button>
+                  <>
+                    {/* Primary Finish / Complete button */}
+                    <button
+                      type="button"
+                      disabled={!ready || busy}
+                      onClick={() =>
+                        void run(
+                          route.planId,
+                          s.workOrderId,
+                          'complete',
+                          undefined,
+                          s.jobId
+                        )
+                      }
+                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
+                      title="Označit bod jako hotový"
+                    >
+                      <CheckCircle2 size={14} />
+                      <span>{isInProgress ? 'Dokončit práci ✓' : 'Hotovo ✓'}</span>
+                    </button>
+
+                    {/* Secondary Start timer button if not yet in progress */}
+                    {!isInProgress && (
+                      <button
+                        type="button"
+                        disabled={!ready || busy}
+                        onClick={() =>
+                          void run(
+                            route.planId,
+                            s.workOrderId,
+                            'start',
+                            undefined,
+                            s.jobId
+                          )
+                        }
+                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-3 py-3 text-xs font-semibold transition shadow-sm cursor-pointer ${
+                          isIssue
+                            ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
+                            : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                        title="Zahájit práci a spustit měření času na místě"
+                      >
+                        <Clock size={14} />
+                        <span>
+                          {isIssue
+                            ? 'Zkusit znovu'
+                            : currentDate > todayStr
+                            ? 'Zahájit v předstihu ⚡'
+                            : 'Zahájit ⏱'}
+                        </span>
+                      </button>
+                    )}
+                  </>
                 )}
 
                 {/* Direct 1-Click Camera Shutter Button */}

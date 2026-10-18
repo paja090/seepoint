@@ -21,7 +21,9 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(db); if (!profile?.enabled) return { timezone: 'Europe/Prague', routes: [] };
   const employee = await db.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
-  if (!employee) return { timezone: profile.timezone, routes: [] };
+  const user = db.user ? await db.user.findUnique({ where: { id: userId }, select: { role: true } }) : null;
+  const isAdminOrManager = ['ADMIN', 'MANAGER'].includes(user?.role ?? '');
+  if (!employee && !isAdminOrManager) return { timezone: profile.timezone, routes: [] };
 
   let targetDate: string;
   if (typeof dateOrNow === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOrNow)) {
@@ -40,7 +42,9 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
   for (const plan of effectivePlans) {
     const result = plan.planningSummary as unknown as PlanningResult;
     const planLocations = await loadPlanCrewLocations(plan.id, organizationId, db);
-    for (const crew of result.crews.filter(c => c.employeeIds.includes(employee.id))) {
+    const userCrews = employee ? result.crews.filter(c => c.employeeIds.includes(employee.id)) : [];
+    const targetCrews = userCrews.length > 0 ? userCrews : (isAdminOrManager ? result.crews : []);
+    for (const crew of targetCrews) {
       const orders = await db.workOrder.findMany({
         where: {
           organizationId,
@@ -312,7 +316,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
 
       routes.push({
         planId: plan.id,
-        crewName: crew.names?.length ? crew.names.join(', ') : null,
+        crewName: crew.name || (crew.names?.length ? crew.names.join(', ') : null),
         vehicleName: crew.vehicleName,
         departureAt: crew.departureAt,
         endAt: crew.endAt,
@@ -340,11 +344,12 @@ export async function executeStop(input: FieldExecutionInput & { planId: string;
     const { organizationId } = requireTenantContext(); const plan = await getPlan(input.planId, tx);
     const employee = await tx.employee.findFirst({ where: { organizationId, userId: actor.id, isActive: true } });
     const result = plan.planningSummary as unknown as PlanningResult;
-    const crew = result.crews.find(c => employee && c.employeeIds.includes(employee.id) && (['start_trip', 'complete_trip'].includes(input.action) || c.stops.some(s => stopId(s) === (input.jobId ?? input.workOrderId))));
-    if (!crew || !employee || !['APPROVED', 'ACTIVE', 'COMPLETED'].includes(plan.status)) throw new Error('FORBIDDEN: pouze vlastní schválená trasa.');
+    const isAdminOrManager = ['ADMIN', 'MANAGER'].includes(actor.role);
+    const crew = result.crews.find(c => (isAdminOrManager || (employee && c.employeeIds.includes(employee.id))) && (['start_trip', 'complete_trip'].includes(input.action) || c.stops.some(s => stopId(s) === (input.jobId ?? input.workOrderId))));
+    if (!crew || (!isAdminOrManager && !employee) || !['APPROVED', 'ACTIVE', 'COMPLETED'].includes(plan.status)) throw new Error('FORBIDDEN: pouze vlastní schválená trasa.');
     const profile = (plan.planningInputSnapshot as unknown as PlanningInput).profile;
     const today = dayInZone(new Date(), profile.timezone);
-    if (plan.date < today && !['ADMIN', 'MANAGER'].includes(actor.role)) {
+    if (plan.date < today && !isAdminOrManager) {
       throw new Error('Nelze realizovat trasu z minulosti; kontaktujte dispečera.');
     }
     if (input.action === 'start_trip' || input.action === 'complete_trip') {
@@ -397,13 +402,13 @@ export async function executeStop(input: FieldExecutionInput & { planId: string;
 
     const orderId = stop.workOrderId || input.workOrderId;
     const order = orderId ? await tx.workOrder.findUnique({ where: { id: orderId, organizationId }, include: { items: true, workTasks: true, crmRealizations: true, navigationOrder: { include: { points: true } } } }) : null;
-    if (orderId && (!order || (order.workTasks.length > 0 && !order.workTasks.some(t => t.organizationId === organizationId && (t.assignedToEmployeeId === employee.id || crew.employeeIds.includes(t.assignedToEmployeeId ?? '')))))) throw new Error('FORBIDDEN: pracovní přiřazení se změnilo.');
+    if (!isAdminOrManager && orderId && (!order || (order.workTasks.length > 0 && !order.workTasks.some(t => t.organizationId === organizationId && (t.assignedToEmployeeId === employee?.id || crew.employeeIds.includes(t.assignedToEmployeeId ?? '')))))) throw new Error('FORBIDDEN: pracovní přiřazení se změnilo.');
     if (order && [...order.crmRealizations, ...order.workTasks, ...(order.navigationOrder ? [order.navigationOrder, ...order.navigationOrder.points] : [])].some(r => r.organizationId !== organizationId)) throw new Error('Cross-tenant reference rejected.');
     if (stop.navigationPointId) {
       if (!await navigationAvailable(tx)) throw new Error('FORBIDDEN: Navigation není aktivní.');
       const point = await tx.navigationPoint.findFirst({ where: { organizationId, id: stop.navigationPointId, navigationOrderId: stop.navigationOrderId, navigationOrder: { organizationId } } });
       const installers = await tx.employee.findMany({ where: { organizationId, id: { in: crew.employeeIds }, isActive: true }, select: { userId: true } });
-      if (!point?.installerUserId || !installers.some(e => e.userId === point.installerUserId)) throw new Error('FORBIDDEN: instalátor bodu se změnil.');
+      if (!isAdminOrManager && (!point?.installerUserId || !installers.some(e => e.userId === point.installerUserId))) throw new Error('FORBIDDEN: instalátor bodu se změnil.');
       if (!point || !point.isSelectedByClient || ['CANCELLED', 'REMOVED'].includes(point.status) || order?.status === 'CANCELLED') throw new Error('Bod již není dostupný.');
       if (input.action === 'inspect') return { ok: true, navigationOrderId: point.navigationOrderId!, navigationPointId: point.id };
       if (!['start', 'complete', 'photo', 'problem'].includes(input.action)) throw new Error('Neplatná akce.');
@@ -420,7 +425,12 @@ export async function executeStop(input: FieldExecutionInput & { planId: string;
           if (point.status === 'INSTALLED') throw new Error('Bod je již dokončen; obnovte trasu.');
           await attachPointInstallationPhotos(point.navigationOrderId!, point.id, installationPhotos, { userId: actor.id, userName: actor.email }, tx);
         }
-        if (input.action === 'complete' && point.status !== 'INSTALLED') throw new Error('Dokončete montáž nahráním fotografie po instalaci.');
+        if (input.action === 'complete' && point.status !== 'INSTALLED') {
+          await tx.navigationPoint.update({
+            where: { id: point.id, organizationId },
+            data: { status: 'INSTALLED' }
+          });
+        }
         // NavigationPoint has no IN_PROGRESS status. Start is an audit event, not a parallel business state.
         if (input.action === 'start' && order && order.status !== 'DONE') await tx.workOrder.update({ where: { id: order.id, organizationId }, data: { status: 'IN_PROGRESS' } });
         if (input.action !== 'start') {
@@ -462,7 +472,6 @@ export async function executeStop(input: FieldExecutionInput & { planId: string;
     if (input.action === 'complete' && order.crmRealizations.some(r => r.claimNote)) throw new Error('Realizace má nevyřešený problém.');
     const lastProblem = await tx.crmAuditLog.findFirst({ where: { organizationId, entityType: 'WorkOrder', entityId: order.id, action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } }, orderBy: { createdAt: 'desc' } });
     if (input.action === 'complete' && !order.crmRealizations.length && !order.navigationOrder && lastProblem?.action === 'FIELD_EXECUTION_BLOCKED') throw new Error('Manažer musí nejprve vyřešit hlášený problém.');
-    if (input.action === 'complete' && order.status !== 'IN_PROGRESS') throw new Error('Nejprve zahajte práci.');
     if (input.action === 'start' && order.status === 'IN_PROGRESS') return { ok: true };
     await tx.workOrder.update({ where: { id: order.id, organizationId }, data: { status: input.action === 'start' ? 'IN_PROGRESS' : 'DONE' } });
     await tx.workTask.updateMany({ where: { organizationId, workOrderId: order.id }, data: { status: input.action === 'start' ? 'IN_PROGRESS' : 'DONE' } });

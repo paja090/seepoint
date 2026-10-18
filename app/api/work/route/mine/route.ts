@@ -14,7 +14,8 @@ export async function POST(request: Request) {
   enterTenantContext({ organizationId: user.organizationId!, userId: user.id, source: 'session' });
   try {
     const input = await request.json();
-    if (typeof input.planId !== 'string' || typeof input.workOrderId !== 'string' || typeof input.action !== 'string') throw new Error('Neplatný požadavek.');
+    if (typeof input.planId !== 'string' || typeof input.action !== 'string') throw new Error('Neplatný požadavek.');
+    if (typeof input.workOrderId !== 'string') input.workOrderId = '';
     return NextResponse.json(await executeStop(input, user));
   } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'Operace selhala.' }, { status: e instanceof Error && e.message.startsWith('FORBIDDEN') ? 403 : 409 }); }
 }

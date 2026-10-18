@@ -17,12 +17,12 @@ import {
   Settings2,
   Plus,
   Trash2,
-  ChevronRight,
-  ExternalLink,
   Search,
-  Filter,
   RefreshCw,
   Navigation,
+  Pencil,
+  UserCheck,
+  X,
 } from 'lucide-react';
 
 type Loaded = { profile: PlanningProfile | null; data: PlanningInput | null; plans: PlanView[] };
@@ -76,8 +76,111 @@ export function WorkRoutePlanner({
   const [inputsChanged, setInputsChanged] = useState(false);
   const [acceptEstimated, setAcceptEstimated] = useState(false);
 
+  const [renameModal, setRenameModal] = useState<{ open: boolean; crewId: string; currentName: string } | null>(null);
+  const [transferModal, setTransferModal] = useState<{
+    open: boolean;
+    crewId: string;
+    crewName: string;
+    currentWorkerNames: string[];
+    currentEmployeeIds: string[];
+  } | null>(null);
+  const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferMode, setTransferMode] = useState<'replace_first' | 'replace_all'>('replace_first');
+  const [toast, setToast] = useState<string | null>(null);
+
   const requestKey = useRef<string | null>(null);
   const loadCounter = useRef(0);
+
+  async function handleRenameSubmit(crewId: string, newName: string) {
+    const trimmed = newName.trim();
+    setRenameModal(null);
+    setCrews((prev) => prev.map((c) => (c.id === crewId ? { ...c, name: trimmed } : c)));
+    if (!plan?.id) {
+      setToast('Název trasy v návrhu byl aktualizován.');
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/work/route', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'renameCrew', id: plan.id, crewId, name: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPlan(data);
+      setLoaded((old) => (old ? { ...old, plans: [data, ...old.plans.filter((p) => p.id !== data.id)] } : old));
+      setToast(`Trasa byla úspěšně přejmenována na „${trimmed || 'výchozí'}“.`);
+      setTimeout(() => setToast(null), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Přejmenování trasy selhalo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleTransferSubmit() {
+    if (!transferModal || !transferTargetId) return;
+    const { crewId, crewName } = transferModal;
+    const targetEmp = loaded?.data?.employees.find((e) => e.id === transferTargetId);
+    const targetName = targetEmp?.name || 'vybraného montážníka';
+
+    setTransferModal(null);
+
+    if (!plan?.id) {
+      setCrews((prev) =>
+        prev.map((c) => {
+          if (c.id !== crewId) return c;
+          if (transferMode === 'replace_all' || c.employeeIds.length <= 1) {
+            return { ...c, employeeIds: [transferTargetId] };
+          }
+          return {
+            ...c,
+            employeeIds: [transferTargetId, ...c.employeeIds.slice(1).filter((id) => id !== transferTargetId)],
+          };
+        })
+      );
+      setInputsChanged(true);
+      setToast(`Trasa ${crewName} byla v návrhu předána na: ${targetName}.`);
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/work/route', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'transferCrew',
+          id: plan.id,
+          crewId,
+          targetEmployeeId: transferTargetId,
+          mode: transferMode,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPlan(data);
+      setLoaded((old) => (old ? { ...old, plans: [data, ...old.plans.filter((p) => p.id !== data.id)] } : old));
+      setCrews((prev) =>
+        prev.map((c) => {
+          if (c.id !== crewId) return c;
+          const updated = data.result.crews.find((rc: { id: string }) => rc.id === crewId);
+          return updated ? { ...c, employeeIds: updated.employeeIds, name: updated.name } : c;
+        })
+      );
+      setToast(`Trasa ${crewName} byla úspěšně předána na pracovníka: ${targetName}.`);
+      setTimeout(() => setToast(null), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Předání trasy selhalo.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     const ticket = ++loadCounter.current;
@@ -92,8 +195,18 @@ export function WorkRoutePlanner({
       setLoaded(data);
       setPlan(data.plans[0] ?? null);
 
-      // Initialize crews if empty
-      if (data.data?.crews && data.data.crews.length > 0) {
+      // Initialize crews with saved plan crews or default
+      if (data.plans[0]?.result?.crews && data.plans[0].result.crews.length > 0) {
+        setCrews(
+          data.plans[0].result.crews.map((c: { id: string; name?: string | null; employeeIds: string[]; vehicleId: string | null; startLocation?: { latitude: number; longitude: number } }) => ({
+            id: c.id,
+            name: c.name || null,
+            employeeIds: c.employeeIds,
+            vehicleId: c.vehicleId,
+            startLocation: c.startLocation,
+          }))
+        );
+      } else if (data.data?.crews && data.data.crews.length > 0) {
         setCrews(data.data.crews);
       } else {
         // Sensible default: 1 initial crew with first available employee
@@ -102,6 +215,7 @@ export function WorkRoutePlanner({
         setCrews([
           {
             id: crypto.randomUUID(),
+            name: 'Trasa 1',
             employeeIds: firstEmployee ? [firstEmployee.id] : [],
             vehicleId: firstVehicle ? firstVehicle.id : null,
           },
@@ -436,7 +550,7 @@ export function WorkRoutePlanner({
             >
               {loaded?.plans.map((p) => (
                 <option key={p.id} value={p.id}>
-                  Verze {p.version} · {p.status === 'APPROVED' ? 'Schváleno' : p.status === 'DRAFT' ? 'Návrh' : p.status}
+                  {p.name ? `${p.name} (v${p.version})` : `Verze ${p.version}`} · {p.status === 'APPROVED' ? 'Schváleno' : p.status === 'DRAFT' ? 'Návrh' : p.status}
                 </option>
               ))}
             </select>
@@ -561,25 +675,56 @@ export function WorkRoutePlanner({
                     key={c.id}
                     className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 transition hover:border-slate-300"
                   >
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-100 text-sky-800 text-xs font-black">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-800 text-xs font-black">
                           #{index + 1}
                         </div>
-                        <h3 className="font-extrabold text-sm text-slate-900">
-                          Posádka {index + 1}
-                        </h3>
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="text"
+                            placeholder={`Název trasy ${index + 1} (např. Sever, Centrum...)`}
+                            value={c.name ?? ''}
+                            onChange={(e) =>
+                              updateCrews(
+                                crews.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x))
+                              )
+                            }
+                            className="input w-full text-xs font-bold text-slate-900 py-1 px-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-slate-50 focus:bg-white transition"
+                          />
+                        </div>
                       </div>
 
-                      {crews.length > 1 && (
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
-                          onClick={() => updateCrews(crews.filter((x) => x.id !== c.id))}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
-                          title="Odebrat posádku"
+                          type="button"
+                          onClick={() => {
+                            setTransferTargetId('');
+                            setTransferModal({
+                              open: true,
+                              crewId: c.id,
+                              crewName: c.name || `Posádka ${index + 1}`,
+                              currentWorkerNames: assignedEmployees.map((e) => e.name),
+                              currentEmployeeIds: c.employeeIds,
+                            });
+                          }}
+                          className="flex items-center gap-1 rounded-xl bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                          title="Předat trasu jinému pracovníkovi"
                         >
-                          <Trash2 size={16} />
+                          <UserCheck size={14} />
+                          <span className="hidden sm:inline">Předat</span>
                         </button>
-                      )}
+
+                        {crews.length > 1 && (
+                          <button
+                            onClick={() => updateCrews(crews.filter((x) => x.id !== c.id))}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                            title="Odebrat posádku"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Workers Chips */}
@@ -669,7 +814,7 @@ export function WorkRoutePlanner({
 
               <button
                 onClick={() =>
-                  updateCrews([...crews, { id: crypto.randomUUID(), employeeIds: [], vehicleId: null }])
+                  updateCrews([...crews, { id: crypto.randomUUID(), name: `Trasa ${crews.length + 1}`, employeeIds: [], vehicleId: null }])
                 }
                 className="w-full rounded-2xl border-2 border-dashed border-slate-300 py-3.5 text-xs font-bold text-sky-700 hover:bg-sky-50/50 hover:border-sky-300 transition flex items-center justify-center gap-2"
               >
@@ -823,7 +968,12 @@ export function WorkRoutePlanner({
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
-                    <span>Posádka {i + 1}</span>
+                    <span>{c.name || `Posádka ${i + 1}`}</span>
+                    {c.names && c.names.length > 0 && (
+                      <span className="text-[10px] font-normal opacity-75 hidden sm:inline">
+                        ({c.names.join(' + ')})
+                      </span>
+                    )}
                     {c.liveLocation && (
                       <span
                         className="inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse"
@@ -874,10 +1024,31 @@ export function WorkRoutePlanner({
             <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900">
-                    Trasa: {activeCrew.names.join(' + ')}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base text-slate-900">
+                      Trasa: {activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRenameModal({
+                          open: true,
+                          crewId: activeCrew.id,
+                          currentName: activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`,
+                        })
+                      }
+                      className="p-1 rounded-lg text-slate-400 hover:text-sky-700 hover:bg-slate-100 transition"
+                      title="Pojmenovat / přejmenovat trasu"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
+                    Montážníci:{' '}
+                    <strong className="text-slate-800 font-semibold">
+                      {activeCrew.names.join(' + ') || 'Nepřiřazeno'}
+                    </strong>
+                    {' · '}
                     {activeCrew.vehicleName ?? 'Bez vozidla'} · Odjezd {formatTime(activeCrew.departureAt)} · Návrat {formatTime(activeCrew.endAt)}
                   </p>
                   {activeCrew.liveLocation && (
@@ -906,17 +1077,38 @@ export function WorkRoutePlanner({
                   )}
                 </div>
 
-                {mapsLinks(plan!, activeCrew.id).map((href, i, links) => (
-                  <a
-                    key={href}
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 rounded-xl bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition"
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTransferTargetId('');
+                      setTransferModal({
+                        open: true,
+                        crewId: activeCrew.id,
+                        crewName: activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`,
+                        currentWorkerNames: activeCrew.names,
+                        currentEmployeeIds: activeCrew.employeeIds,
+                      });
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
+                    title="Předat celou trasu jinému pracovníkovi z týmu"
                   >
-                    <span>Otevřít v Google Maps ↗</span>
-                  </a>
-                ))}
+                    <UserCheck size={14} />
+                    <span>Předat trasu</span>
+                  </button>
+
+                  {mapsLinks(plan!, activeCrew.id).map((href) => (
+                    <a
+                      key={href}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 rounded-xl bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition"
+                    >
+                      <span>Otevřít v Google Maps ↗</span>
+                    </a>
+                  ))}
+                </div>
               </div>
 
               {/* Ordered Stops List */}
@@ -973,6 +1165,192 @@ export function WorkRoutePlanner({
           )}
         </main>
       </div>
+
+      {/* Rename Route Modal */}
+      {renameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Pencil size={18} className="text-sky-600" />
+                Pojmenovat / přejmenovat trasu
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRenameModal(null)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const val = fd.get('name')?.toString() || '';
+                void handleRenameSubmit(renameModal.crewId, val);
+              }}
+              className="mt-4 space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Název trasy / posádky
+                </label>
+                <input
+                  name="name"
+                  defaultValue={renameModal.currentName}
+                  placeholder="např. Severní okruh, Billboardy centrum..."
+                  autoFocus
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 transition"
+                />
+                <p className="mt-1.5 text-[11px] text-slate-500">
+                  Tento název uvidí dispečer v plánu i na mapě a montážník ve své mobilní aplikaci.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRenameModal(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-500 disabled:opacity-50 transition"
+                >
+                  {busy ? 'Ukládám…' : 'Uložit název'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Route Modal */}
+      {transferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <UserCheck size={18} className="text-indigo-600" />
+                Předat trasu na jiného pracovníka
+              </h3>
+              <button
+                type="button"
+                onClick={() => setTransferModal(null)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl bg-indigo-50/70 border border-indigo-100 p-3.5 text-xs text-indigo-950 space-y-1">
+                <div className="font-bold flex items-center justify-between">
+                  <span>Trasa:</span>
+                  <span className="font-extrabold text-indigo-700">{transferModal.crewName}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span>Aktuálně přiřazeno:</span>
+                  <span className="font-semibold">{transferModal.currentWorkerNames.join(' + ') || 'Nikdo'}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Předat na člena týmu:
+                </label>
+                <select
+                  value={transferTargetId}
+                  onChange={(e) => setTransferTargetId(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition"
+                >
+                  <option value="">-- Vyberte pracovníka z týmu --</option>
+                  {loaded?.data?.employees
+                    ?.filter((e) => !transferModal.currentEmployeeIds.includes(e.id))
+                    .map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} ({e.roles?.join(', ') || 'Pracovník'}) {!e.available ? '⚠️ má absenci' : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              {transferModal.currentEmployeeIds.length > 1 && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                    Režim předání posádky:
+                  </label>
+                  <div className="space-y-1.5 text-xs">
+                    <label className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="transferMode"
+                        checked={transferMode === 'replace_first'}
+                        onChange={() => setTransferMode('replace_first')}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <div className="font-semibold text-slate-800">Nahradit vedoucího posádky (1. montážníka)</div>
+                        <div className="text-[11px] text-slate-500">Ostatní členové posádky zůstanou v autě.</div>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 p-2 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="transferMode"
+                        checked={transferMode === 'replace_all'}
+                        onChange={() => setTransferMode('replace_all')}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <div>
+                        <div className="font-semibold text-slate-800">Nahradit celou posádku</div>
+                        <div className="text-[11px] text-slate-500">Trasa bude předána výhradně novému pracovníkovi.</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setTransferModal(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="button"
+                  disabled={!transferTargetId || busy}
+                  onClick={() => void handleTransferSubmit()}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 disabled:opacity-50 transition"
+                >
+                  {busy ? 'Předávám...' : 'Předat trasu'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl bg-slate-900 text-white px-4 py-3 shadow-xl border border-slate-800 text-xs font-medium flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <span>{toast}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="p-1 text-slate-400 hover:text-white rounded-lg transition"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -27,7 +27,7 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
         crew.stops.forEach(stop => {
           const point: [number, number] = [stop.location.latitude, stop.location.longitude];
           const marker = L.marker(point, { icon: L.divIcon({ className: '', html: `<span style="display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:2px solid white;background:${color};color:white;font-weight:700">${stop.routeOrder}</span>` }) });
-          const tooltip = document.createElement('span'); tooltip.textContent = `${crew.names.join(' + ')} · ${stop.title}`;
+          const tooltip = document.createElement('span'); tooltip.textContent = `${crew.name ? crew.name : crew.names.join(' + ')} · ${stop.title}`;
           marker.bindTooltip(tooltip).addTo(m); bounds.extend(point);
           const path = stop.travel.polyline ? decode(stop.travel.polyline) : previous ? [[previous.latitude, previous.longitude], point] as [number, number][] : [];
           if (path.length) L.polyline(path, { color, weight: active === crew.id ? 5 : 3, opacity: active === crew.id ? 1 : 0.5, dashArray: stop.travel.estimated ? '6 8' : undefined }).addTo(m);
@@ -83,7 +83,7 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
 
           const tooltipHtml = `
             <div style="font-family:system-ui,-apple-system,sans-serif;font-size:11px;line-height:1.4;">
-              <strong style="font-size:12px;color:#0f172a;">Posádka ${index + 1}: ${escapeHtml(crew.names.join(' + '))}</strong><br/>
+              <strong style="font-size:12px;color:#0f172a;">${escapeHtml(crew.name || `Posádka ${index + 1}`)}: ${escapeHtml(crew.names.join(' + '))}</strong><br/>
               ${crew.vehicleName ? `<span style="color:#475569;">Vozidlo: ${escapeHtml(crew.vehicleName)}</span><br/>` : ''}
               <span style="color:#0369a1;font-weight:700;">Rychlost: ${speedText}</span> · 
               <span style="color:${isRecent ? '#15803d' : '#b45309'};font-weight:600;">Signál: ${ageText}</span>

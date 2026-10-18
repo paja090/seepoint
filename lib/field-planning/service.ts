@@ -24,9 +24,11 @@ export function hash(value: unknown) {
   return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
 }
 export function planView(row: FieldPlan): PlanView {
+  const result = row.planningSummary as unknown as PlanningResult;
   return { id: row.id, date: row.date, version: row.version, status: row.status, parentPlanId: row.parentPlanId,
-    approvedAt: row.approvedAt?.toISOString() ?? null, result: row.planningSummary as unknown as PlanningResult,
-    profile: (row.planningInputSnapshot as unknown as PlanningInput).profile };
+    approvedAt: row.approvedAt?.toISOString() ?? null, result,
+    profile: (row.planningInputSnapshot as unknown as PlanningInput).profile,
+    name: result.planName ?? null };
 }
 export async function plannerTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, db = prisma): Promise<T> {
   for (let i = 0; ; i++) {
@@ -63,13 +65,25 @@ export async function saveProfile(value: unknown, actor: PlannerActor) {
   });
 }
 export function parseGenerate(value: unknown) {
-  const p = value as { date?: string; requestKey?: string; parentPlanId?: string; jobIds?: string[]; crews?: CrewInput[]; startTime?: string };
+  const p = value as { date?: string; requestKey?: string; parentPlanId?: string; jobIds?: string[]; crews?: CrewInput[]; startTime?: string; planName?: string };
   if (!p || typeof p.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(p.date) || typeof p.requestKey !== 'string' || !/^[\w-]{8,100}$/.test(p.requestKey)) throw new Error('Neplatný den nebo klíč požadavku.');
   if (p.parentPlanId !== undefined && (typeof p.parentPlanId !== 'string' || p.parentPlanId.length > 100)) throw new Error('Neplatný předchozí plán.');
+  if (p.planName !== undefined && p.planName !== null && typeof p.planName !== 'string') throw new Error('Neplatný název plánu.');
   if (p.jobIds !== undefined && (!Array.isArray(p.jobIds) || p.jobIds.length > 200 || !p.jobIds.every(id => typeof id === 'string' && id.length < 100))) throw new Error('Neplatný výběr úkolů.');
-  if (p.crews !== undefined && (!Array.isArray(p.crews) || p.crews.length > 30 || p.crews.some(c => !c || typeof c.id !== 'string' || c.id.length > 100 || !Array.isArray(c.employeeIds) || c.employeeIds.length > 20 || !c.employeeIds.every(id => typeof id === 'string') || (c.vehicleId !== null && typeof c.vehicleId !== 'string') || (c.startLocation !== undefined && !coordinates(c.startLocation))))) throw new Error('Neplatné posádky.');
+  if (p.crews !== undefined && (!Array.isArray(p.crews) || p.crews.length > 30 || p.crews.some(c => !c || typeof c.id !== 'string' || c.id.length > 100 || (c.name !== undefined && c.name !== null && typeof c.name !== 'string') || !Array.isArray(c.employeeIds) || c.employeeIds.length > 20 || !c.employeeIds.every(id => typeof id === 'string') || (c.vehicleId !== null && typeof c.vehicleId !== 'string') || (c.startLocation !== undefined && !coordinates(c.startLocation))))) throw new Error('Neplatné posádky.');
   if (p.startTime !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(p.startTime)) throw new Error('Neplatný čas odjezdu.');
-  return { date: p.date, requestKey: p.requestKey, parentPlanId: p.parentPlanId, jobIds: p.jobIds, crews: p.crews, startTime: p.startTime };
+  return {
+    date: p.date,
+    requestKey: p.requestKey,
+    parentPlanId: p.parentPlanId,
+    jobIds: p.jobIds,
+    crews: p.crews?.map(c => ({
+      ...c,
+      name: typeof c.name === 'string' && c.name.trim() ? c.name.trim().slice(0, 100) : null,
+    })),
+    startTime: p.startTime,
+    planName: typeof p.planName === 'string' && p.planName.trim() ? p.planName.trim().slice(0, 100) : undefined,
+  };
 }
 type ApprovalSnapshot = { reservationIds: string[] };
 function reusableReservations(row?: FieldPlan | null) { return ((row?.approvalSnapshot as unknown as ApprovalSnapshot | null)?.reservationIds ?? []); }
@@ -92,6 +106,9 @@ export async function generatePlan(raw: unknown, actor: PlannerActor) {
     reuseReservationIds: reusableReservations(parent), excludePlanIds: parent ? [parent.id] : [] });
   // No fresh orders are silently added during replanning. DONE/CANCELLED are removed by the engine.
   const result = await planFieldWork(input, googleTravelProvider(input.profile));
+  if (request.planName) {
+    result.planName = request.planName;
+  }
   return plannerTransaction(async tx => {
     const duplicate = await tx.fieldPlan.findUnique({ where: { organizationId_requestKey: { organizationId, requestKey: request.requestKey } } });
     if (duplicate) { await getPlan(duplicate.id, tx); if (duplicate.requestHash !== requestHash) throw new Error('Klíč požadavku již patří jinému zadání.'); return planView(duplicate); }
@@ -218,3 +235,178 @@ export async function cancelDraft(id: string, actor: PlannerActor) {
     await auditPlan(tx, id, actor, 'FIELD_PLAN_CANCELLED'); return planView(saved);
   });
 }
+
+/**
+ * Renames a crew / route in an existing plan (draft, approved, or active).
+ */
+export async function renameCrew(
+  planId: string,
+  crewId: string,
+  name: string,
+  actor: PlannerActor,
+  db = prisma
+): Promise<PlanView> {
+  requirePlannerManager(actor);
+  const cleanName = name.trim().slice(0, 100);
+  const { organizationId } = requireTenantContext();
+  return plannerTransaction(async tx => {
+    const row = await getPlan(planId, tx);
+    const summary = row.planningSummary as unknown as PlanningResult;
+    const input = row.planningInputSnapshot as unknown as PlanningInput;
+    const crew = summary.crews.find(c => c.id === crewId);
+    if (!crew) throw new Error('Posádka / trasa nebyla nalezena.');
+    crew.name = cleanName || null;
+    const inputCrew = input.crews?.find(c => c.id === crewId);
+    if (inputCrew) {
+      inputCrew.name = cleanName || null;
+    }
+    await tx.fieldPlan.update({
+      where: { id: planId, organizationId },
+      data: {
+        planningSummary: json(summary),
+        planningInputSnapshot: json(input),
+      },
+    });
+    await auditPlan(tx, planId, actor, 'FIELD_ROUTE_RENAMED', { crewId, name: cleanName });
+    return planView(await getPlan(planId, tx));
+  }, db);
+}
+
+/**
+ * Reassigns / transfers an entire crew / route to another worker from the team.
+ * If the plan is already APPROVED or ACTIVE, immediately syncs live WorkAssignment,
+ * NavigationPoint installer, and VehicleReservation.
+ */
+export async function transferCrew(
+  planId: string,
+  crewId: string,
+  targetEmployeeId: string,
+  actor: PlannerActor,
+  mode: 'replace_first' | 'replace_all' = 'replace_first',
+  db = prisma
+): Promise<PlanView> {
+  requirePlannerManager(actor);
+  const { organizationId } = requireTenantContext();
+  return plannerTransaction(async tx => {
+    const row = await getPlan(planId, tx);
+    if (row.status === 'CANCELLED') throw new Error('Zrušený plán nelze upravovat.');
+    const summary = row.planningSummary as unknown as PlanningResult;
+    const input = row.planningInputSnapshot as unknown as PlanningInput;
+    const crew = summary.crews.find(c => c.id === crewId);
+    if (!crew) throw new Error('Posádka / trasa nebyla nalezena.');
+
+    const targetEmployee = await tx.employee.findFirst({
+      where: { id: targetEmployeeId, organizationId, isActive: true },
+      select: { id: true, firstName: true, lastName: true, userId: true, isActive: true },
+    });
+    if (!targetEmployee) throw new Error('Cílový pracovník nebyl nalezen nebo není aktivní.');
+
+    const targetName = `${targetEmployee.firstName} ${targetEmployee.lastName}`.trim();
+
+    // Determine old employee IDs being replaced
+    const oldEmployeeIds = [...crew.employeeIds];
+    let newEmployeeIds: string[];
+    if (mode === 'replace_all' || crew.employeeIds.length <= 1) {
+      newEmployeeIds = [targetEmployee.id];
+    } else {
+      // replace first member (lead technician) and preserve assistants
+      newEmployeeIds = [targetEmployee.id, ...crew.employeeIds.slice(1).filter(id => id !== targetEmployee.id)];
+    }
+
+    // Fetch all members' names for the updated crew
+    const allMembers = await tx.employee.findMany({
+      where: { id: { in: newEmployeeIds }, organizationId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const nameMap = new Map(allMembers.map(m => [m.id, `${m.firstName} ${m.lastName}`.trim()]));
+    const newNames = newEmployeeIds.map(id => nameMap.get(id) ?? 'Pracovník');
+
+    // Update crew in memory
+    crew.employeeIds = newEmployeeIds;
+    crew.names = newNames;
+
+    const inputCrew = input.crews?.find(c => c.id === crewId);
+    if (inputCrew) {
+      inputCrew.employeeIds = newEmployeeIds;
+    }
+
+    // If plan is APPROVED or ACTIVE, sync live assignments so new worker sees and owns stops
+    if (['APPROVED', 'ACTIVE', 'COMPLETED'].includes(row.status)) {
+      for (const stop of crew.stops) {
+        // 1. WorkOrder & WorkAssignment
+        if (stop.workOrderId) {
+          // Remove old assignments created by field plan for replaced workers
+          for (const oldEmpId of oldEmployeeIds) {
+            if (!newEmployeeIds.includes(oldEmpId)) {
+              const oldAssignId = `fp-${hash([organizationId, stop.workOrderId, oldEmpId]).slice(0, 32)}`;
+              await tx.workAssignment.deleteMany({ where: { id: oldAssignId, organizationId } });
+            }
+          }
+
+          // Create or update assignment for new worker
+          const newAssignId = `fp-${hash([organizationId, stop.workOrderId, targetEmployee.id]).slice(0, 32)}`;
+          await tx.workAssignment.upsert({
+            where: { id: newAssignId },
+            create: {
+              id: newAssignId,
+              organizationId,
+              workOrderId: stop.workOrderId,
+              userId: targetEmployee.userId,
+              workerName: targetName,
+            },
+            update: {
+              userId: targetEmployee.userId,
+              workerName: targetName,
+            },
+          });
+
+          await syncWorkOrderTasks(stop.workOrderId, tx);
+        }
+
+        // 2. NavigationPoint
+        if (stop.navigationPointId && targetEmployee.userId) {
+          await tx.navigationPoint.updateMany({
+            where: { id: stop.navigationPointId, organizationId },
+            data: { installerUserId: targetEmployee.userId },
+          });
+        }
+
+        // 3. CrmRealization
+        if (stop.crmRealizationId && targetEmployee.userId) {
+          await tx.crmRealization.updateMany({
+            where: { id: stop.crmRealizationId, organizationId },
+            data: { assignedUserId: targetEmployee.userId },
+          });
+        }
+      }
+
+      // 4. Vehicle reservation update if tied to old worker
+      if (crew.vehicleId) {
+        const resId = `fp-${hash([row.id, crew.id]).slice(0, 32)}`;
+        await tx.vehicleReservation.updateMany({
+          where: { organizationId, id: resId },
+          data: { employeeId: targetEmployee.id },
+        });
+      }
+    }
+
+    // Persist updated snapshot
+    await tx.fieldPlan.update({
+      where: { id: planId, organizationId },
+      data: {
+        planningSummary: json(summary),
+        planningInputSnapshot: json(input),
+      },
+    });
+
+    await auditPlan(tx, planId, actor, 'FIELD_ROUTE_TRANSFERRED', {
+      crewId,
+      oldEmployeeIds,
+      newEmployeeId: targetEmployee.id,
+      newEmployeeName: targetName,
+    });
+
+    return planView(await getPlan(planId, tx));
+  }, db);
+}
+

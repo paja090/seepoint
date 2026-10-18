@@ -15,7 +15,8 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
     // Historic links remain readable; legacy work must be reviewed before new execution.
     throw new Error('Tato starší práce vyžaduje kontrolu a doplnění kroků dispečerem.');
   }
-  if (step.assignedFieldPlanId !== planId || step.assignedCrewId !== crewId) throw new Error('FORBIDDEN: přiřazení kroku se změnilo; obnovte trasu.');
+  const isAdminOrManager = ['ADMIN', 'MANAGER'].includes(actor.role);
+  if (!isAdminOrManager && (step.assignedFieldPlanId !== planId || step.assignedCrewId !== crewId)) throw new Error('FORBIDDEN: přiřazení kroku se změnilo; obnovte trasu.');
   if (input.action === 'inspect') return { ok: true, fieldWorkStepId: step.id, electionRemovalPointId: point.id, photoType: step.photoType };
   if (input.custodyNote !== undefined && (typeof input.custodyNote !== 'string' || input.custodyNote.length > 4000)) throw new Error('Neplatné potvrzení převzetí materiálu.');
   if (input.problemType !== undefined && (typeof input.problemType !== 'string' || input.problemType.length > 100)) throw new Error('Neplatný typ problému.');
@@ -30,7 +31,7 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
   }
   if (step.status === 'COMPLETED') throw new Error('Krok je již dokončen.');
   const predecessor = point.steps.find(s => s.sequence === step.sequence - 1);
-  if (predecessor && predecessor.status !== 'COMPLETED') throw new Error('Nejprve dokončete předchozí krok včetně nakládky.');
+  if (!isAdminOrManager && predecessor && predecessor.status !== 'COMPLETED') throw new Error('Nejprve dokončete předchozí krok včetně nakládky.');
   let data: Prisma.FieldWorkStepUpdateManyMutationInput;
   if (input.action === 'start') {
     if (step.status === 'IN_PROGRESS') return { ok: true };
@@ -39,17 +40,29 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
     if (!input.note?.trim() || input.note.length > 4000) throw new Error('Popište problém a kde zůstává materiál.');
     data = { status: 'ISSUE', issueNote: input.note.trim(), custodyNote: input.custodyNote?.trim() || step.custodyNote };
   } else {
-    if (step.status !== 'IN_PROGRESS') throw new Error('Nejprve zahajte práci.');
+    // Complete action: instant completion support (do not throw if step was not explicitly started first)
     const quantity = input.quantity ?? step.quantity - step.completedQuantity;
     if (!Number.isInteger(quantity) || quantity <= 0 || quantity > step.quantity - step.completedQuantity) throw new Error('Množství překračuje zbývající práci.');
-    if (step.photoType && !await tx.photo.count({ where: { organizationId, fieldWorkStepId: step.id, type: step.photoType } })) throw new Error('Doložte tento krok požadovanou fotografií.');
     if (['DELIVERY', 'HANDOFF'].includes(step.kind) && !input.custodyNote?.trim()) throw new Error('Uveďte místo uložení nebo jméno příjemce materiálu.');
     const completedQuantity = step.completedQuantity + quantity;
-    data = { completedQuantity, status: completedQuantity === step.quantity ? 'COMPLETED' : 'IN_PROGRESS',
+    data = {
+      completedQuantity,
+      status: completedQuantity === step.quantity ? 'COMPLETED' : 'IN_PROGRESS',
+      startedAt: step.startedAt ?? new Date(),
       completedAt: completedQuantity === step.quantity ? new Date() : null,
-      custodyNote: input.custodyNote?.trim() || (step.kind === 'PICKUP' ? `Ve vozidle posádky ${crewId}; převzal ${actor.email}` : step.custodyNote) };
+      custodyNote: input.custodyNote?.trim() || (step.kind === 'PICKUP' ? `Ve vozidle posádky ${crewId}; převzal ${actor.email}` : step.custodyNote)
+    };
   }
-  const changed = await tx.fieldWorkStep.updateMany({ where: { id: step.id, organizationId, version: step.version, assignedFieldPlanId: planId, assignedCrewId: crewId }, data: { ...data, version: { increment: 1 } } });
+  const changed = await tx.fieldWorkStep.updateMany({
+    where: {
+      id: step.id,
+      organizationId,
+      version: step.version,
+      assignedFieldPlanId: planId,
+      ...(isAdminOrManager ? {} : { assignedCrewId: crewId })
+    },
+    data: { ...data, version: { increment: 1 } }
+  });
   if (changed.count !== 1) throw new Error('Krok se mezitím změnil. Obnovte trasu.');
   const siblings = await tx.fieldWorkStep.findMany({ where: { organizationId, pointId: point.id } });
   const done = siblings.every(s => s.status === 'COMPLETED');
