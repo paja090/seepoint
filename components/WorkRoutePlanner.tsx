@@ -28,25 +28,69 @@ import {
 
 type Loaded = { profile: PlanningProfile | null; data: PlanningInput | null; plans: PlanView[] };
 
-function mapsLinks(plan: PlanView, crewId: string) {
-  const crew = plan.result.crews.find((c) => c.id === crewId);
-  if (!crew) return [];
-  const coords = (p: { latitude: number; longitude: number }) => `${p.latitude},${p.longitude}`;
-  const points = [crew.startLocation ?? plan.profile.depot, ...crew.stops.map((s) => s.location), plan.profile.endLocation];
-  const links: string[] = [];
-  for (let i = 0; i < points.length - 1; i += 4) {
-    const slice = points.slice(i, i + 5);
-    links.push(
-      `https://www.google.com/maps/dir/?${new URLSearchParams({
-        api: '1',
-        origin: coords(slice[0]),
-        destination: coords(slice.at(-1)!),
-        waypoints: slice.slice(1, -1).map(coords).join('|'),
-        travelmode: 'driving',
-      })}`
-    );
+function getPlanSummaryDetails(p: PlanView) {
+  const allStops = p.result.crews.flatMap((c) => c.stops);
+  const totalStops = allStops.length;
+
+  const clientMap = new Map<string, number>();
+  const citySet = new Set<string>();
+
+  for (const s of allStops) {
+    const client = s.clientName?.trim();
+    if (client) {
+      clientMap.set(client, (clientMap.get(client) ?? 0) + 1);
+    }
+    if (s.address) {
+      const parts = s.address.split(',').map((part) => part.trim());
+      const candidate = parts[parts.length - 1] || parts[0];
+      if (candidate) {
+        const cleaned = candidate.replace(/^\d{3}\s?\d{2}\s*/, '').trim();
+        if (cleaned) citySet.add(cleaned);
+      }
+    }
   }
-  return links;
+
+  const clients = Array.from(clientMap.entries()).map(([name, count]) => ({ name, count }));
+  const cities = Array.from(citySet);
+  const isValid = p.status === 'APPROVED' || p.status === 'ACTIVE';
+
+  let statusBadge = {
+    label: 'Návrh (Draft)',
+    bg: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    icon: '📝',
+    text: 'Zatím neodsouhlasený návrh — montéři v terénu trasu nevidí.',
+  };
+
+  if (p.status === 'APPROVED') {
+    statusBadge = {
+      label: 'Platná trasa (Schváleno)',
+      bg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      icon: '✓',
+      text: 'Platná schválená trasa — pracovníci ji mají aktivní v sekci Moje trasa.',
+    };
+  } else if (p.status === 'ACTIVE') {
+    statusBadge = {
+      label: 'Probíhá v terénu',
+      bg: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+      icon: '⚡',
+      text: 'Výjezd na této trase právě probíhá v terénu.',
+    };
+  } else if (p.status === 'COMPLETED') {
+    statusBadge = {
+      label: 'Dokončeno',
+      bg: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+      icon: '🏁',
+      text: 'Trasa a výjezd byly dokončeny.',
+    };
+  }
+
+  return {
+    totalStops,
+    clients,
+    cities,
+    isValid,
+    statusBadge,
+  };
 }
 
 export function WorkRoutePlanner({
@@ -579,23 +623,43 @@ export function WorkRoutePlanner({
 
           {/* Versions dropdown */}
           {Boolean(loaded?.plans?.length) && (
-            <select
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
-              value={plan?.id ?? ''}
-              onChange={(e) => {
-                const chosen = loaded?.plans.find((p) => p.id === e.target.value);
-                if (chosen) {
-                  setPlan(chosen);
-                  setActiveCrewId(chosen.result.crews[0]?.id ?? '');
-                }
-              }}
-            >
-              {loaded?.plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name ? `${p.name} (v${p.version})` : `Verze ${p.version}`} · {p.status === 'APPROVED' ? 'Schváleno' : p.status === 'DRAFT' ? 'Návrh' : p.status}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="plan-version-select" className="text-xs font-bold text-slate-500 hidden sm:inline">
+                Verze trasy:
+              </label>
+              <select
+                id="plan-version-select"
+                className="max-w-[260px] sm:max-w-md rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 shadow-2xs focus:border-sky-500 focus:outline-none cursor-pointer"
+                value={plan?.id ?? ''}
+                onChange={(e) => {
+                  const chosen = loaded?.plans.find((p) => p.id === e.target.value);
+                  if (chosen) {
+                    setPlan(chosen);
+                    setActiveCrewId(chosen.result.crews[0]?.id ?? '');
+                  }
+                }}
+              >
+                {loaded?.plans.map((p) => {
+                  const d = getPlanSummaryDetails(p);
+                  const clientStr = d.clients.length > 0
+                    ? d.clients.slice(0, 2).map((c) => `${c.name} (${c.count})`).join(', ') + (d.clients.length > 2 ? '…' : '')
+                    : null;
+                  const cityStr = d.cities.length > 0
+                    ? d.cities.slice(0, 2).join(', ') + (d.cities.length > 2 ? '…' : '')
+                    : null;
+                  const targetInfo = [clientStr, cityStr].filter(Boolean).join(' · ');
+
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {d.isValid ? '⭐ [PLATNÁ] ' : '[NÁVRH] '}
+                      {p.name ? `${p.name} (v${p.version})` : `Verze ${p.version}`}
+                      {` · ${d.statusBadge.label}`}
+                      {targetInfo ? ` — ${targetInfo}` : ` (${d.totalStops} zastávek)`}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           )}
         </div>
       </section>
@@ -614,65 +678,99 @@ export function WorkRoutePlanner({
       )}
 
       {/* Plan Summary Banner */}
-      {plan && (
-        <section className="rounded-3xl bg-slate-900 p-5 sm:p-6 text-white shadow-xl">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            <div className="flex items-center gap-3">
-              <span
-                className={`rounded-xl px-3 py-1 text-xs font-black uppercase tracking-wider ${
-                  plan.status === 'APPROVED' || plan.status === 'ACTIVE'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                }`}
-              >
-                {plan.status === 'APPROVED' ? 'Schválený plán' : plan.status === 'ACTIVE' ? 'Probíhá v terénu' : 'Návrh trasy (Draft)'}
+      {plan && (() => {
+        const details = getPlanSummaryDetails(plan);
+        return (
+          <section className="rounded-3xl bg-slate-900 p-5 sm:p-6 text-white shadow-xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black uppercase tracking-wider border shadow-2xs ${details.statusBadge.bg}`}
+                >
+                  <span>{details.statusBadge.icon}</span>
+                  <span>{details.statusBadge.label}</span>
+                </span>
+                <span className="text-xs text-slate-400 font-semibold">
+                  {plan.name ? `${plan.name} (Verze ${plan.version})` : `Verze ${plan.version}`}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-6 text-xs sm:text-sm">
+                <div>
+                  <span className="text-slate-400 text-xs block">Zastávek</span>
+                  <strong className="text-base font-bold">
+                    {plan.result.crews.reduce((acc, c) => acc + c.stops.length, 0)}
+                  </strong>
+                </div>
+                <div className="border-l border-slate-800 pl-4">
+                  <span className="text-slate-400 text-xs block">Posádek</span>
+                  <strong className="text-base font-bold">{plan.result.crews.length}</strong>
+                </div>
+                <div className="border-l border-slate-800 pl-4">
+                  <span className="text-slate-400 text-xs block">Vzdálenost</span>
+                  <strong className="text-base font-bold">{(plan.result.distanceMeters / 1000).toFixed(1)} km</strong>
+                </div>
+                <div className="border-l border-slate-800 pl-4">
+                  <span className="text-slate-400 text-xs block">Čas přejezdů</span>
+                  <strong className="text-base font-bold">{Math.round(plan.result.travelSeconds / 60)} min</strong>
+                </div>
+                <div className="border-l border-slate-800 pl-4">
+                  <span className="text-slate-400 text-xs block">Čas práce</span>
+                  <strong className="text-base font-bold">{plan.result.serviceMinutes} min</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Target orders / clients & destination cities strip */}
+            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                {details.isValid ? 'Platná trasa pokrývá:' : 'Tento návrh plánuje:'}
               </span>
-              <span className="text-xs text-slate-400 font-medium">Verze {plan.version}</span>
+              {details.clients.length > 0 ? (
+                details.clients.map((c) => (
+                  <span
+                    key={c.name}
+                    className="inline-flex items-center gap-1 rounded-lg bg-sky-950/80 border border-sky-700/60 px-2.5 py-1 text-xs font-bold text-sky-200"
+                  >
+                    <span>🎯 {c.name}</span>
+                    <span className="text-[10px] text-sky-400">({c.count})</span>
+                  </span>
+                ))
+              ) : (
+                <span className="text-slate-400 italic">Běžné výjezdy / bez zadaného klienta</span>
+              )}
+
+              {details.cities.length > 0 && (
+                <span className="inline-flex items-center gap-1 text-slate-300 ml-2">
+                  <span className="text-slate-500 font-medium">📍 Směr:</span>
+                  <span className="font-semibold text-slate-200">{details.cities.slice(0, 4).join(', ')}{details.cities.length > 4 ? '…' : ''}</span>
+                </span>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-6 text-xs sm:text-sm">
-              <div>
-                <span className="text-slate-400 text-xs block">Zastávek</span>
-                <strong className="text-base font-bold">
-                  {plan.result.crews.reduce((acc, c) => acc + c.stops.length, 0)}
-                </strong>
-              </div>
-              <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 text-xs block">Posádek</span>
-                <strong className="text-base font-bold">{plan.result.crews.length}</strong>
-              </div>
-              <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 text-xs block">Vzdálenost</span>
-                <strong className="text-base font-bold">{(plan.result.distanceMeters / 1000).toFixed(1)} km</strong>
-              </div>
-              <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 text-xs block">Čas přejezdů</span>
-                <strong className="text-base font-bold">{Math.round(plan.result.travelSeconds / 60)} min</strong>
-              </div>
-              <div className="border-l border-slate-800 pl-4">
-                <span className="text-slate-400 text-xs block">Čas práce</span>
-                <strong className="text-base font-bold">{plan.result.serviceMinutes} min</strong>
-              </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-slate-800/60">
+              <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                💡 {plan.result.explanation}
+              </p>
+              <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                {details.statusBadge.text}
+              </span>
             </div>
-          </div>
 
-          <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-            💡 {plan.result.explanation}
-          </p>
-
-          {plan.result.estimated && plan.status === 'DRAFT' && (
-            <label className="mt-3 flex items-center gap-2 text-xs text-amber-200 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={acceptEstimated}
-                onChange={(e) => setAcceptEstimated(e.target.checked)}
-                className="rounded text-amber-500"
-              />
-              <span>Souhlasím s použitím odhadovaných dojezdových časů (silniční API vrátilo odhad).</span>
-            </label>
-          )}
-        </section>
-      )}
+            {plan.result.estimated && plan.status === 'DRAFT' && (
+              <label className="mt-3 flex items-center gap-2 text-xs text-amber-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptEstimated}
+                  onChange={(e) => setAcceptEstimated(e.target.checked)}
+                  className="rounded text-amber-500"
+                />
+                <span>Souhlasím s použitím odhadovaných dojezdových časů (silniční API vrátilo odhad).</span>
+              </label>
+            )}
+          </section>
+        );
+      })()}
 
       {/* Main Workspace Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1125,6 +1223,50 @@ export function WorkRoutePlanner({
                       </span>
                     </div>
                   )}
+
+                  {/* Summary of clients and towns for this specific crew */}
+                  {(() => {
+                    const crewClients = Array.from(
+                      new Set(activeCrew.stops.map((s) => s.clientName?.trim()).filter(Boolean) as string[])
+                    );
+                    const crewCities = Array.from(
+                      new Set(
+                        activeCrew.stops
+                          .map((s) => {
+                            if (!s.address) return null;
+                            const parts = s.address.split(',').map((p) => p.trim());
+                            const cand = parts[parts.length - 1] || parts[0];
+                            return cand ? cand.replace(/^\d{3}\s?\d{2}\s*/, '').trim() : null;
+                          })
+                          .filter(Boolean) as string[]
+                      )
+                    );
+                    if (crewClients.length === 0 && crewCities.length === 0) return null;
+
+                    return (
+                      <div className="flex flex-wrap items-center gap-2 mt-2 pt-1">
+                        {crewClients.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Zakázky:</span>
+                            {crewClients.map((client) => (
+                              <span
+                                key={client}
+                                className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200"
+                              >
+                                🎯 {client}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {crewCities.length > 0 && (
+                          <div className="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Směr:</span>
+                            <span>📍 {crewCities.slice(0, 3).join(', ')}{crewCities.length > 3 ? '…' : ''}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -1146,18 +1288,6 @@ export function WorkRoutePlanner({
                     <UserCheck size={14} />
                     <span>Předat trasu</span>
                   </button>
-
-                  {mapsLinks(plan!, activeCrew.id).map((href) => (
-                    <a
-                      key={href}
-                      href={href}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1.5 rounded-xl bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition"
-                    >
-                      <span>Otevřít v Google Maps ↗</span>
-                    </a>
-                  ))}
                 </div>
               </div>
 
