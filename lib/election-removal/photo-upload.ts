@@ -44,7 +44,11 @@ export async function uploadFieldPhoto(form: FormData, actor: PlannerActor) {
   return plannerTransaction(async tx => {
     const plan = await tx.fieldPlan.findFirst({ where: { id: input.planId, organizationId, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } } });
     const employee = await tx.employee.findFirst({ where: { organizationId, userId: actor.id, isActive: true } });
-    const crew = (plan?.planningSummary as unknown as PlanningResult | undefined)?.crews.find(c => employee && c.employeeIds.includes(employee.id) && c.stops.some(s => s.jobId === input.jobId));
+    const isAdminOrManager = ['ADMIN', 'MANAGER'].includes(actor.role);
+    const crew = (plan?.planningSummary as unknown as PlanningResult | undefined)?.crews.find(c =>
+      (employee && c.employeeIds.includes(employee.id)) ||
+      (isAdminOrManager && c.stops.some(s => s.jobId === input.jobId))
+    );
     const stop = crew?.stops.find(s => s.jobId === input.jobId);
     if (!plan || !crew || !stop) throw new Error('FORBIDDEN: přiřazení se změnilo.');
     if (targetStepId) {

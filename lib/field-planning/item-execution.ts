@@ -38,7 +38,7 @@ export async function executeItem(tx: Prisma.TransactionClient, stop: PlannedSto
   } else {
     if (item.issueNote || item.crmRealization?.claimNote || item.crmRealization?.status === 'CLAIM') throw new Error('Manažer musí nejprve vyřešit problém položky.');
     if (itemStatus(item) === 'CANCELLED') throw new Error('Položka je zrušená.');
-    if (itemStatus(item) === 'DONE') { if (input.action === 'photo') throw new Error('Položka je již hotová.'); return { ok: true }; }
+    if (itemStatus(item) === 'DONE' && input.action !== 'photo') return { ok: true };
     if (input.action === 'photo') {
       if (!photos?.some(p => p.type === 'AFTER_INSTALLATION')) throw new Error('Chybí fotografie dokončené práce.');
       for (const stored of photos) await tx.photo.create({ data: {

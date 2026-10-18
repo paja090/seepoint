@@ -222,6 +222,20 @@ export default async function PhotoDocumentationHubPage({
     }),
   ]);
 
+  function getLatestPhoto<T extends { createdAt: string | Date }>(photos: T[]): T | null {
+    if (photos.length === 0) return null;
+    let latest = photos[0];
+    let latestTime = new Date(latest.createdAt).getTime();
+    for (let i = 1; i < photos.length; i++) {
+      const t = new Date(photos[i].createdAt).getTime();
+      if (!Number.isNaN(t) && t > latestTime) {
+        latestTime = t;
+        latest = photos[i];
+      }
+    }
+    return latest;
+  }
+
   // Transform Election Campaigns into Unified Albums (grouped by client when a campaign spans multiple clients)
   const fieldWorkAlbums: UnifiedAlbumItem[] = electionCampaigns.flatMap((c) => {
     const slug = buildCampaignAlbumSlug(c.id);
@@ -269,9 +283,10 @@ export default async function PhotoDocumentationHubPage({
       const clientAlbums: UnifiedAlbumItem[] = [];
       for (const [clientKey, clientPoints] of pointsByClient.entries()) {
         const clientPhotos = clientPoints.flatMap((p) => p.photos);
+        const latestPhoto = getLatestPhoto(clientPhotos);
         const coverPhotoUrl =
-          clientPhotos.length > 0
-            ? `/api/photos/${encodeURIComponent(clientPhotos[0].id)}/thumbnail`
+          latestPhoto
+            ? `/api/photos/${encodeURIComponent(latestPhoto.id)}/thumbnail`
             : null;
         const formatted = formatAlbumDisplay(`${clientKey} — ${c.name}`, clientKey, periodLabel);
         const encodedClient = encodeURIComponent(clientKey);
@@ -298,6 +313,7 @@ export default async function PhotoDocumentationHubPage({
           publicShareUrl: `/client/fotodokumentace/${slug}?client=${encodedClient}`,
           downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip?client=${encodedClient}`,
           points: clientPoints,
+          latestPhotoAt: latestPhoto?.createdAt ?? null,
         });
       }
       return clientAlbums;
@@ -309,9 +325,10 @@ export default async function PhotoDocumentationHubPage({
         ? Array.from(pointsByClient.keys())[0]
         : c.clientName;
     const allPhotos = mappedPoints.flatMap((p) => p.photos);
+    const latestPhoto = getLatestPhoto(allPhotos);
     const coverPhotoUrl =
-      allPhotos.length > 0
-        ? `/api/photos/${encodeURIComponent(allPhotos[0].id)}/thumbnail`
+      latestPhoto
+        ? `/api/photos/${encodeURIComponent(latestPhoto.id)}/thumbnail`
         : null;
     const formatted = formatAlbumDisplay(c.name, singleClient, periodLabel);
     const hasInspection = mappedPoints.some((p) => p.operationType === 'INSPECTION');
@@ -338,6 +355,7 @@ export default async function PhotoDocumentationHubPage({
         publicShareUrl: `/client/fotodokumentace/${slug}`,
         downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip`,
         points: mappedPoints,
+        latestPhotoAt: latestPhoto?.createdAt ?? null,
       },
     ];
   });
@@ -400,9 +418,10 @@ export default async function PhotoDocumentationHubPage({
     }
 
     const allPhotos = points.flatMap((p) => p.photos);
+    const latestPhoto = getLatestPhoto(allPhotos);
     const coverPhotoUrl =
-      allPhotos.length > 0
-        ? `/api/photos/${encodeURIComponent(allPhotos[0].id)}/thumbnail`
+      latestPhoto
+        ? `/api/photos/${encodeURIComponent(latestPhoto.id)}/thumbnail`
         : null;
     const year = r.year;
     const quarter = r.quarter || Math.ceil((new Date(r.periodFrom || r.createdAt).getMonth() + 1) / 3);
@@ -435,6 +454,7 @@ export default async function PhotoDocumentationHubPage({
       publicShareUrl: `/client/navigation-documentation/${token}`,
       downloadZipUrl: `/api/client/navigation-documentation/${encodeURIComponent(token)}/download-zip`,
       points,
+      latestPhotoAt: latestPhoto?.createdAt ?? null,
     };
   });
 
@@ -479,12 +499,13 @@ export default async function PhotoDocumentationHubPage({
     const allPhotos = points.flatMap((p) => p.photos);
     if (allPhotos.length === 0) continue;
 
-    const latestPhotoDate = new Date(allPhotos[0].createdAt);
+    const latestPhoto = getLatestPhoto(allPhotos) || allPhotos[0];
+    const latestPhotoDate = new Date(latestPhoto.createdAt);
     const year = Number.isNaN(latestPhotoDate.getTime()) ? new Date().getFullYear() : latestPhotoDate.getFullYear();
     const month = Number.isNaN(latestPhotoDate.getTime()) ? new Date().getMonth() + 1 : latestPhotoDate.getMonth() + 1;
     const quarter = Math.ceil(month / 3);
     const periodLabel = `${quarter}. čtvrtletí ${year}`;
-    const coverPhotoUrl = `/api/photos/${encodeURIComponent(allPhotos[0].id)}/thumbnail`;
+    const coverPhotoUrl = `/api/photos/${encodeURIComponent(latestPhoto.id)}/thumbnail`;
     const safeClientSlug = clientKey.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'plochy';
 
     carrierSurfaceAlbums.push({
@@ -508,15 +529,18 @@ export default async function PhotoDocumentationHubPage({
       publicShareUrl: `/fotodokumentace?source=FIELD_WORK`,
       downloadZipUrl: `/api/client/fotodokumentace/download-zip?surfaceClient=${encodeURIComponent(clientKey)}`,
       points,
+      latestPhotoAt: latestPhoto.createdAt,
     });
   }
 
-  // Merge and sort all albums by photo count and creation date
+  // Merge and sort all albums by photo capture date (newest first), falling back to creation date
   const unifiedAlbums: UnifiedAlbumItem[] = [...fieldWorkAlbums, ...navigationAlbums, ...carrierSurfaceAlbums].sort((a, b) => {
-    if (b.photosCount !== a.photosCount) {
-      return b.photosCount - a.photosCount;
+    const timeA = a.latestPhotoAt ? new Date(a.latestPhotoAt).getTime() : new Date(a.createdAt).getTime();
+    const timeB = b.latestPhotoAt ? new Date(b.latestPhotoAt).getTime() : new Date(b.createdAt).getTime();
+    if (timeB !== timeA) {
+      return timeB - timeA;
     }
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return b.photosCount - a.photosCount;
   });
 
   // Transform Recent Photos for Live Feed and Map

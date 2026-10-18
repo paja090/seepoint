@@ -171,6 +171,7 @@ export function CampaignPhotoAlbum({
       }
     }
 
+    list.sort((a, b) => new Date(b.photo.createdAt).getTime() - new Date(a.photo.createdAt).getTime());
     return list;
   }, [points, clientName, selectedClient, selectedPeriod, typeFilter, searchQuery]);
 
