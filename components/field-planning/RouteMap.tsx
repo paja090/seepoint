@@ -1,7 +1,16 @@
 'use client';
-import { useEffect, useRef } from 'react';
-import type { Map as LeafletMap } from 'leaflet';
+import { useEffect, useRef, useState } from 'react';
+import type { Map as LeafletMap, TileLayer } from 'leaflet';
 import type { PlanningResult, Coordinates } from '@/lib/field-planning/contracts';
+
+export type RouteMapTileType = 'osm' | 'hybrid' | 'roadmap';
+
+const MAP_LAYERS: Record<RouteMapTileType, { url: string; maxZoom: number; label: string; subdomains?: string[] }> = {
+  osm: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19, label: 'OpenStreetMap' },
+  hybrid: { url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', maxZoom: 20, label: 'Satelitní', subdomains: ['0', '1', '2', '3'] },
+  roadmap: { url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', maxZoom: 20, label: 'Google Mapa', subdomains: ['0', '1', '2', '3'] },
+};
+
 function decode(encoded: string): [number, number][] {
   const points: [number, number][] = []; let i = 0; let lat = 0; let lng = 0;
   function next() { let value = 0, shift = 0, b: number; do { b = encoded.charCodeAt(i++) - 63; value |= (b & 31) << shift; shift += 5; } while (b >= 32 && i < encoded.length); return value & 1 ? ~(value >> 1) : value >> 1; }
@@ -14,13 +23,24 @@ function escapeHtml(str: string): string {
 }
 
 export function RouteMap({ result, depot, active }: { result?: PlanningResult; depot?: Coordinates; active: string }) {
-  const element = useRef<HTMLDivElement>(null); const map = useRef<LeafletMap | null>(null);
+  const element = useRef<HTMLDivElement>(null);
+  const map = useRef<LeafletMap | null>(null);
+  const layerInstance = useRef<TileLayer | null>(null);
+  const [mapType, setMapType] = useState<RouteMapTileType>('osm');
+
   useEffect(() => {
     let disposed = false;
     void import('leaflet').then(L => {
       if (disposed || !element.current) return;
-      const m = L.map(element.current).setView(depot ? [depot.latitude, depot.longitude] : [0, 0], depot ? 10 : 2); map.current = m;
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(m);
+      const m = L.map(element.current).setView(depot ? [depot.latitude, depot.longitude] : [0, 0], depot ? 10 : 2);
+      map.current = m;
+
+      const initialConfig = MAP_LAYERS[mapType];
+      layerInstance.current = L.tileLayer(initialConfig.url, {
+        attribution: initialConfig.label === 'OpenStreetMap' ? '&copy; OpenStreetMap' : '© Google Maps',
+        maxZoom: initialConfig.maxZoom,
+        subdomains: initialConfig.subdomains || ['a', 'b', 'c'],
+      }).addTo(m);
       const bounds = L.latLngBounds([]); const colors = ['#0369a1', '#059669', '#9333ea', '#d97706'];
       result?.crews.forEach((crew, index) => {
         const color = colors[index % colors.length]; let previous = crew.startLocation ?? depot;
@@ -98,5 +118,34 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
     });
     return () => { disposed = true; map.current?.remove(); map.current = null; };
   }, [result, depot, active]);
-  return <div ref={element} className="h-[380px] rounded-2xl border lg:h-[600px]" role="region" aria-label="Mapa tras posádek" />;
+
+  useEffect(() => {
+    if (!map.current || !layerInstance.current) return;
+    const config = MAP_LAYERS[mapType];
+    layerInstance.current.setUrl(config.url);
+  }, [mapType]);
+
+  return (
+    <div className="relative h-[380px] rounded-2xl border lg:h-[600px] overflow-hidden" role="region" aria-label="Mapa tras posádek">
+      <div ref={element} className="h-full w-full" />
+      <div className="absolute right-3 top-3 z-[1000] flex flex-col gap-2">
+        <div className="flex overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-slate-900/10">
+          {(Object.entries(MAP_LAYERS) as [RouteMapTileType, { label: string }][]).map(([key, config]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setMapType(key)}
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide transition ${
+                mapType === key
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {config.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

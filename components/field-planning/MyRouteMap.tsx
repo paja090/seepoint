@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { Map as LeafletMap, TileLayer } from 'leaflet';
 import type { MyRouteDTO, MyRouteStop } from '@/lib/field-planning/contracts';
 
-export type GoogleMapType = 'roadmap' | 'hybrid';
+export type MapTileType = 'hybrid' | 'roadmap' | 'osm';
 
-const GOOGLE_MAP_LAYERS: Record<GoogleMapType, { url: string; maxZoom: number; label: string }> = {
-  roadmap: { url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', maxZoom: 20, label: 'Google Mapa' },
-  hybrid: { url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', maxZoom: 20, label: 'Satelitní' },
+const MAP_LAYERS: Record<MapTileType, { url: string; maxZoom: number; label: string; subdomains?: string[] }> = {
+  hybrid: { url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', maxZoom: 20, label: 'Satelitní', subdomains: ['0', '1', '2', '3'] },
+  roadmap: { url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', maxZoom: 20, label: 'Google Mapa', subdomains: ['0', '1', '2', '3'] },
+  osm: { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19, label: 'OpenStreetMap' },
 };
 
 function escapeHtml(str: string): string {
@@ -29,7 +30,7 @@ export function MyRouteMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<LeafletMap | null>(null);
   const layerInstance = useRef<TileLayer | null>(null);
-  const [mapType, setMapType] = useState<GoogleMapType>('hybrid');
+  const [mapType, setMapType] = useState<MapTileType>('hybrid');
 
   useEffect(() => {
     let disposed = false;
@@ -46,9 +47,10 @@ export function MyRouteMap({
       
       mapInstance.current = m;
 
-      layerInstance.current = L.tileLayer(GOOGLE_MAP_LAYERS[mapType].url, {
-        maxZoom: GOOGLE_MAP_LAYERS[mapType].maxZoom,
-        subdomains: ['0', '1', '2', '3'],
+      const initialLayerConfig = MAP_LAYERS[mapType];
+      layerInstance.current = L.tileLayer(initialLayerConfig.url, {
+        maxZoom: initialLayerConfig.maxZoom,
+        subdomains: initialLayerConfig.subdomains || ['a', 'b', 'c'],
       }).addTo(m);
 
       const bounds = L.latLngBounds([]);
@@ -267,7 +269,8 @@ export function MyRouteMap({
 
   useEffect(() => {
     if (!mapInstance.current || !layerInstance.current) return;
-    layerInstance.current.setUrl(GOOGLE_MAP_LAYERS[mapType].url);
+    const config = MAP_LAYERS[mapType];
+    layerInstance.current.setUrl(config.url);
   }, [mapType]);
 
   return (
@@ -277,7 +280,7 @@ export function MyRouteMap({
       {/* Map controls over the map */}
       <div className="absolute right-3 top-3 z-[1000] flex flex-col gap-2">
         <div className="flex overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-slate-900/10">
-          {(Object.entries(GOOGLE_MAP_LAYERS) as [GoogleMapType, { label: string }][]).map(([key, config]) => (
+          {(Object.entries(MAP_LAYERS) as [MapTileType, { label: string }][]).map(([key, config]) => (
             <button
               key={key}
               onClick={() => setMapType(key)}
