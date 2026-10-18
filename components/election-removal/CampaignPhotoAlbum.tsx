@@ -96,7 +96,6 @@ function formatCzechDate(dateVal?: string | Date | null): string {
 export function CampaignPhotoAlbum({
   campaignId,
   albumSlug,
-  campaignName: _campaignName,
   clientName,
   points,
   publicShareUrl,
@@ -245,7 +244,7 @@ export function CampaignPhotoAlbum({
     if (activeLightboxItem) {
       setNameInput(activeLightboxItem.photo.fileName || '');
     }
-  }, [lightboxIndex]);
+  }, [lightboxIndex, activeLightboxItem]);
 
   const handlePrev = () => {
     if (lightboxIndex !== null && lightboxIndex > 0) {
@@ -1057,15 +1056,17 @@ export function CampaignPhotoAlbum({
                   Typ záznamu
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {[
-                    ['CONTROL', '🔍 Kontrola'],
-                    ['INSTALLATION', '🛠️ Instalace'],
-                    ['DEINSTALLATION', '🗑️ Deinstalace'],
-                  ].map(([val, label]) => (
+                  {(
+                    [
+                      ['CONTROL', '🔍 Kontrola'],
+                      ['INSTALLATION', '🛠️ Instalace'],
+                      ['DEINSTALLATION', '🗑️ Deinstalace'],
+                    ] as const
+                  ).map(([val, label]) => (
                     <button
                       key={val}
                       type="button"
-                      onClick={() => setUploadType(val as any)}
+                      onClick={() => setUploadType(val)}
                       className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition ${
                         uploadType === val
                           ? 'bg-slate-900 text-white border-slate-900'
