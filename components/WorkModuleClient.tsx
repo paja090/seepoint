@@ -15,12 +15,16 @@ import {
   CheckCircle2,
   Briefcase,
   History,
+  Car,
+  MapPin,
+  ArrowRight,
 } from 'lucide-react';
 import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
 import { WorkOrderForm } from './WorkOrderForm';
 import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import type { WorkCategory } from '@/lib/work-categories';
+import type { TodayCrewRouteSummary } from '@/lib/field-planning/order-route-mapper';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -28,6 +32,7 @@ type EmployeeOption = { id: string; name: string };
 
 export type WorkModuleClientProps = {
   orders: WorkOrderData[];
+  todayRoutes?: TodayCrewRouteSummary[];
   clients: Option[];
   carriers: CarrierOption[];
   employees: EmployeeOption[];
@@ -42,6 +47,7 @@ export type WorkModuleClientProps = {
 
 export function WorkModuleClient({
   orders,
+  todayRoutes = [],
   clients,
   carriers,
   employees,
@@ -58,7 +64,7 @@ export function WorkModuleClient({
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
   const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
-  const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD'>('ALL');
+  const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD' | 'ROUTED' | 'UNROUTED'>('ALL');
 
   const isWorkshopOrder = (o: WorkOrderData) => {
     return Boolean(
@@ -69,6 +75,10 @@ export function WorkModuleClient({
       (!o.carrierCode && !o.locationNote)
     );
   };
+
+  const isFieldOrder = (o: WorkOrderData) => !isWorkshopOrder(o);
+  const isRoutedOrder = (o: WorkOrderData) => Boolean(o.routeInfo);
+  const isUnroutedOrder = (o: WorkOrderData) => isFieldOrder(o) && !o.routeInfo;
 
   // Dates & Stats Calculation
   const now = new Date();
@@ -97,10 +107,17 @@ export function WorkModuleClient({
   const urgentCount = openOrders.filter((o) => o.priority === 'URGENT').length;
   const invoicingCount = orders.filter((o) => o.ftdSent && !o.invoiced && o.status !== 'CANCELLED').length;
 
+  const workshopCount = orders.filter(isWorkshopOrder).length;
+  const fieldCount = orders.filter(isFieldOrder).length;
+  const routedCount = openOrders.filter(isRoutedOrder).length;
+  const unroutedCount = openOrders.filter(isUnroutedOrder).length;
+
   // Filter orders based on active stat tile selection and scope filter
   const filteredOrders = orders.filter((o) => {
     if (scopeFilter === 'WORKSHOP' && !isWorkshopOrder(o)) return false;
-    if (scopeFilter === 'FIELD' && isWorkshopOrder(o)) return false;
+    if (scopeFilter === 'FIELD' && !isFieldOrder(o)) return false;
+    if (scopeFilter === 'ROUTED' && !isRoutedOrder(o)) return false;
+    if (scopeFilter === 'UNROUTED' && !isUnroutedOrder(o)) return false;
 
     const d = new Date(o.scheduledAt);
     const isCompleted = ['DONE', 'CANCELLED'].includes(o.status);
@@ -165,6 +182,107 @@ export function WorkModuleClient({
           )}
         </div>
       </div>
+
+      {/* TODAY'S FIELD CREWS / ROUTES BANNER */}
+      {todayRoutes.length > 0 && (
+        <section className="rounded-3xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-sky-50/80 p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-200/70 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
+                <Route size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                  <span>🚗 Dnešní výjezdy a posádky v terénu</span>
+                  <span className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-2xs">
+                    {todayRoutes.length} {todayRoutes.length === 1 ? 'posádka' : 'posádky'}
+                  </span>
+                </h2>
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Přehled naplánovaných tras pro dnešní den. Zastávky se propisují do Moje trasa i Plánu práce.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/work/route?date=${todayRoutes[0]?.planDate || new Date().toISOString().slice(0, 10)}`}
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition"
+              >
+                <span>🗺️ Otevřít plánovač výjezdu</span>
+              </Link>
+              <Link
+                href={`/my-route?date=${todayRoutes[0]?.planDate || new Date().toISOString().slice(0, 10)}`}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition"
+              >
+                <span>📱 Moje trasa (terén)</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {todayRoutes.map((route) => {
+              const percent = route.totalStops > 0 ? Math.round((route.completedStops / route.totalStops) * 100) : 0;
+              const isAllDone = route.completedStops === route.totalStops && route.totalStops > 0;
+              return (
+                <div
+                  key={`${route.planId}-${route.crewId}`}
+                  className="rounded-2xl border border-emerald-200/80 bg-white p-4 shadow-2xs hover:border-emerald-300 transition"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-extrabold text-xs text-slate-900">{route.crewName}</h4>
+                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5 flex items-center gap-1">
+                        <Car size={13} className="text-slate-400" />
+                        <span>{route.vehicleName || 'Bez služebního vozu'}</span>
+                      </p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                        isAllDone
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                          : route.completedStops > 0
+                          ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}
+                    >
+                      {isAllDone ? 'Hotovo' : route.completedStops > 0 ? 'V terénu' : 'Naplánováno'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                      <span>Postup:</span>
+                      <span className="font-mono">
+                        {route.completedStops} z {route.totalStops} zastávek ({percent}%)
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          isAllDone ? 'bg-blue-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px] text-slate-500">
+                    <span className="truncate max-w-[180px]">
+                      👥 {route.workerNames.join(', ') || 'Bez pracovníků'}
+                    </span>
+                    <Link
+                      href={`/work/route?date=${route.planDate}&id=${route.planId}`}
+                      className="font-bold text-sky-600 hover:text-sky-800 hover:underline shrink-0"
+                    >
+                      Detail trasy →
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* STAT TILES / QUICK FILTERS */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -325,8 +443,8 @@ export function WorkModuleClient({
           </button>
         </div>
 
-        {/* Scope Switcher: All vs Workshop vs Field */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl self-start sm:self-center">
+        {/* Scope Switcher: All vs Workshop vs Field vs In Route vs Waiting */}
+        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-2xl self-start sm:self-center">
           <button
             type="button"
             onClick={() => setScopeFilter('ALL')}
@@ -340,18 +458,6 @@ export function WorkModuleClient({
           </button>
           <button
             type="button"
-            onClick={() => setScopeFilter('WORKSHOP')}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              scopeFilter === 'WORKSHOP'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span>🏭 Dílna</span>
-            <span className="opacity-75">({orders.filter(isWorkshopOrder).length})</span>
-          </button>
-          <button
-            type="button"
             onClick={() => setScopeFilter('FIELD')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
               scopeFilter === 'FIELD'
@@ -360,7 +466,45 @@ export function WorkModuleClient({
             }`}
           >
             <span>🚗 Výjezdy</span>
-            <span className="opacity-75">({orders.filter((o) => !isWorkshopOrder(o)).length})</span>
+            <span className="opacity-75">({fieldCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setScopeFilter('ROUTED')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              scopeFilter === 'ROUTED'
+                ? 'bg-teal-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Aktivní zakázky zařazené v trase výjezdu"
+          >
+            <span>🟢 V trase</span>
+            <span className="opacity-75">({routedCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setScopeFilter('UNROUTED')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              scopeFilter === 'UNROUTED'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Aktivní výjezdové úkoly, které ještě čekají na naplánování trasy"
+          >
+            <span>⏱️ Čeká na výjezd</span>
+            <span className="opacity-75">({unroutedCount})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setScopeFilter('WORKSHOP')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              scopeFilter === 'WORKSHOP'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🏭 Dílna</span>
+            <span className="opacity-75">({workshopCount})</span>
           </button>
         </div>
       </div>
@@ -383,6 +527,7 @@ export function WorkModuleClient({
             invoiced: o.invoiced || false,
             workers: o.assignments.map((a) => a.workerName),
             carrierCode: o.carrierCode,
+            routeInfo: o.routeInfo,
           }))}
         />
       )}

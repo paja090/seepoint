@@ -5,6 +5,7 @@ import type { CrewInput, PlanningInput, PlanningProfile, PlanView } from '@/lib/
 import { RouteMap } from './field-planning/RouteMap';
 import { PlanningProfileForm } from './field-planning/PlanningProfileForm';
 import { FieldTelemetryCard } from './field-planning/FieldTelemetryCard';
+import { QuickCreateWorkOrderModal } from './field-planning/QuickCreateWorkOrderModal';
 import {
   Calendar,
   Clock,
@@ -52,10 +53,14 @@ export function WorkRoutePlanner({
   defaultDate,
   country,
   navigation = false,
+  initialJobIds,
+  initialPlanId,
 }: {
   navigation?: boolean;
   defaultDate: string;
   country: string | null;
+  initialJobIds?: string[];
+  initialPlanId?: string;
 }) {
   const [date, setDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState('08:00');
@@ -75,6 +80,7 @@ export function WorkRoutePlanner({
   const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [inputsChanged, setInputsChanged] = useState(false);
   const [acceptEstimated, setAcceptEstimated] = useState(false);
+  const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
 
   const [renameModal, setRenameModal] = useState<{ open: boolean; crewId: string; currentName: string } | null>(null);
   const [transferModal, setTransferModal] = useState<{
@@ -90,6 +96,15 @@ export function WorkRoutePlanner({
 
   const requestKey = useRef<string | null>(null);
   const loadCounter = useRef(0);
+
+  const handleTaskCreated = async (newOrderId: string) => {
+    setToast('Úkol byl úspěšně vytvořen v Plánu práce a zařazen do výběru.');
+    setTimeout(() => setToast(null), 4000);
+    await load();
+    setSelectedJobs((prev) => (prev.includes(newOrderId) ? prev : [...prev, newOrderId]));
+    setInputsChanged(true);
+    setActiveTab('jobs');
+  };
 
   async function handleRenameSubmit(crewId: string, newName: string) {
     const trimmed = newName.trim();
@@ -193,12 +208,16 @@ export function WorkRoutePlanner({
 
       setInputsChanged(false);
       setLoaded(data);
-      setPlan(data.plans[0] ?? null);
+
+      const activePlan = initialPlanId
+        ? (data.plans as PlanView[]).find((p: PlanView) => p.id === initialPlanId) ?? data.plans[0] ?? null
+        : data.plans[0] ?? null;
+      setPlan(activePlan);
 
       // Initialize crews with saved plan crews or default
-      if (data.plans[0]?.result?.crews && data.plans[0].result.crews.length > 0) {
+      if (activePlan?.result?.crews && activePlan.result.crews.length > 0) {
         setCrews(
-          data.plans[0].result.crews.map((c: { id: string; name?: string | null; employeeIds: string[]; vehicleId: string | null; startLocation?: { latitude: number; longitude: number } }) => ({
+          activePlan.result.crews.map((c: { id: string; name?: string | null; employeeIds: string[]; vehicleId: string | null; startLocation?: { latitude: number; longitude: number } }) => ({
             id: c.id,
             name: c.name || null,
             employeeIds: c.employeeIds,
@@ -222,20 +241,33 @@ export function WorkRoutePlanner({
         ]);
       }
 
-      // Default selected jobs
-      const jobsToSelect =
-        data.data?.jobs
-          ?.filter((j: { status: string }) => !['DONE', 'CANCELLED'].includes(j.status))
-          ?.map((j: { id: string }) => j.id) ?? [];
+      // Default selected jobs (preselect initialJobIds if provided from work plan)
+      let jobsToSelect: string[] = [];
+      if (initialJobIds && initialJobIds.length > 0) {
+        const availableJobIds = new Set((data.data?.jobs as { id: string }[] | undefined)?.map((j) => j.id) ?? []);
+        jobsToSelect = initialJobIds.filter((id) => availableJobIds.has(id));
+        if (jobsToSelect.length > 0) {
+          setInputsChanged(true);
+          setActiveTab('jobs');
+          setToast(`Z plánu práce bylo vybráno ${jobsToSelect.length} zakázek k naplánování.`);
+          setTimeout(() => setToast(null), 4000);
+        }
+      }
+      if (jobsToSelect.length === 0) {
+        jobsToSelect =
+          data.data?.jobs
+            ?.filter((j: { status: string }) => !['DONE', 'CANCELLED'].includes(j.status))
+            ?.map((j: { id: string }) => j.id) ?? [];
+      }
       setSelectedJobs(jobsToSelect);
 
-      if (data.plans[0]?.result.crews[0]) {
-        setActiveCrewId(data.plans[0].result.crews[0].id);
+      if (activePlan?.result?.crews?.[0]) {
+        setActiveCrewId(activePlan.result.crews[0].id);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Načtení plánovacích dat selhalo.');
     }
-  }, [date]);
+  }, [date, initialJobIds, initialPlanId]);
 
   useEffect(() => {
     setPlan(null);
@@ -494,6 +526,16 @@ export function WorkRoutePlanner({
 
         {/* Primary action buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setCreateTaskModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition shadow-xs"
+            title="Vytvořit nový terénní úkol do plánu práce a zařadit do plánování"
+          >
+            <Plus size={15} />
+            <span>+ Nový úkol</span>
+          </button>
+
           <button
             onClick={() => void handleAction('generate')}
             disabled={busy || !loaded?.data || !selectedJobs.length || !crews.some((c) => c.employeeIds.length > 0)}
@@ -832,6 +874,14 @@ export function WorkRoutePlanner({
                   Zakázky ({selectedJobs.length} z {visibleJobs.length})
                 </h3>
                 <div className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCreateTaskModalOpen(true)}
+                    className="flex items-center gap-1 font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200 transition mr-1"
+                  >
+                    <Plus size={13} />
+                    <span>Přidat úkol</span>
+                  </button>
                   <button
                     onClick={() => {
                       setSelectedJobs(visibleJobs.map((j) => j.id));
@@ -1337,6 +1387,14 @@ export function WorkRoutePlanner({
           </div>
         </div>
       )}
+
+      {/* Quick Create Work Order Modal */}
+      <QuickCreateWorkOrderModal
+        isOpen={createTaskModalOpen}
+        onClose={() => setCreateTaskModalOpen(false)}
+        onCreated={handleTaskCreated}
+        defaultDate={date}
+      />
 
       {/* Toast Notification */}
       {toast && (

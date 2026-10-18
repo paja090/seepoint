@@ -4,6 +4,7 @@ import { WorkModuleClient } from '@/components/WorkModuleClient';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import { overlapsAbsence } from '@/lib/work-absence-conflicts';
 import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
+import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
   const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
 
-  const [orders, clients, carriers, employees, categories] = await Promise.all([
+  const [orders, clients, carriers, employees, categories, plans] = await Promise.all([
     prisma.workOrder.findMany({
       include: {
         assignments: true,
@@ -43,7 +44,24 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
       select: { id: true, firstName: true, lastName: true },
     }),
     getOrganizationWorkCategories(user.organizationId),
+    prisma.fieldPlan.findMany({
+      where: {
+        organizationId: user.organizationId,
+        status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED', 'DRAFT'] },
+      },
+      select: {
+        id: true,
+        date: true,
+        status: true,
+        version: true,
+        planningSummary: true,
+      },
+      orderBy: { version: 'desc' },
+      take: 80,
+    }),
   ]);
+
+  const { orderRouteMap, todayRoutes } = extractOrderRouteMap(plans, orders);
 
   const currentUserName = user.employee
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
@@ -85,6 +103,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     workTasksCount: order.workTasks.length,
     carrierCode: order.items[0]?.carrier?.code,
     carrierCity: order.items[0]?.carrier?.city,
+    routeInfo: orderRouteMap.get(order.id) || null,
   }));
 
   return (
@@ -93,6 +112,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
         {absenceConflicts.length > 0 && <section role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4"><h2 className="font-bold">Konflikty s nepřítomností</h2><ul>{absenceConflicts.map((message, index) => <li key={index}>{message}</li>)}</ul><p>Upravte přiřazení nebo termín podle potřeby.</p></section>}
         <WorkModuleClient
           orders={mappedOrders}
+          todayRoutes={todayRoutes}
           clients={clients.map((client) => ({ id: client.id, label: client.name }))}
           carriers={carriers.map((carrier) => ({
             id: carrier.id,
