@@ -25,6 +25,9 @@ import {
   workStatusStyles,
   workTypeLabels,
 } from '@/lib/work';
+import type { WorkOrderRouteInfo } from '@/lib/field-planning/order-route-mapper';
+
+export type { WorkOrderRouteInfo };
 
 export type WorkOrderData = {
   id: string;
@@ -47,6 +50,7 @@ export type WorkOrderData = {
   workTasksCount: number;
   carrierCode?: string;
   carrierCity?: string;
+  routeInfo?: WorkOrderRouteInfo | null;
 };
 
 export function WorkPlanListView({
@@ -61,6 +65,8 @@ export function WorkPlanListView({
   const [orders, setOrders] = useState(initialOrders);
   const [cleaning, setCleaning] = useState(false);
   const [cleanupMessage, setCleanupMessage] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [planTargetDate, setPlanTargetDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   const now = new Date();
 
@@ -124,6 +130,25 @@ export function WorkPlanListView({
     }
   };
 
+  const toggleSelectOrder = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllActive = () => {
+    if (selectedIds.length === activeOrders.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(activeOrders.map((o) => o.id));
+    }
+  };
+
+  const handlePlanRouteForSelected = () => {
+    if (selectedIds.length === 0) return;
+    router.push(`/work/route?date=${planTargetDate}&jobIds=${selectedIds.join(',')}`);
+  };
+
   const displayedOrders = activeTab === 'ACTIVE' ? activeOrders : completedOrders;
 
   return (
@@ -133,7 +158,10 @@ export function WorkPlanListView({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab('ACTIVE')}
+            onClick={() => {
+              setActiveTab('ACTIVE');
+              setSelectedIds([]);
+            }}
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition shadow-2xs ${
               activeTab === 'ACTIVE'
                 ? 'bg-slate-950 text-white shadow-md'
@@ -146,7 +174,10 @@ export function WorkPlanListView({
 
           <button
             type="button"
-            onClick={() => setActiveTab('HISTORY')}
+            onClick={() => {
+              setActiveTab('HISTORY');
+              setSelectedIds([]);
+            }}
             className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition shadow-2xs ${
               activeTab === 'HISTORY'
                 ? 'bg-slate-950 text-white shadow-md'
@@ -158,18 +189,30 @@ export function WorkPlanListView({
           </button>
         </div>
 
-        {canCleanup && (
-          <button
-            type="button"
-            onClick={handleCleanup}
-            disabled={cleaning}
-            className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-extrabold text-red-800 hover:bg-red-100 transition disabled:opacity-50"
-            title="Vymazat staré vyřízené a zrušené úkoly před dnešním dnem z databáze"
-          >
-            <Trash2 size={14} />
-            <span>{cleaning ? 'Čistím databázi…' : '🧹 Vyčistit vyřízené z DB'}</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTab === 'ACTIVE' && activeOrders.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleSelectAllActive}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+            >
+              <span>{selectedIds.length === activeOrders.length ? 'Odznačit vše' : `Vybrat vše k výjezdu (${activeOrders.length})`}</span>
+            </button>
+          )}
+
+          {canCleanup && (
+            <button
+              type="button"
+              onClick={handleCleanup}
+              disabled={cleaning}
+              className="flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-extrabold text-red-800 hover:bg-red-100 transition disabled:opacity-50"
+              title="Vymazat staré vyřízené a zrušené úkoly před dnešním dnem z databáze"
+            >
+              <Trash2 size={14} />
+              <span>{cleaning ? 'Čistím databázi…' : '🧹 Vyčistit vyřízené z DB'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {cleanupMessage && (
@@ -181,7 +224,7 @@ export function WorkPlanListView({
       {/* Description */}
       <p className="text-xs font-extrabold text-slate-600">
         {activeTab === 'ACTIVE'
-          ? '⚡ Úkoly jsou seřazeny od nejbližšího termínu provedení. Urgentní úkoly jsou zvýrazněny nahoře.'
+          ? '⚡ Úkoly jsou seřazeny od nejbližšího termínu provedení. Zaškrtněte úkoly pro hromadné zařazení do plánovače výjezdů.'
           : '📜 Archiv splněných a vyřízených pracovních zakázek.'}
       </p>
 
@@ -205,11 +248,22 @@ export function WorkPlanListView({
             const isToday =
               new Date(order.scheduledAt).toDateString() === now.toDateString();
 
+            const isWorkshop = Boolean(
+              order.locationNote?.toLowerCase().includes('dílna') ||
+              order.mediaLabel?.toLowerCase().includes('dílna') ||
+              order.mediaLabel?.toLowerCase().includes('tisk') ||
+              order.mediaLabel?.toLowerCase().includes('grafika')
+            );
+
+            const isSelected = selectedIds.includes(order.id);
+
             return (
               <div
                 key={order.id}
                 className={`card relative block transition hover:-translate-y-0.5 hover:shadow-md ${
-                  isOverdue
+                  isSelected
+                    ? 'border-sky-500 ring-2 ring-sky-300 bg-sky-50/30'
+                    : isOverdue
                     ? 'border-red-400 ring-2 ring-red-100 bg-red-50/20'
                     : isToday
                     ? 'border-emerald-300 ring-2 ring-emerald-100 bg-emerald-50/10'
@@ -217,59 +271,105 @@ export function WorkPlanListView({
                 }`}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <Link href={`/work/${order.id}`} className="space-y-1.5 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ${workStatusStyles[order.status as keyof typeof workStatusStyles] || 'bg-slate-100 text-slate-800'}`}>
-                        {workStatusLabels[order.status as keyof typeof workStatusLabels] || order.status}
-                      </span>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ring-1 ${workPriorityStyles[order.priority as keyof typeof workPriorityStyles] || 'bg-slate-100 text-slate-800'}`}>
-                        {workPriorityLabels[order.priority as keyof typeof workPriorityLabels] || order.priority}
-                      </span>
-                      {isToday && (
-                        <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-black text-slate-950 animate-pulse">
-                          📌 Dnešní termín
-                        </span>
-                      )}
-                      {isOverdue && (
-                        <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-black text-white">
-                          ⚠️ Po termínu
-                        </span>
-                      )}
-                      {(order.locationNote?.toLowerCase().includes('dílna') || order.mediaLabel?.toLowerCase().includes('dílna') || order.mediaLabel?.toLowerCase().includes('tisk') || order.mediaLabel?.toLowerCase().includes('grafika')) ? (
-                        <span className="rounded-full bg-sky-100 text-sky-800 border border-sky-200 px-2.5 py-0.5 text-xs font-bold">
-                          🏭 Dílna / Tisk
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold">
-                          🚗 Výjezd / Montáž
-                        </span>
-                      )}
-                      <span className="text-xs font-extrabold text-slate-600">
-                        {workTypeLabels[order.workType as keyof typeof workTypeLabels] || order.workType}
-                      </span>
-                    </div>
-
-                    <h3 className="text-lg font-black text-slate-950 leading-snug hover:text-sky-600 transition">
-                      {order.title}
-                    </h3>
-
-                    <p className="text-xs font-extrabold text-slate-700 flex flex-wrap items-center gap-2">
-                      <span>👤 {order.clientName}</span>
-                      <span>· 📅 {formatWorkDate(new Date(order.scheduledAt))}</span>
-                      {order.contactPhone && <span className="text-emerald-700">· 📞 {order.contactPhone}</span>}
-                    </p>
-
-                    {order.locationNote && (
-                      <p className="text-xs font-semibold text-slate-600">
-                        📍 Lokace: {order.locationNote}
-                      </p>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {activeTab === 'ACTIVE' && (
+                      <div className="pt-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectOrder(order.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                          aria-label={`Vybrat zakázku ${order.title}`}
+                        />
+                      </div>
                     )}
 
-                    <p className="text-xs font-extrabold text-slate-500">
-                      Zadal/a: {order.requestedBy || 'Neuvedeno'}
-                      {order.carrierCode && ` · Nosič: ${order.carrierCode} (${order.carrierCity || ''})`}
-                    </p>
-                  </Link>
+                    <Link href={`/work/${order.id}`} className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ${workStatusStyles[order.status as keyof typeof workStatusStyles] || 'bg-slate-100 text-slate-800'}`}>
+                          {workStatusLabels[order.status as keyof typeof workStatusLabels] || order.status}
+                        </span>
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-black ring-1 ${workPriorityStyles[order.priority as keyof typeof workPriorityStyles] || 'bg-slate-100 text-slate-800'}`}>
+                          {workPriorityLabels[order.priority as keyof typeof workPriorityLabels] || order.priority}
+                        </span>
+                        {isToday && (
+                          <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-xs font-black text-slate-950 animate-pulse">
+                            📌 Dnešní termín
+                          </span>
+                        )}
+                        {isOverdue && (
+                          <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-black text-white">
+                            ⚠️ Po termínu
+                          </span>
+                        )}
+                        {isWorkshop ? (
+                          <span className="rounded-full bg-sky-100 text-sky-800 border border-sky-200 px-2.5 py-0.5 text-xs font-bold">
+                            🏭 Dílna / Tisk
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold">
+                            🚗 Výjezd / Montáž
+                          </span>
+                        )}
+
+                        {/* ROUTE INTEGRATION BADGE */}
+                        {order.routeInfo ? (
+                          <span
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              router.push(`/work/route?date=${order.routeInfo!.planDate}&id=${order.routeInfo!.planId}`);
+                            }}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-black border transition cursor-pointer ${
+                              order.routeInfo.planStatus === 'APPROVED' || order.routeInfo.planStatus === 'ACTIVE'
+                                ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 shadow-2xs'
+                                : order.routeInfo.planStatus === 'COMPLETED'
+                                ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'
+                                : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200'
+                            }`}
+                            title={`Zobrazit výjezd na mapě (den: ${order.routeInfo.planDate}, posádka: ${order.routeInfo.crewName})`}
+                          >
+                            <span>🚗 Výjezd: {order.routeInfo.crewName}</span>
+                            <span className="opacity-80">· #{order.routeInfo.routeOrder}</span>
+                            {order.routeInfo.arrivalAt && (
+                              <span className="font-mono text-[10px] opacity-90">
+                                ({new Date(order.routeInfo.arrivalAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })})
+                              </span>
+                            )}
+                          </span>
+                        ) : !isWorkshop && !['DONE', 'CANCELLED'].includes(order.status) ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 text-[11px] font-bold">
+                            <span>⏱️ Čeká na výjezd</span>
+                          </span>
+                        ) : null}
+
+                        <span className="text-xs font-extrabold text-slate-600">
+                          {workTypeLabels[order.workType as keyof typeof workTypeLabels] || order.workType}
+                        </span>
+                      </div>
+
+                      <h3 className="text-lg font-black text-slate-950 leading-snug hover:text-sky-600 transition">
+                        {order.title}
+                      </h3>
+
+                      <p className="text-xs font-extrabold text-slate-700 flex flex-wrap items-center gap-2">
+                        <span>👤 {order.clientName}</span>
+                        <span>· 📅 {formatWorkDate(new Date(order.scheduledAt))}</span>
+                        {order.contactPhone && <span className="text-emerald-700">· 📞 {order.contactPhone}</span>}
+                      </p>
+
+                      {order.locationNote && (
+                        <p className="text-xs font-semibold text-slate-600">
+                          📍 Lokace: {order.locationNote}
+                        </p>
+                      )}
+
+                      <p className="text-xs font-extrabold text-slate-500">
+                        Zadal/a: {order.requestedBy || 'Neuvedeno'}
+                        {order.carrierCode && ` · Nosič: ${order.carrierCode} (${order.carrierCity || ''})`}
+                      </p>
+                    </Link>
+                  </div>
 
                   <div className="text-xs md:text-right space-y-2 shrink-0">
                     <p className="font-black text-sm text-slate-950">
@@ -303,6 +403,55 @@ export function WorkPlanListView({
           })
         )}
       </div>
+
+      {/* STICKY BOTTOM ACTION BAR FOR BATCH ROUTE PLANNING */}
+      {selectedIds.length > 0 && (
+        <div className="sticky bottom-4 z-40 mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-sky-500 bg-slate-900/95 p-4 text-white shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500 font-black text-slate-950 shadow-sm">
+              {selectedIds.length}
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-sky-400">Vybrané úkoly pro výjezd</p>
+              <p className="text-sm font-bold text-slate-200">
+                {selectedIds.length === 1 ? 'Vybrán 1 úkol' : `${selectedIds.length} úkolů k zařazení do trasy`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label htmlFor="planDateInput" className="text-xs font-bold text-slate-300">
+                Den výjezdu:
+              </label>
+              <input
+                id="planDateInput"
+                type="date"
+                value={planTargetDate}
+                onChange={(e) => setPlanTargetDate(e.target.value)}
+                className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-bold text-white focus:border-sky-400 focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={handlePlanRouteForSelected}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 px-4 py-2 text-xs font-black text-white shadow-md hover:from-sky-400 hover:to-emerald-400 transition transform hover:-translate-y-0.5"
+            >
+              <span>🚗 Naplánovat výjezd pro vybrané</span>
+              <ArrowRight size={14} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              Zrušit výběr
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { formatWorkPrice, workPriorityLabels, workPriorityStyles, workStatusLabels, workStatusStyles, workTypeLabels } from '@/lib/work';
+import type { WorkOrderRouteInfo } from '@/lib/field-planning/order-route-mapper';
 
 type WeekOrder = {
   id: string;
@@ -20,6 +21,7 @@ type WeekOrder = {
   invoiced: boolean;
   workers: string[];
   carrierCode?: string;
+  routeInfo?: WorkOrderRouteInfo | null;
 };
 
 type WorkWeekViewProps = { initialOrders: WeekOrder[] };
@@ -122,7 +124,22 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
           const overdue = isOrderOverdue(order);
           const urgent = order.priority === 'URGENT' && isOpen(order);
           return <article className={`rounded-xl border bg-white p-4 shadow-sm ${overdue ? 'border-red-500 ring-2 ring-red-100' : urgent ? 'border-red-300 bg-red-50' : 'border-sky-200'}`} key={order.id}>
-            <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>{overdue && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">Po termínu</span>}<span className="ml-auto text-sm font-semibold text-slate-700">{new Date(order.scheduledAt).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })} · {new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>
+              {order.routeInfo && (
+                <Link
+                  href={`/work/route?date=${order.routeInfo.planDate}&id=${order.routeInfo.planId}`}
+                  className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 text-xs font-bold hover:bg-emerald-200 transition"
+                  title={`Zobrazit výjezd: ${order.routeInfo.crewName}`}
+                >
+                  <span>🚗 {order.routeInfo.crewName}</span>
+                  <span>#{order.routeInfo.routeOrder}</span>
+                </Link>
+              )}
+              {overdue && <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">Po termínu</span>}
+              <span className="ml-auto text-sm font-semibold text-slate-700">{new Date(order.scheduledAt).toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric' })} · {new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
             <Link className="mt-3 block text-lg font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
             <p className="mt-1 text-sm text-slate-600">{order.clientName} · {order.workers.join(', ') || 'nepřiřazený pracovník'}</p>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{workerStatusActions.map((action) => <button aria-pressed={order.status === action.status} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${order.status === action.status ? action.activeClass : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`} disabled={savingId === order.id} key={action.status} onClick={() => void updateOrder(order, { status: action.status })} type="button">{action.label}</button>)}<button aria-pressed={order.ftdSent} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${order.ftdSent ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { ftdSent: !order.ftdSent })} type="button">Foto {order.ftdSent ? 'nahrána ✓' : 'nahrána'}</button></div>
@@ -151,7 +168,22 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
               <div className="space-y-3">{dayOrders.length === 0 ? <p className="text-xs text-slate-400">Bez práce</p> : dayOrders.map((order) => {
                 const overdue = isOrderOverdue(order);
                 return <article className={`rounded-xl border bg-white p-3 shadow-sm ${overdue ? 'border-red-400 ring-2 ring-red-100' : order.priority === 'URGENT' ? 'border-red-300 bg-red-50' : 'border-slate-200'}`} key={order.id}>
-                  <div className="flex flex-wrap items-center gap-1"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>{overdue && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white">Po termínu</span>}<span className="ml-auto text-[11px] text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span></div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${workStatusStyles[order.status]}`}>{workStatusLabels[order.status]}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${workPriorityStyles[order.priority]}`}>{workPriorityLabels[order.priority]}</span>
+                    {order.routeInfo && (
+                      <Link
+                        href={`/work/route?date=${order.routeInfo.planDate}&id=${order.routeInfo.planId}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 px-1.5 py-0.5 text-[10px] font-bold hover:bg-emerald-200 transition"
+                        title={`Zobrazit výjezd: ${order.routeInfo.crewName}`}
+                      >
+                        <span>🚗 {order.routeInfo.crewName}</span>
+                        <span>#{order.routeInfo.routeOrder}</span>
+                      </Link>
+                    )}
+                    {overdue && <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white">Po termínu</span>}
+                    <span className="ml-auto text-[11px] text-slate-500">{new Date(order.scheduledAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
                   <Link className="mt-2 block text-sm font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
                   <p className="mt-1 text-xs text-slate-600">{order.clientName}</p>
                   <p className="mt-1 text-xs font-semibold text-slate-700">{formatWorkPrice(order.price)}</p>
