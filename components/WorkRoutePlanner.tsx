@@ -17,10 +17,7 @@ import {
   Settings2,
   Plus,
   Trash2,
-  ChevronRight,
-  ExternalLink,
   Search,
-  Filter,
   RefreshCw,
   Navigation,
   Pencil,
@@ -1100,7 +1097,7 @@ export function WorkRoutePlanner({
                     <span>Předat trasu</span>
                   </button>
 
-                  {mapsLinks(plan!, activeCrew.id).map((href, i, links) => (
+                  {mapsLinks(plan!, activeCrew.id).map((href) => (
                     <a
                       key={href}
                       href={href}

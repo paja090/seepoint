@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { planFieldWork, estimatedLeg } from '../lib/field-planning/planning-engine';
 import { parseGenerate, renameCrew, transferCrew } from '../lib/field-planning/service';
-import { myRoute } from '../lib/field-planning/execution';
 import { runWithTenantContext } from '../lib/tenant-context';
 import type { PlanningInput, PlanningProfile, PlanningResult } from '../lib/field-planning/contracts';
 
@@ -85,17 +85,6 @@ test('Route Naming: parseGenerate parses planName and crew name correctly', () =
 });
 
 test('Route Naming in Technician Mobile View: myRoute prefers custom route name', () => {
-  const mockExecution = {
-    planId: 'plan-1',
-    executionStatus: 'IN_PROGRESS',
-    crewId: 'crew-1',
-    crewName: null,
-    vehicleId: null,
-    vehicleName: null,
-    date: '2026-10-18',
-    stops: [],
-  };
-
   const planSummary: PlanningResult = {
     planName: 'Velký plán',
     explanation: 'Plán',
@@ -234,6 +223,7 @@ test('renameCrew: updates route name and creates audit log in tenant transaction
   );
 
   assert.equal(res.result.crews[0].name, 'Východní okruh');
+  assert.ok(updatedFieldPlanData);
   assert.equal(auditLogs.length, 1);
   assert.equal(auditLogs[0].action, 'FIELD_ROUTE_RENAMED');
   assert.equal(JSON.parse(auditLogs[0].detailsJson).name, 'Východní okruh');
