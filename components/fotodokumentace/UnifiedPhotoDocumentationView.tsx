@@ -12,7 +12,6 @@ import {
   Filter,
   Download,
   Share2,
-  Check,
   ChevronRight,
   ArrowLeft,
   Calendar,
@@ -27,6 +26,7 @@ import {
   CampaignPhotoAlbum,
   type InternalPointWithPhotos,
 } from '@/components/election-removal/CampaignPhotoAlbum';
+import { PhotoAlbumShareModal } from './PhotoAlbumShareModal';
 
 export interface UnifiedAlbumItem {
   id: string;
@@ -102,8 +102,8 @@ export function UnifiedPhotoDocumentationView({
   const [groupBy, setGroupBy] = useState<'PERIOD' | 'CLIENT' | 'NONE'>('PERIOD');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(initialAlbumId || null);
-  const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<RecentPhotoItem | null>(null);
+  const [sharingAlbum, setSharingAlbum] = useState<UnifiedAlbumItem | null>(null);
 
   // Available filter options dynamically extracted from albums
   const availableYears = useMemo(() => {
@@ -318,17 +318,6 @@ export function UnifiedPhotoDocumentationView({
     });
     return clients.size;
   }, [albumItems]);
-
-  const handleCopyLink = async (url: string, id: string) => {
-    try {
-      const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
-      await navigator.clipboard.writeText(fullUrl);
-      setCopiedLink(id);
-      setTimeout(() => setCopiedLink(null), 2500);
-    } catch (e) {
-      console.error('Failed to copy link', e);
-    }
-  };
 
   const handleDeleteAlbum = async (album: UnifiedAlbumItem, e?: React.MouseEvent) => {
     if (e) {
@@ -578,15 +567,11 @@ export function UnifiedPhotoDocumentationView({
 
         <button
           type="button"
-          onClick={() => handleCopyLink(album.publicShareUrl, album.id)}
-          title="Kopírovat veřejný odkaz pro klienta"
+          onClick={() => setSharingAlbum(album)}
+          title="Sdílet fotoalbum pro klienta (odkaz, WhatsApp, e-mail)"
           className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition"
         >
-          {copiedLink === album.id ? (
-            <Check className="w-4 h-4 text-emerald-600" />
-          ) : (
-            <Share2 className="w-4 h-4" />
-          )}
+          <Share2 className="w-4 h-4 text-sky-600" />
         </button>
 
         <a
@@ -909,6 +894,15 @@ export function UnifiedPhotoDocumentationView({
                   )}
                   <button
                     type="button"
+                    onClick={() => setSharingAlbum(activeAlbum)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100 text-xs font-bold transition shadow-xs"
+                    title="Sdílet fotoalbum pro klienta (odkaz, WhatsApp, e-mail)"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Sdílet album</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleDeleteAlbum(activeAlbum)}
                     disabled={deletingAlbumId === activeAlbum.id}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition disabled:opacity-50"
@@ -1167,6 +1161,23 @@ export function UnifiedPhotoDocumentationView({
           </div>
         </div>
       )}
+
+      {/* Photo Album Share Modal */}
+      <PhotoAlbumShareModal
+        isOpen={!!sharingAlbum}
+        onClose={() => setSharingAlbum(null)}
+        album={
+          sharingAlbum
+            ? {
+                title: sharingAlbum.displayTitle || sharingAlbum.title,
+                clientName: sharingAlbum.clientName,
+                photosCount: sharingAlbum.photosCount,
+                publicShareUrl: sharingAlbum.publicShareUrl,
+                sourceLabel: sharingAlbum.sourceLabel,
+              }
+            : null
+        }
+      />
     </div>
   );
 }
