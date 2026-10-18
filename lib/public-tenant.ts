@@ -62,8 +62,6 @@ export async function enterPublicNavigationReportTenant(publicTokenHash: string)
   const owner = await platformPrisma.navigationDocumentationReport.findFirst({
     where: {
       publicTokenHash: clean,
-      status: { in: ['PUBLISHED', 'SENT'] },
-      publishedAt: { not: null },
       tokenExpiresAt: { gt: new Date() },
     },
     select: { id: true, organizationId: true },

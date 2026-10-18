@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Copy,
   Check,
+  Share2,
   ExternalLink,
   Clock,
   Upload,
@@ -22,6 +23,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { compressImageFile } from '@/lib/image-compress';
+import { PhotoAlbumShareModal } from '@/components/fotodokumentace/PhotoAlbumShareModal';
 
 export interface InternalPhotoItem {
   id: string;
@@ -123,6 +125,10 @@ export function CampaignPhotoAlbum({
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+
+  // Share Modal & Toast state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
   // Extract all available periods across all photos
   const availablePeriods = useMemo(() => {
@@ -226,12 +232,40 @@ export function CampaignPhotoAlbum({
   }, [publicShareUrl, slug, querySuffix]);
 
   const handleCopyLink = async () => {
+    let success = false;
     try {
-      await navigator.clipboard.writeText(clientShareUrl);
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 3000);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(clientShareUrl);
+        success = true;
+      }
     } catch {
-      // Fallback
+      // Fallback below
+    }
+
+    if (!success) {
+      try {
+        const input = document.createElement('textarea');
+        input.value = clientShareUrl;
+        input.style.position = 'fixed';
+        input.style.left = '-9999px';
+        input.style.top = '-9999px';
+        document.body.appendChild(input);
+        input.focus();
+        input.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(input);
+      } catch (e) {
+        console.error('Fallback copy failed', e);
+      }
+    }
+
+    if (success) {
+      setCopiedLink(true);
+      setShareToast('✅ Odkaz na fotoalbum byl zkopírován do schránky!');
+      setTimeout(() => setCopiedLink(false), 3000);
+      setTimeout(() => setShareToast(null), 3500);
+    } else {
+      window.prompt('Zkopírujte tento odkaz pro klienta:', clientShareUrl);
     }
   };
 
@@ -479,6 +513,16 @@ export function CampaignPhotoAlbum({
             <>
               <button
                 type="button"
+                onClick={() => setShowShareModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition text-xs font-bold shadow-xs"
+                title="Sdílet fotoalbum pro klienta (odkaz, WhatsApp, e-mail)"
+              >
+                <Share2 className="w-4 h-4 text-sky-600" />
+                <span>Sdílet album</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleCopyLink}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition border shadow-sm ${
                   copiedLink
@@ -490,10 +534,10 @@ export function CampaignPhotoAlbum({
                 {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
                 <span>
                   {copiedLink
-                    ? 'Odkaz zkopírován!'
+                    ? 'Zkopírováno!'
                     : selectedClient !== 'ALL'
-                      ? `Odkaz pro: ${selectedClient}`
-                      : 'Kopírovat odkaz pro klienta'}
+                      ? `Kopírovat pro: ${selectedClient}`
+                      : 'Kopírovat odkaz'}
                 </span>
               </button>
 
@@ -501,10 +545,10 @@ export function CampaignPhotoAlbum({
                 href={clientShareUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition text-xs font-semibold"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-xs font-semibold"
                 title="Otevřít veřejné fotoalbum pro klienta v novém okně"
               >
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="w-4 h-4 text-slate-500" />
                 <span>Náhled pro klienta</span>
               </Link>
 
@@ -1109,6 +1153,28 @@ export function CampaignPhotoAlbum({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Share Album Modal */}
+      <PhotoAlbumShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        album={{
+          title: selectedClient !== 'ALL'
+            ? `${selectedClient} — Fotoalbum`
+            : (clientName ? `${clientName} — Fotoalbum` : 'Fotoalbum zakázky'),
+          clientName: selectedClient !== 'ALL' ? selectedClient : clientName,
+          photosCount: totalPhotosCount,
+          publicShareUrl: clientShareUrl,
+          sourceLabel: 'Fotoalbum zakázky',
+        }}
+      />
+
+      {/* Floating toast notification */}
+      {shareToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-slate-900 text-white text-xs font-bold shadow-2xl border border-slate-800 animate-in slide-in-from-bottom-3 duration-200">
+          <span>{shareToast}</span>
         </div>
       )}
     </section>
