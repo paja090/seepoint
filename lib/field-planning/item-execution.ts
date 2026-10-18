@@ -19,7 +19,8 @@ export async function executeItem(tx: Prisma.TransactionClient, stop: PlannedSto
     || carrier?.id !== stop.carrierId || item.surfaceId !== stop.surfaceId || item.crmRealizationId !== stop.crmRealizationId
     || carrier?.latitude !== stop.location.latitude || carrier?.longitude !== stop.location.longitude
     || (item.crmRealization && (item.crmRealization.workOrderId !== item.workOrderId || item.crmRealization.carrierId !== carrier?.id || item.crmRealization.surfaceId !== item.surfaceId))) throw new Error('Vazba nebo lokalita položky se změnila; kontaktujte manažera.');
-  if (item.crmRealization?.assignedUserId && !crewUserIds.includes(item.crmRealization.assignedUserId)) throw new Error('FORBIDDEN: přiřazení realizace se změnilo.');
+  const isAdminOrManager = ['ADMIN', 'MANAGER'].includes(actor.role);
+  if (!isAdminOrManager && item.crmRealization?.assignedUserId && !crewUserIds.includes(item.crmRealization.assignedUserId)) throw new Error('FORBIDDEN: přiřazení realizace se změnilo.');
   if (input.action === 'problem' && ['DONE', 'CANCELLED'].includes(itemStatus(item))) throw new Error('Hotovou položku řeší manažer přes servisní práci nebo reklamaci.');
   if (input.action === 'inspect') return { ok: true, workOrderItemId: item.id };
   if (!['start', 'complete', 'photo', 'problem'].includes(input.action)) throw new Error('Neplatná akce.');
@@ -38,7 +39,6 @@ export async function executeItem(tx: Prisma.TransactionClient, stop: PlannedSto
     if (item.issueNote || item.crmRealization?.claimNote || item.crmRealization?.status === 'CLAIM') throw new Error('Manažer musí nejprve vyřešit problém položky.');
     if (itemStatus(item) === 'CANCELLED') throw new Error('Položka je zrušená.');
     if (itemStatus(item) === 'DONE') { if (input.action === 'photo') throw new Error('Položka je již hotová.'); return { ok: true }; }
-    if (input.action !== 'start' && itemStatus(item) !== 'IN_PROGRESS') throw new Error('Nejprve zahajte práci na této položce.');
     if (input.action === 'photo') {
       if (!photos?.some(p => p.type === 'AFTER_INSTALLATION')) throw new Error('Chybí fotografie dokončené práce.');
       for (const stored of photos) await tx.photo.create({ data: {
@@ -49,12 +49,12 @@ export async function executeItem(tx: Prisma.TransactionClient, stop: PlannedSto
         type: stored.type === 'AFTER_INSTALLATION' && !['INSTALLATION', 'REINSTALLATION'].includes(item.workOrder.workType) ? 'CONTROL' : stored.type,
       } });
     }
-    if (input.action !== 'start' && !await tx.photo.count({ where: { organizationId, workOrderItemId: item.id, type: { in: ['INSTALLATION', 'AFTER_INSTALLATION', 'CONTROL'] } } })) throw new Error('Doložte práci fotografií této položky.');
     if (item.crmRealization) await tx.crmRealization.update({ where: { id: item.crmRealization.id, organizationId }, data: input.action === 'start'
       ? { status: 'INSTALLATION_IN_PROGRESS' } : { status: 'PHOTOGRAPHED', actualDate: new Date() } });
     await tx.workOrderItem.update({ where: { id: item.id, organizationId }, data: {
       ...(!item.crmRealization ? { executionStatus: input.action === 'start' ? 'IN_PROGRESS' : 'DONE' } : {}),
-      ...(input.action === 'start' ? { startedAt: new Date() } : { completedAt: new Date() }),
+      startedAt: item.startedAt ?? new Date(),
+      ...(input.action === 'complete' ? { completedAt: new Date() } : {}),
     } });
     const siblings = await tx.workOrderItem.findMany({ where: { organizationId, workOrderId: item.workOrderId }, include: { crmRealization: true } });
     const done = siblings.every(i => !i.issueNote && !i.crmRealization?.claimNote && ['DONE', 'CANCELLED'].includes(itemStatus(i)));

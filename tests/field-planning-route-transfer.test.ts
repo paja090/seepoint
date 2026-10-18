@@ -4,7 +4,7 @@ import { planFieldWork, estimatedLeg } from '../lib/field-planning/planning-engi
 import { parseGenerate, renameCrew, transferCrew } from '../lib/field-planning/service';
 import { myRoute } from '../lib/field-planning/execution';
 import { runWithTenantContext } from '../lib/tenant-context';
-import type { PlanningInput, PlanningProfile, PlanningResult, FieldPlanExecution } from '../lib/field-planning/contracts';
+import type { PlanningInput, PlanningProfile, PlanningResult } from '../lib/field-planning/contracts';
 
 const profile: PlanningProfile = {
   timezone: 'Europe/Prague',
@@ -80,8 +80,8 @@ test('Route Naming: parseGenerate parses planName and crew name correctly', () =
   });
 
   assert.equal(parsed.planName, 'Expresní montáže pondělí');
-  assert.equal(parsed.crews[0].name, 'Jižní trasa');
-  assert.equal(parsed.crews[1].name, null);
+  assert.equal(parsed.crews?.[0]?.name, 'Jižní trasa');
+  assert.equal(parsed.crews?.[1]?.name, null);
 });
 
 test('Route Naming in Technician Mobile View: myRoute prefers custom route name', () => {
@@ -98,8 +98,7 @@ test('Route Naming in Technician Mobile View: myRoute prefers custom route name'
 
   const planSummary: PlanningResult = {
     planName: 'Velký plán',
-    date: '2026-10-18',
-    fingerprint: 'fp',
+    explanation: 'Plán',
     estimated: false,
     distanceMeters: 1000,
     travelSeconds: 500,
@@ -118,6 +117,8 @@ test('Route Naming in Technician Mobile View: myRoute prefers custom route name'
         travelSeconds: 500,
         serviceMinutes: 60,
         stops: [],
+        returnLeg: { distanceMeters: 0, durationSeconds: 0, estimated: false, polyline: '' },
+        breakMinutes: 0,
       },
     ],
     unassigned: [],

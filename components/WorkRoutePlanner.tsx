@@ -1029,7 +1029,7 @@ export function WorkRoutePlanner({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-extrabold text-base text-slate-900">
-                      Trasa: {activeCrew.name || `Posádka ${plan.result.crews.indexOf(activeCrew) + 1}`}
+                      Trasa: {activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`}
                     </h3>
                     <button
                       type="button"
@@ -1037,7 +1037,7 @@ export function WorkRoutePlanner({
                         setRenameModal({
                           open: true,
                           crewId: activeCrew.id,
-                          currentName: activeCrew.name || `Posádka ${plan.result.crews.indexOf(activeCrew) + 1}`,
+                          currentName: activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`,
                         })
                       }
                       className="p-1 rounded-lg text-slate-400 hover:text-sky-700 hover:bg-slate-100 transition"
@@ -1088,7 +1088,7 @@ export function WorkRoutePlanner({
                       setTransferModal({
                         open: true,
                         crewId: activeCrew.id,
-                        crewName: activeCrew.name || `Posádka ${plan.result.crews.indexOf(activeCrew) + 1}`,
+                        crewName: activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`,
                         currentWorkerNames: activeCrew.names,
                         currentEmployeeIds: activeCrew.employeeIds,
                       });
@@ -1277,7 +1277,7 @@ export function WorkRoutePlanner({
                     ?.filter((e) => !transferModal.currentEmployeeIds.includes(e.id))
                     .map((e) => (
                       <option key={e.id} value={e.id}>
-                        {e.name} ({e.role}) {!e.available ? '⚠️ má absenci' : ''}
+                        {e.name} ({e.roles?.join(', ') || 'Pracovník'}) {!e.available ? '⚠️ má absenci' : ''}
                       </option>
                     ))}
                 </select>
