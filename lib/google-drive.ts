@@ -471,35 +471,40 @@ export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Resp
     });
   }
 
-  const accessToken = await getAccessToken();
-  const primaryRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      cache: 'no-store',
-    },
-  );
-  if (primaryRes.ok) return primaryRes;
-
-  // Fallback 1: High-res CDN thumbnail via Google Drive metadata
+  let primaryRes: Response | null = null;
   try {
-    const metaRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=thumbnailLink,webContentLink&supportsAllDrives=true`,
+    const accessToken = await getAccessToken();
+    primaryRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
         cache: 'no-store',
       },
     );
-    if (metaRes.ok) {
-      const meta = (await metaRes.json()) as { thumbnailLink?: string; webContentLink?: string };
-      const cdnUrl = meta.thumbnailLink ? meta.thumbnailLink.replace(/=s\d+.*$/, '=s2500') : meta.webContentLink;
-      if (cdnUrl) {
-        const cdnRes = await fetch(cdnUrl, { signal: AbortSignal.timeout(8000) });
-        if (cdnRes.ok && cdnRes.body) return cdnRes;
+    if (primaryRes.ok) return primaryRes;
+
+    // Fallback 1: High-res CDN thumbnail via Google Drive metadata
+    try {
+      const metaRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=thumbnailLink,webContentLink&supportsAllDrives=true`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: 'no-store',
+        },
+      );
+      if (metaRes.ok) {
+        const meta = (await metaRes.json()) as { thumbnailLink?: string; webContentLink?: string };
+        const cdnUrl = meta.thumbnailLink ? meta.thumbnailLink.replace(/=s\d+.*$/, '=s2500') : meta.webContentLink;
+        if (cdnUrl) {
+          const cdnRes = await fetch(cdnUrl, { signal: AbortSignal.timeout(8000) });
+          if (cdnRes.ok && cdnRes.body) return cdnRes;
+        }
       }
+    } catch (fallbackErr) {
+      console.warn('[google-drive] High-res thumbnail fallback failed:', fallbackErr);
     }
-  } catch (fallbackErr) {
-    console.warn('[google-drive] High-res thumbnail fallback failed:', fallbackErr);
+  } catch (tokenErr) {
+    console.warn('[google-drive] Drive API access failed, trying public CDN fallback:', tokenErr instanceof Error ? tokenErr.message : tokenErr);
   }
 
   // Fallback 2: Google CDN direct export
@@ -512,7 +517,7 @@ export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Resp
     // Ignore direct CDN errors
   }
 
-  return primaryRes;
+  return primaryRes || new Response(JSON.stringify({ error: 'Fotografie na Google Disku není dostupná.' }), { status: 404 });
 }
 
 export const downloadFileFromGoogleDrive = downloadPhotoFromGoogleDrive;

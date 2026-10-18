@@ -4,6 +4,7 @@ import { enterTenantContext } from '@/lib/tenant-context';
 import { canAccess } from '@/lib/rbac';
 import { prisma } from '@/lib/db';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
+import { getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 import sharp from 'sharp';
 
 export const runtime = 'nodejs';
@@ -51,12 +52,29 @@ export async function GET(
       },
     });
 
-    if (!photo || (!photo.driveFileId && !photo.content && !photo.url)) {
+    if (!photo || (!photo.driveFileId && !photo.content && !photo.url && !photo.storageKey)) {
       return NextResponse.json({ error: 'Fotografie průzkumu nebyla nalezena.' }, { status: 404 });
     }
 
     const stored = await readStoredPhoto(photo);
     if (!stored) {
+      const cached =
+        getCachedThumbnail(`field-survey-photo:${photo.id}`) ||
+        getCachedThumbnail(`photo:${photo.id}`) ||
+        (photo.driveFileId ? getCachedThumbnail(`drive:${photo.driveFileId}`) : null);
+
+      if (cached) {
+        return new Response(new Uint8Array(cached), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/webp',
+            'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ? photo.fileName.replace(/\.[^.]+$/, '.webp') : 'field-survey-photo.webp')}`,
+            'Cache-Control': 'private, max-age=3600',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Photo-Fallback': 'cached-thumbnail',
+          },
+        });
+      }
       return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
     }
 

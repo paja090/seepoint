@@ -73,6 +73,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const stored = await readStoredPhoto(photo);
     if (!stored) {
+      const cachedFallback = getCachedThumbnail(cacheKey);
+      if (cachedFallback) {
+        return new Response(new Uint8Array(cachedFallback), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/webp',
+            'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photoMeta.fileName ? photoMeta.fileName.replace(/\.[^/.]+$/, '.webp') : 'thumbnail.webp')}`,
+            'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        });
+      }
       return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
     }
 
