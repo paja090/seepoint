@@ -88,15 +88,52 @@ export async function POST(req: Request) {
 
     const requestedSurfaceId = typeof surfaceId === 'string' && surfaceId ? surfaceId : null;
     const now = new Date();
-    const surface = (requestedSurfaceId && validCarrierId)
+    let surface = (requestedSurfaceId && validCarrierId)
       ? await prisma.advertisingSurface.findFirst({ where: { id: requestedSurfaceId, carrierId: validCarrierId }, select: {
           id: true,
+          name: true,
+          sidePosition: true,
+          sourcePosition: true,
           occupancies: { where: { dateFrom: { lte: now }, dateTo: { gte: now }, status: { in: ['RESERVED', 'OCCUPIED'] } },
             orderBy: { dateFrom: 'desc' }, take: 1, select: { clientName: true, client: { select: { name: true } } } },
         } })
       : null;
     if (requestedSurfaceId && !surface) return jsonError('SURFACE_NOT_FOUND', 'Vybraná plocha nepatří k nosiči.', 400);
 
+    // If surface was not explicitly chosen, auto-resolve matching surface of carrier (e.g. by side: SIDE_A / SIDE_B)
+    if (!surface && validCarrierId) {
+      const carrierSurfaces = await prisma.advertisingSurface.findMany({
+        where: { carrierId: validCarrierId },
+        select: {
+          id: true,
+          name: true,
+          sidePosition: true,
+          sourcePosition: true,
+          occupancies: {
+            where: { dateFrom: { lte: now }, dateTo: { gte: now }, status: { in: ['RESERVED', 'OCCUPIED'] } },
+            orderBy: { dateFrom: 'desc' },
+            take: 1,
+            select: { clientName: true, client: { select: { name: true } } },
+          },
+        },
+      });
+
+      if (carrierSurfaces.length > 0) {
+        if (side === 'SIDE_A' || side === 'SIDE_B') {
+          const matchedBySide = carrierSurfaces.find((s) => {
+            const val = `${s.sidePosition || ''} ${s.sourcePosition || ''} ${s.name}`.toUpperCase();
+            if (side === 'SIDE_B' && /\b(B|SIDE_B|STRANA B|ZADN[ÍI])\b/.test(val)) return true;
+            if (side === 'SIDE_A' && /\b(A|SIDE_A|STRANA A|PŘEDN[ÍI])\b/.test(val)) return true;
+            return false;
+          });
+          surface = matchedBySide || (carrierSurfaces.length === 1 ? carrierSurfaces[0] : null);
+        } else if (carrierSurfaces.length === 1) {
+          surface = carrierSurfaces[0];
+        }
+      }
+    }
+
+    const isInspection = purpose === 'INSPECTION' || purpose === 'CONTROL';
     const workerUserId = user?.id || 'MOBILE_WORKER';
     const workerName = user?.employee
       ? `${user.employee.firstName} ${user.employee.lastName}`.trim()
@@ -130,11 +167,11 @@ export async function POST(req: Request) {
           storageKey: stored.storageKey,
           contentChecksum: stored.contentChecksum,
           fileName, mimeType, size: stored.bytes.byteLength,
-          type: isSurveyUpload ? 'SURVEY' : purpose === 'DAMAGE' ? 'DAMAGE' : purpose === 'CLIENT_REPORT' ? 'INSTALLATION' : 'CARRIER',
-          note: photoNote, isClientVisible: !isSurveyUpload && purpose === 'CLIENT_REPORT', storageProvider: stored.storageProvider,
+          type: isSurveyUpload ? 'SURVEY' : purpose === 'DAMAGE' ? 'DAMAGE' : isInspection ? 'CONTROL' : purpose === 'CLIENT_REPORT' ? 'INSTALLATION' : 'CARRIER',
+          note: photoNote, isClientVisible: !isSurveyUpload && (purpose === 'CLIENT_REPORT' || isInspection), storageProvider: stored.storageProvider,
           capturedLatitude: clientCoordinates?.lat ?? null, capturedLongitude: clientCoordinates?.lng ?? null, capturedAccuracyMeters: accuracy,
           capturedByWorkerUserId: workerUserId, capturedByWorkerName: workerName,
-          aiStatus: (isSurveyUpload || purpose === 'DAMAGE' || !carrier) ? 'SKIPPED' : 'PENDING',
+          aiStatus: (isSurveyUpload || purpose === 'DAMAGE' || isInspection || !carrier) ? 'SKIPPED' : 'PENDING',
         },
       });
     } catch (error) {
@@ -157,8 +194,8 @@ export async function POST(req: Request) {
 
     const expectedClient = surface?.occupancies[0]?.client?.name || surface?.occupancies[0]?.clientName || null;
     const historyTask = () => logCarrierHistoryEvent({
-      carrierId: carrier.id, surfaceId: surface?.id || null, eventType: purpose === 'DAMAGE' ? 'REPAIR' : 'SERVICE',
-      title: purpose === 'DAMAGE' ? `ZÁVADA: ${damageText || 'Poškozeno'}` : 'Mobilní fotodokumentace z terénu',
+      carrierId: carrier.id, surfaceId: surface?.id || null, eventType: purpose === 'DAMAGE' ? 'REPAIR' : isInspection ? 'INSPECTION' : 'SERVICE',
+      title: purpose === 'DAMAGE' ? `ZÁVADA: ${damageText || 'Poškozeno'}` : isInspection ? 'Kontrola nosiče a plochy' : 'Mobilní fotodokumentace z terénu',
       description: `${photoNote}${clientCoordinates ? `. GPS: ${clientCoordinates.lat}, ${clientCoordinates.lng}.` : '.'}`, performedBy: workerName, photoUrl,
     });
     const chatTask = async () => {
@@ -191,6 +228,10 @@ export async function POST(req: Request) {
         { name: 'history', run: historyTask },
         { name: 'chat', run: chatTask },
         { name: 'carrier-note', run: carrierNoteTask },
+      ]);
+    } else if (isInspection) {
+      warnings = await runPostSaveTasks([
+        { name: 'history', run: historyTask },
       ]);
     } else {
       const imageDataUrl = `data:${mimeType};base64,${Buffer.from(stored.bytes).toString('base64')}`;
@@ -225,6 +266,8 @@ export async function POST(req: Request) {
         ? warnings.includes('chat')
           ? 'Fotografie závady byla uložena, ale upozornění do chatu se nepodařilo odeslat.'
           : 'Závada byla uložena a fotografie odeslána do urgentního chatu.'
+        : isInspection
+        ? 'Kontrola plochy byla zaznamenána a fotografie uložena do fotodokumentace.'
         : 'Fotografie byla bezpečně uložena k nosiči.',
     });
   } catch (error) {
