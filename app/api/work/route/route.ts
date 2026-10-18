@@ -6,7 +6,7 @@ import type { PlanView, PlanningInput } from '@/lib/field-planning/contracts';
 import { navigationAvailable } from '@/lib/field-planning/capabilities';
 import { prisma } from '@/lib/db';
 import { loadPlanningData, loadProfile } from '@/lib/field-planning/data';
-import { approvePlan, cancelDraft, generatePlan, getPlan, planView, requirePlannerManager, saveProfile } from '@/lib/field-planning/service';
+import { approvePlan, cancelDraft, generatePlan, getPlan, planView, renameCrew, requirePlannerManager, saveProfile, transferCrew } from '@/lib/field-planning/service';
 import { enrichCrewsWithLiveLocations } from '@/lib/field-planning/live-location';
 
 async function publicPlan(plan: PlanView) { return { ...plan, profile: profileForNavigation(plan.profile, await navigationAvailable()) }; }
@@ -48,6 +48,16 @@ export async function PATCH(request: Request) {
     if (typeof body.id !== 'string') throw new Error('Chybí plán.');
     if (body.action === 'approve') return NextResponse.json(await publicPlan(await approvePlan(body.id, user, body.acceptEstimated === true)));
     if (body.action === 'cancel') return NextResponse.json(await publicPlan(await cancelDraft(body.id, user)));
+    if (body.action === 'renameCrew') {
+      if (typeof body.crewId !== 'string') throw new Error('Chybí posádka.');
+      if (typeof body.name !== 'string') throw new Error('Chybí název trasy.');
+      return NextResponse.json(await publicPlan(await renameCrew(body.id, body.crewId, body.name, user)));
+    }
+    if (body.action === 'transferCrew') {
+      if (typeof body.crewId !== 'string') throw new Error('Chybí posádka.');
+      if (typeof body.targetEmployeeId !== 'string') throw new Error('Chybí cílový pracovník.');
+      return NextResponse.json(await publicPlan(await transferCrew(body.id, body.crewId, body.targetEmployeeId, user, body.mode)));
+    }
     throw new Error('Neplatná akce.');
   } catch (error) { return failure(error); }
 }

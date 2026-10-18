@@ -42,7 +42,7 @@ export type PlanningEmployee = {
   positions: string[]; roles: string[]; available: boolean;
 };
 export type PlanningVehicle = { id: string; organizationId: string; name: string; status: string; reserved: boolean; capacitySlots?: number | null; equipment?: string[] };
-export type CrewInput = { id: string; employeeIds: string[]; vehicleId: string | null; startLocation?: Coordinates };
+export type CrewInput = { id: string; name?: string | null; employeeIds: string[]; vehicleId: string | null; startLocation?: Coordinates };
 export type PlanningInput = {
   organizationId: string; date: string; now: string; profile: PlanningProfile;
   jobs: PlanningJob[]; employees: PlanningEmployee[]; vehicles: PlanningVehicle[]; crews: CrewInput[];
@@ -65,6 +65,7 @@ export type LiveCrewLocation = {
   workerName?: string | null;
 };
 export type PlannedCrew = CrewInput & {
+  name?: string | null;
   names: string[]; vehicleName: string | null; departureAt: string; endAt: string;
   stops: PlannedStop[]; returnLeg: TravelLeg; distanceMeters: number; travelSeconds: number;
   serviceMinutes: number; breakMinutes: number;
@@ -72,6 +73,7 @@ export type PlannedCrew = CrewInput & {
 };
 export type PlanningAlert = { code: string; message: string; workOrderId?: string; crewId?: string };
 export type PlanningResult = {
+  planName?: string | null;
   crews: PlannedCrew[]; unassigned: PlanningAlert[]; conflicts: PlanningAlert[]; estimated: boolean;
   explanation: string; distanceMeters: number; travelSeconds: number; serviceMinutes: number;
 };
@@ -92,6 +94,7 @@ export const fieldProblemTypes = [
 export type PlanView = {
   id: string; date: string; version: number; status: string; parentPlanId: string | null;
   approvedAt: string | null; result: PlanningResult; profile: PlanningProfile;
+  name?: string | null;
 };
 
 export type MyRouteCarrier = {

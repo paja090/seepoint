@@ -312,7 +312,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
 
       routes.push({
         planId: plan.id,
-        crewName: crew.names?.length ? crew.names.join(', ') : null,
+        crewName: crew.name || (crew.names?.length ? crew.names.join(', ') : null),
         vehicleName: crew.vehicleName,
         departureAt: crew.departureAt,
         endAt: crew.endAt,

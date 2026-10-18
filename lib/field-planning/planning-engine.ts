@@ -46,7 +46,7 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
       result.conflicts.push({ code: 'VEHICLE_CONFLICT', crewId: crew.id, message: `Vozidlo ${vehicle.name} není dostupné.` }); continue;
     }
     members.forEach(e => usedEmployees.add(e!.id)); if (vehicle) usedVehicles.add(vehicle.id);
-    result.crews.push({ ...crew, names: members.map(e => e!.name), vehicleName: vehicle?.name ?? null,
+    result.crews.push({ ...crew, name: crew.name?.trim() || null, names: members.map(e => e!.name), vehicleName: vehicle?.name ?? null,
       departureAt: iso(start), endAt: iso(start), stops: [], returnLeg: emptyLeg(), distanceMeters: 0, travelSeconds: 0, serviceMinutes: 0, breakMinutes: p.breakMinutes });
   }
   const pending = input.jobs.filter(j => !['DONE', 'CANCELLED'].includes(j.status));
