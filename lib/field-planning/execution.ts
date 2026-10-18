@@ -422,7 +422,6 @@ export async function executeStop(input: FieldExecutionInput & { planId: string;
         if (point.issueReported) throw new Error('Nejprve vyřešte problém bodu v Navigation.');
         if (input.action === 'photo') {
           if (!installationPhotos?.length) throw new Error('Použijte nahrání montážní fotografie.');
-          if (point.status === 'INSTALLED') throw new Error('Bod je již dokončen; obnovte trasu.');
           await attachPointInstallationPhotos(point.navigationOrderId!, point.id, installationPhotos, { userId: actor.id, userName: actor.email }, tx);
         }
         if (input.action === 'complete' && point.status !== 'INSTALLED') {

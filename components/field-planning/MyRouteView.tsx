@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
 import { computeRouteLiveETA, formatLiveClock } from '@/lib/field-planning/live-eta';
 import { dayInZone } from '@/lib/field-planning/profile';
+import { compressImageFile } from '@/lib/image-compress';
 import { CarrierPhotoUploadModal } from '@/components/carriers/CarrierPhotoUploadModal';
 import {
   Navigation,
@@ -61,13 +62,16 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
   }
 
   async function handleCameraFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file || !activeCameraStop) return;
+    const rawFile = event.target.files?.[0];
+    if (!rawFile || !activeCameraStop) return;
     const { planId, workOrderId, jobId } = activeCameraStop;
     setUploadingJobId(jobId);
     setError('');
 
     try {
+      // Compress camera image on client side (max 1920px, ~400-800KB) to ensure instant upload and avoid HTTP 413 / 4MB limits
+      const file = await compressImageFile(rawFile, 1920, 0.85);
+
       const form = new FormData();
       form.set('planId', planId);
       form.set('workOrderId', workOrderId);
@@ -296,8 +300,15 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
     form.set('planId', planId);
     form.set('workOrderId', workOrderId);
     form.set('jobId', jobId);
-    const photo = form.get('afterPhoto');
-    if (photo) form.set('file', photo);
+    const rawPhoto = form.get('afterPhoto');
+    let photo = rawPhoto;
+    if (rawPhoto instanceof File && rawPhoto.size > 0) {
+      photo = await compressImageFile(rawPhoto, 1920, 0.85);
+      form.set('file', photo);
+      form.set('afterPhoto', photo);
+    } else if (photo) {
+      form.set('file', photo);
+    }
     form.set('requestKey', keyFor('photo:' + jobId + ':' + (photo instanceof File ? photo.name + photo.size + photo.lastModified : '')));
     try {
       const response = await fetch('/api/work/route/mine/photo', { method: 'POST', body: form });

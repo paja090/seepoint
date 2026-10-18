@@ -49,6 +49,7 @@ export interface UnifiedAlbumItem {
   publicShareUrl: string;
   downloadZipUrl: string;
   points: InternalPointWithPhotos[];
+  latestPhotoAt?: string | Date | null;
 }
 
 export interface RecentPhotoItem {
@@ -175,6 +176,11 @@ export function UnifiedPhotoDocumentationView({
       }
 
       return true;
+    }).sort((a, b) => {
+      const timeA = a.latestPhotoAt ? new Date(a.latestPhotoAt).getTime() : new Date(a.createdAt).getTime();
+      const timeB = b.latestPhotoAt ? new Date(b.latestPhotoAt).getTime() : new Date(b.createdAt).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return b.photosCount - a.photosCount;
     });
   }, [albumItems, sourceFilter, selectedYear, selectedPeriod, selectedClient, searchQuery]);
 
@@ -215,16 +221,29 @@ export function UnifiedPhotoDocumentationView({
         groupsMap.get(key)!.push(a);
       });
 
-      return Array.from(groupsMap.entries()).map(([periodTitle, items]) => {
-        return {
-          key: periodTitle,
-          title: periodTitle,
-          iconType: 'period',
-          totalPhotos: items.reduce((sum, a) => sum + a.photosCount, 0),
-          totalAlbums: items.length,
-          albums: items,
-        };
-      });
+      return Array.from(groupsMap.entries())
+        .sort((a, b) => {
+          // Sort periods by latest photo capture date in that period DESC
+          const maxA = Math.max(...a[1].map((i) => i.latestPhotoAt ? new Date(i.latestPhotoAt).getTime() : new Date(i.createdAt).getTime()));
+          const maxB = Math.max(...b[1].map((i) => i.latestPhotoAt ? new Date(i.latestPhotoAt).getTime() : new Date(i.createdAt).getTime()));
+          return maxB - maxA;
+        })
+        .map(([periodTitle, items]) => {
+          const sortedItems = [...items].sort((a, b) => {
+            const timeA = a.latestPhotoAt ? new Date(a.latestPhotoAt).getTime() : new Date(a.createdAt).getTime();
+            const timeB = b.latestPhotoAt ? new Date(b.latestPhotoAt).getTime() : new Date(b.createdAt).getTime();
+            if (timeB !== timeA) return timeB - timeA;
+            return b.photosCount - a.photosCount;
+          });
+          return {
+            key: periodTitle,
+            title: periodTitle,
+            iconType: 'period',
+            totalPhotos: sortedItems.reduce((sum, a) => sum + a.photosCount, 0),
+            totalAlbums: sortedItems.length,
+            albums: sortedItems,
+          };
+        });
     }
 
     if (groupBy === 'CLIENT') {
@@ -239,15 +258,26 @@ export function UnifiedPhotoDocumentationView({
       });
 
       return Array.from(groupsMap.entries())
-        .sort((a, b) => b[1].length - a[1].length)
+        .sort((a, b) => {
+          // Sort clients by latest photo capture date in that group DESC
+          const maxA = Math.max(...a[1].map((i) => i.latestPhotoAt ? new Date(i.latestPhotoAt).getTime() : new Date(i.createdAt).getTime()));
+          const maxB = Math.max(...b[1].map((i) => i.latestPhotoAt ? new Date(i.latestPhotoAt).getTime() : new Date(i.createdAt).getTime()));
+          return maxB - maxA;
+        })
         .map(([clientTitle, items]) => {
+          const sortedItems = [...items].sort((a, b) => {
+            const timeA = a.latestPhotoAt ? new Date(a.latestPhotoAt).getTime() : new Date(a.createdAt).getTime();
+            const timeB = b.latestPhotoAt ? new Date(b.latestPhotoAt).getTime() : new Date(b.createdAt).getTime();
+            if (timeB !== timeA) return timeB - timeA;
+            return b.photosCount - a.photosCount;
+          });
           return {
             key: clientTitle,
             title: clientTitle,
             iconType: 'client',
-            totalPhotos: items.reduce((sum, a) => sum + a.photosCount, 0),
-            totalAlbums: items.length,
-            albums: items,
+            totalPhotos: sortedItems.reduce((sum, a) => sum + a.photosCount, 0),
+            totalAlbums: sortedItems.length,
+            albums: sortedItems,
           };
         });
     }
@@ -481,12 +511,17 @@ export function UnifiedPhotoDocumentationView({
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700">
               {album.pointsCount} {album.pointsCount === 1 ? 'bod' : album.pointsCount < 5 ? 'body' : 'bodů'}
             </span>
-            {album.createdAt && (
+            {album.latestPhotoAt ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" title={`Poslední pořízená fotka: ${formatDate(album.latestPhotoAt)}`}>
+                <Camera className="w-3 h-3 text-emerald-600" />
+                Pořízeno: {new Date(album.latestPhotoAt).toLocaleDateString('cs-CZ')}
+              </span>
+            ) : album.createdAt ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-50 text-slate-600 border border-slate-200" title={`Vytvořeno ${formatDate(album.createdAt)}`}>
                 <Clock className="w-3 h-3 text-slate-400" />
                 Vytvořeno: {new Date(album.createdAt).toLocaleDateString('cs-CZ')}
               </span>
-            )}
+            ) : null}
             {album.clientName && !album.displayTitle?.toLowerCase().includes(album.clientName.toLowerCase().slice(0, 5)) && (
               <span className="text-[11px] text-slate-400 truncate max-w-[150px]" title={album.clientName}>
                 {album.clientName}
