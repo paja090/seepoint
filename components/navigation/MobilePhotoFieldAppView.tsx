@@ -1148,7 +1148,7 @@ export function MobilePhotoFieldAppView() {
             <label className="text-[11px] font-black uppercase text-amber-400 tracking-wider block mb-1.5">
               2. Účel fotografie
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setPurpose('CLIENT_REPORT')}
@@ -1158,8 +1158,21 @@ export function MobilePhotoFieldAppView() {
                     : 'border-slate-800 bg-slate-900 text-slate-400'
                 }`}
               >
-                <span className="block text-xs font-bold text-white">📸 Doložení klienta</span>
-                <span className="text-[9px] text-slate-400">Fotoreport výlepu</span>
+                <span className="block text-xs font-bold text-white">📸 Doložení</span>
+                <span className="text-[9px] text-slate-400">Výlep klienta</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPurpose('INSPECTION')}
+                className={`rounded-xl border p-2 text-left transition ${
+                  purpose === 'INSPECTION'
+                    ? 'border-emerald-500 bg-emerald-950/70 text-emerald-300 font-bold'
+                    : 'border-slate-800 bg-slate-900 text-slate-400'
+                }`}
+              >
+                <span className="block text-xs font-bold text-emerald-300">🔍 Kontrola</span>
+                <span className="text-[9px] text-emerald-400/80">Revize plochy</span>
               </button>
 
               <button
@@ -1171,8 +1184,8 @@ export function MobilePhotoFieldAppView() {
                     : 'border-slate-800 bg-slate-900 text-slate-400'
                 }`}
               >
-                <span className="block text-xs font-bold text-rose-300">🚨 Závada / Poškození</span>
-                <span className="text-[9px] text-rose-400/80">Odešle alert do Chatu</span>
+                <span className="block text-xs font-bold text-rose-300">🚨 Závada</span>
+                <span className="text-[9px] text-rose-400/80">Alert do Chatu</span>
               </button>
             </div>
           </div>

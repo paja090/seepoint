@@ -159,7 +159,7 @@ export function CarrierPhotoUploadModal({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Nahrání fotky selhalo.');
 
-      alert(data.message);
+      alert(data.message || 'Fotografie byla úspěšně uložena.');
       setImageUrl('');
       setNote('');
       if (onSuccess) onSuccess();
@@ -340,10 +340,10 @@ export function CarrierPhotoUploadModal({
                     : 'border-slate-800 bg-slate-950 text-slate-400 hover:bg-slate-800'
                 }`}
               >
-                <span className="text-xl shrink-0">🧹</span>
+                <span className="text-xl shrink-0">🔍</span>
                 <div>
-                  <span className="block text-xs font-black text-white">Pravidelná kontrola / Údržba</span>
-                  <span className="text-[10px] font-bold text-slate-400">Běžná prohlídka v terénu</span>
+                  <span className="block text-xs font-black text-white">Kontrola plochy / Údržba</span>
+                  <span className="text-[10px] font-bold text-slate-400">Revize stavu a fotodokumentace</span>
                 </div>
               </button>
 

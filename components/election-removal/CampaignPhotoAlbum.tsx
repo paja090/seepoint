@@ -161,7 +161,7 @@ export function CampaignPhotoAlbum({
 
         const isInstall = ['AFTER_INSTALLATION', 'INSTALLATION', 'BEFORE_INSTALLATION'].includes(photo.type);
         const isDeinstall = photo.type === 'AFTER_DEINSTALLATION';
-        const isControl = photo.type === 'CONTROL';
+        const isControl = photo.type === 'CONTROL' || photo.type === 'CHECK';
 
         if (typeFilter === 'INSTALL' && !isInstall) continue;
         if (typeFilter === 'DEINSTALL' && !isDeinstall) continue;
@@ -470,10 +470,12 @@ export function CampaignPhotoAlbum({
                           ? 'bg-emerald-600'
                           : isDeinstall
                           ? 'bg-amber-600'
+                          : photo.type === 'DAMAGE'
+                          ? 'bg-rose-600'
                           : 'bg-sky-600'
                       }`}
                     >
-                      {isInstall ? 'Instalace' : isDeinstall ? 'Deinstalace' : 'Kontrola'}
+                      {isInstall ? 'Instalace' : isDeinstall ? 'Deinstalace' : photo.type === 'DAMAGE' ? 'Závada' : 'Kontrola'}
                     </span>
                   </div>
 

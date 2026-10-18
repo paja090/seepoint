@@ -61,11 +61,35 @@ export async function POST(request: Request) {
       note ? `Poznámka: ${note}` : null,
     ].filter(Boolean).join(' | ');
 
+    const isInspection = body.purpose === 'INSPECTION' || body.purpose === 'CONTROL';
+
     const photo = await prisma.$transaction(async (tx) => {
+      // Find matching surface for the carrier and side
+      const surfaces = await tx.advertisingSurface.findMany({
+        where: { carrierId: carrier.id },
+        select: { id: true, name: true, sidePosition: true, sourcePosition: true },
+      });
+      const sideVal = body.side || '';
+      let matchedSurface = null;
+      if (surfaces.length > 0) {
+        if (sideVal === 'SIDE_A' || sideVal === 'SIDE_B') {
+          matchedSurface = surfaces.find((s) => {
+            const val = `${s.sidePosition || ''} ${s.sourcePosition || ''} ${s.name}`.toUpperCase();
+            if (sideVal === 'SIDE_B' && /\b(B|SIDE_B|STRANA B|ZADN[ÍI])\b/.test(val)) return true;
+            if (sideVal === 'SIDE_A' && /\b(A|SIDE_A|STRANA A|PŘEDN[ÍI])\b/.test(val)) return true;
+            return false;
+          });
+        }
+        if (!matchedSurface && surfaces.length === 1) {
+          matchedSurface = surfaces[0];
+        }
+      }
+
       const created = await tx.photo.create({
         data: {
           id: photoId,
           carrierId: carrier.id,
+          surfaceId: matchedSurface?.id || null,
           url: photoUrl,
           driveFileId: stored!.driveFileId,
           content: stored!.storageProvider === 'DATABASE' ? Buffer.from(stored!.bytes) : undefined,
@@ -75,11 +99,17 @@ export async function POST(request: Request) {
           fileName,
           mimeType: validated!.mimeType,
           size: stored!.bytes.byteLength,
-          type: body.purpose === 'DAMAGE' ? 'DAMAGE' : 'CARRIER',
+          type: body.purpose === 'DAMAGE'
+            ? 'DAMAGE'
+            : isInspection
+            ? 'CONTROL'
+            : body.purpose === 'CLIENT_REPORT'
+            ? 'INSTALLATION'
+            : 'CARRIER',
           note: photoNote,
           capturedByWorkerUserId: auth.id,
           capturedByWorkerName: auth.name || auth.email,
-          isClientVisible: body.purpose === 'CLIENT_REPORT',
+          isClientVisible: body.purpose === 'CLIENT_REPORT' || isInspection,
           aiStatus: 'SKIPPED',
         },
       });
@@ -102,7 +132,14 @@ export async function POST(request: Request) {
       return created;
     });
 
-    return NextResponse.json({ ok: true, photoId: photo.id, storageWarning: stored.warning });
+    return NextResponse.json({
+      ok: true,
+      photoId: photo.id,
+      storageWarning: stored.warning,
+      message: isInspection
+        ? 'Kontrola plochy byla zaznamenána a uložena do fotodokumentace.'
+        : 'Fotografie byla úspěšně uložena k nosiči.',
+    });
   } catch (error) {
     if (stored) await deleteStoredPhoto(stored).catch(() => undefined);
     if (error instanceof PhotoValidationError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });

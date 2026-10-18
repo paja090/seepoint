@@ -20,9 +20,22 @@ const PHOTO_TYPES: Array<{ value: PhotoType; label: string }> = [
   { value: 'CARRIER', label: 'Nosič' },
   { value: 'CAMPAIGN', label: 'Kampaň' },
   { value: 'INSTALLATION', label: 'Instalace' },
+  { value: 'CONTROL', label: 'Kontrola' },
   { value: 'CHECK', label: 'Kontrola' },
   { value: 'ARCHIVE', label: 'Archiv' },
 ];
+
+const PHOTO_TYPE_LABELS: Record<string, string> = {
+  LOCATION: 'Umístění',
+  CARRIER: 'Nosič',
+  CAMPAIGN: 'Kampaň',
+  INSTALLATION: 'Instalace',
+  CONTROL: 'Kontrola',
+  CHECK: 'Kontrola',
+  DAMAGE: 'Závada',
+  SURVEY: 'Průzkum',
+  ARCHIVE: 'Archiv',
+};
 
 function buildUniqueGalleryPhotos(carrierPhotos: Photo[] = [], surfaces: Surface[] = []): GalleryPhoto[] {
   const photoMap = new Map<string, GalleryPhoto>();
@@ -448,7 +461,17 @@ export function PhotoGallery({
                 <div>
                   <div className="flex justify-between items-start">
                     <span className="font-semibold text-slate-800">{photo.targetLabel}</span>
-                    <span className="text-slate-500 font-medium">{photo.type}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      photo.type === 'CONTROL' || photo.type === 'CHECK'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : photo.type === 'DAMAGE'
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : photo.type === 'INSTALLATION'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {PHOTO_TYPE_LABELS[photo.type] || photo.type}
+                    </span>
                   </div>
                   {photo.note && <p className="mt-1 text-slate-600 italic">“{photo.note}”</p>}
                   {(capturedAt || photo.capturedByWorkerName || hasGps) && (

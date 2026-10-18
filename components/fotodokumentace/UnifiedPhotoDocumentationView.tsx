@@ -965,6 +965,23 @@ export function UnifiedPhotoDocumentationView({
                       decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
                     />
+                    <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 z-10">
+                      {(photo.type === 'CONTROL' || photo.type === 'CHECK') && (
+                        <span className="rounded-md bg-emerald-600/90 backdrop-blur-xs px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs">
+                          Kontrola
+                        </span>
+                      )}
+                      {photo.type === 'INSTALLATION' && (
+                        <span className="rounded-md bg-blue-600/90 backdrop-blur-xs px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs">
+                          Instalace
+                        </span>
+                      )}
+                      {photo.type === 'DAMAGE' && (
+                        <span className="rounded-md bg-rose-600/90 backdrop-blur-xs px-1.5 py-0.5 text-[9px] font-bold text-white shadow-xs">
+                          Závada
+                        </span>
+                      )}
+                    </div>
                     <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                       <Maximize2 className="w-5 h-5 text-white drop-shadow-md" />
                     </div>
@@ -1045,7 +1062,24 @@ export function UnifiedPhotoDocumentationView({
 
             <div className="mt-3 w-full bg-slate-900/80 backdrop-blur-md rounded-xl p-3 text-white text-xs flex flex-wrap items-center justify-between gap-3">
               <div>
-                <strong className="text-sm font-bold block">{lightboxPhoto.sourceTitle}</strong>
+                <div className="flex items-center gap-2">
+                  <strong className="text-sm font-bold">{lightboxPhoto.sourceTitle}</strong>
+                  {(lightboxPhoto.type === 'CONTROL' || lightboxPhoto.type === 'CHECK') && (
+                    <span className="rounded-md bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      Kontrola
+                    </span>
+                  )}
+                  {lightboxPhoto.type === 'INSTALLATION' && (
+                    <span className="rounded-md bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      Instalace
+                    </span>
+                  )}
+                  {lightboxPhoto.type === 'DAMAGE' && (
+                    <span className="rounded-md bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      Závada
+                    </span>
+                  )}
+                </div>
                 <span className="text-slate-300">
                   {lightboxPhoto.pointLabel} • {lightboxPhoto.clientName || 'Bez klienta'}
                 </span>
