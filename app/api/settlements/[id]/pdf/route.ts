@@ -32,11 +32,16 @@ export async function GET(
       return NextResponse.json({ error: 'Nemáte oprávnění k tomuto vyúčtování.' }, { status: 403 });
     }
 
-    const invoiceData = await buildSettlementInvoiceData(id);
+    const url = new URL(request.url);
+    const scopeParam = url.searchParams.get('scope');
+    const scope = scopeParam === 'WORK_ONLY' || scopeParam === 'ALL' ? scopeParam : undefined;
+
+    const invoiceData = await buildSettlementInvoiceData(id, undefined, { scope });
     const pdfBuffer = await createSettlementInvoicePdf(invoiceData);
 
     const safeNum = invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const filename = `vyuctovani-${invoiceData.periodYear}-${String(invoiceData.periodMonth).padStart(2, '0')}-${safeNum}.pdf`;
+    const scopeSuffix = invoiceData.scope === 'WORK_ONLY' ? '-pouze-prace' : '';
+    const filename = `vyuctovani-${invoiceData.periodYear}-${String(invoiceData.periodMonth).padStart(2, '0')}-${safeNum}${scopeSuffix}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

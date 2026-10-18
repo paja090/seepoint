@@ -6,6 +6,7 @@ export type StatWorkItemInput = {
   calculatedAmount?: string | number | null;
   amount?: string | number | null;
   workType?: string | null;
+  carrierType?: string | null;
   carrierTypeLabel?: string | null;
   taskTitle?: string | null;
   workTask?: { title?: string | null } | null;
@@ -24,6 +25,28 @@ export type ActivityBreakdownRow = {
   sharePercent: number;
 };
 
+export type CategoryBreakdownActivityItem = {
+  name: string;
+  entriesCount: number;
+  hours: number;
+  taskUnits: number;
+  fixedCount: number;
+  amount: number;
+};
+
+export type CategoryBreakdownRow = {
+  key: string;
+  label: string;
+  icon: string;
+  entriesCount: number;
+  hours: number;
+  taskUnits: number;
+  fixedCount: number;
+  totalAmount: number;
+  sharePercent: number;
+  activities: CategoryBreakdownActivityItem[];
+};
+
 export type WorkStatisticsSummary = {
   entriesCount: number;
   totalHours: number;
@@ -33,6 +56,7 @@ export type WorkStatisticsSummary = {
   hourlyAmount: number;
   taskAmount: number;
   fixedAmount: number;
+  byCategory: CategoryBreakdownRow[];
   byActivity: ActivityBreakdownRow[];
 };
 
@@ -112,6 +136,144 @@ export const OTHER_COST_PRESETS = [
   },
 ] as const;
 
+function normalizeText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+export type MediaCategoryInfo = {
+  key: string;
+  label: string;
+  icon: string;
+};
+
+export const MEDIA_CATEGORIES: Record<string, MediaCategoryInfo> = {
+  NAVIGATION: { key: 'NAVIGATION', label: 'Navigace & Směrovky', icon: '🧭' },
+  BENCH: { key: 'BENCH', label: 'Lavičky & Mobiliář', icon: '🪑' },
+  BILLBOARD: { key: 'BILLBOARD', label: 'Billboardy & Plochy', icon: '🖼️' },
+  CITYLIGHT: { key: 'CITYLIGHT', label: 'Citylighty & CLV', icon: '🏙️' },
+  POSTER: { key: 'POSTER', label: 'Výlep & Plakátování', icon: '📜' },
+  BANNER: { key: 'BANNER', label: 'Bannery & Fasády', icon: '🧱' },
+  LED: { key: 'LED', label: 'LED obrazovky', icon: '💡' },
+  TRANSPORT: { key: 'TRANSPORT', label: 'Doprava & Logistika', icon: '🚚' },
+  MAINTENANCE: { key: 'MAINTENANCE', label: 'Údržba & Servis', icon: '🛠️' },
+  INSTALLATION: { key: 'INSTALLATION', label: 'Montáže & Konstrukce', icon: '🔧' },
+  OTHER: { key: 'OTHER', label: 'Ostatní práce', icon: '📋' },
+};
+
+export function resolveMediaCategory(item: StatWorkItemInput): MediaCategoryInfo {
+  const rawCarrierType = (item.carrierType || '').toUpperCase();
+  const rawWorkType = (item.workType || '').toUpperCase();
+
+  const combined = [
+    item.carrierTypeLabel,
+    item.taskTitle,
+    item.workTask?.title,
+    item.task?.title,
+    item.workOrder?.title,
+    item.description,
+    item.workType,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const text = normalizeText(combined);
+
+  // 1. Navigation / Směrovky / Informační značení
+  if (
+    rawCarrierType === 'NAVIGATION' ||
+    /navigac|smerovk|smerov|tabulk|vyvesk|oznacen|rozcestn|sipk|orientac|system znacen|znacen/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.NAVIGATION;
+  }
+
+  // 2. Benches / Lavičky / Městský mobiliář
+  if (
+    rawCarrierType === 'PROMO_BENCH' ||
+    /lavick|mobiliar|kose|odpadk|stojan|lavic|pristres/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.BENCH;
+  }
+
+  // 3. Billboards / Bigboards / Mega / Horizon
+  if (
+    rawCarrierType === 'BILLBOARD' ||
+    rawCarrierType === 'BIGBOARD' ||
+    rawCarrierType === 'PROMO_HORIZON' ||
+    rawCarrierType === 'PROMO_TOWER' ||
+    rawCarrierType === 'PROMO_MINITOWER' ||
+    /billboard|bilbord|bigboard|megaboard|euroformat|\bbb\b|bb-|reklamni panel|reklamni ploch|ploch/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.BILLBOARD;
+  }
+
+  // 4. Citylighty / CLV / Vitríny
+  if (
+    rawCarrierType === 'CITYLIGHT' ||
+    /citylight|clv|vitrin|abribus|pylon|totem|prosvet/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.CITYLIGHT;
+  }
+
+  // 5. Posters / Výlep / Plakátování
+  if (
+    rawCarrierType === 'CITY_POSTER' ||
+    /vylep|lepeni|plakat|prelep|strhavani|vylepovac/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.POSTER;
+  }
+
+  // 6. Bannery / Fasády / Plachty
+  if (
+    rawCarrierType === 'BANNER' ||
+    rawCarrierType === 'FACADE' ||
+    /banner|fasad|placht|stit|stena/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.BANNER;
+  }
+
+  // 7. LED Obrazovky
+  if (
+    rawCarrierType === 'LED_SCREEN' ||
+    /\bled\b|ledk|obrazovk|displej|display|digital/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.LED;
+  }
+
+  // 8. Doprava / Logistika
+  if (
+    rawWorkType === 'TRANSPORT' ||
+    /doprav|prevoz|odvoz|rozvoz|nakladk|vykladk|svoz|stehovani|zavoz|vyjezd/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.TRANSPORT;
+  }
+
+  // 9. Servis / Údržba / Kontrola
+  if (
+    rawWorkType === 'REPAIR' ||
+    rawWorkType === 'CHECK' ||
+    /udrzba|oprav|servis|myti|cisteni|nater|lakov|kontrola|zamereni|revize|cist/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.MAINTENANCE;
+  }
+
+  // 10. Montáže / Instalace
+  if (
+    rawWorkType === 'INSTALLATION' ||
+    rawWorkType === 'REINSTALLATION' ||
+    rawWorkType === 'DEINSTALLATION' ||
+    /montaz|instalac|demontaz|deinstalac|reinstalac|svareni|kotveni|beton/i.test(text)
+  ) {
+    return MEDIA_CATEGORIES.INSTALLATION;
+  }
+
+  return MEDIA_CATEGORIES.OTHER;
+}
+
 export function resolveActivityName(item: StatWorkItemInput): string {
   const fromCarrierLabel = item.carrierTypeLabel?.trim();
   if (fromCarrierLabel) return fromCarrierLabel;
@@ -159,12 +321,38 @@ export function computeWorkStatistics(items: StatWorkItemInput[]): WorkStatistic
     }
   >();
 
+  const categoryMap = new Map<
+    string,
+    {
+      key: string;
+      label: string;
+      icon: string;
+      entriesCount: number;
+      hours: number;
+      taskUnits: number;
+      fixedCount: number;
+      totalAmount: number;
+      activityMap: Map<
+        string,
+        {
+          name: string;
+          entriesCount: number;
+          hours: number;
+          taskUnits: number;
+          fixedCount: number;
+          amount: number;
+        }
+      >;
+    }
+  >();
+
   for (const item of items) {
     const method = (item.remunerationMethod || item.rateType || 'HOURLY').toUpperCase();
     const qty = Number(item.quantity ?? 0) || 0;
     const amt = Number(item.calculatedAmount ?? item.amount ?? 0) || 0;
     const unit = (item.unit || '').toLowerCase();
     const activity = resolveActivityName(item);
+    const cat = resolveMediaCategory(item);
 
     totalWorkAmount += amt;
 
@@ -186,6 +374,7 @@ export function computeWorkStatistics(items: StatWorkItemInput[]): WorkStatistic
       taskAmount += amt;
     }
 
+    // Update by-activity map
     const existing = map.get(activity) || {
       activity,
       entriesCount: 0,
@@ -201,6 +390,47 @@ export function computeWorkStatistics(items: StatWorkItemInput[]): WorkStatistic
     existing.fixedCount += itemFixedCount;
     existing.totalAmount = Math.round((existing.totalAmount + amt) * 100) / 100;
     map.set(activity, existing);
+
+    // Update by-category map
+    let catEntry = categoryMap.get(cat.key);
+    if (!catEntry) {
+      catEntry = {
+        key: cat.key,
+        label: cat.label,
+        icon: cat.icon,
+        entriesCount: 0,
+        hours: 0,
+        taskUnits: 0,
+        fixedCount: 0,
+        totalAmount: 0,
+        activityMap: new Map(),
+      };
+      categoryMap.set(cat.key, catEntry);
+    }
+
+    catEntry.entriesCount += 1;
+    catEntry.hours = Math.round((catEntry.hours + itemHours) * 100) / 100;
+    catEntry.taskUnits = Math.round((catEntry.taskUnits + itemTaskUnits) * 100) / 100;
+    catEntry.fixedCount += itemFixedCount;
+    catEntry.totalAmount = Math.round((catEntry.totalAmount + amt) * 100) / 100;
+
+    let subAct = catEntry.activityMap.get(activity);
+    if (!subAct) {
+      subAct = {
+        name: activity,
+        entriesCount: 0,
+        hours: 0,
+        taskUnits: 0,
+        fixedCount: 0,
+        amount: 0,
+      };
+      catEntry.activityMap.set(activity, subAct);
+    }
+    subAct.entriesCount += 1;
+    subAct.hours = Math.round((subAct.hours + itemHours) * 100) / 100;
+    subAct.taskUnits = Math.round((subAct.taskUnits + itemTaskUnits) * 100) / 100;
+    subAct.fixedCount += itemFixedCount;
+    subAct.amount = Math.round((subAct.amount + amt) * 100) / 100;
   }
 
   totalHours = Math.round(totalHours * 100) / 100;
@@ -222,6 +452,28 @@ export function computeWorkStatistics(items: StatWorkItemInput[]): WorkStatistic
           : 0,
     }));
 
+  const byCategory: CategoryBreakdownRow[] = Array.from(categoryMap.values())
+    .sort((a, b) => b.totalAmount - a.totalAmount || b.hours - a.hours)
+    .map((cat) => ({
+      key: cat.key,
+      label: cat.label,
+      icon: cat.icon,
+      entriesCount: cat.entriesCount,
+      hours: cat.hours,
+      taskUnits: cat.taskUnits,
+      fixedCount: cat.fixedCount,
+      totalAmount: cat.totalAmount,
+      sharePercent:
+        totalWorkAmount > 0
+          ? Math.round((cat.totalAmount / totalWorkAmount) * 1000) / 10
+          : items.length > 0
+          ? Math.round((cat.entriesCount / items.length) * 1000) / 10
+          : 0,
+      activities: Array.from(cat.activityMap.values()).sort(
+        (a, b) => b.amount - a.amount || b.entriesCount - a.entriesCount
+      ),
+    }));
+
   return {
     entriesCount: items.length,
     totalHours,
@@ -231,6 +483,7 @@ export function computeWorkStatistics(items: StatWorkItemInput[]): WorkStatistic
     hourlyAmount,
     taskAmount,
     fixedAmount,
+    byCategory,
     byActivity,
   };
 }
