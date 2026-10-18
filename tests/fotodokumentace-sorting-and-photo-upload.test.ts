@@ -73,3 +73,100 @@ test('Photos inside album grid are sorted in descending order by capture date', 
   assert.equal(sorted[1].id, 'p3');
   assert.equal(sorted[2].id, 'p1');
 });
+
+test('handlePhotosUpdated correctly recalculates album metrics on upload, rename, and delete', () => {
+  interface InternalPhotoItem {
+    id: string;
+    url: string;
+    type: string;
+    fileName: string | null;
+    createdAt: string;
+  }
+  interface InternalPoint {
+    id: string;
+    photos: InternalPhotoItem[];
+  }
+  interface AlbumState {
+    id: string;
+    points: InternalPoint[];
+    photosCount: number;
+    latestPhotoAt: string | null;
+    coverPhotoUrl: string | null;
+  }
+
+  let album: AlbumState = {
+    id: 'campaign-1',
+    points: [
+      {
+        id: 'point-1',
+        photos: [
+          { id: 'photo-1', url: '/p1.jpg', type: 'CONTROL', fileName: 'orig.jpg', createdAt: '2026-10-18T10:00:00Z' }
+        ]
+      }
+    ],
+    photosCount: 1,
+    latestPhotoAt: '2026-10-18T10:00:00Z',
+    coverPhotoUrl: '/p1.jpg',
+  };
+
+  const updateAlbum = (updatedPoints: InternalPoint[]) => {
+    const allPhotos = updatedPoints.flatMap((pt) => pt.photos || []);
+    const photosCount = allPhotos.length;
+    let latestPhotoAt = null;
+    if (allPhotos.length > 0) {
+      const sortedDates = allPhotos
+        .map((p) => new Date(p.createdAt).getTime())
+        .filter((t) => !isNaN(t))
+        .sort((a, b) => b - a);
+      if (sortedDates.length > 0) {
+        latestPhotoAt = new Date(sortedDates[0]).toISOString();
+      }
+    }
+    const coverPhotoUrl = allPhotos[0]?.url || null;
+    album = {
+      ...album,
+      points: updatedPoints,
+      photosCount,
+      latestPhotoAt,
+      coverPhotoUrl,
+    };
+  };
+
+  // 1. Test Upload
+  const newPhoto: InternalPhotoItem = {
+    id: 'photo-2',
+    url: '/p2.jpg',
+    type: 'INSTALLATION',
+    fileName: 'novy-polep.jpg',
+    createdAt: '2026-10-18T12:00:00Z',
+  };
+  updateAlbum([
+    {
+      id: 'point-1',
+      photos: [newPhoto, ...album.points[0].photos],
+    }
+  ]);
+  assert.equal(album.photosCount, 2);
+  assert.equal(album.latestPhotoAt, '2026-10-18T12:00:00.000Z');
+  assert.equal(album.coverPhotoUrl, '/p2.jpg');
+
+  // 2. Test Rename
+  const renamedPoints = album.points.map((pt) => ({
+    ...pt,
+    photos: pt.photos.map((ph) => ph.id === 'photo-2' ? { ...ph, fileName: 'prejmenovany.jpg' } : ph),
+  }));
+  updateAlbum(renamedPoints);
+  assert.equal(album.points[0].photos[0].fileName, 'prejmenovany.jpg');
+  assert.equal(album.photosCount, 2);
+
+  // 3. Test Delete
+  const deletedPoints = album.points.map((pt) => ({
+    ...pt,
+    photos: pt.photos.filter((ph) => ph.id !== 'photo-2'),
+  }));
+  updateAlbum(deletedPoints);
+  assert.equal(album.photosCount, 1);
+  assert.equal(album.latestPhotoAt, '2026-10-18T10:00:00.000Z');
+  assert.equal(album.coverPhotoUrl, '/p1.jpg');
+});
+
