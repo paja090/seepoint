@@ -426,3 +426,174 @@ test('Settlement Invoice: generateSpaydString produces valid SPAYD format with d
   assert.ok(spayd.includes('RN:Jan Dvorak - Montaze*'));
 });
 
+test('Settlement Invoice: buildSettlementInvoiceData supports WORK_ONLY scope (only work items, excluding bonuses/deductions)', async () => {
+  const mockSettlement = {
+    id: 'settlement-scope-test',
+    organizationId: 'org-1',
+    periodYear: 2026,
+    periodMonth: 10,
+    periodFrom: new Date('2026-10-01T00:00:00.000Z'),
+    periodTo: new Date('2026-10-31T23:59:59.999Z'),
+    status: 'APPROVED',
+    totalWorkAmount: new Prisma.Decimal(25000),
+    totalReimbursements: new Prisma.Decimal(2000),
+    totalDeductions: new Prisma.Decimal(1000),
+    totalAdvances: new Prisma.Decimal(3000),
+    finalPayableAmount: new Prisma.Decimal(23000),
+    note: 'Vyúčtování za říjen',
+    employee: {
+      id: 'emp-1',
+      firstName: 'Petr',
+      lastName: 'Novák',
+      email: 'petr@example.com',
+      phone: null,
+      ico: null,
+      billingProfile: null,
+    },
+    items: [
+      {
+        id: 'item-1',
+        description: 'Instalace lavičky',
+        quantity: new Prisma.Decimal(10),
+        unit: 'ks',
+        unitPrice: new Prisma.Decimal(1500),
+        amount: new Prisma.Decimal(15000),
+        appliedRate: new Prisma.Decimal(1500),
+        carrierTypeLabel: 'Lavička',
+        workType: 'INSTALLATION',
+        task: null,
+      },
+      {
+        id: 'item-2',
+        description: 'Montáž navigace',
+        quantity: new Prisma.Decimal(5),
+        unit: 'ks',
+        unitPrice: new Prisma.Decimal(2000),
+        amount: new Prisma.Decimal(10000),
+        appliedRate: new Prisma.Decimal(2000),
+        carrierTypeLabel: 'Navigace',
+        workType: 'INSTALLATION',
+        task: null,
+      },
+    ],
+    adjustments: [
+      {
+        id: 'adj-1',
+        type: 'REIMBURSEMENT',
+        category: 'FUEL',
+        description: 'Benzín',
+        amount: new Prisma.Decimal(2000),
+      },
+      {
+        id: 'adj-2',
+        type: 'DEDUCTION',
+        category: 'RENT',
+        description: 'Nájem plošiny',
+        amount: new Prisma.Decimal(1000),
+      },
+      {
+        id: 'adj-3',
+        type: 'ADVANCE',
+        category: 'OTHER',
+        description: 'Záloha',
+        amount: new Prisma.Decimal(3000),
+      },
+    ],
+    invoice: null,
+  };
+
+  const mockTx = {
+    settlement: {
+      findUnique: async () => mockSettlement,
+    },
+    organization: {
+      findUnique: async () => ({ id: 'org-1', name: 'Test Org', defaultVatRate: 21, invoiceDueDays: 14 }),
+    },
+    systemSettings: {
+      findFirst: async () => null,
+    },
+  } as any;
+
+  // 1. Test WORK_ONLY scope
+  const workOnlyResult = await buildSettlementInvoiceData('settlement-scope-test', mockTx, { scope: 'WORK_ONLY' });
+  assert.equal(workOnlyResult.scope, 'WORK_ONLY');
+  assert.equal(workOnlyResult.items.length, 2); // only 2 work items, no adjustments
+  assert.equal(workOnlyResult.netPayableAmount, 25000); // pure totalWorkAmount
+  assert.equal(workOnlyResult.grossAmount, 25000);
+
+  // 2. Test ALL scope
+  const allResult = await buildSettlementInvoiceData('settlement-scope-test', mockTx, { scope: 'ALL' });
+  assert.equal(allResult.scope, 'ALL');
+  assert.equal(allResult.items.length, 5); // 2 work items + 3 adjustments
+  assert.equal(allResult.netPayableAmount, 23000); // finalPayableAmount
+  assert.equal(allResult.grossAmount, 23000);
+});
+
+test('Settlement Invoice: computeWorkStatistics categorizes tasks into unified media categories (Navigace, Lavičky, Billboardy...) and keeps detailed activities', async () => {
+  const { computeWorkStatistics } = await import('../lib/work-entry-stats.ts');
+
+  const stats = computeWorkStatistics([
+    {
+      taskTitle: 'Montáž směrovky Zlín',
+      quantity: 4,
+      unit: 'ks',
+      remunerationMethod: 'TASK',
+      amount: 4000,
+      carrierType: 'NAVIGATION',
+    },
+    {
+      taskTitle: 'Instalace lavičky na náměstí',
+      quantity: 6,
+      unit: 'ks',
+      remunerationMethod: 'TASK',
+      amount: 6000,
+      carrierType: 'PROMO_BENCH',
+    },
+    {
+      taskTitle: 'Nátěr lavičky v parku',
+      quantity: 3,
+      unit: 'hod',
+      remunerationMethod: 'HOURLY',
+      amount: 1500,
+      carrierType: 'PROMO_BENCH',
+    },
+    {
+      taskTitle: 'Lepení billboardu 5.1x2.4m',
+      quantity: 2,
+      unit: 'ks',
+      remunerationMethod: 'TASK',
+      amount: 3000,
+      carrierType: 'BILLBOARD',
+    },
+    {
+      taskTitle: 'Výměna plakátu v citylight vitríně',
+      quantity: 5,
+      unit: 'ks',
+      remunerationMethod: 'TASK',
+      amount: 2500,
+      carrierType: 'CITYLIGHT',
+    },
+  ]);
+
+  assert.equal(stats.totalWorkAmount, 17000);
+  assert.equal(stats.totalHours, 3);
+  assert.equal(stats.totalTaskUnits, 17);
+
+  // Check category breakdown
+  const categoryKeys = stats.byCategory.map((c) => c.key);
+  assert.ok(categoryKeys.includes('BENCH'), 'Should contain Lavičky & Mobiliář');
+  assert.ok(categoryKeys.includes('NAVIGATION'), 'Should contain Navigace & Směrovky');
+  assert.ok(categoryKeys.includes('BILLBOARD'), 'Should contain Billboardy & Plochy');
+  assert.ok(categoryKeys.includes('CITYLIGHT'), 'Should contain Citylighty & CLV');
+
+  // Verify Lavičky combined 2 distinct tasks: "Instalace lavičky na náměstí" and "Nátěr lavičky v parku"
+  const benchCat = stats.byCategory.find((c) => c.key === 'BENCH');
+  assert.ok(benchCat);
+  assert.equal(benchCat.totalAmount, 7500); // 6000 + 1500
+  assert.equal(benchCat.entriesCount, 2);
+  assert.equal(benchCat.hours, 3);
+  assert.equal(benchCat.taskUnits, 6);
+  assert.equal(benchCat.activities.length, 2);
+});
+
+

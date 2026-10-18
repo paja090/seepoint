@@ -32,7 +32,11 @@ export async function GET(
       return NextResponse.json({ error: 'Nemáte oprávnění k tomuto vyúčtování.' }, { status: 403 });
     }
 
-    const invoiceData = await buildSettlementInvoiceData(id);
+    const url = new URL(request.url);
+    const scopeParam = url.searchParams.get('scope');
+    const scope = scopeParam === 'WORK_ONLY' || scopeParam === 'ALL' ? scopeParam : undefined;
+
+    const invoiceData = await buildSettlementInvoiceData(id, undefined, { scope });
     return NextResponse.json(invoiceData);
   } catch (error: unknown) {
     const err = error as Error;
@@ -52,7 +56,7 @@ export async function POST(
 
   const { id } = await params;
 
-  let body: { closeMonth?: boolean } = {};
+  let body: { closeMonth?: boolean; scope?: 'WORK_ONLY' | 'ALL' } = {};
   try {
     body = await request.json().catch(() => ({}));
   } catch {
@@ -61,8 +65,12 @@ export async function POST(
 
   try {
     const actor = { id: user.id, email: user.email, role: user.role };
-    const result = await generateSettlementInvoice(id, actor, { closeMonth: Boolean(body.closeMonth) });
-    const invoiceData = await buildSettlementInvoiceData(id);
+    const scope = body.scope === 'WORK_ONLY' || body.scope === 'ALL' ? body.scope : undefined;
+    const result = await generateSettlementInvoice(id, actor, {
+      closeMonth: Boolean(body.closeMonth),
+      scope,
+    });
+    const invoiceData = await buildSettlementInvoiceData(id, undefined, { scope });
 
     return NextResponse.json({
       success: true,

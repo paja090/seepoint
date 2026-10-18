@@ -40,6 +40,8 @@ export type SettlementParty = {
   isVatPayer?: boolean;
 };
 
+export type SettlementInvoiceScope = 'ALL' | 'WORK_ONLY';
+
 export type SettlementInvoiceData = {
   invoiceNumber: string;
   variableSymbol: string;
@@ -51,6 +53,8 @@ export type SettlementInvoiceData = {
   periodYear: number;
   periodTitle: string;
   settlementStatus: string;
+  scope?: SettlementInvoiceScope;
+  scopeLabel?: string;
   supplier: SettlementParty;
   customer: SettlementParty;
   items: Array<{
@@ -158,7 +162,8 @@ export function generateSpaydString(params: {
  */
 export async function buildSettlementInvoiceData(
   settlementId: string,
-  tx?: Prisma.TransactionClient
+  tx?: Prisma.TransactionClient,
+  options?: { scope?: SettlementInvoiceScope }
 ): Promise<SettlementInvoiceData> {
   const client = tx || prisma;
 
@@ -184,6 +189,19 @@ export async function buildSettlementInvoiceData(
   if (!settlement) {
     throw new Error(`Vyúčtování s ID ${settlementId} nebylo nalezeno.`);
   }
+
+  // Determine invoice scope (WORK_ONLY vs ALL)
+  const explicitScope = options?.scope;
+  const inferredScope: SettlementInvoiceScope = explicitScope
+    ? explicitScope
+    : settlement.invoice?.note?.includes('[SCOPE:WORK_ONLY]')
+      ? 'WORK_ONLY'
+      : 'ALL';
+
+  const scope: SettlementInvoiceScope = inferredScope;
+  const scopeLabel = scope === 'WORK_ONLY'
+    ? 'Pouze odpracovaná práce'
+    : 'Kompletní vyúčtování (včetně bonusů a odečtů)';
 
   // Retrieve organization & system settings
   const org = await client.organization.findUnique({
@@ -262,32 +280,37 @@ export async function buildSettlementInvoiceData(
     });
   }
 
-  // Adjustments: Reimbursements, Bonuses, Deductions, Advances
-  for (const adj of settlement.adjustments) {
-    const isCredit = adj.type === 'REIMBURSEMENT' || adj.type === 'BONUS' || adj.type === 'CARRY_OVER_ADD';
-    const signedAmount = isCredit ? Number(adj.amount) : -Number(adj.amount);
-    const prefix = adj.type === 'REIMBURSEMENT'
-      ? 'Náhrada výdajů'
-      : adj.type === 'BONUS'
-        ? 'Prémie / Bonus'
-        : adj.type === 'ADVANCE'
-          ? 'Záloha'
-          : 'Srážka / Odpočet';
+  // Adjustments: Reimbursements, Bonuses, Deductions, Advances included ONLY when scope is ALL
+  if (scope === 'ALL') {
+    for (const adj of settlement.adjustments) {
+      const isCredit = adj.type === 'REIMBURSEMENT' || adj.type === 'BONUS' || adj.type === 'CARRY_OVER_ADD';
+      const signedAmount = isCredit ? Number(adj.amount) : -Number(adj.amount);
+      const prefix = adj.type === 'REIMBURSEMENT'
+        ? 'Náhrada výdajů'
+        : adj.type === 'BONUS'
+          ? 'Prémie / Bonus'
+          : adj.type === 'ADVANCE'
+            ? 'Záloha'
+            : 'Srážka / Odpočet';
 
-    lineItems.push({
-      description: `${prefix}: ${adj.description}${adj.category ? ` (${adj.category})` : ''}`,
-      quantity: 1,
-      unit: isCredit ? 'náhrada' : 'odpočet',
-      unitPrice: signedAmount,
-      amount: signedAmount,
-      vatRate: 0,
-      vatAmount: 0,
-      totalAmount: signedAmount,
-      category: adj.category || 'NÁKLADY',
-    });
+      lineItems.push({
+        description: `${prefix}: ${adj.description}${adj.category ? ` (${adj.category})` : ''}`,
+        quantity: 1,
+        unit: isCredit ? 'náhrada' : 'odpočet',
+        unitPrice: signedAmount,
+        amount: signedAmount,
+        vatRate: 0,
+        vatAmount: 0,
+        totalAmount: signedAmount,
+        category: adj.category || 'NÁKLADY',
+      });
+    }
   }
 
-  const netPayableAmount = Number(settlement.finalPayableAmount);
+  const netPayableAmount = scope === 'WORK_ONLY'
+    ? Number(settlement.totalWorkAmount)
+    : Number(settlement.finalPayableAmount);
+
   const vatAmount = supplier.isVatPayer ? Math.round(netPayableAmount * ((Number(org?.defaultVatRate) || 21) / 100) * 100) / 100 : 0;
   const grossAmount = netPayableAmount + vatAmount;
 
@@ -306,6 +329,10 @@ export async function buildSettlementInvoiceData(
     });
   }
 
+  const defaultNote = scope === 'WORK_ONLY'
+    ? `Fakturována odvedená práce za období ${periodTitle} (bonusy a srážky jsou evidovány mimo fakturu)`
+    : `Vyúčtování odpracovaných prací a nákladů za ${periodTitle}`;
+
   return {
     invoiceNumber,
     variableSymbol,
@@ -317,6 +344,8 @@ export async function buildSettlementInvoiceData(
     periodYear: settlement.periodYear,
     periodTitle,
     settlementStatus: settlement.status,
+    scope,
+    scopeLabel,
     supplier,
     customer,
     items: lineItems,
@@ -327,7 +356,7 @@ export async function buildSettlementInvoiceData(
     netPayableAmount,
     vatAmount,
     grossAmount,
-    note: settlement.note || `Vyúčtování odpracovaných prací a nákladů za ${periodTitle}`,
+    note: settlement.note || defaultNote,
     qrPaymentString,
     paymentIban,
   };
@@ -350,7 +379,7 @@ async function runInTx<T>(
 export async function generateSettlementInvoice(
   settlementId: string,
   actor: { id: string; email: string; role: string },
-  options?: { closeMonth?: boolean },
+  options?: { closeMonth?: boolean; scope?: SettlementInvoiceScope },
   tx?: Prisma.TransactionClient
 ): Promise<{ invoice: Invoice & { items: InvoiceItem[] }; settlement: Settlement }> {
   return await runInTx(tx, async (transaction: Prisma.TransactionClient) => {
@@ -436,7 +465,8 @@ export async function generateSettlementInvoice(
       }
     }
 
-    const data = await buildSettlementInvoiceData(settlementId, transaction);
+    const data = await buildSettlementInvoiceData(settlementId, transaction, { scope: options?.scope });
+    const invoiceNote = `${data.scope === 'WORK_ONLY' ? '[SCOPE:WORK_ONLY] ' : '[SCOPE:ALL] '}${data.note || ''}`.trim();
 
     // Upsert Invoice record
     const invoice = await transaction.invoice.upsert({
@@ -468,7 +498,7 @@ export async function generateSettlementInvoice(
         totalAmount: new Prisma.Decimal(data.netPayableAmount),
         vatAmount: new Prisma.Decimal(data.vatAmount),
         grossAmount: new Prisma.Decimal(data.grossAmount),
-        note: data.note,
+        note: invoiceNote,
         items: {
           create: data.items.map((item) => ({
             organizationId: settlement.organizationId,
@@ -504,7 +534,7 @@ export async function generateSettlementInvoice(
         totalAmount: new Prisma.Decimal(data.netPayableAmount),
         vatAmount: new Prisma.Decimal(data.vatAmount),
         grossAmount: new Prisma.Decimal(data.grossAmount),
-        note: data.note,
+        note: invoiceNote,
         items: {
           deleteMany: {},
           create: data.items.map((item) => ({
@@ -539,6 +569,9 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
   const BLUE = '#0284C7';
   const MUTED = '#64748B';
 
+  const effectiveScope: SettlementInvoiceScope = data.scope || 'ALL';
+  const effectiveScopeLabel = data.scopeLabel || (effectiveScope === 'WORK_ONLY' ? 'Pouze odpracovaná práce' : 'Kompletní vyúčtování (včetně bonusů a odečtů)');
+
   const definition = {
     pageSize: 'A4',
     pageMargins: [36, 36, 36, 42],
@@ -559,12 +592,13 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
             stack: [
               { text: 'SeePOINT OS', bold: true, fontSize: 20, color: BLUE },
               { text: 'MĚSÍČNÍ VYÚČTOVÁNÍ & PODKLAD K FAKTURACI', bold: true, fontSize: 8, color: NAVY, characterSpacing: 1 },
+              { text: `ROZSAH: ${effectiveScopeLabel.toUpperCase()}`, bold: true, fontSize: 7.5, color: BLUE, margin: [0, 2, 0, 0] },
             ],
           },
           {
             width: 220,
             stack: [
-              { text: 'DOKLAD O PROVEDENÉ PRÁCI', bold: true, fontSize: 13, color: NAVY, alignment: 'right' },
+              { text: effectiveScope === 'WORK_ONLY' ? 'FAKTURACE ODVEDENÉ PRÁCE' : 'DOKLAD O PROVEDENÉ PRÁCI', bold: true, fontSize: 13, color: NAVY, alignment: 'right' },
               { text: `Číslo: ${data.invoiceNumber}`, bold: true, fontSize: 11, color: BLUE, alignment: 'right', margin: [0, 4, 0, 0] },
               { text: `Období: ${data.periodTitle}`, fontSize: 9, color: MUTED, alignment: 'right' },
             ],
@@ -679,10 +713,18 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
             width: '*',
             stack: [
               { text: 'REKAPITULACE OBDOBÍ', fontSize: 7.5, bold: true, color: BLUE, characterSpacing: 1 },
-              { text: `Odměna za odvedenou práci: ${formatMoney(data.totalWorkAmount)}`, fontSize: 8.5, color: MUTED, margin: [0, 4, 0, 2] },
-              ...(data.totalReimbursements > 0 ? [{ text: `Náhrady výdajů (palivo, nájem, auto): +${formatMoney(data.totalReimbursements)}`, fontSize: 8.5, color: '#16A34A' }] : []),
-              ...(data.totalDeductions > 0 ? [{ text: `Srážky / odpočty: -${formatMoney(data.totalDeductions)}`, fontSize: 8.5, color: '#DC2626' }] : []),
-              ...(data.totalAdvances > 0 ? [{ text: `Vyplacené zálohy: -${formatMoney(data.totalAdvances)}`, fontSize: 8.5, color: '#DC2626' }] : []),
+              { text: `Odměna za odvedenou práci: ${formatMoney(data.totalWorkAmount)}`, fontSize: 8.5, bold: effectiveScope === 'WORK_ONLY', color: effectiveScope === 'WORK_ONLY' ? NAVY : MUTED, margin: [0, 4, 0, 2] },
+              ...(effectiveScope === 'ALL' && data.totalReimbursements > 0 ? [{ text: `Náhrady výdajů (palivo, nájem, auto): +${formatMoney(data.totalReimbursements)}`, fontSize: 8.5, color: '#16A34A' }] : []),
+              ...(effectiveScope === 'ALL' && data.totalDeductions > 0 ? [{ text: `Srážky / odpočty: -${formatMoney(data.totalDeductions)}`, fontSize: 8.5, color: '#DC2626' }] : []),
+              ...(effectiveScope === 'ALL' && data.totalAdvances > 0 ? [{ text: `Vyplacené zálohy: -${formatMoney(data.totalAdvances)}`, fontSize: 8.5, color: '#DC2626' }] : []),
+              ...(effectiveScope === 'WORK_ONLY'
+                ? [
+                    { text: 'Doklad je vystaven pouze na odvedenou práci. Náhrady a srážky jsou vedeny mimo fakturu.', fontSize: 7.5, color: MUTED, margin: [0, 2, 0, 0] },
+                    ...(data.totalReimbursements > 0 || data.totalDeductions > 0 || data.totalAdvances > 0
+                      ? [{ text: `Evidováno mimo fakturu: Náhrady +${formatMoney(data.totalReimbursements)} · Srážky -${formatMoney(data.totalDeductions + data.totalAdvances)}`, fontSize: 7.5, color: MUTED, margin: [0, 2, 0, 0] }]
+                      : []),
+                  ]
+                : []),
               ...(data.supplier.bankAccount ? [{ text: `Vyplatit na bankovní účet: ${data.supplier.bankAccount}`, fontSize: 8.5, bold: true, color: NAVY, margin: [0, 5, 0, 0] }] : []),
             ],
           },
@@ -699,10 +741,10 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
             table: {
               widths: ['*', 90],
               body: [
-                [{ text: 'Základ vyúčtování', color: MUTED, fontSize: 8.5 }, { text: formatMoney(data.netPayableAmount), alignment: 'right', fontSize: 8.5 }],
+                [{ text: effectiveScope === 'WORK_ONLY' ? 'Základ faktury (práce)' : 'Základ vyúčtování', color: MUTED, fontSize: 8.5 }, { text: formatMoney(data.netPayableAmount), alignment: 'right', fontSize: 8.5 }],
                 ...(data.vatAmount > 0 ? [[{ text: 'DPH', color: MUTED, fontSize: 8.5 }, { text: formatMoney(data.vatAmount), alignment: 'right', fontSize: 8.5 }]] : []),
                 [
-                  { text: 'CELKEM K VÝPLATĚ', bold: true, color: '#FFFFFF', fontSize: 9.5 },
+                  { text: effectiveScope === 'WORK_ONLY' ? 'CELKEM K FAKTURACI' : 'CELKEM K VÝPLATĚ', bold: true, color: '#FFFFFF', fontSize: 9.5 },
                   { text: formatMoney(data.grossAmount), bold: true, color: '#FFFFFF', alignment: 'right', fontSize: 10 },
                 ],
               ],

@@ -12,19 +12,24 @@ type MonthlyInvoiceModalProps = {
 
 export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated }: MonthlyInvoiceModalProps) {
   const [data, setData] = useState<SettlementInvoiceData | null>(null);
+  const [scope, setScope] = useState<'ALL' | 'WORK_ONLY'>('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [closing, setClosing] = useState(false);
   const [notice, setNotice] = useState('');
 
-  const loadData = async () => {
+  const loadData = async (targetScope?: 'ALL' | 'WORK_ONLY') => {
+    const s = targetScope ?? scope;
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/settlements/${settlementId}/invoice`);
+      const res = await fetch(`/api/settlements/${settlementId}/invoice?scope=${s}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Nepodařilo se načíst doklad vyúčtování.');
       setData(json);
+      if (json.scope && !targetScope) {
+        setScope(json.scope);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Chyba při načítání vyúčtování.');
     } finally {
@@ -36,8 +41,17 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
     loadData();
   }, [settlementId]);
 
+  const handleScopeChange = (newScope: 'ALL' | 'WORK_ONLY') => {
+    setScope(newScope);
+    void loadData(newScope);
+  };
+
   const handleCloseMonth = async () => {
-    if (!confirm('Opravdu chcete provést měsíční uzávěrku a vystavit finální vyúčtování za tento měsíc?')) {
+    const promptText = scope === 'WORK_ONLY'
+      ? 'Opravdu chcete provést měsíční uzávěrku a vystavit fakturu POUZE NA ODVEDENOU PRÁCI (bez bonusů a srážek)?'
+      : 'Opravdu chcete provést měsíční uzávěrku a vystavit finální vyúčtování VČETNĚ VŠECH BONUSŮ A ODEČTŮ?';
+
+    if (!confirm(promptText)) {
       return;
     }
     setClosing(true);
@@ -47,7 +61,7 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
       const res = await fetch(`/api/settlements/${settlementId}/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ closeMonth: true }),
+        body: JSON.stringify({ closeMonth: true, scope }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Uzávěrka se nezdařila.');
@@ -68,7 +82,7 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
   };
 
   const handleDownloadPdf = () => {
-    window.open(`/api/settlements/${settlementId}/pdf`, '_blank');
+    window.open(`/api/settlements/${settlementId}/pdf?scope=${scope}`, '_blank');
   };
 
   return (
@@ -128,6 +142,53 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
           </div>
         </div>
 
+        {/* Invoice Scope Selector Bar */}
+        <div className="border-b border-slate-200 bg-gradient-to-r from-blue-50/70 via-slate-50 to-indigo-50/70 px-6 py-3 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-800">⚙️ Rozsah dokladu:</span>
+            <span className="text-xs text-slate-500 hidden sm:inline">
+              {scope === 'WORK_ONLY'
+                ? 'Fakturuje se pouze základní odvedená práce (odměna za hodiny a úkoly).'
+                : 'Fakturuje se kompletní vyúčtování včetně bonusů, náhrad a odečtů.'}
+            </span>
+          </div>
+
+          <div className="inline-flex rounded-xl bg-white p-1 border border-slate-200 shadow-xs">
+            <button
+              type="button"
+              onClick={() => handleScopeChange('WORK_ONLY')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                scope === 'WORK_ONLY'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🛠️</span> Pouze odpracovaná práce
+              {data && (
+                <span className={`ml-1 font-mono text-[11px] ${scope === 'WORK_ONLY' ? 'text-blue-100' : 'text-slate-500'}`}>
+                  ({data.totalWorkAmount.toLocaleString('cs-CZ')} Kč)
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleScopeChange('ALL')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                scope === 'ALL'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>📑</span> Včetně bonusů a odečtů
+              {data && (
+                <span className={`ml-1 font-mono text-[11px] ${scope === 'ALL' ? 'text-blue-100' : 'text-slate-500'}`}>
+                  ({(data.totalWorkAmount + data.totalReimbursements - data.totalDeductions - data.totalAdvances).toLocaleString('cs-CZ')} Kč)
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Notices & Errors */}
         {notice && (
           <div className="mx-6 mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 print:hidden">
@@ -162,15 +223,28 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
                     </span>
                   </div>
                   <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-900">
-                    MĚSÍČNÍ VYÚČTOVÁNÍ PRACÍ & FAKTURAČNÍ PODKLAD
+                    {data.scope === 'WORK_ONLY'
+                      ? 'FAKTURAČNÍ PODKLAD – POUZE ODVEDENÁ PRÁCE'
+                      : 'MĚSÍČNÍ VYÚČTOVÁNÍ PRACÍ & FAKTURAČNÍ PODKLAD'}
                   </h1>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Evidenční číslo: <strong className="font-mono text-slate-800">{data.invoiceNumber}</strong>
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold ${
+                      data.scope === 'WORK_ONLY'
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                        : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                    }`}>
+                      {data.scope === 'WORK_ONLY' ? '🛠️ Rozsah: Pouze odpracovaná práce' : '📑 Rozsah: Včetně bonusů a odečtů'}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      Evidenční číslo: <strong className="font-mono text-slate-800">{data.invoiceNumber}</strong>
+                    </span>
+                  </div>
                 </div>
 
                 <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-right">
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Konečná částka k výplatě</div>
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    {data.scope === 'WORK_ONLY' ? 'Částka k fakturaci (práce)' : 'Konečná částka k výplatě'}
+                  </div>
                   <div className="text-2xl font-black text-slate-900 font-mono mt-1">
                     {data.grossAmount.toLocaleString('cs-CZ')} Kč
                   </div>
@@ -318,28 +392,39 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
                 <div className="space-y-1.5 text-xs text-slate-600 rounded-xl bg-slate-50 p-4 border border-slate-200 md:col-span-5 flex flex-col justify-between">
                   <div>
                     <div className="font-bold text-slate-800 uppercase tracking-wider text-[10px] mb-2">
-                      Rekapitulace složek vyúčtování
+                      {data.scope === 'WORK_ONLY' ? 'Rekapitulace faktury (pouze práce)' : 'Rekapitulace složek vyúčtování'}
                     </div>
                     <div className="flex justify-between">
                       <span>Odměna za práci (hodiny & úkoly):</span>
                       <strong className="font-mono text-slate-900">{data.totalWorkAmount.toLocaleString('cs-CZ')} Kč</strong>
                     </div>
-                    {data.totalReimbursements > 0 && (
+                    {data.scope === 'ALL' && data.totalReimbursements > 0 && (
                       <div className="flex justify-between text-emerald-700">
                         <span>Náhrady výdajů (palivo, auto...):</span>
                         <strong className="font-mono">+{data.totalReimbursements.toLocaleString('cs-CZ')} Kč</strong>
                       </div>
                     )}
-                    {data.totalDeductions > 0 && (
+                    {data.scope === 'ALL' && data.totalDeductions > 0 && (
                       <div className="flex justify-between text-red-600">
                         <span>Srážky / odpočty:</span>
                         <strong className="font-mono">-{data.totalDeductions.toLocaleString('cs-CZ')} Kč</strong>
                       </div>
                     )}
-                    {data.totalAdvances > 0 && (
+                    {data.scope === 'ALL' && data.totalAdvances > 0 && (
                       <div className="flex justify-between text-red-600">
                         <span>Vyplacené zálohy:</span>
                         <strong className="font-mono">-{data.totalAdvances.toLocaleString('cs-CZ')} Kč</strong>
+                      </div>
+                    )}
+                    {data.scope === 'WORK_ONLY' && (data.totalReimbursements > 0 || data.totalDeductions > 0 || data.totalAdvances > 0) && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 text-slate-500 text-[11px] bg-slate-100/70 p-2 rounded-lg space-y-0.5">
+                        <div className="font-semibold text-slate-700">Evidováno mimo tuto fakturu:</div>
+                        {data.totalReimbursements > 0 && (
+                          <div className="text-emerald-700">Náhrady výdajů: +{data.totalReimbursements.toLocaleString('cs-CZ')} Kč</div>
+                        )}
+                        {(data.totalDeductions > 0 || data.totalAdvances > 0) && (
+                          <div className="text-red-600">Srážky a zálohy: -{(data.totalDeductions + data.totalAdvances).toLocaleString('cs-CZ')} Kč</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -382,7 +467,7 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
                 <div className="rounded-xl bg-slate-900 text-white p-4.5 flex flex-col justify-between shadow-sm md:col-span-4">
                   <div>
                     <div className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">
-                      Celková částka k převodu
+                      {data.scope === 'WORK_ONLY' ? 'Celková částka k fakturaci' : 'Celková částka k převodu'}
                     </div>
                     <div className="text-2xl lg:text-3xl font-black font-mono mt-1 text-emerald-400">
                       {data.grossAmount.toLocaleString('cs-CZ')} Kč
