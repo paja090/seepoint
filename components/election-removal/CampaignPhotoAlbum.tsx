@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Camera,
@@ -14,7 +14,14 @@ import {
   Check,
   ExternalLink,
   Clock,
+  Upload,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  Image as ImageIcon,
 } from 'lucide-react';
+import { compressImageFile } from '@/lib/image-compress';
 
 export interface InternalPhotoItem {
   id: string;
@@ -50,6 +57,7 @@ export interface CampaignPhotoAlbumProps {
   publicShareUrl?: string;
   downloadZipUrl?: string;
   createdAt?: string | Date;
+  onPhotosUpdated?: (campaignId: string, updatedPoints: InternalPointWithPhotos[]) => void;
 }
 
 const MONTH_NAMES_CS: Record<string, string> = {
@@ -86,19 +94,40 @@ function formatCzechDate(dateVal?: string | Date | null): string {
 }
 
 export function CampaignPhotoAlbum({
-  campaignId: _campaignId,
+  campaignId,
   albumSlug,
-  campaignName: _campaignName,
   clientName,
   points,
   publicShareUrl,
   downloadZipUrl,
   createdAt,
+  onPhotosUpdated,
 }: CampaignPhotoAlbumProps) {
+  const [pointsState, setPointsState] = useState<InternalPointWithPhotos[]>(points);
+  useEffect(() => {
+    setPointsState(points);
+  }, [points]);
+
+  // Upload modal state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [uploadTargetPointId, setUploadTargetPointId] = useState<string>('');
+  const [uploadCustomName, setUploadCustomName] = useState('');
+  const [uploadType, setUploadType] = useState<'CONTROL' | 'INSTALLATION' | 'DEINSTALLATION' | 'DAMAGE'>('CONTROL');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Rename & Delete state
+  const [isDeletingPhotoId, setIsDeletingPhotoId] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
   // Extract all available periods across all photos
   const availablePeriods = useMemo(() => {
     const set = new Set<string>();
-    for (const p of points) {
+    for (const p of pointsState) {
       for (const ph of p.photos) {
         const d = new Date(ph.createdAt);
         if (!Number.isNaN(d.getTime())) {
@@ -109,12 +138,12 @@ export function CampaignPhotoAlbum({
       }
     }
     return Array.from(set).sort().reverse();
-  }, [points]);
+  }, [pointsState]);
 
   // Extract distinct clients across points
   const availableClients = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const p of points) {
+    for (const p of pointsState) {
       const resolved = (p.clientName || p.layerName || clientName || '').trim();
       if (!resolved) continue;
       counts.set(resolved, (counts.get(resolved) || 0) + p.photos.length);
@@ -122,7 +151,7 @@ export function CampaignPhotoAlbum({
     return Array.from(counts.entries())
       .map(([name, photoCount]) => ({ name, photoCount }))
       .sort((a, b) => b.photoCount - a.photoCount || a.name.localeCompare(b.name, 'cs'));
-  }, [points, clientName]);
+  }, [pointsState, clientName]);
 
   const [selectedPeriod, setSelectedPeriod] = useState<string>('ALL');
   const [selectedClient, setSelectedClient] = useState<string>('ALL');
@@ -135,7 +164,7 @@ export function CampaignPhotoAlbum({
   const flatPhotosWithPoint = useMemo(() => {
     const list: Array<{ photo: InternalPhotoItem; point: InternalPointWithPhotos; pointClient: string | null }> = [];
 
-    for (const point of points) {
+    for (const point of pointsState) {
       const pointClient = (point.clientName || point.layerName || clientName || '').trim() || null;
 
       if (selectedClient !== 'ALL' && pointClient !== selectedClient) {
@@ -173,7 +202,7 @@ export function CampaignPhotoAlbum({
 
     list.sort((a, b) => new Date(b.photo.createdAt).getTime() - new Date(a.photo.createdAt).getTime());
     return list;
-  }, [points, clientName, selectedClient, selectedPeriod, typeFilter, searchQuery]);
+  }, [pointsState, clientName, selectedClient, selectedPeriod, typeFilter, searchQuery]);
 
   const slug = albumSlug;
 
@@ -210,6 +239,13 @@ export function CampaignPhotoAlbum({
     ? flatPhotosWithPoint[lightboxIndex]
     : null;
 
+  useEffect(() => {
+    setIsEditingName(false);
+    if (activeLightboxItem) {
+      setNameInput(activeLightboxItem.photo.fileName || '');
+    }
+  }, [lightboxIndex, activeLightboxItem]);
+
   const handlePrev = () => {
     if (lightboxIndex !== null && lightboxIndex > 0) {
       setLightboxIndex(lightboxIndex - 1);
@@ -226,9 +262,174 @@ export function CampaignPhotoAlbum({
     }
   };
 
-  const totalPhotosCount = points.reduce((sum, p) => sum + p.photos.length, 0);
+  const totalPhotosCount = pointsState.reduce((sum, p) => sum + p.photos.length, 0);
 
   const resolvedDownloadZipUrl = downloadZipUrl || `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip${querySuffix}`;
+
+  // File selection for upload modal
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadFile(file);
+    setUploadError(null);
+    const preview = URL.createObjectURL(file);
+    setUploadPreviewUrl(preview);
+    if (!uploadCustomName.trim()) {
+      setUploadCustomName(file.name.replace(/\.[^/.]+$/, ''));
+    }
+    if (!uploadTargetPointId && pointsState.length > 0) {
+      setUploadTargetPointId(pointsState[0].id);
+    }
+  };
+
+  // Submit new photo upload
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadFile) return;
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const compressed = await compressImageFile(uploadFile, 1920, 0.85);
+      const form = new FormData();
+      form.set('file', compressed);
+      form.set('albumId', campaignId);
+      const targetPoint = uploadTargetPointId || pointsState[0]?.id;
+      if (targetPoint) {
+        form.set('pointId', targetPoint);
+      }
+      if (uploadCustomName.trim()) {
+        form.set('fileName', uploadCustomName.trim());
+      }
+      form.set('type', uploadType);
+
+      const res = await fetch('/api/fotodokumentace/photos', {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Nahrání fotografie se nezdařilo.');
+      }
+
+      const newPhoto: InternalPhotoItem = {
+        id: data.photo.id,
+        url: data.photo.url,
+        type: data.photo.type,
+        fileName: data.photo.fileName,
+        createdAt: data.photo.createdAt,
+        capturedByWorkerName: data.photo.capturedByWorkerName,
+      };
+
+      const updatedPoints = pointsState.map((pt) => {
+        if (pt.id === targetPoint) {
+          return {
+            ...pt,
+            photos: [newPhoto, ...pt.photos],
+          };
+        }
+        return pt;
+      });
+
+      setPointsState(updatedPoints);
+      onPhotosUpdated?.(campaignId, updatedPoints);
+      setShowUploadModal(false);
+      setUploadFile(null);
+      setUploadPreviewUrl(null);
+      setUploadCustomName('');
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Chyba při nahrávání fotografie.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Save renamed photo
+  const savePhotoName = async (photoId: string, newName: string) => {
+    setIsSavingName(true);
+    try {
+      const res = await fetch(`/api/photos/${encodeURIComponent(photoId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: newName }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Přejmenování se nezdařilo.');
+        return false;
+      }
+
+      const updatedPoints = pointsState.map((pt) => ({
+        ...pt,
+        photos: pt.photos.map((ph) =>
+          ph.id === photoId ? { ...ph, fileName: newName } : ph
+        ),
+      }));
+
+      setPointsState(updatedPoints);
+      onPhotosUpdated?.(campaignId, updatedPoints);
+      return true;
+    } catch {
+      alert('Chyba při přejmenování fotografie.');
+      return false;
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  // Quick rename prompt from card
+  const handleQuickRename = async (photo: InternalPhotoItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = photo.fileName || '';
+    const newName = window.prompt('Zadejte nový název fotografie:', current);
+    if (!newName || newName.trim() === '' || newName.trim() === current) return;
+    await savePhotoName(photo.id, newName.trim());
+  };
+
+  // Save rename from lightbox inline input
+  const handleSaveRenameInLightbox = async () => {
+    if (!activeLightboxItem || !nameInput.trim()) return;
+    const ok = await savePhotoName(activeLightboxItem.photo.id, nameInput.trim());
+    if (ok) setIsEditingName(false);
+  };
+
+  // Delete photo
+  const handleDeletePhoto = async (photoId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Opravdu chcete tuto fotografii smazat z alba i disku?')) return;
+    setIsDeletingPhotoId(photoId);
+
+    try {
+      const res = await fetch(`/api/photos/${encodeURIComponent(photoId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Smazání fotografie se nezdařilo.');
+        return;
+      }
+
+      const updatedPoints = pointsState.map((pt) => ({
+        ...pt,
+        photos: pt.photos.filter((ph) => ph.id !== photoId),
+      }));
+
+      setPointsState(updatedPoints);
+      onPhotosUpdated?.(campaignId, updatedPoints);
+
+      if (lightboxIndex !== null) {
+        if (flatPhotosWithPoint.length <= 1) {
+          setLightboxIndex(null);
+        } else if (lightboxIndex >= flatPhotosWithPoint.length - 1) {
+          setLightboxIndex(Math.max(0, flatPhotosWithPoint.length - 2));
+        }
+      }
+    } catch {
+      alert('Chyba při mazání fotografie.');
+    } finally {
+      setIsDeletingPhotoId(null);
+    }
+  };
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-6 shadow-sm">
@@ -257,61 +458,93 @@ export function CampaignPhotoAlbum({
           </p>
         </div>
 
-        {totalPhotosCount > 0 && (
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition border shadow-sm ${
-                copiedLink
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-              title="Zkopíruje odkaz na klientské fotoalbum do schránky"
-            >
-              {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
-              <span>
-                {copiedLink
-                  ? 'Odkaz zkopírován!'
-                  : selectedClient !== 'ALL'
-                    ? `Odkaz pro: ${selectedClient}`
-                    : 'Kopírovat odkaz pro klienta'}
-              </span>
-            </button>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setShowUploadModal(true);
+              setUploadError(null);
+              if (!uploadTargetPointId && pointsState.length > 0) {
+                setUploadTargetPointId(pointsState[0].id);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition text-xs font-bold shadow-sm"
+            title="Nahrát fotografii z telefonu nebo počítače"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nahrát fotografii</span>
+          </button>
 
-            <Link
-              href={clientShareUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition text-xs font-semibold"
-              title="Otevřít veřejné fotoalbum pro klienta v novém okně"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Náhled pro klienta</span>
-            </Link>
+          {totalPhotosCount > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition border shadow-sm ${
+                  copiedLink
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+                title="Zkopíruje odkaz na klientské fotoalbum do schránky"
+              >
+                {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
+                <span>
+                  {copiedLink
+                    ? 'Odkaz zkopírován!'
+                    : selectedClient !== 'ALL'
+                      ? `Odkaz pro: ${selectedClient}`
+                      : 'Kopírovat odkaz pro klienta'}
+                </span>
+              </button>
 
-            <a
-              href={resolvedDownloadZipUrl}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition text-xs font-semibold"
-            >
-              <Download className="w-4 h-4" />
-              <span>
-                {selectedClient !== 'ALL' ? `Stáhnout ZIP (${selectedClient})` : 'Stáhnout ZIP'}
-              </span>
-            </a>
-          </div>
-        )}
+              <Link
+                href={clientShareUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition text-xs font-semibold"
+                title="Otevřít veřejné fotoalbum pro klienta v novém okně"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Náhled pro klienta</span>
+              </Link>
+
+              <a
+                href={resolvedDownloadZipUrl}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition text-xs font-semibold"
+              >
+                <Download className="w-4 h-4" />
+                <span>
+                  {selectedClient !== 'ALL' ? `Stáhnout ZIP (${selectedClient})` : 'Stáhnout ZIP'}
+                </span>
+              </a>
+            </>
+          )}
+        </div>
       </div>
 
       {totalPhotosCount === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center space-y-2">
+        <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center space-y-3">
           <Camera className="w-8 h-8 text-slate-300 mx-auto" />
           <p className="text-sm font-semibold text-slate-700">
             Zatím nebyly nahrány žádné fotografie z terénu
           </p>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Jakmile pracovníci v Moje trasa potvrdí dokončení montáže nebo demontáže pořízením fotografie, snímky se automaticky roztřídí sem do alba podle měsíců a typů prací.
+            Fotografie můžete nahrát přímo z vašeho telefonu nebo počítače, nebo se nahrají automaticky z mobilní aplikace techniků.
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              setShowUploadModal(true);
+              setUploadError(null);
+              if (!uploadTargetPointId && pointsState.length > 0) {
+                setUploadTargetPointId(pointsState[0].id);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition text-xs font-bold shadow-sm mx-auto"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Nahrát první fotografii</span>
+          </button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -324,7 +557,7 @@ export function CampaignPhotoAlbum({
               </span>
               <div className="flex flex-wrap gap-2">
                 {availablePeriods.map((period) => {
-                  const countInPeriod = points.reduce(
+                  const countInPeriod = pointsState.reduce(
                     (sum, p) =>
                       sum +
                       p.photos.filter((ph) => {
@@ -453,13 +686,13 @@ export function CampaignPhotoAlbum({
                 <div
                   key={photo.id}
                   onClick={() => setLightboxIndex(index)}
-                  className="group rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer flex flex-col"
+                  className="group rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer flex flex-col relative"
                 >
                   <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/api/photos/${encodeURIComponent(photo.id)}/thumbnail`}
-                      alt={point.label}
+                      alt={photo.fileName || point.label}
                       loading="lazy"
                       decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
@@ -478,6 +711,31 @@ export function CampaignPhotoAlbum({
                     >
                       {isInstall ? 'Instalace' : isDeinstall ? 'Deinstalace' : photo.type === 'DAMAGE' ? 'Závada' : 'Kontrola'}
                     </span>
+
+                    {/* Quick action overlay buttons on photo card */}
+                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition z-10">
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickRename(photo, e)}
+                        className="p-1.5 rounded-full bg-black/60 text-white hover:bg-sky-600 transition shadow-sm"
+                        title="Přejmenovat fotografii"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeletePhoto(photo.id, e)}
+                        disabled={isDeletingPhotoId === photo.id}
+                        className="p-1.5 rounded-full bg-black/60 text-white hover:bg-rose-600 transition shadow-sm"
+                        title="Smazat fotografii"
+                      >
+                        {isDeletingPhotoId === photo.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-300" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="p-2.5 flex-1 flex flex-col justify-between space-y-1">
@@ -486,12 +744,13 @@ export function CampaignPhotoAlbum({
                         {pointClient}
                       </span>
                     )}
-                    <p className="text-xs font-bold text-slate-900 truncate" title={point.label}>
-                      {point.label}
+                    <p className="text-xs font-bold text-slate-900 truncate" title={photo.fileName || point.label}>
+                      {photo.fileName || point.label}
                     </p>
-                    <p className="text-[10px] text-slate-400">
-                      {formatCzechDate(photo.createdAt)}
-                    </p>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span className="truncate max-w-[100px]" title={point.label}>{point.label}</span>
+                      <span>{formatCzechDate(photo.createdAt)}</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -510,17 +769,79 @@ export function CampaignPhotoAlbum({
             if (e.target === e.currentTarget) setLightboxIndex(null);
           }}
         >
-          <div className="flex items-center justify-between text-white border-b border-white/10 pb-3">
+          <div className="flex items-center justify-between text-white border-b border-white/10 pb-3 gap-2">
             <div>
               <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">
                 Fotografie {lightboxIndex! + 1} z {flatPhotosWithPoint.length}
               </p>
               <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-lg">
-                {activeLightboxItem.point.label}
+                {activeLightboxItem.photo.fileName || activeLightboxItem.point.label}
               </h3>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {isEditingName ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    className="px-2.5 py-1 text-xs rounded-lg bg-white/20 text-white border border-white/30 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                    placeholder="Název fotografie…"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveRenameInLightbox();
+                      if (e.key === 'Escape') setIsEditingName(false);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveRenameInLightbox}
+                    disabled={isSavingName}
+                    className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition text-xs font-bold"
+                    title="Uložit název"
+                  >
+                    {isSavingName ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingName(false)}
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-xs"
+                    title="Zrušit"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingName(true);
+                    setNameInput(activeLightboxItem.photo.fileName || activeLightboxItem.point.label);
+                  }}
+                  className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1.5"
+                  title="Přejmenovat fotografii"
+                >
+                  <Pencil className="w-4 h-4" />
+                  <span className="hidden sm:inline">Přejmenovat</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleDeletePhoto(activeLightboxItem.photo.id)}
+                disabled={isDeletingPhotoId === activeLightboxItem.photo.id}
+                className="p-2 rounded-lg bg-rose-500/30 hover:bg-rose-600 text-rose-200 hover:text-white transition text-xs font-semibold flex items-center gap-1.5"
+                title="Smazat fotografii z alba i disku"
+              >
+                {isDeletingPhotoId === activeLightboxItem.photo.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">Smazat</span>
+              </button>
+
               <a
                 href={`/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/file`}
                 target="_blank"
@@ -555,7 +876,7 @@ export function CampaignPhotoAlbum({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/file`}
-              alt={activeLightboxItem.point.label}
+              alt={activeLightboxItem.photo.fileName || activeLightboxItem.point.label}
               style={{
                 backgroundImage: `url(/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/thumbnail)`,
                 backgroundSize: 'contain',
@@ -592,6 +913,201 @@ export function CampaignPhotoAlbum({
                 GPS: {activeLightboxItem.point.latitude.toFixed(5)}, {activeLightboxItem.point.longitude.toFixed(5)}
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Upload Modal (Upload z telefonu nebo počítače) */}
+      {showUploadModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isUploading) {
+              setShowUploadModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-700">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">Nahrát fotografii do alba</h3>
+                  <p className="text-xs text-slate-500">Z mobilního telefonu nebo počítače</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isUploading}
+                onClick={() => setShowUploadModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {uploadError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {uploadError}
+              </div>
+            )}
+
+            <form onSubmit={handleUploadSubmit} className="space-y-4">
+              {/* File Picker or Camera */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Vyberte fotografii
+                </label>
+                {uploadPreviewUrl ? (
+                  <div className="relative rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center aspect-[16/9] max-h-48">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={uploadPreviewUrl}
+                      alt="Náhled"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => {
+                        setUploadFile(null);
+                        setUploadPreviewUrl(null);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-rose-600 transition"
+                      title="Zvolit jiný soubor"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-black/60 text-white">
+                      {uploadFile?.name} ({(uploadFile!.size / (1024 * 1024)).toFixed(2)} MB)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 hover:border-sky-400 hover:bg-sky-50/50 rounded-xl cursor-pointer transition text-center group">
+                      <Camera className="w-6 h-6 text-slate-400 group-hover:text-sky-600 mb-1" />
+                      <span className="text-xs font-bold text-slate-700 group-hover:text-sky-700">Vyfotit fotoaparátem</span>
+                      <span className="text-[10px] text-slate-400">Přímé vyfocení z mobilu</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                    </label>
+
+                    <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50 rounded-xl cursor-pointer transition text-center group">
+                      <ImageIcon className="w-6 h-6 text-slate-400 group-hover:text-emerald-600 mb-1" />
+                      <span className="text-xs font-bold text-slate-700 group-hover:text-emerald-700">Vybrat soubor / galerii</span>
+                      <span className="text-[10px] text-slate-400">Z počítače nebo knihovny fotek</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Target Point Selector */}
+              {pointsState.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Přiřadit k bodu / nosiči
+                  </label>
+                  <select
+                    value={uploadTargetPointId}
+                    onChange={(e) => setUploadTargetPointId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {pointsState.map((pt) => (
+                      <option key={pt.id} value={pt.id}>
+                        {pt.label} {pt.clientName ? `[${pt.clientName}]` : ''} {pt.description ? `— ${pt.description}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Custom File Name */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Název fotografie (volitelné)
+                </label>
+                <input
+                  type="text"
+                  placeholder="např. Celkový pohled, Detail instalace…"
+                  value={uploadCustomName}
+                  onChange={(e) => setUploadCustomName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Operation Type */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Typ záznamu
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      ['CONTROL', '🔍 Kontrola'],
+                      ['INSTALLATION', '🛠️ Instalace'],
+                      ['DEINSTALLATION', '🗑️ Deinstalace'],
+                    ] as const
+                  ).map(([val, label]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setUploadType(val)}
+                      className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition ${
+                        uploadType === val
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isUploading}
+                  onClick={() => setShowUploadModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="submit"
+                  disabled={!uploadFile || isUploading}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Nahrávám a ukládám na Disk…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span>Nahrát fotografii</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -366,6 +366,40 @@ export function UnifiedPhotoDocumentationView({
     }
   };
 
+  const handlePhotosUpdated = (campaignId: string, updatedPoints: InternalPointWithPhotos[]) => {
+    setAlbumItems((prev) =>
+      prev.map((album) => {
+        if (album.id !== campaignId) return album;
+
+        const allPhotos = updatedPoints.flatMap((pt) => pt.photos || []);
+        const photosCount = allPhotos.length;
+
+        let latestPhotoAt = album.latestPhotoAt;
+        if (allPhotos.length > 0) {
+          const sortedDates = allPhotos
+            .map((p) => new Date(p.createdAt).getTime())
+            .filter((t) => !isNaN(t))
+            .sort((a, b) => b - a);
+          if (sortedDates.length > 0) {
+            latestPhotoAt = new Date(sortedDates[0]).toISOString();
+          }
+        } else {
+          latestPhotoAt = null;
+        }
+
+        const coverPhotoUrl = allPhotos[0]?.url || null;
+
+        return {
+          ...album,
+          points: updatedPoints,
+          photosCount,
+          latestPhotoAt,
+          coverPhotoUrl,
+        };
+      })
+    );
+  };
+
   const formatDate = (date: string | Date) => {
     const d = new Date(date);
     return d.toLocaleString('cs-CZ', {
@@ -899,6 +933,7 @@ export function UnifiedPhotoDocumentationView({
                 publicShareUrl={activeAlbum.publicShareUrl}
                 downloadZipUrl={activeAlbum.downloadZipUrl}
                 createdAt={activeAlbum.createdAt}
+                onPhotosUpdated={handlePhotosUpdated}
               />
             </div>
           ) : (

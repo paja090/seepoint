@@ -32,11 +32,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const canMutate = auth.role === 'ADMIN' || auth.role === 'MANAGER' || photo.capturedByWorkerUserId === auth.id;
     if (!photo.employeeId && !canMutate) return NextResponse.json({ error: 'Tuto fotografii nemáte oprávnění měnit.' }, { status: 403 });
 
-    const { isPrimary, isClientVisible, sortOrder, note } = body;
+    const { isPrimary, isClientVisible, sortOrder, note, fileName } = body;
 
     const dataToUpdate: Prisma.PhotoUpdateInput = {};
     if (note !== undefined) dataToUpdate.note = note ? String(note).trim().slice(0, 1000) : null;
     if (isClientVisible !== undefined) dataToUpdate.isClientVisible = !!isClientVisible;
+    if (fileName !== undefined) {
+      const cleanName = String(fileName).trim().slice(0, 255);
+      if (cleanName) {
+        dataToUpdate.fileName = cleanName;
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       // 1. Handle primary flag changes
@@ -125,7 +131,9 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     });
     if (!photo) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
 
-    if (photo.workOrderItemId) return NextResponse.json({ error: 'Fotografie je dokladem realizace pracovní položky a její historii nelze smazat.' }, { status: 409 });
+    if (photo.workOrderItemId && auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Fotografie je dokladem realizace pracovní položky a její historii může odstranit pouze administrátor.' }, { status: 409 });
+    }
 
     // Authorization checks
     if (photo.employeeId && auth.role !== 'ADMIN') {
@@ -135,6 +143,14 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     if (!photo.employeeId && !canMutate) return NextResponse.json({ error: 'Tuto fotografii nemáte oprávnění odstranit.' }, { status: 403 });
 
     await prisma.$transaction(async (tx) => {
+      // Unlink workOrderItemId if admin is deleting
+      if (photo.workOrderItemId) {
+        await tx.photo.update({
+          where: { id: photo.id },
+          data: { workOrderItemId: null },
+        });
+      }
+
       // Re-elect primary photo if the deleted one was primary
       if (photo.isPrimary) {
         const nextPrimary = await tx.photo.findFirst({
