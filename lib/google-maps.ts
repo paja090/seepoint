@@ -156,9 +156,55 @@ function toGoogleRoutesTravelMode(mode?: string): 'DRIVE' | 'BICYCLE' | 'WALK' |
   }
 }
 
+async function fetchOsrmRoute(
+  origin: { latitude: number; longitude: number },
+  destination: { latitude: number; longitude: number },
+  travelMode: string = 'DRIVING'
+): Promise<RouteComputeResult | null> {
+  try {
+    const mode = travelMode.toUpperCase();
+    const profile =
+      mode === 'WALK' || mode === 'WALKING'
+        ? 'foot'
+        : mode === 'BICYCLE' || mode === 'BICYCLING'
+        ? 'bike'
+        : 'driving';
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=polyline`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'SeePOINT-internal/1.0' },
+      signal: AbortSignal.timeout(5000),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      code?: string;
+      routes?: Array<{
+        distance?: number;
+        duration?: number;
+        geometry?: string;
+      }>;
+    };
+    if (data.code === 'Ok' && data.routes?.[0]) {
+      const first = data.routes[0];
+      const rawDistance = first.distance || 0;
+      const distanceMeters = rawDistance > 0 ? Math.max(50, Math.round(rawDistance / 50) * 50) : 0;
+      const durationSeconds = Math.round(first.duration || 0);
+      return {
+        distanceMeters,
+        durationSeconds,
+        polyline: first.geometry || '',
+        status: 'OK',
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /**
  * Computes route driving distance and polyline using Google Routes API (New).
- * Only called on point creation, drag end, or explicit recalculation request.
+ * Falls back to OpenStreetMap OSRM if Google Maps API key is missing or encounters errors.
  */
 export async function computeGoogleRoute(
   origin: { latitude: number; longitude: number },
@@ -169,12 +215,15 @@ export async function computeGoogleRoute(
   const apiKey = getGoogleMapsServerApiKey();
 
   if (!apiKey) {
+    const osrm = await fetchOsrmRoute(origin, destination, travelMode);
+    if (osrm) return osrm;
+
     return {
       distanceMeters: 0,
       durationSeconds: 0,
       polyline: '',
       status: 'FAILED',
-      error: 'Google Maps API key is missing in environment variables.',
+      error: 'Google Maps API key is missing and OSRM fallback failed.',
     };
   }
 
@@ -261,6 +310,9 @@ export async function computeGoogleRoute(
         /* Fall through to report primary Routes API error */
       }
 
+      const osrmFallback = await fetchOsrmRoute(origin, destination, travelMode);
+      if (osrmFallback) return osrmFallback;
+
       return {
         distanceMeters: 0,
         durationSeconds: 0,
@@ -274,6 +326,9 @@ export async function computeGoogleRoute(
     const route = data.routes?.[0];
 
     if (!route) {
+      const osrmFallback = await fetchOsrmRoute(origin, destination, travelMode);
+      if (osrmFallback) return osrmFallback;
+
       return {
         distanceMeters: 0,
         durationSeconds: 0,
@@ -294,6 +349,9 @@ export async function computeGoogleRoute(
       status: 'OK',
     };
   } catch (err: unknown) {
+    const osrmFallback = await fetchOsrmRoute(origin, destination, travelMode);
+    if (osrmFallback) return osrmFallback;
+
     const msg = err instanceof Error ? err.message : 'Unknown Routes API error';
     return {
       distanceMeters: 0,
