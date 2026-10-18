@@ -27,7 +27,8 @@ export async function approveFieldDraft(campaignId: string, suppliedInput: Plann
   return plannerTransaction(async tx => {
     // Legacy clients identify the server proposal by its exact input hash. No client result is persisted.
     const row = draftId ? await tx.fieldPlan.findFirst({ where: { id: draftId, organizationId } })
-      : await tx.fieldPlan.findUnique({ where: { organizationId_requestKey: { organizationId, requestKey: 'field-' + hash({ input: suppliedInput }) } } });
+      : (await tx.fieldPlan.findUnique({ where: { organizationId_requestKey: { organizationId, requestKey: 'field-' + hash({ input: suppliedInput }) } } }))
+      ?? (await tx.fieldPlan.findFirst({ where: { organizationId, electionCampaignId: campaignId, status: 'DRAFT', date: suppliedInput.date }, orderBy: { createdAt: 'desc' } }));
     if (!row || row.electionCampaignId !== campaignId) throw new Error('Návrh nebyl vytvořen serverem. Přepočítejte jej.');
     if (['APPROVED', 'ACTIVE', 'COMPLETED'].includes(row.status)) return row;
     if (row.status !== 'DRAFT') throw new Error('Návrh již není platný.');
@@ -38,7 +39,7 @@ export async function approveFieldDraft(campaignId: string, suppliedInput: Plann
     const campaign = await tx.electionCampaign.findFirst({ where: { id: campaignId, organizationId } });
     if (!campaign) throw new Error('Akce nebyla nalezena.');
     const parent = row.parentPlanId ? await tx.fieldPlan.findFirst({ where: { id: row.parentPlanId, organizationId, electionCampaignId: campaignId } }) : null;
-    if (row.parentPlanId && (!parent || parent.date !== row.date || !['APPROVED', 'ACTIVE'].includes(parent.status))) throw new Error('Nahrazovaný výjezd není dostupný.');
+    if (row.parentPlanId && (!parent || !['APPROVED', 'ACTIVE', 'DRAFT'].includes(parent.status))) throw new Error('Nahrazovaný výjezd není dostupný.');
     if (parent && await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: parent.id, OR: [{ startedAt: { not: null } }, { completedQuantity: { gt: 0 } }] } })) throw new Error('Zahájený výjezd nelze nahradit bez explicitního předání.');
     const points = await tx.electionRemovalPoint.findMany({ where: { organizationId, campaignId, id: { in: input.jobs.flatMap(j => j.electionRemovalPointId ? [j.electionRemovalPointId] : []) } }, include: { steps: { orderBy: { sequence: 'asc' } } } });
     if (points.length !== input.jobs.length || input.jobs.some(j => {

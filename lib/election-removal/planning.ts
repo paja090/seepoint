@@ -100,7 +100,7 @@ export async function loadElectionPlanningResources(
     requireTenantContext().organizationId;
 
   return runWithTenantContext({ organizationId, userId: getTenantContext()?.userId, source: 'session' }, async () => {
-    const [campaign, employees, vehicles, profile] = await Promise.all([
+    const [campaign, employees, vehicles, profile, fieldPlans] = await Promise.all([
       prisma.electionCampaign.findFirst({
         where: { id: campaignId, organizationId },
         include: {
@@ -125,6 +125,15 @@ export async function loadElectionPlanningResources(
         orderBy: { name: 'asc' },
       }),
       loadProfile(),
+      prisma.fieldPlan.findMany({
+        where: {
+          organizationId,
+          electionCampaignId: campaignId,
+          status: { in: ['APPROVED', 'ACTIVE', 'DRAFT'] },
+        },
+        orderBy: { date: 'desc' },
+        select: { id: true, date: true, status: true, version: true },
+      }),
     ]);
 
     if (!campaign) {
@@ -150,6 +159,7 @@ export async function loadElectionPlanningResources(
 
     return {
       campaign,
+      fieldPlans,
       points: campaign.points,
       employees: employees.map((e) => {
         let busyReason: string | undefined;
@@ -306,10 +316,43 @@ export async function optimizeElectionRemovalRoutes(
     const startTimestamp = zonedTime(payload.date, planStartTime, profile.timezone);
     const planNow = new Date(startTimestamp).toISOString();
 
-    const availability = await fieldAvailability(prisma, organizationId, payload.date, payload.parentPlanId, profile.timezone);
+    // If parentPlanId is not explicitly specified, but selected points belong to an uncompleted plan of this campaign,
+    // auto-adopt it as parentPlanId so the dispatcher can easily replan or reschedule it to a new date
+    let effectiveParentPlanId = payload.parentPlanId;
+    if (!effectiveParentPlanId) {
+      const assignedPlanIds = Array.from(
+        new Set(selectedPoints.map((p) => p.assignedFieldPlanId).filter(Boolean))
+      ) as string[];
+
+      if (assignedPlanIds.length === 1) {
+        const candidatePlanId = assignedPlanIds[0];
+        const existingPlan = await prisma.fieldPlan.findFirst({
+          where: {
+            id: candidatePlanId,
+            organizationId,
+            electionCampaignId: campaignId,
+            status: { in: ['APPROVED', 'ACTIVE', 'DRAFT'] },
+          },
+        });
+        if (existingPlan) {
+          const startedCount = await prisma.fieldWorkStep.count({
+            where: {
+              organizationId,
+              assignedFieldPlanId: candidatePlanId,
+              OR: [{ startedAt: { not: null } }, { completedQuantity: { gt: 0 } }],
+            },
+          });
+          if (startedCount === 0) {
+            effectiveParentPlanId = candidatePlanId;
+          }
+        }
+      }
+    }
+
+    const availability = await fieldAvailability(prisma, organizationId, payload.date, effectiveParentPlanId, profile.timezone);
     const planningJobs: PlanningJob[] = selectedPoints.map(pt => {
       const job = convertElectionPointToJob(pt, campaign);
-      if (pt.assignedFieldPlanId && pt.assignedFieldPlanId !== payload.parentPlanId) job.blockedReason = 'Práce již patří jinému výjezdu.';
+      if (pt.assignedFieldPlanId && pt.assignedFieldPlanId !== effectiveParentPlanId) job.blockedReason = 'Práce již patří jinému výjezdu.';
       return job;
     });
     const planningInput: PlanningInput = {
@@ -326,7 +369,7 @@ export async function optimizeElectionRemovalRoutes(
     const travel = googleTravelProvider(profile);
     const result = await planFieldWork(planningInput, travel);
 
-    const draft = await persistFieldDraft(campaignId, planningInput, result, payload.parentPlanId);
+    const draft = await persistFieldDraft(campaignId, planningInput, result, effectiveParentPlanId);
     return { input: planningInput, result, draftPlanId: draft.id };
   });
 }
@@ -339,8 +382,9 @@ export async function approveAndSaveElectionPlan(
   planningInput: PlanningInput,
   planningResult: PlanningResult,
   actor: { id: string; email: string; role: string },
-  explicitOrganizationId?: string
+  explicitOrganizationId?: string,
+  draftId?: string
 ) {
   if (explicitOrganizationId && explicitOrganizationId !== requireTenantContext().organizationId) throw new Error('Cross-tenant reference rejected.');
-  return approveFieldDraft(campaignId, planningInput, actor);
+  return approveFieldDraft(campaignId, planningInput, actor, draftId);
 }

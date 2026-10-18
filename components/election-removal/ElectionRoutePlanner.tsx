@@ -58,6 +58,7 @@ interface ElectionRoutePlannerProps {
   initialDepot?: { latitude: number; longitude: number };
   initialSelectedPointIds?: string[];
   parentPlanId?: string;
+  fieldPlans?: Array<{ id: string; date: string; status: string; version: number }>;
 }
 
 function getCampaignDefaultOperation(campaign: ElectionCampaign): string {
@@ -108,6 +109,7 @@ export function ElectionRoutePlanner({
   initialDepot,
   initialSelectedPointIds,
   parentPlanId,
+  fieldPlans,
 }: ElectionRoutePlannerProps) {
   const router = useRouter();
   const [draftPlanId, setDraftPlanId] = useState<string>();
@@ -150,6 +152,19 @@ export function ElectionRoutePlanner({
   const pendingPoints = campaign.points.filter((p) =>
     ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ISSUE'].includes(p.status)
   );
+
+  const detectedParentPlan = useMemo(() => {
+    if (parentPlanId) {
+      return fieldPlans?.find((p) => p.id === parentPlanId);
+    }
+    const assignedPlanIds = Array.from(
+      new Set(pendingPoints.map((p) => p.assignedFieldPlanId).filter(Boolean))
+    );
+    if (assignedPlanIds.length === 1) {
+      return fieldPlans?.find((p) => p.id === assignedPlanIds[0]);
+    }
+    return undefined;
+  }, [parentPlanId, fieldPlans, pendingPoints]);
 
   const campaignDefaultOp = useMemo(() => getCampaignDefaultOperation(campaign), [campaign]);
 
@@ -379,7 +394,8 @@ export function ElectionRoutePlanner({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date,
-          parentPlanId, routeMode,
+          parentPlanId: parentPlanId || detectedParentPlan?.id,
+          routeMode,
           startTime,
           endTime,
           flexibleHours,
@@ -527,6 +543,28 @@ export function ElectionRoutePlanner({
         {batchSettingError && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 font-medium">
             {batchSettingError}
+          </div>
+        )}
+
+        {/* Rescheduling Banner if replanning an unexecuted plan or superseding an existing plan */}
+        {detectedParentPlan && (
+          <div className="rounded-xl border border-sky-300 bg-sky-50/90 p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                <span className="text-xs font-bold text-sky-950">
+                  Přeplánování výjezdu (původní termín: {new Date(detectedParentPlan.date).toLocaleDateString('cs-CZ')})
+                </span>
+              </div>
+              <p className="text-[11px] text-sky-700">
+                Body z předchozího neuskutečněného výjezdu budou uvolněny a přeřazeny do nového data. Po schválení tento plán nahradí původní verzi v{detectedParentPlan.version}.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-lg text-xs font-semibold whitespace-nowrap">
+                Nahradí výjezd {detectedParentPlan.id.slice(-6)}
+              </span>
+            </div>
           </div>
         )}
 
@@ -1348,7 +1386,11 @@ export function ElectionRoutePlanner({
                 <button
                   type="button"
                   onClick={handleApprovePlan}
-                  disabled={isApproving || isPending}
+                  disabled={
+                    isApproving ||
+                    isPending ||
+                    planningResult.crews.reduce((acc, c) => acc + c.stops.length, 0) === 0
+                  }
                   className="btn btn-primary px-6 py-2.5 text-sm font-bold inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                 >
                   {isApproving ? (
@@ -1416,11 +1458,50 @@ export function ElectionRoutePlanner({
             </div>
 
             {planningResult.unassigned.length > 0 && (
-              <div className="bg-amber-950/50 border border-amber-800 text-amber-200 text-xs p-3 rounded-lg flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400" />
-                <span>
-                  {planningResult.unassigned.length} médií se nevešlo do pracovní doby zvolených posádek. Pro jejich zařazení přidejte další posádku nebo prodlužte čas.
-                </span>
+              <div className="bg-amber-950/60 border border-amber-800 text-amber-200 text-xs p-3.5 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-amber-300">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                  <span>
+                    {planningResult.unassigned.length}{' '}
+                    {planningResult.unassigned.length === 1
+                      ? 'médium nebylo zařazeno do trasy:'
+                      : planningResult.unassigned.length < 5
+                      ? 'média nebyla zařazena do trasy:'
+                      : 'médií nebylo zařazeno do trasy:'}
+                  </span>
+                </div>
+                <div className="space-y-1 pl-6">
+                  {Array.from(
+                    new Set(
+                      planningResult.unassigned.map((u) => {
+                        const parts = u.message.split(': ');
+                        return parts.length > 1 ? parts.slice(1).join(': ') : u.message;
+                      })
+                    )
+                  ).map((reason, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 text-amber-200/90">
+                      <span className="text-amber-400">•</span>
+                      <span>{reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {planningResult.conflicts && planningResult.conflicts.length > 0 && (
+              <div className="bg-rose-950/60 border border-rose-800 text-rose-200 text-xs p-3.5 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 font-semibold text-rose-300">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                  <span>Zjištěny konflikty v plánu ({planningResult.conflicts.length}):</span>
+                </div>
+                <div className="space-y-1 pl-6">
+                  {Array.from(new Set(planningResult.conflicts.map((c) => c.message))).map((msg, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 text-rose-200/90">
+                      <span className="text-rose-400">•</span>
+                      <span>{msg}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
