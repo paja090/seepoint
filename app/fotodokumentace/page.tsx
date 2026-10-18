@@ -27,7 +27,7 @@ export default async function PhotoDocumentationHubPage({
   if (!organizationId) notFound();
 
   // Load Field Work campaigns, Navigation Documentation reports, and Recent Photos in parallel
-  const [electionCampaigns, navigationReports, rawRecentPhotos] = await Promise.all([
+  const [electionCampaigns, navigationReports, carrierSurfaces, rawRecentPhotos] = await Promise.all([
     prisma.electionCampaign.findMany({
       where: { organizationId, status: { not: 'ARCHIVED' } },
       include: {
@@ -117,6 +117,53 @@ export default async function PhotoDocumentationHubPage({
       },
       orderBy: { createdAt: 'desc' },
     }),
+    prisma.advertisingSurface.findMany({
+      where: {
+        organizationId,
+        photos: {
+          some: {
+            organizationId,
+            isPrivate: false,
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        directionDescription: true,
+        currentClientId: true,
+        currentClient: { select: { id: true, name: true } },
+        carrier: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            address: true,
+            city: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+        photos: {
+          where: {
+            organizationId,
+            isPrivate: false,
+          },
+          select: {
+            id: true,
+            type: true,
+            fileName: true,
+            createdAt: true,
+            capturedLatitude: true,
+            capturedLongitude: true,
+            capturedByWorkerName: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    }),
     prisma.photo.findMany({
       where: {
         organizationId,
@@ -126,6 +173,7 @@ export default async function PhotoDocumentationHubPage({
           { navigationDocumentationItems: { some: {} } },
           { workOrderItemId: { not: null } },
           { carrierId: { not: null } },
+          { surfaceId: { not: null } },
         ],
       },
       select: {
@@ -150,6 +198,22 @@ export default async function PhotoDocumentationHubPage({
             id: true,
             code: true,
             name: true,
+          },
+        },
+        surfaceId: true,
+        surface: {
+          select: {
+            id: true,
+            name: true,
+            currentClientId: true,
+            currentClient: { select: { id: true, name: true } },
+            carrier: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -374,8 +438,81 @@ export default async function PhotoDocumentationHubPage({
     };
   });
 
+  // Transform Carrier Surfaces into Unified Albums (grouped by client or carrier network)
+  const carrierSurfaceAlbums: UnifiedAlbumItem[] = [];
+  const surfacesByClient = new Map<string, typeof carrierSurfaces>();
+
+  for (const s of carrierSurfaces) {
+    if (!s.photos || s.photos.length === 0) continue;
+    const clientKey = s.currentClient?.name?.trim() || 'Vlastní síť nosičů';
+    const list = surfacesByClient.get(clientKey) || [];
+    list.push(s);
+    surfacesByClient.set(clientKey, list);
+  }
+
+  for (const [clientKey, surfaceList] of surfacesByClient.entries()) {
+    const points: InternalPointWithPhotos[] = surfaceList.map((s) => ({
+      id: `surface-${s.id}`,
+      label: s.carrier ? `${s.carrier.code} · ${s.name}` : s.name,
+      description: [
+        s.carrier?.address ? s.carrier.address : null,
+        s.carrier?.city ? s.carrier.city : null,
+        s.directionDescription ? `Směr: ${s.directionDescription}` : null,
+      ].filter(Boolean).join(', ') || null,
+      clientName: clientKey === 'Vlastní síť nosičů' ? undefined : clientKey,
+      quantity: 1,
+      operationType: 'INSPECTION',
+      latitude: s.carrier?.latitude || s.photos[0]?.capturedLatitude || 0,
+      longitude: s.carrier?.longitude || s.photos[0]?.capturedLongitude || 0,
+      photos: s.photos.map((ph) => ({
+        id: ph.id,
+        url: `/api/photos/${encodeURIComponent(ph.id)}/file`,
+        type: ph.type,
+        fileName: ph.fileName,
+        createdAt: ph.createdAt,
+        capturedLatitude: ph.capturedLatitude,
+        capturedLongitude: ph.capturedLongitude,
+        capturedByWorkerName: ph.capturedByWorkerName,
+      })),
+    }));
+
+    const allPhotos = points.flatMap((p) => p.photos);
+    if (allPhotos.length === 0) continue;
+
+    const latestPhotoDate = new Date(allPhotos[0].createdAt);
+    const year = Number.isNaN(latestPhotoDate.getTime()) ? new Date().getFullYear() : latestPhotoDate.getFullYear();
+    const month = Number.isNaN(latestPhotoDate.getTime()) ? new Date().getMonth() + 1 : latestPhotoDate.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const periodLabel = `${quarter}. čtvrtletí ${year}`;
+    const coverPhotoUrl = `/api/photos/${encodeURIComponent(allPhotos[0].id)}/thumbnail`;
+    const safeClientSlug = clientKey.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'plochy';
+
+    carrierSurfaceAlbums.push({
+      id: `carrier-surfaces::${safeClientSlug}`,
+      source: 'FIELD_WORK',
+      sourceLabel: 'Kontrola ploch',
+      title: `${clientKey} – Kontrola ploch`,
+      displayTitle: clientKey,
+      displaySubtitle: 'Pravidelná kontrola a fotodokumentace reklamních ploch',
+      displayBadge: `Kontrola • ${periodLabel}`,
+      clientName: clientKey === 'Vlastní síť nosičů' ? null : clientKey,
+      createdAt: allPhotos[0].createdAt,
+      year,
+      month,
+      quarter,
+      periodLabel,
+      photosCount: allPhotos.length,
+      pointsCount: points.length,
+      coverPhotoUrl,
+      albumSlug: `kontrola-ploch-${safeClientSlug}`,
+      publicShareUrl: `/fotodokumentace?source=FIELD_WORK`,
+      downloadZipUrl: `/api/client/fotodokumentace/download-zip?surfaceClient=${encodeURIComponent(clientKey)}`,
+      points,
+    });
+  }
+
   // Merge and sort all albums by photo count and creation date
-  const unifiedAlbums: UnifiedAlbumItem[] = [...fieldWorkAlbums, ...navigationAlbums].sort((a, b) => {
+  const unifiedAlbums: UnifiedAlbumItem[] = [...fieldWorkAlbums, ...navigationAlbums, ...carrierSurfaceAlbums].sort((a, b) => {
     if (b.photosCount !== a.photosCount) {
       return b.photosCount - a.photosCount;
     }
@@ -395,8 +532,17 @@ export default async function PhotoDocumentationHubPage({
         p.electionRemovalPoint.campaign?.clientName ||
         null;
       pointLabel = p.electionRemovalPoint.label;
+    } else if (p.surface) {
+      sourceTitle = (p.type === 'CONTROL' || p.type === 'CHECK')
+        ? 'Kontrola reklamní plochy'
+        : (p.carrier?.name || p.surface.carrier?.name || `Plocha ${p.surface.name}`);
+      clientName = p.surface.currentClient?.name || null;
+      const carrierCode = p.carrier?.code || p.surface.carrier?.code;
+      pointLabel = carrierCode ? `${carrierCode} · ${p.surface.name}` : p.surface.name;
     } else if (p.carrier) {
-      sourceTitle = p.carrier.name || `Nosič ${p.carrier.code}`;
+      sourceTitle = (p.type === 'CONTROL' || p.type === 'CHECK')
+        ? 'Kontrola nosiče'
+        : (p.carrier.name || `Nosič ${p.carrier.code}`);
       pointLabel = p.carrier.code;
     }
 
@@ -412,7 +558,7 @@ export default async function PhotoDocumentationHubPage({
       sourceTitle,
       clientName,
       pointLabel,
-      carrierCode: p.carrier?.code,
+      carrierCode: p.carrier?.code || p.surface?.carrier?.code,
     };
   });
 

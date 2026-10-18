@@ -7,6 +7,7 @@ export type HistoryEventType =
   | 'GRAPHICS_CHANGE'
   | 'REPAIR'
   | 'SERVICE'
+  | 'INSPECTION'
   | 'DEINSTALLATION'
   | 'CLIENT_CHANGE'
   | 'RENTAL_CHANGE';
