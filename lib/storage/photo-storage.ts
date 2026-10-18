@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { deletePhotoFromGoogleDrive, downloadPhotoFromGoogleDrive, uploadPhotoToGoogleDrive } from '@/lib/google-drive';
 import { tenantStorageKey } from './tenant-storage-key';
+import { getCachedThumbnail } from './thumbnail-cache';
 
 export type PhotoStorageProvider = 'DATABASE' | 'GOOGLE_DRIVE' | 'EXTERNAL_URL' | 'SEEPOINT_STORAGE';
 
@@ -18,6 +19,7 @@ type ReadablePhoto = {
   body?: BodyInit;
   contentType?: string | null;
   redirectUrl?: string;
+  isFallback?: boolean;
 };
 
 export function preferredPhotoStorageProvider(): PhotoStorageProvider {
@@ -58,19 +60,96 @@ export async function readStoredPhoto(photo: {
   storageKey?: string | null;
   storageProvider?: string | null;
 }): Promise<ReadablePhoto | null> {
-  if (photo.content?.byteLength) return { body: Uint8Array.from(photo.content).buffer, contentType: photo.mimeType };
-  if (photo.url.startsWith('data:')) {
+  // 1. Database bytea content
+  if (photo.content?.byteLength) {
+    return { body: Uint8Array.from(photo.content).buffer, contentType: photo.mimeType };
+  }
+
+  // 2. Base64 data URL
+  if (photo.url && photo.url.startsWith('data:')) {
     const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) return null;
-    return { body: Uint8Array.from(Buffer.from(match[2], 'base64')).buffer, contentType: match[1] || photo.mimeType };
+    if (match) {
+      return { body: Uint8Array.from(Buffer.from(match[2], 'base64')).buffer, contentType: match[1] || photo.mimeType };
+    }
   }
+
+  // 3. Google Drive file
   if (photo.driveFileId) {
-    const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
-    if (!file.ok || !file.body) return null;
-    return { body: file.body, contentType: photo.mimeType ?? file.headers.get('Content-Type') };
+    try {
+      const file = await downloadPhotoFromGoogleDrive(photo.driveFileId);
+      if (file.ok && file.body) {
+        return { body: file.body, contentType: photo.mimeType ?? file.headers.get('Content-Type') };
+      }
+      console.warn(`[photo-storage] Google Drive download failed (status ${file.status}) for driveFileId=${photo.driveFileId}, photoId=${photo.id}`);
+    } catch (driveErr) {
+      console.warn(`[photo-storage] Google Drive download threw error for driveFileId=${photo.driveFileId}, photoId=${photo.id}:`, driveErr);
+    }
+
+    // Try direct Google Drive preview / thumbnail CDN
+    try {
+      const directGoogleUrls = [
+        `https://drive.google.com/thumbnail?id=${encodeURIComponent(photo.driveFileId)}&sz=w2000`,
+        `https://lh3.googleusercontent.com/d/${encodeURIComponent(photo.driveFileId)}=s2000`,
+      ];
+      for (const fallbackUrl of directGoogleUrls) {
+        try {
+          const res = await fetch(fallbackUrl, {
+            signal: AbortSignal.timeout(4000),
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+          });
+          if (res.ok && res.body) {
+            const buf = await res.arrayBuffer();
+            if (buf.byteLength > 100) {
+              return { body: buf, contentType: res.headers.get('Content-Type') || photo.mimeType || 'image/jpeg' };
+            }
+          }
+        } catch {
+          // Continue to next fallback
+        }
+      }
+    } catch (fallbackErr) {
+      console.warn(`[photo-storage] Direct Google CDN fallbacks failed for photoId=${photo.id}:`, fallbackErr);
+    }
   }
-  if (/^https:\/\//.test(photo.url) && !photo.url.includes(`/api/photos/${photo.id}`)) return { redirectUrl: photo.url };
-  if (photo.storageProvider === 'SEEPOINT_STORAGE' && photo.storageKey) throw new Error('SeePoint object storage adapter is not configured.');
+
+  // 4. External URL or relative public asset
+  if (photo.url) {
+    const isAbsolute = /^https?:\/\//i.test(photo.url);
+    const isSelfPhotoFileRoute =
+      photo.url.includes(`/api/photos/${photo.id}`) ||
+      photo.url.includes(`/api/field-survey/photos/${photo.id}`);
+
+    if (isAbsolute && !isSelfPhotoFileRoute) {
+      return { redirectUrl: photo.url };
+    }
+
+    if (
+      photo.url.startsWith('/') &&
+      !photo.url.startsWith('/api/photos/') &&
+      !photo.url.startsWith('/api/field-survey/photos/')
+    ) {
+      return { redirectUrl: photo.url };
+    }
+  }
+
+  // 5. Cached thumbnail fallback - prevents fatal error if thumbnail exists
+  const cachedThumb =
+    getCachedThumbnail(`photo:${photo.id}`) ||
+    getCachedThumbnail(`field-survey-photo:${photo.id}`) ||
+    (photo.driveFileId ? getCachedThumbnail(`drive:${photo.driveFileId}`) : null);
+
+  if (cachedThumb) {
+    return {
+      body: Uint8Array.from(cachedThumb).buffer,
+      contentType: 'image/webp',
+      isFallback: true,
+    };
+  }
+
+  if (photo.storageProvider === 'SEEPOINT_STORAGE' && photo.storageKey) {
+    throw new Error('SeePoint object storage adapter is not configured.');
+  }
+
   return null;
 }
 

@@ -14,6 +14,7 @@ test('public report lookup only reads a matching active published token and neve
     if (id === './db') return { platformPrisma: {
       navigationDocumentationReport: {
         findFirst: async ({ where }: any) => {
+          if (!where?.publicTokenHash) return null;
           lookups++;
           assert.equal(where.publicTokenHash, hash);
           assert.equal(where.OR, undefined);

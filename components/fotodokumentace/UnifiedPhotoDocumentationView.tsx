@@ -1111,6 +1111,14 @@ export function UnifiedPhotoDocumentationView({
             <img
               src={lightboxPhoto.url}
               alt={lightboxPhoto.fileName || ''}
+              onError={(e) => {
+                if (lightboxPhoto.id) {
+                  const fallback = `/api/photos/${encodeURIComponent(lightboxPhoto.id)}/thumbnail`;
+                  if (!e.currentTarget.src.endsWith(fallback)) {
+                    e.currentTarget.src = fallback;
+                  }
+                }
+              }}
               style={
                 lightboxPhoto.id
                   ? {

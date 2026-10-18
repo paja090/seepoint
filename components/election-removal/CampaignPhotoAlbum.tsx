@@ -921,6 +921,12 @@ export function CampaignPhotoAlbum({
             <img
               src={`/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/file`}
               alt={activeLightboxItem.photo.fileName || activeLightboxItem.point.label}
+              onError={(e) => {
+                const fallback = `/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/thumbnail`;
+                if (!e.currentTarget.src.endsWith(fallback)) {
+                  e.currentTarget.src = fallback;
+                }
+              }}
               style={{
                 backgroundImage: `url(/api/photos/${encodeURIComponent(activeLightboxItem.photo.id)}/thumbnail)`,
                 backgroundSize: 'contain',
