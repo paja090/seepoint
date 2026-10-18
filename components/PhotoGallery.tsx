@@ -769,6 +769,25 @@ export function PhotoGallery({
               <img
                 src={photos[activePhotoIndex].url}
                 alt={photos[activePhotoIndex].note || ''}
+                style={
+                  photos[activePhotoIndex]?.id
+                    ? {
+                        backgroundImage: `url(/api/photos/${encodeURIComponent(photos[activePhotoIndex].id)}/thumbnail)`,
+                        backgroundSize: 'contain',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                      }
+                    : undefined
+                }
+                onError={(e) => {
+                  const p = photos[activePhotoIndex];
+                  if (p?.id) {
+                    const fallback = `/api/photos/${encodeURIComponent(p.id)}/thumbnail`;
+                    if (!e.currentTarget.src.endsWith(fallback)) {
+                      e.currentTarget.src = fallback;
+                    }
+                  }
+                }}
                 className="max-w-full max-h-[75vh] object-contain rounded"
                 draggable="false"
               />

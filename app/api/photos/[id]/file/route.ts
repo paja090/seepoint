@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
 import { canReadPhoto } from '@/lib/photo-access';
 import { formatNavigationPositionName, getNavigationPhotoDownloadName } from '@/lib/navigation/navigation-naming';
+import { getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
 export const runtime = 'nodejs';
 
@@ -77,14 +78,32 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (!photo || (!photo.driveFileId && !photo.content && !photo.url)) {
+    if (!photo || (!photo.driveFileId && !photo.content && !photo.url && !photo.storageKey)) {
       return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
     }
 
     if (!await canReadPhoto(user, photo)) return NextResponse.json({ error: 'Nemáte oprávnění.' }, { status: 403 });
 
     const stored = await readStoredPhoto(photo);
-    if (!stored) return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
+    if (!stored) {
+      const cached =
+        getCachedThumbnail(`photo:${photo.id}`) ||
+        (photo.driveFileId ? getCachedThumbnail(`drive:${photo.driveFileId}`) : null);
+
+      if (cached) {
+        return new Response(new Uint8Array(cached), {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/webp',
+            'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(photo.fileName ? photo.fileName.replace(/\.[^.]+$/, '.webp') : 'foto.webp')}`,
+            'Cache-Control': 'private, max-age=3600',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Photo-Fallback': 'cached-thumbnail',
+          },
+        });
+      }
+      return NextResponse.json({ error: 'Fotografie nemá platný zdroj dat.' }, { status: 404 });
+    }
     if (stored.redirectUrl) return new Response(null, { status: 307, headers: {
       Location: stored.redirectUrl,
       'Cache-Control': 'private, no-store',
@@ -126,6 +145,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       'Content-Disposition': `${dispositionType}; filename*=UTF-8''${encodeURIComponent(computedFileName)}`,
       'Cache-Control': 'private, max-age=3600',
       'X-Content-Type-Options': 'nosniff',
+      ...(stored.isFallback ? { 'X-Photo-Fallback': 'cached-thumbnail' } : {}),
     } });
   } catch (error) {
     console.error('Photo download failed', error instanceof Error ? error.message : 'unknown error');
