@@ -447,6 +447,19 @@ export async function uploadDocumentToGoogleDrive(file: File, fileName: string, 
 }
 
 export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Response> {
+  if (fileId.startsWith('mock-')) {
+    const mock = getMockDriveFiles().get(fileId) || defaultMockFiles.find(f => f.id === fileId);
+    if (mock) {
+      return new Response(new Uint8Array(mock.content), {
+        status: 200,
+        headers: { 'Content-Type': mock.mimeType },
+      });
+    }
+    if (isGoogleDriveMockEnabled()) {
+      return new Response(JSON.stringify({ error: 'Mock file not found' }), { status: 404 });
+    }
+  }
+
   if (isGoogleDriveMockEnabled()) {
     const file = getMockDriveFiles().get(fileId);
     if (!file) {
@@ -459,13 +472,47 @@ export async function downloadPhotoFromGoogleDrive(fileId: string): Promise<Resp
   }
 
   const accessToken = await getAccessToken();
-  return fetch(
+  const primaryRes = await fetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: 'no-store',
     },
   );
+  if (primaryRes.ok) return primaryRes;
+
+  // Fallback 1: High-res CDN thumbnail via Google Drive metadata
+  try {
+    const metaRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=thumbnailLink,webContentLink&supportsAllDrives=true`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      },
+    );
+    if (metaRes.ok) {
+      const meta = (await metaRes.json()) as { thumbnailLink?: string; webContentLink?: string };
+      const cdnUrl = meta.thumbnailLink ? meta.thumbnailLink.replace(/=s\d+.*$/, '=s2500') : meta.webContentLink;
+      if (cdnUrl) {
+        const cdnRes = await fetch(cdnUrl, { signal: AbortSignal.timeout(8000) });
+        if (cdnRes.ok && cdnRes.body) return cdnRes;
+      }
+    }
+  } catch (fallbackErr) {
+    console.warn('[google-drive] High-res thumbnail fallback failed:', fallbackErr);
+  }
+
+  // Fallback 2: Google CDN direct export
+  try {
+    const directRes = await fetch(`https://lh3.googleusercontent.com/d/${encodeURIComponent(fileId)}=s2500`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (directRes.ok && directRes.body) return directRes;
+  } catch {
+    // Ignore direct CDN errors
+  }
+
+  return primaryRes;
 }
 
 export const downloadFileFromGoogleDrive = downloadPhotoFromGoogleDrive;
