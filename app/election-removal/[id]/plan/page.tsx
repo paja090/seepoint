@@ -31,7 +31,7 @@ export default async function ElectionRemovalPlanPage({
   }
 
   try {
-    const { campaign, employees, vehicles, profile } = await loadElectionPlanningResources(
+    const { campaign, employees, vehicles, profile, fieldPlans } = await loadElectionPlanningResources(
       id,
       undefined,
       user.organization!.id
@@ -72,6 +72,7 @@ export default async function ElectionRemovalPlanPage({
             vehicles={vehicles}
             initialDepot={profile?.depot}
             parentPlanId={resolvedSearchParams?.parentPlanId}
+            fieldPlans={fieldPlans}
             initialSelectedPointIds={initialSelectedPointIds ?? (resolvedSearchParams?.parentPlanId ? campaign.points.filter(p => p.assignedFieldPlanId === resolvedSearchParams.parentPlanId).map(p => p.id) : undefined)}
           />
         </div>
