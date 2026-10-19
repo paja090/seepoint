@@ -5,11 +5,21 @@ function getSecret(): string {
   return process.env.NEXTAUTH_SECRET || process.env.CRON_SECRET || 'seepoint-campaign-album-salt-2026';
 }
 
+function getCandidateSecrets(): string[] {
+  const list = [
+    process.env.NEXTAUTH_SECRET,
+    process.env.AUTH_SECRET,
+    process.env.CRON_SECRET,
+    'seepoint-campaign-album-salt-2026',
+  ].filter(Boolean) as string[];
+  return Array.from(new Set(list));
+}
+
 /**
  * Generates a deterministic HMAC token for a given campaign.
  */
-export function getCampaignAlbumToken(campaignId: string): string {
-  return crypto.createHmac('sha256', getSecret()).update(`campaign-album:${campaignId}`).digest('hex');
+export function getCampaignAlbumToken(campaignId: string, secret = getSecret()): string {
+  return crypto.createHmac('sha256', secret).update(`campaign-album:${campaignId}`).digest('hex');
 }
 
 /**
@@ -29,17 +39,19 @@ export function verifyCampaignAlbumSlug(slug: string): string | null {
   if (parts.length !== 2) return null;
   const [campaignId, signature] = parts;
   if (!campaignId || !signature) return null;
-  const expectedToken = getCampaignAlbumToken(campaignId);
-  if (signature !== expectedToken.slice(0, 32)) return null;
-  return campaignId;
+  for (const secret of getCandidateSecrets()) {
+    const expectedToken = getCampaignAlbumToken(campaignId, secret);
+    if (signature === expectedToken.slice(0, 32)) return campaignId;
+  }
+  return null;
 }
 
 /**
  * Generates deterministic HMAC signature for a surface client album.
  */
-export function getSurfaceAlbumToken(organizationId: string, clientName: string): string {
+export function getSurfaceAlbumToken(organizationId: string, clientName: string, secret = getSecret()): string {
   return crypto
-    .createHmac('sha256', getSecret())
+    .createHmac('sha256', secret)
     .update(`surface-album:${organizationId}:${clientName.trim().toLowerCase()}`)
     .digest('hex');
 }
@@ -69,7 +81,10 @@ export function verifySurfaceAlbumSlug(slug: string): { organizationId: string; 
   } catch {
     return null;
   }
-  const expectedToken = getSurfaceAlbumToken(organizationId, clientName);
-  if (signature !== expectedToken.slice(0, 32)) return null;
-  return { organizationId, clientName };
+  if (!clientName) return null;
+  for (const secret of getCandidateSecrets()) {
+    const expectedToken = getSurfaceAlbumToken(organizationId, clientName, secret);
+    if (signature === expectedToken.slice(0, 32)) return { organizationId, clientName };
+  }
+  return null;
 }

@@ -124,3 +124,42 @@ test('enterPublicSurfaceAlbumTenant - activates tenant context for valid surface
   // Tampered token must fail
   assert.equal(await enterPublicSurfaceAlbumTenant(`${slug}x`), null);
 });
+
+test('enterPublicNavigationReportTenant - resolves active reports with future tokenExpiresAt', async (t) => {
+  const reportId = 'nav-report-xyz-123';
+  const orgId = 'org_seepoint_default';
+  const { getDeterministicReportToken } = await import('../lib/navigation-documentation');
+  const { enterPublicNavigationReportTenant } = await import('../lib/public-tenant');
+  const { hash } = getDeterministicReportToken(reportId);
+
+  const originalReportFindFirst = platformPrisma.navigationDocumentationReport.findFirst;
+  const originalOrgFindUnique = platformPrisma.organization.findUnique;
+
+  t.after(() => {
+    platformPrisma.navigationDocumentationReport.findFirst = originalReportFindFirst;
+    platformPrisma.organization.findUnique = originalOrgFindUnique;
+  });
+
+  (platformPrisma.organization as any).findUnique = (async ({ where }: any) => {
+    if (where.id === orgId) {
+      return { id: orgId, isActive: true };
+    }
+    return null;
+  }) as typeof platformPrisma.organization.findUnique;
+
+  (platformPrisma.navigationDocumentationReport as any).findFirst = (async ({ where }: any) => {
+    if (where.publicTokenHash === hash && where.status?.in?.includes('PUBLISHED') && where.publishedAt && where.tokenExpiresAt?.gt) {
+      return { id: reportId, organizationId: orgId };
+    }
+    return null;
+  }) as typeof platformPrisma.navigationDocumentationReport.findFirst;
+
+  const res = await enterPublicNavigationReportTenant(hash);
+  assert.ok(res);
+  assert.equal(res.id, reportId);
+  assert.equal(res.organizationId, orgId);
+
+  // Invalid token format
+  assert.equal(await enterPublicNavigationReportTenant('short-invalid'), null);
+  assert.equal(await enterPublicNavigationReportTenant(''), null);
+});
