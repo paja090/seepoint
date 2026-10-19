@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
@@ -33,7 +32,7 @@ export default async function PublicFotodokumentacePage({
             organizationId: surfaceMeta.organizationId,
             ...(surfaceMeta.clientName === 'Vlastní síť nosičů'
               ? { currentClientId: null }
-              : { currentClient: { name: surfaceMeta.clientName } }),
+              : { currentClient: { name: { equals: surfaceMeta.clientName, mode: 'insensitive' } } }),
             photos: {
               some: {
                 organizationId: surfaceMeta.organizationId,
@@ -64,7 +63,27 @@ export default async function PublicFotodokumentacePage({
         })
     );
 
-    if (surfaces.length === 0) notFound();
+    const clientDisplayName = surfaceMeta.clientName;
+
+    if (surfaces.length === 0) {
+      return (
+        <PublicCampaignAlbumView
+          token={token}
+          campaign={{
+            id: `surface-${surfaceMeta.organizationId}`,
+            name: `${clientDisplayName} – Kontrola reklamních ploch`,
+            clientName: clientDisplayName,
+            description: 'Pravidelná kontrola a fotodokumentace reklamních ploch',
+            targetDate: null,
+            totalPoints: 0,
+            completedPoints: 0,
+          }}
+          points={[]}
+          availablePeriods={[]}
+          initialPeriod={month}
+        />
+      );
+    }
 
     const periodsSet = new Set<string>();
     for (const surface of surfaces) {
@@ -115,7 +134,6 @@ export default async function PublicFotodokumentacePage({
       };
     });
 
-    const clientDisplayName = surfaceMeta.clientName;
     return (
       <PublicCampaignAlbumView
         token={token}
@@ -134,9 +152,6 @@ export default async function PublicFotodokumentacePage({
       />
     );
   }
-
-  const campaignId = verifyCampaignAlbumSlug(token);
-  if (!campaignId) notFound();
 
   const campaignMeta = await enterPublicCampaignAlbumTenant(token);
   if (!campaignMeta) notFound();

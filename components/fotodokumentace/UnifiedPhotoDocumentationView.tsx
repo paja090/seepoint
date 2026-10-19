@@ -50,6 +50,7 @@ export interface UnifiedAlbumItem {
   downloadZipUrl: string;
   points: InternalPointWithPhotos[];
   latestPhotoAt?: string | Date | null;
+  isDraft?: boolean;
 }
 
 export interface RecentPhotoItem {
@@ -1182,6 +1183,7 @@ export function UnifiedPhotoDocumentationView({
                 photosCount: sharingAlbum.photosCount,
                 publicShareUrl: sharingAlbum.publicShareUrl,
                 sourceLabel: sharingAlbum.sourceLabel,
+                isDraft: sharingAlbum.isDraft,
               }
             : null
         }

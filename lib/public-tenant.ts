@@ -79,7 +79,7 @@ export async function enterPublicNavigationReportTenant(publicTokenHash: string)
 
 export async function enterPublicCampaignAlbumTenant(slug: string) {
   const { verifyCampaignAlbumSlug } = await import('@/lib/election-removal/album-token');
-  const campaignId = verifyCampaignAlbumSlug(slug);
+  const campaignId = verifyCampaignAlbumSlug(slug) || (/^c[a-z0-9]{24}$/.test(slug) ? slug : null);
   if (!campaignId) return null;
 
   const campaign = await platformPrisma.electionCampaign.findUnique({

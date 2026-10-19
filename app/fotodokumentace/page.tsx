@@ -431,6 +431,7 @@ export default async function PhotoDocumentationHubPage({
     const periodLabel = `${quarter}. čtvrtletí ${year}`;
     const formatted = formatAlbumDisplay(r.title, r.client?.name, periodLabel);
 
+    const isPublished = (r.status === 'PUBLISHED' || r.status === 'SENT') && Boolean(r.publishedAt) && Boolean(r.publicTokenHash);
     const { token } = getDeterministicReportToken(r.id);
 
     return {
@@ -440,7 +441,7 @@ export default async function PhotoDocumentationHubPage({
       title: r.title,
       displayTitle: formatted.displayTitle,
       displaySubtitle: formatted.displayLocation || null,
-      displayBadge: formatted.displayPeriod || periodLabel,
+      displayBadge: isPublished ? (formatted.displayPeriod || periodLabel) : `${periodLabel} • Koncept`,
       clientName: r.client?.name || 'Klient VO',
       createdAt: r.createdAt,
       year,
@@ -451,10 +452,11 @@ export default async function PhotoDocumentationHubPage({
       pointsCount: points.length,
       coverPhotoUrl,
       albumSlug: token,
-      publicShareUrl: `/client/navigation-documentation/${token}`,
-      downloadZipUrl: `/api/client/navigation-documentation/${encodeURIComponent(token)}/download-zip`,
+      publicShareUrl: isPublished ? `/client/navigation-documentation/${token}` : `/navigation/documentation?id=${encodeURIComponent(r.id)}`,
+      downloadZipUrl: isPublished ? `/api/client/navigation-documentation/${encodeURIComponent(token)}/download-zip` : `/navigation/documentation?id=${encodeURIComponent(r.id)}`,
       points,
       latestPhotoAt: latestPhoto?.createdAt ?? null,
+      isDraft: !isPublished,
     };
   });
 
