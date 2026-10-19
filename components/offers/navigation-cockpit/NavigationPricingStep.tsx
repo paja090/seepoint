@@ -7,17 +7,25 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  AlertCircle,
-  FileSpreadsheet,
+  Calendar,
 } from 'lucide-react';
 import type { DraftPoint } from './types';
 import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
+import {
+  RENTAL_DURATION_OPTIONS,
+  type RentalDurationMonths,
+  getDurationOption,
+  calculateNavigationPointPrice,
+  calculateNavigationTotalsForDuration,
+} from '@/lib/offers/navigation-pricing';
 
 interface NavigationPricingStepProps {
   points: DraftPoint[];
   onPointsChange: (points: DraftPoint[]) => void;
   onApplyCatalogRates: () => void;
   hasSelectionSubmitted?: boolean;
+  rentalDuration?: RentalDurationMonths;
+  onRentalDurationChange?: (months: RentalDurationMonths) => void;
 }
 
 export function NavigationPricingStep({
@@ -25,7 +33,21 @@ export function NavigationPricingStep({
   onPointsChange,
   onApplyCatalogRates,
   hasSelectionSubmitted,
+  rentalDuration,
+  onRentalDurationChange,
 }: NavigationPricingStepProps) {
+  const [internalDuration, setInternalDuration] = useState<RentalDurationMonths>(12);
+  const activeDuration = rentalDuration ?? internalDuration;
+
+  function handleDurationSelect(months: RentalDurationMonths) {
+    if (onRentalDurationChange) {
+      onRentalDurationChange(months);
+    } else {
+      setInternalDuration(months);
+    }
+  }
+
+  const durationOption = getDurationOption(activeDuration);
   const [showUnselected, setShowUnselected] = useState(false);
 
   // Split points into client-selected and unselected alternatives
@@ -42,35 +64,8 @@ export function NavigationPricingStep({
     );
   }
 
-  function calculatePointSubtotal(p: DraftPoint) {
-    const q = Number(p.quantity || 1);
-    const rental = Number(p.unitPrice || 0);
-    const frame = Number(p.framePrice || 0);
-    const prod = Number(p.productionPrice || 0);
-    const inst = Number(p.installationPrice || 0);
-    const rem = Number(p.removalPrice || 0);
-    return q * (rental + frame + prod + inst + rem);
-  }
-
-  // Financial summary breakdown
-  let totalRental = 0;
-  let totalFrame = 0;
-  let totalProd = 0;
-  let totalInst = 0;
-  let totalRem = 0;
-
-  for (const p of points) {
-    const q = Number(p.quantity || 1);
-    totalRental += q * Number(p.unitPrice || 0);
-    totalFrame += q * Number(p.framePrice || 0);
-    totalProd += q * Number(p.productionPrice || 0);
-    totalInst += q * Number(p.installationPrice || 0);
-    totalRem += q * Number(p.removalPrice || 0);
-  }
-
-  const subtotal = totalRental + totalFrame + totalProd + totalInst + totalRem;
-  const taxAmount = Math.round(subtotal * 0.21);
-  const totalWithTax = subtotal + taxAmount;
+  // Calculate totals dynamically using shared navigation-pricing logic
+  const totals = calculateNavigationTotalsForDuration(selectedPoints, activeDuration);
 
   const formatPrice = (val: number) =>
     new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(val);
@@ -78,7 +73,7 @@ export function NavigationPricingStep({
   return (
     <div className="space-y-6">
       {/* Header bar */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -100,6 +95,47 @@ export function NavigationPricingStep({
           </button>
         </div>
 
+        {/* Rental Duration Switcher */}
+        <div className="rounded-xl border border-slate-200 bg-slate-900 p-3.5 flex flex-wrap items-center justify-between gap-3 text-white">
+          <div className="flex items-center gap-2">
+            <Calendar size={16} className="text-sky-400 shrink-0" />
+            <span className="text-xs font-bold text-slate-300">Doba pronájmu:</span>
+            <span className="text-xs font-black text-sky-300">{durationOption.label}</span>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">
+              · Změnou přepočítáte částku nájmu pro zvolenou délku kampaně
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            {RENTAL_DURATION_OPTIONS.map((opt) => {
+              const isActive = activeDuration === opt.months;
+              return (
+                <button
+                  key={opt.months}
+                  type="button"
+                  onClick={() => handleDurationSelect(opt.months)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    isActive
+                      ? 'bg-sky-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+                  }`}
+                >
+                  <span>{opt.shortLabel}</span>
+                  {opt.badge && (
+                    <span
+                      className={`text-[9px] px-1.5 py-0.2 rounded font-black uppercase tracking-wider ${
+                        isActive ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {opt.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {hasSelectionSubmitted && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
@@ -117,7 +153,10 @@ export function NavigationPricingStep({
                 <th className="px-3.5 py-3 w-12">#</th>
                 <th className="px-3.5 py-3">Navigační bod & Nosič</th>
                 <th className="px-3 py-3 w-16 text-center">Ks</th>
-                <th className="px-3 py-3 w-28 text-right">Pronájem (rok)</th>
+                <th className="px-3 py-3 w-36 text-right">
+                  <span>Pronájem ({durationOption.shortLabel})</span>
+                  <span className="block text-[9px] font-normal lowercase tracking-normal text-slate-400">základ: 12 m</span>
+                </th>
                 <th className="px-3 py-3 w-24 text-right">Výroba rámu</th>
                 <th className="px-3 py-3 w-24 text-right">Tisk cedule</th>
                 <th className="px-3 py-3 w-24 text-right">Montáž</th>
@@ -128,7 +167,7 @@ export function NavigationPricingStep({
             <tbody className="divide-y divide-slate-100">
               {selectedPoints.map((pt, idx) => {
                 const vis = getPointPinVisual(pt);
-                const ptSubtotal = calculatePointSubtotal(pt);
+                const calc = calculateNavigationPointPrice(pt, activeDuration);
 
                 return (
                   <tr key={`price-${pt.id}`} className="hover:bg-slate-50/70">
@@ -156,9 +195,18 @@ export function NavigationPricingStep({
                         type="text"
                         className="input text-xs font-mono text-right py-1 px-2 font-bold text-slate-900"
                         placeholder="0"
+                        title="Základní roční sazba nájmu (Kč / rok). Pro zvolenou dobu se přepočítá automaticky."
                         value={pt.unitPrice}
                         onChange={(e) => handleUpdatePointPrice(pt.id, 'unitPrice', e.target.value)}
                       />
+                      <div className="mt-0.5 flex flex-col items-end text-[10px]">
+                        <span className="font-bold text-sky-700 font-mono">
+                          = {formatPrice(calc.rental)}
+                        </span>
+                        <span className="text-slate-400 font-mono">
+                          ({formatPrice(calc.monthlyRate)}/m)
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <input
@@ -197,7 +245,7 @@ export function NavigationPricingStep({
                       />
                     </td>
                     <td className="px-3.5 py-2.5 text-right font-mono font-black text-slate-900">
-                      {formatPrice(ptSubtotal)}
+                      {formatPrice(calc.subtotal)}
                     </td>
                   </tr>
                 );
@@ -230,7 +278,7 @@ export function NavigationPricingStep({
                     <tr>
                       <th className="px-3 py-2">Bod</th>
                       <th className="px-3 py-2">Stav</th>
-                      <th className="px-3 py-2 text-right">Pronájem</th>
+                      <th className="px-3 py-2 text-right">Pronájem (rok)</th>
                       <th className="px-3 py-2 text-right">Rám</th>
                       <th className="px-3 py-2 text-right">Tisk</th>
                       <th className="px-3 py-2 text-right">Montáž</th>
@@ -272,50 +320,63 @@ export function NavigationPricingStep({
           </div>
         )}
 
-        {/* Sticky / Dedicated Financial Summary Breakdown */}
+        {/* Dedicated Financial Summary Breakdown */}
         <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50/50 via-white to-sky-50/30 p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-purple-100 pb-3">
-            <h3 className="text-sm font-black text-slate-900">Souhrnná finanční rekapitulace</h3>
+          <div className="flex flex-wrap items-center justify-between border-b border-purple-100 pb-3 gap-2">
+            <div>
+              <h3 className="text-sm font-black text-slate-900">Souhrnná finanční rekapitulace</h3>
+              <p className="text-xs text-purple-700 font-semibold mt-0.5">
+                Kalkulováno pro dobu pronájmu: <strong className="text-purple-950 font-black">{durationOption.label}</strong>
+              </p>
+            </div>
             <span className="text-xs font-semibold text-slate-500">Sazba DPH: 21 %</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
             <div className="rounded-lg bg-white p-3 border border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-500 block">Pronájem celkem</span>
-              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totalRental)}</span>
+              <span className="text-[11px] font-semibold text-slate-500 block">Pronájem ({durationOption.shortLabel})</span>
+              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totals.rental)}</span>
+              <span className="text-[10px] text-slate-400 mt-0.5 block font-mono">cca {formatPrice(totals.monthlyRate)}/měs</span>
             </div>
             <div className="rounded-lg bg-white p-3 border border-slate-200">
               <span className="text-[11px] font-semibold text-slate-500 block">Výroba rámů</span>
-              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totalFrame)}</span>
+              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totals.frame)}</span>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">jednorázově</span>
             </div>
             <div className="rounded-lg bg-white p-3 border border-slate-200">
               <span className="text-[11px] font-semibold text-slate-500 block">Tisk celkem</span>
-              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totalProd)}</span>
+              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totals.production)}</span>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">jednorázově</span>
             </div>
             <div className="rounded-lg bg-white p-3 border border-slate-200">
               <span className="text-[11px] font-semibold text-slate-500 block">Montáž celkem</span>
-              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totalInst)}</span>
+              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totals.installation)}</span>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">jednorázově</span>
             </div>
             <div className="rounded-lg bg-white p-3 border border-slate-200">
               <span className="text-[11px] font-semibold text-slate-500 block">Demontáž celkem</span>
-              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totalRem)}</span>
+              <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatPrice(totals.removal)}</span>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">jednorázově</span>
             </div>
           </div>
 
           <div className="border-t border-purple-100 pt-3 flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-0.5 text-xs">
               <div className="text-slate-600">
-                Celkem bez DPH: <strong className="font-mono text-slate-900">{formatPrice(subtotal)}</strong>
+                Jednorázové náklady (hardware + práce): <strong className="font-mono text-slate-900">{formatPrice(totals.oneOffTotal)}</strong>
               </div>
               <div className="text-slate-600">
-                DPH 21 %: <strong className="font-mono text-slate-900">{formatPrice(taxAmount)}</strong>
+                Celkem bez DPH: <strong className="font-mono text-slate-900 text-sm">{formatPrice(totals.subtotal)}</strong>
+              </div>
+              <div className="text-slate-600">
+                DPH 21 %: <strong className="font-mono text-slate-900">{formatPrice(totals.taxAmount)}</strong>
               </div>
             </div>
 
             <div className="text-right">
               <span className="text-xs font-semibold text-slate-500 block">Celková částka s DPH</span>
               <span className="text-xl sm:text-2xl font-black text-purple-950 font-mono block">
-                {formatPrice(totalWithTax)}
+                {formatPrice(totals.totalWithTax)}
               </span>
             </div>
           </div>

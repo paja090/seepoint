@@ -3,7 +3,7 @@ import { Prisma, NavigationArrowDirection } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import type { CurrentUser } from '@/lib/rbac';
 import { canAccessOffer, canManageOfferRole, OfferValidationError, parseDateOnly, serverOfferAuthor } from './domain';
-import { calculateNavigationOfferTotals, calculateNavigationPointSubtotal } from './navigation-pricing';
+import { calculateNavigationOfferTotals, calculateNavigationPointSubtotal, inferDurationMonthsFromDates } from './navigation-pricing';
 import { preparePortalCredential, recoverPortalToken } from './token';
 import { syncNavigationOfferToOrderInTransaction } from '@/lib/ai-realization/navigation-sync';
 
@@ -46,6 +46,23 @@ export function parseNavigationOfferInput(raw: unknown) {
   if (!clientId || !title || !targetName) throw new OfferValidationError('Klient, název nabídky a cíl navigace jsou povinné.');
   const rows = Array.isArray(input.points) ? input.points : [];
   if (rows.length === 0) throw new OfferValidationError('Přidejte alespoň jeden navigační bod.', 'EMPTY_NAVIGATION');
+
+  const validUntil = text(input.validUntil);
+  if (validUntil) parseDateOnly(validUntil, 'Platnost nabídky');
+  const dateFrom = text(input.dateFrom);
+  if (dateFrom) parseDateOnly(dateFrom, 'Termín kampaně (od)');
+  const dateTo = text(input.dateTo);
+  if (dateTo) parseDateOnly(dateTo, 'Termín kampaně (do)');
+  if (dateFrom && dateTo && dateTo < dateFrom) {
+    throw new OfferValidationError('Konec kampaně (do) nemůže předcházet začátku (od).');
+  }
+
+  const rawMonths = Number((input as { rentalDurationMonths?: unknown }).rentalDurationMonths);
+  const explicitDuration = [1, 3, 6, 12, 24, 36].includes(rawMonths)
+    ? (rawMonths as 1 | 3 | 6 | 12 | 24 | 36)
+    : undefined;
+  const rentalDurationMonths = explicitDuration ?? (dateFrom && dateTo ? inferDurationMonthsFromDates(dateFrom, dateTo) : 12);
+
   const points = rows.map((rawPoint, index) => {
     if (!rawPoint || typeof rawPoint !== 'object') throw new OfferValidationError(`Navigační bod ${index + 1} není platný.`);
     const point = rawPoint as Record<string, unknown>;
@@ -56,7 +73,15 @@ export function parseNavigationOfferInput(raw: unknown) {
     const removalPrice = decimal(point.removalPrice, `Demontáž bodu ${index + 1}`);
     const productionPrice = decimal(point.productionPrice, `Výroba bodu ${index + 1}`);
     const framePrice = decimal(point.framePrice, `Výroba rámu bodu ${index + 1}`);
-    const subtotal = calculateNavigationPointSubtotal({ quantity, unitPrice, installationPrice, removalPrice, productionPrice, framePrice });
+    const subtotal = calculateNavigationPointSubtotal({
+      quantity,
+      unitPrice,
+      installationPrice,
+      removalPrice,
+      productionPrice,
+      framePrice,
+      durationMonths: rentalDurationMonths,
+    });
     
     // Parse new Google Maps structured fields
     const rawManualStr =
@@ -138,15 +163,6 @@ export function parseNavigationOfferInput(raw: unknown) {
       isSelectedByClient: point.isSelectedByClient !== false,
     };
   });
-  const validUntil = text(input.validUntil);
-  if (validUntil) parseDateOnly(validUntil, 'Platnost nabídky');
-  const dateFrom = text(input.dateFrom);
-  if (dateFrom) parseDateOnly(dateFrom, 'Termín kampaně (od)');
-  const dateTo = text(input.dateTo);
-  if (dateTo) parseDateOnly(dateTo, 'Termín kampaně (do)');
-  if (dateFrom && dateTo && dateTo < dateFrom) {
-    throw new OfferValidationError('Konec kampaně (do) nemůže předcházet začátku (od).');
-  }
   const propMode = text(input.proposalMode) === 'PRICED_QUOTE' ? 'PRICED_QUOTE' : 'LOCATION_SELECTION';
   const city = text(input.city);
   if (city.length > 120) throw new OfferValidationError('Název města může mít maximálně 120 znaků.');
@@ -212,6 +228,7 @@ export function parseNavigationOfferInput(raw: unknown) {
     clientArtworkUrl: nullable(text(input.clientArtworkUrl)),
     clientArtworkFileName: nullable(text(input.clientArtworkFileName)),
     presentationSettings,
+    rentalDurationMonths,
     points,
   };
 }
@@ -257,6 +274,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
           ...(input.presentationSettings ? { presentationSettings: input.presentationSettings } : {}),
           ...(input.dateFrom !== undefined ? { dateFrom: input.dateFrom } : {}),
           ...(input.dateTo !== undefined ? { dateTo: input.dateTo } : {}),
+          ...(input.rentalDurationMonths ? { rentalDurationMonths: input.rentalDurationMonths } : {}),
         };
 
         let navOffer = existing.navigationOffer;
@@ -456,6 +474,7 @@ export async function saveNavigationOffer(user: CurrentUser, raw: unknown, offer
         ...(input.presentationSettings ? { presentationSettings: input.presentationSettings } : {}),
         ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
         ...(input.dateTo ? { dateTo: input.dateTo } : {}),
+        ...(input.rentalDurationMonths ? { rentalDurationMonths: input.rentalDurationMonths } : {}),
       };
 
       const createdOffer = await tx.offer.create({

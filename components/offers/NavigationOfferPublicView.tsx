@@ -21,6 +21,7 @@ import {
   FileText,
   RefreshCw,
   RotateCw,
+  Calendar,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
@@ -28,6 +29,13 @@ import { canUploadNavigationArtwork } from '@/lib/offers/navigation-artwork-acce
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
 import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 import { toPhotoFullUrl, toPhotoThumbnailUrl } from '@/lib/photo-url';
+import {
+  RENTAL_DURATION_OPTIONS,
+  type RentalDurationMonths,
+  getDurationOption,
+  inferDurationMonthsFromDates,
+  calculateNavigationPointPrice,
+} from '@/lib/offers/navigation-pricing';
 
 const money = (val: string | number | null | undefined) =>
   new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(
@@ -348,29 +356,44 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
   if (!navigation) return null;
 
+  // Selected rental duration state (1, 3, 6, 12, 24, 36 months)
+  const [selectedDuration, setSelectedDuration] = useState<RentalDurationMonths>(() => {
+    const rawMonths = (offer.campaignStrategy as Record<string, unknown> | null)?.rentalDurationMonths;
+    if (typeof rawMonths === 'number' && [1, 3, 6, 12, 24, 36].includes(rawMonths)) {
+      return rawMonths as RentalDurationMonths;
+    }
+    return inferDurationMonthsFromDates(
+      ((offer.campaignStrategy as Record<string, unknown> | null)?.dateFrom as string | undefined) || offer.items[0]?.dateFrom,
+      ((offer.campaignStrategy as Record<string, unknown> | null)?.dateTo as string | undefined) || offer.items[0]?.dateTo
+    );
+  });
+  const durationOption = getDurationOption(selectedDuration);
+
   // Filter price rows dynamically for selected points (or all if none filtered)
   const activePoints = navigation.points.filter((p) =>
     selectedPointIds.length > 0 ? selectedPointIds.includes(p.id) : true
   );
 
   const priceRows = activePoints.map((point) => {
-    const quantity = Number(point.quantity || 0);
-    const rental = quantity * Number(point.unitPrice || 0);
-    const frame = quantity * Number((point as Record<string, unknown>).framePrice || 0);
-    const production = quantity * Number(point.productionPrice || 0);
-    const installation = quantity * Number(point.installationPrice || 0);
-    const removal = quantity * Number(point.removalPrice || 0);
-    return { point, quantity, rental, frame, production, installation, removal, subtotal: rental + frame + production + installation + removal };
+    const calc = calculateNavigationPointPrice(point, selectedDuration);
+    return {
+      point,
+      ...calc,
+    };
   });
 
-  const priceTotals = priceRows.reduce((sum, row) => ({
-    rental: sum.rental + row.rental,
-    frame: sum.frame + row.frame,
-    production: sum.production + row.production,
-    installation: sum.installation + row.installation,
-    removal: sum.removal + row.removal,
-    subtotal: sum.subtotal + row.subtotal,
-  }), { rental: 0, frame: 0, production: 0, installation: 0, removal: 0, subtotal: 0 });
+  const priceTotals = priceRows.reduce(
+    (sum, row) => ({
+      rental: sum.rental + row.rental,
+      monthlyRate: sum.monthlyRate + row.monthlyRate,
+      frame: sum.frame + row.frame,
+      production: sum.production + row.production,
+      installation: sum.installation + row.installation,
+      removal: sum.removal + row.removal,
+      subtotal: sum.subtotal + row.subtotal,
+    }),
+    { rental: 0, monthlyRate: 0, frame: 0, production: 0, installation: 0, removal: 0, subtotal: 0 }
+  );
 
   const taxRate = Number(offer.taxRate || 21);
   const taxAmount = Math.round(priceTotals.subtotal * taxRate) / 100;
@@ -843,8 +866,49 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               <p className="mt-1 text-sm text-slate-300">Přehled ceny a vzdáleností vybraných navigačních bodů ({activePoints.length} z {navigation.points.length}).</p>
             </div>
             <div className="rounded-2xl bg-slate-900 border border-slate-800 px-4 py-2.5 sm:text-right shrink-0">
-              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">Živý přepočet: {activePoints.length} z {navigation.points.length} bodů</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">Živý přepočet: {activePoints.length} z {navigation.points.length} bodů · {durationOption.shortLabel}</p>
               <p className="text-xl font-black text-emerald-400">{money(totalWithTax)} <span className="text-xs text-slate-300 font-normal">s DPH</span></p>
+            </div>
+          </div>
+
+          {/* Duration Selector Bar */}
+          <div className="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-2">
+              <Calendar size={15} className="text-sky-400" />
+              <span className="text-xs font-bold text-slate-300">Doba pronájmu:</span>
+              <span className="text-xs font-black text-sky-300">{durationOption.label}</span>
+              <span className="text-[11px] text-slate-400 hidden sm:inline">
+                · Kliknutím přepnete cenovou kalkulaci pro různé délky kampaně
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              {RENTAL_DURATION_OPTIONS.map((opt) => {
+                const isActive = selectedDuration === opt.months;
+                return (
+                  <button
+                    key={opt.months}
+                    type="button"
+                    onClick={() => setSelectedDuration(opt.months)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      isActive
+                        ? 'bg-sky-600 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+                    }`}
+                  >
+                    <span>{opt.shortLabel}</span>
+                    {opt.badge && (
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded font-black uppercase tracking-wider ${
+                          isActive ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {opt.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -855,7 +919,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <th className="px-5 py-3">Navigační bod</th>
                   <th className="px-3 py-3">Vzdálenost do cíle</th>
                   <th className="px-3 py-3 text-right">Počet</th>
-                  <th className="px-3 py-3 text-right">Pronájem (rok / měs)</th>
+                  <th className="px-3 py-3 text-right">Pronájem ({durationOption.shortLabel})</th>
                   <th className="px-3 py-3 text-right">Výroba rámu</th>
                   <th className="px-3 py-3 text-right">UV tisk na Dibond</th>
                   <th className="px-3 py-3 text-right">Montáž</th>
@@ -864,7 +928,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {priceRows.map(({ point, quantity, rental, frame, production, installation, removal, subtotal }) => {
+                {priceRows.map(({ point, quantity, rental, monthlyRate, frame, production, installation, removal, subtotal }) => {
                   const pObj = point as unknown as Record<string, unknown>;
                   const effectivePoint = getPointWithDistanceOverride(pObj);
                   const editState = distanceEdits[point.id] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
@@ -933,7 +997,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       <td className="px-3 py-4 text-right font-semibold text-slate-700">{quantity.toLocaleString('cs-CZ')} ks</td>
                       <td className="px-3 py-4 text-right text-slate-700">
                         <div className="font-bold">{money(rental)}</div>
-                        <div className="text-[10px] text-sky-700 font-semibold">{money(Math.round(rental / 12))}/měs</div>
+                        <div className="text-[10px] text-sky-700 font-semibold">{money(monthlyRate)}/měs</div>
                       </td>
                       <td className="px-3 py-4 text-right text-slate-700">{money(frame)}</td>
                       <td className="px-3 py-4 text-right text-slate-700">{money(production)}</td>
@@ -949,7 +1013,15 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
           <div className="grid gap-5 border-t border-slate-200 bg-slate-50 p-6 lg:grid-cols-[1fr_340px]">
             <dl className="grid gap-3 text-sm sm:grid-cols-3">
-              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Pronájem nosičů</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.rental)} <span className="text-[10px] text-sky-700 font-normal">({money(Math.round(priceTotals.rental / 12))}/měs)</span></dd></div>
+              <div className="rounded-xl bg-white p-3 border">
+                <dt className="text-slate-500 text-xs">Pronájem nosičů ({durationOption.shortLabel})</dt>
+                <dd className="mt-1 font-bold text-slate-900">
+                  {money(priceTotals.rental)}{' '}
+                  <span className="text-[10px] text-sky-700 font-normal">
+                    ({money(priceTotals.monthlyRate)}/měs)
+                  </span>
+                </dd>
+              </div>
               <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Výroba rámů (D-FLEX)</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.frame)}</dd></div>
               <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">UV tisk na Dibond</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.production)}</dd></div>
               <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Montáž / Instalace</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.installation)}</dd></div>

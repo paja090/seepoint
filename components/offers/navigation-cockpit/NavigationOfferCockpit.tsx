@@ -22,6 +22,11 @@ import type {
   CatalogRates,
 } from './types';
 import { TARGET_COLORS } from './types';
+import {
+  type RentalDurationMonths,
+  inferDurationMonthsFromDates,
+  addMonthsToDate,
+} from '@/lib/offers/navigation-pricing';
 import { NavigationOfferStepHeader } from './NavigationOfferStepHeader';
 import { NavigationOfferBasicsStep } from './NavigationOfferBasicsStep';
 import { NavigationTargetsStep } from './NavigationTargetsStep';
@@ -56,6 +61,28 @@ export function NavigationOfferCockpit({
   const [validUntil, setValidUntil] = useState(initialOffer?.validUntil ?? '');
   const [dateFrom, setDateFrom] = useState((initialOffer?.campaignStrategy as Record<string, unknown> | null)?.dateFrom as string ?? '');
   const [dateTo, setDateTo] = useState((initialOffer?.campaignStrategy as Record<string, unknown> | null)?.dateTo as string ?? '');
+
+  // Rental Duration State (1, 3, 6, 12, 24, 36 months)
+  const [rentalDuration, setRentalDuration] = useState<RentalDurationMonths>(() => {
+    const rawMonths = (initialOffer?.campaignStrategy as Record<string, unknown> | null)?.rentalDurationMonths;
+    if (typeof rawMonths === 'number' && [1, 3, 6, 12, 24, 36].includes(rawMonths)) {
+      return rawMonths as RentalDurationMonths;
+    }
+    const dFrom = ((initialOffer?.campaignStrategy as Record<string, unknown> | null)?.dateFrom as string | undefined) || initialOffer?.items?.[0]?.dateFrom;
+    const dTo = ((initialOffer?.campaignStrategy as Record<string, unknown> | null)?.dateTo as string | undefined) || initialOffer?.items?.[0]?.dateTo;
+    return inferDurationMonthsFromDates(dFrom, dTo);
+  });
+
+  function handleRentalDurationChange(months: RentalDurationMonths) {
+    setRentalDuration(months);
+    setHasUnsavedChanges(true);
+    if (dateFrom) {
+      const calculatedDateTo = addMonthsToDate(dateFrom, months);
+      if (calculatedDateTo) {
+        setDateTo(calculatedDateTo);
+      }
+    }
+  }
 
   // 2. Proposal Mode (Fáze 1 vs Fáze 2)
   const defaultMode: 'LOCATION_SELECTION' | 'PRICED_QUOTE' =
@@ -556,6 +583,7 @@ export function NavigationOfferCockpit({
       validUntil,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
+      rentalDurationMonths: rentalDuration,
       contactPerson: selectedClient?.contactPerson,
       contactEmail: selectedClient?.email,
       contactPhone: selectedClient?.phone,
@@ -693,12 +721,23 @@ export function NavigationOfferCockpit({
           onDateFromChange={(val) => {
             setDateFrom(val);
             setHasUnsavedChanges(true);
+            if (val && dateTo) {
+              setRentalDuration(inferDurationMonthsFromDates(val, dateTo));
+            } else if (val && !dateTo) {
+              const nextTo = addMonthsToDate(val, rentalDuration);
+              if (nextTo) setDateTo(nextTo);
+            }
           }}
           dateTo={dateTo}
           onDateToChange={(val) => {
             setDateTo(val);
             setHasUnsavedChanges(true);
+            if (dateFrom && val) {
+              setRentalDuration(inferDurationMonthsFromDates(dateFrom, val));
+            }
           }}
+          rentalDuration={rentalDuration}
+          onRentalDurationChange={handleRentalDurationChange}
           onClientCreated={(created) => {
             setClients((curr) => [...curr, created]);
           }}
@@ -757,6 +796,8 @@ export function NavigationOfferCockpit({
               }}
               onApplyCatalogRates={applyCatalogRatesToAllPoints}
               hasSelectionSubmitted={initialOffer?.navigation?.selectionSubmitted === true}
+              rentalDuration={rentalDuration}
+              onRentalDurationChange={handleRentalDurationChange}
             />
           ) : (
             <NavigationOfferReviewStep

@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { Building2, Calendar, MapPin, Plus, UserPlus, X, Check } from 'lucide-react';
 import type { ClientOption } from './types';
+import {
+  RENTAL_DURATION_OPTIONS,
+  type RentalDurationMonths,
+} from '@/lib/offers/navigation-pricing';
 
 interface NavigationOfferBasicsStepProps {
   clients: ClientOption[];
@@ -18,6 +22,8 @@ interface NavigationOfferBasicsStepProps {
   onDateFromChange: (date: string) => void;
   dateTo: string;
   onDateToChange: (date: string) => void;
+  rentalDuration?: RentalDurationMonths;
+  onRentalDurationChange?: (months: RentalDurationMonths) => void;
   onClientCreated?: (newClient: ClientOption) => void;
 }
 
@@ -35,6 +41,8 @@ export function NavigationOfferBasicsStep({
   onDateFromChange,
   dateTo,
   onDateToChange,
+  rentalDuration,
+  onRentalDurationChange,
   onClientCreated,
 }: NavigationOfferBasicsStepProps) {
   const [showNewClientModal, setShowNewClientModal] = useState(false);
@@ -241,6 +249,25 @@ export function NavigationOfferBasicsStep({
                 onChange={(e) => onDateToChange(e.target.value)}
               />
             </div>
+            {onRentalDurationChange && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-slate-500 font-medium">Rychlá délka:</span>
+                {RENTAL_DURATION_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.months}
+                    type="button"
+                    onClick={() => onRentalDurationChange(opt.months)}
+                    className={`rounded-md px-2 py-0.5 text-[10px] font-bold border transition cursor-pointer ${
+                      rentalDuration === opt.months
+                        ? 'bg-sky-100 text-sky-900 border-sky-300 shadow-2xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {opt.shortLabel}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
