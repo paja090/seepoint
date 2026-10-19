@@ -79,31 +79,41 @@ export default async function PublicFotodokumentacePage({
     }
     const availablePeriods = Array.from(periodsSet).sort().reverse();
 
-    const points: PublicPointItem[] = surfaces.map((s) => ({
-      id: s.id,
-      label: s.carrier ? `${s.carrier.code} · ${s.name}` : s.name,
-      description: [
-        s.carrier?.address ? s.carrier.address : null,
-        s.carrier?.city ? s.carrier.city : null,
-        s.directionDescription ? `Směr: ${s.directionDescription}` : null,
-      ].filter(Boolean).join(', ') || null,
-      mediaType: 'CARRIER_SURFACE',
-      objectType: 'REKLAMNÍ PLOCHA',
-      quantity: 1,
-      latitude: s.carrier?.latitude || s.photos[0]?.capturedLatitude || 0,
-      longitude: s.carrier?.longitude || s.photos[0]?.capturedLongitude || 0,
-      operationType: 'INSPECTION',
-      photos: s.photos.map((ph) => ({
-        id: ph.id,
-        type: ph.type,
-        fileName: ph.fileName,
-        createdAt: ph.createdAt.toISOString(),
-        capturedLatitude: ph.capturedLatitude,
-        capturedLongitude: ph.capturedLongitude,
-        capturedByWorkerName: ph.capturedByWorkerName,
-        url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
-      })),
-    }));
+    const points: PublicPointItem[] = surfaces.map((s) => {
+      const carrierLat = s.carrier?.latitude != null && !Number.isNaN(Number(s.carrier.latitude)) && Number(s.carrier.latitude) !== 0 ? Number(s.carrier.latitude) : null;
+      const carrierLng = s.carrier?.longitude != null && !Number.isNaN(Number(s.carrier.longitude)) && Number(s.carrier.longitude) !== 0 ? Number(s.carrier.longitude) : null;
+      const photoWithGps = s.photos.find(
+        (ph) => ph.capturedLatitude != null && ph.capturedLongitude != null && (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
+      );
+      const latitude = carrierLat ?? (photoWithGps?.capturedLatitude ? Number(photoWithGps.capturedLatitude) : 0);
+      const longitude = carrierLng ?? (photoWithGps?.capturedLongitude ? Number(photoWithGps.capturedLongitude) : 0);
+
+      return {
+        id: s.id,
+        label: s.carrier ? `${s.carrier.code} · ${s.name}` : s.name,
+        description: [
+          s.carrier?.address ? s.carrier.address : null,
+          s.carrier?.city ? s.carrier.city : null,
+          s.directionDescription ? `Směr: ${s.directionDescription}` : null,
+        ].filter(Boolean).join(', ') || null,
+        mediaType: 'CARRIER_SURFACE',
+        objectType: 'REKLAMNÍ PLOCHA',
+        quantity: 1,
+        latitude,
+        longitude,
+        operationType: 'INSPECTION',
+        photos: s.photos.map((ph) => ({
+          id: ph.id,
+          type: ph.type,
+          fileName: ph.fileName,
+          createdAt: ph.createdAt.toISOString(),
+          capturedLatitude: ph.capturedLatitude != null ? Number(ph.capturedLatitude) : null,
+          capturedLongitude: ph.capturedLongitude != null ? Number(ph.capturedLongitude) : null,
+          capturedByWorkerName: ph.capturedByWorkerName,
+          url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
+        })),
+      };
+    });
 
     const clientDisplayName = surfaceMeta.clientName;
     return (
@@ -183,27 +193,39 @@ export default async function PublicFotodokumentacePage({
   }
   const availablePeriods = Array.from(periodsSet).sort().reverse();
 
-  const points: PublicPointItem[] = filteredRawPoints.map((p) => ({
-    id: p.id,
-    label: p.label,
-    description: p.description,
-    mediaType: p.mediaType,
-    objectType: p.objectType,
-    quantity: p.quantity,
-    latitude: p.latitude,
-    longitude: p.longitude,
-    operationType: p.operationType,
-    photos: p.photos.map((ph) => ({
-      id: ph.id,
-      type: ph.type,
-      fileName: ph.fileName,
-      createdAt: ph.createdAt.toISOString(),
-      capturedLatitude: ph.capturedLatitude,
-      capturedLongitude: ph.capturedLongitude,
-      capturedByWorkerName: ph.capturedByWorkerName,
-      url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
-    })),
-  }));
+  const points: PublicPointItem[] = filteredRawPoints.map((p) => {
+    const photoWithGps = p.photos.find(
+      (ph) => ph.capturedLatitude != null && ph.capturedLongitude != null && (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
+    );
+    const latitude = (p.latitude != null && !Number.isNaN(Number(p.latitude)) && Number(p.latitude) !== 0)
+      ? Number(p.latitude)
+      : (photoWithGps?.capturedLatitude ? Number(photoWithGps.capturedLatitude) : 0);
+    const longitude = (p.longitude != null && !Number.isNaN(Number(p.longitude)) && Number(p.longitude) !== 0)
+      ? Number(p.longitude)
+      : (photoWithGps?.capturedLongitude ? Number(photoWithGps.capturedLongitude) : 0);
+
+    return {
+      id: p.id,
+      label: p.label,
+      description: p.description,
+      mediaType: p.mediaType,
+      objectType: p.objectType,
+      quantity: p.quantity,
+      latitude,
+      longitude,
+      operationType: p.operationType,
+      photos: p.photos.map((ph) => ({
+        id: ph.id,
+        type: ph.type,
+        fileName: ph.fileName,
+        createdAt: ph.createdAt.toISOString(),
+        capturedLatitude: ph.capturedLatitude != null ? Number(ph.capturedLatitude) : null,
+        capturedLongitude: ph.capturedLongitude != null ? Number(ph.capturedLongitude) : null,
+        capturedByWorkerName: ph.capturedByWorkerName,
+        url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
+      })),
+    };
+  });
 
   return (
     <PublicCampaignAlbumView
