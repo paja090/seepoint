@@ -71,7 +71,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
         planId,
         workOrderId,
         jobId,
-        stopLabel: stop.companyName || stop.orderNumber || stop.locality || 'Tato zastávka',
+        stopLabel: stop.title || stop.orderTitle || stop.clientName || stop.address || 'Tato zastávka',
       });
       return;
     }
