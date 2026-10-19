@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
+import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
 import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
+import { readStoredPhoto } from '@/lib/storage/photo-storage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -103,6 +104,105 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const url = new URL(req.url);
+    const monthFilter = url.searchParams.get('month'); // "2026-10"
+    const typeFilter = url.searchParams.get('type');
+    const clientFilter = url.searchParams.get('client')?.trim() || null;
+    const photoIdsParam = url.searchParams.get('photoIds'); // comma-separated ids
+    const photoIdSet = photoIdsParam ? new Set(photoIdsParam.split(',').filter(Boolean)) : null;
+
+    if (token.startsWith('surface.')) {
+      const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);
+      if (!surfaceMeta) {
+        return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+      }
+
+      const surfaces = await prisma.advertisingSurface.findMany({
+        where: {
+          organizationId: surfaceMeta.organizationId,
+          ...(surfaceMeta.clientName === 'Vlastní síť nosičů'
+            ? { currentClientId: null }
+            : { currentClient: { name: surfaceMeta.clientName } }),
+          photos: {
+            some: {
+              organizationId: surfaceMeta.organizationId,
+              isPrivate: false,
+            },
+          },
+        },
+        include: {
+          carrier: true,
+          photos: {
+            where: {
+              organizationId: surfaceMeta.organizationId,
+              isPrivate: false,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+
+      const zipFiles: Array<{ name: string; data: Buffer }> = [];
+      let fileIndex = 1;
+
+      for (const surface of surfaces) {
+        for (const photo of surface.photos) {
+          if (photoIdSet && !photoIdSet.has(photo.id)) continue;
+
+          if (monthFilter) {
+            const d = new Date(photo.createdAt);
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (ym !== monthFilter) continue;
+          }
+
+          let photoBuffer: Buffer | null = null;
+          if (photo.content && photo.content.length > 0) {
+            photoBuffer = Buffer.from(photo.content);
+          } else if (photo.url && photo.url.startsWith('data:')) {
+            const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) photoBuffer = Buffer.from(match[2], 'base64');
+          } else {
+            const file = await readStoredPhoto(photo);
+            if (file?.body) {
+              if (Buffer.isBuffer(file.body)) photoBuffer = file.body;
+              else if (file.body instanceof ArrayBuffer) photoBuffer = Buffer.from(file.body);
+              else if (file.body instanceof Uint8Array) photoBuffer = Buffer.from(file.body);
+            }
+          }
+
+          if (!photoBuffer || photoBuffer.length === 0) continue;
+
+          const orderPrefix = String(fileIndex++).padStart(2, '0');
+          const cleanLabel = sanitizeFileName(surface.carrier?.code ? `${surface.carrier.code}_${surface.name}` : surface.name);
+          const cleanName = `${orderPrefix}_${cleanLabel}_Kontrola.jpg`;
+
+          zipFiles.push({
+            name: cleanName,
+            data: photoBuffer,
+          });
+        }
+      }
+
+      if (zipFiles.length === 0) {
+        return NextResponse.json({ error: 'Nebyly nalezeny žádné fotografie pro vybrané období.' }, { status: 404 });
+      }
+
+      const zipBuffer = buildZipArchive(zipFiles);
+      const safeClientName = sanitizeFileName(surfaceMeta.clientName || 'Kontrola_ploch');
+      const periodSlug = monthFilter ? `-${monthFilter}` : '';
+      const filename = `Fotodokumentace-${safeClientName}${periodSlug}.zip`;
+
+      return new Response(new Uint8Array(zipBuffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          'Cache-Control': 'private, no-store',
+          'Content-Length': String(zipBuffer.length),
+        },
+      });
+    }
+
     const campaignId = verifyCampaignAlbumSlug(token);
     if (!campaignId) {
       return NextResponse.json({ error: 'Neplatný token.' }, { status: 400 });
@@ -112,13 +212,6 @@ export async function GET(
     if (!campaign) {
       return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
     }
-
-    const url = new URL(req.url);
-    const monthFilter = url.searchParams.get('month'); // "2026-10"
-    const typeFilter = url.searchParams.get('type');
-    const clientFilter = url.searchParams.get('client')?.trim() || null;
-    const photoIdsParam = url.searchParams.get('photoIds'); // comma-separated ids
-    const photoIdSet = photoIdsParam ? new Set(photoIdsParam.split(',').filter(Boolean)) : null;
 
     const fullCampaign = await prisma.electionCampaign.findFirst({
       where: { id: campaign.id, organizationId: campaign.organizationId },

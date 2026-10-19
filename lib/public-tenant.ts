@@ -100,3 +100,19 @@ export async function enterPublicCampaignAlbumTenant(slug: string) {
   return campaign;
 }
 
+export async function enterPublicSurfaceAlbumTenant(slug: string) {
+  const { verifySurfaceAlbumSlug } = await import('@/lib/election-removal/album-token');
+  const verified = verifySurfaceAlbumSlug(slug);
+  if (!verified) return null;
+
+  const organization = await platformPrisma.organization.findUnique({
+    where: { id: verified.organizationId },
+    select: { id: true, isActive: true },
+  });
+
+  if (!organization?.isActive) return null;
+
+  enterTenantContext({ organizationId: organization.id, source: 'public-token' });
+  return { organizationId: organization.id, clientName: verified.clientName };
+}
+

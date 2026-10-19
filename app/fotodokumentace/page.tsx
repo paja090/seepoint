@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
 import { AppShell } from '@/components/AppShell';
-import { buildCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { buildCampaignAlbumSlug, buildSurfaceAlbumSlug } from '@/lib/election-removal/album-token';
 import {
   UnifiedPhotoDocumentationView,
   type UnifiedAlbumItem,
@@ -525,9 +525,9 @@ export default async function PhotoDocumentationHubPage({
       photosCount: allPhotos.length,
       pointsCount: points.length,
       coverPhotoUrl,
-      albumSlug: `kontrola-ploch-${safeClientSlug}`,
-      publicShareUrl: `/fotodokumentace?source=FIELD_WORK`,
-      downloadZipUrl: `/api/client/fotodokumentace/download-zip?surfaceClient=${encodeURIComponent(clientKey)}`,
+      albumSlug: buildSurfaceAlbumSlug(organizationId, clientKey),
+      publicShareUrl: `/client/fotodokumentace/${encodeURIComponent(buildSurfaceAlbumSlug(organizationId, clientKey))}`,
+      downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(buildSurfaceAlbumSlug(organizationId, clientKey))}/download-zip`,
       points,
       latestPhotoAt: latestPhoto.createdAt,
     });
