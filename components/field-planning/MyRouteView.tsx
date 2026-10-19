@@ -21,6 +21,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { SwipeToConfirm } from '@/components/field-planning/SwipeToConfirm';
 
 const MyRouteMap = dynamic(() => import('@/components/field-planning/MyRouteMap').then(m => m.MyRouteMap), { ssr: false });
 
@@ -52,6 +53,30 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
   const [photoSuccessToast, setPhotoSuccessToast] = useState<{ jobId: string; message: string } | null>(null);
   const [selectedLightboxPhoto, setSelectedLightboxPhoto] = useState<string | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [missingPhotoStop, setMissingPhotoStop] = useState<{
+    planId: string;
+    workOrderId: string;
+    jobId: string;
+    stopLabel: string;
+  } | null>(null);
+
+  function handleCompleteRequest(
+    planId: string,
+    workOrderId: string,
+    jobId: string,
+    stop: MyRouteDTO['routes'][number]['stops'][number]
+  ) {
+    if (!stop.photos || stop.photos.length === 0) {
+      setMissingPhotoStop({
+        planId,
+        workOrderId,
+        jobId,
+        stopLabel: stop.companyName || stop.orderNumber || stop.locality || 'Tato zastávka',
+      });
+      return;
+    }
+    void run(planId, workOrderId, 'complete', undefined, jobId);
+  }
 
   function triggerDirectCamera(planId: string, workOrderId: string, jobId: string) {
     setActiveCameraStop({ planId, workOrderId, jobId });
@@ -738,69 +763,12 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                   </a>
                 )}
 
-                {/* Start / Finish Button */}
-                {!isDone && s.status !== 'CANCELLED' && (
-                  <>
-                    {/* Primary Finish / Complete button */}
-                    <button
-                      type="button"
-                      disabled={!ready || busy}
-                      onClick={() =>
-                        void run(
-                          route.planId,
-                          s.workOrderId,
-                          'complete',
-                          undefined,
-                          s.jobId
-                        )
-                      }
-                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-700 px-4 py-3 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 active:scale-95 transition cursor-pointer"
-                      title="Označit bod jako hotový"
-                    >
-                      <CheckCircle2 size={14} />
-                      <span>{isInProgress ? 'Dokončit práci ✓' : 'Hotovo ✓'}</span>
-                    </button>
-
-                    {/* Secondary Start timer button if not yet in progress */}
-                    {!isInProgress && (
-                      <button
-                        type="button"
-                        disabled={!ready || busy}
-                        onClick={() =>
-                          void run(
-                            route.planId,
-                            s.workOrderId,
-                            'start',
-                            undefined,
-                            s.jobId
-                          )
-                        }
-                        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-3 py-3 text-xs font-semibold transition shadow-sm cursor-pointer ${
-                          isIssue
-                            ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
-                            : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                        }`}
-                        title="Zahájit práci a spustit měření času na místě"
-                      >
-                        <Clock size={14} />
-                        <span>
-                          {isIssue
-                            ? 'Zkusit znovu'
-                            : currentDate > todayStr
-                            ? 'Zahájit v předstihu ⚡'
-                            : 'Zahájit ⏱'}
-                        </span>
-                      </button>
-                    )}
-                  </>
-                )}
-
                 {/* Direct 1-Click Camera Shutter Button */}
                 <button
                   type="button"
                   disabled={!ready || busy || uploadingJobId === s.jobId}
                   onClick={() => triggerDirectCamera(route.planId, s.workOrderId, s.jobId)}
-                  className={`flex items-center justify-center gap-1.5 rounded-2xl px-3.5 py-3 text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-3.5 py-3 text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer ${
                     uploadingJobId === s.jobId
                       ? 'bg-sky-100 text-sky-800 border border-sky-300 animate-pulse'
                       : s.photos && s.photos.length > 0
@@ -818,6 +786,38 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                       : 'Vyfotit'}
                   </span>
                 </button>
+
+                {/* Start timer button if not yet in progress */}
+                {!isDone && s.status !== 'CANCELLED' && !isInProgress && (
+                  <button
+                    type="button"
+                    disabled={!ready || busy}
+                    onClick={() =>
+                      void run(
+                        route.planId,
+                        s.workOrderId,
+                        'start',
+                        undefined,
+                        s.jobId
+                      )
+                    }
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 rounded-2xl px-3 py-3 text-xs font-semibold transition shadow-sm cursor-pointer ${
+                      isIssue
+                        ? 'border border-rose-300 bg-white text-rose-800 hover:bg-rose-50'
+                        : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                    title="Zahájit práci a spustit měření času na místě"
+                  >
+                    <Clock size={14} />
+                    <span>
+                      {isIssue
+                        ? 'Zkusit znovu'
+                        : currentDate > todayStr
+                        ? 'Zahájit v předstihu ⚡'
+                        : 'Zahájit ⏱'}
+                    </span>
+                  </button>
+                )}
 
                 {/* Optional drawer trigger for uploading with custom note */}
                 {(s.navigationPointId || s.workOrderItemId || s.fieldWorkStepId || s.electionRemovalPointId) && !isDone && (
@@ -855,6 +855,33 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                   </button>
                 )}
               </div>
+
+              {/* Swipe to Complete slider to prevent accidental taps */}
+              {!isDone && s.status !== 'CANCELLED' && (
+                <div className="pt-1.5">
+                  <SwipeToConfirm
+                    onConfirm={() =>
+                      handleCompleteRequest(
+                        route.planId,
+                        s.workOrderId,
+                        s.jobId,
+                        s
+                      )
+                    }
+                    disabled={!ready || busy}
+                    busy={busy}
+                    photosCount={s.photos?.length ?? 0}
+                    hasPhotoWarning={!s.photos || s.photos.length === 0}
+                    label={
+                      isInProgress
+                        ? 'Přejeďte pro dokončení práce ➔'
+                        : 'Přejeďte pro hotovo ➔'
+                    }
+                    confirmedLabel={isInProgress ? 'Práce dokončena ✓' : 'Hotovo ✓'}
+                    resetKey={`${route.planId}-${s.jobId}-${busy}-${Boolean(missingPhotoStop)}`}
+                  />
+                </div>
+              )}
 
               {/* Photo documentation strip / thumbnails */}
               {((s.photos && s.photos.length > 0) || photoSuccessToast?.jobId === s.jobId || uploadingJobId === s.jobId) && (
@@ -1566,6 +1593,71 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
               >
                 Otevřít fotografii v plném rozlišení ↗
               </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Missing Photo Safeguard Confirmation Modal */}
+      {missingPhotoStop && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl space-y-4 border border-amber-200">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-2xs">
+                <AlertTriangle size={24} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-extrabold text-slate-950 leading-tight">
+                  Chybí fotodokumentace
+                </h3>
+                <p className="text-xs font-semibold text-amber-800 truncate mt-0.5">
+                  {missingPhotoStop.stopLabel}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              K této zakázce zatím nebyla pořízena žádná fotografie z místa. Většina zakázek vyžaduje fotku pro předávací protokol a zákazníka. Chcete ji před dokončením pořídit?
+            </p>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = missingPhotoStop;
+                  setMissingPhotoStop(null);
+                  triggerDirectCamera(target.planId, target.workOrderId, target.jobId);
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-sky-700 hover:bg-sky-600 px-4 py-3 text-xs font-bold text-white shadow-md active:scale-98 transition cursor-pointer"
+              >
+                <Camera size={16} />
+                <span>Vyfotit nyní (otevřít fotoaparát)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const target = missingPhotoStop;
+                  setMissingPhotoStop(null);
+                  void run(target.planId, target.workOrderId, 'complete', undefined, target.jobId);
+                }}
+                className="w-full rounded-2xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition cursor-pointer"
+              >
+                Dokončit bez fotografie
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMissingPhotoStop(null)}
+                className="w-full py-1 text-center text-xs font-semibold text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                Zpět k zakázce
+              </button>
             </div>
           </div>
         </div>
