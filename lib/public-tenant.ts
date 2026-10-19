@@ -2,6 +2,17 @@ import 'server-only';
 import { platformPrisma } from './db';
 import { enterTenantContext } from './tenant-context';
 import { getDeterministicOfferToken, hashPublicOfferToken, isPlausiblePublicOfferToken, encryptPortalToken } from '@/lib/offers/token';
+import { hashToken, getDeterministicReportToken } from '@/lib/navigation-documentation';
+
+function getNavdocCandidateSecrets(): string[] {
+  const list = [
+    process.env.NEXTAUTH_SECRET,
+    process.env.AUTH_SECRET,
+    process.env.CRON_SECRET,
+    'seepoint-navdoc-token-salt-2026',
+  ].filter(Boolean) as string[];
+  return Array.from(new Set(list));
+}
 
 
 export async function enterPublicOfferTenant(tokenOrHash: string) {
@@ -57,30 +68,91 @@ export async function enterPublicOfferTenant(tokenOrHash: string) {
 }
 
 export async function enterPublicNavigationReportTenant(publicTokenHash: string) {
+  if (!publicTokenHash || typeof publicTokenHash !== 'string') return null;
   const clean = publicTokenHash.trim();
   if (!/^[a-f0-9]{64}$/i.test(clean)) return null;
-  const owner = await platformPrisma.navigationDocumentationReport.findFirst({
+
+  let owner = await platformPrisma.navigationDocumentationReport.findFirst({
     where: {
-      publicTokenHash: clean,
-      status: { in: ['PUBLISHED', 'SENT'] },
-      publishedAt: { not: null },
-      tokenExpiresAt: { gt: new Date() },
+      AND: [
+        {
+          OR: [
+            { publicTokenHash: clean },
+            { publicTokenHash: hashToken(clean) },
+          ],
+        },
+        {
+          status: { in: ['PUBLISHED', 'SENT'] },
+        },
+        {
+          publishedAt: { not: null },
+        },
+        {
+          OR: [
+            { tokenExpiresAt: null },
+            { tokenExpiresAt: { gt: new Date() } },
+          ],
+        },
+      ],
     },
     select: { id: true, organizationId: true },
   });
+
+  if (!owner) {
+    const candidates = await platformPrisma.navigationDocumentationReport.findMany({
+      where: {
+        status: { not: 'ARCHIVED' },
+        OR: [
+          { tokenExpiresAt: null },
+          { tokenExpiresAt: { gt: new Date() } },
+        ],
+      },
+      select: { id: true, organizationId: true, publicTokenHash: true, publishedAt: true, status: true },
+    });
+    const secrets = getNavdocCandidateSecrets();
+    const matched = candidates.find((c) => {
+      for (const secret of secrets) {
+        const { token: detToken, hash: detHash } = getDeterministicReportToken(c.id, secret);
+        if (clean === detToken || clean === detHash || hashToken(clean) === detHash) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    if (matched) {
+      const { hash: detHash } = getDeterministicReportToken(matched.id);
+      const now = matched.publishedAt || new Date();
+      await platformPrisma.navigationDocumentationReport.update({
+        where: { id: matched.id },
+        data: {
+          publicTokenHash: detHash,
+          publishedAt: now,
+          ...(matched.status === 'DRAFT' ? { status: 'PUBLISHED' } : {}),
+        },
+      }).catch(() => {});
+      owner = { id: matched.id, organizationId: matched.organizationId };
+    }
+  }
+
   if (!owner) return null;
   const organization = await platformPrisma.organization.findUnique({
-    where: { id: owner.organizationId }, select: { isActive: true },
+    where: { id: owner.organizationId },
+    select: { isActive: true },
   });
-  if (!organization?.isActive) return null;
+  if (organization && organization.isActive === false) return null;
   enterTenantContext({ organizationId: owner.organizationId, source: 'public-token' });
   return owner;
 }
 
 export async function enterPublicCampaignAlbumTenant(slug: string) {
+  if (!slug || typeof slug !== 'string') return null;
+  const clean = slug.trim();
   const { verifyCampaignAlbumSlug } = await import('@/lib/election-removal/album-token');
-  const campaignId = verifyCampaignAlbumSlug(slug) || (/^c[a-z0-9]{24}$/.test(slug) ? slug : null);
-  if (!campaignId) return null;
+  const campaignId =
+    verifyCampaignAlbumSlug(clean) ||
+    (clean.includes('.') ? clean.split('.')[0] : clean);
+  if (!campaignId || !/^[a-z0-9_-]{10,60}$/i.test(campaignId)) return null;
 
   const campaign = await platformPrisma.electionCampaign.findUnique({
     where: { id: campaignId },
@@ -94,15 +166,17 @@ export async function enterPublicCampaignAlbumTenant(slug: string) {
     select: { isActive: true },
   });
 
-  if (!organization?.isActive) return null;
+  if (organization && organization.isActive === false) return null;
 
   enterTenantContext({ organizationId: campaign.organizationId, source: 'public-token' });
   return campaign;
 }
 
 export async function enterPublicSurfaceAlbumTenant(slug: string) {
+  if (!slug || typeof slug !== 'string') return null;
+  const clean = slug.trim();
   const { verifySurfaceAlbumSlug } = await import('@/lib/election-removal/album-token');
-  const verified = verifySurfaceAlbumSlug(slug);
+  const verified = verifySurfaceAlbumSlug(clean);
   if (!verified) return null;
 
   const organization = await platformPrisma.organization.findUnique({
@@ -110,7 +184,7 @@ export async function enterPublicSurfaceAlbumTenant(slug: string) {
     select: { id: true, isActive: true },
   });
 
-  if (!organization?.isActive) return null;
+  if (!organization || organization.isActive === false) return null;
 
   enterTenantContext({ organizationId: organization.id, source: 'public-token' });
   return { organizationId: organization.id, clientName: verified.clientName };

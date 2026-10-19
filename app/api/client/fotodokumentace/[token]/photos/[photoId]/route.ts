@@ -69,11 +69,22 @@ export async function GET(
               electionRemovalPoint: {
                 select: { campaignId: true },
               },
+              fieldWorkStep: {
+                select: {
+                  point: {
+                    select: { campaignId: true },
+                  },
+                },
+              },
             },
           })
       );
 
-      if (photoMeta && photoMeta.electionRemovalPoint?.campaignId === campaign.id) {
+      const photoCampaignId =
+        photoMeta?.electionRemovalPoint?.campaignId ||
+        photoMeta?.fieldWorkStep?.point?.campaignId;
+
+      if (photoMeta && photoCampaignId === campaign.id) {
         allowed = true;
       }
     }
