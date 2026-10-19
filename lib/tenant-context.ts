@@ -39,7 +39,20 @@ export function enterTenantContext(context: TenantContext) {
 }
 
 export function runWithTenantContext<T>(context: TenantContext, callback: () => T): T {
-  return storage.run(context, callback);
+  return storage.run(context, () => {
+    const result = callback();
+    // Prisma queries (PrismaPromise) are lazy: they only execute once `.then()` is
+    // called, which normally happens when the caller awaits the result — after
+    // `storage.run()` has already returned and the tenant context is gone.
+    // Start any thenable synchronously here so the query runs inside the scope.
+    if (result !== null && typeof result === 'object' && typeof (result as { then?: unknown }).then === 'function') {
+      const thenable = result as unknown as PromiseLike<unknown>;
+      return new Promise((resolve, reject) => {
+        thenable.then(resolve, reject);
+      }) as unknown as T;
+    }
+    return result;
+  });
 }
 
 export function assertOrganizationId(value: unknown, expected: string) {
