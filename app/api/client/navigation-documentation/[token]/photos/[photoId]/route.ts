@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     }
 
     const tokenHash = hashToken(token);
-    const owner = await enterPublicNavigationReportTenant(tokenHash, token);
+    const owner = await enterPublicNavigationReportTenant(tokenHash);
     if (!owner) {
       return NextResponse.json({ error: 'Report nebyl nalezen.' }, { status: 404 });
     }
