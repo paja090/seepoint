@@ -277,12 +277,24 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
   });
   const [artworkMessage, setArtworkMessage] = useState('');
   const [isUploadingArtwork, setIsUploadingArtwork] = useState(false);
-  const artworkUploadEnabled = canUploadNavigationArtwork(offer);
+  const _artworkUploadEnabled = canUploadNavigationArtwork(offer);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(
     navigation?.points[0]?.id || null,
   );
   const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
   const [activeBranchFilter, setActiveBranchFilter] = useState<string>('ALL');
+
+  // Selected rental duration state (1, 3, 6, 12, 24, 36 months)
+  const [selectedDuration, setSelectedDuration] = useState<RentalDurationMonths>(() => {
+    const rawMonths = (offer.campaignStrategy as Record<string, unknown> | null)?.rentalDurationMonths;
+    if (typeof rawMonths === 'number' && [1, 3, 6, 12, 24, 36].includes(rawMonths)) {
+      return rawMonths as RentalDurationMonths;
+    }
+    return inferDurationMonthsFromDates(
+      ((offer.campaignStrategy as Record<string, unknown> | null)?.dateFrom as string | undefined) || offer.items[0]?.dateFrom,
+      ((offer.campaignStrategy as Record<string, unknown> | null)?.dateTo as string | undefined) || offer.items[0]?.dateTo
+    );
+  });
 
   async function handleArtworkFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -356,17 +368,6 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
   if (!navigation) return null;
 
-  // Selected rental duration state (1, 3, 6, 12, 24, 36 months)
-  const [selectedDuration, setSelectedDuration] = useState<RentalDurationMonths>(() => {
-    const rawMonths = (offer.campaignStrategy as Record<string, unknown> | null)?.rentalDurationMonths;
-    if (typeof rawMonths === 'number' && [1, 3, 6, 12, 24, 36].includes(rawMonths)) {
-      return rawMonths as RentalDurationMonths;
-    }
-    return inferDurationMonthsFromDates(
-      ((offer.campaignStrategy as Record<string, unknown> | null)?.dateFrom as string | undefined) || offer.items[0]?.dateFrom,
-      ((offer.campaignStrategy as Record<string, unknown> | null)?.dateTo as string | undefined) || offer.items[0]?.dateTo
-    );
-  });
   const durationOption = getDurationOption(selectedDuration);
 
   // Filter price rows dynamically for selected points (or all if none filtered)
