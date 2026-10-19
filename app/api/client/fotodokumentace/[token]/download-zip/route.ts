@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
-import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { runWithTenantContext } from '@/lib/tenant-context';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
@@ -117,30 +117,34 @@ export async function GET(
         return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
       }
 
-      const surfaces = await prisma.advertisingSurface.findMany({
-        where: {
-          organizationId: surfaceMeta.organizationId,
-          ...(surfaceMeta.clientName === 'Vlastní síť nosičů'
-            ? { currentClientId: null }
-            : { currentClient: { name: surfaceMeta.clientName } }),
-          photos: {
-            some: {
-              organizationId: surfaceMeta.organizationId,
-              isPrivate: false,
-            },
-          },
-        },
-        include: {
-          carrier: true,
-          photos: {
+      const surfaces = await runWithTenantContext(
+        { organizationId: surfaceMeta.organizationId, source: 'public-token' },
+        () =>
+          prisma.advertisingSurface.findMany({
             where: {
               organizationId: surfaceMeta.organizationId,
-              isPrivate: false,
+              ...(surfaceMeta.clientName === 'Vlastní síť nosičů'
+                ? { currentClientId: null }
+                : { currentClient: { name: { equals: surfaceMeta.clientName, mode: 'insensitive' } } }),
+              photos: {
+                some: {
+                  organizationId: surfaceMeta.organizationId,
+                  isPrivate: false,
+                },
+              },
             },
-            orderBy: { createdAt: 'desc' },
-          },
-        },
-      });
+            include: {
+              carrier: true,
+              photos: {
+                where: {
+                  organizationId: surfaceMeta.organizationId,
+                  isPrivate: false,
+                },
+                orderBy: { createdAt: 'desc' },
+              },
+            },
+          })
+      );
 
       const zipFiles: Array<{ name: string; data: Buffer }> = [];
       let fileIndex = 1;
@@ -203,30 +207,29 @@ export async function GET(
       });
     }
 
-    const campaignId = verifyCampaignAlbumSlug(token);
-    if (!campaignId) {
-      return NextResponse.json({ error: 'Neplatný token.' }, { status: 400 });
-    }
-
     const campaign = await enterPublicCampaignAlbumTenant(token);
     if (!campaign) {
       return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
     }
 
-    const fullCampaign = await prisma.electionCampaign.findFirst({
-      where: { id: campaign.id, organizationId: campaign.organizationId },
-      include: {
-        points: {
+    const fullCampaign = await runWithTenantContext(
+      { organizationId: campaign.organizationId, source: 'public-token' },
+      () =>
+        prisma.electionCampaign.findFirst({
+          where: { id: campaign.id, organizationId: campaign.organizationId },
           include: {
-            photos: {
-              where: { isPrivate: false },
-              orderBy: { createdAt: 'desc' },
+            points: {
+              include: {
+                photos: {
+                  where: { isPrivate: false },
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+              orderBy: { label: 'asc' },
             },
           },
-          orderBy: { label: 'asc' },
-        },
-      },
-    });
+        })
+    );
 
     if (!fullCampaign) {
       return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });

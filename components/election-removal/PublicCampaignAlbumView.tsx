@@ -276,12 +276,20 @@ export function PublicCampaignAlbumView({
 
       // 1. Initialize Map instance once
       if (!mapInstanceRef.current) {
-        const map = L.map(mapContainerRef.current, {
-          center: [49.8175, 15.473],
-          zoom: 8,
-          attributionControl: true,
-        });
-        mapInstanceRef.current = map;
+        if ((mapContainerRef.current as unknown as { _leaflet_id?: unknown })._leaflet_id) {
+          (mapContainerRef.current as unknown as { _leaflet_id?: unknown })._leaflet_id = null;
+        }
+        try {
+          const map = L.map(mapContainerRef.current, {
+            center: [49.8175, 15.473],
+            zoom: 8,
+            attributionControl: true,
+          });
+          mapInstanceRef.current = map;
+        } catch (mapErr) {
+          console.warn('[PublicCampaignAlbumView] Leaflet map init caught error:', mapErr);
+          return;
+        }
       }
 
       const map = mapInstanceRef.current;
@@ -427,8 +435,18 @@ export function PublicCampaignAlbumView({
 
     return () => {
       isSubscribed = false;
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+        } catch {
+          // ignore
+        }
+        mapInstanceRef.current = null;
+        markersRef.current.clear();
+        tileLayerRef.current = null;
+      }
     };
-  }, [mapPoints, mapLayer, activeMapPointId]);
+  }, [mapPoints, mapLayer, viewMode]);
 
   // Recalculate size when switching to map view
   useEffect(() => {

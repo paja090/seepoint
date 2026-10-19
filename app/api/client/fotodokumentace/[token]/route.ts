@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
-import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
+import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
+import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,9 +12,131 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
-    const campaignId = verifyCampaignAlbumSlug(token);
-    if (!campaignId) {
-      return NextResponse.json({ error: 'Neplatný přístupový odkaz.' }, { status: 400 });
+    const url = new URL(req.url);
+    const monthFilter = url.searchParams.get('month'); // "2026-10"
+    const typeFilter = url.searchParams.get('type'); // "INSTALLATION", "DEINSTALLATION", etc.
+
+    if (token.startsWith('surface.')) {
+      const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);
+      if (!surfaceMeta) {
+        return NextResponse.json({ error: 'Fotodokumentace nebyla nalezena.' }, { status: 404 });
+      }
+
+      const surfaces = await runWithTenantContext(
+        { organizationId: surfaceMeta.organizationId, source: 'public-token' },
+        () =>
+          prisma.advertisingSurface.findMany({
+            where: {
+              organizationId: surfaceMeta.organizationId,
+              ...(surfaceMeta.clientName === 'Vlastní síť nosičů'
+                ? { currentClientId: null }
+                : { currentClient: { name: { equals: surfaceMeta.clientName, mode: 'insensitive' } } }),
+              photos: {
+                some: {
+                  organizationId: surfaceMeta.organizationId,
+                  isPrivate: false,
+                },
+              },
+            },
+            include: {
+              carrier: true,
+              photos: {
+                where: {
+                  organizationId: surfaceMeta.organizationId,
+                  isPrivate: false,
+                },
+                select: {
+                  id: true,
+                  type: true,
+                  fileName: true,
+                  mimeType: true,
+                  size: true,
+                  createdAt: true,
+                  capturedLatitude: true,
+                  capturedLongitude: true,
+                  capturedByWorkerName: true,
+                  fieldWorkStepId: true,
+                },
+                orderBy: { createdAt: 'desc' },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          })
+      );
+
+      const periodsSet = new Set<string>();
+      for (const surface of surfaces) {
+        for (const photo of surface.photos) {
+          const d = new Date(photo.createdAt);
+          if (!Number.isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            periodsSet.add(`${y}-${m}`);
+          }
+        }
+      }
+      const availablePeriods = Array.from(periodsSet).sort().reverse();
+
+      const points = surfaces.map((s) => {
+        const filteredPhotos = s.photos.filter((photo) => {
+          if (monthFilter) {
+            const d = new Date(photo.createdAt);
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (ym !== monthFilter) return false;
+          }
+          if (typeFilter && photo.type !== typeFilter) return false;
+          return true;
+        });
+
+        const carrierLat = s.carrier?.latitude != null && !Number.isNaN(Number(s.carrier.latitude)) && Number(s.carrier.latitude) !== 0 ? Number(s.carrier.latitude) : null;
+        const carrierLng = s.carrier?.longitude != null && !Number.isNaN(Number(s.carrier.longitude)) && Number(s.carrier.longitude) !== 0 ? Number(s.carrier.longitude) : null;
+        const photoWithGps = s.photos.find(
+          (ph) => ph.capturedLatitude != null && ph.capturedLongitude != null && (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
+        );
+        const latitude = carrierLat ?? (photoWithGps?.capturedLatitude ? Number(photoWithGps.capturedLatitude) : 0);
+        const longitude = carrierLng ?? (photoWithGps?.capturedLongitude ? Number(photoWithGps.capturedLongitude) : 0);
+
+        return {
+          id: s.id,
+          label: s.carrier ? `${s.carrier.code} · ${s.name}` : s.name,
+          description: [
+            s.carrier?.address ? s.carrier.address : null,
+            s.carrier?.city ? s.carrier.city : null,
+            s.directionDescription ? `Směr: ${s.directionDescription}` : null,
+          ].filter(Boolean).join(', ') || null,
+          mediaType: 'CARRIER_SURFACE',
+          objectType: 'REKLAMNÍ PLOCHA',
+          quantity: 1,
+          latitude,
+          longitude,
+          operationType: 'INSPECTION',
+          photos: filteredPhotos.map((ph) => ({
+            ...ph,
+            url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
+          })),
+          steps: [],
+        };
+      });
+
+      const totalPhotos = surfaces.reduce((sum, s) => sum + s.photos.length, 0);
+      return NextResponse.json({
+        success: true,
+        campaign: {
+          id: `surface-${surfaceMeta.organizationId}`,
+          name: `${surfaceMeta.clientName} – Kontrola reklamních ploch`,
+          clientName: surfaceMeta.clientName,
+          description: 'Pravidelná kontrola a fotodokumentace reklamních ploch',
+          targetDate: null,
+          totalPoints: surfaces.length,
+          completedPoints: surfaces.length,
+        },
+        stats: {
+          totalRealizedPoints: surfaces.length,
+          totalPhotos,
+          availablePeriods,
+        },
+        points,
+      });
     }
 
     const campaign = await enterPublicCampaignAlbumTenant(token);
@@ -22,48 +144,48 @@ export async function GET(
       return NextResponse.json({ error: 'Fotodokumentace nebyla nalezena.' }, { status: 404 });
     }
 
-    const url = new URL(req.url);
-    const monthFilter = url.searchParams.get('month'); // "2026-10"
-    const typeFilter = url.searchParams.get('type'); // "INSTALLATION", "DEINSTALLATION", etc.
-
-    const fullCampaign = await prisma.electionCampaign.findFirst({
-      where: { id: campaign.id, organizationId: campaign.organizationId },
-      include: {
-        points: {
+    const fullCampaign = await runWithTenantContext(
+      { organizationId: campaign.organizationId, source: 'public-token' },
+      () =>
+        prisma.electionCampaign.findFirst({
+          where: { id: campaign.id, organizationId: campaign.organizationId },
           include: {
-            photos: {
-              where: { isPrivate: false },
-              select: {
-                id: true,
-                type: true,
-                fileName: true,
-                mimeType: true,
-                size: true,
-                createdAt: true,
-                capturedLatitude: true,
-                capturedLongitude: true,
-                capturedByWorkerName: true,
-                fieldWorkStepId: true,
+            points: {
+              include: {
+                photos: {
+                  where: { isPrivate: false },
+                  select: {
+                    id: true,
+                    type: true,
+                    fileName: true,
+                    mimeType: true,
+                    size: true,
+                    createdAt: true,
+                    capturedLatitude: true,
+                    capturedLongitude: true,
+                    capturedByWorkerName: true,
+                    fieldWorkStepId: true,
+                  },
+                  orderBy: { createdAt: 'desc' },
+                },
+                steps: {
+                  select: {
+                    id: true,
+                    sequence: true,
+                    kind: true,
+                    label: true,
+                    photoType: true,
+                    status: true,
+                    completedQuantity: true,
+                  },
+                  orderBy: { sequence: 'asc' },
+                },
               },
-              orderBy: { createdAt: 'desc' },
-            },
-            steps: {
-              select: {
-                id: true,
-                sequence: true,
-                kind: true,
-                label: true,
-                photoType: true,
-                status: true,
-                completedQuantity: true,
-              },
-              orderBy: { sequence: 'asc' },
+              orderBy: { label: 'asc' },
             },
           },
-          orderBy: { label: 'asc' },
-        },
-      },
-    });
+        })
+    );
 
     if (!fullCampaign) {
       return NextResponse.json({ error: 'Fotodokumentace nebyla nalezena.' }, { status: 404 });
