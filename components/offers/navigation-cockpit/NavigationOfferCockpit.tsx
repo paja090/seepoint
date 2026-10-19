@@ -256,13 +256,72 @@ export function NavigationOfferCockpit({
     }
   }
 
-  // Google Routes calculation
+  // Client-side DirectionsService helper for browser fallback
+  function computeBrowserDirectionsRoute(
+    fromLat: number,
+    fromLng: number,
+    toLat: number,
+    toLng: number
+  ): Promise<{ calculatedDistanceMeters?: number; routePolyline?: string; routeDistanceMeters?: number } | null> {
+    return new Promise((resolve) => {
+      try {
+        if (typeof window === 'undefined') return resolve(null);
+        const maps = window.google?.maps as unknown as {
+          DirectionsService?: new () => {
+            route: (
+              request: Record<string, unknown>,
+              callback: (
+                result: {
+                  routes?: Array<{
+                    overview_polyline?: string | { points?: string };
+                    legs?: Array<{ distance?: { value?: number } }>;
+                  }>;
+                } | null,
+                status: string
+              ) => void
+            ) => void;
+          };
+          TravelMode?: { DRIVING?: string };
+        };
+        if (!maps?.DirectionsService) return resolve(null);
+
+        new maps.DirectionsService().route(
+          {
+            origin: { lat: fromLat, lng: fromLng },
+            destination: { lat: toLat, lng: toLng },
+            travelMode: maps.TravelMode?.DRIVING || 'DRIVING',
+          },
+          (result, status) => {
+            if (status === 'OK' && result?.routes?.[0]) {
+              const first = result.routes[0];
+              const rawPoly = first.overview_polyline;
+              const polyline = typeof rawPoly === 'string' ? rawPoly : rawPoly?.points;
+              const rawDist = first.legs?.[0]?.distance?.value;
+              const rounded =
+                typeof rawDist === 'number' && rawDist > 0 ? Math.max(50, Math.round(rawDist / 50) * 50) : undefined;
+              return resolve({
+                calculatedDistanceMeters: rounded,
+                routeDistanceMeters: rounded,
+                routePolyline: polyline || undefined,
+              });
+            }
+            resolve(null);
+          }
+        );
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  // Google Routes calculation (server-side with client-side fallback)
   async function fetchRouteInfo(
     fromLat: number,
     fromLng: number,
     toLat: number,
     toLng: number
   ): Promise<{ calculatedDistanceMeters?: number; routePolyline?: string; routeDistanceMeters?: number }> {
+    // 1. Primary: Server-side Google Routes API (/api/navigation-routes)
     try {
       const res = await fetch('/api/navigation-routes', {
         method: 'POST',
@@ -271,18 +330,29 @@ export function NavigationOfferCockpit({
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.status === 'OK' && typeof data.distanceMeters === 'number') {
+        if (data.status === 'OK' && typeof data.distanceMeters === 'number' && data.polyline) {
           const rounded = Math.max(50, Math.round(data.distanceMeters / 50) * 50);
           return {
             calculatedDistanceMeters: rounded,
             routeDistanceMeters: rounded,
-            routePolyline: data.polyline || undefined,
+            routePolyline: data.polyline,
           };
         }
       }
     } catch {
-      /* fallback */
+      /* fallback to client DirectionsService below */
     }
+
+    // 2. Fallback: Browser DirectionsService using loaded Google Maps SDK
+    try {
+      const clientRoute = await computeBrowserDirectionsRoute(fromLat, fromLng, toLat, toLng);
+      if (clientRoute && clientRoute.routePolyline) {
+        return clientRoute;
+      }
+    } catch {
+      /* fallback empty */
+    }
+
     return {};
   }
 
