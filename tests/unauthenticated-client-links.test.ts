@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -6,6 +7,7 @@ import {
   buildSurfaceAlbumSlug,
   verifySurfaceAlbumSlug,
 } from '../lib/election-removal/album-token';
+import { platformPrisma } from '../lib/db';
 import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '../lib/public-tenant';
 import { getTenantContext, runWithTenantContext } from '../lib/tenant-context';
 
@@ -35,15 +37,44 @@ test('buildSurfaceAlbumSlug & verifySurfaceAlbumSlug - signs and verifies surfac
   assert.equal(verifySurfaceAlbumSlug(''), null);
 });
 
-test('enterPublicCampaignAlbumTenant - supports both signed slugs and raw campaign CUIDs', async () => {
+test('enterPublicCampaignAlbumTenant - supports both signed slugs and raw campaign CUIDs', async (t) => {
   const campaignId = 'cmvb9j2hp0001jz07a738oqo3';
+  const orgId = 'org_seepoint_default';
   const signedSlug = buildCampaignAlbumSlug(campaignId);
+
+  const originalCampaignFindUnique = platformPrisma.electionCampaign.findUnique;
+  const originalOrgFindUnique = platformPrisma.organization.findUnique;
+  t.after(() => {
+    platformPrisma.electionCampaign.findUnique = originalCampaignFindUnique;
+    platformPrisma.organization.findUnique = originalOrgFindUnique;
+  });
+
+  (platformPrisma.electionCampaign as any).findUnique = (async ({ where }: any) => {
+    if (where.id === campaignId) {
+      return {
+        id: campaignId,
+        name: 'Volební kampaň 2026',
+        clientName: 'Město Ostrava',
+        description: null,
+        status: 'IN_PROGRESS',
+        organizationId: orgId,
+      };
+    }
+    return null;
+  }) as typeof platformPrisma.electionCampaign.findUnique;
+
+  (platformPrisma.organization as any).findUnique = (async ({ where }: any) => {
+    if (where.id === orgId) {
+      return { id: orgId, isActive: true };
+    }
+    return null;
+  }) as typeof platformPrisma.organization.findUnique;
 
   // 1. Signed slug
   const metaSigned = await enterPublicCampaignAlbumTenant(signedSlug);
   assert.ok(metaSigned);
   assert.equal(metaSigned.id, campaignId);
-  assert.ok(metaSigned.organizationId);
+  assert.equal(metaSigned.organizationId, orgId);
 
   const scopedOrg = runWithTenantContext(
     { organizationId: metaSigned.organizationId, source: 'public-token' },
@@ -55,17 +86,29 @@ test('enterPublicCampaignAlbumTenant - supports both signed slugs and raw campai
   const metaRaw = await enterPublicCampaignAlbumTenant(campaignId);
   assert.ok(metaRaw);
   assert.equal(metaRaw.id, campaignId);
-  assert.ok(metaRaw.organizationId);
+  assert.equal(metaRaw.organizationId, orgId);
 
   // 3. Invalid tokens must return null
   assert.equal(await enterPublicCampaignAlbumTenant('non-existent-campaign-id'), null);
   assert.equal(await enterPublicCampaignAlbumTenant(''), null);
 });
 
-test('enterPublicSurfaceAlbumTenant - activates tenant context for valid surface tokens', async () => {
+test('enterPublicSurfaceAlbumTenant - activates tenant context for valid surface tokens', async (t) => {
   const orgId = 'org_seepoint_default';
   const client = 'Petlando';
   const slug = buildSurfaceAlbumSlug(orgId, client);
+
+  const originalFindUnique = platformPrisma.organization.findUnique;
+  t.after(() => {
+    platformPrisma.organization.findUnique = originalFindUnique;
+  });
+
+  (platformPrisma.organization as any).findUnique = (async ({ where }: any) => {
+    if (where.id === orgId) {
+      return { id: orgId, isActive: true };
+    }
+    return null;
+  }) as typeof platformPrisma.organization.findUnique;
 
   const meta = await enterPublicSurfaceAlbumTenant(slug);
   assert.ok(meta);
