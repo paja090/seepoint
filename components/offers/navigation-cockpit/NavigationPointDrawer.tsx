@@ -31,6 +31,7 @@ interface NavigationPointDrawerProps {
   proposalMode: 'LOCATION_SELECTION' | 'PRICED_QUOTE';
   onOpenVisualizer?: (pointId: string) => void;
   onUploadSitePhoto?: (pointId: string, file: File) => void;
+  onRecalculateRoute?: (pointId: string) => Promise<void>;
 }
 
 export function NavigationPointDrawer({
@@ -41,6 +42,7 @@ export function NavigationPointDrawer({
   proposalMode,
   onOpenVisualizer,
   onUploadSitePhoto,
+  onRecalculateRoute,
 }: NavigationPointDrawerProps) {
   if (!point) return null;
 
@@ -180,6 +182,17 @@ export function NavigationPointDrawer({
                 <span className="text-[11px] text-slate-500">
                   Google auto: <strong>{point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters} m` : '—'}</strong>
                 </span>
+                {onRecalculateRoute && (
+                  <button
+                    type="button"
+                    onClick={() => void onRecalculateRoute(point.id)}
+                    title="Přepočítat trasu a vzdálenost přes Google Routes"
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} className="text-sky-600" />
+                    <span>Přepočítat</span>
+                  </button>
+                )}
               </div>
             </div>
 

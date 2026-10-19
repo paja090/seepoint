@@ -251,6 +251,11 @@ export function NavigationMapStep({
           proposalMode={proposalMode}
           onOpenVisualizer={onOpenVisualizer}
           onUploadSitePhoto={onUploadSitePhoto}
+          onRecalculateRoute={async (ptId) => {
+            await onRecalculateRoutes();
+            const fresh = points.find((p) => p.id === ptId);
+            if (fresh) setEditingPoint(fresh);
+          }}
         />
       )}
     </div>
