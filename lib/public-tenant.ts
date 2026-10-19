@@ -56,21 +56,65 @@ export async function enterPublicOfferTenant(tokenOrHash: string) {
   return owner;
 }
 
-export async function enterPublicNavigationReportTenant(publicTokenHash: string) {
+export async function enterPublicNavigationReportTenant(publicTokenHash: string, rawToken?: string) {
   const clean = publicTokenHash.trim();
   if (!/^[a-f0-9]{64}$/i.test(clean)) return null;
-  const owner = await platformPrisma.navigationDocumentationReport.findFirst({
+
+  let owner = await platformPrisma.navigationDocumentationReport.findFirst({
     where: {
       publicTokenHash: clean,
       status: { in: ['PUBLISHED', 'SENT'] },
       publishedAt: { not: null },
       tokenExpiresAt: { gt: new Date() },
     },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, publishedAt: true, status: true },
   });
+
+  if (!owner) {
+    const { getDeterministicReportToken } = await import('@/lib/navigation-documentation');
+    const candidates = await platformPrisma.navigationDocumentationReport.findMany({
+      where: { status: { not: 'ARCHIVED' } },
+      select: {
+        id: true,
+        organizationId: true,
+        publishedAt: true,
+        status: true,
+        tokenExpiresAt: true,
+        publicTokenHash: true,
+      },
+    });
+    const matched = candidates.find((c) => {
+      const det = getDeterministicReportToken(c.id);
+      return det.hash === clean || det.token === rawToken || det.token === clean;
+    });
+
+    if (matched) {
+      const now = matched.publishedAt || new Date();
+      const expires = matched.tokenExpiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      const det = getDeterministicReportToken(matched.id);
+      await platformPrisma.navigationDocumentationReport
+        .update({
+          where: { id: matched.id },
+          data: {
+            publicTokenHash: det.hash,
+            publishedAt: now,
+            tokenExpiresAt: expires,
+          },
+        })
+        .catch(() => {});
+      owner = {
+        id: matched.id,
+        organizationId: matched.organizationId,
+        publishedAt: now,
+        status: matched.status,
+      };
+    }
+  }
+
   if (!owner) return null;
   const organization = await platformPrisma.organization.findUnique({
-    where: { id: owner.organizationId }, select: { isActive: true },
+    where: { id: owner.organizationId },
+    select: { isActive: true },
   });
   if (!organization?.isActive) return null;
   enterTenantContext({ organizationId: owner.organizationId, source: 'public-token' });
@@ -98,5 +142,21 @@ export async function enterPublicCampaignAlbumTenant(slug: string) {
 
   enterTenantContext({ organizationId: campaign.organizationId, source: 'public-token' });
   return campaign;
+}
+
+export async function enterPublicSurfaceAlbumTenant(slug: string) {
+  const { verifySurfaceAlbumSlug } = await import('@/lib/election-removal/album-token');
+  const verified = verifySurfaceAlbumSlug(slug);
+  if (!verified) return null;
+
+  const organization = await platformPrisma.organization.findUnique({
+    where: { id: verified.organizationId },
+    select: { id: true, isActive: true },
+  });
+
+  if (!organization?.isActive) return null;
+
+  enterTenantContext({ organizationId: organization.id, source: 'public-token' });
+  return { organizationId: organization.id, clientName: verified.clientName };
 }
 

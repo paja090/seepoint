@@ -28,7 +28,7 @@ export default async function PublicNavigationDocumentationPage({
   }
 
   const tokenHash = hashToken(token);
-  const owner = await enterPublicNavigationReportTenant(tokenHash);
+  const owner = await enterPublicNavigationReportTenant(tokenHash, token);
   if (!owner) notFound();
 
   const report = await platformPrisma.navigationDocumentationReport.findFirst({

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { enterPublicCampaignAlbumTenant } from '@/lib/public-tenant';
+import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
 import { verifyCampaignAlbumSlug } from '@/lib/election-removal/album-token';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
 import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
@@ -14,21 +14,48 @@ export async function GET(
 ) {
   try {
     const { token, photoId } = await params;
-    const campaignId = verifyCampaignAlbumSlug(token);
-    if (!campaignId) {
-      return NextResponse.json({ error: 'Neplatný token.' }, { status: 400 });
-    }
+    let organizationId: string;
+    let allowed = false;
 
-    const campaign = await enterPublicCampaignAlbumTenant(token);
-    if (!campaign) {
-      return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
-    }
+    if (token.startsWith('surface.')) {
+      const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);
+      if (!surfaceMeta) {
+        return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+      }
+      organizationId = surfaceMeta.organizationId;
 
-    const urlObj = new URL(request.url);
-    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
-    const cacheKey = `photo:${photoId}`;
+      const photoMeta = await prisma.photo.findFirst({
+        where: {
+          id: photoId,
+          organizationId: surfaceMeta.organizationId,
+          isPrivate: false,
+        },
+        select: {
+          id: true,
+          surface: {
+            select: {
+              currentClient: { select: { name: true } },
+            },
+          },
+        },
+      });
 
-    if (isThumbnail) {
+      const photoClientName = photoMeta?.surface?.currentClient?.name || 'Vlastní síť nosičů';
+      if (photoMeta && photoClientName.trim().toLowerCase() === surfaceMeta.clientName.trim().toLowerCase()) {
+        allowed = true;
+      }
+    } else {
+      const campaignId = verifyCampaignAlbumSlug(token);
+      if (!campaignId) {
+        return NextResponse.json({ error: 'Neplatný token.' }, { status: 400 });
+      }
+
+      const campaign = await enterPublicCampaignAlbumTenant(token);
+      if (!campaign) {
+        return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+      }
+      organizationId = campaign.organizationId;
+
       const photoMeta = await prisma.photo.findFirst({
         where: {
           id: photoId,
@@ -42,9 +69,21 @@ export async function GET(
           },
         },
       });
-      if (!photoMeta || photoMeta.electionRemovalPoint?.campaignId !== campaign.id) {
-        return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
+
+      if (photoMeta && photoMeta.electionRemovalPoint?.campaignId === campaign.id) {
+        allowed = true;
       }
+    }
+
+    if (!allowed) {
+      return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
+    }
+
+    const urlObj = new URL(request.url);
+    const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
+    const cacheKey = `photo:${photoId}`;
+
+    if (isThumbnail) {
       const cachedThumb = getCachedThumbnail(cacheKey);
       if (cachedThumb) {
         return new Response(new Uint8Array(cachedThumb), {
@@ -61,17 +100,12 @@ export async function GET(
     const photo = await prisma.photo.findFirst({
       where: {
         id: photoId,
-        organizationId: campaign.organizationId,
+        organizationId,
         isPrivate: false,
-      },
-      include: {
-        electionRemovalPoint: {
-          select: { campaignId: true },
-        },
       },
     });
 
-    if (!photo || photo.electionRemovalPoint?.campaignId !== campaign.id) {
+    if (!photo) {
       return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
     }
 

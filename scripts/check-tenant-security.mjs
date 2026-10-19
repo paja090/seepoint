@@ -40,8 +40,8 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['lib/db.ts', 6],
   ['lib/offers/service.ts', 4],
   ['lib/organization-usage.ts', 3],
-  // Report token lookup no longer scans or rewrites reports; it checks organization activity instead.
-  ['lib/public-tenant.ts', 9],
+  // Public token lookup resolves offers, reports, campaign albums, and surface inspection albums before entering tenant context.
+  ['lib/public-tenant.ts', 12],
   ['lib/tenant-request-context.ts', 2],
   ['scripts/import-carriers-2026.ts', 4],
 ]);
