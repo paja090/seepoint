@@ -125,22 +125,18 @@ test('enterPublicSurfaceAlbumTenant - activates tenant context for valid surface
   assert.equal(await enterPublicSurfaceAlbumTenant(`${slug}x`), null);
 });
 
-test('enterPublicNavigationReportTenant - resolves reports with null or future tokenExpiresAt and supports deterministic candidate fallback', async (t) => {
+test('enterPublicNavigationReportTenant - resolves active reports with future tokenExpiresAt', async (t) => {
   const reportId = 'nav-report-xyz-123';
   const orgId = 'org_seepoint_default';
-  const { getDeterministicReportToken, hashToken } = await import('../lib/navigation-documentation');
+  const { getDeterministicReportToken } = await import('../lib/navigation-documentation');
   const { enterPublicNavigationReportTenant } = await import('../lib/public-tenant');
-  const { token, hash } = getDeterministicReportToken(reportId);
+  const { hash } = getDeterministicReportToken(reportId);
 
   const originalReportFindFirst = platformPrisma.navigationDocumentationReport.findFirst;
-  const originalReportFindMany = platformPrisma.navigationDocumentationReport.findMany;
-  const originalReportUpdate = platformPrisma.navigationDocumentationReport.update;
   const originalOrgFindUnique = platformPrisma.organization.findUnique;
 
   t.after(() => {
     platformPrisma.navigationDocumentationReport.findFirst = originalReportFindFirst;
-    platformPrisma.navigationDocumentationReport.findMany = originalReportFindMany;
-    platformPrisma.navigationDocumentationReport.update = originalReportUpdate;
     platformPrisma.organization.findUnique = originalOrgFindUnique;
   });
 
@@ -151,57 +147,19 @@ test('enterPublicNavigationReportTenant - resolves reports with null or future t
     return null;
   }) as typeof platformPrisma.organization.findUnique;
 
-  // Case 1: Report has null tokenExpiresAt in DB
   (platformPrisma.navigationDocumentationReport as any).findFirst = (async ({ where }: any) => {
-    const hasHashMatch = where.AND?.some((c: any) =>
-      c.OR?.some((o: any) => o.publicTokenHash === hash || o.publicTokenHash === token)
-    );
-    if (hasHashMatch) {
+    if (where.publicTokenHash === hash && where.status?.in?.includes('PUBLISHED') && where.publishedAt && where.tokenExpiresAt?.gt) {
       return { id: reportId, organizationId: orgId };
     }
     return null;
   }) as typeof platformPrisma.navigationDocumentationReport.findFirst;
 
-  const res1 = await enterPublicNavigationReportTenant(hash);
-  assert.ok(res1);
-  assert.equal(res1.id, reportId);
-  assert.equal(res1.organizationId, orgId);
+  const res = await enterPublicNavigationReportTenant(hash);
+  assert.ok(res);
+  assert.equal(res.id, reportId);
+  assert.equal(res.organizationId, orgId);
 
-  // Also passing raw token should work
-  const resToken = await enterPublicNavigationReportTenant(token);
-  assert.ok(resToken);
-  assert.equal(resToken.id, reportId);
-
-  // Case 2: Candidate fallback when findFirst returns null (e.g. unindexed or draft report)
-  (platformPrisma.navigationDocumentationReport as any).findFirst = (async () => null) as any;
-  (platformPrisma.navigationDocumentationReport as any).findMany = (async () => [
-    {
-      id: reportId,
-      organizationId: orgId,
-      publicTokenHash: null,
-      publishedAt: null,
-      status: 'DRAFT',
-    },
-  ]) as any;
-
-  let updateCalled = false;
-  (platformPrisma.navigationDocumentationReport as any).update = (async ({ where, data }: any) => {
-    if (where.id === reportId) {
-      updateCalled = true;
-      assert.equal(data.publicTokenHash, hash);
-      assert.equal(data.status, 'PUBLISHED');
-      return { id: reportId, organizationId: orgId };
-    }
-    return null;
-  }) as any;
-
-  const resFallback = await enterPublicNavigationReportTenant(token);
-  assert.ok(resFallback);
-  assert.equal(resFallback.id, reportId);
-  assert.equal(resFallback.organizationId, orgId);
-  assert.equal(updateCalled, true);
-
-  // Case 3: Invalid token format
+  // Invalid token format
   assert.equal(await enterPublicNavigationReportTenant('short-invalid'), null);
   assert.equal(await enterPublicNavigationReportTenant(''), null);
 });
