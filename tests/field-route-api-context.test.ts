@@ -13,8 +13,8 @@ test('postpone HTTP handler establishes authenticated tenant across async body a
    'export async function requireElectionRemovalAccess(){await Promise.resolve();return {organizationId:"authenticated-org",user:{id:"manager",role:"MANAGER",email:"m@test"}}};export const isElectionRemovalAccessDenied=()=>false;':
    'import {requireTenantContext} from '+JSON.stringify(context)+';export async function postponeFieldPlan(id){await new Promise(r=>setImmediate(r));return {id,date:"2026-10-21",organizationId:requireTenantContext().organizationId};}'}));
  }}]});
- const module={exports:{} as {POST:(request:Request)=>Promise<Response>}};
- new Function('require','module','exports',bundle.outputFiles[0].text)(createRequire(resolve('package.json')),module,module.exports);
- const response=await runWithTenantContext({organizationId:'wrong-outer-org',source:'test'},()=>module.exports.POST(new Request('https://example.test/api/election-removal/plans/postpone',{method:'POST',body:JSON.stringify({planId:'plan'})})));
+ const evaluatedModule={exports:{} as {POST:(request:Request)=>Promise<Response>}};
+ new Function('require','module','exports',bundle.outputFiles[0].text)(createRequire(resolve('package.json')),evaluatedModule,evaluatedModule.exports);
+ const response=await runWithTenantContext({organizationId:'wrong-outer-org',source:'test'},()=>evaluatedModule.exports.POST(new Request('https://example.test/api/election-removal/plans/postpone',{method:'POST',body:JSON.stringify({planId:'plan'})})));
  assert.equal(response.status,200);assert.deepEqual(await response.json(),{id:'plan',date:'2026-10-21',organizationId:'authenticated-org'});
 });
