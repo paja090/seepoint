@@ -39,12 +39,13 @@ export function convertElectionPointToJob(
 ): PlanningJob {
   const operationType = point.operationType ?? 'OTHER';
   const legacyOperation = operationType === 'REPLACE_AD' || operationType === 'REMOVE_AD' || operationType === 'INSTALL_AD' ? 'BANNER_CHANGE' : operationType === 'RELOCATION' ? 'RELOCATION' : operationType === 'OTHER' ? 'OTHER' : 'FULL_REMOVAL';
-  const steps = point.steps?.filter(s => s.status !== 'COMPLETED').sort((a, b) => a.sequence - b.sequence) ?? [];
+  const steps = point.steps?.filter(s => !['COMPLETED', 'CANCELLED'].includes(s.status)).sort((a, b) => a.sequence - b.sequence) ?? [];
   const first = steps[0];
   const delivery = steps[1];
 
   const calculated = calculateServiceMinutes(point.mediaType, point.quantity, null, legacyOperation);
-  const serviceMinutes = first?.serviceMinutes ?? point.serviceMinutes ?? calculated.totalMinutes;
+  const remainingQuantity = point.quantity - (first?.completedQuantity ?? 0);
+  const serviceMinutes = first ? Math.max(1, Math.ceil(first.serviceMinutes * remainingQuantity / first.quantity)) : point.serviceMinutes ?? calculated.totalMinutes;
   const loadSlots = first ? Math.max(0, first.loadDelta) : calculateMediaLoadSlots(point.mediaType, legacyOperation, point.quantity);
 
   return {
@@ -73,14 +74,14 @@ export function convertElectionPointToJob(
     serviceMinutes,
     constraints: { windowStart: point.windowStart?.toISOString(), windowEnd: point.windowEnd?.toISOString(), requiredWorkers: point.requiredWorkers, requiredPositions: point.requiredPositions, requiredEquipment: point.requiredEquipment, vehicleRequired: loadSlots > 0 },
     blockedReason:
-      point.reviewRequired || !first ? 'Vyžaduje kontrolu: doplňte strukturované zadání a kroky.' : point.startedAt && first.kind !== 'HANDOFF' ? 'Zahájenou práci nelze přeplánovat bez explicitního předání.' : point.status === 'ISSUE'
+      point.reviewRequired || !first ? 'Vyžaduje kontrolu: doplňte strukturované zadání a kroky.' : point.startedAt && first.kind !== 'HANDOFF' && !(first.status === 'PENDING' && !first.assignedFieldPlanId) ? 'V detailu akce použijte „Uvolnit pro novou trasu“, nebo předejte naložený materiál.' : point.status === 'ISSUE'
         ? point.issueNote || 'Hlášen problém na stanovišti'
         : undefined,
     updatedAt: point.updatedAt.toISOString() + steps.map(s => '/' + s.updatedAt.toISOString()).join(''),
     electionCampaignId: campaign.id,
     electionRemovalPointId: point.id,
     mediaType: point.mediaType,
-    quantity: point.quantity,
+    quantity: remainingQuantity,
     operationType,
     loadSlots,
   };
@@ -339,7 +340,8 @@ export async function optimizeElectionRemovalRoutes(
             where: {
               organizationId,
               assignedFieldPlanId: candidatePlanId,
-              OR: [{ startedAt: { not: null } }, { completedQuantity: { gt: 0 } }],
+              status: { notIn: ['COMPLETED', 'CANCELLED'] },
+              OR: [{ status: 'ISSUE' }, { startedAt: { not: null } }, { completedQuantity: { gt: 0 } }, { kind: { in: ['DELIVERY', 'HANDOFF'] }, point: { steps: { some: { loadDelta: { gt: 0 }, completedQuantity: { gt: 0 } } } } }],
             },
           });
           if (startedCount === 0) {

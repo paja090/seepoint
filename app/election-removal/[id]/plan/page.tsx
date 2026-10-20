@@ -68,6 +68,7 @@ export default async function ElectionRemovalPlanPage({
           {/* Planner Component */}
           <ElectionRoutePlanner
             campaign={campaign}
+            canManage={['ADMIN', 'MANAGER'].includes(user.role)}
             employees={employees}
             vehicles={vehicles}
             initialDepot={profile?.depot}

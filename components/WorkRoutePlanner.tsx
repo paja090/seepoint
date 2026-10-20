@@ -1,4 +1,5 @@
 'use client';
+import { PostponeRouteButton } from '@/components/election-removal/PostponeRouteButton';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CrewInput, PlanningInput, PlanningProfile, PlanView } from '@/lib/field-planning/contracts';
@@ -478,6 +479,8 @@ export function WorkRoutePlanner({
           </button>
         </div>
       </header>
+
+      {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && plan.result.crews.some(c=>c.stops.some(s=>s.fieldWorkStepId)) && <div className="rounded-xl border border-sky-300 bg-sky-50 p-4"><PostponeRouteButton planId={plan.id} /></div>}
 
       {/* AI Telemetry & Calibration Section */}
       {telemetryOpen && (
