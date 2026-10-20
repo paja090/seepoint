@@ -148,8 +148,10 @@ test('legacy content and thumbnail endpoints converge on the authorized file rou
 
 test('deleting a photo removes the database row before best-effort object cleanup', () => {
   const api = read('app/api/photos/[id]/route.ts');
-  const transactionIndex = api.indexOf('await prisma.$transaction', api.indexOf('export async function DELETE'));
-  const cleanupIndex = api.indexOf('await deleteStoredPhoto(photo)', transactionIndex);
+  const transactionIndex = api.indexOf('deletePhotoRecord(id, auth)', api.indexOf('export async function DELETE'));
+  assert.match(read('lib/photo-delete.ts'), /await tx\.photo\.delete/);
+  assert.match(read('lib/photo-delete.ts'), /return db\.\$transaction/);
+  const cleanupIndex = api.indexOf('deleteStoredPhoto(photo)', transactionIndex);
   assert.ok(transactionIndex > 0 && cleanupIndex > transactionIndex);
   assert.match(api, /storageCleanupPending/);
   assert.doesNotMatch(api, /Skip Google Drive deletion for carrier/);

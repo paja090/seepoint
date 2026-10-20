@@ -1,6 +1,7 @@
+import { saveAlbumTitle } from '@/lib/fotodokumentace/album-title';
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
-import { enterTenantContext } from '@/lib/tenant-context';
+import { enterTenantContext, runWithTenantContext } from '@/lib/tenant-context';
 import { prisma } from '@/lib/db';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 
@@ -214,4 +215,13 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+export async function PATCH(req: Request, {params}: {params: Promise<{id:string}>}) {
+  const user=await requireApiAccess('photoDocumentation');if(isApiDenied(user))return user;
+  if(!['ADMIN','MANAGER'].includes(user.role)) return NextResponse.json({error:'Název alba může upravit správce nebo manažer.'},{status:403});
+  try {
+    const {id}=await params;const body=await req.json();
+    return NextResponse.json(await runWithTenantContext({organizationId:user.organizationId!,userId:user.id,source:'session'},()=>saveAlbumTitle(id,body,user)));
+  } catch(error) {return NextResponse.json({error:error instanceof Error?error.message:'Název alba se nepodařilo uložit.'},{status:400});}
 }

@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { assertOrganizationId, getTenantContext, requireTenantContext, runWithTenantContext } from './tenant-context';
 
 export const TENANT_MODEL_NAMES = [
-  'AcademyCategory', 'AcademyLesson', 'AcademyLessonRevision', 'AcademyFeedback',
+  'PhotoAlbumSettings', 'AcademyCategory', 'AcademyLesson', 'AcademyLessonRevision', 'AcademyFeedback',
   'OrganizationCarrierType', 'Product',
   'CalendarConnection', 'ExternalCalendar', 'ExternalCalendarEvent', 'PlannerPreferences', 'PlannerBlock',
   'OrganizationFieldPlanningProfile', 'FieldPlan',

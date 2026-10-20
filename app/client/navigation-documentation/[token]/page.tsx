@@ -1,3 +1,4 @@
+import { readAlbumTitle, navigationAlbumKey } from '@/lib/fotodokumentace/album-title';
 import { notFound } from 'next/navigation';
 import { PublicNavigationClientView } from '@/components/navigation-documentation/PublicNavigationClientView';
 import { hashToken, buildSnapshotItem, documentationPhotoSelect, SnapshotItemData } from '@/lib/navigation-documentation';
@@ -99,13 +100,14 @@ export default async function PublicNavigationDocumentationPage({
     return baseItem;
   });
 
-  const campaignTitle = report.offer?.campaignName || report.offer?.title || report.navigationOffer?.targetName || report.title;
+  const publicTitle = await readAlbumTitle(owner.organizationId,navigationAlbumKey(report.id),'');
+  const campaignTitle = publicTitle || report.offer?.campaignName || report.offer?.title || report.navigationOffer?.targetName || report.title;
 
   return (
     <PublicNavigationClientView
       token={token}
       reportData={{
-        title: report.title,
+        title: publicTitle || report.title,
         description: report.description,
         quarter: report.quarter,
         year: report.year,

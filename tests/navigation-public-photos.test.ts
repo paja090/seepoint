@@ -11,11 +11,12 @@ test('report JSON, direct download and ZIP consistently exclude unapproved, priv
   const loader = Module as unknown as { _load: (...args: any[]) => any };
   const original = loader._load;
   loader._load = function(id: string, ...args: any[]) {
+    if (id === '@/lib/fotodokumentace/album-title') return {navigationAlbumKey:(id:string)=>id,readAlbumTitle:async(org:string,key:string)=>{assert.equal(org,'org-a');assert.equal(key,'report');return 'Client album';}};
     if (id === '@/lib/public-tenant') return { enterPublicNavigationReportTenant: async () => ({ id: 'report', organizationId: 'org-a' }) };
     if (id === '@/lib/db') return { platformPrisma: {
       navigationDocumentationReport: { findFirst: async ({where}: any) => {
         assert.deepEqual(where, { id: 'report', organizationId: 'org-a' });
-        return { status: 'PUBLISHED', title: 'Test', year: 2026, client: { name: 'Test' }, items: [{ id: 'item',
+        return { id:'report', status: 'PUBLISHED', title: 'Test', year: 2026, client: { name: 'Test' }, items: [{ id: 'item',
           selectedPhotoId: 'photo', selectedPhoto: photo(), snapshot: { photoUrl: 'https://example.invalid/stale-private-image' } }] };
       } },
       photo: { findFirst: async ({where}: any) => { assert.equal(where.organizationId, 'org-a'); return photoOrg === where.organizationId ? photo() : null; } },
@@ -30,6 +31,8 @@ test('report JSON, direct download and ZIP consistently exclude unapproved, priv
   const request = new Request('https://example.invalid/test');
   const args = { params: Promise.resolve({ token: 'synthetic-test-token', photoId: 'photo' }) };
   const data = await (await json.GET(request, args)).json();
+  assert.equal(data.title,'Client album');
+  assert.equal(data.campaignTitle,'Client album');
   assert.match(data.items[0].photoUrl, /\/photos\/photo$/);
   const photoResponse = await file.GET(request, args);
   assert.equal(photoResponse.status, 200);

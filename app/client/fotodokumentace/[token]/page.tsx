@@ -1,3 +1,4 @@
+import { readAlbumTitle, campaignAlbumKey, surfaceAlbumKey } from '@/lib/fotodokumentace/album-title';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
@@ -64,6 +65,7 @@ export default async function PublicFotodokumentacePage({
     );
 
     const clientDisplayName = surfaceMeta.clientName;
+    const publicTitle=await readAlbumTitle(surfaceMeta.organizationId,surfaceAlbumKey(clientDisplayName),clientDisplayName+' – Kontrola reklamních ploch');
 
     if (surfaces.length === 0) {
       return (
@@ -71,7 +73,7 @@ export default async function PublicFotodokumentacePage({
           token={token}
           campaign={{
             id: `surface-${surfaceMeta.organizationId}`,
-            name: `${clientDisplayName} – Kontrola reklamních ploch`,
+            name: publicTitle,
             clientName: clientDisplayName,
             description: 'Pravidelná kontrola a fotodokumentace reklamních ploch',
             targetDate: null,
@@ -139,7 +141,7 @@ export default async function PublicFotodokumentacePage({
         token={token}
         campaign={{
           id: `surface-${surfaceMeta.organizationId}`,
-          name: `${clientDisplayName} – Kontrola reklamních ploch`,
+          name: publicTitle,
           clientName: clientDisplayName,
           description: 'Pravidelná kontrola a fotodokumentace reklamních ploch',
           targetDate: null,
@@ -186,6 +188,8 @@ export default async function PublicFotodokumentacePage({
 
   if (!campaign) notFound();
 
+  const baseTitle=await readAlbumTitle(campaign.organizationId,campaignAlbumKey(campaign.id),campaign.name);
+  const publicTitle=await readAlbumTitle(campaign.organizationId,campaignAlbumKey(campaign.id,client),baseTitle);
   const clientFilter = client?.trim() || null;
   const filteredRawPoints = clientFilter
     ? campaign.points.filter((p) => {
@@ -247,7 +251,7 @@ export default async function PublicFotodokumentacePage({
       token={token}
       campaign={{
         id: campaign.id,
-        name: clientFilter ? `${clientFilter} — ${campaign.name}` : campaign.name,
+        name: publicTitle,
         clientName: clientFilter || campaign.clientName,
         description: campaign.description,
         targetDate: campaign.targetDate ? campaign.targetDate.toISOString() : null,

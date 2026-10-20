@@ -1,4 +1,5 @@
-import { enterTenantContext } from '@/lib/tenant-context';
+import { deletePhotoRecord, PhotoDeleteError } from '@/lib/photo-delete';
+import { enterTenantContext, runWithTenantContext } from '@/lib/tenant-context';
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
@@ -123,76 +124,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const auth = await requireApiAccess('dashboard');
     if (isApiDenied(auth)) return auth;
-    enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
     const id = (await params).id;
-    const photo = await prisma.photo.findUnique({
-      where: { id, organizationId: auth.organizationId! },
-      select: { workOrderItemId: true, id: true, driveFileId: true, storageProvider: true, employeeId: true, carrierId: true, surfaceId: true, isPrimary: true, capturedByWorkerUserId: true },
-    });
-    if (!photo) return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
-
-    if (photo.workOrderItemId && auth.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Fotografie je dokladem realizace pracovní položky a její historii může odstranit pouze administrátor.' }, { status: 409 });
-    }
-
-    // Authorization checks
-    if (photo.employeeId && auth.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Fotografii zaměstnance může odstranit pouze administrátor.' }, { status: 403 });
-    }
-    const canMutate = auth.role === 'ADMIN' || auth.role === 'MANAGER' || photo.capturedByWorkerUserId === auth.id;
-    if (!photo.employeeId && !canMutate) return NextResponse.json({ error: 'Tuto fotografii nemáte oprávnění odstranit.' }, { status: 403 });
-
-    await prisma.$transaction(async (tx) => {
-      // Unlink workOrderItemId if admin is deleting
-      if (photo.workOrderItemId) {
-        await tx.photo.update({
-          where: { id: photo.id },
-          data: { workOrderItemId: null },
-        });
-      }
-
-      // Re-elect primary photo if the deleted one was primary
-      if (photo.isPrimary) {
-        const nextPrimary = await tx.photo.findFirst({
-          where: {
-            carrierId: photo.carrierId,
-            surfaceId: photo.surfaceId,
-            id: { not: photo.id },
-          },
-          orderBy: { sortOrder: 'asc' },
-        });
-
-        if (nextPrimary) {
-          await tx.photo.update({
-            where: { id: nextPrimary.id },
-            data: { isPrimary: true },
-          });
-        }
-      }
-
-      // Delete database row
-      await tx.photo.delete({ where: { id: photo.id } });
-
-      // Normalize sortOrder for siblings
-      const siblings = await tx.photo.findMany({
-        where: {
-          carrierId: photo.carrierId,
-          surfaceId: photo.surfaceId,
-        },
-        orderBy: { sortOrder: 'asc' },
-      });
-
-      for (let i = 0; i < siblings.length; i++) {
-        await tx.photo.update({
-          where: { id: siblings[i].id },
-          data: { sortOrder: i },
-        });
-      }
-    });
+    const photo = await runWithTenantContext({ organizationId: auth.organizationId!, userId:auth.id, source:'session' }, () => deletePhotoRecord(id, auth));
 
     let storageCleanupPending = false;
     try {
-      await deleteStoredPhoto(photo);
+      await runWithTenantContext({organizationId:auth.organizationId!,userId:auth.id,source:'session'},()=>deleteStoredPhoto(photo));
     } catch (cleanupError) {
       storageCleanupPending = true;
       console.error('[photos/delete] Databázový záznam byl odstraněn, úklid externího souboru selhal', cleanupError);
@@ -200,6 +137,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
     return NextResponse.json({ ok: true, storageCleanupPending });
   } catch (error) {
+    if (error instanceof PhotoDeleteError) return NextResponse.json({error:error.message},{status:error.status});
     console.error('Photo delete failed:', error);
     return NextResponse.json({ error: 'Fotografii se nepodařilo odstranit.' }, { status: 502 });
   }

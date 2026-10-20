@@ -97,6 +97,7 @@ function formatCzechDate(dateVal?: string | Date | null): string {
 
 export function CampaignPhotoAlbum({
   campaignId,
+  campaignName,
   albumSlug,
   clientName,
   points,
@@ -475,7 +476,7 @@ export function CampaignPhotoAlbum({
               <Camera className="w-4 h-4" />
             </span>
             <h2 className="text-lg font-bold text-slate-900">
-              Album fotodokumentace zakázky
+              {campaignName || 'Album fotodokumentace zakázky'}
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
               {totalPhotosCount} fotografií celkem
@@ -1167,9 +1168,7 @@ export function CampaignPhotoAlbum({
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         album={{
-          title: selectedClient !== 'ALL'
-            ? `${selectedClient} — Fotoalbum`
-            : (clientName ? `${clientName} — Fotoalbum` : 'Fotoalbum zakázky'),
+          title: campaignName || (clientName ? clientName + ' — Fotoalbum' : 'Fotoalbum zakázky'),
           clientName: selectedClient !== 'ALL' ? selectedClient : clientName,
           photosCount: totalPhotosCount,
           publicShareUrl: clientShareUrl,
