@@ -1,3 +1,4 @@
+import { readZipSelection } from '@/lib/fotodokumentace/zip-selection';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
@@ -108,8 +109,7 @@ export async function GET(
     const monthFilter = url.searchParams.get('month'); // "2026-10"
     const typeFilter = url.searchParams.get('type');
     const clientFilter = url.searchParams.get('client')?.trim() || null;
-    const photoIdsParam = url.searchParams.get('photoIds'); // comma-separated ids
-    const photoIdSet = photoIdsParam ? new Set(photoIdsParam.split(',').filter(Boolean)) : null;
+    const photoIdSet = await readZipSelection(req);
 
     if (token.startsWith('surface.')) {
       const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);
@@ -326,3 +326,6 @@ export async function GET(
     return NextResponse.json({ error: 'Chyba při stahování balíčku fotografií.' }, { status: 500 });
   }
 }
+
+// Same token and tenant authorization for native form downloads.
+export const POST = GET;

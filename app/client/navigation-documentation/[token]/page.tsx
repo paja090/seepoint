@@ -91,6 +91,7 @@ export default async function PublicNavigationDocumentationPage({
       });
     }
 
+    baseItem.id = item.id;
     baseItem.direction = direction;
 
     if (photoId) {

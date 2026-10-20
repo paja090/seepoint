@@ -1,5 +1,7 @@
 'use client';
 
+import { AlbumZipDownload } from '@/components/fotodokumentace/AlbumZipDownload';
+
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -553,15 +555,16 @@ export function CampaignPhotoAlbum({
                 <span>Náhled pro klienta</span>
               </Link>
 
-              <a
-                href={resolvedDownloadZipUrl}
+              <AlbumZipDownload
+                action={resolvedDownloadZipUrl}
+                ids={flatPhotosWithPoint.map(({ photo }) => photo.id)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition text-xs font-semibold"
               >
                 <Download className="w-4 h-4" />
                 <span>
-                  {selectedClient !== 'ALL' ? `Stáhnout ZIP (${selectedClient})` : 'Stáhnout ZIP'}
+                  {`Stáhnout ZIP (${flatPhotosWithPoint.length})`}
                 </span>
-              </a>
+              </AlbumZipDownload>
             </>
           )}
         </div>

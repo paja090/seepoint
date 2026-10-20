@@ -1,5 +1,7 @@
 'use client';
 
+import { AlbumZipDownload } from '@/components/fotodokumentace/AlbumZipDownload';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Calendar,
@@ -64,7 +66,6 @@ export function PublicNavigationClientView({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Export states
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [isExportingMap, setIsExportingMap] = useState(false);
 
   // Filter items
@@ -269,19 +270,6 @@ export function PublicNavigationClientView({
     }
   }
 
-  // Handle Download All Photos in ZIP
-  function handleDownloadZip() {
-    if (!token) return;
-    setIsDownloadingZip(true);
-    const link = document.createElement('a');
-    link.href = `/api/client/navigation-documentation/${encodeURIComponent(token)}/download-zip`;
-    link.setAttribute('download', `Fotodokumentace-navigaci-${reportData.year}.zip`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => setIsDownloadingZip(false), 2500);
-  }
-
   // Handle Export Map to PNG
   async function handleExportMapPng() {
     if (!mapContainerRef.current || !mapInstanceRef.current) return;
@@ -392,17 +380,17 @@ export function PublicNavigationClientView({
 
             {/* Bulk Download ZIP Button */}
             {token && totalPhotosCount > 0 && (
-              <button
-                type="button"
-                onClick={handleDownloadZip}
-                disabled={isDownloadingZip}
+              <AlbumZipDownload
+                action={`/api/client/navigation-documentation/${encodeURIComponent(token)}/download-zip`}
+                selection="itemIds"
+                ids={filteredItems.filter(item => item.photoUrl).map(item => item.id)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 sm:px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-sky-500 transition disabled:opacity-50"
-                title={`Stáhnout všech ${totalPhotosCount} fotografií v plném rozlišení (ZIP)`}
+                title="Stáhnout fotografie ze zobrazených bodů (ZIP)"
               >
-                {isDownloadingZip ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
-                <span className="hidden xs:inline">Stáhnout vše (ZIP)</span>
+                <Archive size={14} />
+                <span className="hidden xs:inline">Stáhnout výběr (ZIP)</span>
                 <span className="xs:hidden">ZIP</span>
-              </button>
+              </AlbumZipDownload>
             )}
 
             <button

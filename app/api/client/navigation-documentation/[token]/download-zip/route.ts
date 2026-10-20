@@ -1,3 +1,4 @@
+import { readZipSelection } from '@/lib/fotodokumentace/zip-selection';
 import { NextResponse } from 'next/server';
 import { platformPrisma } from '@/lib/db';
 import { hashToken } from '@/lib/navigation-documentation';
@@ -98,9 +99,13 @@ function buildZipArchive(files: Array<{ name: string; data: Buffer }>): Buffer {
   return Buffer.concat([...parts, ...central, end]);
 }
 
-export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params;
+    // Internal albums submit photo IDs; the public report submits visible item IDs.
+    const form = req.method === 'POST' ? await req.clone().formData() : null;
+    const useItems = form ? form.has('itemIds') : new URL(req.url).searchParams.has('itemIds');
+    const selection = await readZipSelection(req, useItems ? 'itemIds' : 'photoIds');
     if (!token || token.length < 16) {
       return NextResponse.json({ error: 'Neplatný přístupový odkaz.' }, { status: 400 });
     }
@@ -140,8 +145,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
 
     for (let i = 0; i < report.items.length; i++) {
       const item = report.items[i];
+      if (useItems && selection && !selection.has(item.id)) continue;
       const photo = item.selectedPhoto || item.navigationPoint?.installedPhoto || item.navigationPoint?.sitePhoto;
       if (!photo || !isClientApprovedPhoto(photo) || photo.organizationId !== owner.organizationId) continue;
+      if (!useItems && selection && !selection.has(photo.id)) continue;
 
       let photoBuffer: Buffer | null = null;
 
@@ -201,3 +208,5 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     return NextResponse.json({ error: 'Chyba při stahování balíčku fotografií.' }, { status: 500 });
   }
 }
+
+export const POST = GET;
