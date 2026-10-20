@@ -1,5 +1,7 @@
 'use client';
 
+import { AlbumZipDownload } from '@/components/fotodokumentace/AlbumZipDownload';
+
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -580,13 +582,14 @@ export function UnifiedPhotoDocumentationView({
           <Share2 className="w-4 h-4 text-sky-600" />
         </button>
 
-        <a
-          href={album.downloadZipUrl}
-          title="Stáhnout ZIP archiv všech fotografií"
+        <AlbumZipDownload
+          action={album.downloadZipUrl}
+          ids={album.points.flatMap(point => point.photos.map(photo => photo.id))}
+          title="Stáhnout ZIP fotografií tohoto alba"
           className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-300 transition"
         >
           <Download className="w-4 h-4" />
-        </a>
+        </AlbumZipDownload>
 
         <button
           type="button"

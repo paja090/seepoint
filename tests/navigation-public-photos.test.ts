@@ -41,6 +41,13 @@ test('report JSON, direct download and ZIP consistently exclude unapproved, priv
   assert.equal(archive.status, 200);
   assert.equal(archive.headers.get('Cache-Control'), 'private, no-store');
   assert.ok(Buffer.from(await archive.arrayBuffer()).includes(Buffer.from('APPROVED_IMAGE_BYTES')));
+  for (const field of ['photoIds', 'itemIds']) {
+    const selected = field === 'photoIds' ? 'photo' : 'item';
+    for (const value of [selected, '', 'outside-report']) {
+      const response = await zip.POST(new Request('https://example.invalid/test', {method:'POST',body:new URLSearchParams({[field]:value})}),args);
+      assert.equal(response.status, value === selected ? 200 : 404);
+    }
+  }
   for (const mode of ['unapproved', 'private', 'foreign']) {
     approved = mode !== 'unapproved'; privatePhoto = mode === 'private'; photoOrg = mode === 'foreign' ? 'org-b' : 'org-a';
     assert.equal((await (await json.GET(request, args)).json()).items[0].photoUrl, null, mode);

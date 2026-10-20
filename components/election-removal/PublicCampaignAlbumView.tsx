@@ -1,5 +1,7 @@
 'use client';
 
+import { AlbumZipDownload } from '@/components/fotodokumentace/AlbumZipDownload';
+
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Map as LeafletMap, TileLayer as LeafletTileLayer, Marker as LeafletMarker } from 'leaflet';
 import {
@@ -500,9 +502,7 @@ export function PublicCampaignAlbumView({
     }
   };
 
-  const downloadZipUrl = `/api/client/fotodokumentace/${encodeURIComponent(token)}/download-zip${
-    selectedPeriod !== 'ALL' ? `?month=${encodeURIComponent(selectedPeriod)}` : ''
-  }`;
+  const downloadZipUrl = `/api/client/fotodokumentace/${encodeURIComponent(token)}/download-zip`;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans print:bg-white print:text-black">
@@ -542,13 +542,14 @@ export function PublicCampaignAlbumView({
               <span>Tisk / PDF</span>
             </button>
 
-            <a
-              href={downloadZipUrl}
+            <AlbumZipDownload
+              action={downloadZipUrl}
+              ids={flatPhotosWithPoint.map(({ photo }) => photo.id)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700 transition shadow-sm"
             >
               <Download className="w-4 h-4" />
               <span>Stáhnout fotografie (ZIP)</span>
-            </a>
+            </AlbumZipDownload>
           </div>
         </div>
       </header>
