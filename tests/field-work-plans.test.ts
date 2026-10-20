@@ -71,3 +71,46 @@ test('production approval rejects stale task and foreign tenant before assignmen
   await assert.rejects(f.approve('plan-a',a),/změnilo/);assert.equal(f.plans[0].status,'DRAFT');
   await assert.rejects(runWithTenantContext({organizationId:'foreign',source:'test'},()=>approveFieldDraft('campaign',a,{id:'m',email:'m@test',role:'MANAGER'},'plan-a',f.db)),/Návrh/);
 });
+
+
+test('partial proposal approves assigned work and leaves omitted points untouched', async () => {
+  const f = fixture(); const i = await f.draft('partial', 'a', 'a');
+  const omitted = convertElectionPointToJob(f.points[1], { id: 'campaign', name: 'Shared action', targetDate: new Date('2026-10-20'), createdAt: new Date('2026-10-01') });
+  i.jobs.push(omitted);
+  f.plans[0].planningSummary.unassigned.push({code:'WORK_ORDER_UNASSIGNED', workOrderId:omitted.id, message:'Does not fit'});
+  f.points[1].quantity = 99; // An omitted job changing must not invalidate assigned work.
+  await f.approve('partial', i);
+  assert.equal(f.plans[0].status, 'APPROVED');
+  assert.equal(f.points[0].assignedFieldPlanId, 'partial');
+  assert.equal(f.points[1].assignedFieldPlanId, null);
+  assert.equal(f.points[1].steps[0].status, 'PENDING');
+});
+
+test('partial approval still rejects resource conflicts and empty routes', async () => {
+  const f = fixture(); const i = await f.draft('conflict', 'a', 'a');
+  f.plans[0].planningSummary.conflicts.push({code:'VEHICLE_CONFLICT',message:'Unavailable'});
+  await assert.rejects(f.approve('conflict', i), /konfliktů/);
+  f.plans[0].planningSummary.conflicts = [];
+  f.plans[0].planningSummary.crews = [];
+  await assert.rejects(f.approve('conflict', i), /naplánovanou práci/);
+  assert.equal(f.points[0].assignedFieldPlanId, null);
+});
+
+
+test('replanning remaining work preserves completed history of the original trip', async () => {
+  const f=fixture(); const original=await f.draft('original','a','a'); await f.approve('original',original);
+  Object.assign(f.points[1],{assignedFieldPlanId:'original',assignedCrewId:'crew-a',status:'COMPLETED'});
+  Object.assign(f.points[1].steps[0],{assignedFieldPlanId:'original',assignedCrewId:'crew-a',status:'COMPLETED',startedAt:new Date(),completedQuantity:1});
+  const next=await f.draft('next','a','a','original'); await f.approve('next',next);
+  assert.equal(f.plans[0].status,'COMPLETED'); assert.equal(f.plans[1].status,'APPROVED');
+  assert.equal(f.points[0].assignedFieldPlanId,'next');
+  assert.equal(f.points[1].steps[0].status,'COMPLETED'); assert.equal(f.points[1].steps[0].assignedFieldPlanId,'original');
+  assert.equal(f.points[1].status,'COMPLETED'); assert.equal(f.points[1].assignedFieldPlanId,'original');
+});
+
+test('unfinished started work still requires release before replacing a trip', async () => {
+  const f=fixture(); const original=await f.draft('original','a','a'); await f.approve('original',original);
+  const next=await f.draft('next','a','a','original'); f.points[0].steps[0].startedAt=new Date();
+  await assert.rejects(f.approve('next',next),/Uvolnit pro novou trasu/);
+  assert.equal(f.points[0].assignedFieldPlanId,'original');
+});

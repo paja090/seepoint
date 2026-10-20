@@ -50,6 +50,15 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
   const [filter, setFilter] = useState('ALL');
   const [formKey, setFormKey] = useState(0);
 
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible' && !busy && !formOpen) router.refresh();
+    };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [router, busy, formOpen]);
+
   async function markPointStatus(pointIds: string[], status: 'COMPLETED' | 'PENDING') {
     if (!pointIds.length) return;
     setBusy(true);
@@ -670,10 +679,25 @@ export function FieldWorkDesk({ campaignId, points }: { campaignId: string; poin
         </div>
       )}
       {p.steps.map(s => <p className="text-sm text-slate-600" key={s.id}>{s.sequence}. {s.label}: {s.completedQuantity}/{s.quantity} · {({ PENDING: 'Čeká', ASSIGNED: 'Naplánováno', IN_PROGRESS: 'Probíhá', ISSUE: 'Problém', COMPLETED: 'Hotovo', CANCELLED: 'Zrušeno' } as Record<string,string>)[s.status] ?? s.status}{s.custodyNote ? ` · ${s.custodyNote}` : ''}{s.issueNote ? ` · ${s.issueNote}` : ''}</p>)}
+      {!['COMPLETED', 'CANCELLED'].includes(p.status) && (p.assignedFieldPlanId || p.startedAt || p.status === 'ISSUE') && !p.steps.some(s => s.loadDelta > 0 && s.completedQuantity > 0) && <details className="mt-3 rounded border border-sky-200 bg-sky-50 p-3"><summary className="cursor-pointer font-semibold text-sky-900">Uvolnit pro novou trasu</summary>
+        <form className="mt-3 space-y-3" onSubmit={async e => {
+          e.preventDefault(); const form = new FormData(e.currentTarget); setBusy(true); setError('');
+          try {
+            const response = await fetch('/api/election-removal/tasks/release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pointId: p.id, note: form.get('note'), confirmed: form.get('confirmed') === 'on', requestKey: crypto.randomUUID() }) });
+            const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Uvolnění práce selhalo.');
+            router.push('/election-removal/' + campaignId + '/plan?points=' + encodeURIComponent(p.id)); router.refresh();
+          } catch (error) { setError(error instanceof Error ? error.message : 'Uvolnění práce selhalo.'); } finally { setBusy(false); }
+        }}>
+          <p className="text-sm">Hotové množství a historie zůstanou zachované. Zbývající práci uvolníte z původní trasy a otevře se plánování nového výjezdu. Nahlášený problém tím potvrdíte jako připravený k dalšímu pokusu.</p>
+          <label className="block text-sm">Stav práce a pokyny pro pokračování<textarea className={input} name="note" required maxLength={4000} placeholder="Např. práce přerušena kvůli počasí, materiál zůstal na místě, pokračovat zítra." /></label>
+          <label className="flex gap-2 text-sm"><input type="checkbox" name="confirmed" required />Potvrzuji, že původní posádka už na bodu nepracuje a práce může pokračovat v nové trase.</label>
+          <button disabled={busy} className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Uvolnit a naplánovat zbývající práci</button>
+        </form>
+      </details>}
       {p.steps.some(s => s.status === 'COMPLETED' && s.loadDelta > 0) && p.steps.some(s => s.kind === 'DELIVERY' && !s.startedAt && s.status !== 'COMPLETED') && <details className="mt-3 rounded border p-3"><summary>Předat naložený materiál jiné posádce</summary>
         <form className="mt-3 space-y-2" onSubmit={async e => {
           e.preventDefault(); setBusy(true); setError(''); const f = new FormData(e.currentTarget);
-          try { const r = await fetch('/api/election-removal/tasks/handoff', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pointId:p.id,latitude:Number(f.get('latitude')),longitude:Number(f.get('longitude')),gpsConfirmed:f.get('confirmed')==='on',note:f.get('note'),requestKey:`handoff-${p.id}-${p.steps.length}`}) });
+          try { const r = await fetch('/api/election-removal/tasks/handoff', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pointId:p.id,latitude:Number(f.get('latitude')),longitude:Number(f.get('longitude')),gpsConfirmed:f.get('confirmed')==='on',note:f.get('note'),requestKey:crypto.randomUUID()}) });
             const d=await r.json();if(!r.ok) throw new Error(d.error);router.refresh();
           } catch(e) {setError(e instanceof Error?e.message:'Předání selhalo.');}finally{setBusy(false);}
         }}><p className="text-sm">Doplňte skutečnou polohu materiálu. Vznikne krok převzetí pro nový výjezd; původní nakládka zůstane v historii.</p>

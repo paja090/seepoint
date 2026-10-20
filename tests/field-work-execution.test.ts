@@ -57,3 +57,17 @@ test('legacy classification uses explicit tags only; descriptions are not rewrit
   assert.equal(classifyLegacyOperation('[Operace: Jiná práce] původní popis').operationType,'OTHER');
   assert.equal(classifyLegacyOperation('[Operace: Převoz na jiné místo]').reviewRequired,true);
 });
+
+
+test('workers can report a blocked later step before pickup and other steps preserve its issue', async () => {
+  const f = fixture();
+  await f.execute(2, 'problem', 'problem-delivery', { problemType: 'Nedostupný nosič', note: 'Sklad je zavřený' });
+  assert.equal(f.steps[1].status, 'ISSUE');
+  await f.execute(1, 'start', 'start-pickup');
+  assert.equal(f.point.status, 'ISSUE');
+  assert.equal((f.point as unknown as {issueType:string}).issueType, 'Nedostupný nosič');
+  await f.execute(1, 'complete', 'finish-pickup');
+  await f.execute(2, 'complete', 'finish-delivery', { custodyNote: 'Převzal skladník' });
+  assert.equal(f.point.status, 'COMPLETED');
+  assert.equal((f.steps[1] as unknown as {issueNote:string|null}).issueNote, null);
+});

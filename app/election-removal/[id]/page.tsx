@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { prisma } from '@/lib/db';
 import { checkElectionRemovalPageAccess } from '@/lib/election-removal/guard';
+import { PostponeRouteButton } from '@/components/election-removal/PostponeRouteButton';
+import { ReleaseWorkPanel } from '@/components/election-removal/ReleaseWorkPanel';
 import { FieldWorkDesk } from '@/components/election-removal/FieldWorkDesk';
 import { CampaignPhotoAlbum } from '@/components/election-removal/CampaignPhotoAlbum';
 import { DuplicateCampaignButton } from '@/components/election-removal/DuplicateCampaignButton';
@@ -178,6 +180,7 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
           </header>
         </div>
 
+        {canManage && <details className="rounded-xl border border-slate-200 bg-white p-3"><summary className="cursor-pointer text-sm font-semibold">Předat jednotlivé body do jiné trasy</summary><ReleaseWorkPanel campaignId={id} points={campaign.points} /></details>}
         {/* Quick Summary Metrics Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
           <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-center">
@@ -219,6 +222,7 @@ export default async function FieldActionPage({ params }: { params: Promise<{ id
                       {statusLabels[p.status] ?? p.status}
                     </span>
                   </p>
+                  {canManage && ['APPROVED', 'ACTIVE'].includes(p.status) && <PostponeRouteButton planId={p.id} />}
                   {['APPROVED', 'ACTIVE'].includes(p.status) && (
                     <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60">
                       <Link

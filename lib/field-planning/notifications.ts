@@ -1,6 +1,23 @@
 import { prisma } from '../db';
 import type { NotificationProvider, SystemNotificationItem } from '../notifications-service';
 import type { PlanningResult, PlanningInput } from './contracts';
+
+// Query current issues, including older reports, rather than relying on audit event names.
+export async function fieldStepProblemNotifications(organizationId: string, db = prisma): Promise<SystemNotificationItem[]> {
+  const steps = await db.fieldWorkStep.findMany({
+    where: { organizationId, status: 'ISSUE', point: { organizationId, status: { notIn: ['CANCELLED', 'COMPLETED'] } } },
+    include: { point: { select: { label: true, campaignId: true, issueType: true } } },
+    orderBy: { updatedAt: 'desc' },
+  });
+  return steps.map(step => ({
+    id: 'field-step-issue-' + step.id,
+    type: 'FIELD_EXECUTION_BLOCKED', title: 'Problém v terénu: ' + step.point.label,
+    message: [step.point.issueType, step.label, step.issueNote].filter(Boolean).join(' · '),
+    severity: 'HIGH', link: '/election-removal/' + encodeURIComponent(step.point.campaignId),
+    createdAt: step.updatedAt.toISOString(),
+  }));
+}
+
 export const fieldPlanningNotifications: NotificationProvider = {
   name: 'field-planning',
   shouldRun: ctx => ctx.enabled('workRoute'),
@@ -24,6 +41,7 @@ export const fieldPlanningNotifications: NotificationProvider = {
       }
     }
     if (manager) {
+      if (ctx.enabled('electionRemoval')) items.push(...await fieldStepProblemNotifications(ctx.organizationId));
       const problems = await prisma.crmAuditLog.findMany({ where: { organizationId: ctx.organizationId, action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] }, createdAt: { gte: new Date(ctx.now.getTime() - 7 * 86400000) } }, orderBy: { createdAt: 'desc' }, take: 50 });
       const seen = new Set<string>();
       for (const p of problems) {

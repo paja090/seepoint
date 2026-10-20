@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { ReleaseWorkPanel, type ReleaseWorkPoint } from './ReleaseWorkPanel';
 import {
   Calendar,
   Clock,
@@ -51,13 +52,14 @@ interface CrewConfig {
 
 interface ElectionRoutePlannerProps {
   campaign: ElectionCampaign & {
-    points: ElectionRemovalPoint[];
+    points: (ElectionRemovalPoint & ReleaseWorkPoint)[];
   };
   employees: ResourceEmployee[];
   vehicles: ResourceVehicle[];
   initialDepot?: { latitude: number; longitude: number };
   initialSelectedPointIds?: string[];
   parentPlanId?: string;
+  canManage?: boolean;
   fieldPlans?: Array<{ id: string; date: string; status: string; version: number }>;
 }
 
@@ -110,6 +112,7 @@ export function ElectionRoutePlanner({
   initialSelectedPointIds,
   parentPlanId,
   fieldPlans,
+  canManage = false,
 }: ElectionRoutePlannerProps) {
   const router = useRouter();
   const [draftPlanId, setDraftPlanId] = useState<string>();
@@ -472,6 +475,7 @@ export function ElectionRoutePlanner({
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
+      {canManage && <ReleaseWorkPanel campaignId={campaign.id} points={campaign.points} />}
       {/* Configuration Card */}
       <div className="card p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
@@ -1387,6 +1391,7 @@ export function ElectionRoutePlanner({
                   type="button"
                   onClick={handleApprovePlan}
                   disabled={
+                    planningResult.conflicts.length > 0 ||
                     isApproving ||
                     isPending ||
                     planningResult.crews.reduce((acc, c) => acc + c.stops.length, 0) === 0
@@ -1401,7 +1406,7 @@ export function ElectionRoutePlanner({
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Schválit výjezd</span>
+                      <span>{planningResult.unassigned.length ? 'Schválit naplánovanou část' : 'Schválit výjezd'}</span>
                     </>
                   )}
                 </button>
@@ -1457,6 +1462,7 @@ export function ElectionRoutePlanner({
               </div>
             </div>
 
+            {planningResult.unassigned.length > 0 && <p className="text-sm text-amber-200">Schválí se pouze naplánované body. Nezařazené body zůstanou k dalšímu řešení. <a className="underline font-semibold" href="#release-work">Uvolnit body pro novou trasu</a></p>}
             {planningResult.unassigned.length > 0 && (
               <div className="bg-amber-950/60 border border-amber-800 text-amber-200 text-xs p-3.5 rounded-xl space-y-2">
                 <div className="flex items-center gap-2 font-semibold text-amber-300">
@@ -1474,8 +1480,7 @@ export function ElectionRoutePlanner({
                   {Array.from(
                     new Set(
                       planningResult.unassigned.map((u) => {
-                        const parts = u.message.split(': ');
-                        return parts.length > 1 ? parts.slice(1).join(': ') : u.message;
+                        return u.message;
                       })
                     )
                   ).map((reason, idx) => (

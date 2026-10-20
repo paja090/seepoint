@@ -35,14 +35,17 @@ export async function approveFieldDraft(campaignId: string, suppliedInput: Plann
     if ((row.approvalSnapshot as { profileHash?: string } | null)?.profileHash !== hash(await loadProfile(tx))) throw new Error('Nastavení plánování se změnilo. Přepočítejte návrh.');
     const input = row.planningInputSnapshot as unknown as PlanningInput;
     const result = row.planningSummary as unknown as PlanningResult;
-    if (!result.crews.length || result.conflicts.length || result.unassigned.length) throw new Error('Vyřešte konflikty nebo zvolte menší výběr práce.');
+    if (!result.crews.some(c => c.stops.some(s => s.fieldWorkStepId)) || result.conflicts.length) throw new Error('Návrh musí obsahovat naplánovanou práci bez konfliktů posádek a vozidel.');
+    // Unassigned jobs remain in the backlog; validate only the proposed work.
+    const assignedPointIds = new Set(result.crews.flatMap(c => c.stops.flatMap(s => s.electionRemovalPointId ? [s.electionRemovalPointId] : [])));
+    const assignedJobs = input.jobs.filter(j => j.electionRemovalPointId && assignedPointIds.has(j.electionRemovalPointId));
     const campaign = await tx.electionCampaign.findFirst({ where: { id: campaignId, organizationId } });
     if (!campaign) throw new Error('Akce nebyla nalezena.');
     const parent = row.parentPlanId ? await tx.fieldPlan.findFirst({ where: { id: row.parentPlanId, organizationId, electionCampaignId: campaignId } }) : null;
     if (row.parentPlanId && (!parent || !['APPROVED', 'ACTIVE', 'DRAFT'].includes(parent.status))) throw new Error('Nahrazovaný výjezd není dostupný.');
-    if (parent && await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: parent.id, OR: [{ startedAt: { not: null } }, { completedQuantity: { gt: 0 } }] } })) throw new Error('Zahájený výjezd nelze nahradit bez explicitního předání.');
-    const points = await tx.electionRemovalPoint.findMany({ where: { organizationId, campaignId, id: { in: input.jobs.flatMap(j => j.electionRemovalPointId ? [j.electionRemovalPointId] : []) } }, include: { steps: { orderBy: { sequence: 'asc' } } } });
-    if (points.length !== input.jobs.length || input.jobs.some(j => {
+    if (parent && await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: parent.id, status: { notIn: ['COMPLETED', 'CANCELLED'] }, OR: [{ status: 'ISSUE' }, { startedAt: { not: null } }, { completedQuantity: { gt: 0 } }, { kind: { in: ['DELIVERY', 'HANDOFF'] }, point: { steps: { some: { loadDelta: { gt: 0 }, completedQuantity: { gt: 0 } } } } }] } })) throw new Error('Ve výjezdu zbývá rozpracovaná práce. V detailu akce ji nejprve uvolněte tlačítkem „Uvolnit pro novou trasu“, nebo předejte naložený materiál.');
+    const points = await tx.electionRemovalPoint.findMany({ where: { organizationId, campaignId, id: { in: [...assignedPointIds] } }, include: { steps: { orderBy: { sequence: 'asc' } } } });
+    if (points.length !== assignedJobs.length || assignedJobs.some(j => {
       const point = points.find(p => p.id === j.electionRemovalPointId);
       return !point || hash(convertElectionPointToJob(point, campaign)) !== hash(j) || (point.assignedFieldPlanId && point.assignedFieldPlanId !== parent?.id);
     })) throw new Error('Zadání nebo přiřazení se od návrhu změnilo. Přepočítejte plán.');
@@ -54,9 +57,9 @@ export async function approveFieldDraft(campaignId: string, suppliedInput: Plann
       if (crew.employeeIds.some(id => hash(current.employees.find(e => e.id === id)) !== hash(input.employees.find(e => e.id === id)))) throw new Error('Požadavky na pracovníky se změnily.');
     }
     if (parent) {
-      await tx.fieldPlan.update({ where: { id: parent.id, organizationId }, data: { status: 'SUPERSEDED' } });
-      await tx.fieldWorkStep.updateMany({ where: { organizationId, assignedFieldPlanId: parent.id }, data: { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING', version: { increment: 1 } } });
-      await tx.electionRemovalPoint.updateMany({ where: { organizationId, assignedFieldPlanId: parent.id }, data: { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING' } });
+      await tx.fieldPlan.update({ where: { id: parent.id, organizationId }, data: { status: await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: parent.id, status: 'COMPLETED' } }) ? 'COMPLETED' : 'SUPERSEDED' } });
+      await tx.fieldWorkStep.updateMany({ where: { organizationId, assignedFieldPlanId: parent.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } }, data: { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING', version: { increment: 1 } } });
+      await tx.electionRemovalPoint.updateMany({ where: { organizationId, assignedFieldPlanId: parent.id, status: { notIn: ['COMPLETED', 'CANCELLED'] } }, data: { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING' } });
       const oldReservations = (parent.approvalSnapshot as { reservationIds?: string[] } | null)?.reservationIds ?? [];
       await tx.vehicleReservation.updateMany({ where: { organizationId, id: { in: oldReservations } }, data: { status: 'CANCELLED' } });
     }

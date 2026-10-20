@@ -31,7 +31,7 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
   }
   if (step.status === 'COMPLETED') throw new Error('Krok je již dokončen.');
   const predecessor = point.steps.find(s => s.sequence === step.sequence - 1);
-  if (!isAdminOrManager && predecessor && predecessor.status !== 'COMPLETED') throw new Error('Nejprve dokončete předchozí krok včetně nakládky.');
+  if (input.action !== 'problem' && !isAdminOrManager && predecessor && predecessor.status !== 'COMPLETED') throw new Error('Nejprve dokončete předchozí krok včetně nakládky.');
   let data: Prisma.FieldWorkStepUpdateManyMutationInput;
   if (input.action === 'start') {
     if (step.status === 'IN_PROGRESS') return { ok: true };
@@ -47,6 +47,7 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
     const completedQuantity = step.completedQuantity + quantity;
     data = {
       completedQuantity,
+      issueNote: null,
       status: completedQuantity === step.quantity ? 'COMPLETED' : 'IN_PROGRESS',
       startedAt: step.startedAt ?? new Date(),
       completedAt: completedQuantity === step.quantity ? new Date() : null,
@@ -68,7 +69,7 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
   const done = siblings.every(s => s.status === 'COMPLETED');
   await tx.electionRemovalPoint.update({ where: { id: point.id, organizationId }, data: {
     status: done ? 'COMPLETED' : siblings.some(s => s.status === 'ISSUE') ? 'ISSUE' : 'IN_PROGRESS',
-    issueType: input.action === 'problem' ? input.problemType ?? 'Jiné' : null,
+    issueType: siblings.some(s => s.status === 'ISSUE') ? (input.action === 'problem' ? input.problemType ?? 'Jiné' : point.issueType) : null,
     issueNote: siblings.find(s => s.status === 'ISSUE')?.issueNote ?? null,
     startedAt: point.startedAt ?? new Date(), completedAt: done ? new Date() : null, completedByUserId: done ? actor.id : null } });
   await tx.electionCampaign.update({ where: { id: point.campaignId, organizationId }, data: {

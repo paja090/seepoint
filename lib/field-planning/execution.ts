@@ -353,7 +353,7 @@ export async function executeStop(input: FieldExecutionInput & { planId: string;
       throw new Error('Nelze realizovat trasu z minulosti; kontaktujte dispečera.');
     }
     if (input.action === 'start_trip' || input.action === 'complete_trip') {
-      if (input.action === 'complete_trip' && crew.stops.some(s => s.fieldWorkStepId) && await tx.fieldWorkStep.count({ where: { organizationId, assignedFieldPlanId: plan.id, assignedCrewId: crew.id, status: { notIn: ['COMPLETED','CANCELLED'] } } })) throw new Error('Nejprve dokončete všechny kroky včetně doručení materiálu.');
+      // Ending the shift records the return; unfinished work and custody stay open.
       const actionStr = input.action === 'start_trip' ? 'FIELD_TRIP_STARTED' : 'FIELD_TRIP_COMPLETED';
       const eventId = `fp-trip-${plan.id}-${crew.id}-${actionStr}`;
       const existing = await tx.crmAuditLog.findUnique({ where: { id: eventId, organizationId } });
