@@ -1,3 +1,4 @@
+import { readAlbumTitle, campaignAlbumKey, surfaceAlbumKey } from '@/lib/fotodokumentace/album-title';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
@@ -123,7 +124,7 @@ export async function GET(
         success: true,
         campaign: {
           id: `surface-${surfaceMeta.organizationId}`,
-          name: `${surfaceMeta.clientName} – Kontrola reklamních ploch`,
+          name: await readAlbumTitle(surfaceMeta.organizationId,surfaceAlbumKey(surfaceMeta.clientName),surfaceMeta.clientName+' – Kontrola reklamních ploch'),
           clientName: surfaceMeta.clientName,
           description: 'Pravidelná kontrola a fotodokumentace reklamních ploch',
           targetDate: null,
@@ -252,7 +253,7 @@ export async function GET(
       success: true,
       campaign: {
         id: fullCampaign.id,
-        name: fullCampaign.name,
+        name: await readAlbumTitle(campaign.organizationId,campaignAlbumKey(campaign.id,url.searchParams.get('client')),await readAlbumTitle(campaign.organizationId,campaignAlbumKey(campaign.id),fullCampaign.name)),
         clientName: fullCampaign.clientName,
         description: fullCampaign.description,
         targetDate: fullCampaign.targetDate,

@@ -1,3 +1,4 @@
+import { albumItemKey } from '@/lib/fotodokumentace/album-title';
 import { notFound } from 'next/navigation';
 import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
@@ -588,10 +589,17 @@ export default async function PhotoDocumentationHubPage({
     };
   });
 
+  const albumTitles = await prisma.photoAlbumSettings.findMany({where:{organizationId}});
+  const titlesByKey = new Map(albumTitles.map(row=>[row.albumKey,row.publicTitle]));
+  for (const album of unifiedAlbums) {
+    const title=titlesByKey.get(albumItemKey(album));
+    if(title) {album.displayTitle=title;album.publicTitle=title;}
+  }
   return (
     <AppShell>
       <UnifiedPhotoDocumentationView
         albums={unifiedAlbums}
+        canManage={user.role === 'ADMIN' || user.role === 'MANAGER'}
         recentPhotos={recentPhotos}
         initialAlbumId={albumId}
         initialSource={source}

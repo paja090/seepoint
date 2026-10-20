@@ -590,6 +590,7 @@ enum ElectionRemovalMediaType {
 }
 
 model Organization {
+  photoAlbumSettings PhotoAlbumSettings[]
   academyCategories AcademyCategory[]
   academyLessons AcademyLesson[]
   academyRevisions AcademyLessonRevision[]
@@ -4862,4 +4863,15 @@ model FieldWorkStep {
   @@unique([pointId, sequence])
   @@unique([id, organizationId])
   @@index([organizationId, assignedFieldPlanId, status])
+}
+
+// Client-facing album names are separate from internal campaign/report names.
+model PhotoAlbumSettings {
+  id String @id @default(cuid())
+  organizationId String @default(dbgenerated("current_setting('app.current_organization_id'::text, true)"))
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  albumKey String
+  publicTitle String
+  updatedAt DateTime @updatedAt
+  @@unique([organizationId, albumKey])
 }

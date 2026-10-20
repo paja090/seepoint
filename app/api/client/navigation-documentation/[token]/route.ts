@@ -1,3 +1,4 @@
+import { readAlbumTitle, navigationAlbumKey } from '@/lib/fotodokumentace/album-title';
 import { NextResponse } from 'next/server';
 import { platformPrisma } from '@/lib/db';
 import { hashToken, buildSnapshotItem, documentationPhotoSelect, SnapshotItemData } from '@/lib/navigation-documentation';
@@ -68,10 +69,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     return baseItem;
   });
 
-  const campaignTitle = report.offer?.campaignName || report.offer?.title || report.navigationOffer?.targetName || report.title;
+  const publicTitle=await readAlbumTitle(owner.organizationId,navigationAlbumKey(report.id),'');
+  const campaignTitle = publicTitle || report.offer?.campaignName || report.offer?.title || report.navigationOffer?.targetName || report.title;
 
   return NextResponse.json({
-    title: report.title,
+    title: publicTitle || report.title,
     description: report.description,
     quarter: report.quarter,
     year: report.year,

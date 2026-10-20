@@ -26,6 +26,7 @@ import {
   CampaignPhotoAlbum,
   type InternalPointWithPhotos,
 } from '@/components/election-removal/CampaignPhotoAlbum';
+import { AlbumTitleEditor } from './AlbumTitleEditor';
 import { PhotoAlbumShareModal } from './PhotoAlbumShareModal';
 
 export interface UnifiedAlbumItem {
@@ -34,6 +35,7 @@ export interface UnifiedAlbumItem {
   sourceLabel: string;
   title: string;
   displayTitle?: string;
+  publicTitle?: string;
   displaySubtitle?: string | null;
   displayBadge?: string | null;
   clientName?: string | null;
@@ -69,6 +71,7 @@ export interface RecentPhotoItem {
 }
 
 interface UnifiedPhotoDocumentationViewProps {
+  canManage?: boolean;
   albums: UnifiedAlbumItem[];
   recentPhotos: RecentPhotoItem[];
   initialAlbumId?: string | null;
@@ -77,6 +80,7 @@ interface UnifiedPhotoDocumentationViewProps {
 
 export function UnifiedPhotoDocumentationView({
   albums,
+  canManage = false,
   recentPhotos,
   initialAlbumId,
   initialSource,
@@ -388,6 +392,7 @@ export function UnifiedPhotoDocumentationView({
         };
       })
     );
+    router.refresh();
   };
 
   const formatDate = (date: string | Date) => {
@@ -918,6 +923,7 @@ export function UnifiedPhotoDocumentationView({
                 </div>
               </div>
 
+              {canManage && <AlbumTitleEditor key={activeAlbum.id} id={activeAlbum.id} source={activeAlbum.source} albumSlug={activeAlbum.albumSlug} title={activeAlbum.publicTitle || activeAlbum.displayTitle || activeAlbum.title} onSaved={title=>{setAlbumItems(prev=>prev.map(album=>album.id===activeAlbum.id?{...album,publicTitle:title,displayTitle:title}:album));router.refresh();}} />}
               {/* Render the full interactive CampaignPhotoAlbum */}
               <CampaignPhotoAlbum
                 campaignId={activeAlbum.id}
