@@ -1,4 +1,6 @@
 'use client';
+import { hasApprovableWork } from '@/lib/field-planning/approval-rules';
+import { planningDayOffset, planningStopHref } from '@/lib/field-planning/presentation';
 import { PostponeRouteButton } from '@/components/election-removal/PostponeRouteButton';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -427,12 +429,7 @@ export function WorkRoutePlanner({
   const activeCrew = plan?.result.crews.find((c) => c.id === activeCrewId) ?? plan?.result.crews[0];
 
   const setDateOffset = (offsetDays: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    setDate(`${yyyy}-${mm}-${dd}`);
+    setDate(planningDayOffset(new Date(), loaded?.profile?.timezone ?? 'Europe/Prague', offsetDays));
   };
 
   return (
@@ -528,7 +525,7 @@ export function WorkRoutePlanner({
             <button
               onClick={() => setDateOffset(0)}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                date === new Date().toISOString().slice(0, 10)
+                date === planningDayOffset(new Date(), loaded?.profile?.timezone ?? 'Europe/Prague', 0)
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -606,11 +603,11 @@ export function WorkRoutePlanner({
           {plan?.status === 'DRAFT' && (
             <button
               onClick={() => void handleAction('approve')}
-              disabled={busy || inputsChanged || Boolean(plan.result.conflicts.length || plan.result.unassigned.length)}
+              disabled={busy || inputsChanged || !hasApprovableWork(plan.result)}
               className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-600 disabled:opacity-40 transition"
             >
               <CheckCircle2 size={16} />
-              <span>Schválit a odeslat posádkám</span>
+              <span>{plan.result.unassigned.length ? 'Schválit naplánovanou část' : 'Schválit a odeslat posádkám'}</span>
             </button>
           )}
 
@@ -624,6 +621,12 @@ export function WorkRoutePlanner({
             </button>
           )}
 
+          {plan?.status === 'DRAFT' && plan.result.unassigned.length > 0 && (
+            <div role="status" className="w-full rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              Schválí se pouze naplánovaná práce. Nezařazené úkoly ({plan.result.unassigned.length}) zůstanou k dalšímu naplánování.
+              <ul className="mt-2 list-disc pl-5">{plan.result.unassigned.map((alert, index) => <li key={index}>{alert.message}</li>)}</ul>
+            </div>
+          )}
           {/* Versions dropdown */}
           {Boolean(loaded?.plans?.length) && (
             <div className="flex items-center gap-1.5">
@@ -1310,12 +1313,12 @@ export function WorkRoutePlanner({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <Link
-                            href={s.navigationOrderId ? `/navigation/orders/${s.navigationOrderId}` : `/work/${s.workOrderId}`}
+                          {planningStopHref(s) ? <Link
+                            href={planningStopHref(s)!}
                             className="font-bold text-xs sm:text-sm text-slate-900 hover:text-sky-700 hover:underline truncate"
                           >
                             {s.title}
-                          </Link>
+                          </Link> : <span className="font-bold text-xs sm:text-sm text-slate-900">{s.title}</span>}
 
                           <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-0.5 rounded-lg shrink-0">
                             Příjezd {formatTime(s.arrivalAt)} (práce {formatTime(s.startAt)}–{formatTime(s.endAt)})

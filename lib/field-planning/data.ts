@@ -51,8 +51,8 @@ export async function loadPlanningData(date: string, options: {
     if (emp.userId && busyUserIds.has(emp.userId)) busyEmployees.add(emp.id);
   }
   for (const plan of plans) {
-    const snapshot = plan.planningInputSnapshot as unknown as PlanningInput;
-    snapshot.crews.forEach(c => c.employeeIds.forEach(id => busyEmployees.add(id)));
+    const summary = plan.planningSummary as unknown as import('./contracts').PlanningResult;
+    summary.crews.filter(c => c.stops.some(s => !s.isWarehousePitstop)).forEach(c => c.employeeIds.forEach(id => busyEmployees.add(id)));
   }
   // Explicitly validate every canonical relation even though tenant Prisma also scopes queries.
   const assertRows = (rows: Array<{ organizationId: string } | null>) => {

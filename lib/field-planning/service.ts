@@ -1,3 +1,4 @@
+import { validateApprovalSelection } from './approval-rules';
 import { createHash } from 'node:crypto';
 import { Prisma, type FieldPlan } from '@prisma/client';
 import { prisma } from '../db';
@@ -130,7 +131,7 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
     if (row.status !== 'DRAFT') throw new Error('Schválit lze pouze návrh.');
     const input = row.planningInputSnapshot as unknown as PlanningInput;
     const result = row.planningSummary as unknown as PlanningResult;
-    if (!result.crews.length || result.conflicts.length || result.unassigned.length) throw new Error('Nejprve vyřešte konflikty a nepřiřazené úkoly; případně vytvořte návrh pro menší výběr.');
+    validateApprovalSelection(input, result);
     if (result.estimated && !acceptEstimated) throw new Error('Odhadované přejezdy vyžadují výslovné potvrzení manažerem.');
     const parent = row.parentPlanId ? await getPlan(row.parentPlanId, tx) : null;
     if (parent && !['DRAFT', 'APPROVED', 'ACTIVE'].includes(parent.status)) throw new Error('Předchozí plán byl již nahrazen nebo uzavřen.');
@@ -221,7 +222,7 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
     await tx.fieldPlan.update({ where: { id, organizationId }, data: { approvalSnapshot: json({ reservationIds }) } });
     if (row.electionCampaignId) await tx.electionCampaign.update({ where: { id: row.electionCampaignId, organizationId }, data: { status: 'PLANNED' } });
     if (parent) await tx.fieldPlan.update({ where: { id: parent.id, organizationId }, data: { status: 'CANCELLED' } });
-    await auditPlan(tx, id, actor, 'FIELD_PLAN_APPROVED', { acceptEstimated, reservationIds, supersededPlanId: parent?.id, navigationPointIds: result.crews.flatMap(c => c.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : [])) });
+    await auditPlan(tx, id, actor, 'FIELD_PLAN_APPROVED', { acceptEstimated, unassigned: result.unassigned, reservationIds, supersededPlanId: parent?.id, navigationPointIds: result.crews.flatMap(c => c.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : [])) });
     return planView(await getPlan(id, tx));
   }, db);
 }
