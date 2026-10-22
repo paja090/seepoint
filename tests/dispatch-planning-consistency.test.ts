@@ -93,3 +93,15 @@ test('availability reserves only crews that actually received work',async()=>{
   assert.equal(loaded.employees.find(e=>e.id==='assigned')?.available,false);
   assert.equal(loaded.employees.find(e=>e.id==='unused')?.available,true);
 });
+
+
+test('partial approval preserves pickup and delivery as one complete transfer',async()=>{
+  const input=fixture();input.jobs[0].delivery={id:'delivery',title:'Předání',location:{latitude:49.001,longitude:18},serviceMinutes:10};
+  const result=await planFieldWork(input,async(a,b)=>estimatedLeg(a,b,input.profile));
+  assert.equal(result.unassigned.length,1);assert.equal(result.crews[0].stops.length,2);
+  assert.doesNotThrow(()=>validateApprovalSelection(input,result));
+  for(const index of [0,1]){
+    const broken=structuredClone(result);broken.crews[0].stops.splice(index,1);
+    assert.throws(()=>validateApprovalSelection(input,broken),/vyzvednutí i doručení/);
+  }
+});

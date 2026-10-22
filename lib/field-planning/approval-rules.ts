@@ -10,11 +10,15 @@ export function validateApprovalSelection(input: PlanningInput, result: Planning
   const accepted = new Map(stops.map(stop => [stopId(stop), stop]));
   if (accepted.size !== stops.length) throw new Error('Stejná práce je naplánována vícekrát. Přepočítejte návrh.');
   for (const stop of stops) {
-    const job = input.jobs.find(job => job.id === stopId(stop));
+    const job = input.jobs.find(job => job.id === stopId(stop) || (job.delivery && 'field-step:' + job.delivery.id === stopId(stop)));
+    if (job?.delivery && (!accepted.has(job.id) || !accepted.has('field-step:' + job.delivery.id))) {
+      throw new Error('Přesun musí obsahovat vyzvednutí i doručení materiálu. Přepočítejte návrh.');
+    }
     if (!job || job.blockedReason) throw new Error('Naplánovaná práce již není dostupná. Přepočítejte návrh.');
     for (const predecessorId of job.constraints.predecessorIds ?? []) {
       if (input.jobs.some(job => job.id === predecessorId && job.status === 'DONE')) continue;
-      const predecessor = accepted.get(predecessorId);
+      const predecessorJob = input.jobs.find(job => job.id === predecessorId);
+      const predecessor = accepted.get(predecessorJob?.delivery ? 'field-step:' + predecessorJob.delivery.id : predecessorId);
       if (!predecessor || !(Date.parse(predecessor.endAt) <= Date.parse(stop.startAt))) {
         throw new Error('Naplánované práci chybí dokončený předchozí krok. Přepočítejte návrh.');
       }
